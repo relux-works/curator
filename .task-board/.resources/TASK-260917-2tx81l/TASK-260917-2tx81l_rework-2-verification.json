@@ -1,0 +1,780 @@
+{
+  "task": "TASK-260917-2tx81l",
+  "title": "manager-content-hash-v2",
+  "base": "30b3d6781924733ed7120c8adac5183b877f506a",
+  "base_overlay_files": [
+    "internal/config/config_test.go",
+    "internal/config/environments_conformance_test.go",
+    "internal/config/environments_test.go",
+    "internal/conformancecoverage/content_hash_v2_gaps_test.go",
+    "internal/contextaudit/contextaudit_test.go",
+    "internal/contextlock/schema_conformance_test.go",
+    "internal/contextmaterialize/system_module_admission_test.go",
+    "internal/contextstore/contextstore_test.go",
+    "internal/envmarker/envmarker_test.go",
+    "internal/envmarker/marker_env_schema_test.go",
+    "internal/envprofile/credential_link_test.go",
+    "internal/envprofile/credential_record_test.go",
+    "internal/envprofile/envprofile_policy_test.go",
+    "internal/envprofile/managed_test.go",
+    "internal/envprofile/migrate_test.go",
+    "internal/install/registry_e2e_test.go",
+    "internal/interop/environments/context_materialization_test.go",
+    "internal/interop/environments/context_resolution_test.go",
+    "internal/marker/schema_coverage_test.go",
+    "internal/registry/registry_test.go",
+    "internal/registry/schema_conformance_test.go"
+  ],
+  "candidate_file_sha256": {
+    ".github/ci/conformance-case-counts.tsv": "6ef836d7b89536137b1bdcb09337aa7b8c7492c508725e24963fcf6f7fe06169",
+    ".github/ci/conformance-gaps.tsv": "5eb57e3be6f0ead0cc34f888c9b48e526ac6b62d12e532eba75e7219e487f412",
+    "internal/config/config.go": "271512bea6868e972f52eef95b902534d0e38c96c496483437ce92f352ad3d48",
+    "internal/config/config_test.go": "1a594dc8a9f6bf279e7b9940f4b162de719a4f5d3e3ab0e21aa3420e3a4595da",
+    "internal/config/environments.go": "c6c9aa280daef20b67954d7c330675b03f0f2879684f7795ebe05552fc9023d3",
+    "internal/config/environments_conformance_test.go": "6145a9b2057995ddc2135b4d87c11b1396c15235749014fa61c64d637f31ef1c",
+    "internal/config/environments_test.go": "cdc94a8737cb4616cde0239c194727e62f36986b69d7128d1252c2af5932178f",
+    "internal/conformancecoverage/content_hash_v2_gaps_test.go": "eb9f81f2cf0cc3416d31bf06980bbd46416703ab1ce3da6e2f5849372b19511a",
+    "internal/contextaudit/contextaudit.go": "bb1c3e8073604c85267b7f3f2f2a520e809dea133cf780ee9a7ee6a488f27a3d",
+    "internal/contextaudit/contextaudit_test.go": "19208b2f4f713b33abf63437678229a500144b125a107033e05bba9a36683317",
+    "internal/contextlock/contextlock.go": "08ecd75d13516cb827e4ab783d1500f4dc410031d7cdae58854171169964d612",
+    "internal/contextlock/schema_conformance_test.go": "fd3b38d9afe0a2f55eab20843fafb55e0550ccab47a9badfa408c4033852d6a1",
+    "internal/contextmaterialize/contextmaterialize.go": "d430dd3c0550e6bb92968a06d3da41a1f79f35d1acacaac1c15b5b2ba670a53e",
+    "internal/contextmaterialize/system_module_admission_test.go": "1a7d7bdf3c72e0bfc947dd475997c30b02159c50a1212fad17736229df8c389f",
+    "internal/contextresolve/contextresolve.go": "20c2c07e721a5a5b8ba8bdae2152fbc2061ac506925f9fb657a615d6b5f6bb6e",
+    "internal/contextstore/contextstore.go": "1f2f2bf9c9561464f3a0f734270265c3eda7c0776d4e5189c285ec8b3e10c6f4",
+    "internal/contextstore/contextstore_test.go": "8002fd8af42cf2babc279afed262d567cd5f62861280df3a8ca4650e4fed60f5",
+    "internal/envmarker/envmarker.go": "181264a31eb922a6970e59c572596f0c6ca9df88558f1829d3968c76d7361bc9",
+    "internal/envmarker/envmarker_test.go": "7f86c4670c74d42fba611997b9222c1064c07387fb8d02ee895d6ead28094b0a",
+    "internal/envmarker/marker_env_schema_test.go": "3e404ac6780bcd0e8cb64730af81213f0b3643093e8c53c17dc077136e52285d",
+    "internal/envprofile/credential_link_test.go": "3eedba8a1cb98210da0e90a0450983e0d339046daafa172fd2339dbf74f57a2e",
+    "internal/envprofile/credential_record_test.go": "d568c07dbf6e231bd82c94f93c07a8d87f4468736fcec223471df539c9a00185",
+    "internal/envprofile/envprofile.go": "6dc2dbb87c8cd5c8072431944e1520a578c64efe1f8b25eddeaa4188a346e316",
+    "internal/envprofile/envprofile_policy_test.go": "cad393c7ee146d20dfd725eb7352d0befdb0a57aecf24c1aac07b95209a84b4b",
+    "internal/envprofile/managed.go": "8aa6645c4ec790c43ac36c21dadd866072c1eb479dadaf7bb7d21b078ba2e080",
+    "internal/envprofile/managed_test.go": "7e56e87c23adbf7670585f4bb9b535aef5c691a0f2964b4bb48245d346670b82",
+    "internal/envprofile/migrate.go": "15949893bc12d32462879b055b44fbb15e67d2b2eaf92b11fa79868f6f214203",
+    "internal/envprofile/migrate_test.go": "959dc6832ca2c2afc8da1d2ce5ec40231efa8873499fa530ee09babedabec8ac",
+    "internal/hashing/hashing.go": "3e007c2af2a39d8fd95122aec8dc6ab3252b6630ca23a112574ea5f3053e6e2b",
+    "internal/install/install.go": "0385af1daaf7e97ef959e901bed51bec5f4db02fac9a163cd1752059535b15fd",
+    "internal/install/registry_e2e_test.go": "25322b26332a1b3bcd83c873eda05b29a0a9d6c5aca6d4bf74ebae8d5bdaecd7",
+    "internal/install/targets.go": "de5b99a84549f8289c879015b3b36edeaca7acb01dbbb2a200d88da62c97972d",
+    "internal/interop/environments/context_materialization_test.go": "1c779256ba14f5d62693817b7de2a5d4d4c74baca4423b753b4e9907d280026b",
+    "internal/interop/environments/context_resolution_test.go": "6a88c9e59b9f3ec49d9ea799051e103c6c27d31e6d82c65f22be6a12db812f81",
+    "internal/marker/marker.go": "c336ad5467045efba2c5eab81d0801fb42108c8eaa2ad5968578915210169fa6",
+    "internal/marker/schema_coverage_test.go": "59d97382838cdddbacf76c1f697b9c764892c40f069e3d9a4d93dfd267ab72ca",
+    "internal/registry/http.go": "40183a3f0122d505a1cb4352a87ffebdfba2eeade6eb98fed504c89b2c6d270c",
+    "internal/registry/registry.go": "0e1ecdf16caee0153979fe7d4d8b19a48f416da71206170fb0d46818bf58e61a",
+    "internal/registry/registry_test.go": "d344504bc22c01d8c969f0b007ffd1c3495d94de205dd5be50a7b493062aa253",
+    "internal/registry/schema_conformance_test.go": "e3abd1d166240c464aec85f384cfe09ef814c58fcd75027766098570371f7361",
+    "internal/contextlock/hash_version_test.go": "b9f4cc3608ffd648b1b05223e43fcac988cf0af9f74a5ee138597b62b680eb74",
+    "internal/envprofile/hash_v2_test_helpers_test.go": "cebfb5f58d554e5711b57a29132c263046601ffaaf496ddeda62d66b3253141e",
+    "internal/hashing/hashing_v2_test.go": "1716184c7fbd314d4678a8ccd2cd7baee7a7273f1052556eeacac9ffe03cb5bb",
+    "internal/marker/marker_hash_v2_test.go": "2a1078f710779da15f5459f6c132a2bb7dd5e5e744f4a362c256cadf0d2b09e0",
+    "internal/registry/carriers.go": "fd415bb20e1be3fa5ab284b7437af18a750ab411b2c402ab4306c97e14e95713"
+  },
+  "base_replay_commands": [
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -json -count=1 -p=1 -parallel=1 -timeout=8m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^TestResolveDriftRepair$' ./internal/envprofile",
+      "real_process_exit_code": 0,
+      "log_sha256": "b045489e21fb18dc871170867c778b75f0a41914038cb585adcdf82f18e771e2",
+      "observed_test_outcomes": [
+        {
+          "Time": "2026-10-01T04:26:53.687531+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestResolveDriftRepair",
+          "Elapsed": 252.52
+        },
+        {
+          "Time": "2026-10-01T04:26:53.690669+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Elapsed": 253.783
+        }
+      ]
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -json -count=1 -p=1 -parallel=1 -timeout=6m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^(TestResolveUnknowns|TestResolveDefaultProfile|TestResolvePassthroughLiveness|TestClaudeRootAlwaysCopied)$' ./internal/envprofile",
+      "real_process_exit_code": 0,
+      "log_sha256": "c6b6a928789153a90ad8771eddc0eff0a347029dae24f2ca0ae2d47c4e97be8a",
+      "observed_test_outcomes": [
+        {
+          "Time": "2026-10-01T04:22:57.5523+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestResolveUnknowns",
+          "Elapsed": 15.62
+        },
+        {
+          "Time": "2026-10-01T04:23:23.723485+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestResolveDefaultProfile",
+          "Elapsed": 26.13
+        },
+        {
+          "Time": "2026-10-01T04:23:55.916463+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestResolvePassthroughLiveness",
+          "Elapsed": 32.24
+        },
+        {
+          "Time": "2026-10-01T04:24:30.926086+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestClaudeRootAlwaysCopied",
+          "Elapsed": 35.01
+        },
+        {
+          "Time": "2026-10-01T04:24:30.929182+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Elapsed": 111.02
+        }
+      ]
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -json -count=1 -p=1 -parallel=1 -timeout=6m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^(TestResolveClaudeProjectEntry|TestCodexKeyringAmbient|TestCodexUnreadableConfigFails|TestRepairNeverRefreshesSeeds|TestResolveIsolatedOpencode)$' ./internal/envprofile",
+      "real_process_exit_code": 0,
+      "log_sha256": "ad1d11e9dcb44efaa78ad2c0372b54cb58b2f2a1e211bf106b3d3eefcd87b00e",
+      "observed_test_outcomes": [
+        {
+          "Time": "2026-10-01T04:26:21.161742+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestResolveClaudeProjectEntry",
+          "Elapsed": 30.78
+        },
+        {
+          "Time": "2026-10-01T04:26:40.158329+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestCodexKeyringAmbient/absent",
+          "Elapsed": 19.03
+        },
+        {
+          "Time": "2026-10-01T04:26:55.599872+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestCodexKeyringAmbient/file",
+          "Elapsed": 15.44
+        },
+        {
+          "Time": "2026-10-01T04:27:13.656569+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestCodexKeyringAmbient/auto",
+          "Elapsed": 18.06
+        },
+        {
+          "Time": "2026-10-01T04:27:23.831476+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestCodexKeyringAmbient/keyring",
+          "Elapsed": 10.18
+        },
+        {
+          "Time": "2026-10-01T04:27:23.831508+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestCodexKeyringAmbient",
+          "Elapsed": 62.71
+        },
+        {
+          "Time": "2026-10-01T04:27:43.312402+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestCodexUnreadableConfigFails",
+          "Elapsed": 19.48
+        },
+        {
+          "Time": "2026-10-01T04:28:01.661705+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestRepairNeverRefreshesSeeds",
+          "Elapsed": 18.33
+        },
+        {
+          "Time": "2026-10-01T04:28:12.447847+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestResolveIsolatedOpencode",
+          "Elapsed": 10.81
+        },
+        {
+          "Time": "2026-10-01T04:28:12.534328+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Elapsed": 144.471
+        }
+      ]
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -json -count=1 -p=1 -parallel=1 -timeout=6m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^(TestResolveFormUnsupported|TestResolveLockContention|TestResolveFormats)$' ./internal/envprofile",
+      "real_process_exit_code": 143,
+      "log_sha256": "d01e668728e9582c61e9b783bd0bea8769215dab8062a0c8c048d1c8cfb7398a",
+      "observed_test_outcomes": [
+        {
+          "Time": "2026-10-01T04:29:01.166994+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestResolveFormUnsupported",
+          "Elapsed": 14.6
+        },
+        {
+          "Time": "2026-10-01T04:29:09.46162+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestResolveLockContention",
+          "Elapsed": 8.33
+        },
+        {
+          "Time": "2026-10-01T04:29:22.371668+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestResolveFormats",
+          "Elapsed": 12.91
+        },
+        {
+          "Time": "2026-10-01T04:29:22.375778+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Elapsed": 36.58
+        }
+      ]
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -json -count=1 -p=1 -parallel=1 -timeout=8m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^TestRegistryBootstrapVectorsDriveInstall$' ./internal/install",
+      "real_process_exit_code": 143,
+      "log_sha256": "230c376c8e99be6f59f43421f360de5d58ab0e1377ef17b6cafe98f5aed84a06",
+      "observed_test_outcomes": [
+        {
+          "Time": "2026-10-01T04:29:07.277938+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryBootstrapVectorsDriveInstall/checkpoint-first-use-accepted",
+          "Elapsed": 25.36
+        },
+        {
+          "Time": "2026-10-01T04:29:15.501931+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryBootstrapVectorsDriveInstall/checkpoint-first-network-below-tampered",
+          "Elapsed": 8.22
+        },
+        {
+          "Time": "2026-10-01T04:29:22.290082+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryBootstrapVectorsDriveInstall/checkpoint-first-network-equal-different-tampered",
+          "Elapsed": 6.79
+        }
+      ]
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -json -count=1 -p=1 -parallel=1 -timeout=8m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^TestRegistryBootstrapVectorsDriveInstall$' ./internal/install",
+      "real_process_exit_code": 0,
+      "log_sha256": "c6879a7507b669cd91245e9128ea3cd9096ee956bc65c538f132adb785f1e71c",
+      "observed_test_outcomes": [
+        {
+          "Time": "2026-10-01T04:31:15.450012+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryBootstrapVectorsDriveInstall/checkpoint-first-use-accepted",
+          "Elapsed": 29.51
+        },
+        {
+          "Time": "2026-10-01T04:31:21.727943+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryBootstrapVectorsDriveInstall/checkpoint-first-network-below-tampered",
+          "Elapsed": 6.28
+        },
+        {
+          "Time": "2026-10-01T04:31:26.18273+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryBootstrapVectorsDriveInstall/checkpoint-first-network-equal-different-tampered",
+          "Elapsed": 4.46
+        },
+        {
+          "Time": "2026-10-01T04:31:49.826437+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryBootstrapVectorsDriveInstall/no-checkpoint-first-use-tofu",
+          "Elapsed": 23.64
+        },
+        {
+          "Time": "2026-10-01T04:31:57.69401+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryBootstrapVectorsDriveInstall/checkpoint-signature-invalid-first-use",
+          "Elapsed": 7.87
+        },
+        {
+          "Time": "2026-10-01T04:32:28.905366+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryBootstrapVectorsDriveInstall/rebootstrap-advance-accepted",
+          "Elapsed": 31.18
+        },
+        {
+          "Time": "2026-10-01T04:32:59.724379+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryBootstrapVectorsDriveInstall/rebootstrap-equal-consistent-noop",
+          "Elapsed": 30.85
+        },
+        {
+          "Time": "2026-10-01T04:33:29.678763+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryBootstrapVectorsDriveInstall/rebootstrap-regression-refused",
+          "Elapsed": 29.91
+        },
+        {
+          "Time": "2026-10-01T04:33:59.44264+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryBootstrapVectorsDriveInstall/rebootstrap-equal-inconsistent-refused",
+          "Elapsed": 29.81
+        },
+        {
+          "Time": "2026-10-01T04:34:25.757411+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryBootstrapVectorsDriveInstall/rebootstrap-signature-invalid-ignored",
+          "Elapsed": 26.31
+        },
+        {
+          "Time": "2026-10-01T04:34:25.758551+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryBootstrapVectorsDriveInstall",
+          "Elapsed": 219.82
+        },
+        {
+          "Time": "2026-10-01T04:34:25.762783+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Elapsed": 221.192
+        }
+      ]
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -json -count=1 -p=1 -parallel=1 -timeout=8m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^TestRegistryMirrorComparisonVectorsDriveInstall$' ./internal/install",
+      "real_process_exit_code": 0,
+      "log_sha256": "2ca41e8f9787fa0eada654e044a563335eb8d74fdf053d316de76e917e4c0eae",
+      "observed_test_outcomes": [
+        {
+          "Time": "2026-10-01T04:35:54.170307+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryMirrorComparisonVectorsDriveInstall/divergence-detected-advisory",
+          "Elapsed": 27.74
+        },
+        {
+          "Time": "2026-10-01T04:36:22.174962+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryMirrorComparisonVectorsDriveInstall/divergence-detected-strict",
+          "Elapsed": 28
+        },
+        {
+          "Time": "2026-10-01T04:36:49.523651+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryMirrorComparisonVectorsDriveInstall/divergence-views-agree",
+          "Elapsed": 27.35
+        },
+        {
+          "Time": "2026-10-01T04:37:16.552886+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryMirrorComparisonVectorsDriveInstall/divergence-different-sizes-skipped",
+          "Elapsed": 27.03
+        },
+        {
+          "Time": "2026-10-01T04:37:43.86272+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryMirrorComparisonVectorsDriveInstall/divergence-single-registry-skipped",
+          "Elapsed": 27.29
+        },
+        {
+          "Time": "2026-10-01T04:37:43.913192+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryMirrorComparisonVectorsDriveInstall",
+          "Elapsed": 137.42
+        },
+        {
+          "Time": "2026-10-01T04:37:43.935362+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Elapsed": 138.913
+        }
+      ]
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -json -count=1 -p=1 -parallel=1 -timeout=6m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^(TestRegistryInvalidFirstUseCheckpointFailsClosed|TestRegistryRebootstrapRegressionKeepsExistingHighWater|TestStrictRegistryPolicyFailsUnknown|TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch|TestRegistrySnapshotMintedDuringFetchIsNotFuture|TestRegistrySnapshotSlowSiblingDoesNotFlipInstantRegistry|TestRegistrySnapshotTwoSecondsPastSkewStillRefuses|TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries|TestRegistrySnapshotWithinTheBoundIsAcceptedThroughInstall)$' ./internal/install",
+      "real_process_exit_code": 0,
+      "log_sha256": "511820f08d2aa2a6e90139993debeb3ebbbf6c73a70607b81f2d858a058c7a03",
+      "observed_test_outcomes": [
+        {
+          "Time": "2026-10-01T04:38:27.453292+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryInvalidFirstUseCheckpointFailsClosed",
+          "Elapsed": 6.98
+        },
+        {
+          "Time": "2026-10-01T04:39:29.836341+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryRebootstrapRegressionKeepsExistingHighWater",
+          "Elapsed": 62.42
+        },
+        {
+          "Time": "2026-10-01T04:40:02.038949+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestStrictRegistryPolicyFailsUnknown",
+          "Elapsed": 32.21
+        },
+        {
+          "Time": "2026-10-01T04:40:09.08269+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistrySnapshotTwoSecondsPastSkewStillRefuses",
+          "Elapsed": 7.04
+        },
+        {
+          "Time": "2026-10-01T04:40:42.286701+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistrySnapshotWithinTheBoundIsAcceptedThroughInstall",
+          "Elapsed": 33.2
+        },
+        {
+          "Time": "2026-10-01T04:40:53.841346+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries",
+          "Elapsed": 11.55
+        },
+        {
+          "Time": "2026-10-01T04:41:25.694931+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistrySnapshotMintedDuringFetchIsNotFuture",
+          "Elapsed": 31.78
+        },
+        {
+          "Time": "2026-10-01T04:41:58.015825+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistrySnapshotSlowSiblingDoesNotFlipInstantRegistry",
+          "Elapsed": 32.4
+        },
+        {
+          "Time": "2026-10-01T04:42:17.235541+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch",
+          "Elapsed": 19.22
+        },
+        {
+          "Time": "2026-10-01T04:42:17.248447+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Elapsed": 238.56
+        }
+      ]
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -json -count=1 -p=1 -parallel=1 -timeout=6m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^(TestMigratePiWrongTargetToAgentRoot|TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker|TestMigrateNoSecretCopies)$' ./internal/envprofile",
+      "real_process_exit_code": 0,
+      "log_sha256": "0ba275ee5199ffa43f589ecf64e888f046ac4901157c6ac8cb699c30dd52e6f5",
+      "observed_test_outcomes": [
+        {
+          "Time": "2026-10-01T04:32:56.202811+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigratePiWrongTargetToAgentRoot",
+          "Elapsed": 24.52
+        },
+        {
+          "Time": "2026-10-01T04:33:06.306879+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker",
+          "Elapsed": 10.11
+        },
+        {
+          "Time": "2026-10-01T04:33:59.032138+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateNoSecretCopies/interrupted_journal_holds_no_credential_bytes",
+          "Elapsed": 30.73
+        },
+        {
+          "Time": "2026-10-01T04:33:59.455702+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateNoSecretCopies",
+          "Elapsed": 53.15
+        },
+        {
+          "Time": "2026-10-01T04:33:59.487297+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Elapsed": 88.908
+        }
+      ]
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -json -count=1 -p=1 -parallel=1 -timeout=6m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^(TestMigrateConflictsRefuse|TestMigratePiRootInspectionFailure|TestMigratePlanDriftRefuses)$' ./internal/envprofile",
+      "real_process_exit_code": 0,
+      "log_sha256": "17f070be8dc0e5accf976aab48a8ceab216a816a87ebdaef93e7f436e870237a",
+      "observed_test_outcomes": [
+        {
+          "Time": "2026-10-01T04:35:43.549357+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateConflictsRefuse/regular_file_non-empty",
+          "Elapsed": 15.74
+        },
+        {
+          "Time": "2026-10-01T04:35:55.79585+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateConflictsRefuse/regular_file_empty",
+          "Elapsed": 12.25
+        },
+        {
+          "Time": "2026-10-01T04:36:10.349299+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateConflictsRefuse/foreign_symlink",
+          "Elapsed": 14.56
+        },
+        {
+          "Time": "2026-10-01T04:36:25.709949+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateConflictsRefuse/stale_foreign_symlink",
+          "Elapsed": 15.32
+        },
+        {
+          "Time": "2026-10-01T04:36:38.419294+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateConflictsRefuse/two_live_pi_credentials",
+          "Elapsed": 12.75
+        },
+        {
+          "Time": "2026-10-01T04:36:50.183681+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateConflictsRefuse/non-empty_directory",
+          "Elapsed": 11.77
+        },
+        {
+          "Time": "2026-10-01T04:37:07.228366+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateConflictsRefuse/invalid_marker",
+          "Elapsed": 17.03
+        },
+        {
+          "Time": "2026-10-01T04:37:17.831855+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateConflictsRefuse/unknown_credential_store",
+          "Elapsed": 10.61
+        },
+        {
+          "Time": "2026-10-01T04:37:17.832816+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateConflictsRefuse",
+          "Elapsed": 110.24
+        },
+        {
+          "Time": "2026-10-01T04:37:29.821749+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigratePiRootInspectionFailure",
+          "Elapsed": 11.99
+        },
+        {
+          "Time": "2026-10-01T04:37:44.338162+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigratePlanDriftRefuses",
+          "Elapsed": 14.51
+        },
+        {
+          "Time": "2026-10-01T04:37:44.343321+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Elapsed": 139.31
+        }
+      ]
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -json -count=1 -p=1 -parallel=1 -timeout=6m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^(TestMigrateRollbackRestoresPriorState|TestMigrateOldRootBytesWarnAndProceed|TestMigratePendingNeedsNothing)$' ./internal/envprofile",
+      "real_process_exit_code": 0,
+      "log_sha256": "84abbdb6421f5cb9ef3fb1ba37201c48dab6a02d4cb52888a21474ffa5933c9b",
+      "observed_test_outcomes": [
+        {
+          "Time": "2026-10-01T04:38:37.743619+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateRollbackRestoresPriorState/link_phase",
+          "Elapsed": 16.42
+        },
+        {
+          "Time": "2026-10-01T04:39:26.403827+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateRollbackRestoresPriorState/post_publish",
+          "Elapsed": 48.68
+        },
+        {
+          "Time": "2026-10-01T04:39:26.44177+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateRollbackRestoresPriorState",
+          "Elapsed": 65.16
+        },
+        {
+          "Time": "2026-10-01T04:39:49.380355+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateOldRootBytesWarnAndProceed",
+          "Elapsed": 22.9
+        },
+        {
+          "Time": "2026-10-01T04:40:08.241192+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigratePendingNeedsNothing",
+          "Elapsed": 18.83
+        },
+        {
+          "Time": "2026-10-01T04:40:08.323582+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Elapsed": 109.569
+        }
+      ]
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -json -count=1 -p=1 -parallel=1 -timeout=6m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^(TestMigrateUnknownOperands|TestMigrateInspectIsReadOnly)$' ./internal/envprofile",
+      "real_process_exit_code": 0,
+      "log_sha256": "72c882fc3b3cb38bd4c469c9b10d7bbb56ea0e91b923e622233436fb0fabffa0",
+      "observed_test_outcomes": [
+        {
+          "Time": "2026-10-01T04:41:56.887431+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateUnknownOperands",
+          "Elapsed": 15.87
+        },
+        {
+          "Time": "2026-10-01T04:42:04.492893+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMigrateInspectIsReadOnly",
+          "Elapsed": 7.61
+        },
+        {
+          "Time": "2026-10-01T04:42:04.495857+04:00",
+          "Action": "pass",
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Elapsed": 26.526
+        }
+      ]
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -count=1 -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^(TestSharedToIsolatedRemovesStaleLink|TestCredentialLinkRegularFileRefuses|TestStaleCredentialLinkRefusals|TestDanglingPiLinkReportedDetached|TestCodexIsolatedAdmission|TestCodexUnknownStoreSharedRefuses|TestPiProvisionTargetsAgentRoot|TestCredentialLinkDirectory|TestCredentialLinkUnrecordedSymlinkRefuses|TestReviewerDanglingExpectedTarget|TestReviewerLiteralCodexSelector|TestDanglingExpectedTargetRepairSucceeds|TestCredentialLinkTargetInspectionFailure|TestCodexCredentialStoreTOMLSpellings|TestCodexMalformedStoreSharedRefuses)$' ./internal/envprofile",
+      "real_process_exit_code": 0,
+      "base_top_level_tests": 15,
+      "evidence": "unified exec returned exit_code 0; managed_3 is the retry after the exit-143 attempt"
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -count=1 -timeout=4m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^(TestResolvePublishesCredentialMarkerThroughLockedJournal|TestResolveRecoversCredentialMarkerAfterRenameCrash|TestPolicyFromConfigCarriesEnvGates|TestMachineClearReachesSeamGate|TestManagerOwnedAbsenceReadsAreGuarded|TestManagerReadScannerFindsAliasedNotExistCollapse)$' ./internal/envprofile",
+      "real_process_exit_code": 0,
+      "base_top_level_tests": 6,
+      "evidence": "unified exec returned exit_code 0; managed_3 is the retry after the exit-143 attempt"
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -count=1 -p=1 -parallel=1 -timeout=6m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^(TestResolveVerifiesGitStoreEntryAgainstPinnedTree|TestResolveRejectsGitPinMissingFromLocalObjectDatabase|TestResolveProvisionRepair|TestResolveReportsRecordedContextSurfaceHashDrift|TestResolveStaleUnprovisioned)$' ./internal/envprofile",
+      "real_process_exit_code": 0,
+      "base_top_level_tests": 5,
+      "evidence": "unified exec returned exit_code 0; managed_3 is the retry after the exit-143 attempt"
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -count=1 -p=1 -parallel=1 -timeout=6m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^(TestResolveFormUnsupported|TestResolveLockContention|TestResolveFormats)$' ./internal/envprofile",
+      "real_process_exit_code": 0,
+      "base_top_level_tests": 3,
+      "evidence": "unified exec returned exit_code 0; managed_3 is the retry after the exit-143 attempt"
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -count=1 -timeout=4m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^(TestMigrateApplyRequiresPlan|TestMigratePrintFailureRefusesBeforeMutation|TestMigrateMarkerDriftRefuses|TestMigrateFailedRelinkKeepsOldLink|TestMigrateSyscallFailureRollsBack|TestMigrateInterruptedApplyRecovers|TestMigratePublishFailureRevertsLinks|TestMigrateSealedJournalDeletesWithoutTouching|TestMigrateBrokenJournalRefuses|TestMigrateRecoveryRefusesUnexpectedTarget|TestMigrateRecoveryCleansOwnedTemp)$' ./internal/envprofile",
+      "real_process_exit_code": 0,
+      "base_top_level_tests": 11,
+      "evidence": "unified exec returned exit_code 0; managed_3 is the retry after the exit-143 attempt"
+    },
+    {
+      "command": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -count=1 -p=1 -parallel=1 -timeout=6m -overlay=/tmp/TASK-260917-2tx81l-continuation/overlay.json -run '^(TestRegistryRevocationDeniesInstall|TestRegistryAttestationLandsInMarker|TestRegistryFirstUseReportsAndPersistsTOFUPosture|TestRegistryCheckpointPersistsBeforeTamperedNetworkSnapshot)$' ./internal/install",
+      "real_process_exit_code": 0,
+      "base_top_level_tests": 4,
+      "evidence": "unified exec returned exit_code 0; managed_3 is the retry after the exit-143 attempt"
+    }
+  ],
+  "reader_exceptions": {
+    "internal/config": "base TestParseRejections/schema and TestUnknownSchemaVersionsRejected: exit 1; v3 now recognized, probes changed to v4",
+    "internal/envmarker": "base TestReadKeepsUnsupportedVersionDiagnostic: exit 1; malformed known v3 needs hash_version 2. Base TestUnsupportedVersionIsRejected: exit 0; candidate probe updated to v4"
+  },
+  "required_mutants": {
+    "length_framing_removed": {
+      "legacy_selector_exit": 0,
+      "negative_selector_exit": 1,
+      "after_restore_exit": 0
+    },
+    "registry_version_not_compared": {
+      "legacy_selector_exit": 0,
+      "negative_selector_exit": 1,
+      "after_restore_exit": 0
+    },
+    "v1_marker_current_for_v2_expectation": {
+      "legacy_selector_exit": 0,
+      "negative_selector_exit": 1,
+      "after_restore_exit": 0
+    }
+  },
+  "F1_narrowing_mutant": {
+    "change": "preserve supplied rc.13 hashes only for skill schema 6; recompute for 7 and 8",
+    "production_entry_point": "internal/marker.Write",
+    "legacy_fixture_exit": 0,
+    "named_regression": "TestWritePreservesContentHashInRC13Mode",
+    "regression_exit": 1,
+    "failing_subtests": [
+      "7",
+      "8"
+    ],
+    "after_restore_exit": 0,
+    "schema_band_coverage": "3/3; narrowing detected in 2/3"
+  },
+  "post_restore_commands": {
+    "go build ./...": 0,
+    "go vet ./...": 0,
+    "golangci-lint run": 0,
+    "gofmt -l cmd internal": 0,
+    "git diff --check": 0
+  }
+}

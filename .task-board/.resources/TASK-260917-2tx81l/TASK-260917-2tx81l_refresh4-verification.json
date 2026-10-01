@@ -1,0 +1,1934 @@
+{
+  "task": "TASK-260917-2tx81l",
+  "revision": 4,
+  "scope": "Base refresh only; no new product change",
+  "identity": {
+    "base": "bd126a9acdc51b6061917ba8c4d7d26a7abafd41",
+    "rev3": "92a072c4e1b03678ea64a2801069ea471628e8e4",
+    "owned_path_identity": [
+      {
+        "path": ".github/ci/conformance-case-counts.tsv",
+        "same_as_rev3": false,
+        "sha256": "3be60579e536a8600c484154578dcbe482c51422092e76c87d2614bcf507247c"
+      },
+      {
+        "path": ".github/ci/conformance-gaps.tsv",
+        "same_as_rev3": true,
+        "sha256": "5eb57e3be6f0ead0cc34f888c9b48e526ac6b62d12e532eba75e7219e487f412"
+      },
+      {
+        "path": "internal/config/config.go",
+        "same_as_rev3": false,
+        "sha256": "cf64a77bd3a15b76ddab2b966b629f3a7f11fa9c6b616631d71f967e9e362fd6"
+      },
+      {
+        "path": "internal/config/config_test.go",
+        "same_as_rev3": true,
+        "sha256": "1a594dc8a9f6bf279e7b9940f4b162de719a4f5d3e3ab0e21aa3420e3a4595da"
+      },
+      {
+        "path": "internal/config/environments.go",
+        "same_as_rev3": true,
+        "sha256": "c6c9aa280daef20b67954d7c330675b03f0f2879684f7795ebe05552fc9023d3"
+      },
+      {
+        "path": "internal/config/environments_conformance_test.go",
+        "same_as_rev3": true,
+        "sha256": "6145a9b2057995ddc2135b4d87c11b1396c15235749014fa61c64d637f31ef1c"
+      },
+      {
+        "path": "internal/config/environments_test.go",
+        "same_as_rev3": true,
+        "sha256": "cdc94a8737cb4616cde0239c194727e62f36986b69d7128d1252c2af5932178f"
+      },
+      {
+        "path": "internal/conformancecoverage/content_hash_v2_gaps_test.go",
+        "same_as_rev3": true,
+        "sha256": "eb9f81f2cf0cc3416d31bf06980bbd46416703ab1ce3da6e2f5849372b19511a"
+      },
+      {
+        "path": "internal/contextaudit/contextaudit.go",
+        "same_as_rev3": true,
+        "sha256": "bb1c3e8073604c85267b7f3f2f2a520e809dea133cf780ee9a7ee6a488f27a3d"
+      },
+      {
+        "path": "internal/contextaudit/contextaudit_test.go",
+        "same_as_rev3": true,
+        "sha256": "19208b2f4f713b33abf63437678229a500144b125a107033e05bba9a36683317"
+      },
+      {
+        "path": "internal/contextlock/contextlock.go",
+        "same_as_rev3": true,
+        "sha256": "08ecd75d13516cb827e4ab783d1500f4dc410031d7cdae58854171169964d612"
+      },
+      {
+        "path": "internal/contextlock/hash_version_test.go",
+        "same_as_rev3": true,
+        "sha256": "b9f4cc3608ffd648b1b05223e43fcac988cf0af9f74a5ee138597b62b680eb74"
+      },
+      {
+        "path": "internal/contextlock/schema_conformance_test.go",
+        "same_as_rev3": true,
+        "sha256": "fd3b38d9afe0a2f55eab20843fafb55e0550ccab47a9badfa408c4033852d6a1"
+      },
+      {
+        "path": "internal/contextmaterialize/contextmaterialize.go",
+        "same_as_rev3": true,
+        "sha256": "d430dd3c0550e6bb92968a06d3da41a1f79f35d1acacaac1c15b5b2ba670a53e"
+      },
+      {
+        "path": "internal/contextmaterialize/system_module_admission_test.go",
+        "same_as_rev3": true,
+        "sha256": "1a7d7bdf3c72e0bfc947dd475997c30b02159c50a1212fad17736229df8c389f"
+      },
+      {
+        "path": "internal/contextresolve/contextresolve.go",
+        "same_as_rev3": true,
+        "sha256": "20c2c07e721a5a5b8ba8bdae2152fbc2061ac506925f9fb657a615d6b5f6bb6e"
+      },
+      {
+        "path": "internal/contextstore/contextstore.go",
+        "same_as_rev3": true,
+        "sha256": "1f2f2bf9c9561464f3a0f734270265c3eda7c0776d4e5189c285ec8b3e10c6f4"
+      },
+      {
+        "path": "internal/contextstore/contextstore_test.go",
+        "same_as_rev3": true,
+        "sha256": "8002fd8af42cf2babc279afed262d567cd5f62861280df3a8ca4650e4fed60f5"
+      },
+      {
+        "path": "internal/envmarker/envmarker.go",
+        "same_as_rev3": true,
+        "sha256": "181264a31eb922a6970e59c572596f0c6ca9df88558f1829d3968c76d7361bc9"
+      },
+      {
+        "path": "internal/envmarker/envmarker_test.go",
+        "same_as_rev3": true,
+        "sha256": "7f86c4670c74d42fba611997b9222c1064c07387fb8d02ee895d6ead28094b0a"
+      },
+      {
+        "path": "internal/envmarker/marker_env_schema_test.go",
+        "same_as_rev3": true,
+        "sha256": "3e404ac6780bcd0e8cb64730af81213f0b3643093e8c53c17dc077136e52285d"
+      },
+      {
+        "path": "internal/envprofile/credential_link_test.go",
+        "same_as_rev3": true,
+        "sha256": "3eedba8a1cb98210da0e90a0450983e0d339046daafa172fd2339dbf74f57a2e"
+      },
+      {
+        "path": "internal/envprofile/credential_record_test.go",
+        "same_as_rev3": true,
+        "sha256": "d568c07dbf6e231bd82c94f93c07a8d87f4468736fcec223471df539c9a00185"
+      },
+      {
+        "path": "internal/envprofile/envprofile.go",
+        "same_as_rev3": true,
+        "sha256": "6dc2dbb87c8cd5c8072431944e1520a578c64efe1f8b25eddeaa4188a346e316"
+      },
+      {
+        "path": "internal/envprofile/envprofile_policy_test.go",
+        "same_as_rev3": true,
+        "sha256": "cad393c7ee146d20dfd725eb7352d0befdb0a57aecf24c1aac07b95209a84b4b"
+      },
+      {
+        "path": "internal/envprofile/hash_v2_test_helpers_test.go",
+        "same_as_rev3": true,
+        "sha256": "cebfb5f58d554e5711b57a29132c263046601ffaaf496ddeda62d66b3253141e"
+      },
+      {
+        "path": "internal/envprofile/managed.go",
+        "same_as_rev3": false,
+        "sha256": "5a4b930dc60103d913741b6ca80817a26c19c9ca0b08c9e43220498aa46c9345"
+      },
+      {
+        "path": "internal/envprofile/managed_test.go",
+        "same_as_rev3": true,
+        "sha256": "7e56e87c23adbf7670585f4bb9b535aef5c691a0f2964b4bb48245d346670b82"
+      },
+      {
+        "path": "internal/envprofile/migrate.go",
+        "same_as_rev3": true,
+        "sha256": "15949893bc12d32462879b055b44fbb15e67d2b2eaf92b11fa79868f6f214203"
+      },
+      {
+        "path": "internal/envprofile/migrate_test.go",
+        "same_as_rev3": true,
+        "sha256": "959dc6832ca2c2afc8da1d2ce5ec40231efa8873499fa530ee09babedabec8ac"
+      },
+      {
+        "path": "internal/hashing/hashing.go",
+        "same_as_rev3": true,
+        "sha256": "3e007c2af2a39d8fd95122aec8dc6ab3252b6630ca23a112574ea5f3053e6e2b"
+      },
+      {
+        "path": "internal/hashing/hashing_v2_test.go",
+        "same_as_rev3": true,
+        "sha256": "1716184c7fbd314d4678a8ccd2cd7baee7a7273f1052556eeacac9ffe03cb5bb"
+      },
+      {
+        "path": "internal/install/install.go",
+        "same_as_rev3": true,
+        "sha256": "0385af1daaf7e97ef959e901bed51bec5f4db02fac9a163cd1752059535b15fd"
+      },
+      {
+        "path": "internal/install/registry_e2e_test.go",
+        "same_as_rev3": true,
+        "sha256": "25322b26332a1b3bcd83c873eda05b29a0a9d6c5aca6d4bf74ebae8d5bdaecd7"
+      },
+      {
+        "path": "internal/install/targets.go",
+        "same_as_rev3": false,
+        "sha256": "50772106681659b9a48709be7d48cafeb41038cb081566192140cfaaf4e1cd9c"
+      },
+      {
+        "path": "internal/interop/environments/context_materialization_test.go",
+        "same_as_rev3": true,
+        "sha256": "1c779256ba14f5d62693817b7de2a5d4d4c74baca4423b753b4e9907d280026b"
+      },
+      {
+        "path": "internal/interop/environments/context_resolution_test.go",
+        "same_as_rev3": true,
+        "sha256": "6a88c9e59b9f3ec49d9ea799051e103c6c27d31e6d82c65f22be6a12db812f81"
+      },
+      {
+        "path": "internal/marker/marker.go",
+        "same_as_rev3": true,
+        "sha256": "c336ad5467045efba2c5eab81d0801fb42108c8eaa2ad5968578915210169fa6"
+      },
+      {
+        "path": "internal/marker/marker_hash_v2_test.go",
+        "same_as_rev3": true,
+        "sha256": "2a1078f710779da15f5459f6c132a2bb7dd5e5e744f4a362c256cadf0d2b09e0"
+      },
+      {
+        "path": "internal/marker/schema_coverage_test.go",
+        "same_as_rev3": true,
+        "sha256": "59d97382838cdddbacf76c1f697b9c764892c40f069e3d9a4d93dfd267ab72ca"
+      },
+      {
+        "path": "internal/registry/carriers.go",
+        "same_as_rev3": true,
+        "sha256": "fd415bb20e1be3fa5ab284b7437af18a750ab411b2c402ab4306c97e14e95713"
+      },
+      {
+        "path": "internal/registry/http.go",
+        "same_as_rev3": true,
+        "sha256": "40183a3f0122d505a1cb4352a87ffebdfba2eeade6eb98fed504c89b2c6d270c"
+      },
+      {
+        "path": "internal/registry/registry.go",
+        "same_as_rev3": true,
+        "sha256": "0e1ecdf16caee0153979fe7d4d8b19a48f416da71206170fb0d46818bf58e61a"
+      },
+      {
+        "path": "internal/registry/registry_test.go",
+        "same_as_rev3": true,
+        "sha256": "d344504bc22c01d8c969f0b007ffd1c3495d94de205dd5be50a7b493062aa253"
+      },
+      {
+        "path": "internal/registry/schema_conformance_test.go",
+        "same_as_rev3": true,
+        "sha256": "e3abd1d166240c464aec85f384cfe09ef814c58fcd75027766098570371f7361"
+      }
+    ],
+    "modified_owned_paths": [
+      {
+        "path": ".github/ci/conformance-case-counts.tsv",
+        "numstat": [
+          "4",
+          "0"
+        ]
+      },
+      {
+        "path": "internal/config/config.go",
+        "numstat": [
+          "5",
+          "1"
+        ]
+      },
+      {
+        "path": "internal/envprofile/managed.go",
+        "numstat": [
+          "4",
+          "1"
+        ]
+      },
+      {
+        "path": "internal/install/targets.go",
+        "numstat": [
+          "1",
+          "1"
+        ]
+      }
+    ],
+    "trunk_only_paths": [
+      ".github/ci/platform-cases.tsv",
+      "README.md",
+      "cmd/curator/env.go",
+      "cmd/curator/firstrun_ux_test.go",
+      "cmd/curator/main.go",
+      "cmd/curator/native_blackbox_test.go",
+      "cmd/curator/profile.go",
+      "cmd/curator/umbrella.go",
+      "docs/cli.md",
+      "docs/external-build-repositories.md",
+      "internal/buildrepo/acquisition_conformance_test.go",
+      "internal/buildrepo/admission.go",
+      "internal/buildrepo/admission_test.go",
+      "internal/buildrepo/adopt_test.go",
+      "internal/buildrepo/protected.go",
+      "internal/buildrepo/protected_artifact_test.go",
+      "internal/buildrepo/protection_windows_test.go",
+      "internal/buildrepo/testdata/acquisitiongitshim/main.go",
+      "internal/crossconformance/draftsources_semantic_external_test.go",
+      "internal/envprofile/named_absence_boundary_test.go",
+      "internal/envprofile/status.go",
+      "internal/install/external.go",
+      "internal/pathboundary/named_absence_test.go"
+    ]
+  },
+  "stats": [
+    {
+      "path": ".github/ci/platform-cases.tsv",
+      "added": 1,
+      "removed": 0,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "README.md",
+      "added": 1,
+      "removed": 1,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "cmd/curator/env.go",
+      "added": 4,
+      "removed": 0,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "cmd/curator/firstrun_ux_test.go",
+      "added": 285,
+      "removed": 0,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "cmd/curator/main.go",
+      "added": 68,
+      "removed": 1,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "cmd/curator/native_blackbox_test.go",
+      "added": 254,
+      "removed": 0,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "cmd/curator/profile.go",
+      "added": 4,
+      "removed": 0,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "cmd/curator/umbrella.go",
+      "added": 1,
+      "removed": 0,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "docs/cli.md",
+      "added": 13,
+      "removed": 4,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "docs/external-build-repositories.md",
+      "added": 75,
+      "removed": 0,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "internal/buildrepo/acquisition_conformance_test.go",
+      "added": 775,
+      "removed": 0,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "internal/buildrepo/admission.go",
+      "added": 6,
+      "removed": 3,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "internal/buildrepo/admission_test.go",
+      "added": 68,
+      "removed": 9,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "internal/buildrepo/adopt_test.go",
+      "added": 2,
+      "removed": 2,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "internal/buildrepo/protected.go",
+      "added": 29,
+      "removed": 3,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "internal/buildrepo/protected_artifact_test.go",
+      "added": 67,
+      "removed": 0,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "internal/buildrepo/protection_windows_test.go",
+      "added": 2,
+      "removed": 2,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "internal/buildrepo/testdata/acquisitiongitshim/main.go",
+      "added": 77,
+      "removed": 0,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "internal/crossconformance/draftsources_semantic_external_test.go",
+      "added": 3,
+      "removed": 1,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "internal/envprofile/named_absence_boundary_test.go",
+      "added": 56,
+      "removed": 0,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "internal/envprofile/status.go",
+      "added": 9,
+      "removed": 2,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "internal/install/external.go",
+      "added": 2,
+      "removed": 2,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": "internal/pathboundary/named_absence_test.go",
+      "added": 64,
+      "removed": 0,
+      "ownership": "trunk-only"
+    },
+    {
+      "path": ".github/ci/conformance-case-counts.tsv",
+      "added": 4,
+      "removed": 0,
+      "ownership": "merged"
+    },
+    {
+      "path": "internal/config/config.go",
+      "added": 5,
+      "removed": 1,
+      "ownership": "merged"
+    },
+    {
+      "path": "internal/envprofile/managed.go",
+      "added": 4,
+      "removed": 1,
+      "ownership": "merged"
+    },
+    {
+      "path": "internal/install/targets.go",
+      "added": 1,
+      "removed": 1,
+      "ownership": "merged"
+    }
+  ],
+  "commands": [
+    {
+      "key": "rc13-coverage",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test ./internal/conformancecoverage -count=1 > /tmp/TASK-260917-2tx81l-refresh4/rc13-coverage.log 2>&1",
+      "chunk_id": "2e6a8f",
+      "wall_time_seconds": 1.496e-06,
+      "session_id": 51035,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "0911a7aa1558d223ee3499f4ff518736cfa91e04a1c30f9db82af776d5a27a7e"
+    },
+    {
+      "key": "rc13-v2",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test ./internal/hashing ./internal/registry ./internal/marker ./internal/contextlock ./internal/envmarker ./internal/config -count=1 -run '^(TestContentSHA256V2.*|TestIdentityEqualityRequiresHashVersion|TestManagedWriterVersion.*|TestAuditRecordV2SchemaCases|TestRegistryV2CarrierSchemaCases|TestReadAuthoritativeMarkerV5SchemaCases|TestContextLockV2SchemaCases|TestParseAuthoritativeEnvMarkerV3SchemaCases|TestManagerConfigV3SchemaCases|TestMatchesRequiresEqualHashVersion|TestResolveVersionedDoesNotAdmitV1RecordForV2Artifact|TestCurrentRejectsV1MarkerForV2Expectation|TestWritePreservesContentHashInRC13Mode|TestWriteEmitsCoreMarkerV5WithHashVersion2)$' -v > /tmp/TASK-260917-2tx81l-refresh4/rc13-v2.log 2>&1",
+      "chunk_id": "770631",
+      "wall_time_seconds": 8.62e-07,
+      "session_id": 79420,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "550222526263e625284b0e3bab3ffecec2433433464275ec67f8d4216ddb4e6a"
+    },
+    {
+      "key": "rc13-corpus",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test ./internal/crossconformance -count=1 -run '^(TestDraftSourcesSchemaCases|TestSkillfileSourcesCorpusCounts)$' -v > /tmp/TASK-260917-2tx81l-refresh4/rc13-corpus.log 2>&1",
+      "chunk_id": "5019e4",
+      "wall_time_seconds": 8.38e-07,
+      "session_id": 58356,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "be6dc21ac59d599567481da1e3ed47b3ae37b8c47056ffb48056566f7a1440ad"
+    },
+    {
+      "key": "candidate-coverage",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-v2-task-260917/conformance/v1 go test ./internal/conformancecoverage -count=1 > /tmp/TASK-260917-2tx81l-refresh4/candidate-coverage.log 2>&1",
+      "chunk_id": "b25ca9",
+      "wall_time_seconds": 8.65e-07,
+      "session_id": 39038,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "47e9fb342133350d2d680fb4918b04c9306c69224e9b8097980f11d6812b770d"
+    },
+    {
+      "key": "candidate-v2",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-v2-task-260917/conformance/v1 go test ./internal/hashing ./internal/registry ./internal/marker ./internal/contextlock ./internal/envmarker ./internal/config -count=1 -run '^(TestContentSHA256V2.*|TestIdentityEqualityRequiresHashVersion|TestManagedWriterVersion.*|TestAuditRecordV2SchemaCases|TestRegistryV2CarrierSchemaCases|TestReadAuthoritativeMarkerV5SchemaCases|TestContextLockV2SchemaCases|TestParseAuthoritativeEnvMarkerV3SchemaCases|TestManagerConfigV3SchemaCases|TestMatchesRequiresEqualHashVersion|TestResolveVersionedDoesNotAdmitV1RecordForV2Artifact|TestCurrentRejectsV1MarkerForV2Expectation|TestWritePreservesContentHashInRC13Mode|TestWriteEmitsCoreMarkerV5WithHashVersion2)$' -v > /tmp/TASK-260917-2tx81l-refresh4/candidate-v2.log 2>&1",
+      "chunk_id": "0bee11",
+      "wall_time_seconds": 6.78e-07,
+      "session_id": 32113,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "3812d0163f9e44d2c8c9190bae3ea64d85bdc73aa632223bbfe9aee08cc72b79"
+    },
+    {
+      "key": "candidate-corpus",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-v2-task-260917/conformance/v1 go test ./internal/crossconformance -count=1 -run '^(TestDraftSourcesSchemaCases|TestSkillfileSourcesCorpusCounts)$' -v > /tmp/TASK-260917-2tx81l-refresh4/candidate-corpus.log 2>&1",
+      "chunk_id": "17ad5d",
+      "wall_time_seconds": 7.32e-07,
+      "session_id": 85276,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "65f14e7540c222214f57c9c3da65c6dd6defb5abb348370b3bf45590cf7cd826"
+    },
+    {
+      "key": "current-candidate-core",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-v2-task-260917/conformance/v1 go test ./internal/hashing ./internal/registry ./internal/marker ./internal/contextlock ./internal/envmarker ./internal/config ./internal/conformancecoverage -count=1 -v > /tmp/TASK-260917-2tx81l-refresh4/current-candidate-core.log 2>&1",
+      "chunk_id": "b356ce",
+      "wall_time_seconds": 8.94e-07,
+      "session_id": 72552,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "ba0b0e74d6426d91455373d67edd8685c610d1e89d4be21cb34222340573eb4d"
+    },
+    {
+      "key": "current-rc13-core",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test ./internal/hashing ./internal/registry ./internal/marker ./internal/contextlock ./internal/envmarker ./internal/config ./internal/conformancecoverage -count=1 -v > /tmp/TASK-260917-2tx81l-refresh4/current-rc13-core.log 2>&1",
+      "chunk_id": "f0a8cf",
+      "wall_time_seconds": 1.887e-06,
+      "session_id": 26073,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "1141df4f94e42afe0de61e342876a51061c0aba401001735d5a11e360fa87a30"
+    },
+    {
+      "key": "build",
+      "cmd": "go build ./... > /tmp/TASK-260917-2tx81l-refresh4/build.log 2>&1",
+      "chunk_id": "b464a2",
+      "wall_time_seconds": 5.64e-07,
+      "session_id": 3317,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "key": "ledger-rc13",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 bash .github/ci/ledger-consistency.sh /tmp/TASK-260917-2tx81l-refresh4/ledger-rc13 > /tmp/TASK-260917-2tx81l-refresh4/ledger-rc13.log 2>&1",
+      "chunk_id": "60e518",
+      "wall_time_seconds": 7.9e-07,
+      "session_id": 26783,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "d489d77677eeb3ee75a57fdfc6c67501da2d88d5f0aff837a3912a98a3083019"
+    },
+    {
+      "key": "ledger-candidate",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-v2-task-260917/conformance/v1 bash .github/ci/ledger-consistency.sh /tmp/TASK-260917-2tx81l-refresh4/ledger-candidate > /tmp/TASK-260917-2tx81l-refresh4/ledger-candidate.log 2>&1",
+      "chunk_id": "c8caf7",
+      "wall_time_seconds": 7.36e-07,
+      "session_id": 7199,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "d489d77677eeb3ee75a57fdfc6c67501da2d88d5f0aff837a3912a98a3083019"
+    },
+    {
+      "key": "M1",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -overlay=/tmp/TASK-260917-2tx81l-refresh4/M1-overlay.json -count=1 -v ./internal/hashing -run '^(TestByteLayout|TestContentSHA256V2LengthFramingSeparatesAdjacentRecordBoundary)$' > /tmp/TASK-260917-2tx81l-refresh4/M1.log 2>&1",
+      "chunk_id": "72f3c4",
+      "wall_time_seconds": 1.451e-06,
+      "session_id": 17231,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 1,
+      "log_sha256": "8fff81b6b31f4a05cfeddb1091bfca497c4e33453f67b823ce1cc4fb72fa341e"
+    },
+    {
+      "key": "M2",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -overlay=/tmp/TASK-260917-2tx81l-refresh4/M2-overlay.json -count=1 -v ./internal/registry -run '^(TestMatches|TestMatchesExact|TestMatchesRequiresEqualHashVersion|TestResolveVersionedDoesNotAdmitV1RecordForV2Artifact)$' > /tmp/TASK-260917-2tx81l-refresh4/M2.log 2>&1",
+      "chunk_id": "fe065e",
+      "wall_time_seconds": 8.91e-07,
+      "session_id": 19982,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 1,
+      "log_sha256": "98e1864d0fb9deffcbf241bf2ff008e70e46c556f39763f9888047efd504673c"
+    },
+    {
+      "key": "M3",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -overlay=/tmp/TASK-260917-2tx81l-refresh4/M3-overlay.json -count=1 -v ./internal/marker -run '^(TestAuthoritativeCompiledMarkerRoundTripsThroughWriter|TestCurrentRejectsV1MarkerForV2Expectation)$' > /tmp/TASK-260917-2tx81l-refresh4/M3.log 2>&1",
+      "chunk_id": "d90296",
+      "wall_time_seconds": 9.04e-07,
+      "session_id": 49256,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 1,
+      "log_sha256": "d0f5cdf7e795ab61ac2a5271c679c8bce86fdd2422076e626bd67ce7fdcc0efb"
+    },
+    {
+      "key": "F1-narrow",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -overlay=/tmp/TASK-260917-2tx81l-refresh4/F1-narrow-overlay.json -count=1 -v ./internal/marker -run '^(TestAuthoritativeCompiledMarkerRoundTripsThroughWriter|TestWritePreservesContentHashInRC13Mode)$' > /tmp/TASK-260917-2tx81l-refresh4/F1-narrow.log 2>&1",
+      "chunk_id": "3e8c38",
+      "wall_time_seconds": 8.38e-07,
+      "session_id": 60755,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 1,
+      "log_sha256": "e21da9202ab1e99546095c05af6fd5d0a00f4a729ca3a05c6d15fb48b4acb3cb"
+    },
+    {
+      "key": "vet",
+      "cmd": "go vet ./... > /tmp/TASK-260917-2tx81l-refresh4/vet.log 2>&1",
+      "chunk_id": "d508d0",
+      "wall_time_seconds": 6.97e-07,
+      "session_id": 32891,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "key": "lint",
+      "cmd": "golangci-lint run > /tmp/TASK-260917-2tx81l-refresh4/lint.log 2>&1",
+      "chunk_id": "d85c90",
+      "wall_time_seconds": 7.69e-07,
+      "session_id": 57201,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "key": "acquisition-rc13",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test ./internal/buildrepo -count=1 -timeout=4m -v -run '^TestExternalRepositoryAcquisitionConformance$' > /tmp/TASK-260917-2tx81l-refresh4/acquisition-rc13.log 2>&1",
+      "chunk_id": "a548ce",
+      "wall_time_seconds": 7.66e-07,
+      "session_id": 86659,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "ac7110d09a5c4fe2c3b86a8ed2ddbf01acc810c7547357e26532a5054f63425c"
+    },
+    {
+      "key": "combined-envprofile",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test ./internal/envprofile -count=1 -timeout=4m -v -run '^TestResolveStaleUnprovisioned$' > /tmp/TASK-260917-2tx81l-refresh4/combined-envprofile.log 2>&1",
+      "chunk_id": "a3f893",
+      "wall_time_seconds": 7.4e-07,
+      "session_id": 53605,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "284d9a4ce589dfbbe24439798915171b668ec1e276ed3c8433eb693a6d8c7f61"
+    },
+    {
+      "key": "M1-control",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -overlay=/tmp/TASK-260917-2tx81l-refresh4/M1-overlay.json -count=1 -v ./internal/hashing -run '^TestByteLayout$' > /tmp/TASK-260917-2tx81l-refresh4/M1-control.log 2>&1",
+      "chunk_id": "8203ab",
+      "wall_time_seconds": 1.936e-06,
+      "session_id": 33682,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "8af16a2d5fe234d83519c2d1024890da3acefe2a94cd9bfa0087c86e76485521"
+    },
+    {
+      "key": "M2-control",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -overlay=/tmp/TASK-260917-2tx81l-refresh4/M2-overlay.json -count=1 -v ./internal/registry -run '^(TestMatches|TestMatchesExact)$' > /tmp/TASK-260917-2tx81l-refresh4/M2-control.log 2>&1",
+      "chunk_id": "f228dd",
+      "wall_time_seconds": 6.78e-07,
+      "session_id": 34137,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "bfdf6d9119acde53b17ca390ff0d540b69f01d711421b4f83720e23e3e70db07"
+    },
+    {
+      "key": "M3-control",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -overlay=/tmp/TASK-260917-2tx81l-refresh4/M3-overlay.json -count=1 -v ./internal/marker -run '^TestAuthoritativeCompiledMarkerRoundTripsThroughWriter$' > /tmp/TASK-260917-2tx81l-refresh4/M3-control.log 2>&1",
+      "chunk_id": "6cd99e",
+      "wall_time_seconds": 4.54e-07,
+      "session_id": 37780,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "afb277ac96e63b114faaa8d4fa97a01194c7b8584b8b67af109750e820311b5d"
+    },
+    {
+      "key": "F1-narrow-control",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test -overlay=/tmp/TASK-260917-2tx81l-refresh4/F1-narrow-overlay.json -count=1 -v ./internal/marker -run '^TestAuthoritativeCompiledMarkerRoundTripsThroughWriter$' > /tmp/TASK-260917-2tx81l-refresh4/F1-narrow-control.log 2>&1",
+      "chunk_id": "613ce8",
+      "wall_time_seconds": 3.67e-07,
+      "session_id": 30348,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "dbd629e482e137609352cbf2e383f64137e9b058c8a67e1ae954d4fb3894ad56"
+    },
+    {
+      "key": "mutant-unmodified-control",
+      "cmd": "CURATOR_CONFORMANCE_ROOT=/tmp/curator-spec-rc13-task-260917/conformance/v1 go test ./internal/hashing ./internal/registry ./internal/marker -count=1 -v -run '^(TestContentSHA256V2LengthFramingSeparatesAdjacentRecordBoundary|TestMatchesRequiresEqualHashVersion|TestResolveVersionedDoesNotAdmitV1RecordForV2Artifact|TestCurrentRejectsV1MarkerForV2Expectation|TestWritePreservesContentHashInRC13Mode|TestAuthoritativeCompiledMarkerRoundTripsThroughWriter)$' > /tmp/TASK-260917-2tx81l-refresh4/mutant-unmodified-control.log 2>&1",
+      "chunk_id": "5a5dab",
+      "wall_time_seconds": 9.65e-07,
+      "session_id": 1113,
+      "original_token_count": 0,
+      "output": "",
+      "exit_code": 0,
+      "log_sha256": "99b61fb0f6309de50c8731e18a6416c38065f2d6a7de0fa8b6d32620f29cc1e8"
+    },
+    {
+      "key": "diff-check",
+      "cmd": "git diff --check -- . ':!.task-board' > /tmp/TASK-260917-2tx81l-refresh4/diff-check.log 2>&1",
+      "chunk_id": "09eb5b",
+      "wall_time_seconds": 0.208280569,
+      "exit_code": 0,
+      "original_token_count": 0,
+      "output": "",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "counts": {
+    "rc13": {
+      "digest": "be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca",
+      "rows": [
+        {
+          "family": "agent-environment-marker-v1/schema-cases",
+          "expected": 61,
+          "actual": 61,
+          "source": "schema-cases/index.json:agent-environment-marker-v1/"
+        },
+        {
+          "family": "agent-environment-marker-v2/schema-cases",
+          "expected": 26,
+          "actual": 26,
+          "source": "schema-cases/index.json:agent-environment-marker-v2/"
+        },
+        {
+          "family": "agent-skill-v7/schema-cases",
+          "expected": 37,
+          "actual": 37,
+          "source": "schema-cases/index.json:agent-skill-v7/"
+        },
+        {
+          "family": "agent-skill-v8/schema-cases",
+          "expected": 66,
+          "actual": 66,
+          "source": "schema-cases/index.json:agent-skill-v8/"
+        },
+        {
+          "family": "audit-record-v1/schema-cases",
+          "expected": 2,
+          "actual": 2,
+          "source": "schema-cases/index.json:audit-record-v1/"
+        },
+        {
+          "family": "build-drivers/argv-cases",
+          "expected": 5,
+          "actual": 5,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/build-drivers.json:argv"
+        },
+        {
+          "family": "build-drivers/fixed-environment-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/build-drivers.json:fixed_environment_cases"
+        },
+        {
+          "family": "build-drivers/positive-cases",
+          "expected": 8,
+          "actual": 8,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/build-drivers.json:positive_cases"
+        },
+        {
+          "family": "build-drivers/rejection-cases",
+          "expected": 77,
+          "actual": 77,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/build-drivers.json:rejection_cases"
+        },
+        {
+          "family": "build-drivers/toolchain-cases",
+          "expected": 12,
+          "actual": 12,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/build-drivers.json:toolchain_cases"
+        },
+        {
+          "family": "build-source/build-source-cases",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/build-drivers.json:build_source_cases"
+        },
+        {
+          "family": "closure/ordering-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/closures.json"
+        },
+        {
+          "family": "context-detectors/cases",
+          "expected": 12,
+          "actual": 12,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/context-detectors.json:cases"
+        },
+        {
+          "family": "context-lock-v1/schema-cases",
+          "expected": 31,
+          "actual": 31,
+          "source": "schema-cases/index.json:context-lock-v1/"
+        },
+        {
+          "family": "context-versions/lock-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/context-versions.json:lock_cases"
+        },
+        {
+          "family": "context-versions/ordering-cases",
+          "expected": 1,
+          "actual": 1,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/context-versions.json:ordering_cases"
+        },
+        {
+          "family": "context-versions/range-cases",
+          "expected": 50,
+          "actual": 50,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/context-versions.json:range_cases"
+        },
+        {
+          "family": "context-versions/resolution-cases",
+          "expected": 23,
+          "actual": 23,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/context-versions.json:resolution_cases"
+        },
+        {
+          "family": "context-versions/satisfies-cases",
+          "expected": 63,
+          "actual": 63,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/context-versions.json:satisfies_cases"
+        },
+        {
+          "family": "context-versions/version-cases",
+          "expected": 15,
+          "actual": 15,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/context-versions.json:version_cases"
+        },
+        {
+          "family": "csk-skill-v7/schema-cases",
+          "expected": 37,
+          "actual": 37,
+          "source": "schema-cases/index.json:csk-skill-v7/"
+        },
+        {
+          "family": "csk-skill-v8/schema-cases",
+          "expected": 66,
+          "actual": 66,
+          "source": "schema-cases/index.json:csk-skill-v8/"
+        },
+        {
+          "family": "environments-codex-seed/posture-cases",
+          "expected": 8,
+          "actual": 8,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-codex-seed.json:posture_cases"
+        },
+        {
+          "family": "environments-codex-seed/provisioning-cases",
+          "expected": 7,
+          "actual": 7,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-codex-seed.json:provisioning_cases"
+        },
+        {
+          "family": "environments-env-passthrough/allowlist-empty-cases",
+          "expected": 6,
+          "actual": 6,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-env-passthrough.json:allowlist_empty_cases"
+        },
+        {
+          "family": "environments-env-passthrough/default-resolution-cases",
+          "expected": 7,
+          "actual": 7,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-env-passthrough.json:default_resolution_cases"
+        },
+        {
+          "family": "environments-env-passthrough/schema-cases",
+          "expected": 4,
+          "actual": 4,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-env-passthrough.json:schema_cases"
+        },
+        {
+          "family": "environments-env-passthrough/surfacing-cases",
+          "expected": 6,
+          "actual": 6,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-env-passthrough.json:surfacing_cases"
+        },
+        {
+          "family": "environments-env-passthrough/surfacing-order-cases",
+          "expected": 2,
+          "actual": 2,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-env-passthrough.json:surfacing_order_cases"
+        },
+        {
+          "family": "environments-path-kind-admission/dry_run_cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-path-kind-admission.json:dry_run_cases"
+        },
+        {
+          "family": "environments-path-kind-admission/mcp_kind_cases",
+          "expected": 5,
+          "actual": 5,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-path-kind-admission.json:mcp_kind_cases"
+        },
+        {
+          "family": "environments-path-kind-admission/path_boundary_cases",
+          "expected": 14,
+          "actual": 14,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-path-kind-admission.json:path_boundary_cases"
+        },
+        {
+          "family": "environments-read-failure/cases",
+          "expected": 37,
+          "actual": 37,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-read-failure.json:operation split"
+        },
+        {
+          "family": "environments-read-failure/restore",
+          "expected": 2,
+          "actual": 2,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-read-failure.json:operation split"
+        },
+        {
+          "family": "environments-store-boundary/dry_run_cases",
+          "expected": 4,
+          "actual": 4,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-store-boundary.json:dry_run_cases"
+        },
+        {
+          "family": "environments-store-boundary/repair_cases",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-store-boundary.json:repair_cases"
+        },
+        {
+          "family": "environments-store-boundary/resolve_cases",
+          "expected": 20,
+          "actual": 20,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-store-boundary.json:resolve_cases"
+        },
+        {
+          "family": "environments-store-boundary/status_cases",
+          "expected": 4,
+          "actual": 4,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-store-boundary.json:status_cases"
+        },
+        {
+          "family": "environments-write-nofollow/cases",
+          "expected": 11,
+          "actual": 11,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments-write-nofollow.json:cases"
+        },
+        {
+          "family": "environments/header-cases",
+          "expected": 4,
+          "actual": 4,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments.json:header_cases"
+        },
+        {
+          "family": "environments/materialization-cases",
+          "expected": 24,
+          "actual": 24,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/environments.json:materialization_cases"
+        },
+        {
+          "family": "external-repository-lifecycle/status-repair-gc-cases",
+          "expected": 5,
+          "actual": 5,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/external-repository-lifecycle.json:status_repair_gc_cases"
+        },
+        {
+          "family": "external-repository/acquisition/cases",
+          "expected": 12,
+          "actual": 12,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/external-repository-acquisition.json:cases"
+        },
+        {
+          "family": "external-repository/acquisition/clean-environment",
+          "expected": 17,
+          "actual": 17,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/external-repository-acquisition.json:clean_environment"
+        },
+        {
+          "family": "external-repository/acquisition/common-fetch-argv",
+          "expected": 55,
+          "actual": 55,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/external-repository-acquisition.json:common_fetch_argv"
+        },
+        {
+          "family": "external-repository/acquisition/forbidden-fetch-features",
+          "expected": 11,
+          "actual": 11,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/external-repository-acquisition.json:forbidden_fetch_features"
+        },
+        {
+          "family": "external-repository/lfs-pointers",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/fixtures/external-repository/lfs-pointers.json:cases"
+        },
+        {
+          "family": "external-repository/local-config-and-refs",
+          "expected": 15,
+          "actual": 15,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/fixtures/external-repository/local-config-and-refs.json:cases"
+        },
+        {
+          "family": "external-repository/pack-index",
+          "expected": 8,
+          "actual": 8,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/fixtures/external-repository/pack-index.json:cases"
+        },
+        {
+          "family": "external-repository/raw-objects",
+          "expected": 12,
+          "actual": 12,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/fixtures/external-repository/raw-objects.json:cases"
+        },
+        {
+          "family": "go-host-execution-policy/capability-evidence-cases",
+          "expected": 11,
+          "actual": 11,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/go-host-execution-policy.json:capability_evidence_cases"
+        },
+        {
+          "family": "go-host-execution-policy/identity-and-protocol-cases",
+          "expected": 14,
+          "actual": 14,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/go-host-execution-policy.json:identity_and_protocol_cases"
+        },
+        {
+          "family": "go-host-execution-policy/package-influence-cases",
+          "expected": 8,
+          "actual": 8,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/go-host-execution-policy.json:package_influence_cases"
+        },
+        {
+          "family": "install/dry-run-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/manager-lifecycle.json:dry_run_cases"
+        },
+        {
+          "family": "interop/canonical-invalid-vectors",
+          "expected": 5,
+          "actual": 5,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/canonical-invalid.json"
+        },
+        {
+          "family": "interop/canonical-valid-vectors",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/canonical-valid.json"
+        },
+        {
+          "family": "interop/identifier-vectors",
+          "expected": 13,
+          "actual": 13,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/identifiers.json"
+        },
+        {
+          "family": "interop/locale-selector-vectors",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/locale-selectors.json"
+        },
+        {
+          "family": "interop/manager-config-vectors",
+          "expected": 15,
+          "actual": 15,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/manager-config.json"
+        },
+        {
+          "family": "interop/source-identity-vectors",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/source-identities.json"
+        },
+        {
+          "family": "launch-env-fragment-v1/schema-cases",
+          "expected": 50,
+          "actual": 50,
+          "source": "schema-cases/index.json:launch-env-fragment-v1/"
+        },
+        {
+          "family": "manager-config-v2/schema-cases",
+          "expected": 107,
+          "actual": 107,
+          "source": "schema-cases/index.json:manager-config-v2/"
+        },
+        {
+          "family": "manager-config-v2/vectors",
+          "expected": 56,
+          "actual": 56,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/manager-config-v2.json"
+        },
+        {
+          "family": "manager-lifecycle/bootstrap-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/manager-lifecycle.json:bootstrap_cases"
+        },
+        {
+          "family": "manager-lifecycle/build-order-cases",
+          "expected": 1,
+          "actual": 1,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/manager-lifecycle.json:build_order_cases"
+        },
+        {
+          "family": "manager-lifecycle/launcher-cases",
+          "expected": 2,
+          "actual": 2,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/manager-lifecycle.json:launcher_cases"
+        },
+        {
+          "family": "manager-lifecycle/upgrade-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/manager-lifecycle.json:upgrade_cases"
+        },
+        {
+          "family": "marker/install-marker-v2/schema-cases",
+          "expected": 14,
+          "actual": 14,
+          "source": "schema-cases/index.json:install-marker-v2/"
+        },
+        {
+          "family": "marker/install-marker-v3/schema-cases",
+          "expected": 27,
+          "actual": 27,
+          "source": "schema-cases/index.json:install-marker-v3/"
+        },
+        {
+          "family": "marker/install-marker-v4/schema-cases",
+          "expected": 27,
+          "actual": 27,
+          "source": "schema-cases/index.json:install-marker-v4/"
+        },
+        {
+          "family": "module-roots/vectors",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/module-roots.json:cases"
+        },
+        {
+          "family": "portable-paths/vectors",
+          "expected": 18,
+          "actual": 18,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/portable-paths.json"
+        },
+        {
+          "family": "registry-client/bootstrap-cases",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/registry-client.json:phase split"
+        },
+        {
+          "family": "registry-client/mirror-comparison-cases",
+          "expected": 5,
+          "actual": 5,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/registry-client.json:phase split"
+        },
+        {
+          "family": "registry-log-entry-v1/schema-cases",
+          "expected": 2,
+          "actual": 2,
+          "source": "schema-cases/index.json:registry-log-entry-v1/"
+        },
+        {
+          "family": "script-host-execution-policy/executable-identity-cases",
+          "expected": 8,
+          "actual": 8,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/script-host-execution-policy.json:executable_identity_cases"
+        },
+        {
+          "family": "script-host-execution-policy/opt-in-cases",
+          "expected": 6,
+          "actual": 6,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/script-host-execution-policy.json:opt_in_cases"
+        },
+        {
+          "family": "security-posture/vectors",
+          "expected": 17,
+          "actual": 17,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/security-posture.json:cases"
+        },
+        {
+          "family": "shell-hook-trust/vectors",
+          "expected": 14,
+          "actual": 14,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/shell-hook-trust.json:cases"
+        },
+        {
+          "family": "skill-build-v1/schema-cases",
+          "expected": 13,
+          "actual": 13,
+          "source": "schema-cases/index.json:skill-build-v1/"
+        },
+        {
+          "family": "skillfile-dev-v2/schema-cases",
+          "expected": 16,
+          "actual": 16,
+          "source": "schema-cases/index.json:skillfile-dev-v2/"
+        },
+        {
+          "family": "skillfile-sources-v1/schema-cases",
+          "expected": 121,
+          "actual": 121,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/skillfile-sources-v1/index.json"
+        },
+        {
+          "family": "skillfile-sources-v1/semantic-cases/0",
+          "expected": 21,
+          "actual": 21,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/skillfile-sources-v1/semantic-cases.json"
+        },
+        {
+          "family": "skillfile-sources-v1/semantic-cases/1",
+          "expected": 28,
+          "actual": 28,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/skillfile-sources-v1/semantic-cases.json"
+        },
+        {
+          "family": "skillfile-sources-v1/semantic-cases/2",
+          "expected": 14,
+          "actual": 14,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/skillfile-sources-v1/semantic-cases.json"
+        },
+        {
+          "family": "skillfile-sources-v1/semantic-cases/3",
+          "expected": 19,
+          "actual": 19,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/skillfile-sources-v1/semantic-cases.json"
+        },
+        {
+          "family": "skillfile-sources-v1/semantic-cases/4",
+          "expected": 23,
+          "actual": 23,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/skillfile-sources-v1/semantic-cases.json"
+        },
+        {
+          "family": "skillfile-sources-v1/snapshot-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/skillfile-sources-v1/snapshot-cases.json"
+        },
+        {
+          "family": "snapshot-acquisition/cases",
+          "expected": 1,
+          "actual": 1,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/snapshot-acquisition.json:cases"
+        },
+        {
+          "family": "source-identities/vectors",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/source-identities.json"
+        },
+        {
+          "family": "system-config-v2/schema-cases",
+          "expected": 42,
+          "actual": 42,
+          "source": "schema-cases/index.json:system-config-v2/"
+        },
+        {
+          "family": "umbrella-provider-resolution/cases",
+          "expected": 14,
+          "actual": 14,
+          "source": "/tmp/curator-spec-rc13-task-260917/conformance/v1/vectors/umbrella-provider-resolution.json:cases"
+        }
+      ],
+      "unresolved": [],
+      "mismatches": []
+    },
+    "candidate": {
+      "digest": "950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60",
+      "rows": [
+        {
+          "family": "agent-environment-marker-v1/schema-cases",
+          "expected": 61,
+          "actual": 61,
+          "source": "schema-cases/index.json:agent-environment-marker-v1/"
+        },
+        {
+          "family": "agent-environment-marker-v2/schema-cases",
+          "expected": 27,
+          "actual": 27,
+          "source": "schema-cases/index.json:agent-environment-marker-v2/"
+        },
+        {
+          "family": "agent-environment-marker-v3/schema-cases",
+          "expected": 28,
+          "actual": 28,
+          "source": "schema-cases/index.json:agent-environment-marker-v3/"
+        },
+        {
+          "family": "agent-skill-v7/schema-cases",
+          "expected": 37,
+          "actual": 37,
+          "source": "schema-cases/index.json:agent-skill-v7/"
+        },
+        {
+          "family": "agent-skill-v8/schema-cases",
+          "expected": 66,
+          "actual": 66,
+          "source": "schema-cases/index.json:agent-skill-v8/"
+        },
+        {
+          "family": "audit-record-v1/schema-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "schema-cases/index.json:audit-record-v1/"
+        },
+        {
+          "family": "audit-record-v2/schema-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "schema-cases/index.json:audit-record-v2/"
+        },
+        {
+          "family": "build-drivers/argv-cases",
+          "expected": 5,
+          "actual": 5,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/build-drivers.json:argv"
+        },
+        {
+          "family": "build-drivers/fixed-environment-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/build-drivers.json:fixed_environment_cases"
+        },
+        {
+          "family": "build-drivers/positive-cases",
+          "expected": 8,
+          "actual": 8,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/build-drivers.json:positive_cases"
+        },
+        {
+          "family": "build-drivers/rejection-cases",
+          "expected": 77,
+          "actual": 77,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/build-drivers.json:rejection_cases"
+        },
+        {
+          "family": "build-drivers/toolchain-cases",
+          "expected": 12,
+          "actual": 12,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/build-drivers.json:toolchain_cases"
+        },
+        {
+          "family": "build-source/build-source-cases",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/build-drivers.json:build_source_cases"
+        },
+        {
+          "family": "closure/ordering-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/closures.json"
+        },
+        {
+          "family": "content-hashes-v2/vectors",
+          "expected": 5,
+          "actual": 5,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/content-hashes-v2.json"
+        },
+        {
+          "family": "context-detectors/cases",
+          "expected": 12,
+          "actual": 12,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/context-detectors.json:cases"
+        },
+        {
+          "family": "context-lock-v1/schema-cases",
+          "expected": 32,
+          "actual": 32,
+          "source": "schema-cases/index.json:context-lock-v1/"
+        },
+        {
+          "family": "context-lock-v2/schema-cases",
+          "expected": 4,
+          "actual": 4,
+          "source": "schema-cases/index.json:context-lock-v2/"
+        },
+        {
+          "family": "context-versions/lock-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/context-versions.json:lock_cases"
+        },
+        {
+          "family": "context-versions/ordering-cases",
+          "expected": 1,
+          "actual": 1,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/context-versions.json:ordering_cases"
+        },
+        {
+          "family": "context-versions/range-cases",
+          "expected": 50,
+          "actual": 50,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/context-versions.json:range_cases"
+        },
+        {
+          "family": "context-versions/resolution-cases",
+          "expected": 23,
+          "actual": 23,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/context-versions.json:resolution_cases"
+        },
+        {
+          "family": "context-versions/satisfies-cases",
+          "expected": 63,
+          "actual": 63,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/context-versions.json:satisfies_cases"
+        },
+        {
+          "family": "context-versions/version-cases",
+          "expected": 15,
+          "actual": 15,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/context-versions.json:version_cases"
+        },
+        {
+          "family": "csk-skill-v7/schema-cases",
+          "expected": 37,
+          "actual": 37,
+          "source": "schema-cases/index.json:csk-skill-v7/"
+        },
+        {
+          "family": "csk-skill-v8/schema-cases",
+          "expected": 66,
+          "actual": 66,
+          "source": "schema-cases/index.json:csk-skill-v8/"
+        },
+        {
+          "family": "environments-codex-seed/posture-cases",
+          "expected": 8,
+          "actual": 8,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-codex-seed.json:posture_cases"
+        },
+        {
+          "family": "environments-codex-seed/provisioning-cases",
+          "expected": 7,
+          "actual": 7,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-codex-seed.json:provisioning_cases"
+        },
+        {
+          "family": "environments-env-passthrough/allowlist-empty-cases",
+          "expected": 6,
+          "actual": 6,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-env-passthrough.json:allowlist_empty_cases"
+        },
+        {
+          "family": "environments-env-passthrough/default-resolution-cases",
+          "expected": 7,
+          "actual": 7,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-env-passthrough.json:default_resolution_cases"
+        },
+        {
+          "family": "environments-env-passthrough/schema-cases",
+          "expected": 4,
+          "actual": 4,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-env-passthrough.json:schema_cases"
+        },
+        {
+          "family": "environments-env-passthrough/surfacing-cases",
+          "expected": 6,
+          "actual": 6,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-env-passthrough.json:surfacing_cases"
+        },
+        {
+          "family": "environments-env-passthrough/surfacing-order-cases",
+          "expected": 2,
+          "actual": 2,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-env-passthrough.json:surfacing_order_cases"
+        },
+        {
+          "family": "environments-path-kind-admission/dry_run_cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-path-kind-admission.json:dry_run_cases"
+        },
+        {
+          "family": "environments-path-kind-admission/mcp_kind_cases",
+          "expected": 5,
+          "actual": 5,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-path-kind-admission.json:mcp_kind_cases"
+        },
+        {
+          "family": "environments-path-kind-admission/path_boundary_cases",
+          "expected": 14,
+          "actual": 14,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-path-kind-admission.json:path_boundary_cases"
+        },
+        {
+          "family": "environments-read-failure/cases",
+          "expected": 37,
+          "actual": 37,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-read-failure.json:operation split"
+        },
+        {
+          "family": "environments-read-failure/restore",
+          "expected": 2,
+          "actual": 2,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-read-failure.json:operation split"
+        },
+        {
+          "family": "environments-store-boundary/dry_run_cases",
+          "expected": 4,
+          "actual": 4,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-store-boundary.json:dry_run_cases"
+        },
+        {
+          "family": "environments-store-boundary/repair_cases",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-store-boundary.json:repair_cases"
+        },
+        {
+          "family": "environments-store-boundary/resolve_cases",
+          "expected": 20,
+          "actual": 20,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-store-boundary.json:resolve_cases"
+        },
+        {
+          "family": "environments-store-boundary/status_cases",
+          "expected": 4,
+          "actual": 4,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-store-boundary.json:status_cases"
+        },
+        {
+          "family": "environments-write-nofollow/cases",
+          "expected": 11,
+          "actual": 11,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments-write-nofollow.json:cases"
+        },
+        {
+          "family": "environments/header-cases",
+          "expected": 4,
+          "actual": 4,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments.json:header_cases"
+        },
+        {
+          "family": "environments/materialization-cases",
+          "expected": 24,
+          "actual": 24,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/environments.json:materialization_cases"
+        },
+        {
+          "family": "external-repository-lifecycle/status-repair-gc-cases",
+          "expected": 5,
+          "actual": 5,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/external-repository-lifecycle.json:status_repair_gc_cases"
+        },
+        {
+          "family": "external-repository/lfs-pointers",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/fixtures/external-repository/lfs-pointers.json:cases"
+        },
+        {
+          "family": "external-repository/local-config-and-refs",
+          "expected": 15,
+          "actual": 15,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/fixtures/external-repository/local-config-and-refs.json:cases"
+        },
+        {
+          "family": "external-repository/pack-index",
+          "expected": 8,
+          "actual": 8,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/fixtures/external-repository/pack-index.json:cases"
+        },
+        {
+          "family": "external-repository/raw-objects",
+          "expected": 12,
+          "actual": 12,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/fixtures/external-repository/raw-objects.json:cases"
+        },
+        {
+          "family": "go-host-execution-policy/capability-evidence-cases",
+          "expected": 11,
+          "actual": 11,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/go-host-execution-policy.json:capability_evidence_cases"
+        },
+        {
+          "family": "go-host-execution-policy/identity-and-protocol-cases",
+          "expected": 14,
+          "actual": 14,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/go-host-execution-policy.json:identity_and_protocol_cases"
+        },
+        {
+          "family": "go-host-execution-policy/package-influence-cases",
+          "expected": 8,
+          "actual": 8,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/go-host-execution-policy.json:package_influence_cases"
+        },
+        {
+          "family": "install/dry-run-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/manager-lifecycle.json:dry_run_cases"
+        },
+        {
+          "family": "interop/canonical-invalid-vectors",
+          "expected": 5,
+          "actual": 5,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/canonical-invalid.json"
+        },
+        {
+          "family": "interop/canonical-valid-vectors",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/canonical-valid.json"
+        },
+        {
+          "family": "interop/identifier-vectors",
+          "expected": 13,
+          "actual": 13,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/identifiers.json"
+        },
+        {
+          "family": "interop/locale-selector-vectors",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/locale-selectors.json"
+        },
+        {
+          "family": "interop/manager-config-vectors",
+          "expected": 15,
+          "actual": 15,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/manager-config.json"
+        },
+        {
+          "family": "interop/source-identity-vectors",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/source-identities.json"
+        },
+        {
+          "family": "launch-env-fragment-v1/schema-cases",
+          "expected": 50,
+          "actual": 50,
+          "source": "schema-cases/index.json:launch-env-fragment-v1/"
+        },
+        {
+          "family": "log-response-v3/schema-cases",
+          "expected": 2,
+          "actual": 2,
+          "source": "schema-cases/index.json:log-response-v3/"
+        },
+        {
+          "family": "manager-config-v2/schema-cases",
+          "expected": 107,
+          "actual": 107,
+          "source": "schema-cases/index.json:manager-config-v2/"
+        },
+        {
+          "family": "manager-config-v2/vectors",
+          "expected": 56,
+          "actual": 56,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/manager-config-v2.json"
+        },
+        {
+          "family": "manager-config-v3/schema-cases",
+          "expected": 5,
+          "actual": 5,
+          "source": "schema-cases/index.json:manager-config-v3/"
+        },
+        {
+          "family": "manager-lifecycle/bootstrap-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/manager-lifecycle.json:bootstrap_cases"
+        },
+        {
+          "family": "manager-lifecycle/build-order-cases",
+          "expected": 1,
+          "actual": 1,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/manager-lifecycle.json:build_order_cases"
+        },
+        {
+          "family": "manager-lifecycle/launcher-cases",
+          "expected": 2,
+          "actual": 2,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/manager-lifecycle.json:launcher_cases"
+        },
+        {
+          "family": "manager-lifecycle/upgrade-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/manager-lifecycle.json:upgrade_cases"
+        },
+        {
+          "family": "marker/install-marker-v2/schema-cases",
+          "expected": 14,
+          "actual": 14,
+          "source": "schema-cases/index.json:install-marker-v2/"
+        },
+        {
+          "family": "marker/install-marker-v3/schema-cases",
+          "expected": 28,
+          "actual": 28,
+          "source": "schema-cases/index.json:install-marker-v3/"
+        },
+        {
+          "family": "marker/install-marker-v4/schema-cases",
+          "expected": 28,
+          "actual": 28,
+          "source": "schema-cases/index.json:install-marker-v4/"
+        },
+        {
+          "family": "marker/install-marker-v5/schema-cases",
+          "expected": 29,
+          "actual": 29,
+          "source": "schema-cases/index.json:install-marker-v5/"
+        },
+        {
+          "family": "module-roots/vectors",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/module-roots.json:cases"
+        },
+        {
+          "family": "portable-paths/vectors",
+          "expected": 18,
+          "actual": 18,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/portable-paths.json"
+        },
+        {
+          "family": "registry-bundle-v2/schema-cases",
+          "expected": 2,
+          "actual": 2,
+          "source": "schema-cases/index.json:registry-bundle-v2/"
+        },
+        {
+          "family": "registry-client/bootstrap-cases",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/registry-client.json:phase split"
+        },
+        {
+          "family": "registry-client/mirror-comparison-cases",
+          "expected": 5,
+          "actual": 5,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/registry-client.json:phase split"
+        },
+        {
+          "family": "registry-log-entry-v1/schema-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "schema-cases/index.json:registry-log-entry-v1/"
+        },
+        {
+          "family": "registry-log-entry-v2/schema-cases",
+          "expected": 2,
+          "actual": 2,
+          "source": "schema-cases/index.json:registry-log-entry-v2/"
+        },
+        {
+          "family": "script-host-execution-policy/executable-identity-cases",
+          "expected": 8,
+          "actual": 8,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/script-host-execution-policy.json:executable_identity_cases"
+        },
+        {
+          "family": "script-host-execution-policy/opt-in-cases",
+          "expected": 6,
+          "actual": 6,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/script-host-execution-policy.json:opt_in_cases"
+        },
+        {
+          "family": "security-posture/vectors",
+          "expected": 17,
+          "actual": 17,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/security-posture.json:cases"
+        },
+        {
+          "family": "shell-hook-trust/vectors",
+          "expected": 14,
+          "actual": 14,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/shell-hook-trust.json:cases"
+        },
+        {
+          "family": "skill-build-v1/schema-cases",
+          "expected": 13,
+          "actual": 13,
+          "source": "schema-cases/index.json:skill-build-v1/"
+        },
+        {
+          "family": "skillfile-dev-v2/schema-cases",
+          "expected": 16,
+          "actual": 16,
+          "source": "schema-cases/index.json:skillfile-dev-v2/"
+        },
+        {
+          "family": "skillfile-sources-v1/schema-cases",
+          "expected": 121,
+          "actual": 121,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/skillfile-sources-v1/index.json"
+        },
+        {
+          "family": "skillfile-sources-v1/semantic-cases/0",
+          "expected": 21,
+          "actual": 21,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/skillfile-sources-v1/semantic-cases.json"
+        },
+        {
+          "family": "skillfile-sources-v1/semantic-cases/1",
+          "expected": 28,
+          "actual": 28,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/skillfile-sources-v1/semantic-cases.json"
+        },
+        {
+          "family": "skillfile-sources-v1/semantic-cases/2",
+          "expected": 14,
+          "actual": 14,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/skillfile-sources-v1/semantic-cases.json"
+        },
+        {
+          "family": "skillfile-sources-v1/semantic-cases/3",
+          "expected": 19,
+          "actual": 19,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/skillfile-sources-v1/semantic-cases.json"
+        },
+        {
+          "family": "skillfile-sources-v1/semantic-cases/4",
+          "expected": 23,
+          "actual": 23,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/skillfile-sources-v1/semantic-cases.json"
+        },
+        {
+          "family": "skillfile-sources-v1/snapshot-cases",
+          "expected": 3,
+          "actual": 3,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/skillfile-sources-v1/snapshot-cases.json"
+        },
+        {
+          "family": "snapshot-acquisition/cases",
+          "expected": 1,
+          "actual": 1,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/snapshot-acquisition.json:cases"
+        },
+        {
+          "family": "source-identities/vectors",
+          "expected": 10,
+          "actual": 10,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/source-identities.json"
+        },
+        {
+          "family": "system-config-v2/schema-cases",
+          "expected": 42,
+          "actual": 42,
+          "source": "schema-cases/index.json:system-config-v2/"
+        },
+        {
+          "family": "umbrella-provider-resolution/cases",
+          "expected": 14,
+          "actual": 14,
+          "source": "/tmp/curator-spec-v2-task-260917/conformance/v1/vectors/umbrella-provider-resolution.json:cases"
+        }
+      ],
+      "unresolved": [],
+      "mismatches": []
+    }
+  },
+  "owned_case_tallies": [
+    {
+      "family": "audit-record-v2/schema-cases",
+      "driven": 3,
+      "total": 3
+    },
+    {
+      "family": "registry-log-entry-v2/schema-cases",
+      "driven": 2,
+      "total": 2
+    },
+    {
+      "family": "registry-bundle-v2/schema-cases",
+      "driven": 2,
+      "total": 2
+    },
+    {
+      "family": "log-response-v3/schema-cases",
+      "driven": 2,
+      "total": 2
+    },
+    {
+      "family": "marker/install-marker-v5/schema-cases",
+      "driven": 29,
+      "total": 29
+    },
+    {
+      "family": "context-lock-v2/schema-cases",
+      "driven": 4,
+      "total": 4
+    },
+    {
+      "family": "agent-environment-marker-v3/schema-cases",
+      "driven": 28,
+      "total": 28
+    },
+    {
+      "family": "manager-config-v3/schema-cases",
+      "driven": 5,
+      "total": 5
+    },
+    {
+      "family": "content-hashes-v2/vectors",
+      "driven": 5,
+      "total": 5
+    }
+  ],
+  "count_validation": {
+    "command": "python3 /tmp/TASK-260917-2tx81l-refresh4/counts.py",
+    "exit_code": 0
+  },
+  "mutation_bound": "3/3 required mutants plus F1 narrowing; v1 control processes each exit 0, negative processes each exit 1, no-overlay regression process exits 0",
+  "base_replay": "Accepted from the attached rev3 verdict/evidence; not rerun in the refresh."
+}

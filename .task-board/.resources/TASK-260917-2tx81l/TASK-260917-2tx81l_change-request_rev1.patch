@@ -1,0 +1,3479 @@
+diff --git a/.github/ci/conformance-gaps.tsv b/.github/ci/conformance-gaps.tsv
+index b24d9bdf..81857e34 100644
+--- a/.github/ci/conformance-gaps.tsv
++++ b/.github/ci/conformance-gaps.tsv
+@@ -2,46 +2,6 @@
+ # Rows are scoped to the SHA-256 identity of conformance/v1/manifest.json; candidate-only gaps are absent under rc.13.
+ # Remove a row only after its named published case passes its production-entry consumer.
+ suite_manifest_sha256	family	case_id	owner	reason
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-empty-backend-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-backend-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-backend.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-isolation.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-path-on-file-link.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-path-on-keyring-preferred-file.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-provenance.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-source-role.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-missing-strategy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-path-on-ambient-backend.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-path-on-ambient-strategy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-path-on-isolated-per-home-keychain.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-unknown-backend.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-unknown-field.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-unknown-isolation.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-unknown-provenance.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-unknown-source-role.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-unknown-strategy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	valid-ambient.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	valid-file-link.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	valid-in-place.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	valid-keyring-preferred-ambient.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	valid-keyring-preferred-file.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	valid-per-home-keychain-isolated.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	agent-environment-marker-v3/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	audit-record-v2/schema-cases	invalid-v1-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	audit-record-v2/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	audit-record-v2/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	content-hashes-v2/vectors	colliding_v1_pair	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	content-hashes-v2/vectors	empty_tree	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	content-hashes-v2/vectors	nested_nul	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	content-hashes-v2/vectors	ordinary_tree	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	content-hashes-v2/vectors	registry_version_mismatch	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-lock-v2/schema-cases	invalid-missing-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-lock-v2/schema-cases	invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-lock-v2/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	context-lock-v2/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/posture-cases	a-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/posture-cases	b-home-empty-snapshot-no-rows	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/posture-cases	b-home-lists-not-inherited	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+@@ -51,60 +11,13 @@ suite_manifest_sha256	family	case_id	owner	reason
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/provisioning-cases	b-strips-servers-keeps-rest	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/provisioning-cases	b-subtable-only-form-stripped	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/provisioning-cases	b-without-servers-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	log-response-v3/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	log-response-v3/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-config-v3/schema-cases	invalid-v3-state-waiver-commit-length.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-config-v3/schema-cases	invalid-waiver-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-config-v3/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-config-v3/schema-cases	valid-v2-state-hash-waiver.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	manager-config-v3/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v4/schema-cases	invalid-external-declared-effective-mismatch.json	BUG-260923-2afgyq	marker.Read admits unequal declared and effective external repository identities
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v4/schema-cases	invalid-marker-local-identity-kind-mismatch.json	BUG-260923-2afgyq	marker.Read admits a local marker identity with the wrong repository identity kind
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v4/schema-cases	invalid-marker-network-identity-kind-mismatch.json	BUG-260923-2afgyq	marker.Read admits a network marker identity with the wrong repository identity kind
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v4/schema-cases	invalid-marker-sha1-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-1 external revision with the wrong effective width
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v4/schema-cases	invalid-marker-sha256-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-256 external revision with the wrong effective width
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-external-declared-effective-mismatch.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-external-hardened-execution-policy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-external-missing-execution-policy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-external-object-width.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-external-only-build-source.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-external-receipt-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-local-hardened-execution-policy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-local-missing-execution-policy.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-local-receipt-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-marker-local-identity-kind-mismatch.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-marker-network-identity-kind-mismatch.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-marker-sha1-effective-revision-width.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-marker-sha256-effective-revision-width.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-missing-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-missing-local-build-source.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-package-signing.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-empty-builds.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-external-only-substituted.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-external-only-unsubstituted.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-local-only.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-network-sha1-revision.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-network-sha256-revision.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-network-substitution-branch.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-network-substitution-tag.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-sha256-external.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid-untagged-external.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	marker/install-marker-v5/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	registry-bundle-v2/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	registry-bundle-v2/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	registry-log-entry-v2/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	registry-log-entry-v2/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	script-host-execution-policy/executable-identity-cases	windows-exec-noncomponent-store-hardlinks	STORY-260925-1v7pvn	The production resolver accepts multiply-linked System32 targets without proving every additional link belongs to the component store.
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	script-host-execution-policy/executable-identity-cases	windows-exec-unowned-file-hardlinks	STORY-260925-1v7pvn	The production resolver accepts a multiply-linked file below captured SystemRoot\System32 without proving the target is platform-owned.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/schema-cases	schema-cases/install-marker-v6/invalid-missing-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/schema-cases	schema-cases/install-marker-v6/valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/schema-cases	schema-cases/skillfile-lock-v2/invalid-missing-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/schema-cases	schema-cases/skillfile-lock-v2/invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/schema-cases	schema-cases/skillfile-lock-v2/valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/schema-cases	schema-cases/source-audit-v2/invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	skillfile-sources-v1/schema-cases	schema-cases/source-audit-v2/valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	a-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	b-home-empty-snapshot-no-rows	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	b-home-lists-not-inherited	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 018244f3..dafe329a 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -22,14 +22,17 @@ import (
+ )
+ 
+ // SchemaVersion is the original machine config schema. SchemaVersion2 adds
+-// the environments §12.1 object and registry bootstrap members; both stay
+-// readable (manager §12) and an unknown schema_version is rejected explicitly.
++// the environments §12.1 object and registry bootstrap members, and
++// SchemaVersion3 versions state-hash waiver pins. All three stay readable.
+ const SchemaVersion = 1
+ 
+ // SchemaVersion2 is the machine config schema carrying the environments
+ // §12.1 knobs and registry bootstrap members.
+ const SchemaVersion2 = 2
+ 
++// SchemaVersion3 adds hash_version to state-hash secret material waivers.
++const SchemaVersion3 = 3
++
+ // DefaultWorktreeAliasPattern extracts checkout aliases for git worktrees.
+ const DefaultWorktreeAliasPattern = `[A-Z]+-[0-9]+`
+ 
+@@ -158,7 +161,7 @@ type Execution struct {
+ // Config is the effective machine configuration.
+ type Config struct {
+ 	Path string
+-	// Schema is the effective schema_version: 1 or 2.
++	// Schema is the effective schema_version: 1, 2, or 3.
+ 	Schema int
+ 	// Env is the effective environments §12.1 machine configuration with
+ 	// the §12.1 defaults applied. A schema-1 file carries every default.
+@@ -550,14 +553,14 @@ func parseConfig(data map[string]any, path string, locked map[string]bool, machi
+ 	if !ok {
+ 		return nil, verr.New("schema_version", "must be an integer")
+ 	}
+-	if schema != SchemaVersion && schema != SchemaVersion2 {
++	if schema != SchemaVersion && schema != SchemaVersion2 && schema != SchemaVersion3 {
+ 		return nil, verr.New("schema_version", "unsupported config schema_version %d; this config requires a newer tool", schema)
+ 	}
+ 	if schema == SchemaVersion && hasConfigKey(machineData, "security_posture") {
+ 		return nil, verr.New("security_posture", "requires schema_version 2; manager-config-v1 is frozen without this field")
+ 	}
+ 	posture := defaultSecurityPosture(schema)
+-	if schema == SchemaVersion2 {
++	if schema >= SchemaVersion2 {
+ 		if rawPosture, present := data["security_posture"]; present {
+ 			value, ok := rawPosture.(string)
+ 			if !ok || (value != SecurityPosturePermissive && value != SecurityPostureHardened) {
+@@ -578,7 +581,7 @@ func parseConfig(data map[string]any, path string, locked map[string]bool, machi
+ 	} else if rawEnv, present := data["environments"]; present && rawEnv == nil {
+ 		return nil, verr.New("environments", "must be an object")
+ 	}
+-	env, err := parseEnvironments(data["environments"])
++	env, err := parseEnvironmentsVersion(data["environments"], schema)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -1102,7 +1105,7 @@ func parseRegistries(raw any, schema int, configPath string) ([]Registry, error)
+ 		}
+ 		for key := range entry {
+ 			known := key == "name" || key == "url" || key == "public_keys" || key == "enabled"
+-			if schema == SchemaVersion2 {
++			if schema >= SchemaVersion2 {
+ 				known = known || key == "bootstrap_checkpoint" || key == "mirror_group"
+ 			}
+ 			if !known {
+diff --git a/internal/config/environments.go b/internal/config/environments.go
+index e7a95612..32ae1661 100644
+--- a/internal/config/environments.go
++++ b/internal/config/environments.go
+@@ -107,10 +107,11 @@ type ShadowAcknowledgement struct {
+ // SecretMaterialWaiver is one secret_material_waivers entry (environments
+ // §9.1): the member pin, file protocol path, exact byte span, and reason.
+ type SecretMaterialWaiver struct {
+-	Pin    string
+-	File   string
+-	Span   [2]int
+-	Reason string
++	Pin         string
++	HashVersion int
++	File        string
++	Span        [2]int
++	Reason      string
+ }
+ 
+ // SystemModuleWaiver is one system_module_waivers entry (environments
+@@ -195,9 +196,15 @@ func defaultEnvironments() Environments {
+ 	}
+ }
+ 
+-// parseEnvironments validates the manager-config schema-2 environments
+-// object with the §12.1 value grammars and fills the table defaults.
++// parseEnvironments validates a frozen manager-config schema-2 environments
++// object and fills the table defaults.
+ func parseEnvironments(raw any) (Environments, error) {
++	return parseEnvironmentsVersion(raw, SchemaVersion2)
++}
++
++// parseEnvironmentsVersion validates the environments object using its
++// enclosing manager-config schema so frozen waiver shapes stay frozen.
++func parseEnvironmentsVersion(raw any, schema int) (Environments, error) {
+ 	env := defaultEnvironments()
+ 	if raw == nil {
+ 		return env, nil
+@@ -316,7 +323,7 @@ func parseEnvironments(raw any) (Environments, error) {
+ 		env.ShadowAcknowledged = acks
+ 	}
+ 	if rawWaivers, present := obj["secret_material_waivers"]; present && rawWaivers != nil {
+-		waivers, err := parseSecretWaivers(rawWaivers)
++		waivers, err := parseSecretWaivers(rawWaivers, schema)
+ 		if err != nil {
+ 			return Environments{}, err
+ 		}
+@@ -935,7 +942,7 @@ func parseShadowAcknowledged(raw any) ([]ShadowAcknowledgement, error) {
+ 	return acks, nil
+ }
+ 
+-func parseSecretWaivers(raw any) ([]SecretMaterialWaiver, error) {
++func parseSecretWaivers(raw any, schema int) ([]SecretMaterialWaiver, error) {
+ 	list, ok := raw.([]any)
+ 	if !ok {
+ 		return nil, verr.New("environments.secret_material_waivers", "must be a list")
+@@ -948,7 +955,7 @@ func parseSecretWaivers(raw any) ([]SecretMaterialWaiver, error) {
+ 			return nil, verr.New(label, "must be an object")
+ 		}
+ 		for key := range entry {
+-			if key != "pin" && key != "file" && key != "span" && key != "reason" {
++			if key != "pin" && key != "file" && key != "span" && key != "reason" && (schema != SchemaVersion3 || key != "hash_version") {
+ 				return nil, verr.New(label, "has unsupported field %q", key)
+ 			}
+ 		}
+@@ -956,6 +963,24 @@ func parseSecretWaivers(raw any) ([]SecretMaterialWaiver, error) {
+ 		if !envCommitRE.MatchString(pin) {
+ 			return nil, verr.New(label+".pin", "must be 40 or 64 lowercase hex characters")
+ 		}
++		hashVersion := 0
++		if rawVersion, present := entry["hash_version"]; present {
++			if schema != SchemaVersion3 {
++				return nil, verr.New(label+".hash_version", "requires manager-config schema_version 3")
++			}
++			value, ok := integerValue(rawVersion)
++			if !ok || value != 2 {
++				return nil, verr.New(label+".hash_version", "must be 2")
++			}
++			if len(pin) != 64 {
++				return nil, verr.New(label+".pin", "hash_version requires a 64-character state hash pin")
++			}
++			hashVersion = 2
++		} else if len(pin) == 64 {
++			// A state hash without the additive member retains its frozen v1
++			// interpretation, including when read from schema 3.
++			hashVersion = 1
++		}
+ 		file, _ := entry["file"].(string)
+ 		if !identifiers.PortablePath(file) {
+ 			return nil, verr.New(label+".file", "must be a portable relative path")
+@@ -980,7 +1005,7 @@ func parseSecretWaivers(raw any) ([]SecretMaterialWaiver, error) {
+ 		if !nonEmptyString(reason) {
+ 			return nil, verr.New(label+".reason", "requires a non-empty string")
+ 		}
+-		waivers = append(waivers, SecretMaterialWaiver{Pin: pin, File: file, Span: bounds, Reason: reason})
++		waivers = append(waivers, SecretMaterialWaiver{Pin: pin, HashVersion: hashVersion, File: file, Span: bounds, Reason: reason})
+ 	}
+ 	return waivers, nil
+ }
+@@ -1198,10 +1223,14 @@ func (e Environments) render() map[string]any {
+ 	}
+ 	waivers := []any{}
+ 	for _, waiver := range e.SecretWaivers {
+-		waivers = append(waivers, map[string]any{
++		entry := map[string]any{
+ 			"pin": waiver.Pin, "file": waiver.File,
+ 			"span": []any{waiver.Span[0], waiver.Span[1]}, "reason": waiver.Reason,
+-		})
++		}
++		if waiver.HashVersion == 2 {
++			entry["hash_version"] = 2
++		}
++		waivers = append(waivers, entry)
+ 	}
+ 	systemWaivers := []any{}
+ 	for _, waiver := range e.SystemModuleWaivers {
+diff --git a/internal/config/environments_conformance_test.go b/internal/config/environments_conformance_test.go
+index 53fc4a41..2dacf302 100644
+--- a/internal/config/environments_conformance_test.go
++++ b/internal/config/environments_conformance_test.go
+@@ -125,6 +125,40 @@ func TestManagerConfigV2SchemaCases(t *testing.T) {
+ 		})
+ }
+ 
++// TestManagerConfigV3SchemaCases runs the published v3 waiver cases through
++// the production Load entry point. The v2 state pin must survive parsing as
++// an explicitly versioned identity.
++func TestManagerConfigV3SchemaCases(t *testing.T) {
++	root := conformanceRoot(t)
++	suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++		return
++	}
++	cases := schemaCaseValidity(t, root, "manager-config-v3")
++	conformancecoverage.RunOutcomes(t, "manager-config-v3/schema-cases", cases,
++		func(tc namedSchemaCase) string { return tc.Name }, func(t *testing.T, tc namedSchemaCase) conformancecoverage.Observation {
++			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "manager-config-v3", tc.Name)) // #nosec G304 -- explicit conformance input
++			if err != nil {
++				t.Fatal(err)
++			}
++			path := writeConfig(t, t.TempDir(), "config.json", string(payload))
++			cfg, loadErr := Load(path, nil)
++			if tc.Valid && loadErr != nil {
++				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("Load rejected published-valid case: %v", loadErr)}
++			}
++			if !tc.Valid && loadErr == nil {
++				return conformancecoverage.Observation{FailureReason: "Load accepted published-invalid case"}
++			}
++			if tc.Name == "valid-v2-state-hash-waiver.json" && (len(cfg.Env.SecretWaivers) != 1 || cfg.Env.SecretWaivers[0].HashVersion != 2) {
++				return conformancecoverage.Observation{FailureReason: "Load did not retain hash_version 2 on the state waiver"}
++			}
++			return conformancecoverage.Observation{}
++		})
++}
++
+ type sourceSignerMergeVectorFile struct {
+ 	MergeCases []struct {
+ 		Name     string                         `json:"name"`
+diff --git a/internal/conformancecoverage/content_hash_v2_gaps_test.go b/internal/conformancecoverage/content_hash_v2_gaps_test.go
+index 8f0bdfdb..e5d36503 100644
+--- a/internal/conformancecoverage/content_hash_v2_gaps_test.go
++++ b/internal/conformancecoverage/content_hash_v2_gaps_test.go
+@@ -2,44 +2,25 @@ package conformancecoverage
+ 
+ import (
+ 	"encoding/json"
+-	"fmt"
+ 	"os"
+ 	"path/filepath"
+-	"sort"
+ 	"strings"
+ 	"testing"
+-)
+-
+-type publishedSchemaEntry struct {
+-	Instance string `json:"instance"`
+-}
+ 
+-type candidateSchemaCase struct {
+-	Name string
+-}
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/registry"
++)
+ 
+ func isContentHashV2Gap(gap Gap) bool {
+-	switch gap.Family {
+-	case "agent-environment-marker-v3/schema-cases",
+-		"audit-record-v2/schema-cases",
+-		"context-lock-v2/schema-cases",
+-		"marker/install-marker-v5/schema-cases",
+-		"log-response-v3/schema-cases",
+-		"manager-config-v3/schema-cases",
+-		"registry-bundle-v2/schema-cases",
+-		"registry-log-entry-v2/schema-cases",
+-		"content-hashes-v2/vectors":
+-		return true
+-	case "skillfile-sources-v1/schema-cases":
++	if gap.Family == "skillfile-sources-v1/schema-cases" {
+ 		return strings.HasPrefix(gap.CaseID, "schema-cases/install-marker-v6/") ||
+ 			strings.HasPrefix(gap.CaseID, "schema-cases/skillfile-lock-v2/") ||
+ 			strings.HasPrefix(gap.CaseID, "schema-cases/source-audit-v2/")
+-	default:
+-		return false
+ 	}
++	return false
+ }
+ 
+-func TestContentHashV2GapRowsHaveTheAssignedOwner(t *testing.T) {
++func TestDeferredContentHashV2CarrierCasesAreAbsentAndUnowned(t *testing.T) {
+ 	suiteID, err := selectedSuiteIdentity()
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -48,7 +29,7 @@ func TestContentHashV2GapRowsHaveTheAssignedOwner(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	ownedRows := 0
++	deferredRows := 0
+ 	for _, gap := range gaps {
+ 		if !isContentHashV2Gap(gap) {
+ 			continue
+@@ -57,119 +38,167 @@ func TestContentHashV2GapRowsHaveTheAssignedOwner(t *testing.T) {
+ 			t.Errorf("content-hash-v2 gap %s/%s leaked into non-candidate suite %s", gap.Family, gap.CaseID, suiteID)
+ 			continue
+ 		}
+-		ownedRows++
+-		if gap.Owner != "TASK-260917-2tx81l" {
+-			t.Errorf("content-hash-v2 gap %s/%s owner = %q, want TASK-260917-2tx81l", gap.Family, gap.CaseID, gap.Owner)
+-		}
++		deferredRows++
+ 	}
+-	if suiteID == ContentHashV2CandidateManifestSHA256 && ownedRows != 87 {
+-		t.Errorf("candidate content-hash-v2 owned gap rows = %d, want 87", ownedRows)
++	if deferredRows != 0 {
++		t.Errorf("deferred carrier gap rows = %d, want 0 for selected suite %s", deferredRows, suiteID)
++	}
++	if suiteID != ContentHashV2CandidateManifestSHA256 {
++		return
+ 	}
+-}
+-
+-// TestContentHashV2FamiliesAreKnownGapsWhenPublished accounts for every case
+-// in the not-yet-implemented v2 schema families. The families are discovered
+-// from index.json and only activated when the selected root publishes them.
+-func TestContentHashV2FamiliesAreKnownGapsWhenPublished(t *testing.T) {
+ 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+ 	if root == "" {
+-		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++		t.Fatal("candidate suite identity requires CURATOR_CONFORMANCE_ROOT")
+ 	}
+-	suiteID, err := selectedSuiteIdentity()
++	data, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))
+ 	if err != nil {
+-		t.Fatal(err)
++		t.Fatalf("read schema-case index: %v", err)
+ 	}
+-	wantCandidate := suiteID == ContentHashV2CandidateManifestSHA256
+-	indexPath := filepath.Join(root, "schema-cases", "index.json")
+-	indexBytes, err := os.ReadFile(indexPath)
+-	if err != nil {
+-		t.Fatalf("read published schema-case index: %v", err)
++	var index []struct {
++		Instance string `json:"instance"`
++	}
++	if err := json.Unmarshal(data, &index); err != nil {
++		t.Fatalf("parse schema-case index: %v", err)
+ 	}
+-	var index []publishedSchemaEntry
+-	if err := json.Unmarshal(indexBytes, &index); err != nil {
+-		t.Fatalf("parse published schema-case index: %v", err)
++	deferredPaths := []string{
++		"install-marker-v6/",
++		"skillfile-lock-v2/",
++		"source-audit-v2/",
+ 	}
+-	indexed := map[string][]string{}
+ 	for _, entry := range index {
+-		family, name, ok := strings.Cut(entry.Instance, "/")
+-		if !ok || family == "" || name == "" || strings.Contains(name, "/") {
+-			t.Fatalf("schema-case index has unsupported instance path %q", entry.Instance)
++		for _, path := range deferredPaths {
++			if strings.Contains(entry.Instance, path) {
++				t.Errorf("deferred schema case %q is unexpectedly published in suite %s", entry.Instance, suiteID)
++			}
+ 		}
+-		indexed[family] = append(indexed[family], name)
+ 	}
++}
+ 
+-	families := []struct {
+-		indexFamily string
+-		coverageID  string
+-	}{
+-		{indexFamily: "agent-environment-marker-v3", coverageID: "agent-environment-marker-v3/schema-cases"},
+-		{indexFamily: "audit-record-v2", coverageID: "audit-record-v2/schema-cases"},
+-		{indexFamily: "context-lock-v2", coverageID: "context-lock-v2/schema-cases"},
+-		{indexFamily: "install-marker-v5", coverageID: "marker/install-marker-v5/schema-cases"},
+-		{indexFamily: "log-response-v3", coverageID: "log-response-v3/schema-cases"},
+-		{indexFamily: "manager-config-v3", coverageID: "manager-config-v3/schema-cases"},
+-		{indexFamily: "registry-bundle-v2", coverageID: "registry-bundle-v2/schema-cases"},
+-		{indexFamily: "registry-log-entry-v2", coverageID: "registry-log-entry-v2/schema-cases"},
+-	}
+-	for _, family := range families {
+-		family := family
+-		caseNames := indexed[family.indexFamily]
+-		dir := filepath.Join(root, "schema-cases", family.indexFamily)
+-		_, statErr := os.Stat(dir)
+-		if os.IsNotExist(statErr) {
+-			if len(caseNames) != 0 {
+-				t.Fatalf("schema-case index lists %s cases but its directory is absent", family.indexFamily)
+-			}
+-			if wantCandidate {
+-				t.Fatalf("candidate suite lost schema-cases/%s", family.indexFamily)
+-			}
+-			continue
++type contentHashVector struct {
++	ID string
++}
++
++type contentHashVectorFile struct {
++	Path      string `json:"path"`
++	BytesUTF8 string `json:"bytes_utf8"`
++}
++
++type contentHashVectorTree struct {
++	Files    []contentHashVectorFile `json:"files"`
++	V1SHA256 string                  `json:"v1_sha256"`
++	V2SHA256 string                  `json:"v2_sha256"`
++}
++
++func driveContentHashVector(t *testing.T, root string, vector contentHashVector) {
++	t.Helper()
++	readJSON := func(path string, target any) {
++		t.Helper()
++		data, err := os.ReadFile(filepath.Join(root, "vectors", "content-hashes-v2.json"))
++		if err != nil {
++			t.Fatal(err)
++		}
++		var document map[string]json.RawMessage
++		if err := json.Unmarshal(data, &document); err != nil {
++			t.Fatal(err)
+ 		}
+-		if statErr != nil {
+-			t.Fatalf("inspect schema-cases/%s: %v", family.indexFamily, statErr)
++		if err := json.Unmarshal(document[path], target); err != nil {
++			t.Fatalf("decode vector %s: %v", path, err)
+ 		}
+-		if len(caseNames) == 0 {
+-			t.Fatalf("schema-cases/%s exists without indexed cases", family.indexFamily)
++	}
++	writeTree := func(files []contentHashVectorFile) string {
++		t.Helper()
++		dir := t.TempDir()
++		for _, file := range files {
++			path := filepath.Join(dir, filepath.FromSlash(file.Path))
++			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(path, []byte(file.BytesUTF8), 0o600); err != nil {
++				t.Fatal(err)
++			}
+ 		}
+-		sort.Strings(caseNames)
+-		entries, err := os.ReadDir(dir)
++		return dir
++	}
++	assertHashes := func(dir string, v1, v2 string) {
++		t.Helper()
++		gotV1, err := hashing.ContentSHA256WithVersion(dir, nil, hashing.VersionV1)
+ 		if err != nil {
+-			t.Fatalf("read schema-cases/%s: %v", family.indexFamily, err)
++			t.Fatal(err)
+ 		}
+-		var diskNames []string
+-		for _, entry := range entries {
+-			if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+-				continue
+-			}
+-			diskNames = append(diskNames, entry.Name())
++		gotV2, err := hashing.ContentSHA256WithVersion(dir, nil, hashing.VersionV2)
++		if err != nil {
++			t.Fatal(err)
+ 		}
+-		sort.Strings(diskNames)
+-		if fmt.Sprint(diskNames) != fmt.Sprint(caseNames) {
+-			t.Fatalf("schema-cases/%s disk/index cases differ: disk=%v index=%v", family.indexFamily, diskNames, caseNames)
++		if v1 != "" && gotV1 != v1 {
++			t.Fatalf("v1 hash = %s, want %s", gotV1, v1)
+ 		}
+-		cases := make([]candidateSchemaCase, 0, len(caseNames))
+-		for _, name := range caseNames {
+-			if _, err := os.ReadFile(filepath.Join(dir, name)); err != nil {
+-				t.Fatalf("read schema-cases/%s/%s: %v", family.indexFamily, name, err)
+-			}
+-			cases = append(cases, candidateSchemaCase{Name: name})
++		if gotV2 != v2 {
++			t.Fatalf("v2 hash = %s, want %s", gotV2, v2)
+ 		}
+-		RunOutcomes(t, family.coverageID, cases, func(testCase candidateSchemaCase) string {
+-			return testCase.Name
+-		}, func(*testing.T, candidateSchemaCase) Observation {
+-			return Observation{FailureReason: "content-hash-v2 reader is owned by TASK-260917-2tx81l and is not implemented in this task"}
+-		})
+ 	}
+-}
+ 
+-type contentHashVector struct {
+-	ID string
++	switch vector.ID {
++	case "colliding_v1_pair":
++		var payload struct {
++			Trees []contentHashVectorTree `json:"trees"`
++		}
++		readJSON(vector.ID, &payload)
++		if len(payload.Trees) != 2 {
++			t.Fatalf("collision vector tree count = %d, want 2", len(payload.Trees))
++		}
++		for _, tree := range payload.Trees {
++			assertHashes(writeTree(tree.Files), tree.V1SHA256, tree.V2SHA256)
++		}
++		if payload.Trees[0].V1SHA256 != payload.Trees[1].V1SHA256 || payload.Trees[0].V2SHA256 == payload.Trees[1].V2SHA256 {
++			t.Fatal("published collision construction does not collide under v1 and separate under v2")
++		}
++	case "empty_tree":
++		var payload struct {
++			V2SHA256 string `json:"v2_sha256"`
++		}
++		readJSON(vector.ID, &payload)
++		assertHashes(writeTree(nil), "", payload.V2SHA256)
++	case "nested_nul":
++		var payload struct {
++			File     contentHashVectorFile `json:"file"`
++			V2SHA256 string                `json:"v2_sha256"`
++		}
++		readJSON(vector.ID, &payload)
++		assertHashes(writeTree([]contentHashVectorFile{payload.File}), "", payload.V2SHA256)
++	case "ordinary_tree":
++		var payload contentHashVectorTree
++		readJSON(vector.ID, &payload)
++		assertHashes(writeTree(payload.Files), payload.V1SHA256, payload.V2SHA256)
++	case "registry_version_mismatch":
++		var payload struct {
++			Computed struct {
++				ContentSHA256 string `json:"content_sha256"`
++				HashVersion   int    `json:"hash_version"`
++			} `json:"computed"`
++			Record struct {
++				ContentSHA256 string `json:"content_sha256"`
++				HashVersion   int    `json:"hash_version"`
++			} `json:"record"`
++		}
++		readJSON(vector.ID, &payload)
++		record := registry.Record{
++			ContentSHA256:  payload.Record.ContentSHA256,
++			HashVersion:    hashing.Version(payload.Record.HashVersion),
++			SourceIdentity: "same-source",
++			Commit:         "same-commit",
++		}
++		if registry.MatchesVersioned(record, record.SourceIdentity, record.Commit, payload.Computed.ContentSHA256, hashing.Version(payload.Computed.HashVersion)) {
++			t.Fatal("registry matching admitted equal digest/source across unequal hash versions")
++		}
++	default:
++		t.Fatalf("unhandled content hash vector %q", vector.ID)
++	}
+ }
+ 
+ // TestContentHashV2VectorsAreKnownGapsWhenPublished counts and classifies the
+ // five executable vectors in content-hashes-v2.json. The schema_version and
+ // framing members define the vector document; they are metadata, not cases.
+-func TestContentHashV2VectorsAreKnownGapsWhenPublished(t *testing.T) {
++func TestContentHashV2VectorsWhenPublished(t *testing.T) {
+ 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+ 	if root == "" {
+ 		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+@@ -178,6 +207,9 @@ func TestContentHashV2VectorsAreKnownGapsWhenPublished(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
++	if suiteID != ContentHashV2CandidateManifestSHA256 {
++		return
++	}
+ 	path := filepath.Join(root, "vectors", "content-hashes-v2.json")
+ 	data, err := os.ReadFile(path)
+ 	if os.IsNotExist(err) {
+@@ -205,7 +237,8 @@ func TestContentHashV2VectorsAreKnownGapsWhenPublished(t *testing.T) {
+ 	}
+ 	RunOutcomes(t, "content-hashes-v2/vectors", cases, func(testCase contentHashVector) string {
+ 		return testCase.ID
+-	}, func(*testing.T, contentHashVector) Observation {
+-		return Observation{FailureReason: "content-hash-v2 hashing is owned by TASK-260917-2tx81l and is not implemented in this task"}
++	}, func(t *testing.T, testCase contentHashVector) Observation {
++		driveContentHashVector(t, root, testCase)
++		return Observation{}
+ 	})
+ }
+diff --git a/internal/contextaudit/contextaudit.go b/internal/contextaudit/contextaudit.go
+index 93a7be31..605f0140 100644
+--- a/internal/contextaudit/contextaudit.go
++++ b/internal/contextaudit/contextaudit.go
+@@ -7,14 +7,15 @@ import (
+ 	"bytes"
+ 	"fmt"
+ 	"io/fs"
+-	"os"
+ 	"path/filepath"
+ 	"regexp"
+ 	"sort"
+ 	"strings"
+ 
+ 	"github.com/relux-works/curator/internal/contextpkg"
++	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/opaquescan"
++	"github.com/relux-works/curator/internal/stateread"
+ )
+ 
+ // Classes and diagnostics.
+@@ -67,10 +68,11 @@ func InScope(path string) bool {
+ // (secret_material_waivers). Pin is the member's pin as the lock spells it —
+ // bare hex — or as the header spells it ("commit <hex>", "state sha256:<hex>").
+ type Waiver struct {
+-	Pin    string
+-	File   string
+-	Span   [2]int
+-	Reason string
++	Pin         string
++	HashVersion hashing.Version
++	File        string
++	Span        [2]int
++	Reason      string
+ }
+ 
+ // Finding is one detector finding.
+@@ -143,19 +145,32 @@ func PinKey(pin string) string {
+ // member's pin; only waivers at that pin apply, and every waiver handed in
+ // that clears nothing is reported unmatched.
+ func Detect(root, pin string, waivers []Waiver) (Report, error) {
++	return DetectAtVersion(root, pin, hashing.VersionV1, waivers)
++}
++
++// DetectAtVersion binds state-hash waivers to the content-hash framing
++// version carried by the resolved context lock. Commit pins have no framing
++// version and may match only unversioned commit waivers.
++func DetectAtVersion(root, pin string, hashVersion hashing.Version, waivers []Waiver) (Report, error) {
++	if hashVersion != hashing.VersionV1 && hashVersion != hashing.VersionV2 {
++		return Report{}, fmt.Errorf("unsupported context content hash version %d", hashVersion)
++	}
+ 	files := map[string][]byte{}
+ 	for _, name := range ScopeFiles {
+-		payload, err := os.ReadFile(filepath.Join(root, name)) // #nosec G304 -- snapshot root chosen by the caller
++		read, err := stateread.ReadFile(filepath.Join(root, name))
+ 		if err != nil {
+-			if os.IsNotExist(err) {
+-				continue
+-			}
+ 			return Report{}, fmt.Errorf("read %s: %w", name, err)
+ 		}
+-		files[name] = payload
++		if read.Kind == stateread.KindPresent {
++			files[name] = read.Bytes
++		}
+ 	}
+ 	contextRoot := filepath.Join(root, contextpkg.ContextDir)
+-	if info, err := os.Lstat(contextRoot); err == nil && info.IsDir() {
++	info, err := stateread.Lstat(contextRoot)
++	if err != nil {
++		return Report{}, err
++	}
++	if info.Kind == stateread.KindPresent && info.Info.IsDir() {
+ 		err := filepath.WalkDir(contextRoot, func(path string, entry fs.DirEntry, err error) error {
+ 			if err != nil {
+ 				return err
+@@ -167,47 +182,62 @@ func Detect(root, pin string, waivers []Waiver) (Report, error) {
+ 			if err != nil {
+ 				return err
+ 			}
+-			payload, err := os.ReadFile(path) // #nosec G304 -- walked below the snapshot root
++			read, err := stateread.ReadFile(path)
+ 			if err != nil {
+ 				return err
+ 			}
+-			files[filepath.ToSlash(rel)] = payload
++			if read.Kind == stateread.KindPresent {
++				files[filepath.ToSlash(rel)] = read.Bytes
++			}
+ 			return nil
+ 		})
+ 		if err != nil {
+ 			return Report{}, err
+ 		}
+ 	}
+-	paths, err := opaquescan.NULPaths(root)
+-	if err != nil {
+-		return Report{}, err
+-	}
+ 	var opaqueFindings []Finding
+-	for _, path := range paths {
+-		opaqueFindings = append(opaqueFindings, Finding{
+-			Class: ClassOpaqueFile, File: path, Pattern: PatternNULByte,
+-			Severity: SeverityBlocking,
+-		})
++	if hashVersion == hashing.VersionV1 {
++		paths, err := opaquescan.NULPaths(root)
++		if err != nil {
++			return Report{}, err
++		}
++		for _, path := range paths {
++			opaqueFindings = append(opaqueFindings, Finding{
++				Class: ClassOpaqueFile, File: path, Pattern: PatternNULByte,
++				Severity: SeverityBlocking,
++			})
++		}
+ 	}
+-	return detectFiles(files, pin, waivers, opaqueFindings), nil
++	return detectFiles(files, pin, hashVersion, waivers, opaqueFindings), nil
+ }
+ 
+ // DetectFiles runs the secret detector over its existing scope and applies the
+ // opaque NUL rule to every in-memory file keyed by snapshot-relative path.
+ func DetectFiles(files map[string][]byte, pin string, waivers []Waiver) Report {
++	return DetectFilesAtVersion(files, pin, hashing.VersionV1, waivers)
++}
++
++// DetectFilesAtVersion is the in-memory counterpart of DetectAtVersion.
++func DetectFilesAtVersion(files map[string][]byte, pin string, hashVersion hashing.Version, waivers []Waiver) Report {
+ 	var opaqueFindings []Finding
+-	for path, content := range files {
+-		if offset := bytes.IndexByte(content, 0); offset >= 0 {
+-			opaqueFindings = append(opaqueFindings, Finding{
+-				Class: ClassOpaqueFile, File: path, Pattern: PatternNULByte,
+-				Severity: SeverityBlocking, Span: [2]int{offset, offset + 1},
+-			})
++	if hashVersion == hashing.VersionV1 {
++		for path, content := range files {
++			if offset := bytes.IndexByte(content, 0); offset >= 0 {
++				opaqueFindings = append(opaqueFindings, Finding{
++					Class: ClassOpaqueFile, File: path, Pattern: PatternNULByte,
++					Severity: SeverityBlocking, Span: [2]int{offset, offset + 1},
++				})
++			}
+ 		}
++	} else if hashVersion != hashing.VersionV2 {
++		return Report{Findings: []Finding{{
++			Class: ClassOpaqueFile, Pattern: PatternNULByte, Severity: SeverityBlocking,
++		}}}
+ 	}
+-	return detectFiles(files, pin, waivers, opaqueFindings)
++	return detectFiles(files, pin, hashVersion, waivers, opaqueFindings)
+ }
+ 
+-func detectFiles(files map[string][]byte, pin string, waivers []Waiver, opaqueFindings []Finding) Report {
++func detectFiles(files map[string][]byte, pin string, hashVersion hashing.Version, waivers []Waiver, opaqueFindings []Finding) Report {
+ 	var report Report
+ 	paths := make([]string, 0, len(files))
+ 	for path := range files {
+@@ -246,7 +276,7 @@ func detectFiles(files map[string][]byte, pin string, waivers []Waiver, opaqueFi
+ 	memberPin := PinKey(pin)
+ 	for _, waiver := range waivers {
+ 		applied := false
+-		if PinKey(waiver.Pin) == memberPin {
++		if PinKey(waiver.Pin) == memberPin && waiverMatchesHashVersion(pin, hashVersion, waiver.HashVersion) {
+ 			for index := range report.Findings {
+ 				finding := &report.Findings[index]
+ 				if finding.Class != ClassOpaqueFile && finding.File == waiver.File && finding.Span == waiver.Span && !finding.Waived {
+@@ -269,6 +299,19 @@ func detectFiles(files map[string][]byte, pin string, waivers []Waiver, opaqueFi
+ 	return report
+ }
+ 
++func waiverMatchesHashVersion(pin string, memberVersion, waiverVersion hashing.Version) bool {
++	if strings.HasPrefix(strings.TrimSpace(pin), "commit ") {
++		return waiverVersion == 0
++	}
++	if memberVersion == 0 {
++		memberVersion = hashing.VersionV1
++	}
++	if waiverVersion == 0 {
++		waiverVersion = hashing.VersionV1
++	}
++	return memberVersion == waiverVersion
++}
++
+ // isPlaceholder applies the closed placeholder rule: a body whose remainder
+ // after the class prefix is one repeated character or ends in EXAMPLE.
+ func isPlaceholder(class PatternClass, body string) bool {
+diff --git a/internal/contextaudit/contextaudit_test.go b/internal/contextaudit/contextaudit_test.go
+index e1e19261..763bb8bf 100644
+--- a/internal/contextaudit/contextaudit_test.go
++++ b/internal/contextaudit/contextaudit_test.go
+@@ -5,6 +5,8 @@ import (
+ 	"path/filepath"
+ 	"strings"
+ 	"testing"
++
++	"github.com/relux-works/curator/internal/hashing"
+ )
+ 
+ // Production entry points under test: Detect, DetectFiles, InScope, PinKey,
+@@ -133,6 +135,30 @@ func TestDetectorIsUnpinnable(t *testing.T) {
+ 	}
+ }
+ 
++func TestSecretWaiversRequireEqualStateHashVersion(t *testing.T) {
++	files := map[string][]byte{"context/a.md": []byte("key " + exampleKey() + " here\n")}
++	finding := DetectFilesAtVersion(files, "state sha256:"+testPin, hashing.VersionV1, nil)
++	if len(finding.Findings) != 1 {
++		t.Fatalf("findings %+v", finding.Findings)
++	}
++	span := finding.Findings[0].Span
++	v1Waiver := Waiver{Pin: testPin, File: "context/a.md", Span: span, Reason: "legacy review"}
++	v2Waiver := Waiver{Pin: testPin, HashVersion: hashing.VersionV2, File: "context/a.md", Span: span, Reason: "v2 review"}
++
++	if report := DetectFilesAtVersion(files, "state sha256:"+testPin, hashing.VersionV2, []Waiver{v1Waiver}); !report.Blocking() {
++		t.Fatal("a v1 state waiver cleared a v2 state finding")
++	}
++	if report := DetectFilesAtVersion(files, "state sha256:"+testPin, hashing.VersionV2, []Waiver{v2Waiver}); report.Blocking() {
++		t.Fatalf("same-version state waiver did not clear finding: %+v", report)
++	}
++	if report := DetectFilesAtVersion(files, "state sha256:"+testPin, hashing.VersionV1, []Waiver{v2Waiver}); !report.Blocking() {
++		t.Fatal("a v2 state waiver cleared a v1 state finding")
++	}
++	if report := DetectFilesAtVersion(files, "commit "+testPin, hashing.VersionV1, []Waiver{v2Waiver}); !report.Blocking() {
++		t.Fatal("a v2 state waiver cleared a commit-pinned finding")
++	}
++}
++
+ func TestOpaqueNULBlocksOutsideSecretScopeAndIgnoresWaivers(t *testing.T) {
+ 	files := map[string][]byte{"assets/deep/image.bin": []byte("prefix\x00suffix")}
+ 	report := DetectFiles(files, testPin, []Waiver{{
+@@ -151,6 +177,28 @@ func TestOpaqueNULBlocksOutsideSecretScopeAndIgnoresWaivers(t *testing.T) {
+ 	if len(report.Waivers) != 1 || report.Waivers[0].Diagnostic != DiagWaiverUnmatched {
+ 		t.Fatalf("opaque waiver result %+v, want unmatched waiver", report.Waivers)
+ 	}
++	v2Report := DetectFilesAtVersion(files, testPin, hashing.VersionV2, nil)
++	if v2Report.Blocking() {
++		t.Fatalf("v2 treats NUL as ordinary file data, got %+v", v2Report.Findings)
++	}
++}
++
++func TestDetectAtVersionAppliesNULRuleOnlyToV1(t *testing.T) {
++	root := t.TempDir()
++	if err := os.MkdirAll(filepath.Join(root, "assets", "deep"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(root, "assets", "deep", "image.bin"), []byte("prefix\x00suffix"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	v1, err := DetectAtVersion(root, "commit "+testPin, hashing.VersionV1, nil)
++	if err != nil || !v1.Blocking() {
++		t.Fatalf("v1 opaque rule report=%+v err=%v, want blocking", v1, err)
++	}
++	v2, err := DetectAtVersion(root, "commit "+testPin, hashing.VersionV2, nil)
++	if err != nil || v2.Blocking() {
++		t.Fatalf("v2 NUL bytes are ordinary data, report=%+v err=%v", v2, err)
++	}
+ }
+ 
+ func TestDetectScansDeepRegularFiles(t *testing.T) {
+diff --git a/internal/contextlock/contextlock.go b/internal/contextlock/contextlock.go
+index c5bc6a80..5f3963cf 100644
+--- a/internal/contextlock/contextlock.go
++++ b/internal/contextlock/contextlock.go
+@@ -1,5 +1,5 @@
+ // Package contextlock is the profile lock of the agent-environments
+-// capability, context-lock-v1 (environments §1.3): the strict schema-1
++// capability, context-lock-v1/v2 (environments §1.3): the strict schema
+ // object naming the root and every closure member, its canonical CCJ-1 bytes,
+ // and the lock hash that is the profile's effective pin.
+ package contextlock
+@@ -23,9 +23,12 @@ import (
+ 	"github.com/relux-works/curator/internal/stateread"
+ )
+ 
+-// SchemaVersion is the only lock schema this release reads or writes.
++// SchemaVersion is the frozen v1 lock schema retained for reads.
+ const SchemaVersion = 1
+ 
++// SchemaVersion2 is the current writer schema; it carries hash_version 2.
++const SchemaVersion2 = 2
++
+ // Member kinds, in their bytewise order.
+ const (
+ 	KindContext = "context"
+@@ -68,8 +71,10 @@ func (m Member) PinKey() string {
+ 
+ // Lock is one context-lock-v1 object.
+ type Lock struct {
+-	Root    string
+-	Members []Member
++	SchemaVersion int
++	HashVersion   int
++	Root          string
++	Members       []Member
+ }
+ 
+ // Delta is one resolved-version change between two locks. Exactly one of
+@@ -124,7 +129,8 @@ func ResolvedDelta(oldLock, newLock *Lock) []Delta {
+ 		case !hasNew:
+ 			copyMember := oldMember
+ 			deltas = append(deltas, Delta{Old: &copyMember})
+-		case oldMember.Version != newMember.Version || deltaMemberPin(oldMember) != deltaMemberPin(newMember):
++		case oldMember.Version != newMember.Version || deltaMemberPin(oldMember) != deltaMemberPin(newMember) ||
++			(oldMember.StateHash != "" && newMember.StateHash != "" && lockHashVersion(oldLock) != lockHashVersion(newLock)):
+ 			oldCopy, newCopy := oldMember, newMember
+ 			deltas = append(deltas, Delta{Old: &oldCopy, New: &newCopy})
+ 		}
+@@ -211,8 +217,12 @@ var (
+ 	hex256RE = regexp.MustCompile(`^[0-9a-f]{64}$`)
+ )
+ 
+-// Validate applies the context-lock-v1 schema rules.
++// Validate applies the context-lock-v1/v2 schema rules.
+ func (lock *Lock) Validate() error {
++	schemaVersion, hashVersion := lockVersions(lock)
++	if (schemaVersion != SchemaVersion || hashVersion != 1) && (schemaVersion != SchemaVersion2 || hashVersion != 2) {
++		return fmt.Errorf("lock schema_version %d and hash_version %d are incompatible", schemaVersion, hashVersion)
++	}
+ 	if !identifiers.Valid(lock.Root) {
+ 		return fmt.Errorf("lock root %q is not a portable identifier", lock.Root)
+ 	}
+@@ -302,6 +312,7 @@ func (lock *Lock) Validate() error {
+ 
+ // Object renders the lock as the JSON-domain value CCJ-1 encodes.
+ func (lock *Lock) Object() map[string]any {
++	schemaVersion, hashVersion := lockVersions(lock)
+ 	members := make([]any, 0, len(lock.Members))
+ 	for _, member := range lock.Members {
+ 		object := map[string]any{
+@@ -332,11 +343,36 @@ func (lock *Lock) Object() map[string]any {
+ 		}
+ 		members = append(members, object)
+ 	}
+-	return map[string]any{
+-		"schema_version": SchemaVersion,
++	object := map[string]any{
++		"schema_version": schemaVersion,
+ 		"root":           lock.Root,
+ 		"members":        members,
+ 	}
++	if schemaVersion == SchemaVersion2 {
++		object["hash_version"] = hashVersion
++	}
++	return object
++}
++
++func lockVersions(lock *Lock) (int, int) {
++	schemaVersion := lock.SchemaVersion
++	if schemaVersion == 0 {
++		schemaVersion = SchemaVersion2
++	}
++	hashVersion := lock.HashVersion
++	if hashVersion == 0 {
++		if schemaVersion == SchemaVersion {
++			hashVersion = 1
++		} else {
++			hashVersion = 2
++		}
++	}
++	return schemaVersion, hashVersion
++}
++
++func lockHashVersion(lock *Lock) int {
++	_, hashVersion := lockVersions(lock)
++	return hashVersion
+ }
+ 
+ // Canonical returns the CCJ-1 bytes of the lock after validation.
+@@ -371,6 +407,7 @@ func Parse(payload []byte) (*Lock, error) {
+ 	decoder.UseNumber()
+ 	var raw struct {
+ 		SchemaVersion json.Number `json:"schema_version"`
++		HashVersion   json.Number `json:"hash_version"`
+ 		Root          string      `json:"root"`
+ 		Members       []struct {
+ 			Kind       string      `json:"kind"`
+@@ -389,10 +426,21 @@ func Parse(payload []byte) (*Lock, error) {
+ 	if err := decoder.Decode(&raw); err != nil {
+ 		return nil, fmt.Errorf("invalid lock: %w", err)
+ 	}
+-	if raw.SchemaVersion.String() != strconv.Itoa(SchemaVersion) {
+-		return nil, fmt.Errorf("invalid lock: schema_version must be %d", SchemaVersion)
++	schemaVersion, err := strconv.Atoi(raw.SchemaVersion.String())
++	if err != nil || (schemaVersion != SchemaVersion && schemaVersion != SchemaVersion2) {
++		return nil, fmt.Errorf("invalid lock: schema_version must be %d or %d", SchemaVersion, SchemaVersion2)
++	}
++	hashVersion := 1
++	if schemaVersion == SchemaVersion2 {
++		parsed, parseErr := strconv.Atoi(raw.HashVersion.String())
++		if parseErr != nil || parsed != 2 {
++			return nil, fmt.Errorf("invalid lock: schema_version 2 requires hash_version 2")
++		}
++		hashVersion = parsed
++	} else if raw.HashVersion.String() != "" {
++		return nil, fmt.Errorf("invalid lock: schema_version 1 does not carry hash_version")
+ 	}
+-	lock := &Lock{Root: raw.Root}
++	lock := &Lock{SchemaVersion: schemaVersion, HashVersion: hashVersion, Root: raw.Root}
+ 	for _, member := range raw.Members {
+ 		weight, err := strconv.ParseInt(member.Weight.String(), 10, 64)
+ 		if err != nil {
+diff --git a/internal/contextlock/schema_conformance_test.go b/internal/contextlock/schema_conformance_test.go
+index 34b086fa..0f33db00 100644
+--- a/internal/contextlock/schema_conformance_test.go
++++ b/internal/contextlock/schema_conformance_test.go
+@@ -15,6 +15,53 @@ type frozenLockSchemaIndexEntry struct {
+ 	Valid    bool   `json:"valid"`
+ }
+ 
++func TestContextLockV2SchemaCases(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++		return
++	}
++	indexBytes, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var index []frozenLockSchemaIndexEntry
++	if err := json.Unmarshal(indexBytes, &index); err != nil {
++		t.Fatalf("parse schema-case index: %v", err)
++	}
++	const family = "context-lock-v2"
++	prefix := family + "/"
++	var cases []frozenLockSchemaIndexEntry
++	for _, entry := range index {
++		if strings.HasPrefix(entry.Instance, prefix) {
++			cases = append(cases, entry)
++		}
++	}
++	conformancecoverage.RequirePublishedCount(t, family+"/schema-cases", len(cases))
++	conformancecoverage.RunOutcomes(t, family+"/schema-cases", cases,
++		func(entry frozenLockSchemaIndexEntry) string { return strings.TrimPrefix(entry.Instance, prefix) },
++		func(t *testing.T, entry frozenLockSchemaIndexEntry) conformancecoverage.Observation {
++			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", filepath.FromSlash(entry.Instance)))
++			if err != nil {
++				t.Fatal(err)
++			}
++			lock, parseErr := Parse(payload)
++			if (parseErr == nil) != entry.Valid {
++				t.Fatalf("valid=%v: Parse err=%v", entry.Valid, parseErr)
++			}
++			if entry.Valid && (lock.SchemaVersion != SchemaVersion2 || lock.HashVersion != 2) {
++				t.Fatalf("parsed versions = schema:%d hash:%d, want 2/2", lock.SchemaVersion, lock.HashVersion)
++			}
++			return conformancecoverage.Observation{}
++		})
++}
++
+ func TestParseRejectsHashVersionOnFrozenContextLock(t *testing.T) {
+ 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+ 	if root == "" {
+diff --git a/internal/contextmaterialize/contextmaterialize.go b/internal/contextmaterialize/contextmaterialize.go
+index f5a7dc26..9af3b3c5 100644
+--- a/internal/contextmaterialize/contextmaterialize.go
++++ b/internal/contextmaterialize/contextmaterialize.go
+@@ -20,6 +20,7 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/contextlock"
+ 	"github.com/relux-works/curator/internal/contextpkg"
++	"github.com/relux-works/curator/internal/hashing"
+ )
+ 
+ // HeaderTypeLine is the generation-header type line.
+@@ -287,24 +288,10 @@ func SystemPrompt(lock *contextlock.Lock, precedence Precedence, environment str
+ }
+ 
+ // SurfaceHash is the core §8 content hash over a materialized file set keyed
+-// by home-relative portable path: records "path NUL content" joined by NUL,
+-// in bytewise path order, prefixed "sha256:".
++// by home-relative portable path, using the v2 content identity framing.
+ func SurfaceHash(files map[string][]byte) string {
+-	paths := make([]string, 0, len(files))
+-	for path := range files {
+-		paths = append(paths, path)
+-	}
+-	sort.Strings(paths)
+-	digest := sha256.New()
+-	for index, path := range paths {
+-		if index > 0 {
+-			digest.Write([]byte{0})
+-		}
+-		digest.Write([]byte(path))
+-		digest.Write([]byte{0})
+-		digest.Write(files[path])
+-	}
+-	return "sha256:" + hex.EncodeToString(digest.Sum(nil))
++	digest, _ := hashing.ContentSHA256Files(files, hashing.VersionV2)
++	return digest
+ }
+ 
+ // FileHash is the plain SHA-256 of one file's bytes, "sha256:" prefixed.
+diff --git a/internal/contextresolve/contextresolve.go b/internal/contextresolve/contextresolve.go
+index 6465589a..1047022d 100644
+--- a/internal/contextresolve/contextresolve.go
++++ b/internal/contextresolve/contextresolve.go
+@@ -19,6 +19,7 @@ import (
+ 	"strings"
+ 
+ 	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/identity"
+ 	"github.com/relux-works/curator/internal/pkgversion"
+ )
+@@ -243,14 +244,15 @@ type Result struct {
+ 
+ // Resolved is where a member was resolved from.
+ type Resolved struct {
+-	Kind      string
+-	Name      string
+-	Source    string
+-	Directory string
+-	Commit    string
+-	StateHash string
+-	Version   string
+-	Package   *Package
++	Kind        string
++	Name        string
++	Source      string
++	Directory   string
++	Commit      string
++	StateHash   string
++	HashVersion hashing.Version
++	Version     string
++	Package     *Package
+ }
+ 
+ // Key joins kind and name.
+@@ -897,7 +899,7 @@ func (r *resolver) build() (*Result, error) {
+ 
+ 	var warnings []Warning
+ 	result := &Result{Members: map[string]Resolved{}}
+-	lock := &contextlock.Lock{Root: rootName}
++	lock := &contextlock.Lock{SchemaVersion: contextlock.SchemaVersion2, HashVersion: int(hashing.VersionV2), Root: rootName}
+ 	names := make([]string, 0, len(r.selected))
+ 	for name := range r.selected {
+ 		names = append(names, name)
+@@ -968,7 +970,7 @@ func (r *resolver) build() (*Result, error) {
+ 		member.Weight = weight
+ 		lock.Members = append(lock.Members, member)
+ 		result.Members[Key(sel.kind, name)] = Resolved{Kind: sel.kind, Name: name, Source: sel.source, Directory: sel.directory,
+-			Commit: sel.commit, StateHash: member.StateHash, Version: member.Version, Package: sel.pkg}
++			Commit: sel.commit, StateHash: member.StateHash, HashVersion: hashing.VersionV2, Version: member.Version, Package: sel.pkg}
+ 	}
+ 	lock.Sort()
+ 	hash, err := lock.Hash()
+diff --git a/internal/contextstore/contextstore.go b/internal/contextstore/contextstore.go
+index abd72104..77f41335 100644
+--- a/internal/contextstore/contextstore.go
++++ b/internal/contextstore/contextstore.go
+@@ -58,7 +58,7 @@ func Exists(home, kind, name, pinKey string) (bool, error) {
+ // ContentHash is the core §8 content hash of a store entry (no exclusions:
+ // a store entry carries no marker).
+ func ContentHash(dir string) (string, error) {
+-	return hashing.ContentSHA256(dir, map[string]bool{})
++	return hashing.ContentSHA256WithVersion(dir, map[string]bool{}, hashing.VersionV2)
+ }
+ 
+ // EnsureGit installs the snapshot of commit from repo as the entry of
+diff --git a/internal/contextstore/contextstore_test.go b/internal/contextstore/contextstore_test.go
+index 0d14a4f1..f58b25eb 100644
+--- a/internal/contextstore/contextstore_test.go
++++ b/internal/contextstore/contextstore_test.go
+@@ -51,6 +51,26 @@ func TestStateEntryIsContentKeyed(t *testing.T) {
+ 	}
+ }
+ 
++func TestContentHashUsesVersion2Framing(t *testing.T) {
++	dir := t.TempDir()
++	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("curator\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.MkdirAll(filepath.Join(dir, "src"), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "src", "main.go"), []byte("package main\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	got, err := ContentHash(dir)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got != "sha256:55150544f675ac2ff1a88407e6231a7f93c5a78a75e1b3f183463ae78d9a95cf" {
++		t.Fatalf("ContentHash() = %s, want the v2 ordinary-tree vector", got)
++	}
++}
++
+ // TestStateEntryRejectsLinks narrows the archive-discipline gate: a symlink
+ // in a state tree must fail with profile_source_invalid. A mutant that
+ // copies through links must fail this test.
+diff --git a/internal/envmarker/envmarker.go b/internal/envmarker/envmarker.go
+index 31c25591..df6b3809 100644
+--- a/internal/envmarker/envmarker.go
++++ b/internal/envmarker/envmarker.go
+@@ -1,5 +1,5 @@
+ // Package envmarker reads and writes the environment marker of environments
+-// §8.2, agent-environment-marker-v1 and agent-environment-marker-v2: the
++// §8.2, agent-environment-marker-v1, v2, and v3: the
+ // per-home ledger of record for environment surfaces
+ // (.agent-environment.json). Readers reject an unsupported version and
+ // unknown fields; failed reads and malformed content fail closed as
+@@ -24,12 +24,13 @@ import (
+ // Name is the marker file name beside the managed surfaces.
+ const Name = ".agent-environment.json"
+ 
+-// Marker schema versions supported by the reader. New managed-home
+-// provisioning writes VersionV2; linked and copied markers retain v1 until
+-// their owning writer migrates them independently.
++// Marker schema versions supported by the reader. Version 3 is the current
++// writer shape and records content framing version 2. Versions 1 and 2 keep
++// their frozen v1 meaning.
+ const (
+ 	VersionV1 = 1
+ 	VersionV2 = 2
++	VersionV3 = 3
+ 	// Version is the legacy writer version for marker paths outside managed
+ 	// homes. Keep those call sites explicit until their own schema-2 work.
+ 	Version = VersionV1
+@@ -126,6 +127,7 @@ type Surface struct {
+ // reader accepts a managed-home marker; callers decide which schema to write.
+ type Marker struct {
+ 	Version         int                `json:"version"`
++	HashVersion     int                `json:"hash_version,omitempty"`
+ 	Profile         Profile            `json:"profile"`
+ 	Members         []Member           `json:"members"`
+ 	Precedence      Precedence         `json:"precedence"`
+@@ -169,9 +171,16 @@ var (
+ 
+ // Validate applies the schema rules.
+ func (m *Marker) Validate() error {
+-	if m.Version != VersionV1 && m.Version != VersionV2 {
++	if m.Version != VersionV1 && m.Version != VersionV2 && m.Version != VersionV3 {
+ 		return &unsupportedMarkerVersionError{version: m.Version}
+ 	}
++	if m.Version == VersionV3 {
++		if m.HashVersion != 2 {
++			return fmt.Errorf("version 3 requires hash_version 2")
++		}
++	} else if m.HashVersion != 0 {
++		return fmt.Errorf("versions 1 and 2 do not carry hash_version")
++	}
+ 	if !identifiers.Valid(m.Profile.Name) || !identifiers.Valid(m.Profile.Root) {
+ 		return fmt.Errorf("profile name or root is not a portable identifier")
+ 	}
+diff --git a/internal/envmarker/envmarker_test.go b/internal/envmarker/envmarker_test.go
+index 5ef0859c..2c13b7c0 100644
+--- a/internal/envmarker/envmarker_test.go
++++ b/internal/envmarker/envmarker_test.go
+@@ -49,15 +49,15 @@ func TestRoundTrip(t *testing.T) {
+ 
+ // TestUnsupportedVersionIsRejected narrows the version gate: readers reject
+ // an unsupported marker version and never infer newer semantics. A mutant
+-// that accepts version 3 must fail this test.
++// that accepts version 4 must fail this test.
+ func TestUnsupportedVersionIsRejected(t *testing.T) {
+ 	payload, err := testMarker().Marshal()
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	future := strings.Replace(string(payload), `"version": 1`, `"version": 3`, 1)
++	future := strings.Replace(string(payload), `"version": 1`, `"version": 4`, 1)
+ 	if _, err := Parse([]byte(future)); err == nil {
+-		t.Fatal("version 3 must be rejected")
++		t.Fatal("version 4 must be rejected")
+ 	} else if !strings.Contains(err.Error(), DiagMarkerInvalid) {
+ 		t.Fatalf("error %v carries no %s", err, DiagMarkerInvalid)
+ 	}
+@@ -69,7 +69,7 @@ func TestReadKeepsUnsupportedVersionDiagnostic(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	future := strings.Replace(string(payload), `"version": 1`, `"version": 3`, 1)
++	future := strings.Replace(string(payload), `"version": 1`, `"version": 4`, 1)
+ 	if err := os.WriteFile(filepath.Join(home, Name), []byte(future), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/internal/envmarker/marker_env_schema_test.go b/internal/envmarker/marker_env_schema_test.go
+index afe25191..75bb3cd9 100644
+--- a/internal/envmarker/marker_env_schema_test.go
++++ b/internal/envmarker/marker_env_schema_test.go
+@@ -149,3 +149,36 @@ func TestParseAuthoritativeEnvMarkerV2SchemaCases(t *testing.T) {
+ 			return conformancecoverage.Observation{}
+ 		})
+ }
++
++func TestParseAuthoritativeEnvMarkerV3SchemaCases(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++		return
++	}
++	cases := schemaCaseValidity(t, root, "agent-environment-marker-v3")
++	conformancecoverage.RunOutcomes(t, "agent-environment-marker-v3/schema-cases", cases,
++		func(tc namedSchemaCase) string { return tc.Name }, func(t *testing.T, tc namedSchemaCase) conformancecoverage.Observation {
++			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "agent-environment-marker-v3", tc.Name)) // #nosec G304 -- explicit conformance input
++			if err != nil {
++				t.Fatal(err)
++			}
++			parsed, parseErr := Parse(payload)
++			if tc.Valid && parseErr != nil {
++				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("Parse rejected published-valid case: %v", parseErr)}
++			}
++			if !tc.Valid && parseErr == nil {
++				return conformancecoverage.Observation{FailureReason: "Parse accepted published-invalid case"}
++			}
++			if tc.Valid && (parsed.Version != VersionV3 || parsed.HashVersion != 2) {
++				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("parsed versions = marker:%d hash:%d, want 3/2", parsed.Version, parsed.HashVersion)}
++			}
++			return conformancecoverage.Observation{}
++		})
++}
+diff --git a/internal/envprofile/credential_link_test.go b/internal/envprofile/credential_link_test.go
+index 8d97599e..efc38956 100644
+--- a/internal/envprofile/credential_link_test.go
++++ b/internal/envprofile/credential_link_test.go
+@@ -444,7 +444,7 @@ func TestPiProvisionTargetsAgentRoot(t *testing.T) {
+ 		t.Fatalf("the pending finding is not a conflict: %q", resolved)
+ 	}
+ 	marker := readManagedMarker(t, fx, "pi")
+-	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
++	if marker.Version != envmarker.VersionV3 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
+ 		t.Fatalf("one passthrough entry recorded: %+v", marker.Passthrough)
+ 	}
+ 	entry := (*marker.Passthrough)[0]
+diff --git a/internal/envprofile/credential_record_test.go b/internal/envprofile/credential_record_test.go
+index 2cf0d432..3dec70e3 100644
+--- a/internal/envprofile/credential_record_test.go
++++ b/internal/envprofile/credential_record_test.go
+@@ -65,8 +65,8 @@ func TestResolvePublishesCredentialMarkerThroughLockedJournal(t *testing.T) {
+ 		t.Fatalf("marker publication evidence: install=%t sibling_stage=%t second_lock_refused=%t", reachedMarkerInstall, stagedBesideMarker, secondLockRefused)
+ 	}
+ 	marker := readManagedMarker(t, fx, "codex_cli")
+-	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
+-		t.Fatalf("provision writes one schema-2 record: %+v", marker)
++	if marker.Version != envmarker.VersionV3 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
++		t.Fatalf("provision writes one schema-3 hash-v2 record: %+v", marker)
+ 	}
+ 	entry := (*marker.Passthrough)[0]
+ 	if entry.Path != "auth.json" || entry.Isolation != "shared" || entry.Strategy != "keyring-preferred" ||
+@@ -77,7 +77,7 @@ func TestResolvePublishesCredentialMarkerThroughLockedJournal(t *testing.T) {
+ 
+ // TestResolveRecoversCredentialMarkerAfterRenameCrash leaves the transaction
+ // journal and same-directory staging file at the exact before-rename boundary,
+-// then drives Resolve again to recover and verify the complete v2 marker.
++// then drives Resolve again to recover and verify the complete v3 marker.
+ func TestResolveRecoversCredentialMarkerAfterRenameCrash(t *testing.T) {
+ 	fx := writeManagedFixture(t, "acme")
+ 	seedLiveNativeCredentials(t, fx)
+@@ -117,7 +117,7 @@ func TestResolveRecoversCredentialMarkerAfterRenameCrash(t *testing.T) {
+ 		t.Fatalf("the next resolve recovers and verifies the marker: %v", err)
+ 	}
+ 	marker := readManagedMarker(t, fx, "codex_cli")
+-	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 || (*marker.Passthrough)[0].Provenance != "provisioned" {
++	if marker.Version != envmarker.VersionV3 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 || (*marker.Passthrough)[0].Provenance != "provisioned" {
+ 		t.Fatalf("recovery installs the complete intended marker: %+v", marker)
+ 	}
+ 	journals, err = os.ReadDir(filepath.Join(fx.home, "state", "transactions", "v1"))
+diff --git a/internal/envprofile/envprofile.go b/internal/envprofile/envprofile.go
+index daa7a32a..0a027512 100644
+--- a/internal/envprofile/envprofile.go
++++ b/internal/envprofile/envprofile.go
+@@ -464,6 +464,9 @@ type Policy struct {
+ 	// SystemModuleWaivers admits transitive packages' system modules by
+ 	// name (environments §3, §12.1).
+ 	SystemModuleWaivers []SystemModuleWaiver
++	// SecretWaivers are scoped to both the member pin and its state-hash
++	// framing version. A legacy v1 waiver cannot clear a v2 state finding.
++	SecretWaivers []contextaudit.Waiver
+ 	// Takeover is the explicit section 9.5 takeover flag carried by a
+ 	// mutating operation (profile install, use, update, sync, env resolve
+ 	// --repair): with it the operation backs up and takes over the
+@@ -620,6 +623,16 @@ func PolicyFromConfig(cfg *config.Config) Policy {
+ 		policy.SystemModuleWaivers = append(policy.SystemModuleWaivers,
+ 			SystemModuleWaiver{Package: waiver.Package, Reason: waiver.Reason})
+ 	}
++	for _, waiver := range cfg.Env.SecretWaivers {
++		hashVersion := hashing.VersionV1
++		if waiver.HashVersion == 2 {
++			hashVersion = hashing.VersionV2
++		}
++		policy.SecretWaivers = append(policy.SecretWaivers, contextaudit.Waiver{
++			Pin: waiver.Pin, HashVersion: hashVersion,
++			File: waiver.File, Span: waiver.Span, Reason: waiver.Reason,
++		})
++	}
+ 	if len(cfg.Env.Overlays) > 0 {
+ 		policy.Overlays = map[string][]OverlaySpec{}
+ 		for profile, list := range cfg.Env.Overlays {
+@@ -1531,7 +1544,7 @@ func auditMember(home string, manager *gitManager, key string, resolved contextr
+ 	}
+ 	defer cleanup()
+ 	root := packageRoot(entry, resolved.Directory)
+-	report, err := contextaudit.Detect(root, pinOf(resolved), nil)
++	report, err := contextaudit.DetectAtVersion(root, pinOf(resolved), resolvedHashVersion(resolved), policy.SecretWaivers)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -1570,7 +1583,7 @@ func auditNewUpdateMember(home string, manager *gitManager, key string, resolved
+ 		return err
+ 	}
+ 	defer cleanup()
+-	report, err := contextaudit.Detect(packageRoot(entry, resolved.Directory), pinOf(resolved), nil)
++	report, err := contextaudit.DetectAtVersion(packageRoot(entry, resolved.Directory), pinOf(resolved), resolvedHashVersion(resolved), policy.SecretWaivers)
+ 	if err != nil {
+ 		return err
+ 	}
+@@ -1661,6 +1674,13 @@ func pinOf(resolved contextresolve.Resolved) string {
+ 	return "state sha256:" + resolved.StateHash
+ }
+ 
++func resolvedHashVersion(resolved contextresolve.Resolved) hashing.Version {
++	if resolved.HashVersion == 0 {
++		return hashing.VersionV1
++	}
++	return resolved.HashVersion
++}
++
+ // strictAuditMember runs the manager §7 source audit in strict mode over one
+ // member (environments §9.1): raw-tree hashing, the static canary whose
+ // failure always blocks, the deterministic detectors, and revocation.
+@@ -1998,7 +2018,7 @@ func migrateGlobalSkills(home string, policy Policy) ([]contextlock.Member, erro
+ 		if err != nil {
+ 			return nil, err
+ 		}
+-		if report, err := contextaudit.Detect(entry, "commit "+resolved.Commit, nil); err != nil {
++		if report, err := contextaudit.DetectAtVersion(entry, "commit "+resolved.Commit, hashing.VersionV1, policy.SecretWaivers); err != nil {
+ 			return nil, err
+ 		} else if report.Blocking() {
+ 			finding, _ := report.FirstBlocking()
+diff --git a/internal/envprofile/envprofile_policy_test.go b/internal/envprofile/envprofile_policy_test.go
+index 90a4d8dd..65f21c28 100644
+--- a/internal/envprofile/envprofile_policy_test.go
++++ b/internal/envprofile/envprofile_policy_test.go
+@@ -5,7 +5,9 @@ import (
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/contextaudit"
+ 	"github.com/relux-works/curator/internal/contextmaterialize"
++	"github.com/relux-works/curator/internal/hashing"
+ )
+ 
+ // TestPolicyFromConfigCarriesEnvGates drives the production PolicyFromConfig
+@@ -93,6 +95,41 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
+ 	}
+ }
+ 
++func TestPolicyFromConfigCarriesStateWaiverHashVersion(t *testing.T) {
++	cfg, err := config.Parse(map[string]any{
++		"schema_version": float64(3), "skills_root": "x", "projects": map[string]any{},
++		"environments": map[string]any{
++			"secret_material_waivers": []any{
++				map[string]any{
++					"pin": strings.Repeat("ab", 32), "file": "context/a.md",
++					"span": []any{float64(1), float64(2)}, "reason": "legacy state review",
++				},
++				map[string]any{
++					"pin": strings.Repeat("cd", 32), "hash_version": float64(2), "file": "context/b.md",
++					"span": []any{float64(3), float64(4)}, "reason": "v2 state review",
++				},
++			},
++		},
++	}, "config.json")
++	if err != nil {
++		t.Fatal(err)
++	}
++
++	policy := PolicyFromConfig(cfg)
++	if len(policy.SecretWaivers) != 2 {
++		t.Fatalf("state waivers = %+v, want legacy and v2 waivers", policy.SecretWaivers)
++	}
++	want := []contextaudit.Waiver{
++		{Pin: strings.Repeat("ab", 32), HashVersion: hashing.VersionV1, File: "context/a.md", Span: [2]int{1, 2}, Reason: "legacy state review"},
++		{Pin: strings.Repeat("cd", 32), HashVersion: hashing.VersionV2, File: "context/b.md", Span: [2]int{3, 4}, Reason: "v2 state review"},
++	}
++	for index := range want {
++		if policy.SecretWaivers[index] != want[index] {
++			t.Errorf("state waiver %d = %+v, want %+v", index, policy.SecretWaivers[index], want[index])
++		}
++	}
++}
++
+ // TestMachineClearReachesSeamGate drives the machine-clear combination
+ // (clearScope with no scope, which the CLI rejects as usage) through the
+ // production UseWithPolicy seam: the single structural gate refuses when
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index d12ab96e..ca44ad39 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -348,7 +348,8 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
+ 		return nil, err
+ 	}
+ 	marker := &envmarker.Marker{
+-		Version: 1,
++		Version:     envmarker.VersionV3,
++		HashVersion: 2,
+ 		Profile: envmarker.Profile{
+ 			Name: req.Profile, Root: lock.Root, Kind: markerKind(source),
+ 			LockSHA256: strings.TrimPrefix(hash, "sha256:"),
+@@ -1294,7 +1295,8 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
+ 		return nil, err
+ 	}
+ 	marker := plan.marker
+-	marker.Version = envmarker.VersionV2
++	marker.Version = envmarker.VersionV3
++	marker.HashVersion = 2
+ 	if prior != nil && prior.CodexSeedRecord != nil {
+ 		record := *prior.CodexSeedRecord
+ 		record.NativeMCPServers = append([]string{}, prior.CodexSeedRecord.NativeMCPServers...)
+@@ -1706,6 +1708,9 @@ func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source,
+ 		return verdict
+ 	}
+ 	verdict.marker = marker
++	if marker.Version != envmarker.VersionV3 || marker.HashVersion != 2 {
++		verdict.reasons = append(verdict.reasons, "environment marker content-hash version is not current")
++	}
+ 	manager := newGitManager(req.Home)
+ 	servers, err := mcpsOf(req.Home, manager, lock)
+ 	if err != nil {
+@@ -1983,7 +1988,7 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
+ 		v.reasons = append(v.reasons, fmt.Sprintf("passthrough: %v", err))
+ 		return
+ 	}
+-	if marker.Version == envmarker.VersionV2 {
++	if marker.Version != envmarker.VersionV1 {
+ 		expected, err := req.credentialRecords(plan.adapter, plan.isolation, "provisioned")
+ 		if err != nil {
+ 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough: %v", err))
+diff --git a/internal/envprofile/migrate.go b/internal/envprofile/migrate.go
+index 4313e964..fc3cbfce 100644
+--- a/internal/envprofile/migrate.go
++++ b/internal/envprofile/migrate.go
+@@ -1286,7 +1286,8 @@ func changedMarkers(report *MigrateReport) (map[string][]byte, map[string][]byte
+ 			continue
+ 		}
+ 		updated := *home.marker
+-		updated.Version = envmarker.VersionV2
++		updated.Version = envmarker.VersionV3
++		updated.HashVersion = 2
+ 		complete := append([]envmarker.Passthrough{}, home.credentialRecords...)
+ 		updated.Passthrough = &complete
+ 		payload, err := updated.Marshal()
+diff --git a/internal/envprofile/migrate_test.go b/internal/envprofile/migrate_test.go
+index 39c0e152..d19230af 100644
+--- a/internal/envprofile/migrate_test.go
++++ b/internal/envprofile/migrate_test.go
+@@ -287,11 +287,11 @@ func TestMigratePiWrongTargetToAgentRoot(t *testing.T) {
+ 	}
+ }
+ 
+-// TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker proves that a
++// TestMigrateSchema1UnlinkPublishesCompleteSchema3Marker proves that a
+ // schema-1 marker stays old until migration already requires a marker update
+-// for an unlink; that replacement upgrades once and records the complete v2
++// for an unlink; that replacement upgrades once and records the complete v3
+ // credential set for the new isolated state.
+-func TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker(t *testing.T) {
++func TestMigrateSchema1UnlinkPublishesCompleteSchema3Marker(t *testing.T) {
+ 	requireLinkCapability(t)
+ 	fx := writeManagedFixture(t, "acme")
+ 	seedLiveNativeCredentials(t, fx)
+@@ -308,6 +308,7 @@ func TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker(t *testing.T) {
+ 	}
+ 	legacy := *marker
+ 	legacy.Version = envmarker.VersionV1
++	legacy.HashVersion = 0
+ 	legacy.Passthrough = &legacyEntries
+ 	legacyBytes, err := legacy.Marshal()
+ 	if err != nil {
+@@ -339,7 +340,7 @@ func TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker(t *testing.T) {
+ 		t.Fatalf("the migration unlinks the recorded passthrough: %v", err)
+ 	}
+ 	upgraded := readManagedMarker(t, fx, "pi")
+-	if upgraded.Version != envmarker.VersionV2 || upgraded.Passthrough == nil || len(*upgraded.Passthrough) != 0 {
++	if upgraded.Version != envmarker.VersionV3 || upgraded.HashVersion != 2 || upgraded.Passthrough == nil || len(*upgraded.Passthrough) != 0 {
+ 		t.Fatalf("marker replacement upgrades with the complete isolated record set: %+v", upgraded)
+ 	}
+ }
+diff --git a/internal/envprofile/state_read_guard_test.go b/internal/envprofile/state_read_guard_test.go
+index 6fa3815f..813e19ae 100644
+--- a/internal/envprofile/state_read_guard_test.go
++++ b/internal/envprofile/state_read_guard_test.go
+@@ -86,7 +86,6 @@ func reviewedManagerReadExceptions() map[string]string {
+ 	)
+ 	allow("Inspects a caller-selected source snapshot for declared content; absence means the snapshot lacks that input and other read failures do not count as absence.",
+ 		"internal/audit/audit.go:detectWithOpaquePaths",
+-		"internal/contextaudit/contextaudit.go:Detect",
+ 		"internal/closure/resolve.go:openGitFrozen",
+ 		"internal/closure/resolve.go:serveGitSubtree",
+ 		"internal/closure/resolve.go:stagePriorFile",
+diff --git a/internal/hashing/hashing.go b/internal/hashing/hashing.go
+index 3f590ddc..485e1282 100644
+--- a/internal/hashing/hashing.go
++++ b/internal/hashing/hashing.go
+@@ -10,17 +10,49 @@ package hashing
+ 
+ import (
+ 	"crypto/sha256"
++	"encoding/binary"
+ 	"encoding/hex"
++	"fmt"
++	"io"
+ 	"io/fs"
+ 	"os"
+ 	"path/filepath"
+ 	"sort"
+ 	"strings"
++
++	"github.com/relux-works/curator/internal/pathboundary"
+ )
+ 
+ // MarkerName is excluded from hashing by default.
+ const MarkerName = ".csk-install.json"
+ 
++// Version identifies the framing used to compute a tree identity. A missing
++// version on legacy state is interpreted as V1 by its carrier reader.
++type Version uint64
++
++const (
++	// VersionV1 is the byte-frozen legacy content framing.
++	VersionV1 Version = 1
++	// VersionV2 is the domain-separated, length-framed content framing.
++	VersionV2 Version = 2
++)
++
++const contentV2Domain = "curator-content-v2\x00"
++
++// Identity keeps a digest and its framing version inseparable at comparison
++// sites. Identical digest text from different versions is a different
++// identity.
++type Identity struct {
++	HashVersion Version `json:"hash_version"`
++	SHA256      string  `json:"content_sha256"`
++}
++
++// Equal reports whether both identities have the same framing version and
++// normalized digest.
++func (identity Identity) Equal(other Identity) bool {
++	return identity.HashVersion == other.HashVersion && Normalize(identity.SHA256) == Normalize(other.SHA256)
++}
++
+ // ContentSHA256 hashes the tree rooted at root, excluding the given
+ // root-relative POSIX paths (defaults to the install marker when nil).
+ func ContentSHA256(root string, exclude map[string]bool) (string, error) {
+@@ -70,6 +102,130 @@ func ContentSHA256(root string, exclude map[string]bool) (string, error) {
+ 	return "sha256:" + hex.EncodeToString(digest.Sum(nil)), nil
+ }
+ 
++// ContentSHA256WithVersion hashes root with the explicitly selected framing.
++// ContentSHA256 remains the frozen v1 entry point for legacy readers.
++func ContentSHA256WithVersion(root string, exclude map[string]bool, version Version) (string, error) {
++	switch version {
++	case VersionV1:
++		return ContentSHA256(root, exclude)
++	case VersionV2:
++		return contentSHA256V2(root, exclude)
++	default:
++		return "", fmt.Errorf("unsupported content hash version %d", version)
++	}
++}
++
++// ContentIdentity computes a versioned tree identity.
++func ContentIdentity(root string, exclude map[string]bool, version Version) (Identity, error) {
++	digest, err := ContentSHA256WithVersion(root, exclude, version)
++	if err != nil {
++		return Identity{}, err
++	}
++	return Identity{HashVersion: version, SHA256: digest}, nil
++}
++
++// ContentSHA256Files hashes an already materialized, path-keyed file set with
++// the selected content framing. It is used for surfaces assembled in memory.
++func ContentSHA256Files(files map[string][]byte, version Version) (string, error) {
++	paths := make([]string, 0, len(files))
++	for path := range files {
++		paths = append(paths, path)
++	}
++	sort.Strings(paths)
++	digest := sha256.New()
++	switch version {
++	case VersionV1:
++		for index, path := range paths {
++			if index > 0 {
++				_, _ = digest.Write([]byte{0})
++			}
++			_, _ = io.WriteString(digest, path)
++			_, _ = digest.Write([]byte{0})
++			_, _ = digest.Write(files[path])
++		}
++	case VersionV2:
++		_, _ = io.WriteString(digest, contentV2Domain)
++		var length [8]byte
++		for _, path := range paths {
++			_, _ = digest.Write([]byte{'F'})
++			binary.BigEndian.PutUint64(length[:], uint64(len(path)))
++			_, _ = digest.Write(length[:])
++			_, _ = io.WriteString(digest, path)
++			binary.BigEndian.PutUint64(length[:], uint64(len(files[path])))
++			_, _ = digest.Write(length[:])
++			_, _ = digest.Write(files[path])
++		}
++	default:
++		return "", fmt.Errorf("unsupported content hash version %d", version)
++	}
++	return "sha256:" + hex.EncodeToString(digest.Sum(nil)), nil
++}
++
++func contentSHA256V2(root string, exclude map[string]bool) (string, error) {
++	if exclude == nil {
++		exclude = map[string]bool{MarkerName: true}
++	}
++	var files []string
++	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
++		if walkErr != nil {
++			return walkErr
++		}
++		// V2 identities cover regular files only. In particular, symlinks
++		// are not dereferenced into content supplied by another path.
++		if !entry.Type().IsRegular() {
++			return nil
++		}
++		rel, relErr := filepath.Rel(root, path)
++		if relErr != nil {
++			return relErr
++		}
++		posix := filepath.ToSlash(rel)
++		if !exclude[posix] {
++			files = append(files, posix)
++		}
++		return nil
++	})
++	if err != nil {
++		return "", err
++	}
++	sort.Strings(files)
++
++	digest := sha256.New()
++	_, _ = io.WriteString(digest, contentV2Domain)
++	var length [8]byte
++	for _, posix := range files {
++		file, err := pathboundary.OpenReadNoFollow(filepath.Join(root, filepath.FromSlash(posix)))
++		if err != nil {
++			return "", err
++		}
++		info, statErr := file.Stat()
++		if statErr != nil {
++			_ = file.Close()
++			return "", statErr
++		}
++		if !info.Mode().IsRegular() {
++			_ = file.Close()
++			return "", fmt.Errorf("content hash v2 entry %q is not a regular file", posix)
++		}
++		content, readErr := io.ReadAll(file)
++		closeErr := file.Close()
++		if readErr != nil {
++			return "", readErr
++		}
++		if closeErr != nil {
++			return "", closeErr
++		}
++		_, _ = digest.Write([]byte{'F'})
++		binary.BigEndian.PutUint64(length[:], uint64(len(posix)))
++		_, _ = digest.Write(length[:])
++		_, _ = io.WriteString(digest, posix)
++		binary.BigEndian.PutUint64(length[:], uint64(len(content)))
++		_, _ = digest.Write(length[:])
++		_, _ = digest.Write(content)
++	}
++	return "sha256:" + hex.EncodeToString(digest.Sum(nil)), nil
++}
++
+ // Normalize lowercases and strips the optional prefix so hashes compare
+ // reliably.
+ func Normalize(hash string) string {
+diff --git a/internal/hashing/hashing_v2_test.go b/internal/hashing/hashing_v2_test.go
+new file mode 100644
+index 00000000..10ab8e69
+--- /dev/null
++++ b/internal/hashing/hashing_v2_test.go
+@@ -0,0 +1,134 @@
++package hashing
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++func writeBytes(t *testing.T, root, rel string, content []byte) {
++	t.Helper()
++	path := filepath.Join(root, filepath.FromSlash(rel))
++	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, content, 0o644); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func TestContentSHA256V2ConformanceVectors(t *testing.T) {
++	tests := []struct {
++		name  string
++		files map[string][]byte
++		want  string
++	}{
++		{
++			name:  "empty tree",
++			files: map[string][]byte{},
++			want:  "sha256:f34a9d36a24a41168189f7ac17fc4fd0fb0a7b7c15ce1065fa4a2409d48c0c12",
++		},
++		{
++			name:  "embedded nul differs from file boundary",
++			files: map[string][]byte{"a": []byte("one\x00b\x00two")},
++			want:  "sha256:576c3d373a5b48e95cbd87c736f55a3f6bcfa9f5c789186bb6ea775fcd23551c",
++		},
++		{
++			name:  "nested nul byte",
++			files: map[string][]byte{"deep/third/bytes.bin": []byte("before\x00after")},
++			want:  "sha256:7a02fafc05a0e2eb24f219d73a38194512675f95b6b072089a5ede5c0da135f1",
++		},
++		{
++			name:  "ordinary tree",
++			files: map[string][]byte{"README.md": []byte("curator\n"), "src/main.go": []byte("package main\n")},
++			want:  "sha256:55150544f675ac2ff1a88407e6231a7f93c5a78a75e1b3f183463ae78d9a95cf",
++		},
++	}
++	for _, tc := range tests {
++		t.Run(tc.name, func(t *testing.T) {
++			root := t.TempDir()
++			for path, contents := range tc.files {
++				writeBytes(t, root, path, contents)
++			}
++			got, err := ContentSHA256WithVersion(root, nil, VersionV2)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if got != tc.want {
++				t.Fatalf("ContentSHA256WithVersion() = %s, want %s", got, tc.want)
++			}
++		})
++	}
++}
++
++func TestContentSHA256V2SeparatesTheV1Collision(t *testing.T) {
++	one := t.TempDir()
++	writeBytes(t, one, "a", []byte("one\x00b\x00two"))
++	two := t.TempDir()
++	writeBytes(t, two, "a", []byte("one"))
++	writeBytes(t, two, "b", []byte("two"))
++
++	legacyOne, err := ContentSHA256(one, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	legacyTwo, err := ContentSHA256(two, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if legacyOne != legacyTwo || legacyOne != "sha256:c518e668673099905d1dd12ce983ff9447008f4e87829dfcfe1316a52114970c" {
++		t.Fatalf("v1 collision changed: one=%s two=%s", legacyOne, legacyTwo)
++	}
++
++	identityOne, err := ContentIdentity(one, nil, VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	identityTwo, err := ContentIdentity(two, nil, VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if identityOne.Equal(identityTwo) {
++		t.Fatalf("v2 identities for colliding v1 pair compare equal: %+v %+v", identityOne, identityTwo)
++	}
++	if identityOne.SHA256 != "sha256:576c3d373a5b48e95cbd87c736f55a3f6bcfa9f5c789186bb6ea775fcd23551c" ||
++		identityTwo.SHA256 != "sha256:de107e6a5f86b44a79e035761d78ceba8fc125cde23520d4268ac11b214a28d4" {
++		t.Fatalf("v2 vector mismatch: one=%s two=%s", identityOne.SHA256, identityTwo.SHA256)
++	}
++}
++
++func TestContentSHA256V2LengthFramingSeparatesAdjacentRecordBoundary(t *testing.T) {
++	// Without either length field, the first stream is byte-for-byte equal to
++	// the second: F + "a" + (F + "b" + "two") ==
++	// (F + "a" + empty) + (F + "b" + "two").
++	one := t.TempDir()
++	writeBytes(t, one, "a", []byte("\x46btwo"))
++	two := t.TempDir()
++	writeBytes(t, two, "a", nil)
++	writeBytes(t, two, "b", []byte("two"))
++
++	oneHash, err := ContentSHA256WithVersion(one, nil, VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	twoHash, err := ContentSHA256WithVersion(two, nil, VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if oneHash == twoHash {
++		t.Fatalf("v2 identities collided when one file's bytes contain the next record framing: %s", oneHash)
++	}
++}
++
++func TestIdentityEqualityRequiresHashVersion(t *testing.T) {
++	digest := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
++	if (Identity{HashVersion: VersionV1, SHA256: digest}).Equal(Identity{HashVersion: VersionV2, SHA256: digest}) {
++		t.Fatal("equal digest text with different hash versions compared equal")
++	}
++}
++
++func TestContentSHA256V2RejectsUnknownVersion(t *testing.T) {
++	if _, err := ContentSHA256WithVersion(t.TempDir(), nil, 3); err == nil {
++		t.Fatal("unsupported hash version was accepted")
++	}
++}
+diff --git a/internal/install/install.go b/internal/install/install.go
+index 99c9224d..9cadba1f 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -1190,20 +1190,17 @@ func buildMarker(
+ 	if builds == nil {
+ 		builds = map[string]marker.Build{}
+ 	}
+-	// Marker v3 and v4 record an explicit receipt schema version and an
+-	// explicit execution policy for every local go-v1 build; marker v2 records
+-	// neither. The band is the manifest schema, not one exact version.
+-	if node.Spec.SchemaVersion >= 7 {
+-		upgraded := make(map[string]marker.Build, len(builds))
+-		for command, build := range builds {
+-			if build.Driver == "go-v1" {
+-				build.ReceiptSchemaVersion = 1
+-				build.ExecutionPolicy = "manager-worker-v1"
+-			}
+-			upgraded[command] = build
++	// Core marker v5 retains the marker-v4 build-record rules for every
++	// manifest band, so each local build records its receipt schema and policy.
++	upgraded := make(map[string]marker.Build, len(builds))
++	for command, build := range builds {
++		if build.Driver == "go-v1" {
++			build.ReceiptSchemaVersion = 1
++			build.ExecutionPolicy = "manager-worker-v1"
+ 		}
+-		builds = upgraded
++		upgraded[command] = build
+ 	}
++	builds = upgraded
+ 	if len(builds) == 0 {
+ 		source = nil
+ 	}
+@@ -1483,9 +1480,9 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string,
+ 	if len(usable) == 0 {
+ 		return result, fmt.Errorf("every trusted audit registry served a tampered snapshot")
+ 	}
+-	var fetch registry.FetchFn
++	var fetch registry.FetchVersionedFn
+ 	if persist {
+-		fetch = registry.NewHTTPFetchWithPolicyAndObserver(
++		fetch = registry.NewHTTPFetchVersionedWithPolicyAndObserver(
+ 			cacheDir,
+ 			snapshotStateDir,
+ 			usable,
+@@ -1495,13 +1492,13 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string,
+ 			registry.FetchPolicy{PersistCache: true, PersistState: true}, observer,
+ 		)
+ 	} else {
+-		fetch = registry.NewHTTPFetchWithPolicyReadOnlyAndObserver(
++		fetch = registry.NewHTTPFetchVersionedWithPolicyAndObserver(
+ 			cacheDir,
+ 			snapshotStateDir,
+ 			usable,
+ 			time.Duration(cfg.Audit.CacheTTLSeconds)*time.Second,
+ 			time.Duration(cfg.Audit.OfflineGraceSeconds)*time.Second,
+-			nil, observer,
++			nil, registry.FetchPolicy{}, observer,
+ 		)
+ 	}
+ 	strict := cfg.Audit.RegistryPolicy == "strict"
+@@ -1510,15 +1507,19 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string,
+ 		if node.Identity == "" {
+ 			continue
+ 		}
+-		contentHash, err := hashing.ContentSHA256(node.Snapshot, nil)
++		hashVersion := hashing.VersionV2
++		if draft {
++			hashVersion = hashing.VersionV1
++		}
++		contentHash, err := hashing.ContentSHA256WithVersion(node.Snapshot, nil, hashVersion)
+ 		if err != nil {
+ 			return result, err
+ 		}
+ 		var resolution registry.Resolution
+ 		if draft {
+-			resolution = registry.ResolveExact(usable, node.Name, node.Identity, node.Resolved.Commit, contentHash, fetch)
++			resolution = registry.ResolveExactVersioned(usable, node.Name, node.Identity, node.Resolved.Commit, contentHash, hashVersion, fetch)
+ 		} else {
+-			resolution = registry.Resolve(usable, node.Identity, node.Resolved.Commit, contentHash, fetch)
++			resolution = registry.ResolveVersioned(usable, node.Identity, node.Resolved.Commit, contentHash, hashVersion, fetch)
+ 		}
+ 		for _, warning := range resolution.Warnings {
+ 			result.Warnings = append(result.Warnings, alias+": registry: "+warning)
+diff --git a/internal/install/registry_e2e_test.go b/internal/install/registry_e2e_test.go
+index 0f97591b..38da6305 100644
+--- a/internal/install/registry_e2e_test.go
++++ b/internal/install/registry_e2e_test.go
+@@ -154,6 +154,7 @@ func fakeRegistryWithSigner(t *testing.T, status, sourceIdentity, commit, conten
+ 				pageBoundary = snapshot()
+ 			}
+ 			record := sign(map[string]any{
++				"schema_version": 2, "hash_version": 2,
+ 				"name": "skill-a", "source_identity": sourceIdentity,
+ 				"commit": commit, "content_sha256": contentHash, "status": status,
+ 			})
+@@ -189,7 +190,7 @@ func registryEnvWithSigner(t *testing.T, status string, options ...registryOptio
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	contentHash, err := hashing.ContentSHA256(snap, nil)
++	contentHash, err := hashing.ContentSHA256WithVersion(snap, nil, hashing.VersionV2)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/internal/install/targets.go b/internal/install/targets.go
+index 3330b20e..f837da4e 100644
+--- a/internal/install/targets.go
++++ b/internal/install/targets.go
+@@ -79,11 +79,18 @@ func stageNode(stageRoot string, install nodeInstall, clock Clock) (staging.Plan
+ 		install.expected.Locale = ""
+ 		install.expected.Agents = []string{}
+ 	}
+-	contentHash, err := hashing.ContentSHA256(staged, nil)
++	hashVersion := hashing.VersionV2
++	if install.expected.Package != nil {
++		hashVersion = hashing.VersionV1
++	}
++	contentHash, err := hashing.ContentSHA256WithVersion(staged, nil, hashVersion)
+ 	if err != nil {
+ 		return staging.Plan{}, "", err
+ 	}
+ 	install.expected.ContentSHA256 = contentHash
++	if install.expected.Package == nil {
++		install.expected.HashVersion = hashVersion
++	}
+ 	install.expected.Files = files
+ 	install.expected.InstalledAt = installedAt(clock)
+ 	if err := marker.Write(staged, install.expected); err != nil {
+diff --git a/internal/marker/marker.go b/internal/marker/marker.go
+index f557f1bf..d006e1ca 100644
+--- a/internal/marker/marker.go
++++ b/internal/marker/marker.go
+@@ -14,6 +14,7 @@ import (
+ 	"reflect"
+ 	"regexp"
+ 	"sort"
++	"strconv"
+ 	"strings"
+ 	"time"
+ 	"unicode/utf8"
+@@ -79,12 +80,9 @@ const (
+ 	// 8 and no other difference, so every marker-v3 build-record rule applies
+ 	// to it unchanged.
+ 	PolicySchemaVersion = 4
+-	// SchemaV5 is written only for skillfile-sources draft installations
+-	// (Skillfile schema 2). Its package replaces the legacy
+-	// source/git/ref_kind/ref/commit fields and its lock_sha256 binds the
+-	// installed selection and declared ref through the validated lock and
+-	// matching manifest. Every locked draft member records it, whatever
+-	// the skill manifest version; legacy lanes never write it.
++	// SchemaV5 is the current core marker shape and also the frozen draft
++	// package shape. Core v5 carries hash_version 2; the disjoint package
++	// shape retains its frozen v1 meaning until its own schema advances.
+ 	SchemaV5 = 5
+ 	// NewestSchemaVersion is the highest marker schema this release reads. It
+ 	// is what an operator is told when a document from a newer manager is
+@@ -219,6 +217,7 @@ type Commit struct {
+ // Marker is the install marker payload (Spec §8.5).
+ type Marker struct {
+ 	SchemaVersion      int                   `json:"schema_version"`
++	HashVersion        hashing.Version       `json:"hash_version,omitempty"`
+ 	Name               string                `json:"name"`
+ 	Source             string                `json:"source,omitempty"`
+ 	RefKind            string                `json:"ref_kind,omitempty"`
+@@ -354,16 +353,24 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
+ 		required = append(required, "build_roots", "builds")
+ 		allowed = append(allowed, "build_roots", "build_source", "builds")
+ 	case SchemaV5:
+-		// The frozen package replaces every legacy source field, so v5
+-		// carries its own required set without them.
+-		required = []string{
+-			"schema_version", "name", "package", "lock_sha256", "content_sha256", "locale",
+-			"agents", "commands", "dependencies", "skill_schema_version", "runtime_roots",
+-			"build_roots", "builds", "installed_at", "files",
+-		}
+-		allowed = append(append([]string(nil), required...),
+-			"requirements", "mcp_servers", "attestation", "activation", "requirers", "substituted",
+-			"build_source")
++		if m.Package == nil {
++			// Core v5 retains v4's identity/build shape and adds a required
++			// framing version. The package member remains exclusive to the
++			// separately frozen skillfile-sources marker-v5 shape.
++			required = append(required, "hash_version", "build_roots", "builds")
++			allowed = append(allowed, "hash_version", "build_roots", "build_source", "builds")
++		} else {
++			// The frozen package replaces every legacy source field, so the
++			// source-extension v5 shape keeps its own required set.
++			required = []string{
++				"schema_version", "name", "package", "lock_sha256", "content_sha256", "locale",
++				"agents", "commands", "dependencies", "skill_schema_version", "runtime_roots",
++				"build_roots", "builds", "installed_at", "files",
++			}
++			allowed = append(append([]string(nil), required...),
++				"requirements", "mcp_servers", "attestation", "activation", "requirers", "substituted",
++				"build_source")
++		}
+ 	default:
+ 		return false
+ 	}
+@@ -376,18 +383,35 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
+ 		return false
+ 	}
+ 	if m.SchemaVersion == SchemaV5 {
+-		if !validV5Identity(m, raw) {
++		if m.Package != nil {
++			if !validV5Identity(m, raw) {
++				return false
++			}
++		} else if !validCoreV5Identity(m) {
+ 			return false
+ 		}
+ 	} else if !identifiers.PortablePath(m.Source) || !validLegacyTriple(m) {
+ 		return false
+ 	}
++	if m.SchemaVersion == SchemaV5 {
++		hashVersionRaw, hasHashVersion := raw["hash_version"]
++		if m.Package == nil {
++			if !hasHashVersion || !rawIntegerEquals(hashVersionRaw, int64(hashing.VersionV2)) || m.HashVersion != hashing.VersionV2 {
++				return false
++			}
++		} else if hasHashVersion || m.HashVersion != 0 {
++			return false
++		}
++	} else if m.HashVersion != 0 {
++		return false
++	}
+ 	if !markerSHA256RE.MatchString(m.ContentSHA256) || m.SkillSchemaVersion < 0 ||
+ 		(m.SchemaVersion == LegacySchemaVersion && m.SkillSchemaVersion > 5) ||
+ 		(m.SchemaVersion == SchemaVersion && m.SkillSchemaVersion > 6) ||
+ 		(m.SchemaVersion == ExternalSchemaVersion && m.SkillSchemaVersion != 7) ||
+ 		(m.SchemaVersion == PolicySchemaVersion && m.SkillSchemaVersion != 8) ||
+-		(m.SchemaVersion == SchemaV5 && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 9)) {
++		(m.SchemaVersion == SchemaV5 && m.Package == nil && m.SkillSchemaVersion > 8) ||
++		(m.SchemaVersion == SchemaV5 && m.Package != nil && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 9)) {
+ 		return false
+ 	}
+ 	setsSorted := m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion ||
+@@ -472,6 +496,16 @@ func validV5Identity(m *Marker, raw map[string]json.RawMessage) bool {
+ 	return true
+ }
+ 
++func validCoreV5Identity(m *Marker) bool {
++	if !identifiers.PortablePath(m.Source) || !validLegacyTriple(m) {
++		return false
++	}
++	if m.RefKind == "revision" {
++		return markerCommitRE.MatchString(m.Ref) && m.Ref == m.Commit
++	}
++	return true
++}
++
+ // validLegacyTriple reports whether the declared ref identity uses the
+ // legacy grammar: a known ref kind, a non-empty bounded ref and a hex
+ // commit. Legacy markers require it.
+@@ -888,7 +922,7 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
+ 		// A draft v5 marker binds receipt version 3 on every build entry,
+ 		// whatever the skill schema: its cache entries are receipt-3 package
+ 		// wrappers, so a legacy record shape can never describe them.
+-		if m.SchemaVersion == SchemaV5 {
++		if m.SchemaVersion == SchemaV5 && m.Package != nil {
+ 			rawBuild, present := buildsRaw[command]
+ 			if !present {
+ 				return false
+@@ -908,6 +942,12 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
+ 			}
+ 			continue
+ 		}
++		if m.SchemaVersion == SchemaV5 {
++			if !validCoreV5Build(build) {
++				return false
++			}
++			continue
++		}
+ 		if m.SchemaVersion == SchemaVersion {
+ 			if build.Driver != buildmeta.DriverGoV1 || build.ReceiptSchemaVersion != 0 || build.ExecutionPolicy != "" || hasRepositoryState(build) {
+ 				return false
+@@ -932,6 +972,56 @@ func validV3Build(build Build) bool {
+ 	return validDriverBuild(build, 1, 2)
+ }
+ 
++// validCoreV5Build applies marker-v4 build rules plus the v5 substitution
++// identity binding. An un-substituted source stays on its declared identity
++// and commit; a substitution's effective identity kind follows its typed
++// substitution record.
++func validCoreV5Build(build Build) bool {
++	if !validV3Build(build) {
++		return false
++	}
++	if build.Driver != "go-repository-v1" {
++		return true
++	}
++	if !build.Substituted {
++		return build.DeclaredIdentity.Kind == build.EffectiveIdentity.Kind &&
++			build.DeclaredIdentity.Value == build.EffectiveIdentity.Value &&
++			build.ObjectFormat == build.DeclaredLockedCommit.ObjectFormat &&
++			build.Commit == build.DeclaredLockedCommit.Hex
++	}
++	if build.Substitution == nil {
++		return false
++	}
++	switch build.Substitution.Type {
++	case "local-path":
++		return build.EffectiveIdentity.Kind == "operator-local-git" && build.Substitution.Ref == nil
++	case "network-git":
++		return build.EffectiveIdentity.Kind == "network-git" && validCoreV5StructuredRef(build.Substitution.Ref, build.ObjectFormat)
++	default:
++		return false
++	}
++}
++
++func validCoreV5StructuredRef(ref *RepositoryRef, objectFormat string) bool {
++	if ref == nil {
++		return false
++	}
++	switch ref.Kind {
++	case "revision":
++		wantLength := 40
++		if objectFormat == "sha256" {
++			wantLength = 64
++		} else if objectFormat != "sha1" {
++			return false
++		}
++		return len(ref.Value) == wantLength && markerCommitRE.MatchString(ref.Value)
++	case "tag", "branch":
++		return identity.DraftSourceRefName(ref.Value)
++	default:
++		return false
++	}
++}
++
+ // validV5Build is the marker-5 record: every retained driver field of the
+ // v3/v4 record with receipt_schema_version 3 on both arms.
+ func validV5Build(build Build) bool {
+@@ -967,10 +1057,6 @@ func validDriverBuild(build Build, localReceipt, externalReceipt int) bool {
+ 	if build.Substituted != (build.Substitution != nil) {
+ 		return false
+ 	}
+-	if build.Substitution != nil && build.Substitution.Type != "local-path" &&
+-		(build.Substitution.Type != "network-git" || build.Substitution.Ref == nil) {
+-		return false
+-	}
+ 	return true
+ }
+ 
+@@ -1076,7 +1162,7 @@ func BuildBearingSchema(version int) bool {
+ // external go-repository-v1 commands alongside local ones. Marker v4 is v3
+ // with the version bumped and nothing else changed, so both answer yes.
+ func externalCapableSchema(version int) bool {
+-	return version == ExternalSchemaVersion || version == PolicySchemaVersion
++	return version == ExternalSchemaVersion || version == PolicySchemaVersion || version == SchemaV5
+ }
+ 
+ // SupportedSchema reports whether version is a marker schema this release
+@@ -1090,9 +1176,8 @@ func SupportedSchema(version int) bool {
+ 
+ // Write stores the marker inside dir with sorted keys and a trailing newline.
+ //
+-// A marker carrying a frozen draft package is always schema 5, regardless
+-// of skill manifest version; every other marker keeps the legacy
+-// skill-schema band byte-identically.
++// A marker carrying a frozen draft package retains its v5 source-extension
++// shape; a core marker is written as v5 with content framing version 2.
+ func Write(dir string, m *Marker) error {
+ 	if m == nil {
+ 		return errors.New("install marker is nil")
+@@ -1100,12 +1185,10 @@ func Write(dir string, m *Marker) error {
+ 	switch {
+ 	case m.Package != nil:
+ 		m.SchemaVersion = SchemaV5
+-	case m.SkillSchemaVersion >= 8:
+-		m.SchemaVersion = PolicySchemaVersion
+-	case m.SkillSchemaVersion == 7:
+-		m.SchemaVersion = ExternalSchemaVersion
++		m.HashVersion = 0
+ 	default:
+-		m.SchemaVersion = SchemaVersion
++		m.SchemaVersion = SchemaV5
++		m.HashVersion = hashing.VersionV2
+ 	}
+ 	m.Agents = nonNilStrings(m.Agents)
+ 	m.Commands = nonNilStrings(m.Commands)
+@@ -1135,6 +1218,11 @@ func Write(dir string, m *Marker) error {
+ 	if m.Requirers != nil {
+ 		sort.Strings(m.Requirers)
+ 	}
++	contentHash, err := hashing.ContentSHA256WithVersion(dir, nil, markerHashVersion(m))
++	if err != nil {
++		return err
++	}
++	m.ContentSHA256 = contentHash
+ 	payload, err := json.MarshalIndent(m, "", "  ")
+ 	if err != nil {
+ 		return err
+@@ -1210,7 +1298,7 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
+ 	// frozen package it carries is what selects the v5 comparison. A v5
+ 	// marker never matches a legacy one; changed registry, substitution,
+ 	// declared ref, package or lock makes the installation non-current.
+-	if recorded.SchemaVersion == SchemaV5 || expected.Package != nil {
++	if recorded.Package != nil || expected.Package != nil {
+ 		if recorded.SchemaVersion != SchemaV5 || expected.Package == nil {
+ 			return false, nil
+ 		}
+@@ -1243,7 +1331,11 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
+ 			return false, nil
+ 		}
+ 	}
+-	actual, err := hashing.ContentSHA256(installedDir, nil)
++	recordedHashVersion := markerHashVersion(recorded)
++	if recordedHashVersion != markerHashVersion(expected) {
++		return false, nil
++	}
++	actual, err := hashing.ContentSHA256WithVersion(installedDir, nil, recordedHashVersion)
+ 	if err != nil {
+ 		return false, err
+ 	}
+@@ -1259,6 +1351,25 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
+ 	return currentBuilds(installedDir, recorded, buildState[0])
+ }
+ 
++func markerHashVersion(m *Marker) hashing.Version {
++	if m.HashVersion != 0 {
++		return m.HashVersion
++	}
++	if m.SchemaVersion == SchemaV5 && m.Package == nil || m.SchemaVersion == 0 && m.Package == nil {
++		return hashing.VersionV2
++	}
++	return hashing.VersionV1
++}
++
++func rawIntegerEquals(raw json.RawMessage, expected int64) bool {
++	var value json.Number
++	if err := json.Unmarshal(raw, &value); err != nil {
++		return false
++	}
++	parsed, err := strconv.ParseInt(value.String(), 10, 64)
++	return err == nil && parsed == expected
++}
++
+ func currentBuilds(installedDir string, recorded *Marker, state BuildCurrentness) (bool, error) {
+ 	if state.ContextFiles == nil || state.RuntimeFiles == nil {
+ 		return false, nil
+diff --git a/internal/marker/marker_hash_v2_test.go b/internal/marker/marker_hash_v2_test.go
+new file mode 100644
+index 00000000..5582d1e3
+--- /dev/null
++++ b/internal/marker/marker_hash_v2_test.go
+@@ -0,0 +1,76 @@
++package marker
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"testing"
++
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++func TestWriteEmitsCoreMarkerV5WithHashVersion2(t *testing.T) {
++	dir := t.TempDir()
++	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("v2 marker"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	contentHash, err := hashing.ContentSHA256WithVersion(dir, nil, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	m := validMarkerV2()
++	m.ContentSHA256 = contentHash
++	if err := Write(dir, m); err != nil {
++		t.Fatal(err)
++	}
++	if m.SchemaVersion != SchemaV5 || m.HashVersion != hashing.VersionV2 {
++		t.Fatalf("writer versions = schema:%d hash:%d, want 5/2", m.SchemaVersion, m.HashVersion)
++	}
++	var raw map[string]any
++	payload, err := os.ReadFile(filepath.Join(dir, Name))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	if raw["schema_version"] != float64(5) || raw["hash_version"] != float64(2) {
++		t.Fatalf("wire versions = schema:%v hash:%v", raw["schema_version"], raw["hash_version"])
++	}
++	current, err := Current(dir, m)
++	if err != nil || !current {
++		t.Fatalf("fresh v2 marker current=%v err=%v", current, err)
++	}
++}
++
++func TestCurrentRejectsV1MarkerForV2Expectation(t *testing.T) {
++	dir := t.TempDir()
++	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("legacy marker"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	legacyHash, err := hashing.ContentSHA256WithVersion(dir, nil, hashing.VersionV1)
++	if err != nil {
++		t.Fatal(err)
++	}
++	legacy := validMarkerV2()
++	legacy.SchemaVersion = PolicySchemaVersion
++	legacy.SkillSchemaVersion = 8
++	legacy.ContentSHA256 = legacyHash
++	payload, err := json.Marshal(legacy)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, Name), append(payload, '\n'), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	expected := *legacy
++	expected.SchemaVersion = 0
++	expected.HashVersion = 0
++	current, err := Current(dir, &expected)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if current {
++		t.Fatal("a v1 marker was current for a v2 expectation")
++	}
++}
+diff --git a/internal/marker/marker_v2_test.go b/internal/marker/marker_v2_test.go
+index e8b103dd..fbff352b 100644
+--- a/internal/marker/marker_v2_test.go
++++ b/internal/marker/marker_v2_test.go
+@@ -30,7 +30,7 @@ func validMarkerV2() *Marker {
+ 	}
+ }
+ 
+-func TestWriteAlwaysProducesCanonicalMarkerV2(t *testing.T) {
++func TestWriteAlwaysProducesCanonicalCoreMarkerV5(t *testing.T) {
+ 	dir := t.TempDir()
+ 	m := validMarkerV2()
+ 	m.SchemaVersion = LegacySchemaVersion
+@@ -41,7 +41,7 @@ func TestWriteAlwaysProducesCanonicalMarkerV2(t *testing.T) {
+ 	if err := Write(dir, m); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if m.SchemaVersion != SchemaVersion || m.BuildRoots == nil || m.Builds == nil {
++	if m.SchemaVersion != SchemaV5 || m.HashVersion != hashing.VersionV2 || m.BuildRoots == nil || m.Builds == nil {
+ 		t.Fatalf("canonical marker = %+v", m)
+ 	}
+ 	if !reflect.DeepEqual(m.Agents, []string{"codex_cli", "zed"}) {
+@@ -58,8 +58,8 @@ func TestWriteAlwaysProducesCanonicalMarkerV2(t *testing.T) {
+ 	if err := json.Unmarshal(payload, &raw); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if string(raw["schema_version"]) != "2" || string(raw["build_roots"]) != "[]" || string(raw["builds"]) != "{}" {
+-		t.Fatalf("unexpected v2 wire state: %s", payload)
++	if string(raw["schema_version"]) != "5" || string(raw["hash_version"]) != "2" || string(raw["build_roots"]) != "[]" || string(raw["builds"]) != "{}" {
++		t.Fatalf("unexpected core v5 wire state: %s", payload)
+ 	}
+ 	if _, present := raw["build_source"]; present {
+ 		t.Fatal("empty builds must omit build_source")
+@@ -86,23 +86,32 @@ func TestAuthoritativeCompiledMarkerRoundTripsThroughWriter(t *testing.T) {
+ 	if m == nil {
+ 		t.Fatal("authoritative compiled marker is unreadable")
+ 	}
++	// The v2 compiled fixture predates the marker-v4 local-build policy
++	// fields. Supply the source boundary that a current install plan provides
++	// before asking the v5 writer to publish it.
++	m.BuildRoots = []string{"build"}
++	m.BuildSource = &buildsource.Identity{
++		Algorithm: buildsource.Algorithm, ContentSHA256: "sha256:" + strings.Repeat("b", 64),
++	}
++	expectedBuilds := make(map[string]Build, len(m.Builds))
++	for name, build := range m.Builds {
++		if build.Driver == buildmeta.DriverGoV1 {
++			build.ReceiptSchemaVersion = 1
++			build.ExecutionPolicy = buildmeta.ExecutionPolicy
++		}
++		m.Builds[name] = build
++		expectedBuilds[name] = build
++	}
+ 	destination := t.TempDir()
+ 	if err := Write(destination, m); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	written, err := os.ReadFile(filepath.Join(destination, Name))
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	var got, want any
+-	if err := json.Unmarshal(written, &got); err != nil {
+-		t.Fatal(err)
++	recorded := Read(destination)
++	if recorded == nil || recorded.SchemaVersion != SchemaV5 || recorded.HashVersion != hashing.VersionV2 {
++		t.Fatalf("writer did not upgrade the compiled marker to core v5/hash v2: %+v", recorded)
+ 	}
+-	if err := json.Unmarshal(payload, &want); err != nil {
+-		t.Fatal(err)
+-	}
+-	if !reflect.DeepEqual(got, want) {
+-		t.Fatalf("compiled marker round trip:\n got %s\nwant %s", written, payload)
++	if !reflect.DeepEqual(recorded.Builds, expectedBuilds) {
++		t.Fatalf("compiled build records do not carry core v5 policy fields:\n got %+v\nwant %+v", recorded.Builds, expectedBuilds)
+ 	}
+ }
+ 
+@@ -183,12 +192,12 @@ func TestReadLegacyV1AndRewriteAsV2WithoutChangingContentHash(t *testing.T) {
+ 	if err := Write(dir, recorded); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if recorded.SchemaVersion != SchemaVersion {
++	if recorded.SchemaVersion != SchemaV5 || recorded.HashVersion != hashing.VersionV2 {
+ 		t.Fatalf("rewritten schema = %d", recorded.SchemaVersion)
+ 	}
+-	after, err := hashing.ContentSHA256(dir, nil)
+-	if err != nil || after != contentHash {
+-		t.Fatalf("marker-excluding hash = %s, %v; want %s", after, err, contentHash)
++	after, err := hashing.ContentSHA256WithVersion(dir, nil, hashing.VersionV2)
++	if err != nil || after != recorded.ContentSHA256 || after == contentHash {
++		t.Fatalf("marker-excluding v2 hash = %s, %v; marker=%s legacy=%s", after, err, recorded.ContentSHA256, contentHash)
+ 	}
+ }
+ 
+@@ -215,7 +224,7 @@ func TestReadLegacyV1AndRewriteV2PreservesEmptyRequirer(t *testing.T) {
+ 		t.Fatalf("rewrite v2: %v", err)
+ 	}
+ 	rewritten := Read(dir)
+-	if rewritten == nil || rewritten.SchemaVersion != SchemaVersion ||
++	if rewritten == nil || rewritten.SchemaVersion != SchemaV5 || rewritten.HashVersion != hashing.VersionV2 ||
+ 		!reflect.DeepEqual(rewritten.Requirers, []string{""}) {
+ 		t.Fatalf("rewritten marker = %#v", rewritten)
+ 	}
+@@ -312,7 +321,7 @@ func TestBuildCurrentnessResultPropagatesSnapshotCloseFailure(t *testing.T) {
+ 
+ func TestPackageRootMarkerBytesAffectBuildSourceButNotInstalledContentHash(t *testing.T) {
+ 	fixture := compiledFixture(t)
+-	before, err := hashing.ContentSHA256(fixture.installed, nil)
++	before, err := hashing.ContentSHA256WithVersion(fixture.installed, nil, hashing.VersionV2)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -326,7 +335,7 @@ func TestPackageRootMarkerBytesAffectBuildSourceButNotInstalledContentHash(t *te
+ 	if current {
+ 		t.Fatal("package root marker drift must invalidate build source")
+ 	}
+-	after, err := hashing.ContentSHA256(fixture.installed, nil)
++	after, err := hashing.ContentSHA256WithVersion(fixture.installed, nil, hashing.VersionV2)
+ 	if err != nil || after != before {
+ 		t.Fatalf("installed marker-excluding hash = %s, %v; want %s", after, err, before)
+ 	}
+@@ -370,7 +379,7 @@ func compiledFixture(t *testing.T) compiledFixtureState {
+ 	if err := os.WriteFile(filepath.Join(installed, "SKILL.md"), []byte("context"), 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	contentHash, err := hashing.ContentSHA256(installed, nil)
++	contentHash, err := hashing.ContentSHA256WithVersion(installed, nil, hashing.VersionV2)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -424,7 +433,8 @@ func compiledFixture(t *testing.T) compiledFixtureState {
+ 	m.BuildRoots = []string{"build"}
+ 	m.BuildSource = &identity
+ 	m.Files = []string{"SKILL.md"}
+-	m.Builds = map[string]Build{"tool": {Driver: buildmeta.DriverGoV1, CacheKey: key, ReceiptSHA256: receiptHash, ArtifactSHA256: artifact.SHA256, ArtifactPath: artifact.Path}}
++	m.Builds = map[string]Build{"tool": {Driver: buildmeta.DriverGoV1, ReceiptSchemaVersion: 1, ExecutionPolicy: buildmeta.ExecutionPolicy,
++		CacheKey: key, ReceiptSHA256: receiptHash, ArtifactSHA256: artifact.SHA256, ArtifactPath: artifact.Path}}
+ 	if err := Write(installed, m); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -434,6 +444,9 @@ func compiledFixture(t *testing.T) compiledFixtureState {
+ 		Inputs:       map[string]buildmeta.Input{"tool": input},
+ 		Assurance:    binding,
+ 		ContextFiles: []string{"SKILL.md"}, RuntimeFiles: []string{},
++		VerifyShim: func(command string, build Build) (bool, error) {
++			return command == "tool" && build.ArtifactPath == "bin/tool", nil
++		},
+ 	}
+ 	options.InspectCache = func(_ string, expectation buildcache.Expectation) buildcache.Result {
+ 		if !reflect.DeepEqual(expectation.Input, input) || !reflect.DeepEqual(expectation.Assurance, binding) || expectation.ReceiptHash != receiptHash {
+diff --git a/internal/marker/marker_v3_test.go b/internal/marker/marker_v3_test.go
+index ca9c44b4..92051a45 100644
+--- a/internal/marker/marker_v3_test.go
++++ b/internal/marker/marker_v3_test.go
+@@ -27,7 +27,7 @@ func TestMarkerV3ExternalCurrentnessIsReadOnlyAndFailsClosed(t *testing.T) {
+ 	m := v3Base()
+ 	m.Commands, m.BuildRoots, m.BuildSource = []string{"external"}, []string{}, nil
+ 	m.Builds["external"] = externalV3Build()
+-	hash, err := hashing.ContentSHA256(dir, nil)
++	hash, err := hashing.ContentSHA256WithVersion(dir, nil, hashing.VersionV2)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -93,10 +93,10 @@ func TestMarkerV3StructurallyRepresentsLocalExternalAndMixed(t *testing.T) {
+ 			if err := Write(dir, m); err != nil {
+ 				t.Fatal(err)
+ 			}
+-			if m.SchemaVersion != ExternalSchemaVersion {
+-				t.Fatalf("schema=%d", m.SchemaVersion)
++			if m.SchemaVersion != SchemaV5 || m.HashVersion != hashing.VersionV2 {
++				t.Fatalf("schema=%d hash_version=%d", m.SchemaVersion, m.HashVersion)
+ 			}
+-			if got := Read(dir); got == nil || len(got.Builds) != len(m.Builds) {
++			if got := Read(dir); got == nil || got.SchemaVersion != SchemaV5 || got.HashVersion != hashing.VersionV2 || len(got.Builds) != len(m.Builds) {
+ 				t.Fatalf("round trip=%+v", got)
+ 			}
+ 			payload, _ := os.ReadFile(filepath.Join(dir, Name))
+diff --git a/internal/marker/marker_v4_test.go b/internal/marker/marker_v4_test.go
+index 50f676d9..3d3fdf1b 100644
+--- a/internal/marker/marker_v4_test.go
++++ b/internal/marker/marker_v4_test.go
+@@ -41,11 +41,11 @@ func TestMarkerV4IsWrittenForSchema8Installations(t *testing.T) {
+ 			if err := Write(dir, m); err != nil {
+ 				t.Fatal(err)
+ 			}
+-			if m.SchemaVersion != PolicySchemaVersion {
+-				t.Fatalf("schema=%d, want %d", m.SchemaVersion, PolicySchemaVersion)
++			if m.SchemaVersion != SchemaV5 || m.HashVersion != hashing.VersionV2 {
++				t.Fatalf("schema=%d hash_version=%d, want 5/2", m.SchemaVersion, m.HashVersion)
+ 			}
+ 			recorded := Read(dir)
+-			if recorded == nil || recorded.SchemaVersion != PolicySchemaVersion || recorded.SkillSchemaVersion != 8 ||
++			if recorded == nil || recorded.SchemaVersion != SchemaV5 || recorded.HashVersion != hashing.VersionV2 || recorded.SkillSchemaVersion != 8 ||
+ 				len(recorded.Builds) != len(m.Builds) {
+ 				t.Fatalf("round trip=%+v", recorded)
+ 			}
+@@ -57,7 +57,7 @@ func TestMarkerV4IsWrittenForSchema8Installations(t *testing.T) {
+ 			if err := json.Unmarshal(payload, &raw); err != nil {
+ 				t.Fatal(err)
+ 			}
+-			if raw["schema_version"] != float64(4) || raw["skill_schema_version"] != float64(8) {
++			if raw["schema_version"] != float64(5) || raw["hash_version"] != float64(2) || raw["skill_schema_version"] != float64(8) {
+ 				t.Fatalf("payload versions = %v/%v", raw["schema_version"], raw["skill_schema_version"])
+ 			}
+ 			for command, value := range raw["builds"].(map[string]any) {
+diff --git a/internal/marker/schema_coverage_test.go b/internal/marker/schema_coverage_test.go
+index b6def430..3b5e6d8f 100644
+--- a/internal/marker/schema_coverage_test.go
++++ b/internal/marker/schema_coverage_test.go
+@@ -100,3 +100,18 @@ func TestReadAuthoritativeMarkerV2SchemaCases(t *testing.T) {
+ func TestReadAuthoritativeMarkerV4SchemaCases(t *testing.T) {
+ 	runMarkerSchemaCases(t, "install-marker-v4")
+ }
++
++func TestReadAuthoritativeMarkerV5SchemaCases(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++		return
++	}
++	runMarkerSchemaCases(t, "install-marker-v5")
++}
+diff --git a/internal/registry/carriers.go b/internal/registry/carriers.go
+new file mode 100644
+index 00000000..ece8d876
+--- /dev/null
++++ b/internal/registry/carriers.go
+@@ -0,0 +1,150 @@
++package registry
++
++import (
++	"fmt"
++	"unicode/utf8"
++)
++
++// LogEntry is one authenticated registry-log row. ParseLogEntry is the
++// frozen v1 reader; ParseLogEntryVersioned accepts the v2 container and its
++// historical v1 or current v2 audit records.
++type LogEntry struct {
++	Sequence  int
++	EntryHash string
++	PrevHash  string
++	Record    Record
++}
++
++// ParseLogEntry reads the frozen registry-log-entry-v1 shape.
++func ParseLogEntry(payload map[string]any) (LogEntry, error) {
++	return parseLogEntry(payload, false)
++}
++
++// ParseLogEntryVersioned reads registry-log-entry-v2, including historical
++// v1 records and v2 records that carry hash_version 2.
++func ParseLogEntryVersioned(payload map[string]any) (LogEntry, error) {
++	return parseLogEntry(payload, true)
++}
++
++func parseLogEntry(payload map[string]any, allowVersion2 bool) (LogEntry, error) {
++	if unknown := unknownKeys(payload, "seq", "entry_hash", "prev_hash", "record"); len(unknown) > 0 || len(payload) != 4 {
++		return LogEntry{}, fmt.Errorf("registry log entry must contain exactly seq, entry_hash, prev_hash, and record")
++	}
++	sequence, ok := nonNegativeSafeInteger(payload["seq"])
++	entryHash, hashOK := payload["entry_hash"].(string)
++	prevHash, prevOK := payload["prev_hash"].(string)
++	recordPayload, recordOK := payload["record"].(map[string]any)
++	if !ok || sequence < 1 || !hashOK || !hex256RE.MatchString(entryHash) || !prevOK || !hex256RE.MatchString(prevHash) || !recordOK {
++		return LogEntry{}, fmt.Errorf("registry log entry has invalid sequence, hashes, or record")
++	}
++	var record Record
++	var err error
++	if allowVersion2 {
++		record, err = ParseRecordVersioned(recordPayload)
++	} else {
++		record, err = ParseRecord(recordPayload)
++	}
++	if err != nil {
++		return LogEntry{}, fmt.Errorf("registry log entry record: %w", err)
++	}
++	return LogEntry{Sequence: sequence, EntryHash: entryHash, PrevHash: prevHash, Record: record}, nil
++}
++
++// BundleV2 is a schema-validated offline registry bundle. Signature and
++// checkpoint admission remain the importing caller's responsibility.
++type BundleV2 struct {
++	Records   []Record
++	Snapshot  map[string]any
++	PublicKey string
++}
++
++// ParseBundleV2 validates the v2 envelope and parses every historical or
++// v2 record with an explicit content-hash version.
++func ParseBundleV2(payload map[string]any) (BundleV2, error) {
++	if unknown := unknownKeys(payload, "schema_version", "records", "snapshot", "public_key"); len(unknown) > 0 || len(payload) != 4 {
++		return BundleV2{}, fmt.Errorf("registry bundle v2 must contain exactly schema_version, records, snapshot, and public_key")
++	}
++	if !integerEquals(payload["schema_version"], 2) {
++		return BundleV2{}, fmt.Errorf("registry bundle schema_version must be 2")
++	}
++	rawRecords, ok := payload["records"].([]any)
++	if !ok || len(rawRecords) > 1_000_000 {
++		return BundleV2{}, fmt.Errorf("registry bundle records must be an array of at most 1000000 items")
++	}
++	snapshot, ok := payload["snapshot"].(map[string]any)
++	if !ok {
++		return BundleV2{}, fmt.Errorf("registry bundle snapshot must be an object")
++	}
++	if _, err := parseSnapshot(snapshot); err != nil {
++		return BundleV2{}, fmt.Errorf("registry bundle snapshot: %w", err)
++	}
++	publicKey, ok := payload["public_key"].(string)
++	if !ok {
++		return BundleV2{}, fmt.Errorf("registry bundle public_key must be a string")
++	}
++	if _, err := ParsePublicKey(publicKey); err != nil {
++		return BundleV2{}, fmt.Errorf("registry bundle public_key: %w", err)
++	}
++	result := BundleV2{Records: make([]Record, 0, len(rawRecords)), Snapshot: snapshot, PublicKey: publicKey}
++	for i, raw := range rawRecords {
++		recordPayload, ok := raw.(map[string]any)
++		if !ok {
++			return BundleV2{}, fmt.Errorf("registry bundle record %d must be an object", i)
++		}
++		record, err := ParseRecordVersioned(recordPayload)
++		if err != nil {
++			return BundleV2{}, fmt.Errorf("registry bundle record %d: %w", i, err)
++		}
++		result.Records = append(result.Records, record)
++	}
++	return result, nil
++}
++
++// LogResponseV3 is one paged registry-log response at a signed snapshot
++// boundary. Its entry records preserve the hash version from each audit
++// record; the boundary has its independent snapshot identity.
++type LogResponseV3 struct {
++	Entries    []LogEntry
++	NextCursor *string
++	Boundary   map[string]any
++}
++
++// ParseLogResponseV3 validates the response envelope and parses each v2
++// container entry without widening the frozen log-response-v2 reader.
++func ParseLogResponseV3(payload map[string]any) (LogResponseV3, error) {
++	if unknown := unknownKeys(payload, "entries", "next_cursor", "boundary"); len(unknown) > 0 || len(payload) != 3 {
++		return LogResponseV3{}, fmt.Errorf("log response v3 must contain exactly entries, next_cursor, and boundary")
++	}
++	rawEntries, ok := payload["entries"].([]any)
++	if !ok || len(rawEntries) > maxPageSize {
++		return LogResponseV3{}, fmt.Errorf("log response entries must be an array of at most %d items", maxPageSize)
++	}
++	var nextCursor *string
++	if rawCursor := payload["next_cursor"]; rawCursor != nil {
++		cursor, ok := rawCursor.(string)
++		if !ok || cursor == "" || utf8.RuneCountInString(cursor) > 4096 {
++			return LogResponseV3{}, fmt.Errorf("log response next_cursor must be null or a 1-4096 character string")
++		}
++		nextCursor = &cursor
++	}
++	boundary, ok := payload["boundary"].(map[string]any)
++	if !ok {
++		return LogResponseV3{}, fmt.Errorf("log response boundary must be a snapshot object")
++	}
++	if _, err := parseSnapshot(boundary); err != nil {
++		return LogResponseV3{}, fmt.Errorf("log response boundary: %w", err)
++	}
++	result := LogResponseV3{Entries: make([]LogEntry, 0, len(rawEntries)), NextCursor: nextCursor, Boundary: boundary}
++	for i, raw := range rawEntries {
++		entryPayload, ok := raw.(map[string]any)
++		if !ok {
++			return LogResponseV3{}, fmt.Errorf("log response entry %d must be an object", i)
++		}
++		entry, err := ParseLogEntryVersioned(entryPayload)
++		if err != nil {
++			return LogResponseV3{}, fmt.Errorf("log response entry %d: %w", i, err)
++		}
++		result.Entries = append(result.Entries, entry)
++	}
++	return result, nil
++}
+diff --git a/internal/registry/http.go b/internal/registry/http.go
+index 2aebf140..1e9e3884 100644
+--- a/internal/registry/http.go
++++ b/internal/registry/http.go
+@@ -19,6 +19,7 @@ import (
+ 	"time"
+ 	"unicode/utf8"
+ 
++	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+ )
+ 
+@@ -173,6 +174,20 @@ func NewHTTPFetchWithPolicyReadOnlyAndObserver(cacheDir, stateDir string, regist
+ }
+ 
+ func newHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time, policy FetchPolicy, observer *MirrorViewObserver) FetchFn {
++	versioned := newHTTPFetchVersioned(cacheDir, stateDir, registries, ttl, grace, now, policy, observer)
++	return func(baseURL, sourceIdentity, commit, contentSHA256 string) ([]map[string]any, error) {
++		return versioned(baseURL, sourceIdentity, commit, contentSHA256, hashing.VersionV1)
++	}
++}
++
++// NewHTTPFetchVersionedWithPolicyAndObserver is the versioned query form used
++// by v2 content identities. The hash version is included in the request and
++// cache key before any registry records are considered.
++func NewHTTPFetchVersionedWithPolicyAndObserver(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time, policy FetchPolicy, observer *MirrorViewObserver) FetchVersionedFn {
++	return newHTTPFetchVersioned(cacheDir, stateDir, registries, ttl, grace, now, policy, observer)
++}
++
++func newHTTPFetchVersioned(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time, policy FetchPolicy, observer *MirrorViewObserver) FetchVersionedFn {
+ 	if now == nil {
+ 		now = time.Now
+ 	}
+@@ -183,7 +198,10 @@ func newHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace t
+ 	for _, reg := range registries {
+ 		byURL[strings.TrimRight(reg.URL, "/")] = reg
+ 	}
+-	return func(baseURL, sourceIdentity, commit, contentSHA256 string) ([]map[string]any, error) {
++	return func(baseURL, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version) ([]map[string]any, error) {
++		if hashVersion != hashing.VersionV1 && hashVersion != hashing.VersionV2 {
++			return nil, fmt.Errorf("unsupported content hash version %d", hashVersion)
++		}
+ 		reg, trusted := byURL[strings.TrimRight(baseURL, "/")]
+ 		if !trusted || len(reg.PublicKeys) == 0 {
+ 			return nil, fmt.Errorf("registry %s is not trusted: no pinned keys to verify its page boundary", baseURL)
+@@ -192,12 +210,10 @@ func newHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace t
+ 		if err != nil {
+ 			return nil, err
+ 		}
+-		query := url.Values{}
+-		query.Set("source_identity", sourceIdentity)
+-		query.Set("commit", commit)
+-		query.Set("content_sha256", contentSHA256)
+-		query.Set("limit", fmt.Sprintf("%d", maxPageSize))
+-		endpoint := strings.TrimRight(baseURL, "/") + "/v1/records?" + query.Encode()
++		endpoint, err := recordsEndpoint(baseURL, sourceIdentity, commit, contentSHA256, hashVersion)
++		if err != nil {
++			return nil, err
++		}
+ 		sum := sha256.Sum256([]byte(endpoint))
+ 		cacheFile := filepath.Join(cacheDir, "records-"+hex.EncodeToString(sum[:])[:16]+".json")
+ 
+@@ -233,6 +249,21 @@ func newHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace t
+ 	}
+ }
+ 
++func recordsEndpoint(baseURL, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version) (string, error) {
++	if hashVersion != hashing.VersionV1 && hashVersion != hashing.VersionV2 {
++		return "", fmt.Errorf("unsupported content hash version %d", hashVersion)
++	}
++	query := url.Values{}
++	query.Set("source_identity", sourceIdentity)
++	query.Set("commit", commit)
++	query.Set("content_sha256", contentSHA256)
++	if hashVersion == hashing.VersionV2 {
++		query.Set("hash_version", "2")
++	}
++	query.Set("limit", fmt.Sprintf("%d", maxPageSize))
++	return strings.TrimRight(baseURL, "/") + "/v1/records?" + query.Encode(), nil
++}
++
+ func httpGetAllRecords(chain *pageChain, endpoint string, reg Registry, observer *MirrorViewObserver) ([]map[string]any, error) {
+ 	records := make([]map[string]any, 0)
+ 	seenCursors := map[string]bool{}
+diff --git a/internal/registry/registry.go b/internal/registry/registry.go
+index 9e6cf45d..d85ffaf9 100644
+--- a/internal/registry/registry.go
++++ b/internal/registry/registry.go
+@@ -18,6 +18,7 @@ import (
+ 	"time"
+ 	"unicode/utf8"
+ 
++	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/identifiers"
+ 	"github.com/relux-works/curator/internal/identity"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+@@ -64,6 +65,7 @@ type Record struct {
+ 	SourceIdentity string
+ 	Commit         string
+ 	ContentSHA256  string
++	HashVersion    hashing.Version
+ 	Status         string
+ 	Raw            map[string]any
+ }
+@@ -97,6 +99,10 @@ type Resolution struct {
+ // FetchFn returns raw record payloads for an artifact query.
+ type FetchFn func(url, sourceIdentity, commit, contentSHA256 string) ([]map[string]any, error)
+ 
++// FetchVersionedFn includes the content-hash framing version in the registry
++// query. Version 1 is the frozen query form; version 2 carries hash_version=2.
++type FetchVersionedFn func(url, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version) ([]map[string]any, error)
++
+ // CanonicalBytes is the signed form of any registry object: compact sorted
+ // CCJ-1 JSON of every field except the top-level "sig" (Spec Registry §1).
+ // Invalid CCJ-1 input returns nil; verification uses CanonicalBytesChecked so
+@@ -141,13 +147,45 @@ func KeyID(publicKey ed25519.PublicKey) string {
+ 
+ // ParseRecord validates a raw record payload (Spec §13.1).
+ func ParseRecord(payload map[string]any) (Record, error) {
+-	if unknown := unknownKeys(payload, "schema_version", "name", "source_identity", "commit", "content_sha256", "status", "audit", "endorsements", "sig"); len(unknown) > 0 {
++	return parseRecord(payload, false)
++}
++
++// ParseRecordVersioned validates a raw audit-record-v1 or audit-record-v2
++// payload. Frozen containers call ParseRecord so a nested v2 record cannot
++// silently widen their schema.
++func ParseRecordVersioned(payload map[string]any) (Record, error) {
++	return parseRecord(payload, true)
++}
++
++func parseRecord(payload map[string]any, allowVersion2 bool) (Record, error) {
++	if unknown := unknownKeys(payload, "schema_version", "hash_version", "name", "source_identity", "commit", "content_sha256", "status", "audit", "endorsements", "sig"); len(unknown) > 0 {
+ 		return Record{}, fmt.Errorf("audit record has unknown fields: %s", strings.Join(unknown, ", "))
+ 	}
+-	if schema, present := payload["schema_version"]; present && !integerEquals(schema, 1) {
+-		return Record{}, fmt.Errorf("audit record schema_version must be 1")
++	schema := int64(1)
++	if rawSchema, present := payload["schema_version"]; present {
++		if integerEquals(rawSchema, 1) {
++			schema = 1
++		} else if integerEquals(rawSchema, 2) {
++			if !allowVersion2 {
++				return Record{}, fmt.Errorf("audit record schema_version 2 requires a versioned reader")
++			}
++			schema = 2
++		} else {
++			return Record{}, fmt.Errorf("audit record schema_version must be 1 or 2")
++		}
+ 	}
+-	record := Record{Raw: payload}
++	hashVersion := hashing.VersionV1
++	if schema == 1 {
++		if _, present := payload["hash_version"]; present {
++			return Record{}, fmt.Errorf("audit record schema_version 1 does not carry hash_version")
++		}
++	} else {
++		if !integerEquals(payload["hash_version"], int64(hashing.VersionV2)) {
++			return Record{}, fmt.Errorf("audit record schema_version 2 requires hash_version 2")
++		}
++		hashVersion = hashing.VersionV2
++	}
++	record := Record{Raw: payload, HashVersion: hashVersion}
+ 	for _, field := range []struct {
+ 		key string
+ 		dst *string
+@@ -301,6 +339,19 @@ func integerEquals(raw any, expected int64) bool {
+ // Matches reports whether a record names the artifact: equal content hash,
+ // or equal source identity plus commit (Spec §13.3).
+ func Matches(record Record, sourceIdentity, commit, contentSHA256 string) bool {
++	return MatchesVersioned(record, sourceIdentity, commit, contentSHA256, hashing.VersionV1)
++}
++
++// MatchesVersioned refuses cross-version records before considering either
++// content or source identity. Same-version records follow the ordinary
++// content-or-source-and-commit matching rule.
++func MatchesVersioned(record Record, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version) bool {
++	if hashVersion != hashing.VersionV1 && hashVersion != hashing.VersionV2 {
++		return false
++	}
++	if recordHashVersion(record) != hashVersion {
++		return false
++	}
+ 	if record.ContentSHA256 == contentSHA256 {
+ 		return true
+ 	}
+@@ -313,12 +364,28 @@ func Matches(record Record, sourceIdentity, commit, contentSHA256 string) bool {
+ // Matches, neither a content-only coincidence nor an identity+commit
+ // coincidence admits the record, and the record name is always compared.
+ func MatchesExact(record Record, name, sourceIdentity, commit, contentSHA256 string) bool {
++	return MatchesExactVersioned(record, name, sourceIdentity, commit, contentSHA256, hashing.VersionV1)
++}
++
++// MatchesExactVersioned adds the framing-version guard to the exact draft
++// match while retaining all existing identity requirements.
++func MatchesExactVersioned(record Record, name, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version) bool {
++	if recordHashVersion(record) != hashVersion {
++		return false
++	}
+ 	return record.Name == name &&
+ 		record.SourceIdentity == sourceIdentity &&
+ 		record.Commit == commit &&
+ 		record.ContentSHA256 == contentSHA256
+ }
+ 
++func recordHashVersion(record Record) hashing.Version {
++	if record.HashVersion == 0 {
++		return hashing.VersionV1
++	}
++	return record.HashVersion
++}
++
+ // Resolve combines verified records from every trusted registry under
+ // deny-wins (Spec §13.3).
+ //
+@@ -336,6 +403,18 @@ func Resolve(registries []Registry, sourceIdentity, commit, contentSHA256 string
+ 	})
+ }
+ 
++// ResolveVersioned combines verified v1/v2 records while requiring the
++// artifact and record framing versions to match before either content or
++// source identity can authorize.
++func ResolveVersioned(registries []Registry, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version, fetch FetchVersionedFn) Resolution {
++	if sourceIdentity == "" && commit == "" {
++		return Resolution{Result: ResultUnknown}
++	}
++	return resolveMatchedVersioned(registries, sourceIdentity, commit, contentSHA256, hashVersion, fetch, func(record Record) bool {
++		return MatchesVersioned(record, sourceIdentity, commit, contentSHA256, hashVersion)
++	})
++}
++
+ // ResolveExact combines verified records exactly like Resolve, but a
+ // record authorizes only on an exact draft §4 match of name, canonical
+ // repository, commit, and context hash. The draft install lane resolves
+@@ -350,9 +429,32 @@ func ResolveExact(registries []Registry, name, sourceIdentity, commit, contentSH
+ 	})
+ }
+ 
++// ResolveExactVersioned is the versioned exact-match form used by draft
++// sources. It keeps the draft name/source/commit/content requirements and
++// also refuses cross-version records.
++func ResolveExactVersioned(registries []Registry, name, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version, fetch FetchVersionedFn) Resolution {
++	if sourceIdentity == "" && commit == "" {
++		return Resolution{Result: ResultUnknown}
++	}
++	return resolveMatchedVersioned(registries, sourceIdentity, commit, contentSHA256, hashVersion, fetch, func(record Record) bool {
++		return MatchesExactVersioned(record, name, sourceIdentity, commit, contentSHA256, hashVersion)
++	})
++}
++
+ // resolveMatched is the shared deny-wins combination behind Resolve and
+ // ResolveExact: only the record-admission predicate differs.
+ func resolveMatched(registries []Registry, sourceIdentity, commit, contentSHA256 string, fetch FetchFn, match func(Record) bool) Resolution {
++	versionedFetch := func(url, sourceIdentity, commit, contentSHA256 string, _ hashing.Version) ([]map[string]any, error) {
++		return fetch(url, sourceIdentity, commit, contentSHA256)
++	}
++	return resolveRecords(registries, sourceIdentity, commit, contentSHA256, hashing.VersionV1, versionedFetch, false, match)
++}
++
++func resolveMatchedVersioned(registries []Registry, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version, fetch FetchVersionedFn, match func(Record) bool) Resolution {
++	return resolveRecords(registries, sourceIdentity, commit, contentSHA256, hashVersion, fetch, true, match)
++}
++
++func resolveRecords(registries []Registry, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version, fetch FetchVersionedFn, allowVersion2 bool, match func(Record) bool) Resolution {
+ 	var warnings []string
+ 	var unreachable []string
+ 	var audited, deprecated *Attestation
+@@ -361,7 +463,7 @@ func resolveMatched(registries []Registry, sourceIdentity, commit, contentSHA256
+ 			warnings = append(warnings, fmt.Sprintf("registry %s has no pinned keys; its records are not trusted", reg.Name))
+ 			continue
+ 		}
+-		payloads, err := fetch(reg.URL, sourceIdentity, commit, contentSHA256)
++		payloads, err := fetch(reg.URL, sourceIdentity, commit, contentSHA256, hashVersion)
+ 		if err != nil {
+ 			warnings = append(warnings, fmt.Sprintf("registry %s unavailable: %v", reg.Name, err))
+ 			if isRegistryUnavailable(err) {
+@@ -370,7 +472,13 @@ func resolveMatched(registries []Registry, sourceIdentity, commit, contentSHA256
+ 			continue
+ 		}
+ 		for _, payload := range payloads {
+-			record, err := ParseRecord(payload)
++			var record Record
++			var err error
++			if allowVersion2 {
++				record, err = ParseRecordVersioned(payload)
++			} else {
++				record, err = ParseRecord(payload)
++			}
+ 			if err != nil {
+ 				warnings = append(warnings, fmt.Sprintf("registry %s returned a malformed record: %v", reg.Name, err))
+ 				continue
+@@ -378,7 +486,7 @@ func resolveMatched(registries []Registry, sourceIdentity, commit, contentSHA256
+ 			// Positive schema-2 evidence has an exact four-field grant.
+ 			// Revocation retains registry §3's broader artifact match, so a
+ 			// repository+commit denial cannot be narrowed by name or content.
+-			revocationMatch := record.Status == StatusRevoked && Matches(record, sourceIdentity, commit, contentSHA256)
++			revocationMatch := record.Status == StatusRevoked && MatchesVersioned(record, sourceIdentity, commit, contentSHA256, hashVersion)
+ 			if !match(record) && !revocationMatch {
+ 				continue
+ 			}
+diff --git a/internal/registry/registry_test.go b/internal/registry/registry_test.go
+index ea289350..0ee451e0 100644
+--- a/internal/registry/registry_test.go
++++ b/internal/registry/registry_test.go
+@@ -7,6 +7,7 @@ import (
+ 	"errors"
+ 	"net/http"
+ 	"net/http/httptest"
++	"net/url"
+ 	"os"
+ 	"path/filepath"
+ 	"runtime"
+@@ -14,6 +15,7 @@ import (
+ 	"testing"
+ 	"time"
+ 
++	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/stateread"
+ )
+ 
+@@ -197,6 +199,35 @@ func TestParseRecordValidation(t *testing.T) {
+ 	}
+ }
+ 
++func TestParseRecordVersion2RequiresExplicitHashVersion2(t *testing.T) {
++	s := newSigner(t)
++	v2 := record(StatusAudited)
++	v2["schema_version"] = 2
++	v2["hash_version"] = 2
++	parsed, err := ParseRecordVersioned(s.sign(v2))
++	if err != nil {
++		t.Fatalf("valid v2 record refused: %v", err)
++	}
++	if parsed.HashVersion != hashing.VersionV2 {
++		t.Fatalf("record hash version = %d, want 2", parsed.HashVersion)
++	}
++
++	for name, mutate := range map[string]func(map[string]any){
++		"missing hash version": func(value map[string]any) { delete(value, "hash_version") },
++		"wrong hash version":   func(value map[string]any) { value["hash_version"] = 1 },
++	} {
++		t.Run(name, func(t *testing.T) {
++			value := record(StatusAudited)
++			value["schema_version"] = 2
++			value["hash_version"] = 2
++			mutate(value)
++			if _, err := ParseRecordVersioned(s.sign(value)); err == nil {
++				t.Fatal("invalid v2 hash-version carrier was accepted")
++			}
++		})
++	}
++}
++
+ func TestMatches(t *testing.T) {
+ 	s := newSigner(t)
+ 	parsed, _ := ParseRecord(s.sign(record(StatusAudited)))
+@@ -211,6 +242,78 @@ func TestMatches(t *testing.T) {
+ 	}
+ }
+ 
++func TestMatchesRequiresEqualHashVersion(t *testing.T) {
++	s := newSigner(t)
++	parsed, err := ParseRecord(s.sign(record(StatusAudited)))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if parsed.HashVersion != hashing.VersionV1 {
++		t.Fatalf("legacy record hash version = %d, want 1", parsed.HashVersion)
++	}
++	if MatchesVersioned(parsed, parsed.SourceIdentity, parsed.Commit, parsed.ContentSHA256, hashing.VersionV2) {
++		t.Fatal("a v1 record matched a v2 artifact through equal content/source identity")
++	}
++
++	v2 := parsed
++	v2.HashVersion = hashing.VersionV2
++	if !MatchesVersioned(v2, v2.SourceIdentity, v2.Commit, v2.ContentSHA256, hashing.VersionV2) {
++		t.Fatal("same-version record did not match")
++	}
++	if MatchesVersioned(v2, v2.SourceIdentity, v2.Commit, v2.ContentSHA256, hashing.VersionV1) {
++		t.Fatal("a v2 record matched a v1 artifact")
++	}
++}
++
++func TestResolveVersionedDoesNotAdmitV1RecordForV2Artifact(t *testing.T) {
++	s := newSigner(t)
++	reg := Registry{Name: "trusted", URL: "https://registry.example", PublicKeys: []string{s.pinned}}
++	v1 := s.sign(record(StatusAudited))
++	fetch := func(string, string, string, string, hashing.Version) ([]map[string]any, error) {
++		return []map[string]any{v1}, nil
++	}
++	resolution := ResolveVersioned([]Registry{reg}, "git.example.com/skills/skill-a", testCommit, testContentSHA256, hashing.VersionV2, fetch)
++	if resolution.Result != ResultUnknown || resolution.Attestation != nil {
++		t.Fatalf("a v1 record authorized a v2 artifact: %+v", resolution)
++	}
++
++	v2 := record(StatusAudited)
++	v2["schema_version"] = 2
++	v2["hash_version"] = 2
++	fetch = func(string, string, string, string, hashing.Version) ([]map[string]any, error) {
++		return []map[string]any{s.sign(v2)}, nil
++	}
++	resolution = ResolveVersioned([]Registry{reg}, "git.example.com/skills/skill-a", testCommit, testContentSHA256, hashing.VersionV2, fetch)
++	if resolution.Result != ResultAudited || resolution.Attestation == nil {
++		t.Fatalf("same-version v2 record did not authorize: %+v", resolution)
++	}
++}
++
++func TestRecordsEndpointVersionsContentHashQuery(t *testing.T) {
++	for _, tc := range []struct {
++		version hashing.Version
++		want    string
++	}{
++		{version: hashing.VersionV1, want: ""},
++		{version: hashing.VersionV2, want: "2"},
++	} {
++		endpoint, err := recordsEndpoint("https://registry.example", "git.example/skill", testCommit, testContentSHA256, tc.version)
++		if err != nil {
++			t.Fatal(err)
++		}
++		parsed, err := url.Parse(endpoint)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if got := parsed.Query().Get("hash_version"); got != tc.want {
++			t.Errorf("version %d query hash_version = %q, want %q", tc.version, got, tc.want)
++		}
++	}
++	if _, err := recordsEndpoint("https://registry.example", "git.example/skill", testCommit, testContentSHA256, 3); err == nil {
++		t.Fatal("unsupported content hash version produced a registry query")
++	}
++}
++
+ // TestMatchesExact locks draft §4 admission: name, canonical repository,
+ // commit, and context hash must ALL match. Each single-field mismatch
+ // refuses, including the two shapes frozen §13.3 OR-matching admits (a
+diff --git a/internal/registry/schema_conformance_test.go b/internal/registry/schema_conformance_test.go
+index ddc14fd9..97b7dcfe 100644
+--- a/internal/registry/schema_conformance_test.go
++++ b/internal/registry/schema_conformance_test.go
+@@ -15,6 +15,113 @@ type frozenRegistrySchemaIndexEntry struct {
+ 	Valid    bool   `json:"valid"`
+ }
+ 
++func TestAuditRecordV2SchemaCases(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++		return
++	}
++	indexBytes, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var index []frozenRegistrySchemaIndexEntry
++	if err := json.Unmarshal(indexBytes, &index); err != nil {
++		t.Fatalf("parse schema-case index: %v", err)
++	}
++	const family = "audit-record-v2"
++	prefix := family + "/"
++	var cases []frozenRegistrySchemaIndexEntry
++	for _, entry := range index {
++		if strings.HasPrefix(entry.Instance, prefix) {
++			cases = append(cases, entry)
++		}
++	}
++	conformancecoverage.RequirePublishedCount(t, family+"/schema-cases", len(cases))
++	conformancecoverage.RunOutcomes(t, family+"/schema-cases", cases,
++		func(entry frozenRegistrySchemaIndexEntry) string { return strings.TrimPrefix(entry.Instance, prefix) },
++		func(t *testing.T, entry frozenRegistrySchemaIndexEntry) conformancecoverage.Observation {
++			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", filepath.FromSlash(entry.Instance)))
++			if err != nil {
++				t.Fatal(err)
++			}
++			var object map[string]any
++			if err := decodeJSON(payload, &object); err != nil {
++				t.Fatalf("decode audit-record-v2 case %s: %v", entry.Instance, err)
++			}
++			_, parseErr := ParseRecordVersioned(object)
++			if (parseErr == nil) != entry.Valid {
++				t.Fatalf("valid=%v: ParseRecord err=%v", entry.Valid, parseErr)
++			}
++			return conformancecoverage.Observation{}
++		})
++}
++
++func TestRegistryV2CarrierSchemaCases(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++		return
++	}
++	indexBytes, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var index []frozenRegistrySchemaIndexEntry
++	if err := json.Unmarshal(indexBytes, &index); err != nil {
++		t.Fatalf("parse schema-case index: %v", err)
++	}
++	families := []struct {
++		name  string
++		parse func(map[string]any) error
++	}{
++		{name: "registry-log-entry-v2", parse: func(value map[string]any) error { _, err := ParseLogEntryVersioned(value); return err }},
++		{name: "registry-bundle-v2", parse: func(value map[string]any) error { _, err := ParseBundleV2(value); return err }},
++		{name: "log-response-v3", parse: func(value map[string]any) error { _, err := ParseLogResponseV3(value); return err }},
++	}
++	for _, family := range families {
++		family := family
++		prefix := family.name + "/"
++		var cases []frozenRegistrySchemaIndexEntry
++		for _, entry := range index {
++			if strings.HasPrefix(entry.Instance, prefix) {
++				cases = append(cases, entry)
++			}
++		}
++		coverageID := family.name + "/schema-cases"
++		conformancecoverage.RequirePublishedCount(t, coverageID, len(cases))
++		conformancecoverage.RunOutcomes(t, coverageID, cases,
++			func(entry frozenRegistrySchemaIndexEntry) string { return strings.TrimPrefix(entry.Instance, prefix) },
++			func(t *testing.T, entry frozenRegistrySchemaIndexEntry) conformancecoverage.Observation {
++				payload, err := os.ReadFile(filepath.Join(root, "schema-cases", filepath.FromSlash(entry.Instance)))
++				if err != nil {
++					t.Fatal(err)
++				}
++				var object map[string]any
++				if err := decodeJSON(payload, &object); err != nil {
++					t.Fatalf("decode %s case %s: %v", family.name, entry.Instance, err)
++				}
++				parseErr := family.parse(object)
++				if (parseErr == nil) != entry.Valid {
++					t.Fatalf("valid=%v: parse err=%v", entry.Valid, parseErr)
++				}
++				return conformancecoverage.Observation{}
++			})
++	}
++}
++
+ func readFrozenRegistrySchemaCase(t *testing.T, root, family, caseName string) ([]byte, bool) {
+ 	t.Helper()
+ 	indexBytes, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))
+@@ -116,4 +223,7 @@ func TestParseRecordRejectsV2RecordInsideFrozenRegistryLogEntry(t *testing.T) {
+ 	if _, err := ParseRecord(record); err == nil {
+ 		t.Fatal("ParseRecord accepted a v2 record inside a frozen registry-log-entry-v1 case")
+ 	}
++	if _, err := ParseLogEntry(entry); err == nil {
++		t.Fatal("ParseLogEntry accepted a v2 record inside a frozen registry-log-entry-v1 case")
++	}
+ }
