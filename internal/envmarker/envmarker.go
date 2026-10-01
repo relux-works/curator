@@ -1,5 +1,5 @@
 // Package envmarker reads and writes the environment marker of environments
-// §8.2, agent-environment-marker-v1 and agent-environment-marker-v2: the
+// §8.2, agent-environment-marker-v1, v2, and v3: the
 // per-home ledger of record for environment surfaces
 // (.agent-environment.json). Readers reject an unsupported version and
 // unknown fields; failed reads and malformed content fail closed as
@@ -24,12 +24,13 @@ import (
 // Name is the marker file name beside the managed surfaces.
 const Name = ".agent-environment.json"
 
-// Marker schema versions supported by the reader. New managed-home
-// provisioning writes VersionV2; linked and copied markers retain v1 until
-// their owning writer migrates them independently.
+// Marker schema versions supported by the reader. Version 3 is the current
+// writer shape and records content framing version 2. Versions 1 and 2 keep
+// their frozen v1 meaning.
 const (
 	VersionV1 = 1
 	VersionV2 = 2
+	VersionV3 = 3
 	// Version is the legacy writer version for marker paths outside managed
 	// homes. Keep those call sites explicit until their own schema-2 work.
 	Version = VersionV1
@@ -126,6 +127,7 @@ type Surface struct {
 // reader accepts a managed-home marker; callers decide which schema to write.
 type Marker struct {
 	Version         int                `json:"version"`
+	HashVersion     int                `json:"hash_version,omitempty"`
 	Profile         Profile            `json:"profile"`
 	Members         []Member           `json:"members"`
 	Precedence      Precedence         `json:"precedence"`
@@ -169,8 +171,15 @@ var (
 
 // Validate applies the schema rules.
 func (m *Marker) Validate() error {
-	if m.Version != VersionV1 && m.Version != VersionV2 {
+	if m.Version != VersionV1 && m.Version != VersionV2 && m.Version != VersionV3 {
 		return &unsupportedMarkerVersionError{version: m.Version}
+	}
+	if m.Version == VersionV3 {
+		if m.HashVersion != 2 {
+			return fmt.Errorf("version 3 requires hash_version 2")
+		}
+	} else if m.HashVersion != 0 {
+		return fmt.Errorf("versions 1 and 2 do not carry hash_version")
 	}
 	if !identifiers.Valid(m.Profile.Name) || !identifiers.Valid(m.Profile.Root) {
 		return fmt.Errorf("profile name or root is not a portable identifier")

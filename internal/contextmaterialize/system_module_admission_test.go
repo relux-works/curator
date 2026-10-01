@@ -29,6 +29,7 @@ import (
 	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextpkg"
+	"github.com/relux-works/curator/internal/hashing"
 )
 
 // systemModuleAdmissionCases are the five §3 admission cases by name:
@@ -146,6 +147,15 @@ func TestSystemModuleAdmissionVectors(t *testing.T) {
 // package and module), and the expected file bytes and surface hash.
 func runAdmissionVectorCase(t *testing.T, root string, tc admissionVectorCase) {
 	t.Helper()
+	var lockIdentity struct {
+		HashVersion int `json:"hash_version"`
+	}
+	if err := json.Unmarshal(tc.Lock, &lockIdentity); err != nil {
+		t.Fatalf("decode vector lock hash version: %v", err)
+	}
+	previousWriterVersion := hashing.EnableV2Writers
+	hashing.EnableV2Writers = lockIdentity.HashVersion == int(hashing.VersionV2)
+	defer func() { hashing.EnableV2Writers = previousWriterVersion }()
 	if tc.Surface != "system-prompt" {
 		t.Fatalf("admission case %q has surface %q, want system-prompt", tc.Name, tc.Surface)
 	}

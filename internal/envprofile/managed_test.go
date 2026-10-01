@@ -14,6 +14,7 @@ import (
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
@@ -399,6 +400,39 @@ func TestResolveReportsRecordedContextSurfaceHashDrift(t *testing.T) {
 				t.Fatalf("status row does not report %s as %s: %+v", surface, DiagSurfaceDrift, row.Surfaces)
 			}
 		})
+	}
+}
+
+func TestResolveRejectsEnvironmentMarkerHashVersionMismatch(t *testing.T) {
+	previousWriterVersion := hashing.EnableV2Writers
+	hashing.EnableV2Writers = false
+	defer func() { hashing.EnableV2Writers = previousWriterVersion }()
+
+	fx := writeManagedFixture(t, "acme")
+	seedLiveNativeCredentials(t, fx)
+	provision := fx.request("codex_cli")
+	provision.Repair = true
+	if _, err := Resolve(provision); err != nil {
+		t.Fatalf("provision managed home: %v", err)
+	}
+	marker := readManagedMarker(t, fx, "codex_cli")
+	marker.Version = envmarker.VersionV3
+	marker.HashVersion = int(hashing.VersionV2)
+	payload, err := marker.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	markerPath := filepath.Join(ManagedHomeDir(fx.home, fx.profile, "codex_cli"), envmarker.Name)
+	if err := os.WriteFile(markerPath, payload, 0o600); err != nil {
+		t.Fatalf("write v2 marker over the v1-versioned surface hashes: %v", err)
+	}
+
+	result, err := Resolve(fx.request("codex_cli"))
+	if err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
+		t.Fatalf("Resolve accepted an agent marker with a different hash version: result=%+v err=%v", result, err)
+	}
+	if result == nil || len(result.Document) != 0 {
+		t.Fatalf("version-mismatched resolve emitted a fragment: %+v", result)
 	}
 }
 

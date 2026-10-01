@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -79,12 +80,9 @@ const (
 	// 8 and no other difference, so every marker-v3 build-record rule applies
 	// to it unchanged.
 	PolicySchemaVersion = 4
-	// SchemaV5 is written only for skillfile-sources draft installations
-	// (Skillfile schema 2). Its package replaces the legacy
-	// source/git/ref_kind/ref/commit fields and its lock_sha256 binds the
-	// installed selection and declared ref through the validated lock and
-	// matching manifest. Every locked draft member records it, whatever
-	// the skill manifest version; legacy lanes never write it.
+	// SchemaV5 is the current core marker shape and also the frozen draft
+	// package shape. Core v5 carries hash_version 2; the disjoint package
+	// shape retains its frozen v1 meaning until its own schema advances.
 	SchemaV5 = 5
 	// NewestSchemaVersion is the highest marker schema this release reads. It
 	// is what an operator is told when a document from a newer manager is
@@ -219,6 +217,7 @@ type Commit struct {
 // Marker is the install marker payload (Spec §8.5).
 type Marker struct {
 	SchemaVersion      int                   `json:"schema_version"`
+	HashVersion        hashing.Version       `json:"hash_version,omitempty"`
 	Name               string                `json:"name"`
 	Source             string                `json:"source,omitempty"`
 	RefKind            string                `json:"ref_kind,omitempty"`
@@ -354,16 +353,24 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 		required = append(required, "build_roots", "builds")
 		allowed = append(allowed, "build_roots", "build_source", "builds")
 	case SchemaV5:
-		// The frozen package replaces every legacy source field, so v5
-		// carries its own required set without them.
-		required = []string{
-			"schema_version", "name", "package", "lock_sha256", "content_sha256", "locale",
-			"agents", "commands", "dependencies", "skill_schema_version", "runtime_roots",
-			"build_roots", "builds", "installed_at", "files",
+		if m.Package == nil {
+			// Core v5 retains v4's identity/build shape and adds a required
+			// framing version. The package member remains exclusive to the
+			// separately frozen skillfile-sources marker-v5 shape.
+			required = append(required, "hash_version", "build_roots", "builds")
+			allowed = append(allowed, "hash_version", "build_roots", "build_source", "builds")
+		} else {
+			// The frozen package replaces every legacy source field, so the
+			// source-extension v5 shape keeps its own required set.
+			required = []string{
+				"schema_version", "name", "package", "lock_sha256", "content_sha256", "locale",
+				"agents", "commands", "dependencies", "skill_schema_version", "runtime_roots",
+				"build_roots", "builds", "installed_at", "files",
+			}
+			allowed = append(append([]string(nil), required...),
+				"requirements", "mcp_servers", "attestation", "activation", "requirers", "substituted",
+				"build_source")
 		}
-		allowed = append(append([]string(nil), required...),
-			"requirements", "mcp_servers", "attestation", "activation", "requirers", "substituted",
-			"build_source")
 	default:
 		return false
 	}
@@ -376,10 +383,26 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 		return false
 	}
 	if m.SchemaVersion == SchemaV5 {
-		if !validV5Identity(m, raw) {
+		if m.Package != nil {
+			if !validV5Identity(m, raw) {
+				return false
+			}
+		} else if !validCoreV5Identity(m) {
 			return false
 		}
 	} else if !identifiers.PortablePath(m.Source) || !validLegacyTriple(m) {
+		return false
+	}
+	if m.SchemaVersion == SchemaV5 {
+		hashVersionRaw, hasHashVersion := raw["hash_version"]
+		if m.Package == nil {
+			if !hasHashVersion || !rawIntegerEquals(hashVersionRaw, int64(hashing.VersionV2)) || m.HashVersion != hashing.VersionV2 {
+				return false
+			}
+		} else if hasHashVersion || m.HashVersion != 0 {
+			return false
+		}
+	} else if m.HashVersion != 0 {
 		return false
 	}
 	if !markerSHA256RE.MatchString(m.ContentSHA256) || m.SkillSchemaVersion < 0 ||
@@ -387,7 +410,8 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 		(m.SchemaVersion == SchemaVersion && m.SkillSchemaVersion > 6) ||
 		(m.SchemaVersion == ExternalSchemaVersion && m.SkillSchemaVersion != 7) ||
 		(m.SchemaVersion == PolicySchemaVersion && m.SkillSchemaVersion != 8) ||
-		(m.SchemaVersion == SchemaV5 && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 9)) {
+		(m.SchemaVersion == SchemaV5 && m.Package == nil && m.SkillSchemaVersion > 8) ||
+		(m.SchemaVersion == SchemaV5 && m.Package != nil && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 9)) {
 		return false
 	}
 	setsSorted := m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion ||
@@ -468,6 +492,16 @@ func validV5Identity(m *Marker, raw map[string]json.RawMessage) bool {
 		if _, present := raw["substituted"]; present {
 			return false
 		}
+	}
+	return true
+}
+
+func validCoreV5Identity(m *Marker) bool {
+	if !identifiers.PortablePath(m.Source) || !validLegacyTriple(m) {
+		return false
+	}
+	if m.RefKind == "revision" {
+		return markerCommitRE.MatchString(m.Ref) && m.Ref == m.Commit
 	}
 	return true
 }
@@ -888,7 +922,7 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
 		// A draft v5 marker binds receipt version 3 on every build entry,
 		// whatever the skill schema: its cache entries are receipt-3 package
 		// wrappers, so a legacy record shape can never describe them.
-		if m.SchemaVersion == SchemaV5 {
+		if m.SchemaVersion == SchemaV5 && m.Package != nil {
 			rawBuild, present := buildsRaw[command]
 			if !present {
 				return false
@@ -904,6 +938,12 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
 				}
 			}
 			if !validV5Build(build) {
+				return false
+			}
+			continue
+		}
+		if m.SchemaVersion == SchemaV5 {
+			if !validCoreV5Build(build) {
 				return false
 			}
 			continue
@@ -930,6 +970,56 @@ func hasRepositoryState(build Build) bool {
 
 func validV3Build(build Build) bool {
 	return validDriverBuild(build, 1, 2)
+}
+
+// validCoreV5Build applies marker-v4 build rules plus the v5 substitution
+// identity binding. An un-substituted source stays on its declared identity
+// and commit; a substitution's effective identity kind follows its typed
+// substitution record.
+func validCoreV5Build(build Build) bool {
+	if !validV3Build(build) {
+		return false
+	}
+	if build.Driver != "go-repository-v1" {
+		return true
+	}
+	if !build.Substituted {
+		return build.DeclaredIdentity.Kind == build.EffectiveIdentity.Kind &&
+			build.DeclaredIdentity.Value == build.EffectiveIdentity.Value &&
+			build.ObjectFormat == build.DeclaredLockedCommit.ObjectFormat &&
+			build.Commit == build.DeclaredLockedCommit.Hex
+	}
+	if build.Substitution == nil {
+		return false
+	}
+	switch build.Substitution.Type {
+	case "local-path":
+		return build.EffectiveIdentity.Kind == "operator-local-git" && build.Substitution.Ref == nil
+	case "network-git":
+		return build.EffectiveIdentity.Kind == "network-git" && validCoreV5StructuredRef(build.Substitution.Ref, build.ObjectFormat)
+	default:
+		return false
+	}
+}
+
+func validCoreV5StructuredRef(ref *RepositoryRef, objectFormat string) bool {
+	if ref == nil {
+		return false
+	}
+	switch ref.Kind {
+	case "revision":
+		wantLength := 40
+		if objectFormat == "sha256" {
+			wantLength = 64
+		} else if objectFormat != "sha1" {
+			return false
+		}
+		return len(ref.Value) == wantLength && markerCommitRE.MatchString(ref.Value)
+	case "tag", "branch":
+		return identity.DraftSourceRefName(ref.Value)
+	default:
+		return false
+	}
 }
 
 // validV5Build is the marker-5 record: every retained driver field of the
@@ -965,10 +1055,6 @@ func validDriverBuild(build Build, localReceipt, externalReceipt int) bool {
 		return false
 	}
 	if build.Substituted != (build.Substitution != nil) {
-		return false
-	}
-	if build.Substitution != nil && build.Substitution.Type != "local-path" &&
-		(build.Substitution.Type != "network-git" || build.Substitution.Ref == nil) {
 		return false
 	}
 	return true
@@ -1076,7 +1162,7 @@ func BuildBearingSchema(version int) bool {
 // external go-repository-v1 commands alongside local ones. Marker v4 is v3
 // with the version bumped and nothing else changed, so both answer yes.
 func externalCapableSchema(version int) bool {
-	return version == ExternalSchemaVersion || version == PolicySchemaVersion
+	return version == ExternalSchemaVersion || version == PolicySchemaVersion || version == SchemaV5
 }
 
 // SupportedSchema reports whether version is a marker schema this release
@@ -1090,9 +1176,9 @@ func SupportedSchema(version int) bool {
 
 // Write stores the marker inside dir with sorted keys and a trailing newline.
 //
-// A marker carrying a frozen draft package is always schema 5, regardless
-// of skill manifest version; every other marker keeps the legacy
-// skill-schema band byte-identically.
+// A marker carrying a frozen draft package retains its v5 source-extension
+// shape. Core markers preserve the rc.13 schema and v1 hash by default; the
+// internal hash writer switch selects the v5/v2 form.
 func Write(dir string, m *Marker) error {
 	if m == nil {
 		return errors.New("install marker is nil")
@@ -1100,12 +1186,19 @@ func Write(dir string, m *Marker) error {
 	switch {
 	case m.Package != nil:
 		m.SchemaVersion = SchemaV5
+		m.HashVersion = 0
+	case hashing.WriteVersion() == hashing.VersionV2:
+		m.SchemaVersion = SchemaV5
+		m.HashVersion = hashing.VersionV2
 	case m.SkillSchemaVersion >= 8:
 		m.SchemaVersion = PolicySchemaVersion
+		m.HashVersion = 0
 	case m.SkillSchemaVersion == 7:
 		m.SchemaVersion = ExternalSchemaVersion
+		m.HashVersion = 0
 	default:
 		m.SchemaVersion = SchemaVersion
+		m.HashVersion = 0
 	}
 	m.Agents = nonNilStrings(m.Agents)
 	m.Commands = nonNilStrings(m.Commands)
@@ -1134,6 +1227,15 @@ func Write(dir string, m *Marker) error {
 	}
 	if m.Requirers != nil {
 		sort.Strings(m.Requirers)
+	}
+	// rc.13 writers preserve the caller-provided v1 identity byte-for-byte.
+	// Only the opt-in v2 writer computes and publishes a new framed identity.
+	if markerHashVersion(m) == hashing.VersionV2 {
+		contentHash, err := hashing.ContentSHA256WithVersion(dir, nil, hashing.VersionV2)
+		if err != nil {
+			return err
+		}
+		m.ContentSHA256 = contentHash
 	}
 	payload, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
@@ -1210,7 +1312,7 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 	// frozen package it carries is what selects the v5 comparison. A v5
 	// marker never matches a legacy one; changed registry, substitution,
 	// declared ref, package or lock makes the installation non-current.
-	if recorded.SchemaVersion == SchemaV5 || expected.Package != nil {
+	if recorded.Package != nil || expected.Package != nil {
 		if recorded.SchemaVersion != SchemaV5 || expected.Package == nil {
 			return false, nil
 		}
@@ -1243,7 +1345,11 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 			return false, nil
 		}
 	}
-	actual, err := hashing.ContentSHA256(installedDir, nil)
+	recordedHashVersion := markerHashVersion(recorded)
+	if recordedHashVersion != markerHashVersion(expected) {
+		return false, nil
+	}
+	actual, err := hashing.ContentSHA256WithVersion(installedDir, nil, recordedHashVersion)
 	if err != nil {
 		return false, err
 	}
@@ -1257,6 +1363,28 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 		return false, nil
 	}
 	return currentBuilds(installedDir, recorded, buildState[0])
+}
+
+func markerHashVersion(m *Marker) hashing.Version {
+	if m.HashVersion != 0 {
+		return m.HashVersion
+	}
+	if m.SchemaVersion == SchemaV5 && m.Package == nil {
+		return hashing.VersionV2
+	}
+	if m.SchemaVersion == 0 && m.Package == nil {
+		return hashing.WriteVersion()
+	}
+	return hashing.VersionV1
+}
+
+func rawIntegerEquals(raw json.RawMessage, expected int64) bool {
+	var value json.Number
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return false
+	}
+	parsed, err := strconv.ParseInt(value.String(), 10, 64)
+	return err == nil && parsed == expected
 }
 
 func currentBuilds(installedDir string, recorded *Marker, state BuildCurrentness) (bool, error) {

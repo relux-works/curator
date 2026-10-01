@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/privatedir"
 )
 
@@ -48,6 +49,30 @@ func TestStateEntryIsContentKeyed(t *testing.T) {
 	}
 	if _, err := ContentHash(first); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestContentHashUsesVersion2Framing(t *testing.T) {
+	previousWriterVersion := hashing.EnableV2Writers
+	hashing.EnableV2Writers = true
+	defer func() { hashing.EnableV2Writers = previousWriterVersion }()
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("curator\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "src"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "src", "main.go"), []byte("package main\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ContentHash(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "sha256:55150544f675ac2ff1a88407e6231a7f93c5a78a75e1b3f183463ae78d9a95cf" {
+		t.Fatalf("ContentHash() = %s, want the v2 ordinary-tree vector", got)
 	}
 }
 

@@ -40,6 +40,7 @@ import (
 
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -1286,7 +1287,13 @@ func changedMarkers(report *MigrateReport) (map[string][]byte, map[string][]byte
 			continue
 		}
 		updated := *home.marker
-		updated.Version = envmarker.VersionV2
+		if hashing.WriteVersion() == hashing.VersionV2 {
+			updated.Version = envmarker.VersionV3
+			updated.HashVersion = int(hashing.VersionV2)
+		} else {
+			updated.Version = envmarker.VersionV2
+			updated.HashVersion = 0
+		}
 		complete := append([]envmarker.Passthrough{}, home.credentialRecords...)
 		updated.Passthrough = &complete
 		payload, err := updated.Marshal()

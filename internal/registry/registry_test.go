@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -197,6 +199,35 @@ func TestParseRecordValidation(t *testing.T) {
 	}
 }
 
+func TestParseRecordVersion2RequiresExplicitHashVersion2(t *testing.T) {
+	s := newSigner(t)
+	v2 := record(StatusAudited)
+	v2["schema_version"] = 2
+	v2["hash_version"] = 2
+	parsed, err := ParseRecordVersioned(s.sign(v2))
+	if err != nil {
+		t.Fatalf("valid v2 record refused: %v", err)
+	}
+	if parsed.HashVersion != hashing.VersionV2 {
+		t.Fatalf("record hash version = %d, want 2", parsed.HashVersion)
+	}
+
+	for name, mutate := range map[string]func(map[string]any){
+		"missing hash version": func(value map[string]any) { delete(value, "hash_version") },
+		"wrong hash version":   func(value map[string]any) { value["hash_version"] = 1 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			value := record(StatusAudited)
+			value["schema_version"] = 2
+			value["hash_version"] = 2
+			mutate(value)
+			if _, err := ParseRecordVersioned(s.sign(value)); err == nil {
+				t.Fatal("invalid v2 hash-version carrier was accepted")
+			}
+		})
+	}
+}
+
 func TestMatches(t *testing.T) {
 	s := newSigner(t)
 	parsed, _ := ParseRecord(s.sign(record(StatusAudited)))
@@ -208,6 +239,78 @@ func TestMatches(t *testing.T) {
 	}
 	if Matches(parsed, "other/repo", "zzz", "sha256:other") {
 		t.Fatal("nothing matching must not match")
+	}
+}
+
+func TestMatchesRequiresEqualHashVersion(t *testing.T) {
+	s := newSigner(t)
+	parsed, err := ParseRecord(s.sign(record(StatusAudited)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.HashVersion != hashing.VersionV1 {
+		t.Fatalf("legacy record hash version = %d, want 1", parsed.HashVersion)
+	}
+	if MatchesVersioned(parsed, parsed.SourceIdentity, parsed.Commit, parsed.ContentSHA256, hashing.VersionV2) {
+		t.Fatal("a v1 record matched a v2 artifact through equal content/source identity")
+	}
+
+	v2 := parsed
+	v2.HashVersion = hashing.VersionV2
+	if !MatchesVersioned(v2, v2.SourceIdentity, v2.Commit, v2.ContentSHA256, hashing.VersionV2) {
+		t.Fatal("same-version record did not match")
+	}
+	if MatchesVersioned(v2, v2.SourceIdentity, v2.Commit, v2.ContentSHA256, hashing.VersionV1) {
+		t.Fatal("a v2 record matched a v1 artifact")
+	}
+}
+
+func TestResolveVersionedDoesNotAdmitV1RecordForV2Artifact(t *testing.T) {
+	s := newSigner(t)
+	reg := Registry{Name: "trusted", URL: "https://registry.example", PublicKeys: []string{s.pinned}}
+	v1 := s.sign(record(StatusAudited))
+	fetch := func(string, string, string, string, hashing.Version) ([]map[string]any, error) {
+		return []map[string]any{v1}, nil
+	}
+	resolution := ResolveVersioned([]Registry{reg}, "git.example.com/skills/skill-a", testCommit, testContentSHA256, hashing.VersionV2, fetch)
+	if resolution.Result != ResultUnknown || resolution.Attestation != nil {
+		t.Fatalf("a v1 record authorized a v2 artifact: %+v", resolution)
+	}
+
+	v2 := record(StatusAudited)
+	v2["schema_version"] = 2
+	v2["hash_version"] = 2
+	fetch = func(string, string, string, string, hashing.Version) ([]map[string]any, error) {
+		return []map[string]any{s.sign(v2)}, nil
+	}
+	resolution = ResolveVersioned([]Registry{reg}, "git.example.com/skills/skill-a", testCommit, testContentSHA256, hashing.VersionV2, fetch)
+	if resolution.Result != ResultAudited || resolution.Attestation == nil {
+		t.Fatalf("same-version v2 record did not authorize: %+v", resolution)
+	}
+}
+
+func TestRecordsEndpointVersionsContentHashQuery(t *testing.T) {
+	for _, tc := range []struct {
+		version hashing.Version
+		want    string
+	}{
+		{version: hashing.VersionV1, want: ""},
+		{version: hashing.VersionV2, want: "2"},
+	} {
+		endpoint, err := recordsEndpoint("https://registry.example", "git.example/skill", testCommit, testContentSHA256, tc.version)
+		if err != nil {
+			t.Fatal(err)
+		}
+		parsed, err := url.Parse(endpoint)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := parsed.Query().Get("hash_version"); got != tc.want {
+			t.Errorf("version %d query hash_version = %q, want %q", tc.version, got, tc.want)
+		}
+	}
+	if _, err := recordsEndpoint("https://registry.example", "git.example/skill", testCommit, testContentSHA256, 3); err == nil {
+		t.Fatal("unsupported content hash version produced a registry query")
 	}
 }
 

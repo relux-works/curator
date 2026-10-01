@@ -100,3 +100,18 @@ func TestReadAuthoritativeMarkerV2SchemaCases(t *testing.T) {
 func TestReadAuthoritativeMarkerV4SchemaCases(t *testing.T) {
 	runMarkerSchemaCases(t, "install-marker-v4")
 }
+
+func TestReadAuthoritativeMarkerV5SchemaCases(t *testing.T) {
+	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+	if root == "" {
+		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+	}
+	suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
+		return
+	}
+	runMarkerSchemaCases(t, "install-marker-v5")
+}

@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/contextaudit"
 	"github.com/relux-works/curator/internal/contextmaterialize"
+	"github.com/relux-works/curator/internal/hashing"
 )
 
 // TestPolicyFromConfigCarriesEnvGates drives the production PolicyFromConfig
@@ -90,6 +92,41 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
 	defaults := PolicyFromConfig(schema1)
 	if len(defaults.MCPAllowlist) != 0 || defaults.ForbidsOverlays() {
 		t.Fatalf("schema-1 file must keep the defaults: %+v", defaults)
+	}
+}
+
+func TestPolicyFromConfigCarriesStateWaiverHashVersion(t *testing.T) {
+	cfg, err := config.Parse(map[string]any{
+		"schema_version": float64(3), "skills_root": "x", "projects": map[string]any{},
+		"environments": map[string]any{
+			"secret_material_waivers": []any{
+				map[string]any{
+					"pin": strings.Repeat("ab", 32), "file": "context/a.md",
+					"span": []any{float64(1), float64(2)}, "reason": "legacy state review",
+				},
+				map[string]any{
+					"pin": strings.Repeat("cd", 32), "hash_version": float64(2), "file": "context/b.md",
+					"span": []any{float64(3), float64(4)}, "reason": "v2 state review",
+				},
+			},
+		},
+	}, "config.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := PolicyFromConfig(cfg)
+	if len(policy.SecretWaivers) != 2 {
+		t.Fatalf("state waivers = %+v, want legacy and v2 waivers", policy.SecretWaivers)
+	}
+	want := []contextaudit.Waiver{
+		{Pin: strings.Repeat("ab", 32), HashVersion: hashing.VersionV1, File: "context/a.md", Span: [2]int{1, 2}, Reason: "legacy state review"},
+		{Pin: strings.Repeat("cd", 32), HashVersion: hashing.VersionV2, File: "context/b.md", Span: [2]int{3, 4}, Reason: "v2 state review"},
+	}
+	for index := range want {
+		if policy.SecretWaivers[index] != want[index] {
+			t.Errorf("state waiver %d = %+v, want %+v", index, policy.SecretWaivers[index], want[index])
+		}
 	}
 }
 

@@ -23,13 +23,16 @@ import (
 )
 
 // SchemaVersion is the original machine config schema. SchemaVersion2 adds
-// the environments §12.1 object and registry bootstrap members; both stay
-// readable (manager §12) and an unknown schema_version is rejected explicitly.
+// the environments §12.1 object and registry bootstrap members, and
+// SchemaVersion3 versions state-hash waiver pins. All three stay readable.
 const SchemaVersion = 1
 
 // SchemaVersion2 is the machine config schema carrying the environments
 // §12.1 knobs and registry bootstrap members.
 const SchemaVersion2 = 2
+
+// SchemaVersion3 adds hash_version to state-hash secret material waivers.
+const SchemaVersion3 = 3
 
 // DefaultWorktreeAliasPattern extracts checkout aliases for git worktrees.
 const DefaultWorktreeAliasPattern = `[A-Z]+-[0-9]+`
@@ -159,7 +162,7 @@ type Execution struct {
 // Config is the effective machine configuration.
 type Config struct {
 	Path string
-	// Schema is the effective schema_version: 1 or 2.
+	// Schema is the effective schema_version: 1, 2, or 3.
 	Schema int
 	// Env is the effective environments §12.1 machine configuration with
 	// the §12.1 defaults applied. A schema-1 file carries every default.
@@ -551,14 +554,14 @@ func parseConfig(data map[string]any, path string, locked map[string]bool, machi
 	if !ok {
 		return nil, verr.New("schema_version", "must be an integer")
 	}
-	if schema != SchemaVersion && schema != SchemaVersion2 {
+	if schema != SchemaVersion && schema != SchemaVersion2 && schema != SchemaVersion3 {
 		return nil, verr.New("schema_version", "unsupported config schema_version %d; this config requires a newer tool", schema)
 	}
 	if schema == SchemaVersion && hasConfigKey(machineData, "security_posture") {
 		return nil, verr.New("security_posture", "requires schema_version 2; manager-config-v1 is frozen without this field")
 	}
 	posture := defaultSecurityPosture(schema)
-	if schema == SchemaVersion2 {
+	if schema >= SchemaVersion2 {
 		if rawPosture, present := data["security_posture"]; present {
 			value, ok := rawPosture.(string)
 			if !ok || (value != SecurityPosturePermissive && value != SecurityPostureHardened) {
@@ -579,7 +582,7 @@ func parseConfig(data map[string]any, path string, locked map[string]bool, machi
 	} else if rawEnv, present := data["environments"]; present && rawEnv == nil {
 		return nil, verr.New("environments", "must be an object")
 	}
-	env, err := parseEnvironments(data["environments"])
+	env, err := parseEnvironmentsVersion(data["environments"], schema)
 	if err != nil {
 		return nil, err
 	}
@@ -1103,7 +1106,7 @@ func parseRegistries(raw any, schema int, configPath string) ([]Registry, error)
 		}
 		for key := range entry {
 			known := key == "name" || key == "url" || key == "public_keys" || key == "enabled"
-			if schema == SchemaVersion2 {
+			if schema >= SchemaVersion2 {
 				known = known || key == "bootstrap_checkpoint" || key == "mirror_group"
 			}
 			if !known {

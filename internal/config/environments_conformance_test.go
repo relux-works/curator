@@ -125,6 +125,40 @@ func TestManagerConfigV2SchemaCases(t *testing.T) {
 		})
 }
 
+// TestManagerConfigV3SchemaCases runs the published v3 waiver cases through
+// the production Load entry point. The v2 state pin must survive parsing as
+// an explicitly versioned identity.
+func TestManagerConfigV3SchemaCases(t *testing.T) {
+	root := conformanceRoot(t)
+	suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
+		return
+	}
+	cases := schemaCaseValidity(t, root, "manager-config-v3")
+	conformancecoverage.RunOutcomes(t, "manager-config-v3/schema-cases", cases,
+		func(tc namedSchemaCase) string { return tc.Name }, func(t *testing.T, tc namedSchemaCase) conformancecoverage.Observation {
+			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "manager-config-v3", tc.Name)) // #nosec G304 -- explicit conformance input
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := writeConfig(t, t.TempDir(), "config.json", string(payload))
+			cfg, loadErr := Load(path, nil)
+			if tc.Valid && loadErr != nil {
+				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("Load rejected published-valid case: %v", loadErr)}
+			}
+			if !tc.Valid && loadErr == nil {
+				return conformancecoverage.Observation{FailureReason: "Load accepted published-invalid case"}
+			}
+			if tc.Name == "valid-v2-state-hash-waiver.json" && (len(cfg.Env.SecretWaivers) != 1 || cfg.Env.SecretWaivers[0].HashVersion != 2) {
+				return conformancecoverage.Observation{FailureReason: "Load did not retain hash_version 2 on the state waiver"}
+			}
+			return conformancecoverage.Observation{}
+		})
+}
+
 type sourceSignerMergeVectorFile struct {
 	MergeCases []struct {
 		Name     string                         `json:"name"`

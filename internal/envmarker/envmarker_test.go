@@ -49,15 +49,15 @@ func TestRoundTrip(t *testing.T) {
 
 // TestUnsupportedVersionIsRejected narrows the version gate: readers reject
 // an unsupported marker version and never infer newer semantics. A mutant
-// that accepts version 3 must fail this test.
+// that accepts version 4 must fail this test.
 func TestUnsupportedVersionIsRejected(t *testing.T) {
 	payload, err := testMarker().Marshal()
 	if err != nil {
 		t.Fatal(err)
 	}
-	future := strings.Replace(string(payload), `"version": 1`, `"version": 3`, 1)
+	future := strings.Replace(string(payload), `"version": 1`, `"version": 4`, 1)
 	if _, err := Parse([]byte(future)); err == nil {
-		t.Fatal("version 3 must be rejected")
+		t.Fatal("version 4 must be rejected")
 	} else if !strings.Contains(err.Error(), DiagMarkerInvalid) {
 		t.Fatalf("error %v carries no %s", err, DiagMarkerInvalid)
 	}
@@ -69,7 +69,7 @@ func TestReadKeepsUnsupportedVersionDiagnostic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	future := strings.Replace(string(payload), `"version": 1`, `"version": 3`, 1)
+	future := strings.Replace(string(payload), `"version": 1`, `"version": 4`, 1)
 	if err := os.WriteFile(filepath.Join(home, Name), []byte(future), 0o600); err != nil {
 		t.Fatal(err)
 	}

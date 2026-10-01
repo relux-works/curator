@@ -33,6 +33,7 @@ import (
 	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
@@ -347,8 +348,15 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
 	if err := plan.mcp(req, servers, surfaces); err != nil {
 		return nil, err
 	}
+	markerVersion := envmarker.VersionV1
+	hashVersion := 0
+	if hashing.WriteVersion() == hashing.VersionV2 {
+		markerVersion = envmarker.VersionV3
+		hashVersion = int(hashing.VersionV2)
+	}
 	marker := &envmarker.Marker{
-		Version: 1,
+		Version:     markerVersion,
+		HashVersion: hashVersion,
 		Profile: envmarker.Profile{
 			Name: req.Profile, Root: lock.Root, Kind: markerKind(source),
 			LockSHA256: strings.TrimPrefix(hash, "sha256:"),
@@ -1294,7 +1302,13 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 		return nil, err
 	}
 	marker := plan.marker
-	marker.Version = envmarker.VersionV2
+	if hashing.WriteVersion() == hashing.VersionV2 {
+		marker.Version = envmarker.VersionV3
+		marker.HashVersion = int(hashing.VersionV2)
+	} else {
+		marker.Version = envmarker.VersionV2
+		marker.HashVersion = 0
+	}
 	if prior != nil && prior.CodexSeedRecord != nil {
 		record := *prior.CodexSeedRecord
 		record.NativeMCPServers = append([]string{}, prior.CodexSeedRecord.NativeMCPServers...)
@@ -1719,6 +1733,9 @@ func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source,
 		return verdict
 	}
 	verdict.plan = plan
+	if marker.HashVersion != plan.marker.HashVersion {
+		verdict.reasons = append(verdict.reasons, "environment marker content-hash version does not match the current plan")
+	}
 	verdict.hash = hash
 	verdict.warnings = append(verdict.warnings, plan.warnings...)
 	if marker.Profile.LockSHA256 != strings.TrimPrefix(hash, "sha256:") {
@@ -1983,7 +2000,7 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
 		v.reasons = append(v.reasons, fmt.Sprintf("passthrough: %v", err))
 		return
 	}
-	if marker.Version == envmarker.VersionV2 {
+	if marker.Version != envmarker.VersionV1 {
 		expected, err := req.credentialRecords(plan.adapter, plan.isolation, "provisioned")
 		if err != nil {
 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough: %v", err))

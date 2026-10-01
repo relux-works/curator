@@ -200,7 +200,7 @@ func TestParseRejections(t *testing.T) {
 		text string
 		want string
 	}{
-		{"schema", `{"schema_version": 3, "skills_root": "x", "projects": {}}`, "schema_version"},
+		{"schema", `{"schema_version": 4, "skills_root": "x", "projects": {}}`, "schema_version"},
 		{"skills_root", `{"schema_version": 1, "projects": {}}`, "skills_root"},
 		{"projects", `{"schema_version": 1, "skills_root": "x"}`, "projects"},
 		{"adapter", `{"schema_version": 1, "skills_root": "x", "projects": {}, "adapter_mode": "hardlink"}`, "adapter_mode"},

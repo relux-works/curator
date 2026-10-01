@@ -149,7 +149,7 @@ func TestSchema2NullEnvironmentsRejected(t *testing.T) {
 }
 
 func TestUnknownSchemaVersionsRejected(t *testing.T) {
-	for _, version := range []string{"0", "3", "99"} {
+	for _, version := range []string{"0", "4", "99"} {
 		loadFails(t, `{"schema_version": `+version+`, "skills_root": "x", "projects": {}}`, "schema_version")
 	}
 }

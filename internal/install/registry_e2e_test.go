@@ -102,6 +102,10 @@ func fakeRegistry(t *testing.T, status, sourceIdentity, commit, contentHash stri
 }
 
 func fakeRegistryWithSigner(t *testing.T, status, sourceIdentity, commit, contentHash string, options ...registryOption) (*httptest.Server, string, ed25519.PrivateKey) {
+	return fakeRegistryWithSignerVersion(t, status, sourceIdentity, commit, contentHash, hashing.VersionV1, options...)
+}
+
+func fakeRegistryWithSignerVersion(t *testing.T, status, sourceIdentity, commit, contentHash string, hashVersion hashing.Version, options ...registryOption) (*httptest.Server, string, ed25519.PrivateKey) {
 	t.Helper()
 	public, private, err := ed25519.GenerateKey(nil)
 	if err != nil {
@@ -153,10 +157,17 @@ func fakeRegistryWithSigner(t *testing.T, status, sourceIdentity, commit, conten
 			if pageBoundary == nil {
 				pageBoundary = snapshot()
 			}
-			record := sign(map[string]any{
+			record := map[string]any{
 				"name": "skill-a", "source_identity": sourceIdentity,
 				"commit": commit, "content_sha256": contentHash, "status": status,
-			})
+			}
+			// Version 1 serves the unchanged rc.13 record bytes; only the v2
+			// fixture adds the audit-record-v2 version pair.
+			if hashVersion == hashing.VersionV2 {
+				record["schema_version"] = 2
+				record["hash_version"] = 2
+			}
+			record = sign(record)
 			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{record}, "next_cursor": nil, "boundary": pageBoundary})
 		default:
 			http.NotFound(w, r)
@@ -171,7 +182,16 @@ func registryEnv(t *testing.T, status string, options ...registryOption) (*env, 
 }
 
 func registryEnvWithSigner(t *testing.T, status string, options ...registryOption) (*env, *httptest.Server, ed25519.PrivateKey, string) {
+	return registryEnvWithVersions(t, status, hashing.VersionV1, hashing.VersionV1, options...)
+}
+
+func registryEnvWithVersions(t *testing.T, status string, artifactVersion, recordVersion hashing.Version, options ...registryOption) (*env, *httptest.Server, ed25519.PrivateKey, string) {
 	t.Helper()
+	if artifactVersion == hashing.VersionV2 {
+		prior := hashing.EnableV2Writers
+		hashing.EnableV2Writers = true
+		t.Cleanup(func() { hashing.EnableV2Writers = prior })
+	}
 	e := newEnv(t)
 	e.skill("skill-a")
 	e.declare("skill-a")
@@ -189,12 +209,12 @@ func registryEnvWithSigner(t *testing.T, status string, options ...registryOptio
 	if err != nil {
 		t.Fatal(err)
 	}
-	contentHash, err := hashing.ContentSHA256(snap, nil)
+	contentHash, err := hashing.ContentSHA256WithVersion(snap, nil, artifactVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
 	id := identity.Canonical("git@git.example.com:skills/skill-a.git")
-	server, pinned, private := fakeRegistryWithSigner(t, status, id, ref.Commit, contentHash, options...)
+	server, pinned, private := fakeRegistryWithSignerVersion(t, status, id, ref.Commit, contentHash, recordVersion, options...)
 	e.cfg.AuditRegistries = []config.Registry{{Name: "test-reg", URL: server.URL, PublicKeys: []string{pinned}, Enabled: true}}
 	return e, server, private, pinned
 }
@@ -220,6 +240,30 @@ func TestRegistryAttestationLandsInMarker(t *testing.T) {
 	recorded := readMarkerFor(t, e, "skill-a")
 	if recorded.Attestation == nil || recorded.Attestation.Registry != "test-reg" || recorded.Attestation.Status != "audited" {
 		t.Fatalf("attestation: %+v", recorded.Attestation)
+	}
+}
+
+func TestV1InstallRejectsV2RegistryEvidence(t *testing.T) {
+	e, server, _, _ := registryEnvWithVersions(t, "audited", hashing.VersionV1, hashing.VersionV2)
+	defer server.Close()
+	e.cfg.Audit.RegistryPolicy = "strict"
+	result := e.install(Options{})
+	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, "\n"), "registry_policy is strict") {
+		t.Fatalf("v2 evidence must not authorize a v1 artifact: %+v", result)
+	}
+}
+
+func TestV2RegistryAttestationUsesVersionedInstallPath(t *testing.T) {
+	e, server, _, _ := registryEnvWithVersions(t, "audited", hashing.VersionV2, hashing.VersionV2)
+	defer server.Close()
+	result := e.install(Options{})
+	if result.Status != "ok" {
+		t.Fatalf("matching v2 registry evidence must install: %+v", result)
+	}
+	recorded := readMarkerFor(t, e, "skill-a")
+	if recorded.SchemaVersion != markerpkg.SchemaV5 || recorded.HashVersion != hashing.VersionV2 ||
+		recorded.Attestation == nil || recorded.Attestation.Status != "audited" {
+		t.Fatalf("v2 marker did not retain matching registry evidence: %+v", recorded)
 	}
 }
 

@@ -1190,10 +1190,10 @@ func buildMarker(
 	if builds == nil {
 		builds = map[string]marker.Build{}
 	}
-	// Marker v3 and v4 record an explicit receipt schema version and an
-	// explicit execution policy for every local go-v1 build; marker v2 records
-	// neither. The band is the manifest schema, not one exact version.
-	if node.Spec.SchemaVersion >= 7 {
+	// The v2 marker shape uses the marker-v4 build-record rules for every
+	// manifest band. While the rc.13 write gate is off, preserve its existing
+	// rule: only schema-7+ markers carry the receipt and execution-policy pair.
+	if hashing.WriteVersion() == hashing.VersionV2 || node.Spec.SchemaVersion >= 7 {
 		upgraded := make(map[string]marker.Build, len(builds))
 		for command, build := range builds {
 			if build.Driver == "go-v1" {
@@ -1483,9 +1483,9 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 	if len(usable) == 0 {
 		return result, fmt.Errorf("every trusted audit registry served a tampered snapshot")
 	}
-	var fetch registry.FetchFn
+	var fetch registry.FetchVersionedFn
 	if persist {
-		fetch = registry.NewHTTPFetchWithPolicyAndObserver(
+		fetch = registry.NewHTTPFetchVersionedWithPolicyAndObserver(
 			cacheDir,
 			snapshotStateDir,
 			usable,
@@ -1495,13 +1495,13 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 			registry.FetchPolicy{PersistCache: true, PersistState: true}, observer,
 		)
 	} else {
-		fetch = registry.NewHTTPFetchWithPolicyReadOnlyAndObserver(
+		fetch = registry.NewHTTPFetchVersionedWithPolicyAndObserver(
 			cacheDir,
 			snapshotStateDir,
 			usable,
 			time.Duration(cfg.Audit.CacheTTLSeconds)*time.Second,
 			time.Duration(cfg.Audit.OfflineGraceSeconds)*time.Second,
-			nil, observer,
+			nil, registry.FetchPolicy{}, observer,
 		)
 	}
 	strict := cfg.Audit.RegistryPolicy == "strict"
@@ -1510,15 +1510,19 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 		if node.Identity == "" {
 			continue
 		}
-		contentHash, err := hashing.ContentSHA256(node.Snapshot, nil)
+		hashVersion := hashing.WriteVersion()
+		if draft {
+			hashVersion = hashing.VersionV1
+		}
+		contentHash, err := hashing.ContentSHA256WithVersion(node.Snapshot, nil, hashVersion)
 		if err != nil {
 			return result, err
 		}
 		var resolution registry.Resolution
 		if draft {
-			resolution = registry.ResolveExact(usable, node.Name, node.Identity, node.Resolved.Commit, contentHash, fetch)
+			resolution = registry.ResolveExactVersioned(usable, node.Name, node.Identity, node.Resolved.Commit, contentHash, hashVersion, fetch)
 		} else {
-			resolution = registry.Resolve(usable, node.Identity, node.Resolved.Commit, contentHash, fetch)
+			resolution = registry.ResolveVersioned(usable, node.Identity, node.Resolved.Commit, contentHash, hashVersion, fetch)
 		}
 		for _, warning := range resolution.Warnings {
 			result.Warnings = append(result.Warnings, alias+": registry: "+warning)

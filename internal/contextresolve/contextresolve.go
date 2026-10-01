@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/contextlock"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/pkgversion"
 )
@@ -243,14 +244,15 @@ type Result struct {
 
 // Resolved is where a member was resolved from.
 type Resolved struct {
-	Kind      string
-	Name      string
-	Source    string
-	Directory string
-	Commit    string
-	StateHash string
-	Version   string
-	Package   *Package
+	Kind        string
+	Name        string
+	Source      string
+	Directory   string
+	Commit      string
+	StateHash   string
+	HashVersion hashing.Version
+	Version     string
+	Package     *Package
 }
 
 // Key joins kind and name.
@@ -897,7 +899,14 @@ func (r *resolver) build() (*Result, error) {
 
 	var warnings []Warning
 	result := &Result{Members: map[string]Resolved{}}
-	lock := &contextlock.Lock{Root: rootName}
+	hashVersion := hashing.WriteVersion()
+	lockSchema := contextlock.SchemaVersion
+	lockHashVersion := 1
+	if hashVersion == hashing.VersionV2 {
+		lockSchema = contextlock.SchemaVersion2
+		lockHashVersion = 2
+	}
+	lock := &contextlock.Lock{SchemaVersion: lockSchema, HashVersion: lockHashVersion, Root: rootName}
 	names := make([]string, 0, len(r.selected))
 	for name := range r.selected {
 		names = append(names, name)
@@ -968,7 +977,7 @@ func (r *resolver) build() (*Result, error) {
 		member.Weight = weight
 		lock.Members = append(lock.Members, member)
 		result.Members[Key(sel.kind, name)] = Resolved{Kind: sel.kind, Name: name, Source: sel.source, Directory: sel.directory,
-			Commit: sel.commit, StateHash: member.StateHash, Version: member.Version, Package: sel.pkg}
+			Commit: sel.commit, StateHash: member.StateHash, HashVersion: hashVersion, Version: member.Version, Package: sel.pkg}
 	}
 	lock.Sort()
 	hash, err := lock.Hash()

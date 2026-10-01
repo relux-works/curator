@@ -15,6 +15,53 @@ type frozenLockSchemaIndexEntry struct {
 	Valid    bool   `json:"valid"`
 }
 
+func TestContextLockV2SchemaCases(t *testing.T) {
+	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+	if root == "" {
+		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+	}
+	suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
+		return
+	}
+	indexBytes, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var index []frozenLockSchemaIndexEntry
+	if err := json.Unmarshal(indexBytes, &index); err != nil {
+		t.Fatalf("parse schema-case index: %v", err)
+	}
+	const family = "context-lock-v2"
+	prefix := family + "/"
+	var cases []frozenLockSchemaIndexEntry
+	for _, entry := range index {
+		if strings.HasPrefix(entry.Instance, prefix) {
+			cases = append(cases, entry)
+		}
+	}
+	conformancecoverage.RequirePublishedCount(t, family+"/schema-cases", len(cases))
+	conformancecoverage.RunOutcomes(t, family+"/schema-cases", cases,
+		func(entry frozenLockSchemaIndexEntry) string { return strings.TrimPrefix(entry.Instance, prefix) },
+		func(t *testing.T, entry frozenLockSchemaIndexEntry) conformancecoverage.Observation {
+			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", filepath.FromSlash(entry.Instance)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			lock, parseErr := Parse(payload)
+			if (parseErr == nil) != entry.Valid {
+				t.Fatalf("valid=%v: Parse err=%v", entry.Valid, parseErr)
+			}
+			if entry.Valid && (lock.SchemaVersion != SchemaVersion2 || lock.HashVersion != 2) {
+				t.Fatalf("parsed versions = schema:%d hash:%d, want 2/2", lock.SchemaVersion, lock.HashVersion)
+			}
+			return conformancecoverage.Observation{}
+		})
+}
+
 func TestParseRejectsHashVersionOnFrozenContextLock(t *testing.T) {
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
 	if root == "" {

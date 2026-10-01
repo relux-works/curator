@@ -79,11 +79,18 @@ func stageNode(stageRoot string, install nodeInstall, clock Clock) (staging.Plan
 		install.expected.Locale = ""
 		install.expected.Agents = []string{}
 	}
-	contentHash, err := hashing.ContentSHA256(staged, nil)
+	hashVersion := hashing.WriteVersion()
+	if install.expected.Package != nil {
+		hashVersion = hashing.VersionV1
+	}
+	contentHash, err := hashing.ContentSHA256WithVersion(staged, nil, hashVersion)
 	if err != nil {
 		return staging.Plan{}, "", err
 	}
 	install.expected.ContentSHA256 = contentHash
+	if install.expected.Package == nil {
+		install.expected.HashVersion = hashVersion
+	}
 	install.expected.Files = files
 	install.expected.InstalledAt = installedAt(clock)
 	if err := marker.Write(staged, install.expected); err != nil {

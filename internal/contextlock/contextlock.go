@@ -1,5 +1,5 @@
 // Package contextlock is the profile lock of the agent-environments
-// capability, context-lock-v1 (environments §1.3): the strict schema-1
+// capability, context-lock-v1/v2 (environments §1.3): the strict schema
 // object naming the root and every closure member, its canonical CCJ-1 bytes,
 // and the lock hash that is the profile's effective pin.
 package contextlock
@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/pkgversion"
 	"github.com/relux-works/curator/internal/privatedir"
@@ -23,8 +24,12 @@ import (
 	"github.com/relux-works/curator/internal/stateread"
 )
 
-// SchemaVersion is the only lock schema this release reads or writes.
+// SchemaVersion is the frozen v1 lock schema retained for reads.
 const SchemaVersion = 1
+
+// SchemaVersion2 is the additive reader/writer shape carrying hash_version
+// 2. Production writes select it only when the shared v2 writer switch is on.
+const SchemaVersion2 = 2
 
 // Member kinds, in their bytewise order.
 const (
@@ -68,8 +73,10 @@ func (m Member) PinKey() string {
 
 // Lock is one context-lock-v1 object.
 type Lock struct {
-	Root    string
-	Members []Member
+	SchemaVersion int
+	HashVersion   int
+	Root          string
+	Members       []Member
 }
 
 // Delta is one resolved-version change between two locks. Exactly one of
@@ -124,7 +131,8 @@ func ResolvedDelta(oldLock, newLock *Lock) []Delta {
 		case !hasNew:
 			copyMember := oldMember
 			deltas = append(deltas, Delta{Old: &copyMember})
-		case oldMember.Version != newMember.Version || deltaMemberPin(oldMember) != deltaMemberPin(newMember):
+		case oldMember.Version != newMember.Version || deltaMemberPin(oldMember) != deltaMemberPin(newMember) ||
+			(oldMember.StateHash != "" && newMember.StateHash != "" && lockHashVersion(oldLock) != lockHashVersion(newLock)):
 			oldCopy, newCopy := oldMember, newMember
 			deltas = append(deltas, Delta{Old: &oldCopy, New: &newCopy})
 		}
@@ -211,8 +219,12 @@ var (
 	hex256RE = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
-// Validate applies the context-lock-v1 schema rules.
+// Validate applies the context-lock-v1/v2 schema rules.
 func (lock *Lock) Validate() error {
+	schemaVersion, hashVersion := lockVersions(lock)
+	if (schemaVersion != SchemaVersion || hashVersion != 1) && (schemaVersion != SchemaVersion2 || hashVersion != 2) {
+		return fmt.Errorf("lock schema_version %d and hash_version %d are incompatible", schemaVersion, hashVersion)
+	}
 	if !identifiers.Valid(lock.Root) {
 		return fmt.Errorf("lock root %q is not a portable identifier", lock.Root)
 	}
@@ -302,6 +314,7 @@ func (lock *Lock) Validate() error {
 
 // Object renders the lock as the JSON-domain value CCJ-1 encodes.
 func (lock *Lock) Object() map[string]any {
+	schemaVersion, hashVersion := lockVersions(lock)
 	members := make([]any, 0, len(lock.Members))
 	for _, member := range lock.Members {
 		object := map[string]any{
@@ -332,11 +345,39 @@ func (lock *Lock) Object() map[string]any {
 		}
 		members = append(members, object)
 	}
-	return map[string]any{
-		"schema_version": SchemaVersion,
+	object := map[string]any{
+		"schema_version": schemaVersion,
 		"root":           lock.Root,
 		"members":        members,
 	}
+	if schemaVersion == SchemaVersion2 {
+		object["hash_version"] = hashVersion
+	}
+	return object
+}
+
+func lockVersions(lock *Lock) (int, int) {
+	schemaVersion := lock.SchemaVersion
+	if schemaVersion == 0 {
+		schemaVersion = SchemaVersion
+		if hashing.WriteVersion() == hashing.VersionV2 {
+			schemaVersion = SchemaVersion2
+		}
+	}
+	hashVersion := lock.HashVersion
+	if hashVersion == 0 {
+		if schemaVersion == SchemaVersion {
+			hashVersion = 1
+		} else {
+			hashVersion = 2
+		}
+	}
+	return schemaVersion, hashVersion
+}
+
+func lockHashVersion(lock *Lock) int {
+	_, hashVersion := lockVersions(lock)
+	return hashVersion
 }
 
 // Canonical returns the CCJ-1 bytes of the lock after validation.
@@ -371,6 +412,7 @@ func Parse(payload []byte) (*Lock, error) {
 	decoder.UseNumber()
 	var raw struct {
 		SchemaVersion json.Number `json:"schema_version"`
+		HashVersion   json.Number `json:"hash_version"`
 		Root          string      `json:"root"`
 		Members       []struct {
 			Kind       string      `json:"kind"`
@@ -389,10 +431,21 @@ func Parse(payload []byte) (*Lock, error) {
 	if err := decoder.Decode(&raw); err != nil {
 		return nil, fmt.Errorf("invalid lock: %w", err)
 	}
-	if raw.SchemaVersion.String() != strconv.Itoa(SchemaVersion) {
-		return nil, fmt.Errorf("invalid lock: schema_version must be %d", SchemaVersion)
+	schemaVersion, err := strconv.Atoi(raw.SchemaVersion.String())
+	if err != nil || (schemaVersion != SchemaVersion && schemaVersion != SchemaVersion2) {
+		return nil, fmt.Errorf("invalid lock: schema_version must be %d or %d", SchemaVersion, SchemaVersion2)
 	}
-	lock := &Lock{Root: raw.Root}
+	hashVersion := 1
+	if schemaVersion == SchemaVersion2 {
+		parsed, parseErr := strconv.Atoi(raw.HashVersion.String())
+		if parseErr != nil || parsed != 2 {
+			return nil, fmt.Errorf("invalid lock: schema_version 2 requires hash_version 2")
+		}
+		hashVersion = parsed
+	} else if raw.HashVersion.String() != "" {
+		return nil, fmt.Errorf("invalid lock: schema_version 1 does not carry hash_version")
+	}
+	lock := &Lock{SchemaVersion: schemaVersion, HashVersion: hashVersion, Root: raw.Root}
 	for _, member := range raw.Members {
 		weight, err := strconv.ParseInt(member.Weight.String(), 10, 64)
 		if err != nil {

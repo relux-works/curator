@@ -19,6 +19,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
@@ -173,6 +174,20 @@ func NewHTTPFetchWithPolicyReadOnlyAndObserver(cacheDir, stateDir string, regist
 }
 
 func newHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time, policy FetchPolicy, observer *MirrorViewObserver) FetchFn {
+	versioned := newHTTPFetchVersioned(cacheDir, stateDir, registries, ttl, grace, now, policy, observer)
+	return func(baseURL, sourceIdentity, commit, contentSHA256 string) ([]map[string]any, error) {
+		return versioned(baseURL, sourceIdentity, commit, contentSHA256, hashing.VersionV1)
+	}
+}
+
+// NewHTTPFetchVersionedWithPolicyAndObserver is the versioned query form used
+// by v2 content identities. The hash version is included in the request and
+// cache key before any registry records are considered.
+func NewHTTPFetchVersionedWithPolicyAndObserver(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time, policy FetchPolicy, observer *MirrorViewObserver) FetchVersionedFn {
+	return newHTTPFetchVersioned(cacheDir, stateDir, registries, ttl, grace, now, policy, observer)
+}
+
+func newHTTPFetchVersioned(cacheDir, stateDir string, registries []Registry, ttl, grace time.Duration, now func() time.Time, policy FetchPolicy, observer *MirrorViewObserver) FetchVersionedFn {
 	if now == nil {
 		now = time.Now
 	}
@@ -183,7 +198,10 @@ func newHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace t
 	for _, reg := range registries {
 		byURL[strings.TrimRight(reg.URL, "/")] = reg
 	}
-	return func(baseURL, sourceIdentity, commit, contentSHA256 string) ([]map[string]any, error) {
+	return func(baseURL, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version) ([]map[string]any, error) {
+		if hashVersion != hashing.VersionV1 && hashVersion != hashing.VersionV2 {
+			return nil, fmt.Errorf("unsupported content hash version %d", hashVersion)
+		}
 		reg, trusted := byURL[strings.TrimRight(baseURL, "/")]
 		if !trusted || len(reg.PublicKeys) == 0 {
 			return nil, fmt.Errorf("registry %s is not trusted: no pinned keys to verify its page boundary", baseURL)
@@ -192,12 +210,10 @@ func newHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace t
 		if err != nil {
 			return nil, err
 		}
-		query := url.Values{}
-		query.Set("source_identity", sourceIdentity)
-		query.Set("commit", commit)
-		query.Set("content_sha256", contentSHA256)
-		query.Set("limit", fmt.Sprintf("%d", maxPageSize))
-		endpoint := strings.TrimRight(baseURL, "/") + "/v1/records?" + query.Encode()
+		endpoint, err := recordsEndpoint(baseURL, sourceIdentity, commit, contentSHA256, hashVersion)
+		if err != nil {
+			return nil, err
+		}
 		sum := sha256.Sum256([]byte(endpoint))
 		cacheFile := filepath.Join(cacheDir, "records-"+hex.EncodeToString(sum[:])[:16]+".json")
 
@@ -231,6 +247,21 @@ func newHTTPFetch(cacheDir, stateDir string, registries []Registry, ttl, grace t
 		}
 		return records, nil
 	}
+}
+
+func recordsEndpoint(baseURL, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version) (string, error) {
+	if hashVersion != hashing.VersionV1 && hashVersion != hashing.VersionV2 {
+		return "", fmt.Errorf("unsupported content hash version %d", hashVersion)
+	}
+	query := url.Values{}
+	query.Set("source_identity", sourceIdentity)
+	query.Set("commit", commit)
+	query.Set("content_sha256", contentSHA256)
+	if hashVersion == hashing.VersionV2 {
+		query.Set("hash_version", "2")
+	}
+	query.Set("limit", fmt.Sprintf("%d", maxPageSize))
+	return strings.TrimRight(baseURL, "/") + "/v1/records?" + query.Encode(), nil
 }
 
 func httpGetAllRecords(chain *pageChain, endpoint string, reg Registry, observer *MirrorViewObserver) ([]map[string]any, error) {

@@ -18,6 +18,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/protocoljson"
@@ -64,6 +65,7 @@ type Record struct {
 	SourceIdentity string
 	Commit         string
 	ContentSHA256  string
+	HashVersion    hashing.Version
 	Status         string
 	Raw            map[string]any
 }
@@ -96,6 +98,10 @@ type Resolution struct {
 
 // FetchFn returns raw record payloads for an artifact query.
 type FetchFn func(url, sourceIdentity, commit, contentSHA256 string) ([]map[string]any, error)
+
+// FetchVersionedFn includes the content-hash framing version in the registry
+// query. Version 1 is the frozen query form; version 2 carries hash_version=2.
+type FetchVersionedFn func(url, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version) ([]map[string]any, error)
 
 // CanonicalBytes is the signed form of any registry object: compact sorted
 // CCJ-1 JSON of every field except the top-level "sig" (Spec Registry §1).
@@ -141,13 +147,45 @@ func KeyID(publicKey ed25519.PublicKey) string {
 
 // ParseRecord validates a raw record payload (Spec §13.1).
 func ParseRecord(payload map[string]any) (Record, error) {
-	if unknown := unknownKeys(payload, "schema_version", "name", "source_identity", "commit", "content_sha256", "status", "audit", "endorsements", "sig"); len(unknown) > 0 {
+	return parseRecord(payload, false)
+}
+
+// ParseRecordVersioned validates a raw audit-record-v1 or audit-record-v2
+// payload. Frozen containers call ParseRecord so a nested v2 record cannot
+// silently widen their schema.
+func ParseRecordVersioned(payload map[string]any) (Record, error) {
+	return parseRecord(payload, true)
+}
+
+func parseRecord(payload map[string]any, allowVersion2 bool) (Record, error) {
+	if unknown := unknownKeys(payload, "schema_version", "hash_version", "name", "source_identity", "commit", "content_sha256", "status", "audit", "endorsements", "sig"); len(unknown) > 0 {
 		return Record{}, fmt.Errorf("audit record has unknown fields: %s", strings.Join(unknown, ", "))
 	}
-	if schema, present := payload["schema_version"]; present && !integerEquals(schema, 1) {
-		return Record{}, fmt.Errorf("audit record schema_version must be 1")
+	schema := int64(1)
+	if rawSchema, present := payload["schema_version"]; present {
+		if integerEquals(rawSchema, 1) {
+			schema = 1
+		} else if integerEquals(rawSchema, 2) {
+			if !allowVersion2 {
+				return Record{}, fmt.Errorf("audit record schema_version 2 requires a versioned reader")
+			}
+			schema = 2
+		} else {
+			return Record{}, fmt.Errorf("audit record schema_version must be 1 or 2")
+		}
 	}
-	record := Record{Raw: payload}
+	hashVersion := hashing.VersionV1
+	if schema == 1 {
+		if _, present := payload["hash_version"]; present {
+			return Record{}, fmt.Errorf("audit record schema_version 1 does not carry hash_version")
+		}
+	} else {
+		if !integerEquals(payload["hash_version"], int64(hashing.VersionV2)) {
+			return Record{}, fmt.Errorf("audit record schema_version 2 requires hash_version 2")
+		}
+		hashVersion = hashing.VersionV2
+	}
+	record := Record{Raw: payload, HashVersion: hashVersion}
 	for _, field := range []struct {
 		key string
 		dst *string
@@ -301,6 +339,19 @@ func integerEquals(raw any, expected int64) bool {
 // Matches reports whether a record names the artifact: equal content hash,
 // or equal source identity plus commit (Spec §13.3).
 func Matches(record Record, sourceIdentity, commit, contentSHA256 string) bool {
+	return MatchesVersioned(record, sourceIdentity, commit, contentSHA256, hashing.VersionV1)
+}
+
+// MatchesVersioned refuses cross-version records before considering either
+// content or source identity. Same-version records follow the ordinary
+// content-or-source-and-commit matching rule.
+func MatchesVersioned(record Record, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version) bool {
+	if hashVersion != hashing.VersionV1 && hashVersion != hashing.VersionV2 {
+		return false
+	}
+	if recordHashVersion(record) != hashVersion {
+		return false
+	}
 	if record.ContentSHA256 == contentSHA256 {
 		return true
 	}
@@ -313,10 +364,26 @@ func Matches(record Record, sourceIdentity, commit, contentSHA256 string) bool {
 // Matches, neither a content-only coincidence nor an identity+commit
 // coincidence admits the record, and the record name is always compared.
 func MatchesExact(record Record, name, sourceIdentity, commit, contentSHA256 string) bool {
+	return MatchesExactVersioned(record, name, sourceIdentity, commit, contentSHA256, hashing.VersionV1)
+}
+
+// MatchesExactVersioned adds the framing-version guard to the exact draft
+// match while retaining all existing identity requirements.
+func MatchesExactVersioned(record Record, name, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version) bool {
+	if recordHashVersion(record) != hashVersion {
+		return false
+	}
 	return record.Name == name &&
 		record.SourceIdentity == sourceIdentity &&
 		record.Commit == commit &&
 		record.ContentSHA256 == contentSHA256
+}
+
+func recordHashVersion(record Record) hashing.Version {
+	if record.HashVersion == 0 {
+		return hashing.VersionV1
+	}
+	return record.HashVersion
 }
 
 // Resolve combines verified records from every trusted registry under
@@ -336,6 +403,18 @@ func Resolve(registries []Registry, sourceIdentity, commit, contentSHA256 string
 	})
 }
 
+// ResolveVersioned combines verified v1/v2 records while requiring the
+// artifact and record framing versions to match before either content or
+// source identity can authorize.
+func ResolveVersioned(registries []Registry, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version, fetch FetchVersionedFn) Resolution {
+	if sourceIdentity == "" && commit == "" {
+		return Resolution{Result: ResultUnknown}
+	}
+	return resolveMatchedVersioned(registries, sourceIdentity, commit, contentSHA256, hashVersion, fetch, func(record Record) bool {
+		return MatchesVersioned(record, sourceIdentity, commit, contentSHA256, hashVersion)
+	})
+}
+
 // ResolveExact combines verified records exactly like Resolve, but a
 // record authorizes only on an exact draft §4 match of name, canonical
 // repository, commit, and context hash. The draft install lane resolves
@@ -350,9 +429,32 @@ func ResolveExact(registries []Registry, name, sourceIdentity, commit, contentSH
 	})
 }
 
+// ResolveExactVersioned is the versioned exact-match form used by draft
+// sources. It keeps the draft name/source/commit/content requirements and
+// also refuses cross-version records.
+func ResolveExactVersioned(registries []Registry, name, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version, fetch FetchVersionedFn) Resolution {
+	if sourceIdentity == "" && commit == "" {
+		return Resolution{Result: ResultUnknown}
+	}
+	return resolveMatchedVersioned(registries, sourceIdentity, commit, contentSHA256, hashVersion, fetch, func(record Record) bool {
+		return MatchesExactVersioned(record, name, sourceIdentity, commit, contentSHA256, hashVersion)
+	})
+}
+
 // resolveMatched is the shared deny-wins combination behind Resolve and
 // ResolveExact: only the record-admission predicate differs.
 func resolveMatched(registries []Registry, sourceIdentity, commit, contentSHA256 string, fetch FetchFn, match func(Record) bool) Resolution {
+	versionedFetch := func(url, sourceIdentity, commit, contentSHA256 string, _ hashing.Version) ([]map[string]any, error) {
+		return fetch(url, sourceIdentity, commit, contentSHA256)
+	}
+	return resolveRecords(registries, sourceIdentity, commit, contentSHA256, hashing.VersionV1, versionedFetch, false, match)
+}
+
+func resolveMatchedVersioned(registries []Registry, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version, fetch FetchVersionedFn, match func(Record) bool) Resolution {
+	return resolveRecords(registries, sourceIdentity, commit, contentSHA256, hashVersion, fetch, true, match)
+}
+
+func resolveRecords(registries []Registry, sourceIdentity, commit, contentSHA256 string, hashVersion hashing.Version, fetch FetchVersionedFn, allowVersion2 bool, match func(Record) bool) Resolution {
 	var warnings []string
 	var unreachable []string
 	var audited, deprecated *Attestation
@@ -361,7 +463,7 @@ func resolveMatched(registries []Registry, sourceIdentity, commit, contentSHA256
 			warnings = append(warnings, fmt.Sprintf("registry %s has no pinned keys; its records are not trusted", reg.Name))
 			continue
 		}
-		payloads, err := fetch(reg.URL, sourceIdentity, commit, contentSHA256)
+		payloads, err := fetch(reg.URL, sourceIdentity, commit, contentSHA256, hashVersion)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("registry %s unavailable: %v", reg.Name, err))
 			if isRegistryUnavailable(err) {
@@ -370,7 +472,13 @@ func resolveMatched(registries []Registry, sourceIdentity, commit, contentSHA256
 			continue
 		}
 		for _, payload := range payloads {
-			record, err := ParseRecord(payload)
+			var record Record
+			var err error
+			if allowVersion2 {
+				record, err = ParseRecordVersioned(payload)
+			} else {
+				record, err = ParseRecord(payload)
+			}
 			if err != nil {
 				warnings = append(warnings, fmt.Sprintf("registry %s returned a malformed record: %v", reg.Name, err))
 				continue
@@ -378,7 +486,7 @@ func resolveMatched(registries []Registry, sourceIdentity, commit, contentSHA256
 			// Positive schema-2 evidence has an exact four-field grant.
 			// Revocation retains registry §3's broader artifact match, so a
 			// repository+commit denial cannot be narrowed by name or content.
-			revocationMatch := record.Status == StatusRevoked && Matches(record, sourceIdentity, commit, contentSHA256)
+			revocationMatch := record.Status == StatusRevoked && MatchesVersioned(record, sourceIdentity, commit, contentSHA256, hashVersion)
 			if !match(record) && !revocationMatch {
 				continue
 			}

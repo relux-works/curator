@@ -107,10 +107,11 @@ type ShadowAcknowledgement struct {
 // SecretMaterialWaiver is one secret_material_waivers entry (environments
 // §9.1): the member pin, file protocol path, exact byte span, and reason.
 type SecretMaterialWaiver struct {
-	Pin    string
-	File   string
-	Span   [2]int
-	Reason string
+	Pin         string
+	HashVersion int
+	File        string
+	Span        [2]int
+	Reason      string
 }
 
 // SystemModuleWaiver is one system_module_waivers entry (environments
@@ -195,9 +196,15 @@ func defaultEnvironments() Environments {
 	}
 }
 
-// parseEnvironments validates the manager-config schema-2 environments
-// object with the §12.1 value grammars and fills the table defaults.
+// parseEnvironments validates a frozen manager-config schema-2 environments
+// object and fills the table defaults.
 func parseEnvironments(raw any) (Environments, error) {
+	return parseEnvironmentsVersion(raw, SchemaVersion2)
+}
+
+// parseEnvironmentsVersion validates the environments object using its
+// enclosing manager-config schema so frozen waiver shapes stay frozen.
+func parseEnvironmentsVersion(raw any, schema int) (Environments, error) {
 	env := defaultEnvironments()
 	if raw == nil {
 		return env, nil
@@ -316,7 +323,7 @@ func parseEnvironments(raw any) (Environments, error) {
 		env.ShadowAcknowledged = acks
 	}
 	if rawWaivers, present := obj["secret_material_waivers"]; present && rawWaivers != nil {
-		waivers, err := parseSecretWaivers(rawWaivers)
+		waivers, err := parseSecretWaivers(rawWaivers, schema)
 		if err != nil {
 			return Environments{}, err
 		}
@@ -935,7 +942,7 @@ func parseShadowAcknowledged(raw any) ([]ShadowAcknowledgement, error) {
 	return acks, nil
 }
 
-func parseSecretWaivers(raw any) ([]SecretMaterialWaiver, error) {
+func parseSecretWaivers(raw any, schema int) ([]SecretMaterialWaiver, error) {
 	list, ok := raw.([]any)
 	if !ok {
 		return nil, verr.New("environments.secret_material_waivers", "must be a list")
@@ -948,13 +955,31 @@ func parseSecretWaivers(raw any) ([]SecretMaterialWaiver, error) {
 			return nil, verr.New(label, "must be an object")
 		}
 		for key := range entry {
-			if key != "pin" && key != "file" && key != "span" && key != "reason" {
+			if key != "pin" && key != "file" && key != "span" && key != "reason" && (schema != SchemaVersion3 || key != "hash_version") {
 				return nil, verr.New(label, "has unsupported field %q", key)
 			}
 		}
 		pin, _ := entry["pin"].(string)
 		if !envCommitRE.MatchString(pin) {
 			return nil, verr.New(label+".pin", "must be 40 or 64 lowercase hex characters")
+		}
+		hashVersion := 0
+		if rawVersion, present := entry["hash_version"]; present {
+			if schema != SchemaVersion3 {
+				return nil, verr.New(label+".hash_version", "requires manager-config schema_version 3")
+			}
+			value, ok := integerValue(rawVersion)
+			if !ok || value != 2 {
+				return nil, verr.New(label+".hash_version", "must be 2")
+			}
+			if len(pin) != 64 {
+				return nil, verr.New(label+".pin", "hash_version requires a 64-character state hash pin")
+			}
+			hashVersion = 2
+		} else if len(pin) == 64 {
+			// A state hash without the additive member retains its frozen v1
+			// interpretation, including when read from schema 3.
+			hashVersion = 1
 		}
 		file, _ := entry["file"].(string)
 		if !identifiers.PortablePath(file) {
@@ -980,7 +1005,7 @@ func parseSecretWaivers(raw any) ([]SecretMaterialWaiver, error) {
 		if !nonEmptyString(reason) {
 			return nil, verr.New(label+".reason", "requires a non-empty string")
 		}
-		waivers = append(waivers, SecretMaterialWaiver{Pin: pin, File: file, Span: bounds, Reason: reason})
+		waivers = append(waivers, SecretMaterialWaiver{Pin: pin, HashVersion: hashVersion, File: file, Span: bounds, Reason: reason})
 	}
 	return waivers, nil
 }
@@ -1198,10 +1223,14 @@ func (e Environments) render() map[string]any {
 	}
 	waivers := []any{}
 	for _, waiver := range e.SecretWaivers {
-		waivers = append(waivers, map[string]any{
+		entry := map[string]any{
 			"pin": waiver.Pin, "file": waiver.File,
 			"span": []any{waiver.Span[0], waiver.Span[1]}, "reason": waiver.Reason,
-		})
+		}
+		if waiver.HashVersion == 2 {
+			entry["hash_version"] = 2
+		}
+		waivers = append(waivers, entry)
 	}
 	systemWaivers := []any{}
 	for _, waiver := range e.SystemModuleWaivers {

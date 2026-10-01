@@ -149,3 +149,36 @@ func TestParseAuthoritativeEnvMarkerV2SchemaCases(t *testing.T) {
 			return conformancecoverage.Observation{}
 		})
 }
+
+func TestParseAuthoritativeEnvMarkerV3SchemaCases(t *testing.T) {
+	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+	if root == "" {
+		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+	}
+	suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
+		return
+	}
+	cases := schemaCaseValidity(t, root, "agent-environment-marker-v3")
+	conformancecoverage.RunOutcomes(t, "agent-environment-marker-v3/schema-cases", cases,
+		func(tc namedSchemaCase) string { return tc.Name }, func(t *testing.T, tc namedSchemaCase) conformancecoverage.Observation {
+			payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "agent-environment-marker-v3", tc.Name)) // #nosec G304 -- explicit conformance input
+			if err != nil {
+				t.Fatal(err)
+			}
+			parsed, parseErr := Parse(payload)
+			if tc.Valid && parseErr != nil {
+				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("Parse rejected published-valid case: %v", parseErr)}
+			}
+			if !tc.Valid && parseErr == nil {
+				return conformancecoverage.Observation{FailureReason: "Parse accepted published-invalid case"}
+			}
+			if tc.Valid && (parsed.Version != VersionV3 || parsed.HashVersion != 2) {
+				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("parsed versions = marker:%d hash:%d, want 3/2", parsed.Version, parsed.HashVersion)}
+			}
+			return conformancecoverage.Observation{}
+		})
+}

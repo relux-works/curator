@@ -12,6 +12,7 @@ import (
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/contextpkg"
+	"github.com/relux-works/curator/internal/hashing"
 )
 
 type vectorPrecedence struct {
@@ -195,6 +196,9 @@ func TestConformanceEnvironmentsMonolithic(t *testing.T) {
 	}
 	conformancecoverage.Run(t, "environments/materialization-cases", vector.MaterializationCases,
 		func(tc environmentsMaterializationCase) string { return tc.Name }, func(t *testing.T, tc environmentsMaterializationCase) {
+			previousWriterVersion := hashing.EnableV2Writers
+			hashing.EnableV2Writers = tc.Lock.HashVersion == int(hashing.VersionV2)
+			defer func() { hashing.EnableV2Writers = previousWriterVersion }()
 			lock := vectorLockToLock(t, tc.Lock)
 			hash, err := lock.Hash()
 			if err != nil {

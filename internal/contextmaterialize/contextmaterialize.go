@@ -20,6 +20,7 @@ import (
 
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextpkg"
+	"github.com/relux-works/curator/internal/hashing"
 )
 
 // HeaderTypeLine is the generation-header type line.
@@ -287,24 +288,17 @@ func SystemPrompt(lock *contextlock.Lock, precedence Precedence, environment str
 }
 
 // SurfaceHash is the core §8 content hash over a materialized file set keyed
-// by home-relative portable path: records "path NUL content" joined by NUL,
-// in bytewise path order, prefixed "sha256:".
+// by home-relative portable path, using the framing selected for new manager
+// state.
 func SurfaceHash(files map[string][]byte) string {
-	paths := make([]string, 0, len(files))
-	for path := range files {
-		paths = append(paths, path)
-	}
-	sort.Strings(paths)
-	digest := sha256.New()
-	for index, path := range paths {
-		if index > 0 {
-			digest.Write([]byte{0})
-		}
-		digest.Write([]byte(path))
-		digest.Write([]byte{0})
-		digest.Write(files[path])
-	}
-	return "sha256:" + hex.EncodeToString(digest.Sum(nil))
+	digest, _ := SurfaceHashWithVersion(files, hashing.WriteVersion())
+	return digest
+}
+
+// SurfaceHashWithVersion hashes a materialized file set with an explicit
+// framing version. It is used by version-aware readers and conformance tests.
+func SurfaceHashWithVersion(files map[string][]byte, version hashing.Version) (string, error) {
+	return hashing.ContentSHA256Files(files, version)
 }
 
 // FileHash is the plain SHA-256 of one file's bytes, "sha256:" prefixed.

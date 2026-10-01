@@ -14,7 +14,9 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/contextpkg"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/opaquescan"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // Classes and diagnostics.
@@ -67,10 +69,11 @@ func InScope(path string) bool {
 // (secret_material_waivers). Pin is the member's pin as the lock spells it —
 // bare hex — or as the header spells it ("commit <hex>", "state sha256:<hex>").
 type Waiver struct {
-	Pin    string
-	File   string
-	Span   [2]int
-	Reason string
+	Pin         string
+	HashVersion hashing.Version
+	File        string
+	Span        [2]int
+	Reason      string
 }
 
 // Finding is one detector finding.
@@ -189,25 +192,89 @@ func Detect(root, pin string, waivers []Waiver) (Report, error) {
 			Severity: SeverityBlocking,
 		})
 	}
-	return detectFiles(files, pin, waivers, opaqueFindings), nil
+	return detectFiles(files, pin, hashing.VersionV1, waivers, opaqueFindings), nil
+}
+
+// DetectAtVersion binds state-hash waivers to the content-hash framing
+// version carried by the resolved context lock. Commit pins have no framing
+// version and may match only unversioned commit waivers.
+func DetectAtVersion(root, pin string, hashVersion hashing.Version, waivers []Waiver) (Report, error) {
+	if hashVersion == hashing.VersionV1 {
+		return Detect(root, pin, waivers)
+	}
+	if hashVersion != hashing.VersionV2 {
+		return Report{}, fmt.Errorf("unsupported context content hash version %d", hashVersion)
+	}
+	files := map[string][]byte{}
+	for _, name := range ScopeFiles {
+		read, err := stateread.ReadFile(filepath.Join(root, name))
+		if err != nil {
+			return Report{}, fmt.Errorf("read %s: %w", name, err)
+		}
+		if read.Kind == stateread.KindPresent {
+			files[name] = read.Bytes
+		}
+	}
+	contextRoot := filepath.Join(root, contextpkg.ContextDir)
+	info, err := stateread.Lstat(contextRoot)
+	if err != nil {
+		return Report{}, err
+	}
+	if info.Kind == stateread.KindPresent && info.Info.IsDir() {
+		err := filepath.WalkDir(contextRoot, func(path string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if !entry.Type().IsRegular() {
+				return nil
+			}
+			rel, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			read, err := stateread.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if read.Kind == stateread.KindPresent {
+				files[filepath.ToSlash(rel)] = read.Bytes
+			}
+			return nil
+		})
+		if err != nil {
+			return Report{}, err
+		}
+	}
+	return detectFiles(files, pin, hashVersion, waivers, nil), nil
 }
 
 // DetectFiles runs the secret detector over its existing scope and applies the
 // opaque NUL rule to every in-memory file keyed by snapshot-relative path.
 func DetectFiles(files map[string][]byte, pin string, waivers []Waiver) Report {
-	var opaqueFindings []Finding
-	for path, content := range files {
-		if offset := bytes.IndexByte(content, 0); offset >= 0 {
-			opaqueFindings = append(opaqueFindings, Finding{
-				Class: ClassOpaqueFile, File: path, Pattern: PatternNULByte,
-				Severity: SeverityBlocking, Span: [2]int{offset, offset + 1},
-			})
-		}
-	}
-	return detectFiles(files, pin, waivers, opaqueFindings)
+	return DetectFilesAtVersion(files, pin, hashing.VersionV1, waivers)
 }
 
-func detectFiles(files map[string][]byte, pin string, waivers []Waiver, opaqueFindings []Finding) Report {
+// DetectFilesAtVersion is the in-memory counterpart of DetectAtVersion.
+func DetectFilesAtVersion(files map[string][]byte, pin string, hashVersion hashing.Version, waivers []Waiver) Report {
+	var opaqueFindings []Finding
+	if hashVersion == hashing.VersionV1 {
+		for path, content := range files {
+			if offset := bytes.IndexByte(content, 0); offset >= 0 {
+				opaqueFindings = append(opaqueFindings, Finding{
+					Class: ClassOpaqueFile, File: path, Pattern: PatternNULByte,
+					Severity: SeverityBlocking, Span: [2]int{offset, offset + 1},
+				})
+			}
+		}
+	} else if hashVersion != hashing.VersionV2 {
+		return Report{Findings: []Finding{{
+			Class: ClassOpaqueFile, Pattern: PatternNULByte, Severity: SeverityBlocking,
+		}}}
+	}
+	return detectFiles(files, pin, hashVersion, waivers, opaqueFindings)
+}
+
+func detectFiles(files map[string][]byte, pin string, hashVersion hashing.Version, waivers []Waiver, opaqueFindings []Finding) Report {
 	var report Report
 	paths := make([]string, 0, len(files))
 	for path := range files {
@@ -246,7 +313,7 @@ func detectFiles(files map[string][]byte, pin string, waivers []Waiver, opaqueFi
 	memberPin := PinKey(pin)
 	for _, waiver := range waivers {
 		applied := false
-		if PinKey(waiver.Pin) == memberPin {
+		if PinKey(waiver.Pin) == memberPin && waiverMatchesHashVersion(pin, hashVersion, waiver.HashVersion) {
 			for index := range report.Findings {
 				finding := &report.Findings[index]
 				if finding.Class != ClassOpaqueFile && finding.File == waiver.File && finding.Span == waiver.Span && !finding.Waived {
@@ -267,6 +334,19 @@ func detectFiles(files map[string][]byte, pin string, waivers []Waiver, opaqueFi
 		}
 	}
 	return report
+}
+
+func waiverMatchesHashVersion(pin string, memberVersion, waiverVersion hashing.Version) bool {
+	if strings.HasPrefix(strings.TrimSpace(pin), "commit ") {
+		return waiverVersion == 0
+	}
+	if memberVersion == 0 {
+		memberVersion = hashing.VersionV1
+	}
+	if waiverVersion == 0 {
+		waiverVersion = hashing.VersionV1
+	}
+	return memberVersion == waiverVersion
 }
 
 // isPlaceholder applies the closed placeholder rule: a body whose remainder

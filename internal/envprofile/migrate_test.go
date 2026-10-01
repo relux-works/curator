@@ -1978,3 +1978,63 @@ func TestMigrateRecoveryCleansOwnedTemp(t *testing.T) {
 		t.Fatalf("the recovered apply deletes the journal: %v", err)
 	}
 }
+
+// TestMigrateSchema1UnlinkPublishesCompleteSchema3MarkerV2WriterMode is the
+// v2 writer-mode counterpart of
+// TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker: with the writer
+// switch explicitly on, the required marker replacement upgrades a schema-1
+// marker straight to v3 carrying hash_version 2.
+func TestMigrateSchema1UnlinkPublishesCompleteSchema3MarkerV2WriterMode(t *testing.T) {
+	enableV2WritersForTest(t)
+	requireLinkCapability(t)
+	fx := writeManagedFixture(t, "acme")
+	seedLiveNativeCredentials(t, fx)
+	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
+	markerPath := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), envmarker.Name)
+	marker := readManagedMarker(t, fx, "pi")
+	legacyEntries := []envmarker.Passthrough{}
+	if marker.Passthrough != nil {
+		for _, entry := range *marker.Passthrough {
+			if entry.Path != "" {
+				legacyEntries = append(legacyEntries, envmarker.Passthrough{Path: entry.Path, Strategy: entry.Strategy})
+			}
+		}
+	}
+	legacy := *marker
+	legacy.Version = envmarker.VersionV1
+	legacy.HashVersion = 0
+	legacy.Passthrough = &legacyEntries
+	legacyBytes, err := legacy.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(markerPath, legacyBytes, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
+	if _, err := os.Lstat(link); err != nil {
+		t.Fatalf("schema-1 marker's recorded link is present: %v", err)
+	}
+	config := envregistry.DefaultMachineConfig()
+	config.Isolation = map[string]map[string]string{"acme": {"pi": envregistry.IsolationIsolated}}
+	req := fx.migrateRequest()
+	req.Machine = config
+	report, err := PlanMigration(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Ops()) != 1 || report.Ops()[0].Kind != MigrateOpUnlink || report.Ops()[0].Path != "auth.json" {
+		t.Fatalf("migration requires an unlink marker update: %+v", report.Ops())
+	}
+	req.Expect = report.Hash
+	if _, err := ApplyMigration(req); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(link); !os.IsNotExist(err) {
+		t.Fatalf("the migration unlinks the recorded passthrough: %v", err)
+	}
+	upgraded := readManagedMarker(t, fx, "pi")
+	if upgraded.Version != envmarker.VersionV3 || upgraded.HashVersion != 2 || upgraded.Passthrough == nil || len(*upgraded.Passthrough) != 0 {
+		t.Fatalf("marker replacement upgrades with the complete isolated record set: %+v", upgraded)
+	}
+}

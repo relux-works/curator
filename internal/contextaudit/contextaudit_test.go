@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/hashing"
 )
 
 // Production entry points under test: Detect, DetectFiles, InScope, PinKey,
@@ -133,6 +135,30 @@ func TestDetectorIsUnpinnable(t *testing.T) {
 	}
 }
 
+func TestSecretWaiversRequireEqualStateHashVersion(t *testing.T) {
+	files := map[string][]byte{"context/a.md": []byte("key " + exampleKey() + " here\n")}
+	finding := DetectFilesAtVersion(files, "state sha256:"+testPin, hashing.VersionV1, nil)
+	if len(finding.Findings) != 1 {
+		t.Fatalf("findings %+v", finding.Findings)
+	}
+	span := finding.Findings[0].Span
+	v1Waiver := Waiver{Pin: testPin, File: "context/a.md", Span: span, Reason: "legacy review"}
+	v2Waiver := Waiver{Pin: testPin, HashVersion: hashing.VersionV2, File: "context/a.md", Span: span, Reason: "v2 review"}
+
+	if report := DetectFilesAtVersion(files, "state sha256:"+testPin, hashing.VersionV2, []Waiver{v1Waiver}); !report.Blocking() {
+		t.Fatal("a v1 state waiver cleared a v2 state finding")
+	}
+	if report := DetectFilesAtVersion(files, "state sha256:"+testPin, hashing.VersionV2, []Waiver{v2Waiver}); report.Blocking() {
+		t.Fatalf("same-version state waiver did not clear finding: %+v", report)
+	}
+	if report := DetectFilesAtVersion(files, "state sha256:"+testPin, hashing.VersionV1, []Waiver{v2Waiver}); !report.Blocking() {
+		t.Fatal("a v2 state waiver cleared a v1 state finding")
+	}
+	if report := DetectFilesAtVersion(files, "commit "+testPin, hashing.VersionV1, []Waiver{v2Waiver}); !report.Blocking() {
+		t.Fatal("a v2 state waiver cleared a commit-pinned finding")
+	}
+}
+
 func TestOpaqueNULBlocksOutsideSecretScopeAndIgnoresWaivers(t *testing.T) {
 	files := map[string][]byte{"assets/deep/image.bin": []byte("prefix\x00suffix")}
 	report := DetectFiles(files, testPin, []Waiver{{
@@ -150,6 +176,41 @@ func TestOpaqueNULBlocksOutsideSecretScopeAndIgnoresWaivers(t *testing.T) {
 	}
 	if len(report.Waivers) != 1 || report.Waivers[0].Diagnostic != DiagWaiverUnmatched {
 		t.Fatalf("opaque waiver result %+v, want unmatched waiver", report.Waivers)
+	}
+}
+
+// TestDetectFilesAtVersionAppliesNULRuleOnlyToV1 is the in-memory v2
+// counterpart of the rc.13 opaque-NUL test above: v1 keeps the blocking
+// opaque finding, v2 treats NUL as ordinary file data, and an unknown framing
+// version blocks instead of silently dropping the rule.
+func TestDetectFilesAtVersionAppliesNULRuleOnlyToV1(t *testing.T) {
+	files := map[string][]byte{"assets/deep/image.bin": []byte("prefix\x00suffix")}
+	if report := DetectFilesAtVersion(files, testPin, hashing.VersionV1, nil); !report.Blocking() {
+		t.Fatalf("v1 opaque findings %+v must block", report.Findings)
+	}
+	if report := DetectFilesAtVersion(files, testPin, hashing.VersionV2, nil); report.Blocking() {
+		t.Fatalf("v2 treats NUL as ordinary file data, got %+v", report.Findings)
+	}
+	if report := DetectFilesAtVersion(files, testPin, hashing.Version(3), nil); !report.Blocking() {
+		t.Fatalf("an unknown framing version must block, got %+v", report.Findings)
+	}
+}
+
+func TestDetectAtVersionAppliesNULRuleOnlyToV1(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "assets", "deep"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "assets", "deep", "image.bin"), []byte("prefix\x00suffix"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	v1, err := DetectAtVersion(root, "commit "+testPin, hashing.VersionV1, nil)
+	if err != nil || !v1.Blocking() {
+		t.Fatalf("v1 opaque rule report=%+v err=%v, want blocking", v1, err)
+	}
+	v2, err := DetectAtVersion(root, "commit "+testPin, hashing.VersionV2, nil)
+	if err != nil || v2.Blocking() {
+		t.Fatalf("v2 NUL bytes are ordinary data, report=%+v err=%v", v2, err)
 	}
 }
 

@@ -58,7 +58,7 @@ func Exists(home, kind, name, pinKey string) (bool, error) {
 // ContentHash is the core §8 content hash of a store entry (no exclusions:
 // a store entry carries no marker).
 func ContentHash(dir string) (string, error) {
-	return hashing.ContentSHA256(dir, map[string]bool{})
+	return hashing.ContentSHA256WithVersion(dir, map[string]bool{}, hashing.WriteVersion())
 }
 
 // EnsureGit installs the snapshot of commit from repo as the entry of

@@ -11,6 +11,7 @@ import (
 	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextresolve"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/pkgversion"
 	"github.com/relux-works/curator/internal/protocoljson"
 )
@@ -18,6 +19,7 @@ import (
 // vectorLock is the context-lock-v1 object as the vectors spell it.
 type vectorLock struct {
 	SchemaVersion int              `json:"schema_version"`
+	HashVersion   int              `json:"hash_version,omitempty"`
 	Root          string           `json:"root"`
 	Members       []map[string]any `json:"members"`
 }
@@ -218,6 +220,9 @@ func TestConformanceContextResolution(t *testing.T) {
 
 	conformancecoverage.Run(t, "context-versions/resolution-cases", vector.ResolutionCases,
 		func(tc contextResolutionCase) string { return tc.Name }, func(t *testing.T, tc contextResolutionCase) {
+			previousWriterVersion := hashing.EnableV2Writers
+			hashing.EnableV2Writers = tc.Expected.Lock != nil && tc.Expected.Lock.HashVersion == int(hashing.VersionV2)
+			defer func() { hashing.EnableV2Writers = previousWriterVersion }()
 			input := contextresolve.Input{
 				Root: contextresolve.Requirement{Name: tc.Input.Install.Name, Range: tc.Input.Install.Range,
 					Tag: tc.Input.Install.Tag, Revision: tc.Input.Install.Revision},

@@ -464,6 +464,9 @@ type Policy struct {
 	// SystemModuleWaivers admits transitive packages' system modules by
 	// name (environments §3, §12.1).
 	SystemModuleWaivers []SystemModuleWaiver
+	// SecretWaivers are scoped to both the member pin and its state-hash
+	// framing version. A legacy v1 waiver cannot clear a v2 state finding.
+	SecretWaivers []contextaudit.Waiver
 	// Takeover is the explicit section 9.5 takeover flag carried by a
 	// mutating operation (profile install, use, update, sync, env resolve
 	// --repair): with it the operation backs up and takes over the
@@ -619,6 +622,16 @@ func PolicyFromConfig(cfg *config.Config) Policy {
 	for _, waiver := range cfg.Env.SystemModuleWaivers {
 		policy.SystemModuleWaivers = append(policy.SystemModuleWaivers,
 			SystemModuleWaiver{Package: waiver.Package, Reason: waiver.Reason})
+	}
+	for _, waiver := range cfg.Env.SecretWaivers {
+		hashVersion := hashing.VersionV1
+		if waiver.HashVersion == 2 {
+			hashVersion = hashing.VersionV2
+		}
+		policy.SecretWaivers = append(policy.SecretWaivers, contextaudit.Waiver{
+			Pin: waiver.Pin, HashVersion: hashVersion,
+			File: waiver.File, Span: waiver.Span, Reason: waiver.Reason,
+		})
 	}
 	if len(cfg.Env.Overlays) > 0 {
 		policy.Overlays = map[string][]OverlaySpec{}
@@ -1531,7 +1544,7 @@ func auditMember(home string, manager *gitManager, key string, resolved contextr
 	}
 	defer cleanup()
 	root := packageRoot(entry, resolved.Directory)
-	report, err := contextaudit.Detect(root, pinOf(resolved), nil)
+	report, err := contextaudit.DetectAtVersion(root, pinOf(resolved), resolvedHashVersion(resolved), policy.SecretWaivers)
 	if err != nil {
 		return nil, err
 	}
@@ -1570,7 +1583,7 @@ func auditNewUpdateMember(home string, manager *gitManager, key string, resolved
 		return err
 	}
 	defer cleanup()
-	report, err := contextaudit.Detect(packageRoot(entry, resolved.Directory), pinOf(resolved), nil)
+	report, err := contextaudit.DetectAtVersion(packageRoot(entry, resolved.Directory), pinOf(resolved), resolvedHashVersion(resolved), policy.SecretWaivers)
 	if err != nil {
 		return err
 	}
@@ -1659,6 +1672,13 @@ func pinOf(resolved contextresolve.Resolved) string {
 		return "commit " + resolved.Commit
 	}
 	return "state sha256:" + resolved.StateHash
+}
+
+func resolvedHashVersion(resolved contextresolve.Resolved) hashing.Version {
+	if resolved.HashVersion == 0 {
+		return hashing.VersionV1
+	}
+	return resolved.HashVersion
 }
 
 // strictAuditMember runs the manager §7 source audit in strict mode over one
@@ -1998,7 +2018,7 @@ func migrateGlobalSkills(home string, policy Policy) ([]contextlock.Member, erro
 		if err != nil {
 			return nil, err
 		}
-		if report, err := contextaudit.Detect(entry, "commit "+resolved.Commit, nil); err != nil {
+		if report, err := contextaudit.DetectAtVersion(entry, "commit "+resolved.Commit, hashing.VersionV1, policy.SecretWaivers); err != nil {
 			return nil, err
 		} else if report.Blocking() {
 			finding, _ := report.FirstBlocking()

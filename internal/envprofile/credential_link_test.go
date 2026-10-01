@@ -896,3 +896,86 @@ func TestCodexMalformedStoreSharedRefuses(t *testing.T) {
 		})
 	}
 }
+
+// TestPiProvisionTargetsAgentRootV2WriterMode is the v2 writer-mode
+// counterpart of TestPiProvisionTargetsAgentRoot, which stays the rc.13
+// row: with the writer switch explicitly on, the same provisioning records
+// the agent-root link in an environment marker v3 carrying hash_version 2.
+func TestPiProvisionTargetsAgentRootV2WriterMode(t *testing.T) {
+	enableV2WritersForTest(t)
+	requireLinkCapability(t)
+	fx := writeManagedFixture(t, "acme")
+	req := fx.request("pi")
+	req.Repair = true
+	provisioned, err := Resolve(req)
+	if err != nil {
+		t.Fatalf("provisioning with no native credential yet succeeds: %v", err)
+	}
+	warnings := strings.Join(provisioned.Warnings, "; ")
+	for _, want := range []string{"detached-pending", "does not exist yet", "pi"} {
+		if !strings.Contains(warnings, want) {
+			t.Fatalf("provision warns loudly about the pending target, want %q in %q", want, warnings)
+		}
+	}
+	if strings.Contains(warnings, envregistry.DiagCredentialConflict) {
+		t.Fatalf("the pending warning is not a conflict: %q", warnings)
+	}
+	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
+	want := filepath.Join(fx.native["pi"], "agent", "auth.json")
+	if target, err := os.Readlink(link); err != nil || target != want {
+		t.Fatalf("new Pi homes link the agent root: %q (%v), want %q", target, err, want)
+	}
+	current, err := Resolve(fx.request("pi"))
+	if err != nil {
+		t.Fatalf("a dangling-but-correct link succeeds with its finding, got %v", err)
+	}
+	resolved := strings.Join(current.Warnings, "; ")
+	for _, want := range []string{"detached-pending", "does not exist yet", "pi"} {
+		if !strings.Contains(resolved, want) {
+			t.Fatalf("bare resolve carries the pending finding, want %q in %q", want, resolved)
+		}
+	}
+	if strings.Contains(resolved, envregistry.DiagCredentialConflict) {
+		t.Fatalf("the pending finding is not a conflict: %q", resolved)
+	}
+	marker := readManagedMarker(t, fx, "pi")
+	if marker.Version != envmarker.VersionV3 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
+		t.Fatalf("one passthrough entry recorded: %+v", marker.Passthrough)
+	}
+	entry := (*marker.Passthrough)[0]
+	if entry.Path != "auth.json" || entry.Isolation != envregistry.IsolationShared || entry.Strategy != envregistry.StrategyFileLink ||
+		entry.SourceRole != "native" || entry.Backend != "file" || entry.BackendVersion != "0.84.2" || entry.Provenance != "provisioned" {
+		t.Fatalf("recorded entry %+v", entry)
+	}
+	payload, err := json.Marshal(marker.Passthrough)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded []map[string]any
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	for key := range decoded[0] {
+		if key != "path" && key != "isolation" && key != "strategy" && key != "source_role" && key != "backend" && key != "backend_version" && key != "provenance" {
+			t.Fatalf("schema-v2 credential record has an unknown field %q in %s", key, payload)
+		}
+	}
+	// With the native credential present the link reads through.
+	if err := os.MkdirAll(filepath.Join(fx.native["pi"], "agent"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	nativeAuth := []byte("{\"t\":\"pi-credential\"}\n")
+	if err := os.WriteFile(want, nativeAuth, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if payload, err := os.ReadFile(link); err != nil || string(payload) != string(nativeAuth) {
+		t.Fatalf("the link serves the agent-root bytes: %q (%v)", payload, err)
+	}
+	healed, err := Resolve(fx.request("pi"))
+	if err != nil {
+		t.Fatalf("the linked home is current: %v", err)
+	}
+	if warnings := strings.Join(healed.Warnings, "; "); strings.Contains(warnings, "detached-pending") {
+		t.Fatalf("the pending finding clears once the native target exists: %q", warnings)
+	}
+}
