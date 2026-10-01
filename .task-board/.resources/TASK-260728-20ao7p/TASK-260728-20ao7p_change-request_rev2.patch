@@ -1,0 +1,603 @@
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index 090140cf..e7c601a1 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -306,6 +306,7 @@ cmd/curator	TestStatusReportsAnUnusableToolchainPerCompiledCommand	darwin,window
+ cmd/curator	TestGCRetainsAndReportsReferencedCompiledState	darwin,windows	linux	platform-control	gc neither removes nor reports removing a cache entry a live marker references
+ cmd/curator	TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck	darwin,windows	linux	platform-control	machine-wide status reports compiled currentness and fails `--check` for every non-current state
+ cmd/curator	TestGlobalStatusReportsATransitivelyResolvedCompiledCommand	darwin,windows	linux	platform-control	machine-wide status resolves a compiled command no declaration names
++cmd/curator	TestNativeBlackboxExternalBuildLifecycle	darwin,windows	linux	platform-control	the built binary installs a schema-7 external build repository command from a local substitution, runs its shim, reinstalls as a cache hit, and removes the shim and build root
+ 
+ # ===========================================================================
+ # Protocol platform exclusion -- asserted, never merely omitted.
+diff --git a/README.md b/README.md
+index 8de7c24f..2be6632e 100644
+--- a/README.md
++++ b/README.md
+@@ -72,7 +72,7 @@ Curator controls environment dependencies and runtime delivery:
+ - **Scopes**: Project, global, and hybrid (machine-stored, per-project activation).
+ - **MCP requirements**: Read-only verification of declared MCP servers against agent configuration surfaces.
+ - **Security**: Source allowlists, declared capability boundaries, zero code execution during install, and an audit registry client (Ed25519 signed records, deny-wins federation, snapshot verification).
+-- **Operator credentials**: Per-repository SSH selection and scoped HTTPS token sources for external build repositories, matched by canonical source identity and never selectable by a package. Private HTTPS fetches use a manager-owned, host-pinned askpass broker; public HTTPS can remain anonymous. See [SSH credentials](docs/build-ssh.md) and [HTTPS credentials](docs/build-https.md).
++- **Operator credentials**: Per-repository SSH selection and scoped HTTPS token sources for external build repositories, matched by canonical source identity and never selectable by a package. Private HTTPS fetches use a manager-owned, host-pinned askpass broker; public HTTPS can remain anonymous. See [SSH credentials](docs/build-ssh.md) and [HTTPS credentials](docs/build-https.md). See [External build repositories](docs/external-build-repositories.md) for declaring `build_repositories`, locked commits, and local development substitution.
+ 
+ ## Registry client guarantees
+ 
+diff --git a/cmd/curator/native_blackbox_test.go b/cmd/curator/native_blackbox_test.go
+new file mode 100644
+index 00000000..c8f90ba3
+--- /dev/null
++++ b/cmd/curator/native_blackbox_test.go
+@@ -0,0 +1,254 @@
++package main
++
++// Native lifecycle black box: the real curator binary, built once, drives
++// install → shim run → cache-hit reinstall → remove of a schema-7 skill
++// whose command builds from an external build repository, after a refused
++// install over an ordinary checkout. The repository is a local git checkout
++// selected through Skillfile.dev.json, so the run needs git and a Go
++// toolchain but no network. The build completes only on hosts
++// rc5-native-control-inventory-v1 covers (macOS, Windows); elsewhere the
++// case skips with the inventory reason.
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"regexp"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/manifest"
++	"github.com/relux-works/curator/internal/privatedir"
++	"github.com/relux-works/curator/internal/testcli"
++)
++
++func TestNativeBlackboxExternalBuildLifecycle(t *testing.T) {
++	requireNativeControlInventoryPlatform(t)
++	testcli.RequireGit(t)
++	bin := testcli.Binary(t)
++	root, err := filepath.EvalSymlinks(t.TempDir())
++	if err != nil {
++		t.Fatal(err)
++	}
++	skillsRoot := filepath.Join(root, "skills")
++	project := filepath.Join(root, "project")
++	home := filepath.Join(root, "home")
++	if err := privatedir.Make(home); err != nil {
++		t.Fatal(err)
++	}
++	if err := privatedir.Validate(home); err != nil {
++		t.Fatal(err)
++	}
++	for _, dir := range []string{filepath.Join(skillsRoot, "skill-a"), project} {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	work := filepath.Join(project, "tools-src")
++	draftCLIGit(t, "", "init", "--quiet", "-b", "main", "--object-format=sha1", work)
++	writeBlackboxFiles(t, work, map[string]string{
++		"skill-build.json":       `{"schema_version":1,"targets":{"tool":{"driver":"go-repository-v1","build_root":"tools","source_dir":"tools/cmd/tool"}}}`,
++		"tools/go.mod":           "module example.test/tool\n\ngo 1.21\n",
++		"tools/cmd/tool/main.go": "package main\n\nimport \"fmt\"\n\nfunc main() { fmt.Println(\"blackbox-tool-ok\") }\n",
++	})
++	draftCLIGit(t, work, "add", ".")
++	draftCLIGit(t, work, "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "tool")
++	lock := draftCLIGit(t, work, "rev-parse", "HEAD")
++
++	skill := filepath.Join(skillsRoot, "skill-a")
++	var payload []byte
++	payload, err = json.Marshal(map[string]any{
++		"schema_version": 7,
++		"capabilities":   map[string]any{},
++		"build_repositories": map[string]any{
++			"tools": map[string]any{"git": "https://fixture.test/tools.git", "locked_commit": map[string]any{"object_format": "sha1", "hex": lock}},
++		},
++		"commands": map[string]any{
++			"bbtool": map[string]any{"type": "build", "driver": "go-repository-v1", "repository": "tools", "target": "tool"},
++		},
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	writeBlackboxFiles(t, skill, map[string]string{
++		"agent-skill.json": string(payload),
++		"SKILL.md":         "---\nname: skill-a\n---\n# Skill\n",
++	})
++	draftCLIGit(t, "", "init", "--quiet", "-b", "main", skill)
++	draftCLIGit(t, skill, "add", ".")
++	draftCLIGit(t, skill, "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "skill")
++	draftCLIGit(t, skill, "tag", "v1")
++
++	writeBlackboxFiles(t, project, map[string]string{
++		manifest.Name:        `{"schema_version":1,"agents":["codex_cli"],"skills":[{"name":"skill-a","tag":"v1"}]}`,
++		"Skillfile.dev.json": `{"schema_version":2,"substitutions":{},"build_repository_substitutions":{"skill-a":{"tools":{"path":"tools-src"}}}}`,
++		".gitignore":         ".agents/\n.codex/skills/\nSkillfile.dev.json\ntools-src/\n",
++	})
++	draftCLIGit(t, "", "init", "--quiet", "-b", "main", project)
++	configPath := filepath.Join(home, "config.json")
++	if err := config.Bootstrap(configPath, skillsRoot, "", []string{"codex_cli"}, false); err != nil {
++		t.Fatal(err)
++	}
++	if err := config.AddProject(configPath, "app", project, []string{"codex_cli"}); err != nil {
++		t.Fatal(err)
++	}
++	env := []string{"CURATOR_CONFIG=" + configPath, "HOME=" + home, "USERPROFILE=" + home}
++
++	run := func(args ...string) string {
++		t.Helper()
++		code, stdout, stderr := testcli.Run(t, project, env, "", bin, args...)
++		if code != 0 {
++			t.Fatalf("curator %v exit=%d\nstdout:\n%s\nstderr:\n%s", args, code, stdout, stderr)
++		}
++		t.Logf("curator %v exit=0\n%s", args, stdout)
++		if strings.Contains(stderr, "build cache sweep skipped") {
++			t.Fatalf("cache cleanup could not prove the fixture's private home: %s", stderr)
++		}
++		return stdout
++	}
++	shim := filepath.Join(project, ".agents", "bin", "bbtool")
++	if runtime.GOOS == "windows" {
++		shim += ".cmd"
++	}
++	installedSkill := filepath.Join(project, ".agents", "skills", "skill-a")
++	artifacts := filepath.Join(home, "external-build-cache", "artifacts")
++
++	// The ordinary checkout still carries the hooks, info, and logs git
++	// init/commit wrote, which local admission refuses: the install fails
++	// before any build and publishes nothing.
++	refusedCode, refusedOut, refusedErr := testcli.Run(t, project, env, "", bin, "install", "app")
++	if refusedCode == 0 || !strings.Contains(refusedOut+refusedErr, "build_repository_source_unavailable") {
++		t.Fatalf("install over an ordinary checkout: exit=%d\nstdout:\n%s\nstderr:\n%s", refusedCode, refusedOut, refusedErr)
++	}
++	t.Logf("curator [install app] over an ordinary checkout exit=%d\n%s%s", refusedCode, refusedOut, refusedErr)
++	if _, err := os.Lstat(shim); !os.IsNotExist(err) {
++		t.Fatalf("refused install published %s: %v", shim, err)
++	}
++	entries, err := os.ReadDir(artifacts)
++	if err != nil && !os.IsNotExist(err) {
++		t.Fatalf("read %s: %v", artifacts, err)
++	}
++	if len(entries) != 0 {
++		t.Fatalf("refused install published build roots: %v", entries)
++	}
++	pruneBlackboxGitDir(t, work)
++
++	// Install: admission, audit, build into the cache, shim publication.
++	stdout := run("install", "app")
++	if !strings.Contains(stdout, "BUILD REPOSITORY SUBSTITUTION skill-a.tools") {
++		t.Fatalf("install did not report the local substitution:\n%s", stdout)
++	}
++	key := blackboxOutcome(t, stdout, "would-preflight-and-build")
++	buildRoot := filepath.Join(artifacts, key)
++	receipt := filepath.Join(buildRoot, "receipt.json")
++	firstReceipt := blackboxRead(t, receipt)
++	artifactPath := filepath.Join(buildRoot, buildrepo.CacheArtifactName(runtime.GOOS))
++	firstInfo, err := os.Stat(artifactPath)
++	if err != nil {
++		t.Fatalf("build root has no artifact after install: %v\n%s", err, stdout)
++	}
++	for _, path := range []string{shim, installedSkill} {
++		if _, err := os.Stat(path); err != nil {
++			t.Fatalf("install did not publish %s: %v", path, err)
++		}
++	}
++
++	// The shim resolves to the cached artifact and runs it.
++	shimCommand := shim
++	var shimArgs []string
++	if runtime.GOOS == "windows" {
++		// Batch shims need the native command interpreter; CreateProcess
++		// cannot launch a .cmd file directly.
++		shimCommand = "cmd.exe"
++		shimArgs = []string{"/d", "/c", "call", shim}
++	}
++	code, shimOut, shimErr := testcli.Run(t, project, env, "", shimCommand, shimArgs...)
++	if code != 0 || strings.TrimSpace(shimOut) != "blackbox-tool-ok" {
++		t.Fatalf("shim exit=%d stdout=%q stderr=%q", code, shimOut, shimErr)
++	}
++	t.Logf("shim %s exit=0 stdout=%q", filepath.Base(shim), shimOut)
++
++	// Reinstall: same key, cache hit, the artifact and receipt untouched.
++	stdout = run("install", "app")
++	if again := blackboxOutcome(t, stdout, "cache-hit"); again != key {
++		t.Fatalf("reinstall key %s, first install key %s", again, key)
++	}
++	againInfo, err := os.Stat(artifactPath)
++	if err != nil || !againInfo.ModTime().Equal(firstInfo.ModTime()) {
++		t.Fatalf("cache hit rewrote the artifact: %v (%v -> %v)", err, firstInfo.ModTime(), againInfo)
++	}
++	if blackboxRead(t, receipt) != firstReceipt {
++		t.Fatal("cache hit rewrote the receipt")
++	}
++
++	// Remove the declaration and reconcile: shim, skill, and build root go.
++	if stdout := run("remove", "skill-a"); !strings.Contains(stdout, "removed skill-a") {
++		t.Fatalf("remove stdout:\n%s", stdout)
++	}
++	if stdout := run("install", "app"); strings.Contains(stdout, "external build key=") {
++		t.Fatalf("reconcile after remove still plans a build:\n%s", stdout)
++	}
++	for _, path := range []string{shim, installedSkill, buildRoot} {
++		if _, err := os.Lstat(path); !os.IsNotExist(err) {
++			t.Fatalf("%s survived remove: %v", path, err)
++		}
++	}
++}
++
++var blackboxKeyPattern = regexp.MustCompile(`skill-a\.bbtool external build key=sha256:([0-9a-f]{64}) outcome=(\S+)`)
++
++// blackboxOutcome returns the external build key of the one bbtool row and
++// fails unless its outcome is want.
++func blackboxOutcome(t *testing.T, stdout, want string) string {
++	t.Helper()
++	rows := blackboxKeyPattern.FindAllStringSubmatch(stdout, -1)
++	if len(rows) != 1 || rows[0][2] != want {
++		t.Fatalf("want one bbtool build row with outcome=%s, got %q\nstdout:\n%s", want, rows, stdout)
++	}
++	return rows[0][1]
++}
++
++func blackboxRead(t *testing.T, path string) string {
++	t.Helper()
++	data, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return string(data)
++}
++
++// pruneBlackboxGitDir leaves only the administration children local
++// admission accepts (HEAD, config, index, objects, refs, packed-refs);
++// git init/commit also write hooks, info, logs, and description.
++func pruneBlackboxGitDir(t *testing.T, work string) {
++	t.Helper()
++	allowed := map[string]bool{"HEAD": true, "config": true, "index": true, "objects": true, "refs": true, "packed-refs": true}
++	gitDir := filepath.Join(work, ".git")
++	entries, err := os.ReadDir(gitDir)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, entry := range entries {
++		if !allowed[entry.Name()] {
++			if err := os.RemoveAll(filepath.Join(gitDir, entry.Name())); err != nil {
++				t.Fatal(err)
++			}
++		}
++	}
++}
++
++func writeBlackboxFiles(t *testing.T, dir string, files map[string]string) {
++	t.Helper()
++	for name, content := range files {
++		path := filepath.Join(dir, filepath.FromSlash(name))
++		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++}
+diff --git a/docs/external-build-repositories.md b/docs/external-build-repositories.md
+new file mode 100644
+index 00000000..d72828c9
+--- /dev/null
++++ b/docs/external-build-repositories.md
+@@ -0,0 +1,75 @@
++# External Build Repositories
++
++A schema 7 skill can build a command from a separate Git repository. The skill names the repository and pins one exact commit, and Curator verifies that commit before it compiles anything. This guide covers the author-facing surface. The full normative rules live in the specification's [External build repositories](https://github.com/relux-works/curator-spec/blob/main/docs/external-build-repositories.md) guide.
++
++## Declare a repository
++
++To build from an external repository, declare it under `build_repositories` and point a `build` command at it. `build_repositories` requires `schema_version: 7`.
++
++This `agent-skill.json` declares one repository and one command built from it:
++
++```json
++{
++  "schema_version": 7,
++  "capabilities": {},
++  "build_repositories": {
++    "tools": {
++      "git": "https://git.example.com/org/tools.git",
++      "locked_commit": {"object_format": "sha1", "hex": "0123456789abcdef0123456789abcdef01234567"},
++      "tag": "v1.4.0"
++    }
++  },
++  "commands": {
++    "tool": {"type": "build", "driver": "go-repository-v1", "repository": "tools", "target": "tool"}
++  }
++}
++```
++
++The command names the repository and a target. The repository root carries `skill-build.json`, which maps each target to a Go module and command package:
++
++```json
++{"schema_version": 1, "targets": {"tool": {"driver": "go-repository-v1", "build_root": "tools", "source_dir": "tools/cmd/tool"}}}
++```
++
++## Locked commit and tag
++
++The `locked_commit` is the identity of the build. Curator fetches that exact object and refuses any other commit, so moving a branch or a tag never changes what installs. `object_format` is `sha1` or `sha256` and must match the repository.
++
++The `tag` is optional. When you declare it, Curator also asserts in the same operation that the tag still names the locked commit. A moved or deleted tag fails the install instead of silently building a different tree. To release a new version, update `locked_commit` and `tag` together.
++
++The `git` URL uses `https` or `ssh`. Private repositories need operator credentials; see [SSH credentials](build-ssh.md) and [HTTPS credentials](build-https.md). A package can never select credentials itself.
++
++## Develop against a local checkout
++
++To build from a working copy while you develop, add a substitution to `Skillfile.dev.json` next to the project's `Skillfile.json`. The file is operator-owned and must stay out of version control.
++
++This substitution builds the `tools` repository of `my-skill` from a local checkout:
++
++```json
++{
++  "schema_version": 2,
++  "substitutions": {},
++  "build_repository_substitutions": {
++    "my-skill": {"tools": {"path": "../tools"}}
++  }
++}
++```
++
++`curator install` then prints `BUILD REPOSITORY SUBSTITUTION my-skill.tools` and builds the commit at the checkout's `HEAD`. Curator reads the committed objects as inert bytes and never runs Git inside the checkout. Commit a change before you install it; uncommitted edits in the working tree are not built.
++
++The local checkout needs a narrow layout. It must be a non-bare worktree with a direct `.git` directory, not a gitfile or a linked worktree. Inside `.git`, Curator admits only `HEAD`, `config`, `index`, `objects`, `refs`, and `packed-refs`. `git init` and `git clone` also create `hooks/`, `info/`, and `logs/` by default, and Curator refuses such a checkout with `build_repository_source_unavailable`.
++
++A substitution can also name a network `git` URL with a `ref` of kind `tag`, `revision`, or `branch`. Substituted builds are recorded as substituted in the install marker. Strict audit refuses every install while `Skillfile.dev.json` declares a substitution.
++
++## What Curator verifies
++
++Every install runs the same pipeline, in order. A failure at any stage stops the install before a shim is published.
++
++1. **Admission.** Curator fetches the exact commit into private state and proves the object graph, the declared tag, and the source files. LFS pointers and unsupported repository layouts are refused.
++2. **Audit.** An independent audit of the admitted snapshot runs before any code executes.
++3. **Cache.** Curator derives a cache key from the source, the toolchain, and the execution policy. A matching verified artifact is reused, and the install reports `outcome=cache-hit` without rebuilding.
++4. **Compiler.** On a cache miss, the Go toolchain builds the target from the immutable snapshot under the manager-owned execution policy. Curator records a receipt next to the artifact and publishes the shim in `.agents/bin/`.
++
++Compilation runs on macOS and Windows. On Linux and other hosts, Curator refuses the build before the worker starts with `build_execution_control_unavailable`; see Platform support in [Authoring CLI commands](authoring-cli-commands.md).
++
++Removing the skill and reinstalling removes its shim and the build root it no longer references. For status codes and repair, see [Compiled commands](compiled-commands.md) and [Troubleshooting](troubleshooting.md).
+diff --git a/internal/buildrepo/adopt_test.go b/internal/buildrepo/adopt_test.go
+index ffe239b3..3fcd3274 100644
+--- a/internal/buildrepo/adopt_test.go
++++ b/internal/buildrepo/adopt_test.go
+@@ -198,7 +198,7 @@ func TestAdoptArtifactRefusesWhatItCannotProve(t *testing.T) {
+ 			final := newFinal(t, true)
+ 			entry := filepath.Join(final.Root, ArtifactsDir(version), name)
+ 			transactionCopy(t, stagedEntry, entry)
+-			if err := os.WriteFile(filepath.Join(entry, "artifact"), []byte("forged"), 0o700); err != nil {
++			if err := os.WriteFile(filepath.Join(entry, CacheArtifactName(runtime.GOOS)), []byte("forged"), 0o700); err != nil {
+ 				t.Fatal(err)
+ 			}
+ 			return final, version, key
+@@ -231,7 +231,7 @@ func TestAdoptArtifactRefusesWhatItCannotProve(t *testing.T) {
+ 			final := newFinal(t, true)
+ 			entry := filepath.Join(final.Root, ArtifactsDir(version), name)
+ 			transactionCopy(t, stagedEntry, entry)
+-			if err := os.Symlink(filepath.Join(entry, "artifact"), filepath.Join(entry, "alias")); err != nil {
++			if err := os.Symlink(filepath.Join(entry, CacheArtifactName(runtime.GOOS)), filepath.Join(entry, "alias")); err != nil {
+ 				t.Fatal(err)
+ 			}
+ 			return final, version, key
+diff --git a/internal/buildrepo/protected.go b/internal/buildrepo/protected.go
+index 210649a4..d1dae9e3 100644
+--- a/internal/buildrepo/protected.go
++++ b/internal/buildrepo/protected.go
+@@ -27,6 +27,24 @@ type DiskProtectedStore struct {
+ 	proofHook     func(string)
+ }
+ 
++// CacheArtifactName names the executable in the implementation-private cache.
++// The receipt retains its logical bin/<command>[.exe] path; Windows also needs
++// the executable suffix on the physical file invoked by the command shim.
++func CacheArtifactName(goos string) string {
++	if goos == "windows" {
++		return "artifact.exe"
++	}
++	return "artifact"
++}
++
++func cacheArtifactNameFromInput(input map[string]any) (string, bool) {
++	if _, ok := artifactPathFromInput(input); !ok {
++		return "", false
++	}
++	target := driverInputOf(input)["target"].(map[string]any)
++	return CacheArtifactName(target["goos"].(string)), true
++}
++
+ func (s *DiskProtectedStore) proves(info os.FileInfo, directory bool) bool {
+ 	if s.identityProof != nil {
+ 		return s.identityProof(info, directory)
+@@ -268,11 +286,15 @@ func (s *DiskProtectedStore) LookupArtifact(key string, input map[string]any, mu
+ 	if len(obj) != 4 || !numberEquals(obj["schema_version"], version) {
+ 		return nil, s.corrupt(entry, CodeReceiptInvalid, mutate, fmt.Errorf("receipt closed shape mismatch"))
+ 	}
+-	artifact, err := s.readProtectedFile(filepath.Join(entry, "artifact"), 1<<30)
++	artifactName, pathOK := cacheArtifactNameFromInput(input)
++	if !pathOK {
++		return nil, s.corrupt(entry, CodeReceiptInvalid, mutate, fmt.Errorf("receipt input does not identify a portable artifact path"))
++	}
++	artifact, err := s.readProtectedFile(filepath.Join(entry, artifactName), 1<<30)
+ 	if err != nil {
+ 		return nil, s.corrupt(entry, CodeArtifactInvalid, mutate, err)
+ 	}
+-	artifactInfo, statErr := os.Lstat(filepath.Join(entry, "artifact"))
++	artifactInfo, statErr := os.Lstat(filepath.Join(entry, artifactName))
+ 	if statErr != nil || runtime.GOOS != "windows" && artifactInfo.Mode().Perm()&0o111 == 0 {
+ 		return nil, s.corrupt(entry, CodeArtifactInvalid, mutate, fmt.Errorf("artifact is not executable"))
+ 	}
+@@ -327,7 +349,11 @@ func (s *DiskProtectedStore) StoreArtifact(key string, input map[string]any, _ s
+ 		return nil, err
+ 	}
+ 	defer func() { _ = os.RemoveAll(stage) }()
+-	if err = os.WriteFile(filepath.Join(stage, "artifact"), artifact, 0o700); err != nil {
++	artifactName, ok := cacheArtifactNameFromInput(input)
++	if !ok {
++		return nil, fmt.Errorf("receipt input does not identify a portable artifact path")
++	}
++	if err = os.WriteFile(filepath.Join(stage, artifactName), artifact, 0o700); err != nil {
+ 		return nil, err
+ 	}
+ 	sum := sha256.Sum256(artifact)
+diff --git a/internal/buildrepo/protected_artifact_test.go b/internal/buildrepo/protected_artifact_test.go
+new file mode 100644
+index 00000000..936e97af
+--- /dev/null
++++ b/internal/buildrepo/protected_artifact_test.go
+@@ -0,0 +1,67 @@
++package buildrepo
++
++import (
++	"bytes"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// Drive the production cache writer and reader for each target OS, including
++// Windows on non-Windows hosts, and for both receipt namespaces.
++func TestProtectedArtifactNameMatchesTargetPlatform(t *testing.T) {
++	for _, target := range []struct{ goos, filename, logical string }{
++		{"darwin", "artifact", "bin/tool"},
++		{"linux", "artifact", "bin/tool"},
++		{"windows", "artifact.exe", "bin/tool.exe"},
++	} {
++		for _, version := range []int{LegacyReceiptSchemaVersion, SourceAwareReceiptSchemaVersion} {
++			t.Run(target.goos+"/"+ArtifactsDir(version), func(t *testing.T) {
++				input := adoptionArtifactInput(version)
++				driverInputOf(input)["target"].(map[string]any)["goos"] = target.goos
++				key, err := cacheKey(input)
++				if err != nil {
++					t.Fatal(err)
++				}
++				store := &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}
++				artifact := []byte("cached executable")
++				execution := testExecutionReceiptBytes(t, driverInputOf(input), artifact)
++				receipt, err := store.StoreArtifact(key, input, "tool", artifact, execution)
++				if err != nil {
++					t.Fatal(err)
++				}
++				entry := filepath.Join(store.Root, ArtifactsDir(version), strings.TrimPrefix(key, "sha256:"))
++				physical := filepath.Join(entry, target.filename)
++				if got, err := os.ReadFile(physical); err != nil || !bytes.Equal(got, artifact) {
++					t.Fatalf("physical artifact = %q, err=%v", got, err)
++				}
++				var record struct {
++					CacheKey string                `json:"cache_key"`
++					Artifact struct{ Path string } `json:"artifact"`
++				}
++				if err := json.Unmarshal(receipt, &record); err != nil {
++					t.Fatal(err)
++				}
++				if record.CacheKey != key || record.Artifact.Path != target.logical {
++					t.Fatalf("receipt key=%q path=%q; want %q, %q", record.CacheKey, record.Artifact.Path, key, target.logical)
++				}
++				hit, err := store.LookupArtifact(key, input, false)
++				if err != nil || hit == nil || !bytes.Equal(hit.Bytes, artifact) || !bytes.Equal(hit.Receipt, receipt) {
++					t.Fatalf("cache hit=%+v err=%v", hit, err)
++				}
++				// An extensionless legacy Windows file cannot satisfy the new
++				// executable path, even when its bytes and receipt are intact.
++				if target.goos == "windows" {
++					if err := os.Rename(physical, filepath.Join(entry, "artifact")); err != nil {
++						t.Fatal(err)
++					}
++					if hit, err := store.LookupArtifact(key, input, false); hit != nil || ErrorCode(err) != CodeArtifactInvalid {
++						t.Fatalf("extensionless Windows artifact accepted: hit=%+v err=%v", hit, err)
++					}
++				}
++			})
++		}
++	}
++}
+diff --git a/internal/buildrepo/protection_windows_test.go b/internal/buildrepo/protection_windows_test.go
+index 098bd925..7daa2394 100644
+--- a/internal/buildrepo/protection_windows_test.go
++++ b/internal/buildrepo/protection_windows_test.go
+@@ -84,7 +84,7 @@ func TestWindowsProtectedSecurityDescriptorRejectsWrongOwnerAndDACL(t *testing.T
+ func TestWindowsProtectedArtifactAdversarialStateQuarantines(t *testing.T) {
+ 	t.Run("hard-link", func(t *testing.T) {
+ 		store, key, input, entry := windowsArtifactFixture(t)
+-		if err := os.Link(filepath.Join(entry, "artifact"), filepath.Join(entry, "artifact-link")); err != nil {
++		if err := os.Link(filepath.Join(entry, CacheArtifactName("windows")), filepath.Join(entry, "artifact-link")); err != nil {
+ 			t.Fatal(err)
+ 		}
+ 		assertWindowsArtifactQuarantined(t, store, key, input, entry)
+@@ -231,7 +231,7 @@ func TestWindowsProtectedArtifactEntrySwapCannotReturnBytes(t *testing.T) {
+ 	if err := os.Mkdir(replacement, 0o700); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	for _, name := range []string{"artifact", "receipt.json", "execution-receipt.ccj.json"} {
++	for _, name := range []string{CacheArtifactName("windows"), "receipt.json", "execution-receipt.ccj.json"} {
+ 		data, err := os.ReadFile(filepath.Join(entry, name))
+ 		if err != nil {
+ 			t.Fatal(err)
+diff --git a/internal/crossconformance/draftsources_semantic_external_test.go b/internal/crossconformance/draftsources_semantic_external_test.go
+index e5e19388..f9096b0c 100644
+--- a/internal/crossconformance/draftsources_semantic_external_test.go
++++ b/internal/crossconformance/draftsources_semantic_external_test.go
+@@ -9,9 +9,11 @@ import (
+ 	"os"
+ 	"path/filepath"
+ 	"reflect"
++	"runtime"
+ 	"strings"
+ 	"testing"
+ 
++	"github.com/relux-works/curator/internal/buildrepo"
+ 	"github.com/relux-works/curator/internal/install"
+ 	"github.com/relux-works/curator/internal/marker"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+@@ -431,7 +433,7 @@ func driveExternalMismatch(t *testing.T, _ draftSemanticCase, field string) {
+ // recorded bytes.
+ func assertProtectedExternalBytes(t *testing.T, home string, arm map[string]any, command string) {
+ 	t.Helper()
+-	artifactPath := filepath.Join(filepath.Dir(protectedReceiptPath(t, home)), "artifact")
++	artifactPath := filepath.Join(filepath.Dir(protectedReceiptPath(t, home)), buildrepo.CacheArtifactName(runtime.GOOS))
+ 	payload, err := os.ReadFile(artifactPath)
+ 	if err != nil {
+ 		t.Fatal(err)
+diff --git a/internal/install/external.go b/internal/install/external.go
+index d972c836..94bf167d 100644
+--- a/internal/install/external.go
++++ b/internal/install/external.go
+@@ -231,7 +231,7 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
+ 				return stagedExternal{}, err
+ 			}
+ 			entryRoot := filepath.Join(plan.deps.StoreRoot, buildrepo.ArtifactsDir(row.result.ReceiptSchemaVersion), strings.TrimPrefix(row.result.CacheKey, "sha256:"))
+-			artifactPath := filepath.Join(entryRoot, "artifact")
++			artifactPath := filepath.Join(entryRoot, buildrepo.CacheArtifactName(adapter.Identity().GOOS))
+ 			artifact, readErr := os.ReadFile(artifactPath) // #nosec G304 -- manager-derived protected cache path from a validated cache key.
+ 			if readErr != nil {
+ 				return stagedExternal{}, readErr
+@@ -256,7 +256,7 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
+ 			return stagedExternal{}, fmt.Errorf("%s.%s: %w", row.node.Name, row.command.Name, err)
+ 		}
+ 		entryRoot := filepath.Join(root, buildrepo.ArtifactsDir(result.ReceiptSchemaVersion), strings.TrimPrefix(result.CacheKey, "sha256:"))
+-		artifactPath := filepath.Join(entryRoot, "artifact")
++		artifactPath := filepath.Join(entryRoot, buildrepo.CacheArtifactName(adapter.Identity().GOOS))
+ 		receiptPath := filepath.Join(entryRoot, "receipt.json")
+ 		artifact, err := os.ReadFile(artifactPath) // #nosec G304 -- pipeline result supplies the manager-staged artifact path.
+ 		if err != nil {
+diff --git a/internal/install/targets.go b/internal/install/targets.go
+index 3330b20e..396951bd 100644
+--- a/internal/install/targets.go
++++ b/internal/install/targets.go
+@@ -231,7 +231,7 @@ func stageRuntimeAndShims(
+ 					return runtimeStaging{}, fmt.Errorf("%s.%s: the external build was not staged", node.Name, name)
+ 				}
+ 				keyName := strings.TrimPrefix(entry.result.CacheKey, "sha256:")
+-				finalArtifact := filepath.Join(externalRoot, buildrepo.ArtifactsDir(entry.result.ReceiptSchemaVersion), keyName, "artifact")
++				finalArtifact := filepath.Join(externalRoot, buildrepo.ArtifactsDir(entry.result.ReceiptSchemaVersion), keyName, filepath.Base(entry.artifactPath))
+ 				compiled, err := runtimestore.ExternalCompiledTarget(entry.artifactPath, finalArtifact,
+ 					entry.record.CacheKey, entry.record.ReceiptSHA256, entry.record.ArtifactSHA256, platform)
+ 				if err != nil {
