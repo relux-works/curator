@@ -2455,7 +2455,10 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 		}
 		return &ResolveResult{Document: document, Warnings: verdict.warnings}, nil
 	}
-	if !req.Repair || req.DryRun {
+	if !req.Repair {
+		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s; rerun with --repair", DiagHomeStale, strings.Join(verdict.reasons, "; "))
+	}
+	if req.DryRun {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", DiagHomeStale, strings.Join(verdict.reasons, "; "))
 	}
 	return repairUnderLock(&req, adapter, source, lock, hash)

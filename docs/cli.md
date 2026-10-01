@@ -20,6 +20,8 @@ Curator flags use consistent names and behavior across command groups.
 
 ## Environment initialization and skill lifecycle
 
+<a id="bootstrap"></a>
+
 ### curator bootstrap
 
 `curator bootstrap` creates machine configuration and default directories.
@@ -42,10 +44,10 @@ Flags:
 Run bootstrap to create missing machine configuration:
 
 ```bash
-curator bootstrap --if-missing --non-interactive
+curator bootstrap --if-missing --non-interactive --skills-root "$HOME/skills"
 ```
 
-The command initializes `$HOME/.curator/config.json` without overwriting existing files.
+The command initializes `$HOME/.curator/config.json` without overwriting existing files. `--non-interactive` requires `--skills-root`; without it bootstrap exits 2 (`bootstrap requires --skills-root`).
 
 ### curator init
 
@@ -246,6 +248,10 @@ check. The `--json` document carries the same rows under `shell_hook_trust`
 (malformed lines, unreadable state) under `shell_hook_trust_warnings`.
 `curator env status` reports the same posture rows with the same `--check`
 semantics.
+For the profile × environment home rows, only profiles that are current in
+some reported scope decide the `--check` exit code; rows of other installed
+profiles (for example `home unprovisioned` on a profile never used) are
+printed as informational.
 
 Both `curator status` and `curator env status` also report one registry page
 boundary row per enabled registry with pinned keys. Each row names the
@@ -608,13 +614,16 @@ Synopsis:
 curator global init
 ```
 
-Initialize global configuration:
+Prerequisite: `curator bootstrap --skills-root <dir>` (see [curator bootstrap](#bootstrap)). Every `global`, `profile`, and `env` subcommand needs the global config that bootstrap writes; on a clean home they exit 1 with `global config not found: <path>` followed by the hint to run bootstrap first. Group-level help (`curator global --help`, `curator profile --help`, `curator env --help`, or `<group> help`) works without config. Subcommand flag help (for example `curator env resolve --help`) requires config and retains its flag usage and exit code 2.
+
+Initialize the global Skillfile after bootstrap:
 
 ```bash
+curator bootstrap --skills-root "$HOME/skills"
 curator global init
 ```
 
-The command creates global configuration files under the Curator home directory.
+The command creates the global Skillfile under the Curator home directory.
 
 ### curator global add
 

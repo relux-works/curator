@@ -720,6 +720,7 @@ func (c cli) cmdUmbrella(cfg *config.Config, home string, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
 	}
 	command := exec.Command(path, args[1:]...) // #nosec G204,G702 -- §11 dispatches the trust-root-resolved provider with operator argv verbatim
+	command.Env = c.childEnviron()
 	command.Stdin = os.Stdin
 	command.Stdout = c.stdout
 	command.Stderr = c.stderr

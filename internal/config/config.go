@@ -4,6 +4,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -1235,11 +1236,14 @@ func canonicalRegistryURL(value string) (string, error) {
 	return canonical, nil
 }
 
+// ErrConfigNotFound marks an absent config file (never a failed read).
+var ErrConfigNotFound = errors.New("global config not found")
+
 func readObject(path string) (map[string]any, error) {
 	payload, err := os.ReadFile(path) // #nosec G304 -- config path comes from the operator
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("global config not found: %s", path)
+			return nil, fmt.Errorf("%w: %s", ErrConfigNotFound, path)
 		}
 		return nil, err
 	}

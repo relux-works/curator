@@ -62,6 +62,10 @@ func (c cli) cmdEnv(args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config | migrate | unmanage")
 		return exitUsage
 	}
+	if wantsHelp(args) {
+		_, _ = fmt.Fprint(c.stdout, "usage: curator env <resolve|status|config|migrate|unmanage> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
+		return exitOK
+	}
 	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code

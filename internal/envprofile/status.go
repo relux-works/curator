@@ -372,12 +372,19 @@ func StatusOf(req StatusRequest) (*Status, error) {
 			status.Homes = append(status.Homes, homeState(req, info.Name, adapter))
 		}
 	}
+	status.Scopes, status.Diagnostics = scopeHomes(req, installed)
+	// Only rows of a profile that is current in some reported scope
+	// decide currency; other profiles' rows stay informational (a
+	// never-used profile's unprovisioned homes are not a finding).
+	currentProfiles := map[string]bool{}
+	for _, scope := range status.Scopes {
+		currentProfiles[scope.Profile] = true
+	}
 	for _, state := range status.Homes {
-		if !state.Current {
+		if !state.Current && currentProfiles[state.Profile] {
 			status.NonCurrent = true
 		}
 	}
-	status.Scopes, status.Diagnostics = scopeHomes(req, installed)
 	for _, scope := range status.Scopes {
 		if scope.Diagnostic != nil {
 			status.NonCurrent = true

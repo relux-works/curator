@@ -24,6 +24,10 @@ func (c cli) cmdProfile(args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator: profile needs a subcommand: install | import | list | use | update | remove | sync | compose")
 		return exitUsage
 	}
+	if wantsHelp(args) {
+		_, _ = fmt.Fprint(c.stdout, "usage: curator profile <install|import|list|use|update|remove|sync|compose> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
+		return exitOK
+	}
 	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code

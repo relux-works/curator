@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -196,6 +197,37 @@ type cli struct {
 	// seams; production commands leave them nil and envprofile uses stateread.
 	unmanageBackupLstat   func(string) (stateread.Metadata, error)
 	unmanageBackupReadDir func(string) (stateread.Directory, error)
+	// posture records whether this process tree has already printed the
+	// security_posture_permissive warning; nil means no nested dispatch
+	// needs the marker (in-process tests that build cli directly).
+	posture *postureState
+}
+
+// postureWarnedEnv is the internal marker a curator process exports to
+// the children it dispatches once the permissive-posture warning has been
+// printed. Its value must identify the child's immediate parent. An
+// intervening shell (curator run → shell → curator) breaks that binding,
+// so that grandchild warns again; suppression covers direct dispatch only.
+const postureWarnedEnv = "CURATOR_INTERNAL_POSTURE_WARNED"
+
+type postureState struct{ warned bool }
+
+// childEnviron returns the environment for a dispatched child process,
+// carrying the posture marker when this process tree already warned.
+func (c cli) childEnviron() []string {
+	environ := os.Environ()
+	// Replace any inherited marker rather than forwarding stale ancestry.
+	filtered := environ[:0]
+	for _, entry := range environ {
+		if !strings.HasPrefix(entry, postureWarnedEnv+"=") {
+			filtered = append(filtered, entry)
+		}
+	}
+	environ = filtered
+	if c.posture != nil && c.posture.warned {
+		environ = append(environ, postureWarnedEnv+"="+strconv.Itoa(os.Getpid()))
+	}
+	return environ
 }
 
 func (c cli) newFlagSet(name string) *flag.FlagSet {
@@ -237,7 +269,7 @@ func runEnforcedShim(executable string, args []string) int {
 // output writers are explicit so callers can run concurrent invocations without
 // mutating CURATOR_CONFIG, os.Stdout, or os.Stderr.
 func run(args []string, source configSource, stdout, stderr io.Writer) int {
-	command := cli{config: source, stdout: stdout, stderr: stderr, userHome: os.UserHomeDir}
+	command := cli{config: source, stdout: stdout, stderr: stderr, userHome: os.UserHomeDir, posture: &postureState{}}
 	return command.run(args)
 }
 
@@ -323,12 +355,43 @@ func (c cli) loadConfig() (*config.Config, int) {
 	})
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+		if errors.Is(err, config.ErrConfigNotFound) {
+			_, _ = fmt.Fprintln(c.stderr, "curator: "+configNotFoundHint)
+		}
 		return nil, exitFail
 	}
 	if warning := cfg.SecurityPostureWarning(); warning != "" {
+		parentWarned := os.Getppid() > 1 && os.Getenv(postureWarnedEnv) == strconv.Itoa(os.Getppid())
+		if parentWarned || (c.posture != nil && c.posture.warned) {
+			if c.posture != nil {
+				c.posture.warned = true
+			}
+			return cfg, exitOK
+		}
 		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
+		if c.posture != nil {
+			c.posture.warned = true
+		}
 	}
 	return cfg, exitOK
+}
+
+// configNotFoundHint tells a first-run operator how to create the global
+// config the refused command needs.
+const configNotFoundHint = "run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap)"
+
+const globalHelp = `usage: curator global <init|add|remove|list|status|install|adopt|update|upgrade> [flags]
+
+Manage machine-wide skill installations. Requires the global config:
+` + "run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap).\n"
+
+// wantsHelp answers group-level help without loading the global config.
+// Subcommand help must reach its own FlagSet with its original exit code.
+func wantsHelp(args []string) bool {
+	if len(args) == 0 {
+		return false
+	}
+	return args[0] == "-h" || args[0] == "--help" || args[0] == "help"
 }
 
 func projectRootArg(args []string) string {
@@ -1434,6 +1497,10 @@ func (c cli) cmdGlobal(args []string) int {
 	if len(args) == 0 {
 		_, _ = fmt.Fprintln(c.stderr, "curator: global requires a subcommand: init, add, remove, list, status, install, adopt, update, upgrade")
 		return exitUsage
+	}
+	if wantsHelp(args) {
+		_, _ = fmt.Fprint(c.stdout, globalHelp)
+		return exitOK
 	}
 	cfg, code := c.loadConfig()
 	if code != exitOK {
