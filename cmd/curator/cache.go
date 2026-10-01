@@ -29,7 +29,8 @@ its commit, or while it was used within the 24h grace period.
   --json                   print the retention report as JSON
 
 With neither policy flag, every unreferenced snapshot outside the grace period
-is removed. If a marker or lock cannot be read, nothing is removed and the
+is removed. A dry run refuses pending transaction recovery and exits 1 without
+removing anything. If a marker or lock cannot be read, nothing is removed and the
 command exits 1. Sizes are allocated bytes; on APFS, clones can make them
 overstate what a removal frees.
 `
@@ -120,14 +121,22 @@ func (c cli) cmdCachePrune(args []string) int {
 	return exitOK
 }
 
-// pruneUnderLock recovers incomplete transactions first, as `curator gc`
-// does, so no journal is in flight while the plan is computed.
+// pruneUnderLock recovers before a real run. A dry run inspects journal names
+// and refuses pending recovery, so it cannot delete through recovery or cleanup.
 func pruneUnderLock(home string, lock *managerlock.HomeLock, policy snapcache.Policy, dryRun bool) (snapcache.Report, error) {
 	engine, err := transaction.New(home)
 	if err != nil {
 		return snapcache.Report{}, fmt.Errorf("open the install transaction journal: %w", err)
 	}
-	if err := engine.Recover(lock); err != nil {
+	if dryRun {
+		pending, err := engine.HasPendingRecovery(lock)
+		if err != nil {
+			return snapcache.Report{DryRun: true}, fmt.Errorf("inspect install transaction journals: %w", err)
+		}
+		if pending {
+			return snapcache.Report{DryRun: true}, errors.New("cache prune dry-run requires completed transaction recovery; run cache prune without --dry-run to recover first")
+		}
+	} else if err := engine.Recover(lock); err != nil {
 		return snapcache.Report{}, fmt.Errorf("recover incomplete install transactions: %w", err)
 	}
 	refs := scopes.CollectSnapshotReferences(home)
