@@ -1,0 +1,280 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a4593bd8..f4059a00 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,8 @@ All notable implementation changes are recorded here.
+ 
+ ## Unreleased
+ 
++- Unix HTTPS askpass requests the secret only after accepting the password prompt, preventing broken-pipe transport errors on refusal paths.
++
+ ### Added
+ 
+ - R5 script-worker-v1 runtime conformance qualification. All 33 named
+diff --git a/internal/buildrepo/httpsbroker_pipe_unix.go b/internal/buildrepo/httpsbroker_pipe_unix.go
+index 3de93a77..4dd3a720 100644
+--- a/internal/buildrepo/httpsbroker_pipe_unix.go
++++ b/internal/buildrepo/httpsbroker_pipe_unix.go
+@@ -17,6 +17,10 @@ import (
+ // the fetch child.
+ const EnvHTTPSBrokerTransport = "CURATOR_BUILD_HTTPS_ASKPASS_HANDLE"
+ 
++// Only the validated password prompt requests secret material. Username and
++// refusal paths close their inherited endpoint without sending this byte.
++const httpsBrokerSecretRequest = "P"
++
+ type unixHTTPSBrokerSecretTransport struct {
+ 	reader      *os.File
+ 	writer      *os.File
+@@ -28,16 +32,35 @@ type unixHTTPSBrokerSecretTransport struct {
+ 	writerErr   error
+ }
+ 
+-// NewHTTPSBrokerSecretTransport creates a fetch-scoped pipe for the askpass
+-// secret and configures command to inherit its read end.
++// NewHTTPSBrokerSecretTransport creates a fetch-scoped socket pair for the
++// askpass secret and configures command to inherit the requesting endpoint.
+ func NewHTTPSBrokerSecretTransport(command *exec.Cmd, secret string) (HTTPSBrokerSecretTransport, error) {
+ 	if command == nil {
+ 		return nil, errors.New("HTTPS broker command is nil")
+ 	}
+-	reader, writer, err := os.Pipe()
++	// Prevent either endpoint leaking into an unrelated concurrent exec before
++	// close-on-exec is set. ExtraFiles explicitly inherits only the child end.
++	syscall.ForkLock.RLock()
++	fds, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
++	if err == nil {
++		syscall.CloseOnExec(fds[0])
++		syscall.CloseOnExec(fds[1])
++	}
++	syscall.ForkLock.RUnlock()
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	// Nonblocking descriptors let os.File use the runtime poller, so Close
++	// interrupts a pending request read or secret write on cancellation.
++	for _, fd := range fds {
++		if err := syscall.SetNonblock(fd, true); err != nil {
++			_ = syscall.Close(fds[0])
++			_ = syscall.Close(fds[1])
++			return nil, err
++		}
++	}
++	reader := os.NewFile(uintptr(fds[0]), "https-askpass-child")
++	writer := os.NewFile(uintptr(fds[1]), "https-askpass-server")
+ 	fd := 3 + len(command.ExtraFiles)
+ 	command.ExtraFiles = append(command.ExtraFiles, reader)
+ 	return &unixHTTPSBrokerSecretTransport{
+@@ -62,7 +85,20 @@ func (transport *unixHTTPSBrokerSecretTransport) Serve(ctx context.Context) erro
+ 	}
+ 	writeDone := make(chan error, 1)
+ 	go func() {
+-		_, err := io.WriteString(transport.writer, transport.secret)
++		var request [1]byte
++		_, err := io.ReadFull(transport.writer, request[:])
++		switch err {
++		case io.EOF:
++			// No request means no secret was needed. The caller still owns
++			// the child's exit status; this cannot turn refusal into success.
++			err = nil
++		case nil:
++			if string(request[:]) != httpsBrokerSecretRequest {
++				err = errors.New("invalid HTTPS broker secret request")
++			} else {
++				_, err = io.WriteString(transport.writer, transport.secret)
++			}
++		}
+ 		writeDone <- errors.Join(err, transport.closeWriterOnce())
+ 	}()
+ 	select {
+@@ -71,7 +107,7 @@ func (transport *unixHTTPSBrokerSecretTransport) Serve(ctx context.Context) erro
+ 	case <-ctx.Done():
+ 		closeErr := transport.closeWriterOnce()
+ 		writeErr := <-writeDone
+-		if ctx.Err() != nil {
++		if errors.Is(writeErr, os.ErrClosed) && closeErr == nil {
+ 			return nil
+ 		}
+ 		return errors.Join(closeErr, writeErr)
+@@ -117,6 +153,10 @@ func readHTTPSBrokerSecret(getenv func(string) string) ([]byte, bool) {
+ 	if pipe == nil {
+ 		return nil, false
+ 	}
++	if _, err := io.WriteString(pipe, httpsBrokerSecretRequest); err != nil {
++		_ = pipe.Close()
++		return nil, false
++	}
+ 	secret, readErr := io.ReadAll(pipe)
+ 	closeErr := pipe.Close()
+ 	if readErr != nil || closeErr != nil {
+diff --git a/internal/buildrepo/httpsbroker_pipe_unix_test.go b/internal/buildrepo/httpsbroker_pipe_unix_test.go
+new file mode 100644
+index 00000000..14d85f1f
+--- /dev/null
++++ b/internal/buildrepo/httpsbroker_pipe_unix_test.go
+@@ -0,0 +1,165 @@
++//go:build !windows
++
++package buildrepo
++
++import (
++	"bytes"
++	"context"
++	"errors"
++	"os"
++	"os/exec"
++	"syscall"
++	"testing"
++	"time"
++)
++
++// Drive the real askpass dispatch, but wait for its exit before starting the
++// secret server. No scheduler choice or race instrumentation is needed.
++func TestHTTPSBrokerSecretTransportChildExitsBeforeServe(t *testing.T) {
++	executable, err := os.Executable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	wrapper, state, err := materializeHTTPSCredentialBroker(t.TempDir(), executable,
++		NewHTTPSCredentials("fixture.test", "oauth2", "refusal-secret"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, tc := range []struct {
++		name   string
++		args   []string
++		code   int
++		output string
++	}{
++		{"foreign_user", []string{"Password for 'https://root@fixture.test': "}, 1, ""},
++		{"bare_prompt", []string{"Password: "}, 1, ""},
++		{"no_arguments", nil, 1, ""},
++		{"extra_argument", []string{"Username for 'https://fixture.test': ", "extra"}, 1, ""},
++		{"username", []string{"Username for 'https://fixture.test': "}, 0, "oauth2\n"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			cmd := exec.Command(wrapper, tc.args...)
++			transport, err := NewHTTPSBrokerSecretTransport(cmd, "refusal-secret")
++			if err != nil {
++				t.Fatal(err)
++			}
++			t.Cleanup(func() { _ = transport.Close() })
++			cmd.Env = []string{EnvHTTPSBrokerState + "=" + state,
++				EnvHTTPSBrokerTransport + "=" + transport.EnvironmentValue()}
++			var stdout, stderr bytes.Buffer
++			cmd.Stdout, cmd.Stderr = &stdout, &stderr
++			if err := cmd.Start(); err != nil {
++				t.Fatal(err)
++			}
++			transport.ChildStarted()
++			waitErr := cmd.Wait()
++			var exitErr *exec.ExitError
++			if waitErr != nil && !errors.As(waitErr, &exitErr) {
++				t.Fatal(waitErr)
++			}
++			if cmd.ProcessState.ExitCode() != tc.code || stdout.String() != tc.output || stderr.Len() != 0 {
++				t.Fatalf("unexpected child result: code=%d; output redacted", cmd.ProcessState.ExitCode())
++			}
++			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++			defer cancel()
++			if err := transport.Serve(ctx); err != nil {
++				t.Fatalf("HTTPS broker secret transport after non-reading child exit: %v", err)
++			}
++			if ctx.Err() != nil {
++				t.Fatal("transport did not observe child exit")
++			}
++		})
++	}
++}
++
++func TestHTTPSBrokerSecretTransportReportsWriteFailureAfterRequest(t *testing.T) {
++	transport, err := NewHTTPSBrokerSecretTransport(exec.Command(os.Args[0]), "transport-secret")
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = transport.Close() })
++	unix := transport.(*unixHTTPSBrokerSecretTransport)
++	// The requesting endpoint stays open for reading. Break only the server's
++	// write direction, so a real transport failure cannot look like no request.
++	if _, err := unix.reader.WriteString("P"); err != nil {
++		t.Fatal(err)
++	}
++	if err := syscall.Shutdown(int(unix.writer.Fd()), syscall.SHUT_WR); err != nil {
++		t.Fatal(err)
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++	defer cancel()
++	if err := transport.Serve(ctx); !errors.Is(err, syscall.EPIPE) {
++		t.Fatalf("requested secret write error = %v, want EPIPE", err)
++	}
++}
++
++func TestHTTPSBrokerSecretTransportRejectsInvalidRequest(t *testing.T) {
++	transport, err := NewHTTPSBrokerSecretTransport(exec.Command(os.Args[0]), "transport-secret")
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = transport.Close() })
++	unix := transport.(*unixHTTPSBrokerSecretTransport)
++	if _, err := unix.reader.WriteString("X"); err != nil {
++		t.Fatal(err)
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++	defer cancel()
++	if err := transport.Serve(ctx); err == nil || err.Error() != "invalid HTTPS broker secret request" {
++		t.Fatalf("invalid request error = %v", err)
++	}
++	var answer [1]byte
++	if n, _ := unix.reader.Read(answer[:]); n != 0 {
++		t.Fatal("invalid request received secret material")
++	}
++}
++
++func TestHTTPSCredentialBrokerRejectsClosedSecretSocket(t *testing.T) {
++	executable, err := os.Executable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	_, state, err := materializeHTTPSCredentialBroker(t.TempDir(), executable,
++		NewHTTPSCredentials("fixture.test", "oauth2", "transport-secret"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	transport, err := NewHTTPSBrokerSecretTransport(exec.Command(executable), "transport-secret")
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = transport.Close() })
++	unix := transport.(*unixHTTPSBrokerSecretTransport)
++	if err := syscall.Shutdown(int(unix.writer.Fd()), syscall.SHUT_WR); err != nil {
++		t.Fatal(err)
++	}
++	var output bytes.Buffer
++	code := RunHTTPSCredentialBroker([]string{"Password for 'https://oauth2@fixture.test': "},
++		func(name string) string {
++			switch name {
++			case EnvHTTPSBrokerState:
++				return state
++			case EnvHTTPSBrokerTransport:
++				return testHTTPSBrokerTransportValue(transport)
++			default:
++				return ""
++			}
++		}, &output)
++	if code != 1 || output.Len() != 0 {
++		t.Fatalf("closed socket returned code=%d; output redacted, want silent refusal", code)
++	}
++}
++
++func TestHTTPSBrokerSecretTransportCancellationWithoutRequest(t *testing.T) {
++	transport, err := NewHTTPSBrokerSecretTransport(exec.Command(os.Args[0]), "transport-secret")
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = transport.Close() })
++	ctx, cancel := context.WithCancel(context.Background())
++	cancel()
++	if err := transport.Serve(ctx); err != nil {
++		t.Fatalf("cancel unrequested secret: %v", err)
++	}
++}

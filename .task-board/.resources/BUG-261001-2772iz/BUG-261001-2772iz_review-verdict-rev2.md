@@ -1,0 +1,30 @@
+# BUG-261001-2772iz — askpass-pipe-refusal-epipe: review verdict, revision 2
+
+Verdict: **accepted**. No findings requiring rework. This accepts CR-BUG-261001-2772iz-2 revision 2 for integration; it does not claim a landing or close the task.
+
+Reviewer run: RUN-261001-6e13a7. Base: `54d4aface89e22bf4a4116505eba3ecfe668efa8`. Candidate tree: `4189bda212dd1bb79f2e17f7ec00881ab7b4e2ed`. All six changed paths match the candidate. Repository code, index, branch and LOGBOOK.md were not modified by this review; reproduction and mutant source copies existed only under /tmp.
+
+Evidence: `BUG-261001-2772iz_review-evidence-rev2.md` contains commands, observed exit codes, raw local test output, changed-file hashes and selected Windows terminal records. Existing `BUG-261001-2772iz_change-request_rev2-validation.log` was read and independently checked against GitHub run 36848051591. Its head commit 144a79ee0a1622d282d8b630a385bf34b7995d83 resolves to the exact candidate tree.
+
+## Swept surfaces
+
+| Surface | Review and evidence | Result |
+| --- | --- | --- |
+| Deterministic ordering | `httpsbroker_pipe_unix_test.go:18`: actual broker child starts, inherited parent endpoint closes, `cmd.Wait()` completes before `Serve`. No sleeps or race instrumentation. All 4/4 incident refusal cases plus username tested. Base archive plus unchanged candidate test fails 5/5 with `write |1: broken pipe`, exit 1; candidate passes 5/5, exit 0. | Accepted |
+| No write before request | `httpsbroker_pipe_unix.go:85`: read one byte first; only `P` permits the write. EOF means no request and no secret delivery. Invalid request test proves no response bytes. This is the brief's preferred request-before-write design, rather than broad EPIPE suppression. | Accepted |
+| Refusal and authentication | `httpsbroker.go:75` decision logic unchanged. Child status retained by `admission.go:581-584`; no-request transport success cannot replace child refusal. Empty/closed transport refuses with code 1 and no output; `TestHTTPSCredentialBrokerRejectsClosedSecretSocket` passes. | Accepted |
+| Real transport failures | `httpsbroker_pipe_unix_test.go:75`, `TestHTTPSBrokerSecretTransportReportsWriteFailureAfterRequest`: requesting endpoint remains open for reading, server write half is shut down after P. Requires errors.Is(EPIPE), passes with exit 0. Read errors other than EOF, invalid requests, and requested-write errors remain errors. | Accepted |
+| Secret handling | Only inherited socket carries payload to askpass; then intended stdout credential answer. State remains host/username only. No new log/file/environment/argv sink. CLOEXEC is set under ForkLock; only explicit ExtraFiles child endpoint inherits. Nonblocking os.File permits cancellation to interrupt IO. Existing state, environment, real Git and fetch/askpass transport tests pass in full buildrepo race suite. | Accepted |
+| Linux happy path | Shared fixture now starts the real broker executable with sole descriptor ownership (`httpsbroker_test.go:89`), eliminating same-process duplicate poller ownership. Reviewer Docker Linux `go test ./internal/buildrepo -run HTTPSCredentialBroker -count=20` exits 0; same class and new transport tests on Darwin x20 exit 0. | Accepted |
+| Windows meaningful tests | `httpsbroker_test_pipe_windows_test.go:13` implements fetch child, launches actual askpass and checks its exit; only unused helper removed. Shared `TestHTTPSBrokerPipeSurvivesFetchAndAskpassExecOnEveryPlatform` asserts delivery and environment isolation. Existing Windows DACL, single-client and cancellation tests remain substantive. Exact-tree Windows JSON has 31/31 selected terminal records passing, zero selected skips/failures, including password, real Git, fetch/askpass and all crossconformance dispatch rows. | Accepted |
+| Mutants | Targeted EOF mutant attempts the formerly eager write and fails all 5 deterministic cases with EPIPE, exit 1. Separate full original-transport revert in candidate archive fails the same 5/5, exit 1. Neither modifies reviewed worktree. | Accepted |
+| Integration and regression | Reviewer Darwin crossconformance `-race -count=50` exit 0 (57.384s); full `go test -race ./internal/buildrepo ./internal/testcli -count=1` exit 0 (buildrepo 101.817s; testcli has no tests). Production entry points: `cmd/curator/main.go:138`, `admission.go:563`. | Accepted |
+| Hygiene | Exactly one CHANGELOG content bullet under Unreleased plus blank separator; no LOGBOOK change or prohibited naming in added text. Focused golangci-lint: 0 issues, exit 0; vet, formatting and diff checks clean. Exact-tree hosted full lint, tests on Linux/macOS/Windows, and Linux/macOS race all success. | Accepted |
+
+## Evidence bounds and lifecycle
+
+Local environment was Go 1.26.0 darwin/amd64; Linux execution used golang:1.26.0. Windows tests and full hosted matrix were accepted from exact-tree attached/hosted evidence and inspected, not claimed as locally rerun. Hosted optional rose-air and candidate-suite lanes were skipped; they are not counted as passing. Windows selected terminal-record count includes parent test records as well as subtests and is not a claim of total suite coverage. Deterministic incident coverage is 4/4 refusal cases; extended non-reading matrix is 5/5. This is a review of the scoped transport change, not a claim to have exhaustively proven all broker security properties.
+
+Fresh authority read advertised main e87d488b8fd892bc86c037ae5e325e596df8e745; exact-ref fetch matched. Its changed paths have zero overlap with the six CR paths. The nearby admission.go upstream change reorders request validation, outside the transport call site. Integration freshness and combined-tree validation remain the producer/integration transaction's responsibility.
+
+Run goal query reports no active goal / not goal-bound. Acceptance uses accept_cr revision 2, with no commit_ack and no done transition. Review checklist items 8–10 satisfied by the evidence above; conditional rejection-routing item 11 is not applicable because this verdict accepts. Attachments precede the verdict transaction.
