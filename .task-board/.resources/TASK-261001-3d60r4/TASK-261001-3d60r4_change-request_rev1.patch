@@ -1,0 +1,91 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 2561fed..9d55ccb 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -5,6 +5,15 @@ Versioning for the complete specification set.
+ 
+ ## Unreleased
+ 
++### Changed
++
++- Record the operator's adoption of
++  [Decision 0019](decisions/0019-fragment-consumers-and-one-construction-site.md)
++  and [Decision 0021](decisions/0021-sessions-enter-through-curator-run.md)
++  on 2026-10-01. Add amendment backlinks in Decision 0013 and update the
++  decision status index. Preserve proposal and normative text; protocol
++  and launcher specification amendments remain follow-ups.
++
+ ### Added
+ 
+ - Add an informative "Threat review for a new build driver" checklist to
+diff --git a/UNRESOLVED_QUESTIONS.md b/UNRESOLVED_QUESTIONS.md
+index 840d5e4..d7bf922 100644
+--- a/UNRESOLVED_QUESTIONS.md
++++ b/UNRESOLVED_QUESTIONS.md
+@@ -36,15 +36,20 @@ leaves.
+ - [Decision 0017: environment credential modes](decisions/0017-environment-credential-modes.md) — adopted 2026-09-21: options 1–3 as recommended, open questions 1–7 resolved.
+ - [Decision 0018: curator run permission interface](decisions/0018-curator-run-permission-interface.md) — adopted 2026-09-21 with the 2026-09-16 amendment (TASK-260916-2fu85y, rev 2 after review): config-driven mode, interactive default `yolo` / headless default `native`, force-`native` lock, fail-closed legacy transport; open questions 1–7 resolved.
+ 
++The launch-profile decisions below were adopted 2026-10-01 by the operator.
++Their proposal text is preserved; normative amendments and their open
++questions remain follow-ups.
++
++- [Decision 0019: fragment consumers and one construction site](decisions/0019-fragment-consumers-and-one-construction-site.md) — adopted 2026-10-01 by the operator.
++- [Decision 0021: sessions enter through curator run and are hosted through the ax contract](decisions/0021-sessions-enter-through-curator-run.md) — adopted 2026-10-01 by the operator.
++
+ ## Filed proposals
+ 
+ These decision drafts are **proposed — not adopted** (0014–0016 from
+-migration workstream B7, 0019 and 0021 from the launch-profile work).
++migration workstream B7).
+ Filing does not authorize implementation, normative changes, workarounds,
+ or draft landing.
+ 
+ - [Decision 0014: tool-configuration surfaces](decisions/0014-tool-configuration-surfaces.md)
+ - [Decision 0015: per-project policy and profile selection](decisions/0015-per-project-policy.md)
+ - [Decision 0016: skill command roots in managed homes](decisions/0016-managed-home-command-roots.md)
+-- [Decision 0019: fragment consumers and one construction site](decisions/0019-fragment-consumers-and-one-construction-site.md)
+-- [Decision 0021: sessions enter through curator run and are hosted through the ax contract](decisions/0021-sessions-enter-through-curator-run.md)
+diff --git a/decisions/0013-execution-ownership-and-launch-plans.md b/decisions/0013-execution-ownership-and-launch-plans.md
+index 42bfcd5..7fa0fed 100644
+--- a/decisions/0013-execution-ownership-and-launch-plans.md
++++ b/decisions/0013-execution-ownership-and-launch-plans.md
+@@ -4,6 +4,12 @@
+ 
+ Proposed 2026-09-05. Draft for review; nothing here is normative yet.
+ 
++Amends: [Decision 0019](0019-fragment-consumers-and-one-construction-site.md),
++adopted 2026-10-01 by the operator, amends Decisions 1, 5, 6.3 and 6.5;
++[Decision 0021](0021-sessions-enter-through-curator-run.md), adopted
++2026-10-01 by the operator, amends Decisions 1 and 6.4. This adoption
++record preserves the proposal text below; normative revisions are follow-ups.
++
+ Numbering: Decision 0011 is reserved by the swift-driver draft
+ (`decisions/0011-swift-driver-pair.md` on the unlanded branch
+ `draft/TASK-260728-1yhuqi-swift-driver`, head `604d525`); Decision 0012
+diff --git a/decisions/0019-fragment-consumers-and-one-construction-site.md b/decisions/0019-fragment-consumers-and-one-construction-site.md
+index ad89779..540c0f0 100644
+--- a/decisions/0019-fragment-consumers-and-one-construction-site.md
++++ b/decisions/0019-fragment-consumers-and-one-construction-site.md
+@@ -2,7 +2,7 @@
+ 
+ ## Status
+ 
+-Status: proposed — not adopted
++Status: adopted 2026-10-01 by the operator
+ 
+ Proposed 2026-09-24. DRAFT for review. The operator chose this direction
+ for the launch-profile work on 2026-09-23; adoption is a separate act in
+diff --git a/decisions/0021-sessions-enter-through-curator-run.md b/decisions/0021-sessions-enter-through-curator-run.md
+index 1f9de8a..2e78798 100644
+--- a/decisions/0021-sessions-enter-through-curator-run.md
++++ b/decisions/0021-sessions-enter-through-curator-run.md
+@@ -2,7 +2,7 @@
+ 
+ ## Status
+ 
+-Status: proposed — not adopted
++Status: adopted 2026-10-01 by the operator
+ 
+ Proposed 2026-09-24. DRAFT for review. The operator chose this direction
+ on 2026-09-24; adoption is a separate act in this repository. Filing this
