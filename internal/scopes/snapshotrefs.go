@@ -8,6 +8,7 @@ import (
 
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/envprofile"
+	"github.com/relux-works/curator/internal/nofollow"
 	"github.com/relux-works/curator/internal/sourcelock"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -69,15 +70,21 @@ func CollectSnapshotReferences(home string) SnapshotReferences {
 	}
 	roots = append(roots, consumers...)
 	for _, root := range roots {
-		refs.readSourceLock(sourcelock.PathIn(root))
+		anchor, rel := root, filepath.Base(sourcelock.PathIn(root))
+		if root == filepath.Join(home, "global") || root == filepath.Join(home, "hybrid") {
+			anchor = home
+			rel, _ = filepath.Rel(home, sourcelock.PathIn(root))
+		}
+		refs.readSourceLock(anchor, rel)
 	}
 	refs.readProfileLocks(envprofile.ProfilesDir(home))
 	sort.Strings(refs.Uncertain)
 	return refs
 }
 
-func (refs *SnapshotReferences) readSourceLock(path string) {
-	state, err := stateread.ReadRegularFile(path)
+func (refs *SnapshotReferences) readSourceLock(anchor, rel string) {
+	path := filepath.Join(anchor, rel)
+	state, err := nofollow.ReadRegularFile(anchor, rel)
 	if err != nil {
 		refs.Uncertain = append(refs.Uncertain, fmt.Sprintf("source lock %s cannot be trusted: %v", path, err))
 		return
