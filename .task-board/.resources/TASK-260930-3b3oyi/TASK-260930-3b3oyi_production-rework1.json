@@ -1,0 +1,120 @@
+[
+  {
+    "args": [
+      "global",
+      "init"
+    ],
+    "marker": null,
+    "exit": 1,
+    "stdout": "",
+    "stderr": "curator: global config not found: /var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TASK-260930-3b3oyi-home-_etcag77/.curator/config.json\ncurator: run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap)\n"
+  },
+  {
+    "args": [
+      "global",
+      "--help"
+    ],
+    "marker": null,
+    "exit": 0,
+    "stdout": "usage: curator global <init|add|remove|list|status|install|adopt|update|upgrade> [flags]\n\nManage machine-wide skill installations. Requires the global config:\nrun `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap).\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "profile",
+      "--help"
+    ],
+    "marker": null,
+    "exit": 0,
+    "stdout": "usage: curator profile <install|import|list|use|update|remove|sync|compose> [flags]\n\nRequires the global config: run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap).\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "env",
+      "--help"
+    ],
+    "marker": null,
+    "exit": 0,
+    "stdout": "usage: curator env <resolve|status|config|migrate|unmanage> [flags]\n\nRequires the global config: run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap).\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "env",
+      "resolve",
+      "--help"
+    ],
+    "marker": null,
+    "exit": 1,
+    "stdout": "",
+    "stderr": "curator: global config not found: /var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TASK-260930-3b3oyi-home-_etcag77/.curator/config.json\ncurator: run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap)\n"
+  },
+  {
+    "args": [
+      "bootstrap",
+      "--if-missing",
+      "--non-interactive",
+      "--skills-root",
+      "/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TASK-260930-3b3oyi-home-_etcag77/skills"
+    ],
+    "marker": null,
+    "exit": 0,
+    "stdout": "wrote /var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TASK-260930-3b3oyi-home-_etcag77/.curator/config.json\nshell profile changes are not required: agent skills can invoke project and global command shims directly\noptional bare commands for interactive use: curator shell-init --install\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "global",
+      "init"
+    ],
+    "marker": null,
+    "exit": 0,
+    "stdout": "initialized /var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TASK-260930-3b3oyi-home-_etcag77/.curator/global/Skillfile.json\n",
+    "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\n"
+  },
+  {
+    "args": [
+      "env",
+      "resolve",
+      "--help"
+    ],
+    "marker": null,
+    "exit": 2,
+    "stdout": "",
+    "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\nUsage of env resolve:\n  -dry-run\n    \treport store rebuilds without modifying state (requires --repair)\n  -format string\n    \tfragment format: json | env | shell (default \"json\")\n  -profile string\n    \tprofile name (default: the current profile)\n  -repair\n    \tprovision or repair the managed home under the mutation lock\n  -takeover\n    \ttake over the unmanaged files the repair would write (only with --repair)\ncurator: env resolve <env-id> [--profile <name>] [--repair [--dry-run]] [--takeover] [--format json|env|shell]\ncurator: <env-id> accepts claude and codex as aliases of claude_code and codex_cli; outputs keep the canonical id\n"
+  },
+  {
+    "args": [
+      "global",
+      "add",
+      "--help"
+    ],
+    "marker": null,
+    "exit": 2,
+    "stdout": "",
+    "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\nUsage of global add:\n  -branch string\n    \tgit branch\n  -git string\n    \tgit clone URL\n  -revision string\n    \tgit revision\n  -source string\n    \tsource directory under skills_root\n  -tag string\n    \tgit tag\n"
+  },
+  {
+    "args": [
+      "env",
+      "status",
+      "--json"
+    ],
+    "marker": "1",
+    "exit": 0,
+    "stdout": "{\n  \"homes\": null,\n  \"scopes\": null,\n  \"adapters\": [\n    {\n      \"id\": \"claude_code\",\n      \"recorded\": \"2.1.261\",\n      \"detected\": \"2.1.286\",\n      \"supported\": [\n        \"monolithic\",\n        \"referenced\"\n      ]\n    },\n    {\n      \"id\": \"codex_cli\",\n      \"recorded\": \"0.153.2\",\n      \"detected\": \"0.159.0\",\n      \"supported\": [\n        \"monolithic\"\n      ]\n    },\n    {\n      \"id\": \"opencode\",\n      \"recorded\": \"unrecorded\",\n      \"detected\": \"unknown\",\n      \"supported\": [\n        \"monolithic\",\n        \"referenced\"\n      ]\n    },\n    {\n      \"id\": \"pi\",\n      \"recorded\": \"0.84.2\",\n      \"detected\": \"0.84.2\",\n      \"supported\": [\n        \"monolithic\"\n      ]\n    }\n  ],\n  \"targets\": [\n    {\n      \"id\": \"xcode-coding-assistant\",\n      \"adapter\": \"claude_code\",\n      \"participating\": false,\n      \"consented\": false,\n      \"detail\": \"auto: probe path absent, nothing materialized\",\n      \"ungoverned\": \"the embedded host's MCP configuration and commands/ are present, unaudited, and outside this capability\"\n    },\n    {\n      \"id\": \"xcode-coding-assistant\",\n      \"adapter\": \"codex_cli\",\n      \"participating\": false,\n      \"consented\": false,\n      \"detail\": \"auto: probe path absent, nothing materialized\",\n      \"ungoverned\": \"the embedded host's MCP configuration and commands/ are present, unaudited, and outside this capability\"\n    }\n  ],\n  \"profiles\": null,\n  \"providers\": [\n    {\n      \"name\": \"run\",\n      \"executable\": \"curator-run\",\n      \"resolved\": \"/usr/local/bin/curator-run\",\n      \"verdict\": \"outside_trust_roots\",\n      \"diagnostic\": \"subcommand_provider_outside_trust_roots\",\n      \"current\": true,\n      \"trust_roots_consulted\": [\n        \"/private/tmp\"\n      ]\n    },\n    {\n      \"name\": \"session\",\n      \"executable\": \"curator-session\",\n      \"resolved\": null,\n      \"verdict\": \"missing\",\n      \"diagnostic\": \"subcommand_provider_missing\",\n      \"current\": false,\n      \"trust_roots_consulted\": [\n        \"/private/tmp\"\n      ]\n    }\n  ],\n  \"unregistered_environments\": null,\n  \"orphans\": null,\n  \"notes\": [\n    \"opencode skills come from the machine-current profile, split-brain by construction (\u00a77.1)\"\n  ],\n  \"non_current\": true,\n  \"shell_hook_trust\": null,\n  \"s4_profile\": \"s4-warn\",\n  \"passable_env_names\": null,\n  \"warnings\": [\n    \"mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted\"\n  ],\n  \"codex_seed_rule\": {\n    \"revision\": \"A\",\n    \"provenance\": \"shipped\"\n  },\n  \"mcp_declarations\": null,\n  \"registry_posture\": [],\n  \"require_source_signers\": false,\n  \"source_signers\": null,\n  \"update_confirmation_revision\": \"B-flip\",\n  \"update_confirmation_behavior\": \"a triggered update delta refuses profile_update_confirmation_required unless --confirm-system-delta is given\",\n  \"security_posture_rows\": null\n}\n",
+    "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\n"
+  },
+  {
+    "args": [
+      "env",
+      "status",
+      "--json"
+    ],
+    "marker": "58583",
+    "exit": 0,
+    "stdout": "{\n  \"homes\": null,\n  \"scopes\": null,\n  \"adapters\": [\n    {\n      \"id\": \"claude_code\",\n      \"recorded\": \"2.1.261\",\n      \"detected\": \"2.1.286\",\n      \"supported\": [\n        \"monolithic\",\n        \"referenced\"\n      ]\n    },\n    {\n      \"id\": \"codex_cli\",\n      \"recorded\": \"0.153.2\",\n      \"detected\": \"0.159.0\",\n      \"supported\": [\n        \"monolithic\"\n      ]\n    },\n    {\n      \"id\": \"opencode\",\n      \"recorded\": \"unrecorded\",\n      \"detected\": \"unknown\",\n      \"supported\": [\n        \"monolithic\",\n        \"referenced\"\n      ]\n    },\n    {\n      \"id\": \"pi\",\n      \"recorded\": \"0.84.2\",\n      \"detected\": \"0.84.2\",\n      \"supported\": [\n        \"monolithic\"\n      ]\n    }\n  ],\n  \"targets\": [\n    {\n      \"id\": \"xcode-coding-assistant\",\n      \"adapter\": \"claude_code\",\n      \"participating\": false,\n      \"consented\": false,\n      \"detail\": \"auto: probe path absent, nothing materialized\",\n      \"ungoverned\": \"the embedded host's MCP configuration and commands/ are present, unaudited, and outside this capability\"\n    },\n    {\n      \"id\": \"xcode-coding-assistant\",\n      \"adapter\": \"codex_cli\",\n      \"participating\": false,\n      \"consented\": false,\n      \"detail\": \"auto: probe path absent, nothing materialized\",\n      \"ungoverned\": \"the embedded host's MCP configuration and commands/ are present, unaudited, and outside this capability\"\n    }\n  ],\n  \"profiles\": null,\n  \"providers\": [\n    {\n      \"name\": \"run\",\n      \"executable\": \"curator-run\",\n      \"resolved\": \"/usr/local/bin/curator-run\",\n      \"verdict\": \"outside_trust_roots\",\n      \"diagnostic\": \"subcommand_provider_outside_trust_roots\",\n      \"current\": true,\n      \"trust_roots_consulted\": [\n        \"/private/tmp\"\n      ]\n    },\n    {\n      \"name\": \"session\",\n      \"executable\": \"curator-session\",\n      \"resolved\": null,\n      \"verdict\": \"missing\",\n      \"diagnostic\": \"subcommand_provider_missing\",\n      \"current\": false,\n      \"trust_roots_consulted\": [\n        \"/private/tmp\"\n      ]\n    }\n  ],\n  \"unregistered_environments\": null,\n  \"orphans\": null,\n  \"notes\": [\n    \"opencode skills come from the machine-current profile, split-brain by construction (\u00a77.1)\"\n  ],\n  \"non_current\": true,\n  \"shell_hook_trust\": null,\n  \"s4_profile\": \"s4-warn\",\n  \"passable_env_names\": null,\n  \"warnings\": [\n    \"mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted\"\n  ],\n  \"codex_seed_rule\": {\n    \"revision\": \"A\",\n    \"provenance\": \"shipped\"\n  },\n  \"mcp_declarations\": null,\n  \"registry_posture\": [],\n  \"require_source_signers\": false,\n  \"source_signers\": null,\n  \"update_confirmation_revision\": \"B-flip\",\n  \"update_confirmation_behavior\": \"a triggered update delta refuses profile_update_confirmation_required unless --confirm-system-delta is given\",\n  \"security_posture_rows\": null\n}\n",
+    "stderr": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\n"
+  }
+]

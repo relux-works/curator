@@ -1,0 +1,506 @@
+diff --git a/cmd/curator/env.go b/cmd/curator/env.go
+index c2446d22..3a9658b7 100644
+--- a/cmd/curator/env.go
++++ b/cmd/curator/env.go
+@@ -62,6 +62,10 @@ func (c cli) cmdEnv(args []string) int {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config | migrate | unmanage")
+ 		return exitUsage
+ 	}
++	if wantsHelp(args) {
++		_, _ = fmt.Fprint(c.stdout, "usage: curator env <resolve|status|config|migrate|unmanage> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
++		return exitOK
++	}
+ 	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+diff --git a/cmd/curator/firstrun_ux_test.go b/cmd/curator/firstrun_ux_test.go
+new file mode 100644
+index 00000000..76181490
+--- /dev/null
++++ b/cmd/curator/firstrun_ux_test.go
+@@ -0,0 +1,232 @@
++package main
++
++import (
++	"errors"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"regexp"
++	"runtime"
++	"strings"
++	"testing"
++)
++
++// Second-operator first-run rows (TASK-260930-3b3oyi): every row drives
++// the production CLI entry run() — or the built binary for the nested
++// process-tree row — and pins the exact message and exit code.
++
++const wantConfigHint = "curator: run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap)"
++
++func runFile(t *testing.T, configPath string, args ...string) (int, string, string) {
++	t.Helper()
++	var stdout, stderr strings.Builder
++	code := run(args, fileConfigSource(configPath), &stdout, &stderr)
++	return code, stdout.String(), stderr.String()
++}
++
++func TestGlobalInitCleanHomeRefusesWithBootstrapHint(t *testing.T) {
++	configPath := filepath.Join(t.TempDir(), "config.json")
++	for _, args := range [][]string{
++		{"global", "init"},
++		{"global", "list"},
++		{"profile", "list"},
++		{"env", "status"},
++	} {
++		code, stdout, stderr := runFile(t, configPath, args...)
++		want := "curator: global config not found: " + configPath + "\n" + wantConfigHint + "\n"
++		if code != exitFail || stderr != want || stdout != "" {
++			t.Fatalf("%v on a clean home = %d\nstdout %q\nstderr %q\nwant stderr %q", args, code, stdout, stderr, want)
++		}
++	}
++	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
++		t.Fatalf("the refusal created the config: %v", err)
++	}
++}
++
++// A malformed config is a failed read, not an absence: it must not get the
++// bootstrap hint that is defined for the missing file.
++func TestGlobalInitMalformedConfigHasNoBootstrapHint(t *testing.T) {
++	configPath := filepath.Join(t.TempDir(), "config.json")
++	if err := os.WriteFile(configPath, []byte("{"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	code, _, stderr := runFile(t, configPath, "global", "init")
++	if code != exitFail || strings.Contains(stderr, "bootstrap") || strings.Contains(stderr, "not found") {
++		t.Fatalf("malformed config = %d\nstderr %q", code, stderr)
++	}
++}
++
++func TestGlobalInitHelpWithoutConfig(t *testing.T) {
++	configPath := filepath.Join(t.TempDir(), "config.json")
++	for _, args := range [][]string{
++		{"global", "--help"},
++		{"global", "-h"},
++		{"global", "init", "--help"},
++		{"profile", "--help"},
++		{"env", "--help"},
++		{"env", "status", "-h"},
++	} {
++		code, stdout, stderr := runFile(t, configPath, args...)
++		if code != exitOK || stderr != "" || !strings.HasPrefix(stdout, "usage: curator "+args[0]) ||
++			!strings.Contains(stdout, "curator bootstrap --skills-root <dir>") {
++			t.Fatalf("%v = %d\nstdout %q\nstderr %q", args, code, stdout, stderr)
++		}
++	}
++}
++
++func TestBootstrapDocsExampleRuns(t *testing.T) {
++	docs, err := os.ReadFile(filepath.Join("..", "..", "docs", "cli.md"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	match := regexp.MustCompile("(?m)^curator bootstrap --if-missing --non-interactive.*$").Find(docs)
++	if match == nil {
++		t.Fatal("docs/cli.md lost the bootstrap example")
++	}
++	home := t.TempDir()
++	t.Setenv("HOME", home)
++	args := strings.Fields(strings.ReplaceAll(string(match), `"$HOME/skills"`, filepath.Join(home, "skills")))[1:]
++	configPath := filepath.Join(home, ".curator", "config.json")
++	code, stdout, stderr := runFile(t, configPath, args...)
++	if code != exitOK || !strings.Contains(stdout, "wrote "+configPath) {
++		t.Fatalf("documented example %v = %d\nstdout %q\nstderr %q", args, code, stdout, stderr)
++	}
++	// The old example (no --skills-root) is a usage error.
++	code, _, stderr = runFile(t, filepath.Join(t.TempDir(), "config.json"), "bootstrap", "--if-missing", "--non-interactive")
++	if code != exitUsage || stderr != "curator: bootstrap requires --skills-root\n" {
++		t.Fatalf("bootstrap without --skills-root = %d stderr %q", code, stderr)
++	}
++	// After bootstrap global init succeeds.
++	if code, _, stderr := runFile(t, configPath, "global", "init"); code != exitOK {
++		t.Fatalf("global init after bootstrap = %d\n%s", code, stderr)
++	}
++}
++
++func TestEnvResolveStaleHintsRepair(t *testing.T) {
++	source, _ := profileHome(t)
++	installCLIEnvProfile(t, source)
++	code, stdout, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--profile", "acme")
++	if code != exitFail || stdout != "" || !strings.HasSuffix(stderr, "curator: environment_home_stale: home unprovisioned; rerun with --repair\n") {
++		t.Fatalf("resolve without --repair = %d\nstdout %q\nstderr %q", code, stdout, stderr)
++	}
++	// --repair --dry-run already names the repair: no rerun hint.
++	code, _, stderr = runProfile(t, source, "env", "resolve", "codex_cli", "--profile", "acme", "--repair", "--dry-run")
++	if strings.Contains(stderr, "rerun with --repair") {
++		t.Fatalf("dry-run repair = %d carries the rerun hint:\n%s", code, stderr)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--profile", "acme", "--repair"); code != exitOK {
++		t.Fatalf("resolve --repair = %d\n%s", code, stderr)
++	}
++}
++
++// TestEnvStatusCheckCurrentScopeOnly: a non-current profile's
++// unprovisioned homes are printed but do not fail --check; the same
++// finding on the current profile still does.
++func TestEnvStatusCheckCurrentScopeOnly(t *testing.T) {
++	source, _ := profileHome(t)
++	writeNativeCredentials(t)
++	bin := t.TempDir()
++	for _, name := range []string{"curator-run", "curator-session"} {
++		full := filepath.Join(bin, name)
++		if runtime.GOOS == "windows" {
++			full += ".exe"
++		}
++		if err := os.WriteFile(full, []byte(""), 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++		t.Fatalf("install stderr:\n%s", stderr)
++	}
++	if code, _, stderr := runProfile(t, source, "profile", "use", "acme"); code != exitOK {
++		t.Fatalf("use stderr:\n%s", stderr)
++	}
++	envs := []string{"claude_code", "codex_cli", "opencode", "pi"}
++	for _, env := range envs[1:] {
++		if code, _, stderr := runProfile(t, source, "env", "resolve", env, "--profile", "acme", "--repair"); code != exitOK {
++			t.Fatalf("repair %s stderr:\n%s", env, stderr)
++		}
++	}
++	// Current profile still has one unprovisioned home: --check fails.
++	code, stdout, _ := runProfile(t, source, "env", "status", "--check")
++	if code != exitFail || !strings.Contains(stdout, "acme claude_code: non-current, unprovisioned") {
++		t.Fatalf("current-scope unprovisioned --check = %d\n%s", code, stdout)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", envs[0], "--profile", "acme", "--repair"); code != exitOK {
++		t.Fatalf("repair stderr:\n%s", stderr)
++	}
++	code, stdout, _ = runProfile(t, source, "env", "status", "--check")
++	if code != exitOK {
++		t.Fatalf("healthy current scope --check = %d, want %d\n%s", code, exitOK, stdout)
++	}
++	if !strings.Contains(stdout, "default codex_cli: non-current, unprovisioned") {
++		t.Fatalf("the non-current profile's row is no longer printed:\n%s", stdout)
++	}
++}
++
++func postureWarnings(stderr string) int {
++	return strings.Count(stderr, "security_posture_permissive")
++}
++
++func TestPostureWarningOncePerProcessTree(t *testing.T) {
++	home := t.TempDir()
++	configPath := filepath.Join(home, "config.json")
++	t.Setenv(postureWarnedEnv, "")
++	t.Setenv("CURATOR_CONFIG", configPath)
++	if code, _, stderr := runFile(t, configPath, "bootstrap", "--non-interactive", "--skills-root", filepath.Join(home, "skills")); code != exitOK {
++		t.Fatalf("bootstrap = %d\n%s", code, stderr)
++	}
++	// A single command still prints the warning exactly once.
++	code, _, stderr := runFile(t, configPath, "env", "status")
++	if code != exitOK || postureWarnings(stderr) != 1 {
++		t.Fatalf("top-level env status = %d, printed %d posture warnings:\n%s", code, postureWarnings(stderr), stderr)
++	}
++	// A native manager binary named curator-run stands in for the provider:
++	// curator run env status → curator-run env status. Both invocations
++	// drive main() and the real dispatch, without a platform-specific shell.
++	plant := t.TempDir()
++	binary := filepath.Join(plant, "curator-run")
++	if runtime.GOOS == "windows" {
++		binary += ".exe"
++	}
++	build := exec.Command("go", "build", "-o", binary, ".")
++	if output, err := build.CombinedOutput(); err != nil {
++		t.Fatalf("go build: %v\n%s", err, output)
++	}
++	t.Setenv("PATH", plant+string(os.PathListSeparator)+os.Getenv("PATH"))
++	runBinary := func(args ...string) (int, string, string) {
++		t.Helper()
++		command := exec.Command(binary, args...)
++		var stdout, stderr strings.Builder
++		command.Stdout, command.Stderr = &stdout, &stderr
++		code := exitOK
++		if err := command.Run(); err != nil {
++			var exitError *exec.ExitError
++			if !errors.As(err, &exitError) {
++				t.Fatal(err)
++			}
++			code = exitError.ExitCode()
++		}
++		t.Logf("production binary %v: exit=%d stderr=%q", args, code, stderr.String())
++		return code, stdout.String(), stderr.String()
++	}
++	// The outer process warns, the nested one must not. Successful exit
++	// and the child's status output prove the provider actually ran.
++	code, stdout, stderr := runBinary("run", "env", "status", "--json")
++	if code != exitOK || postureWarnings(stderr) != 1 || !strings.Contains(stdout, `"security_posture_rows"`) {
++		t.Fatalf("curator run → env status = %d, printed %d posture warnings, want 1:\nstdout %s\nstderr %s", code, postureWarnings(stderr), stdout, stderr)
++	}
++	// The nested child alone (no marker) would warn: the suppression is
++	// the marker, not a missing warning.
++	code, _, stderr = runBinary("env", "status", "--json")
++	if code != exitOK || postureWarnings(stderr) != 1 {
++		t.Fatalf("standalone nested command = %d, printed %d warnings:\n%s", code, postureWarnings(stderr), stderr)
++	}
++	t.Setenv(postureWarnedEnv, "1")
++	if code, _, stderr := runBinary("env", "status", "--json"); code != exitOK || postureWarnings(stderr) != 0 {
++		t.Fatalf("marked nested invocation = %d re-printed the warning:\n%s", code, stderr)
++	}
++}
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index a1ce25ac..640f7440 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -196,6 +196,28 @@ type cli struct {
+ 	// seams; production commands leave them nil and envprofile uses stateread.
+ 	unmanageBackupLstat   func(string) (stateread.Metadata, error)
+ 	unmanageBackupReadDir func(string) (stateread.Directory, error)
++	// posture records whether this process tree has already printed the
++	// security_posture_permissive warning; nil means no nested dispatch
++	// needs the marker (in-process tests that build cli directly).
++	posture *postureState
++}
++
++// postureWarnedEnv is the internal marker a curator process exports to
++// the children it dispatches once the permissive-posture warning has been
++// printed in the process tree, so nested invocations (curator run →
++// env resolve) do not repeat it.
++const postureWarnedEnv = "CURATOR_INTERNAL_POSTURE_WARNED"
++
++type postureState struct{ warned bool }
++
++// childEnviron returns the environment for a dispatched child process,
++// carrying the posture marker when this process tree already warned.
++func (c cli) childEnviron() []string {
++	environ := os.Environ()
++	if c.posture != nil && c.posture.warned {
++		environ = append(environ, postureWarnedEnv+"=1")
++	}
++	return environ
+ }
+ 
+ func (c cli) newFlagSet(name string) *flag.FlagSet {
+@@ -237,7 +259,7 @@ func runEnforcedShim(executable string, args []string) int {
+ // output writers are explicit so callers can run concurrent invocations without
+ // mutating CURATOR_CONFIG, os.Stdout, or os.Stderr.
+ func run(args []string, source configSource, stdout, stderr io.Writer) int {
+-	command := cli{config: source, stdout: stdout, stderr: stderr, userHome: os.UserHomeDir}
++	command := cli{config: source, stdout: stdout, stderr: stderr, userHome: os.UserHomeDir, posture: &postureState{}}
+ 	return command.run(args)
+ }
+ 
+@@ -323,14 +345,46 @@ func (c cli) loadConfig() (*config.Config, int) {
+ 	})
+ 	if err != nil {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
++		if errors.Is(err, config.ErrConfigNotFound) {
++			_, _ = fmt.Fprintln(c.stderr, "curator: "+configNotFoundHint)
++		}
+ 		return nil, exitFail
+ 	}
+ 	if warning := cfg.SecurityPostureWarning(); warning != "" {
++		if os.Getenv(postureWarnedEnv) == "1" || (c.posture != nil && c.posture.warned) {
++			return cfg, exitOK
++		}
+ 		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
++		if c.posture != nil {
++			c.posture.warned = true
++		}
+ 	}
+ 	return cfg, exitOK
+ }
+ 
++// configNotFoundHint tells a first-run operator how to create the global
++// config the refused command needs.
++const configNotFoundHint = "run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap)"
++
++const globalHelp = `usage: curator global <init|add|remove|list|status|install|adopt|update|upgrade> [flags]
++
++Manage machine-wide skill installations. Requires the global config:
++` + "run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap).\n"
++
++// wantsHelp reports whether a command-group invocation asks for help, which
++// is answered without loading the global config.
++func wantsHelp(args []string) bool {
++	for _, arg := range args {
++		if arg == "--" {
++			return false
++		}
++		if arg == "-h" || arg == "--help" || arg == "help" && arg == args[0] {
++			return true
++		}
++	}
++	return false
++}
++
+ func projectRootArg(args []string) string {
+ 	for _, arg := range args {
+ 		if !strings.HasPrefix(arg, "-") {
+@@ -1435,6 +1489,10 @@ func (c cli) cmdGlobal(args []string) int {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator: global requires a subcommand: init, add, remove, list, status, install, adopt, update, upgrade")
+ 		return exitUsage
+ 	}
++	if wantsHelp(args) {
++		_, _ = fmt.Fprint(c.stdout, globalHelp)
++		return exitOK
++	}
+ 	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+diff --git a/cmd/curator/profile.go b/cmd/curator/profile.go
+index bfda9b88..e6575302 100644
+--- a/cmd/curator/profile.go
++++ b/cmd/curator/profile.go
+@@ -24,6 +24,10 @@ func (c cli) cmdProfile(args []string) int {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator: profile needs a subcommand: install | import | list | use | update | remove | sync | compose")
+ 		return exitUsage
+ 	}
++	if wantsHelp(args) {
++		_, _ = fmt.Fprint(c.stdout, "usage: curator profile <install|import|list|use|update|remove|sync|compose> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
++		return exitOK
++	}
+ 	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+diff --git a/cmd/curator/umbrella.go b/cmd/curator/umbrella.go
+index ff64c21e..3076463d 100644
+--- a/cmd/curator/umbrella.go
++++ b/cmd/curator/umbrella.go
+@@ -720,6 +720,7 @@ func (c cli) cmdUmbrella(cfg *config.Config, home string, args []string) int {
+ 		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
+ 	}
+ 	command := exec.Command(path, args[1:]...) // #nosec G204,G702 -- §11 dispatches the trust-root-resolved provider with operator argv verbatim
++	command.Env = c.childEnviron()
+ 	command.Stdin = os.Stdin
+ 	command.Stdout = c.stdout
+ 	command.Stderr = c.stderr
+diff --git a/docs/cli.md b/docs/cli.md
+index c9d5b948..6bbeac40 100644
+--- a/docs/cli.md
++++ b/docs/cli.md
+@@ -20,6 +20,8 @@ Curator flags use consistent names and behavior across command groups.
+ 
+ ## Environment initialization and skill lifecycle
+ 
++<a id="bootstrap"></a>
++
+ ### curator bootstrap
+ 
+ `curator bootstrap` creates machine configuration and default directories.
+@@ -42,10 +44,10 @@ Flags:
+ Run bootstrap to create missing machine configuration:
+ 
+ ```bash
+-curator bootstrap --if-missing --non-interactive
++curator bootstrap --if-missing --non-interactive --skills-root "$HOME/skills"
+ ```
+ 
+-The command initializes `$HOME/.curator/config.json` without overwriting existing files.
++The command initializes `$HOME/.curator/config.json` without overwriting existing files. `--non-interactive` requires `--skills-root`; without it bootstrap exits 2 (`bootstrap requires --skills-root`).
+ 
+ ### curator init
+ 
+@@ -246,6 +248,10 @@ check. The `--json` document carries the same rows under `shell_hook_trust`
+ (malformed lines, unreadable state) under `shell_hook_trust_warnings`.
+ `curator env status` reports the same posture rows with the same `--check`
+ semantics.
++For the profile × environment home rows, only profiles that are current in
++some reported scope decide the `--check` exit code; rows of other installed
++profiles (for example `home unprovisioned` on a profile never used) are
++printed as informational.
+ 
+ Both `curator status` and `curator env status` also report one registry page
+ boundary row per enabled registry with pinned keys. Each row names the
+@@ -608,13 +614,16 @@ Synopsis:
+ curator global init
+ ```
+ 
+-Initialize global configuration:
++Prerequisite: `curator bootstrap --skills-root <dir>` (see [curator bootstrap](#bootstrap)). Every `global`, `profile`, and `env` command except `--help` needs the global config that bootstrap writes; on a clean home they exit 1 with `global config not found: <path>` followed by the hint to run bootstrap first.
++
++Initialize the global Skillfile after bootstrap:
+ 
+ ```bash
++curator bootstrap --skills-root "$HOME/skills"
+ curator global init
+ ```
+ 
+-The command creates global configuration files under the Curator home directory.
++The command creates the global Skillfile under the Curator home directory.
+ 
+ ### curator global add
+ 
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 018244f3..8a80cbd5 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -4,6 +4,7 @@ package config
+ 
+ import (
+ 	"encoding/json"
++	"errors"
+ 	"fmt"
+ 	"net"
+ 	"net/url"
+@@ -1235,11 +1236,14 @@ func canonicalRegistryURL(value string) (string, error) {
+ 	return canonical, nil
+ }
+ 
++// ErrConfigNotFound marks an absent config file (never a failed read).
++var ErrConfigNotFound = errors.New("global config not found")
++
+ func readObject(path string) (map[string]any, error) {
+ 	payload, err := os.ReadFile(path) // #nosec G304 -- config path comes from the operator
+ 	if err != nil {
+ 		if os.IsNotExist(err) {
+-			return nil, fmt.Errorf("global config not found: %s", path)
++			return nil, fmt.Errorf("%w: %s", ErrConfigNotFound, path)
+ 		}
+ 		return nil, err
+ 	}
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index d12ab96e..2b84db92 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -2455,7 +2455,10 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 		}
+ 		return &ResolveResult{Document: document, Warnings: verdict.warnings}, nil
+ 	}
+-	if !req.Repair || req.DryRun {
++	if !req.Repair {
++		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s; rerun with --repair", DiagHomeStale, strings.Join(verdict.reasons, "; "))
++	}
++	if req.DryRun {
+ 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", DiagHomeStale, strings.Join(verdict.reasons, "; "))
+ 	}
+ 	return repairUnderLock(&req, adapter, source, lock, hash)
+diff --git a/internal/envprofile/status.go b/internal/envprofile/status.go
+index f57a256a..e7f15be8 100644
+--- a/internal/envprofile/status.go
++++ b/internal/envprofile/status.go
+@@ -372,12 +372,19 @@ func StatusOf(req StatusRequest) (*Status, error) {
+ 			status.Homes = append(status.Homes, homeState(req, info.Name, adapter))
+ 		}
+ 	}
++	status.Scopes, status.Diagnostics = scopeHomes(req, installed)
++	// Only rows of a profile that is current in some reported scope
++	// decide currency; other profiles' rows stay informational (a
++	// never-used profile's unprovisioned homes are not a finding).
++	currentProfiles := map[string]bool{}
++	for _, scope := range status.Scopes {
++		currentProfiles[scope.Profile] = true
++	}
+ 	for _, state := range status.Homes {
+-		if !state.Current {
++		if !state.Current && currentProfiles[state.Profile] {
+ 			status.NonCurrent = true
+ 		}
+ 	}
+-	status.Scopes, status.Diagnostics = scopeHomes(req, installed)
+ 	for _, scope := range status.Scopes {
+ 		if scope.Diagnostic != nil {
+ 			status.NonCurrent = true
