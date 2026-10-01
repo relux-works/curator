@@ -9,9 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/protocoljson"
@@ -431,7 +433,7 @@ func driveExternalMismatch(t *testing.T, _ draftSemanticCase, field string) {
 // recorded bytes.
 func assertProtectedExternalBytes(t *testing.T, home string, arm map[string]any, command string) {
 	t.Helper()
-	artifactPath := filepath.Join(filepath.Dir(protectedReceiptPath(t, home)), "artifact")
+	artifactPath := filepath.Join(filepath.Dir(protectedReceiptPath(t, home)), buildrepo.CacheArtifactName(runtime.GOOS))
 	payload, err := os.ReadFile(artifactPath)
 	if err != nil {
 		t.Fatal(err)

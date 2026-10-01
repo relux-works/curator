@@ -306,6 +306,7 @@ cmd/curator	TestStatusReportsAnUnusableToolchainPerCompiledCommand	darwin,window
 cmd/curator	TestGCRetainsAndReportsReferencedCompiledState	darwin,windows	linux	platform-control	gc neither removes nor reports removing a cache entry a live marker references
 cmd/curator	TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck	darwin,windows	linux	platform-control	machine-wide status reports compiled currentness and fails `--check` for every non-current state
 cmd/curator	TestGlobalStatusReportsATransitivelyResolvedCompiledCommand	darwin,windows	linux	platform-control	machine-wide status resolves a compiled command no declaration names
+cmd/curator	TestNativeBlackboxExternalBuildLifecycle	darwin,windows	linux	platform-control	the built binary installs a schema-7 external build repository command from a local substitution, runs its shim, reinstalls as a cache hit, and removes the shim and build root
 
 # ===========================================================================
 # Protocol platform exclusion -- asserted, never merely omitted.

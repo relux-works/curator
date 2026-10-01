@@ -198,7 +198,7 @@ func TestAdoptArtifactRefusesWhatItCannotProve(t *testing.T) {
 			final := newFinal(t, true)
 			entry := filepath.Join(final.Root, ArtifactsDir(version), name)
 			transactionCopy(t, stagedEntry, entry)
-			if err := os.WriteFile(filepath.Join(entry, "artifact"), []byte("forged"), 0o700); err != nil {
+			if err := os.WriteFile(filepath.Join(entry, CacheArtifactName(runtime.GOOS)), []byte("forged"), 0o700); err != nil {
 				t.Fatal(err)
 			}
 			return final, version, key
@@ -231,7 +231,7 @@ func TestAdoptArtifactRefusesWhatItCannotProve(t *testing.T) {
 			final := newFinal(t, true)
 			entry := filepath.Join(final.Root, ArtifactsDir(version), name)
 			transactionCopy(t, stagedEntry, entry)
-			if err := os.Symlink(filepath.Join(entry, "artifact"), filepath.Join(entry, "alias")); err != nil {
+			if err := os.Symlink(filepath.Join(entry, CacheArtifactName(runtime.GOOS)), filepath.Join(entry, "alias")); err != nil {
 				t.Fatal(err)
 			}
 			return final, version, key

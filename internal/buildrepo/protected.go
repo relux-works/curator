@@ -27,6 +27,24 @@ type DiskProtectedStore struct {
 	proofHook     func(string)
 }
 
+// CacheArtifactName names the executable in the implementation-private cache.
+// The receipt retains its logical bin/<command>[.exe] path; Windows also needs
+// the executable suffix on the physical file invoked by the command shim.
+func CacheArtifactName(goos string) string {
+	if goos == "windows" {
+		return "artifact.exe"
+	}
+	return "artifact"
+}
+
+func cacheArtifactNameFromInput(input map[string]any) (string, bool) {
+	if _, ok := artifactPathFromInput(input); !ok {
+		return "", false
+	}
+	target := driverInputOf(input)["target"].(map[string]any)
+	return CacheArtifactName(target["goos"].(string)), true
+}
+
 func (s *DiskProtectedStore) proves(info os.FileInfo, directory bool) bool {
 	if s.identityProof != nil {
 		return s.identityProof(info, directory)
@@ -268,11 +286,15 @@ func (s *DiskProtectedStore) LookupArtifact(key string, input map[string]any, mu
 	if len(obj) != 4 || !numberEquals(obj["schema_version"], version) {
 		return nil, s.corrupt(entry, CodeReceiptInvalid, mutate, fmt.Errorf("receipt closed shape mismatch"))
 	}
-	artifact, err := s.readProtectedFile(filepath.Join(entry, "artifact"), 1<<30)
+	artifactName, pathOK := cacheArtifactNameFromInput(input)
+	if !pathOK {
+		return nil, s.corrupt(entry, CodeReceiptInvalid, mutate, fmt.Errorf("receipt input does not identify a portable artifact path"))
+	}
+	artifact, err := s.readProtectedFile(filepath.Join(entry, artifactName), 1<<30)
 	if err != nil {
 		return nil, s.corrupt(entry, CodeArtifactInvalid, mutate, err)
 	}
-	artifactInfo, statErr := os.Lstat(filepath.Join(entry, "artifact"))
+	artifactInfo, statErr := os.Lstat(filepath.Join(entry, artifactName))
 	if statErr != nil || runtime.GOOS != "windows" && artifactInfo.Mode().Perm()&0o111 == 0 {
 		return nil, s.corrupt(entry, CodeArtifactInvalid, mutate, fmt.Errorf("artifact is not executable"))
 	}
@@ -327,7 +349,11 @@ func (s *DiskProtectedStore) StoreArtifact(key string, input map[string]any, _ s
 		return nil, err
 	}
 	defer func() { _ = os.RemoveAll(stage) }()
-	if err = os.WriteFile(filepath.Join(stage, "artifact"), artifact, 0o700); err != nil {
+	artifactName, ok := cacheArtifactNameFromInput(input)
+	if !ok {
+		return nil, fmt.Errorf("receipt input does not identify a portable artifact path")
+	}
+	if err = os.WriteFile(filepath.Join(stage, artifactName), artifact, 0o700); err != nil {
 		return nil, err
 	}
 	sum := sha256.Sum256(artifact)

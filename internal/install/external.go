@@ -231,7 +231,7 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
 				return stagedExternal{}, err
 			}
 			entryRoot := filepath.Join(plan.deps.StoreRoot, buildrepo.ArtifactsDir(row.result.ReceiptSchemaVersion), strings.TrimPrefix(row.result.CacheKey, "sha256:"))
-			artifactPath := filepath.Join(entryRoot, "artifact")
+			artifactPath := filepath.Join(entryRoot, buildrepo.CacheArtifactName(adapter.Identity().GOOS))
 			artifact, readErr := os.ReadFile(artifactPath) // #nosec G304 -- manager-derived protected cache path from a validated cache key.
 			if readErr != nil {
 				return stagedExternal{}, readErr
@@ -256,7 +256,7 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
 			return stagedExternal{}, fmt.Errorf("%s.%s: %w", row.node.Name, row.command.Name, err)
 		}
 		entryRoot := filepath.Join(root, buildrepo.ArtifactsDir(result.ReceiptSchemaVersion), strings.TrimPrefix(result.CacheKey, "sha256:"))
-		artifactPath := filepath.Join(entryRoot, "artifact")
+		artifactPath := filepath.Join(entryRoot, buildrepo.CacheArtifactName(adapter.Identity().GOOS))
 		receiptPath := filepath.Join(entryRoot, "receipt.json")
 		artifact, err := os.ReadFile(artifactPath) // #nosec G304 -- pipeline result supplies the manager-staged artifact path.
 		if err != nil {

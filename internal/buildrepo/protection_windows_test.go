@@ -84,7 +84,7 @@ func TestWindowsProtectedSecurityDescriptorRejectsWrongOwnerAndDACL(t *testing.T
 func TestWindowsProtectedArtifactAdversarialStateQuarantines(t *testing.T) {
 	t.Run("hard-link", func(t *testing.T) {
 		store, key, input, entry := windowsArtifactFixture(t)
-		if err := os.Link(filepath.Join(entry, "artifact"), filepath.Join(entry, "artifact-link")); err != nil {
+		if err := os.Link(filepath.Join(entry, CacheArtifactName("windows")), filepath.Join(entry, "artifact-link")); err != nil {
 			t.Fatal(err)
 		}
 		assertWindowsArtifactQuarantined(t, store, key, input, entry)
@@ -231,7 +231,7 @@ func TestWindowsProtectedArtifactEntrySwapCannotReturnBytes(t *testing.T) {
 	if err := os.Mkdir(replacement, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"artifact", "receipt.json", "execution-receipt.ccj.json"} {
+	for _, name := range []string{CacheArtifactName("windows"), "receipt.json", "execution-receipt.ccj.json"} {
 		data, err := os.ReadFile(filepath.Join(entry, name))
 		if err != nil {
 			t.Fatal(err)

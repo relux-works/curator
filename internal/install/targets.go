@@ -231,7 +231,7 @@ func stageRuntimeAndShims(
 					return runtimeStaging{}, fmt.Errorf("%s.%s: the external build was not staged", node.Name, name)
 				}
 				keyName := strings.TrimPrefix(entry.result.CacheKey, "sha256:")
-				finalArtifact := filepath.Join(externalRoot, buildrepo.ArtifactsDir(entry.result.ReceiptSchemaVersion), keyName, "artifact")
+				finalArtifact := filepath.Join(externalRoot, buildrepo.ArtifactsDir(entry.result.ReceiptSchemaVersion), keyName, filepath.Base(entry.artifactPath))
 				compiled, err := runtimestore.ExternalCompiledTarget(entry.artifactPath, finalArtifact,
 					entry.record.CacheKey, entry.record.ReceiptSHA256, entry.record.ArtifactSHA256, platform)
 				if err != nil {

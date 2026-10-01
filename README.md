@@ -72,7 +72,7 @@ Curator controls environment dependencies and runtime delivery:
 - **Scopes**: Project, global, and hybrid (machine-stored, per-project activation).
 - **MCP requirements**: Read-only verification of declared MCP servers against agent configuration surfaces.
 - **Security**: Source allowlists, declared capability boundaries, zero code execution during install, and an audit registry client (Ed25519 signed records, deny-wins federation, snapshot verification).
-- **Operator credentials**: Per-repository SSH selection and scoped HTTPS token sources for external build repositories, matched by canonical source identity and never selectable by a package. Private HTTPS fetches use a manager-owned, host-pinned askpass broker; public HTTPS can remain anonymous. See [SSH credentials](docs/build-ssh.md) and [HTTPS credentials](docs/build-https.md).
+- **Operator credentials**: Per-repository SSH selection and scoped HTTPS token sources for external build repositories, matched by canonical source identity and never selectable by a package. Private HTTPS fetches use a manager-owned, host-pinned askpass broker; public HTTPS can remain anonymous. See [SSH credentials](docs/build-ssh.md) and [HTTPS credentials](docs/build-https.md). See [External build repositories](docs/external-build-repositories.md) for declaring `build_repositories`, locked commits, and local development substitution.
 
 ## Registry client guarantees
 
