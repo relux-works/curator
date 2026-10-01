@@ -148,7 +148,7 @@ func readEntry(path, source, commit string, info fs.FileInfo) (Entry, bool, erro
 // twice.
 func measure(path string) (allocated, logical int64, err error) {
 	seen := map[string]bool{}
-	err = filepath.WalkDir(path, func(_ string, entry fs.DirEntry, walkErr error) error {
+	err = filepath.WalkDir(path, func(filePath string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -159,7 +159,11 @@ func measure(path string) (allocated, logical int64, err error) {
 		if err != nil {
 			return err
 		}
-		if id, ok := fileIdentity(info); ok {
+		id, ok, err := fileIdentity(filePath, info)
+		if err != nil {
+			return err
+		}
+		if ok {
 			if seen[id] {
 				return nil
 			}

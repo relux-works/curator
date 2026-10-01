@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -127,11 +126,12 @@ func TestReadInventoryNeverFollowsLinkedSources(t *testing.T) {
 }
 
 func TestMeasureCountsHardLinksOnce(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("hard-link deduplication is exercised on the unix runners; a Windows directory walk carries no file identity")
-	}
 	home := t.TempDir()
 	entry := writeEntry(t, home, "s", commitOf("a"), testNow, map[string]string{"one": strings.Repeat("x", 5000)})
+	singleAllocated, singleLogical, err := measure(entry)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Link(filepath.Join(entry, "snapshot", "one"), filepath.Join(entry, "snapshot", "two")); err != nil {
 		t.Fatal(err)
 	}
@@ -142,8 +142,8 @@ func TestMeasureCountsHardLinksOnce(t *testing.T) {
 	if logical != 5000 {
 		t.Fatalf("logical = %d, want 5000", logical)
 	}
-	if allocated < 4096 || allocated > 64*1024 {
-		t.Fatalf("allocated = %d, want the blocks of one 5000-byte file", allocated)
+	if allocated != singleAllocated || logical != singleLogical {
+		t.Fatalf("two names measured %d/%d, one identity measured %d/%d", allocated, logical, singleAllocated, singleLogical)
 	}
 }
 

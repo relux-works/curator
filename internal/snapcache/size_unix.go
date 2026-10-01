@@ -20,12 +20,12 @@ func allocatedSize(info fs.FileInfo) int64 {
 
 // fileIdentity is the device and inode pair of a multiply linked file. A file
 // with one link cannot be counted twice, so it needs no identity.
-func fileIdentity(info fs.FileInfo) (string, bool) {
+func fileIdentity(_ string, info fs.FileInfo) (string, bool, error) {
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok || stat == nil || stat.Nlink <= 1 {
-		return "", false
+		return "", false, nil
 	}
-	return fmt.Sprintf("%d:%d", stat.Dev, stat.Ino), true
+	return fmt.Sprintf("%d:%d", stat.Dev, stat.Ino), true, nil
 }
 
 func isReparsePoint(fs.FileInfo) bool { return false }
