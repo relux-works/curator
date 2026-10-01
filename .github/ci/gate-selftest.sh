@@ -364,6 +364,35 @@ for goos in linux darwin windows; do
 done
 
 echo ''
+echo '=== non-git install ledger: only the two Unix PATH-shim rows may skip ==='
+hygiene_reason='PATH git shell shim requires Unix; corrupt .git row runs on all platforms'
+hygiene_gate() {
+	CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" CI_GATE_MODULE="$MODULE_PATH" \
+		CI_GATE_GOOS="$1" bash "$GATE" "$2" "$WORK/hygiene-ev"
+}
+cp "$WORK/shipped-windows.json" "$WORK/hygiene-windows.json"
+for hygiene_row in unexpected-exit-2 unexpected-exit-128; do
+	evout cmd/curator "TestInstallGitignoreEntryPoint/$hygiene_row" "$hygiene_reason" >>"$WORK/hygiene-windows.json"
+	ev skip cmd/curator "TestInstallGitignoreEntryPoint/$hygiene_row" >>"$WORK/hygiene-windows.json"
+done
+assert 'Windows permits the two declared POSIX git shim skips' 0 hygiene_gate windows "$WORK/hygiene-windows.json"
+
+cp "$WORK/hygiene-windows.json" "$WORK/hygiene-bad.json"
+evout cmd/curator 'TestInstallGitignoreEntryPoint/non-git' "$hygiene_reason" >>"$WORK/hygiene-bad.json"
+ev skip cmd/curator 'TestInstallGitignoreEntryPoint/non-git' >>"$WORK/hygiene-bad.json"
+assert 'Windows cannot skip the positive non-git bytes row' 1 hygiene_gate windows "$WORK/hygiene-bad.json"
+
+cp "$WORK/hygiene-windows.json" "$WORK/hygiene-bad.json"
+evout cmd/curator 'TestInstallGitignoreEntryPoint/broken-git' "$hygiene_reason" >>"$WORK/hygiene-bad.json"
+ev skip cmd/curator 'TestInstallGitignoreEntryPoint/broken-git' >>"$WORK/hygiene-bad.json"
+assert 'Windows cannot skip the real corrupt Git refusal row' 1 hygiene_gate windows "$WORK/hygiene-bad.json"
+
+cp "$WORK/shipped-darwin.json" "$WORK/hygiene-bad.json"
+evout cmd/curator 'TestInstallGitignoreEntryPoint/unexpected-exit-128' "$hygiene_reason" >>"$WORK/hygiene-bad.json"
+ev skip cmd/curator 'TestInstallGitignoreEntryPoint/unexpected-exit-128' >>"$WORK/hygiene-bad.json"
+assert 'Unix cannot skip an unexpected Git exit fixture' 1 hygiene_gate darwin "$WORK/hygiene-bad.json"
+
+echo ''
 echo '=== platform-cases.tsv: the packages this pin promoted tolerate no skip ==='
 #
 # The committed SPEC_PIN publishes every artefact `root-artifacts.tsv` declares

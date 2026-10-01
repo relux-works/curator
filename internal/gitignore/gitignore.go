@@ -1,6 +1,6 @@
 // Package gitignore enforces the managed .gitignore block (Spec §6.3).
 //
-// Generated paths must be ignored by git before installation proceeds; the
+// Generated paths in work trees must be ignored before installation proceeds; the
 // check probes git check-ignore so any ignore mechanism counts.
 package gitignore
 
@@ -25,11 +25,14 @@ const checkIgnoreEACCESRetryDelay = 100 * time.Millisecond
 // to inject child-start errors without depending on runner filesystem state.
 var checkIgnoreCommandRunner = func(cmd *exec.Cmd) error { return cmd.Run() }
 
+// ErrNotRepository means the hygiene check does not apply to this root.
+// Other Git failures must not be treated as absence of a repository.
+var ErrNotRepository = errors.New("gitignore hygiene check does not apply: project root is not a git repository")
+
 // NotIgnoredError reports the policy outcome that entries are not ignored.
 // It is distinct from a tool failure: a git that cannot be executed (a
 // spawn error or a missing git binary) is returned as a plain wrapped
-// error, never as this type. Git's own verdicts, including "not a
-// repository", are policy outcomes as before.
+// error, never as this type. Only exit 1 means an entry is not ignored.
 type NotIgnoredError struct {
 	Missing []string
 }
@@ -50,11 +53,10 @@ func IsNotIgnored(err error) bool {
 // A git that cannot be executed — a spawn error or exec.ErrNotFound, i.e.
 // any cmd.Run() failure that is not an *exec.ExitError — is returned as an
 // error carrying the tool diagnostic, so callers never mistake a broken git
-// invocation for a policy outcome. Every exit status git itself reports
-// keeps the pre-existing behaviour: the entry is reported as not ignored,
-// whether the status is 1 (not ignored) or 128/other (not a repository, a
-// fatal git error). The diagnostic names only the entry, never the full
-// probe path, environment, or project root.
+// invocation for a policy outcome. Exit 1 reports an unignored entry;
+// exit 128 with Git's repository-discovery diagnostic returns ErrNotRepository.
+// All other exits fail closed. Operation context names the entry; Git stderr
+// is retained to diagnose tool failures.
 func Missing(projectRoot string, entries []string) ([]string, error) {
 	var missing []string
 	for _, entry := range entries {
@@ -63,8 +65,13 @@ func Missing(projectRoot string, entries []string) ([]string, error) {
 		if err != nil {
 			var exitErr *exec.ExitError
 			if errors.As(err, &exitErr) {
-				missing = append(missing, entry)
-				continue
+				if exitErr.ExitCode() == 1 {
+					missing = append(missing, entry)
+					continue
+				}
+				if exitErr.ExitCode() == 128 && isRepositoryDiscoveryAbsence(stderr) {
+					return nil, ErrNotRepository
+				}
 			}
 			if detail := strings.TrimSpace(stderr); detail != "" {
 				return nil, fmt.Errorf("git check-ignore failed for %q: %s: %w", entry, detail, err)
@@ -73,6 +80,13 @@ func Missing(projectRoot string, entries []string) ([]string, error) {
 		}
 	}
 	return missing, nil
+}
+
+func isRepositoryDiscoveryAbsence(stderr string) bool {
+	message := strings.TrimSpace(stderr)
+	return message == "fatal: not a git repository (or any of the parent directories): .git" ||
+		(strings.HasPrefix(message, "fatal: not a git repository (or any parent up to mount point ") &&
+			strings.HasSuffix(message, ")\nStopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set)."))
 }
 
 // runCheckIgnoreWithEACCESRetry retries one child-start EACCES after a short
@@ -95,6 +109,8 @@ func runCheckIgnoreWithEACCESRetry(projectRoot, probe string) (string, error) {
 
 func runCheckIgnoreAttempt(projectRoot, probe string) (string, error) {
 	cmd := exec.Command("git", "-C", projectRoot, "check-ignore", "-q", probe) // #nosec G204 -- fixed binary and flags
+	// Repository-discovery classification requires Git's stable English diagnostic.
+	cmd.Env = append(os.Environ(), "LC_ALL=C")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	err := checkIgnoreCommandRunner(cmd)
@@ -114,7 +130,8 @@ func isCheckIgnoreSpawnEACCES(err error) bool {
 }
 
 // Ensure verifies the entries are ignored; with fix it appends the missing
-// ones under the managed comment and re-checks.
+// ones under the managed comment and re-checks. A non-repository root returns
+// ErrNotRepository without writing an ignore file.
 func Ensure(projectRoot string, entries []string, fix bool) error {
 	missing, err := Missing(projectRoot, entries)
 	if err != nil {

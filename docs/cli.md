@@ -120,6 +120,14 @@ The command updates `Skillfile.json` and removes the installed skill directory.
 
 `curator install` applies `Skillfile.json` and materializes project dependencies.
 
+A non-git product folder containing nested repositories is also a supported
+project root. Install materializes its declared skills and prints a notice that
+gitignore hygiene does not apply; it does not initialize Git or create a
+`.gitignore`, even with `--fix-gitignore`. In Git work trees, the existing ignore
+requirements still apply, and unexpected Git failures refuse installation.
+The schema-2 `Skillfile.lock.json` lives at the project root; machine-local
+source bindings live under the manager home's `source-bindings/` directory.
+
 Synopsis:
 
 ```bash

@@ -245,6 +245,8 @@ All notable implementation changes are recorded here.
 
 ### Fixed
 
+- Project install now materializes skills at non-git product roots with a hygiene notice, while unexpected Git failures refuse installation.
+
 - E4: the user-bin shim directory counts as manager-published — and
   refuses providers under revision A — only once the manager has
   actually published shims there (the ownership ledger exists) or the

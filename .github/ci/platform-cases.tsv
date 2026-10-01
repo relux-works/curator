@@ -784,3 +784,17 @@ internal/envprofile	TestPathOverlayFailureBlocksResolveAndMakesStatusNonCurrent	
 cmd/curator	TestGCFailsClosedForUntrustedCurrentPathSource	linux,darwin,windows	-	-	GC validates the current path source before transaction recovery or consumer pruning
 internal/install	TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts	linux,darwin,windows	-	-	proven checkout absence falls back while blocked or present-unusable locked repositories fail closed
 internal/install	TestInstallScriptSecurityRows	linux,darwin	windows	platform-control	install.sh verification rows (POSIX installer)
+
+# Non-git project install (BUG-261001-2n70px). Only the two POSIX PATH-shim
+# rows may skip on Windows; real Git discovery and corrupt metadata run there.
+cmd/curator	TestInstallGitignoreEntryPoint	linux,darwin,windows	-	-	compiled CLI install hygiene matrix
+cmd/curator	TestInstallGitignoreEntryPoint/non-git	linux,darwin,windows	-	-	non-git product root installs declared skill bytes and prints a hygiene notice
+cmd/curator	TestInstallGitignoreEntryPoint/non-git-fix	linux,darwin,windows	-	-	non-git --fix-gitignore installs bytes without creating Git metadata or an ignore file
+cmd/curator	TestInstallGitignoreEntryPoint/git-parent-ignored	linux,darwin,windows	-	-	project inside a parent work tree retains ignore enforcement
+cmd/curator	TestInstallGitignoreEntryPoint/git-ignored	linux,darwin,windows	-	-	ignored Git project installs bytes without changing its ignore file
+cmd/curator	TestInstallGitignoreEntryPoint/git-missing-ignore	linux,darwin,windows	-	-	unignored Git project retains the existing skip policy
+cmd/curator	TestInstallGitignoreEntryPoint/git-fix-ignore	linux,darwin,windows	-	-	--fix-gitignore repairs missing entries in a real Git project and installs bytes
+cmd/curator	TestInstallGitignoreEntryPoint/git-ignore-negation	linux,darwin,windows	-	-	negated ignore entries still skip without publishing bytes
+cmd/curator	TestInstallGitignoreEntryPoint/broken-git	linux,darwin,windows	-	-	corrupt .git metadata refuses with nonzero exit and no installed bytes
+cmd/curator	TestInstallGitignoreEntryPoint/unexpected-exit-2	linux,darwin	windows	platform-control	unexpected Git exit 2 carrying the absence diagnostic refuses through the CLI; POSIX shim fixture
+cmd/curator	TestInstallGitignoreEntryPoint/unexpected-exit-128	linux,darwin	windows	platform-control	unexpected Git exit 128 carrying an unrelated diagnostic refuses through the CLI; POSIX shim fixture

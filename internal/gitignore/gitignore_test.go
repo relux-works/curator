@@ -169,13 +169,14 @@ func TestMissingRetriesOnceOnSpawnEACCES(t *testing.T) {
 }
 
 func TestMissingDoesNotRetryGitExitStatus(t *testing.T) {
+	exitOne := exec.Command("git", "-C", gitProject(t), "check-ignore", "-q", ".agents/.curator-probe").Run()
 	previousRunner := checkIgnoreCommandRunner
 	t.Cleanup(func() { checkIgnoreCommandRunner = previousRunner })
 
 	calls := 0
 	checkIgnoreCommandRunner = func(*exec.Cmd) error {
 		calls++
-		return &exec.ExitError{}
+		return exitOne
 	}
 
 	missing, err := Missing(t.TempDir(), []string{".agents/"})
@@ -257,29 +258,33 @@ func checkIgnoreSpawnError(errno syscall.Errno) error {
 	return &os.PathError{Op: "fork/exec", Path: "/opt/homebrew/bin/git", Err: errno}
 }
 
-// TestMissingNonRepositoryIsNotIgnored pins the exit-128 branch of
-// BUG-260921-1fpaij (rework 1): a root that is not a git repository keeps the
-// PRE-EXISTING outcome — git's own verdict, including "not a repository", is
-// a policy outcome (not ignored), never a tool error. Only a git that cannot
-// be executed is an error.
-func TestMissingNonRepositoryIsNotIgnored(t *testing.T) {
+func TestMissingNonRepositoryDoesNotApply(t *testing.T) {
 	plain := t.TempDir()
 	missing, err := Missing(plain, []string{".agents/"})
-	if err != nil {
-		t.Fatalf("Missing outside a repository: %v, want the pre-existing not-ignored outcome", err)
+	if !errors.Is(err, ErrNotRepository) || len(missing) != 0 {
+		t.Fatalf("Missing = %q, %v, want not applicable", missing, err)
 	}
-	if len(missing) != 1 || missing[0] != ".agents/" {
-		t.Fatalf("missing = %q, want [\".agents/\"]", missing)
+	for _, fix := range []bool{false, true} {
+		if err := Ensure(plain, []string{".agents/"}, fix); !errors.Is(err, ErrNotRepository) {
+			t.Fatalf("Ensure(fix=%v) = %v, want not applicable", fix, err)
+		}
 	}
-	err = Ensure(plain, []string{".agents/"}, false)
-	if err == nil {
-		t.Fatal("Ensure outside a repository must report not ignored")
+	if _, err := os.Stat(filepath.Join(plain, ".gitignore")); !os.IsNotExist(err) {
+		t.Fatalf("non-git root must not gain .gitignore: %v", err)
 	}
-	if !IsNotIgnored(err) {
-		t.Fatalf("err = %v (%T), want a NotIgnoredError", err, err)
+}
+
+func TestMissingBrokenRepositoryFailsClosed(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, ".git"), []byte("gitdir: missing\n"), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(err.Error(), "generated paths are not ignored by git") {
-		t.Fatalf("err = %q, want the stable policy message", err)
+	err := Ensure(root, []string{".agents/"}, true)
+	if err == nil || errors.Is(err, ErrNotRepository) || IsNotIgnored(err) {
+		t.Fatalf("broken .git must be a tool failure: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".gitignore")); !os.IsNotExist(err) {
+		t.Fatalf("broken git must not write .gitignore: %v", err)
 	}
 }
 

@@ -334,13 +334,16 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	// 3. Managed .gitignore gate.
 	required := adapters.RequiredGitignoreEntries(agents)
 	if err := gitignore.Ensure(projectRoot, required, opts.FixGitignore && !opts.DryRun); err != nil {
-		if !gitignore.IsNotIgnored(err) {
+		if errors.Is(err, gitignore.ErrNotRepository) {
+			result.Messages = append(result.Messages, fmt.Sprintf("%s: notice: %v", alias, err))
+		} else if !gitignore.IsNotIgnored(err) {
 			result.failf("%v", err)
 			return result, nil
+		} else {
+			result.Status = "skipped"
+			result.Messages = append(result.Messages, fmt.Sprintf("%s: %v; skipped", alias, err))
+			return result, nil
 		}
-		result.Status = "skipped"
-		result.Messages = append(result.Messages, fmt.Sprintf("%s: %v; skipped", alias, err))
-		return result, nil
 	}
 
 	// 4. Dev substitutions. No Curator command writes this file, so nothing
@@ -362,7 +365,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 			result.failf("dev substitutions are active in %s; strict audit refuses substituted installs", devsub.Name)
 			return result, nil
 		}
-		if err := gitignore.Ensure(projectRoot, []string{devsub.Name}, opts.FixGitignore && !opts.DryRun); err != nil {
+		if err := gitignore.Ensure(projectRoot, []string{devsub.Name}, opts.FixGitignore && !opts.DryRun); err != nil && !errors.Is(err, gitignore.ErrNotRepository) {
 			if !gitignore.IsNotIgnored(err) {
 				result.failf("%v", err)
 				return result, nil

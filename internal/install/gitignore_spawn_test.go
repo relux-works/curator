@@ -53,3 +53,43 @@ func TestProjectRefusesOnGitignoreSpawnFailure(t *testing.T) {
 		t.Fatalf("refusal = %q, must never carry the policy message: %+v", joined, result)
 	}
 }
+
+// Exercise the schema-1 lane and its additional dev-substitution hygiene gate.
+func TestProjectNonGitWithDevSubstitution(t *testing.T) {
+	for _, substituted := range []bool{false, true} {
+		name := "declared"
+		if substituted {
+			name = "substituted"
+		}
+		t.Run(name, func(t *testing.T) {
+			e := newEnv(t)
+			e.skill("skill-a")
+			e.declare("skill-a")
+			if err := os.RemoveAll(filepath.Join(e.project, ".git")); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Remove(filepath.Join(e.project, ".gitignore")); err != nil {
+				t.Fatal(err)
+			}
+			if substituted {
+				e.write(e.project, "Skillfile.dev.json", `{"substitutions":{"skill-a":{"path":`+quoteJSONPath(filepath.Join(e.skillsRoot, "skill-a"))+`}}}`)
+			}
+			result := e.install(Options{FixGitignore: true})
+			if result.Status != "ok" {
+				t.Fatalf("non-git install = %+v", result)
+			}
+			if !hasMessageContaining(result.Messages, "gitignore hygiene check does not apply") {
+				t.Fatalf("missing hygiene notice: %+v", result)
+			}
+			payload, err := os.ReadFile(filepath.Join(e.project, ".agents", "skills", "skill-a", "SKILL.md"))
+			if err != nil || !strings.Contains(string(payload), "# skill-a") {
+				t.Fatalf("skill bytes missing: %v", err)
+			}
+			for _, name := range []string{".git", ".gitignore"} {
+				if _, err := os.Lstat(filepath.Join(e.project, name)); !os.IsNotExist(err) {
+					t.Fatalf("non-git install wrote %s: %v", name, err)
+				}
+			}
+		})
+	}
+}
