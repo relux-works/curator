@@ -158,6 +158,10 @@ type marks struct {
 	consumers []string
 	runtime   map[string]bool
 	builds    []string
+	// commits are the locked Git commits of draft markers, whose runtime key
+	// is not a commit. Snapshot retention reads them; the runtime and build
+	// sweeps do not.
+	commits []string
 	// uncertain describes state that exists but could not be trusted, so the
 	// reference set derived from it is incomplete. Any entry here blocks the
 	// build sweep and protects every consumer it came from.
@@ -212,6 +216,9 @@ func markScopes(home string) marks {
 func (marked *marks) absorb(scope scopeMarks) {
 	for _, installed := range scope.markers {
 		if installed.Package != nil {
+			if installed.Package.Commit != nil && installed.Package.Commit.Hex != "" {
+				marked.commits = append(marked.commits, installed.Package.Commit.Hex)
+			}
 			// A draft marker keys its runtime tree by the frozen package
 			// identity in the source-v1 namespace, never by a commit: mark
 			// that leaf so the sweep keeps the live tree. An unhashable

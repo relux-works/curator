@@ -33,6 +33,19 @@ const defaultSuiteManifestSHA256 = "be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc
 // the conformance consumers in this change.
 const ContentHashV2CandidateManifestSHA256 = "950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60"
 
+// SnapshotRetentionCandidateManifestSHA256 is the content-hash-v2 candidate
+// suite plus the snapshot-retention family of manager profile section 10.1
+// (curator-spec#75). It publishes every content-hash-v2 candidate family
+// byte-for-byte, so it carries the same count pins and gap rows plus the one
+// added family.
+const SnapshotRetentionCandidateManifestSHA256 = "12206193497c54c175dec6d4a44488d7f1a0abb775c42416e27879fa483aa82f"
+
+// IsContentHashV2Candidate reports whether suiteID names a suite that
+// publishes the content-hash-v2 candidate families.
+func IsContentHashV2Candidate(suiteID string) bool {
+	return suiteID == ContentHashV2CandidateManifestSHA256 || suiteID == SnapshotRetentionCandidateManifestSHA256
+}
+
 // Observation is the result of one published case. A failure may be accepted
 // only when the ledger names this family and case. Bounds and skips are
 // explicit classifications, never passes.

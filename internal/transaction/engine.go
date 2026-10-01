@@ -317,6 +317,18 @@ func (engine *Engine) Commit(lock HomeLock, transactionID string) error {
 	return engine.resume(journal)
 }
 
+// HasPendingRecovery inspects journal names without resuming transactions or
+// cleaning up committed state. Dry-run callers must refuse when this is true.
+func (engine *Engine) HasPendingRecovery(lock HomeLock) (bool, error) {
+	if err := requireHomeLock(lock); err != nil {
+		return false, err
+	}
+	engine.mu.Lock()
+	defer engine.mu.Unlock()
+	ids, err := engine.journalIDs()
+	return len(ids) != 0, err
+}
+
 // Recover processes every journal in unsigned transaction-id order. Recovery
 // is home-scoped and intentionally does not accept a current project filter.
 func (engine *Engine) Recover(lock HomeLock) error {
