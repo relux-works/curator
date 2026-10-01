@@ -277,11 +277,52 @@ func TestLocalConfigAndAdministrationAdversarialBoundaries(t *testing.T) {
 	if err := json.Unmarshal(payload, &fixtures); err != nil {
 		t.Fatal(err)
 	}
+	fixture := makeGitFixture(t, "sha1", false)
+	tool := realGitTool(t)
 	conformancecoverage.RunOutcomes(t, "external-repository/local-config-and-refs", fixtures.Cases,
 		func(tc localConfigCase) string { return tc.Name }, func(t *testing.T, testCase localConfigCase) conformancecoverage.Observation {
 			encoded, ok := testCase.Files["config"]
 			if !ok {
-				return conformancecoverage.Observation{BoundReason: "parseLocalConfig consumes config bytes; this case publishes no config file"}
+				switch testCase.Name {
+				case "reject-gitfile":
+					gitfile, exists := testCase.Files["dot-git-file"]
+					if !exists {
+						return conformancecoverage.Observation{FailureReason: "gitfile case has no published .git file bytes"}
+					}
+					data, err := base64.StdEncoding.DecodeString(gitfile)
+					if err != nil {
+						t.Fatal(err)
+					}
+					root := t.TempDir()
+					if err := os.WriteFile(filepath.Join(root, ".git"), data, 0o600); err != nil {
+						t.Fatal(err)
+					}
+					_, err = AdmitLocal(context.Background(), LocalRequest{Path: root, Tool: tool})
+					if ErrorCode(err) != testCase.ExpectedError {
+						return conformancecoverage.Observation{FailureReason: fmt.Sprintf("AdmitLocal error = %v, want %s", err, testCase.ExpectedError)}
+					}
+					return conformancecoverage.Observation{}
+				case "reject-link-or-special-administration-file":
+					fixtureCopy := copyFixture(t, fixture.work)
+					linkTarget := filepath.Join(t.TempDir(), "outside-state")
+					if err := os.WriteFile(linkTarget, []byte("outside\n"), 0o600); err != nil {
+						t.Fatal(err)
+					}
+					linkPath := filepath.Join(fixtureCopy, ".git", "objects", "pack", "pack-"+strings.Repeat("a", 40)+".pack")
+					if err := os.MkdirAll(filepath.Dir(linkPath), 0o700); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.Symlink(linkTarget, linkPath); err != nil {
+						return conformancecoverage.Observation{BoundReason: "host could not create the published symbolic-link administration fixture"}
+					}
+					_, err := AdmitLocal(context.Background(), LocalRequest{Path: fixtureCopy, Tool: tool})
+					if ErrorCode(err) != testCase.ExpectedError {
+						return conformancecoverage.Observation{FailureReason: fmt.Sprintf("AdmitLocal link error = %v, want %s", err, testCase.ExpectedError)}
+					}
+					return conformancecoverage.Observation{}
+				default:
+					return conformancecoverage.Observation{BoundReason: "published case has no config bytes or complete local administration fixture"}
+				}
 			}
 			config, err := base64.StdEncoding.DecodeString(encoded)
 			if err != nil {
@@ -298,8 +339,6 @@ func TestLocalConfigAndAdministrationAdversarialBoundaries(t *testing.T) {
 			return conformancecoverage.Observation{}
 		})
 
-	fixture := makeGitFixture(t, "sha1", false)
-	tool := realGitTool(t)
 	attacks := []struct{ name, path, code string }{
 		{"alternate", "objects/info/alternates", CodeLocalFormatUnsupported},
 		{"graft", "info/grafts", CodeLocalFormatUnsupported},
@@ -419,11 +458,12 @@ func TestPackIndexConformanceAndExactSSHWrapper(t *testing.T) {
 		t.Fatal(err)
 	}
 	type packIndexCase struct {
-		Name          string `json:"name"`
-		ObjectFormat  string `json:"object_format"`
-		PackHex       string `json:"pack_hex"`
-		IndexHex      string `json:"index_hex"`
-		ExpectedError string `json:"expected_error"`
+		Name          string   `json:"name"`
+		ObjectFormat  string   `json:"object_format"`
+		PackHex       string   `json:"pack_hex"`
+		IndexHex      string   `json:"index_hex"`
+		Files         []string `json:"files"`
+		ExpectedError string   `json:"expected_error"`
 	}
 	var fixture struct {
 		Cases []packIndexCase `json:"cases"`
@@ -431,10 +471,29 @@ func TestPackIndexConformanceAndExactSSHWrapper(t *testing.T) {
 	if err := json.Unmarshal(payload, &fixture); err != nil {
 		t.Fatal(err)
 	}
+	tool := realGitTool(t)
 	conformancecoverage.RunOutcomes(t, "external-repository/pack-index", fixture.Cases,
 		func(tc packIndexCase) string { return tc.Name }, func(t *testing.T, testCase packIndexCase) conformancecoverage.Observation {
 			if testCase.PackHex == "" || testCase.IndexHex == "" {
-				return conformancecoverage.Observation{BoundReason: "validatePackIndex requires the pack and index byte pair; this case publishes no index"}
+				if testCase.Name == "reject-pack-without-index" {
+					if len(testCase.Files) != 1 {
+						return conformancecoverage.Observation{FailureReason: "pack-without-index case must publish exactly one pack path"}
+					}
+					local := makeGitFixture(t, "sha1", false)
+					packPath := filepath.Join(local.work, ".git", "objects", "pack", filepath.FromSlash(testCase.Files[0]))
+					if err := os.MkdirAll(filepath.Dir(packPath), 0o700); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(packPath, nil, 0o600); err != nil {
+						t.Fatal(err)
+					}
+					_, err := AdmitLocal(context.Background(), LocalRequest{Path: local.work, Tool: tool})
+					if ErrorCode(err) != testCase.ExpectedError {
+						return conformancecoverage.Observation{FailureReason: fmt.Sprintf("AdmitLocal pack-inventory error = %v, want %s", err, testCase.ExpectedError)}
+					}
+					return conformancecoverage.Observation{}
+				}
+				return conformancecoverage.Observation{BoundReason: "vector publishes no pack/index byte pair or local pack inventory path for this row"}
 			}
 			pack, err := hex.DecodeString(testCase.PackHex)
 			if err != nil {

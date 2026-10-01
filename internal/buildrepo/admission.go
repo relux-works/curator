@@ -277,9 +277,6 @@ func AcquireNetwork(ctx context.Context, request NetworkRequest) (*Snapshot, err
 // runs the same checks per attempt under its shared deadline, so a resolved
 // acquisition refuses exactly what the lane refuses.
 func admitNetworkRequest(ctx context.Context, request NetworkRequest) error {
-	if err := ValidateGitTool(ctx, request.Tool); err != nil {
-		return err
-	}
 	parsedSource, err := ParseSource(request.Source.Git)
 	if err != nil || parsedSource != request.Source {
 		return admissionError(CodeIdentityInvalid, "network source is not canonical parsed input")
@@ -311,6 +308,12 @@ func admitNetworkRequest(ctx context.Context, request NetworkRequest) error {
 	}
 	if request.RefKind != "" && !ValidRefName(request.RefValue) {
 		return admissionError(CodeIdentityInvalid, "invalid substitution ref")
+	}
+	// Validate the pure request shape before invoking the trusted Git
+	// executable. In particular, malformed refs are rejected without starting
+	// even Git's version probe; valid requests still pin Git before acquisition.
+	if err := ValidateGitTool(ctx, request.Tool); err != nil {
+		return err
 	}
 	return nil
 }
