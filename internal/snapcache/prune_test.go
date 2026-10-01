@@ -339,3 +339,56 @@ func TestPruneCertaintyIndependentOfEntryReasons(t *testing.T) {
 		}
 	}
 }
+
+// Substitute a previously inventoried parent with a link immediately before
+// deletion. The victim has the same entry name, so a pathname delete would
+// remove valid content outside the proven cache boundary.
+func TestRemoveEntryRefusesSubstitutedParents(t *testing.T) {
+	for _, swapCache := range []bool{false, true} {
+		t.Run(map[bool]string{false: "source", true: "cache"}[swapCache], func(t *testing.T) {
+			home, victimHome := t.TempDir(), t.TempDir()
+			entry := writeEntry(t, home, "host/owner/repo", commitOf("a"), testNow, map[string]string{"f": "ours"})
+			victim := writeEntry(t, victimHome, "host/owner/repo", commitOf("a"), testNow, map[string]string{"f": "victim"})
+			if _, err := ReadInventory(home); err != nil {
+				t.Fatal(err)
+			}
+			parent, target := filepath.Dir(entry), filepath.Dir(victim)
+			if swapCache {
+				parent, target = CacheRoot(home), CacheRoot(victimHome)
+			}
+			if err := os.Rename(parent, parent+"-original"); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(target, parent); err != nil {
+				t.Skipf("symlink unavailable: %v", err)
+			}
+			if err := removeEntry(CacheRoot(home), entry); err == nil {
+				t.Error("deletion accepted a substituted linked parent")
+			}
+			if !exists(t, victim) {
+				t.Fatal("deletion escaped through substituted parent")
+			}
+		})
+	}
+}
+
+func TestLeftoverDeletionRefusesLinkedParent(t *testing.T) {
+	home, victimHome := t.TempDir(), t.TempDir()
+	name := prunePrefix + commitOf("a") + "-0011"
+	victim := filepath.Join(CacheRoot(victimHome), "s", name)
+	if err := os.MkdirAll(filepath.Join(victim, "snapshot"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(CacheRoot(home), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Dir(victim), filepath.Join(CacheRoot(home), "s")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	if err := removeLeftover(CacheRoot(home), filepath.Join(CacheRoot(home), "s", name)); err == nil {
+		t.Fatal("leftover deletion accepted linked parent")
+	}
+	if !exists(t, victim) {
+		t.Fatal("leftover deletion escaped through linked parent")
+	}
+}

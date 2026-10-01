@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/relux-works/curator/internal/nofollow"
 )
 
 // HomeLock witnesses the caller-held manager-home mutation lock.
@@ -134,7 +136,7 @@ func Prune(request Request) (Report, error) {
 		if request.DryRun {
 			continue
 		}
-		if err := os.RemoveAll(leftover); err != nil {
+		if err := removeLeftover(CacheRoot(request.Home), leftover); err != nil {
 			failures = append(failures, fmt.Errorf("delete interrupted removal %s: %w", leftover, err))
 			continue
 		}
@@ -177,19 +179,32 @@ func removeEntry(cacheRoot, entry string) error {
 	if _, err := rand.Read(suffix[:]); err != nil {
 		return err
 	}
+
 	parent := filepath.Dir(entry)
-	moved := filepath.Join(parent, prunePrefix+filepath.Base(entry)+"-"+hex.EncodeToString(suffix[:]))
-	if err := os.Rename(entry, moved); err != nil {
+	root, leaf, err := openRemovalParent(cacheRoot, entry)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+	moved := prunePrefix + leaf + "-" + hex.EncodeToString(suffix[:])
+	if err := root.Rename(leaf, moved); err != nil {
 		return fmt.Errorf("move out of the store: %w", err)
 	}
-	if err := os.RemoveAll(moved); err != nil {
+	if err := root.RemoveAll(moved); err != nil {
 		return fmt.Errorf("delete %s (a later run finishes it): %w", moved, err)
 	}
 	for dir := parent; dir != cacheRoot && isWithin(cacheRoot, dir); dir = filepath.Dir(dir) {
-		if err := os.Remove(dir); err != nil {
-			break // not empty, or already gone
+		root, leaf, err := openRemovalParent(cacheRoot, dir)
+		if err != nil {
+			break
 		}
+		err = root.Remove(leaf)
+		_ = root.Close()
+		if err != nil {
+			break
+		} // not empty, or already gone
 	}
+
 	return nil
 }
 
@@ -197,4 +212,27 @@ func isWithin(root, path string) bool {
 	rel, err := filepath.Rel(root, path)
 	return err == nil && rel != "." && rel != ".." && !filepath.IsAbs(rel) &&
 		!strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+// openRemovalParent revalidates every parent below the manager home and pins
+// the resulting directory object. Mutations address only direct child names.
+func openRemovalParent(cacheRoot, target string) (*os.Root, string, error) {
+	if !isWithin(cacheRoot, target) {
+		return nil, "", fmt.Errorf("removal %s is outside the cache", target)
+	}
+	home := filepath.Dir(cacheRoot)
+	rel, err := filepath.Rel(home, target)
+	if err != nil {
+		return nil, "", err
+	}
+	return nofollow.OpenParent(home, rel)
+}
+
+func removeLeftover(cacheRoot, leftover string) error {
+	root, leaf, err := openRemovalParent(cacheRoot, leftover)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+	return root.RemoveAll(leaf)
 }
