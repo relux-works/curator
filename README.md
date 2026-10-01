@@ -36,6 +36,8 @@ curl -fsSL https://raw.githubusercontent.com/relux-works/curator/main/install.sh
 
 </details>
 
+Second operator on a new machine: see [docs/second-operator.md](docs/second-operator.md) for the verified install, managed-home profile, credential passthrough, and `curator run` path.
+
 <details>
 <summary>Scoop (Windows)</summary>
 
