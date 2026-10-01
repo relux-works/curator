@@ -1,0 +1,564 @@
+diff --git a/.github/ci/gate-selftest.sh b/.github/ci/gate-selftest.sh
+index ea405473..7de164e3 100644
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -363,6 +363,35 @@ for goos in linux darwin windows; do
+ 	fi
+ done
+ 
++echo ''
++echo '=== non-git install ledger: only the two Unix PATH-shim rows may skip ==='
++hygiene_reason='PATH git shell shim requires Unix; corrupt .git row runs on all platforms'
++hygiene_gate() {
++	CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" CI_GATE_MODULE="$MODULE_PATH" \
++		CI_GATE_GOOS="$1" bash "$GATE" "$2" "$WORK/hygiene-ev"
++}
++cp "$WORK/shipped-windows.json" "$WORK/hygiene-windows.json"
++for hygiene_row in unexpected-exit-2 unexpected-exit-128; do
++	evout cmd/curator "TestInstallGitignoreEntryPoint/$hygiene_row" "$hygiene_reason" >>"$WORK/hygiene-windows.json"
++	ev skip cmd/curator "TestInstallGitignoreEntryPoint/$hygiene_row" >>"$WORK/hygiene-windows.json"
++done
++assert 'Windows permits the two declared POSIX git shim skips' 0 hygiene_gate windows "$WORK/hygiene-windows.json"
++
++cp "$WORK/hygiene-windows.json" "$WORK/hygiene-bad.json"
++evout cmd/curator 'TestInstallGitignoreEntryPoint/non-git' "$hygiene_reason" >>"$WORK/hygiene-bad.json"
++ev skip cmd/curator 'TestInstallGitignoreEntryPoint/non-git' >>"$WORK/hygiene-bad.json"
++assert 'Windows cannot skip the positive non-git bytes row' 1 hygiene_gate windows "$WORK/hygiene-bad.json"
++
++cp "$WORK/hygiene-windows.json" "$WORK/hygiene-bad.json"
++evout cmd/curator 'TestInstallGitignoreEntryPoint/broken-git' "$hygiene_reason" >>"$WORK/hygiene-bad.json"
++ev skip cmd/curator 'TestInstallGitignoreEntryPoint/broken-git' >>"$WORK/hygiene-bad.json"
++assert 'Windows cannot skip the real corrupt Git refusal row' 1 hygiene_gate windows "$WORK/hygiene-bad.json"
++
++cp "$WORK/shipped-darwin.json" "$WORK/hygiene-bad.json"
++evout cmd/curator 'TestInstallGitignoreEntryPoint/unexpected-exit-128' "$hygiene_reason" >>"$WORK/hygiene-bad.json"
++ev skip cmd/curator 'TestInstallGitignoreEntryPoint/unexpected-exit-128' >>"$WORK/hygiene-bad.json"
++assert 'Unix cannot skip an unexpected Git exit fixture' 1 hygiene_gate darwin "$WORK/hygiene-bad.json"
++
+ echo ''
+ echo '=== platform-cases.tsv: the packages this pin promoted tolerate no skip ==='
+ #
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index e7c601a1..d1622664 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -784,3 +784,17 @@ internal/envprofile	TestPathOverlayFailureBlocksResolveAndMakesStatusNonCurrent
+ cmd/curator	TestGCFailsClosedForUntrustedCurrentPathSource	linux,darwin,windows	-	-	GC validates the current path source before transaction recovery or consumer pruning
+ internal/install	TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts	linux,darwin,windows	-	-	proven checkout absence falls back while blocked or present-unusable locked repositories fail closed
+ internal/install	TestInstallScriptSecurityRows	linux,darwin	windows	platform-control	install.sh verification rows (POSIX installer)
++
++# Non-git project install (BUG-261001-2n70px). Only the two POSIX PATH-shim
++# rows may skip on Windows; real Git discovery and corrupt metadata run there.
++cmd/curator	TestInstallGitignoreEntryPoint	linux,darwin,windows	-	-	compiled CLI install hygiene matrix
++cmd/curator	TestInstallGitignoreEntryPoint/non-git	linux,darwin,windows	-	-	non-git product root installs declared skill bytes and prints a hygiene notice
++cmd/curator	TestInstallGitignoreEntryPoint/non-git-fix	linux,darwin,windows	-	-	non-git --fix-gitignore installs bytes without creating Git metadata or an ignore file
++cmd/curator	TestInstallGitignoreEntryPoint/git-parent-ignored	linux,darwin,windows	-	-	project inside a parent work tree retains ignore enforcement
++cmd/curator	TestInstallGitignoreEntryPoint/git-ignored	linux,darwin,windows	-	-	ignored Git project installs bytes without changing its ignore file
++cmd/curator	TestInstallGitignoreEntryPoint/git-missing-ignore	linux,darwin,windows	-	-	unignored Git project retains the existing skip policy
++cmd/curator	TestInstallGitignoreEntryPoint/git-fix-ignore	linux,darwin,windows	-	-	--fix-gitignore repairs missing entries in a real Git project and installs bytes
++cmd/curator	TestInstallGitignoreEntryPoint/git-ignore-negation	linux,darwin,windows	-	-	negated ignore entries still skip without publishing bytes
++cmd/curator	TestInstallGitignoreEntryPoint/broken-git	linux,darwin,windows	-	-	corrupt .git metadata refuses with nonzero exit and no installed bytes
++cmd/curator	TestInstallGitignoreEntryPoint/unexpected-exit-2	linux,darwin	windows	platform-control	unexpected Git exit 2 carrying the absence diagnostic refuses through the CLI; POSIX shim fixture
++cmd/curator	TestInstallGitignoreEntryPoint/unexpected-exit-128	linux,darwin	windows	platform-control	unexpected Git exit 128 carrying an unrelated diagnostic refuses through the CLI; POSIX shim fixture
+diff --git a/.github/ci/skip-classes.tsv b/.github/ci/skip-classes.tsv
+index 6eb1df9f..5c520544 100644
+--- a/.github/ci/skip-classes.tsv
++++ b/.github/ci/skip-classes.tsv
+@@ -60,6 +60,7 @@ platform-control	executes (a )?POSIX (launcher|skill commands)	allow	a POSIX lau
+ platform-control	POSIX post-install launch fixture	allow	a POSIX post-install fixture, asserted on the unix runners
+ platform-control	shell sentinel is Unix-only	allow	the sentinel exists on unix only
+ platform-control	test transport wrapper is POSIX-only	allow	the fixture uses a POSIX shell wrapper; native admission remains covered on Windows
++platform-control	^PATH git shell shim requires Unix; corrupt [.]git row runs on all platforms$	allow	the two unexpected-exit fixtures execute a POSIX PATH shim on Unix; the real corrupt-.git refusal and positive install rows run on Windows
+ platform-control	local TLS fixture relies on the platform Git shipped on Unix CI	allow	the fixture serves HTTPS from a local certificate the Unix CI Git trusts; the broker's own admission and prompt boundary stay asserted on Windows
+ platform-control	controlled launcher symlink is a Unix regression fixture	allow	the launcher symlink fixture is asserted on unix runners
+ platform-control	hard-link count is enforced by the native Windows protected-root backend	allow	the generic hard-link fixture is replaced by the native Windows backend case
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a4593bd8..89130b92 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -243,6 +243,8 @@ All notable implementation changes are recorded here.
+ 
+ ### Fixed
+ 
++- Project install now materializes skills at non-git product roots with a hygiene notice, while unexpected Git failures refuse installation.
++
+ - E4: the user-bin shim directory counts as manager-published — and
+   refuses providers under revision A — only once the manager has
+   actually published shims there (the ownership ledger exists) or the
+diff --git a/cmd/curator/install_gitignore_test.go b/cmd/curator/install_gitignore_test.go
+new file mode 100644
+index 00000000..bb4ddd82
+--- /dev/null
++++ b/cmd/curator/install_gitignore_test.go
+@@ -0,0 +1,205 @@
++package main
++
++import (
++	"bytes"
++	"errors"
++	"fmt"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/install"
++)
++
++// Drive main -> cli.install -> install.Project -> gitignore.Ensure with the
++// compiled production binary, including real process exits and published bytes.
++func TestInstallGitignoreEntryPoint(t *testing.T) {
++	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
++	build := exec.Command("go", "build", "-o", binary, ".")
++	if out, err := build.CombinedOutput(); err != nil {
++		t.Fatalf("build curator: %v\n%s", err, out)
++	}
++	rows := []struct {
++		name      string
++		git       bool
++		parentGit bool
++		fix       bool
++		ignore    string
++		broken    bool
++		gitExit   int
++		installed bool
++		code      int
++	}{
++		{name: "non-git", installed: true},
++		{name: "non-git-fix", fix: true, installed: true},
++		{name: "git-parent-ignored", parentGit: true, ignore: ".agents/\n.codex/skills/\n", installed: true},
++		{name: "git-ignored", git: true, ignore: ".agents/\n.codex/skills/\n", installed: true},
++		{name: "git-missing-ignore", git: true},
++		{name: "git-fix-ignore", git: true, fix: true, installed: true},
++		{name: "git-ignore-negation", git: true, fix: true, ignore: ".agents/\n!.agents/\n.codex/skills/\n"},
++		{name: "broken-git", broken: true, fix: true, code: exitFail},
++		{name: "unexpected-exit-2", gitExit: 2, fix: true, code: exitFail},
++		{name: "unexpected-exit-128", gitExit: 128, fix: true, code: exitFail},
++	}
++	for _, row := range rows {
++		t.Run(row.name, func(t *testing.T) {
++			if row.gitExit != 0 && runtime.GOOS == "windows" {
++				t.Skip("PATH git shell shim requires Unix; corrupt .git row runs on all platforms")
++			}
++			root := t.TempDir()
++			userHome := filepath.Join(root, "user")
++			project := filepath.Join(root, "product")
++			configPath := filepath.Join(root, "manager", "config.json")
++			for _, dir := range []string{userHome, project} {
++				if err := os.MkdirAll(dir, 0o755); err != nil {
++					t.Fatal(err)
++				}
++			}
++			environment := append(os.Environ(), "HOME="+userHome, "USERPROFILE="+userHome, "CURATOR_CONFIG="+configPath)
++			invoke := func(args ...string) (int, string) {
++				t.Helper()
++				cmd := exec.Command(binary, args...)
++				cmd.Env = environment
++				cmd.Dir = project
++				out, err := cmd.CombinedOutput()
++				code := 0
++				if err != nil {
++					var exitErr *exec.ExitError
++					if !errors.As(err, &exitErr) {
++						t.Fatalf("launch curator: %v", err)
++					}
++					code = exitErr.ExitCode()
++				}
++				t.Logf("curator %v: exit %d\n%s", args, code, out)
++				return code, string(out)
++			}
++			for _, args := range [][]string{
++				{"bootstrap", "--non-interactive", "--skills-root", filepath.Join(root, "skills-root")},
++				{"project", "add", "app", project, "--agents", "codex_cli"},
++			} {
++				if code, out := invoke(args...); code != 0 {
++					t.Fatalf("setup exit %d: %s", code, out)
++				}
++			}
++			source := filepath.Join(project, "repos", "review")
++			writeCLISkill(t, source, "review")
++			// The product folder holds a real nested repository; it is never
++			// initialized as a repository in either positive non-git row.
++			runGit(t, source, "init", "-q")
++			manifest := `{"schema_version":2,"agents":["codex_cli"],"sources":{"s":{"path":"./repos"}},"skills":[{"name":"review","from":"s","directory":"review"}]}`
++			if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(manifest), 0o644); err != nil {
++				t.Fatal(err)
++			}
++			if code, out := invoke("project", "resolve", "app"); code != 0 {
++				t.Fatalf("resolve exit %d: %s", code, out)
++			}
++			for _, path := range []string{filepath.Join(project, "Skillfile.lock.json"), install.DraftBindingsPath(filepath.Dir(configPath), project)} {
++				if _, err := os.Stat(path); err != nil {
++					t.Fatalf("lock/bindings missing: %v", err)
++				}
++			}
++			if err := os.Remove(filepath.Join(project, ".gitignore")); err != nil {
++				t.Fatal(err)
++			}
++			if row.parentGit {
++				runGit(t, root, "init", "-q")
++			}
++			if row.git {
++				runGit(t, project, "init", "-q")
++			}
++			if row.ignore != "" {
++				if err := os.WriteFile(filepath.Join(project, ".gitignore"), []byte(row.ignore), 0o644); err != nil {
++					t.Fatal(err)
++				}
++			}
++			if row.broken {
++				if err := os.WriteFile(filepath.Join(project, ".git"), []byte("gitdir: missing\n"), 0o644); err != nil {
++					t.Fatal(err)
++				}
++			}
++			if row.gitExit != 0 {
++				shim := filepath.Join(root, "shim")
++				if err := os.Mkdir(shim, 0o755); err != nil {
++					t.Fatal(err)
++				}
++				// Exit 2 even carries the absence diagnostic: both code and
++				// message must agree before the non-repository fallback applies.
++				message := "fatal: unexpected git failure"
++				if row.gitExit == 2 {
++					message = "fatal: not a git repository (or any of the parent directories): .git"
++				}
++				script := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' '%s' >&2\nexit %d\n", message, row.gitExit)
++				if err := os.WriteFile(filepath.Join(shim, "git"), []byte(script), 0o755); err != nil {
++					t.Fatal(err)
++				}
++				environment = append(environment, "PATH="+shim+string(os.PathListSeparator)+os.Getenv("PATH"))
++			}
++			beforeSource := digestTree(t, source)
++			args := []string{"install", "app"}
++			if row.fix {
++				args = append(args, "--fix-gitignore")
++			}
++			code, out := invoke(args...)
++			if code != row.code {
++				t.Fatalf("install exit %d, want %d:\n%s", code, row.code, out)
++			}
++			installed := filepath.Join(project, ".agents", "skills", "review")
++			if row.installed {
++				for _, name := range []string{"SKILL.md", filepath.Join("references", "info.md")} {
++					want, err := os.ReadFile(filepath.Join(source, name))
++					if err != nil {
++						t.Fatal(err)
++					}
++					got, err := os.ReadFile(filepath.Join(installed, name))
++					if err != nil || !bytes.Equal(got, want) {
++						t.Fatalf("installed %s bytes missing/differ: %v\n%s", name, err, out)
++					}
++				}
++			} else if _, err := os.Stat(installed); !os.IsNotExist(err) {
++				t.Fatalf("refused/skipped row published skill: %v", err)
++			}
++			nonGit := !row.git && !row.parentGit && !row.broken && row.gitExit == 0
++			if strings.Contains(out, "gitignore hygiene check does not apply") != nonGit {
++				t.Fatalf("incorrect hygiene notice:\n%s", out)
++			}
++			if nonGit {
++				for _, name := range []string{".git", ".gitignore"} {
++					if _, err := os.Lstat(filepath.Join(project, name)); !os.IsNotExist(err) {
++						t.Fatalf("non-git install wrote %s: %v", name, err)
++					}
++				}
++			}
++			if !row.installed && row.code == 0 && !strings.Contains(out, "skipped") {
++				t.Fatalf("git policy behavior changed:\n%s", out)
++			}
++			if row.code != 0 && !strings.Contains(out, "git check-ignore failed") {
++				t.Fatalf("git failure diagnostic missing:\n%s", out)
++			}
++			if row.ignore != "" {
++				got, err := os.ReadFile(filepath.Join(project, ".gitignore"))
++				if err != nil || string(got) != row.ignore {
++					t.Fatalf("existing ignore file changed: %v\n%s", err, got)
++				}
++			}
++			if !row.installed && row.ignore == "" {
++				if _, err := os.Lstat(filepath.Join(project, ".gitignore")); !os.IsNotExist(err) {
++					t.Fatalf("refused/skipped row wrote .gitignore: %v", err)
++				}
++			}
++			entries, err := os.ReadDir(project)
++			if err != nil {
++				t.Fatal(err)
++			}
++			allowed := map[string]bool{"Skillfile.json": true, "Skillfile.lock.json": true, "repos": true, ".agents": true, ".codex": true, ".git": true, ".gitignore": true}
++			for _, entry := range entries {
++				if !allowed[entry.Name()] {
++					t.Fatalf("install wrote undeclared project surface: %s", entry.Name())
++				}
++			}
++			assertTreesEqual(t, beforeSource, digestTree(t, source))
++		})
++	}
++}
+diff --git a/docs/cli.md b/docs/cli.md
+index fafc38ee..1ed15df9 100644
+--- a/docs/cli.md
++++ b/docs/cli.md
+@@ -120,6 +120,14 @@ The command updates `Skillfile.json` and removes the installed skill directory.
+ 
+ `curator install` applies `Skillfile.json` and materializes project dependencies.
+ 
++A non-git product folder containing nested repositories is also a supported
++project root. Install materializes its declared skills and prints a notice that
++gitignore hygiene does not apply; it does not initialize Git or create a
++`.gitignore`, even with `--fix-gitignore`. In Git work trees, the existing ignore
++requirements still apply, and unexpected Git failures refuse installation.
++The schema-2 `Skillfile.lock.json` lives at the project root; machine-local
++source bindings live under the manager home's `source-bindings/` directory.
++
+ Synopsis:
+ 
+ ```bash
+diff --git a/internal/gitignore/gitignore.go b/internal/gitignore/gitignore.go
+index bc3804c5..29d19d24 100644
+--- a/internal/gitignore/gitignore.go
++++ b/internal/gitignore/gitignore.go
+@@ -1,6 +1,6 @@
+ // Package gitignore enforces the managed .gitignore block (Spec §6.3).
+ //
+-// Generated paths must be ignored by git before installation proceeds; the
++// Generated paths in work trees must be ignored before installation proceeds; the
+ // check probes git check-ignore so any ignore mechanism counts.
+ package gitignore
+ 
+@@ -25,11 +25,14 @@ const checkIgnoreEACCESRetryDelay = 100 * time.Millisecond
+ // to inject child-start errors without depending on runner filesystem state.
+ var checkIgnoreCommandRunner = func(cmd *exec.Cmd) error { return cmd.Run() }
+ 
++// ErrNotRepository means the hygiene check does not apply to this root.
++// Other Git failures must not be treated as absence of a repository.
++var ErrNotRepository = errors.New("gitignore hygiene check does not apply: project root is not a git repository")
++
+ // NotIgnoredError reports the policy outcome that entries are not ignored.
+ // It is distinct from a tool failure: a git that cannot be executed (a
+ // spawn error or a missing git binary) is returned as a plain wrapped
+-// error, never as this type. Git's own verdicts, including "not a
+-// repository", are policy outcomes as before.
++// error, never as this type. Only exit 1 means an entry is not ignored.
+ type NotIgnoredError struct {
+ 	Missing []string
+ }
+@@ -50,11 +53,10 @@ func IsNotIgnored(err error) bool {
+ // A git that cannot be executed — a spawn error or exec.ErrNotFound, i.e.
+ // any cmd.Run() failure that is not an *exec.ExitError — is returned as an
+ // error carrying the tool diagnostic, so callers never mistake a broken git
+-// invocation for a policy outcome. Every exit status git itself reports
+-// keeps the pre-existing behaviour: the entry is reported as not ignored,
+-// whether the status is 1 (not ignored) or 128/other (not a repository, a
+-// fatal git error). The diagnostic names only the entry, never the full
+-// probe path, environment, or project root.
++// invocation for a policy outcome. Exit 1 reports an unignored entry;
++// exit 128 with Git's repository-discovery diagnostic returns ErrNotRepository.
++// All other exits fail closed. Operation context names the entry; Git stderr
++// is retained to diagnose tool failures.
+ func Missing(projectRoot string, entries []string) ([]string, error) {
+ 	var missing []string
+ 	for _, entry := range entries {
+@@ -63,8 +65,13 @@ func Missing(projectRoot string, entries []string) ([]string, error) {
+ 		if err != nil {
+ 			var exitErr *exec.ExitError
+ 			if errors.As(err, &exitErr) {
+-				missing = append(missing, entry)
+-				continue
++				if exitErr.ExitCode() == 1 {
++					missing = append(missing, entry)
++					continue
++				}
++				if exitErr.ExitCode() == 128 && isRepositoryDiscoveryAbsence(stderr) {
++					return nil, ErrNotRepository
++				}
+ 			}
+ 			if detail := strings.TrimSpace(stderr); detail != "" {
+ 				return nil, fmt.Errorf("git check-ignore failed for %q: %s: %w", entry, detail, err)
+@@ -75,6 +82,13 @@ func Missing(projectRoot string, entries []string) ([]string, error) {
+ 	return missing, nil
+ }
+ 
++func isRepositoryDiscoveryAbsence(stderr string) bool {
++	message := strings.TrimSpace(stderr)
++	return message == "fatal: not a git repository (or any of the parent directories): .git" ||
++		(strings.HasPrefix(message, "fatal: not a git repository (or any parent up to mount point ") &&
++			strings.HasSuffix(message, ")\nStopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set)."))
++}
++
+ // runCheckIgnoreWithEACCESRetry retries one child-start EACCES after a short
+ // delay. It does not retry Git exit statuses or other spawn errors; a second
+ // failure is returned so persistent permission errors still fail closed.
+@@ -95,6 +109,8 @@ func runCheckIgnoreWithEACCESRetry(projectRoot, probe string) (string, error) {
+ 
+ func runCheckIgnoreAttempt(projectRoot, probe string) (string, error) {
+ 	cmd := exec.Command("git", "-C", projectRoot, "check-ignore", "-q", probe) // #nosec G204 -- fixed binary and flags
++	// Repository-discovery classification requires Git's stable English diagnostic.
++	cmd.Env = append(os.Environ(), "LC_ALL=C")
+ 	var stderr bytes.Buffer
+ 	cmd.Stderr = &stderr
+ 	err := checkIgnoreCommandRunner(cmd)
+@@ -114,7 +130,8 @@ func isCheckIgnoreSpawnEACCES(err error) bool {
+ }
+ 
+ // Ensure verifies the entries are ignored; with fix it appends the missing
+-// ones under the managed comment and re-checks.
++// ones under the managed comment and re-checks. A non-repository root returns
++// ErrNotRepository without writing an ignore file.
+ func Ensure(projectRoot string, entries []string, fix bool) error {
+ 	missing, err := Missing(projectRoot, entries)
+ 	if err != nil {
+diff --git a/internal/gitignore/gitignore_test.go b/internal/gitignore/gitignore_test.go
+index fed82acf..9b7f2f7f 100644
+--- a/internal/gitignore/gitignore_test.go
++++ b/internal/gitignore/gitignore_test.go
+@@ -169,13 +169,14 @@ func TestMissingRetriesOnceOnSpawnEACCES(t *testing.T) {
+ }
+ 
+ func TestMissingDoesNotRetryGitExitStatus(t *testing.T) {
++	exitOne := exec.Command("git", "-C", gitProject(t), "check-ignore", "-q", ".agents/.curator-probe").Run()
+ 	previousRunner := checkIgnoreCommandRunner
+ 	t.Cleanup(func() { checkIgnoreCommandRunner = previousRunner })
+ 
+ 	calls := 0
+ 	checkIgnoreCommandRunner = func(*exec.Cmd) error {
+ 		calls++
+-		return &exec.ExitError{}
++		return exitOne
+ 	}
+ 
+ 	missing, err := Missing(t.TempDir(), []string{".agents/"})
+@@ -257,29 +258,33 @@ func checkIgnoreSpawnError(errno syscall.Errno) error {
+ 	return &os.PathError{Op: "fork/exec", Path: "/opt/homebrew/bin/git", Err: errno}
+ }
+ 
+-// TestMissingNonRepositoryIsNotIgnored pins the exit-128 branch of
+-// BUG-260921-1fpaij (rework 1): a root that is not a git repository keeps the
+-// PRE-EXISTING outcome — git's own verdict, including "not a repository", is
+-// a policy outcome (not ignored), never a tool error. Only a git that cannot
+-// be executed is an error.
+-func TestMissingNonRepositoryIsNotIgnored(t *testing.T) {
++func TestMissingNonRepositoryDoesNotApply(t *testing.T) {
+ 	plain := t.TempDir()
+ 	missing, err := Missing(plain, []string{".agents/"})
+-	if err != nil {
+-		t.Fatalf("Missing outside a repository: %v, want the pre-existing not-ignored outcome", err)
++	if !errors.Is(err, ErrNotRepository) || len(missing) != 0 {
++		t.Fatalf("Missing = %q, %v, want not applicable", missing, err)
+ 	}
+-	if len(missing) != 1 || missing[0] != ".agents/" {
+-		t.Fatalf("missing = %q, want [\".agents/\"]", missing)
++	for _, fix := range []bool{false, true} {
++		if err := Ensure(plain, []string{".agents/"}, fix); !errors.Is(err, ErrNotRepository) {
++			t.Fatalf("Ensure(fix=%v) = %v, want not applicable", fix, err)
++		}
+ 	}
+-	err = Ensure(plain, []string{".agents/"}, false)
+-	if err == nil {
+-		t.Fatal("Ensure outside a repository must report not ignored")
++	if _, err := os.Stat(filepath.Join(plain, ".gitignore")); !os.IsNotExist(err) {
++		t.Fatalf("non-git root must not gain .gitignore: %v", err)
+ 	}
+-	if !IsNotIgnored(err) {
+-		t.Fatalf("err = %v (%T), want a NotIgnoredError", err, err)
++}
++
++func TestMissingBrokenRepositoryFailsClosed(t *testing.T) {
++	root := t.TempDir()
++	if err := os.WriteFile(filepath.Join(root, ".git"), []byte("gitdir: missing\n"), 0o644); err != nil {
++		t.Fatal(err)
+ 	}
+-	if !strings.Contains(err.Error(), "generated paths are not ignored by git") {
+-		t.Fatalf("err = %q, want the stable policy message", err)
++	err := Ensure(root, []string{".agents/"}, true)
++	if err == nil || errors.Is(err, ErrNotRepository) || IsNotIgnored(err) {
++		t.Fatalf("broken .git must be a tool failure: %v", err)
++	}
++	if _, err := os.Stat(filepath.Join(root, ".gitignore")); !os.IsNotExist(err) {
++		t.Fatalf("broken git must not write .gitignore: %v", err)
+ 	}
+ }
+ 
+diff --git a/internal/install/gitignore_spawn_test.go b/internal/install/gitignore_spawn_test.go
+index 25cf7477..0618891e 100644
+--- a/internal/install/gitignore_spawn_test.go
++++ b/internal/install/gitignore_spawn_test.go
+@@ -53,3 +53,43 @@ func TestProjectRefusesOnGitignoreSpawnFailure(t *testing.T) {
+ 		t.Fatalf("refusal = %q, must never carry the policy message: %+v", joined, result)
+ 	}
+ }
++
++// Exercise the schema-1 lane and its additional dev-substitution hygiene gate.
++func TestProjectNonGitWithDevSubstitution(t *testing.T) {
++	for _, substituted := range []bool{false, true} {
++		name := "declared"
++		if substituted {
++			name = "substituted"
++		}
++		t.Run(name, func(t *testing.T) {
++			e := newEnv(t)
++			e.skill("skill-a")
++			e.declare("skill-a")
++			if err := os.RemoveAll(filepath.Join(e.project, ".git")); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.Remove(filepath.Join(e.project, ".gitignore")); err != nil {
++				t.Fatal(err)
++			}
++			if substituted {
++				e.write(e.project, "Skillfile.dev.json", `{"substitutions":{"skill-a":{"path":`+quoteJSONPath(filepath.Join(e.skillsRoot, "skill-a"))+`}}}`)
++			}
++			result := e.install(Options{FixGitignore: true})
++			if result.Status != "ok" {
++				t.Fatalf("non-git install = %+v", result)
++			}
++			if !hasMessageContaining(result.Messages, "gitignore hygiene check does not apply") {
++				t.Fatalf("missing hygiene notice: %+v", result)
++			}
++			payload, err := os.ReadFile(filepath.Join(e.project, ".agents", "skills", "skill-a", "SKILL.md"))
++			if err != nil || !strings.Contains(string(payload), "# skill-a") {
++				t.Fatalf("skill bytes missing: %v", err)
++			}
++			for _, name := range []string{".git", ".gitignore"} {
++				if _, err := os.Lstat(filepath.Join(e.project, name)); !os.IsNotExist(err) {
++					t.Fatalf("non-git install wrote %s: %v", name, err)
++				}
++			}
++		})
++	}
++}
+diff --git a/internal/install/install.go b/internal/install/install.go
+index 37812736..21e81480 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -334,13 +334,16 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 	// 3. Managed .gitignore gate.
+ 	required := adapters.RequiredGitignoreEntries(agents)
+ 	if err := gitignore.Ensure(projectRoot, required, opts.FixGitignore && !opts.DryRun); err != nil {
+-		if !gitignore.IsNotIgnored(err) {
++		if errors.Is(err, gitignore.ErrNotRepository) {
++			result.Messages = append(result.Messages, fmt.Sprintf("%s: notice: %v", alias, err))
++		} else if !gitignore.IsNotIgnored(err) {
+ 			result.failf("%v", err)
+ 			return result, nil
++		} else {
++			result.Status = "skipped"
++			result.Messages = append(result.Messages, fmt.Sprintf("%s: %v; skipped", alias, err))
++			return result, nil
+ 		}
+-		result.Status = "skipped"
+-		result.Messages = append(result.Messages, fmt.Sprintf("%s: %v; skipped", alias, err))
+-		return result, nil
+ 	}
+ 
+ 	// 4. Dev substitutions. No Curator command writes this file, so nothing
+@@ -362,7 +365,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 			result.failf("dev substitutions are active in %s; strict audit refuses substituted installs", devsub.Name)
+ 			return result, nil
+ 		}
+-		if err := gitignore.Ensure(projectRoot, []string{devsub.Name}, opts.FixGitignore && !opts.DryRun); err != nil {
++		if err := gitignore.Ensure(projectRoot, []string{devsub.Name}, opts.FixGitignore && !opts.DryRun); err != nil && !errors.Is(err, gitignore.ErrNotRepository) {
+ 			if !gitignore.IsNotIgnored(err) {
+ 				result.failf("%v", err)
+ 				return result, nil
