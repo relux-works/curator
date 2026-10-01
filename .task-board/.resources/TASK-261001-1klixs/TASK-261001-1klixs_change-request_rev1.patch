@@ -1,0 +1,173 @@
+diff --git a/README.md b/README.md
+index 8de7c24f..ae528e67 100644
+--- a/README.md
++++ b/README.md
+@@ -36,6 +36,8 @@ curl -fsSL https://raw.githubusercontent.com/relux-works/curator/main/install.sh
+ 
+ </details>
+ 
++Second operator on a new machine: see [docs/second-operator.md](docs/second-operator.md) for the verified install, managed-home profile, credential passthrough, and `curator run` path.
++
+ <details>
+ <summary>Scoop (Windows)</summary>
+ 
+diff --git a/docs/second-operator.md b/docs/second-operator.md
+new file mode 100644
+index 00000000..11eee873
+--- /dev/null
++++ b/docs/second-operator.md
+@@ -0,0 +1,154 @@
++# Second-operator onboarding
++
++A step-by-step path for an operator who starts using Curator, a managed-home
++profile, and `curator run` on their own machine. Every command below was run
++on a clean HOME (macOS, Curator built from trunk, curator-run 0.1.0, stub
++`claude`/`codex` executables). Real agents and Linux were not exercised; see
++[Unverified](#unverified).
++
++## 1. Prerequisites
++
++- macOS or Linux, `git` on `PATH`.
++- `gh` (with `gh attestation verify`) or `cosign`, for the verified installer.
++- Go toolchain from the launcher's `go.mod`, for `curator-run`.
++- The agent tools you use (`claude`, `codex`) on `PATH`, logged in natively
++  once (`claude` then `/login`; `codex login`).
++
++## 2. Install Curator and the launcher
++
++```bash
++brew install relux-works/tap/curator
++# or the verified installer:
++curl -fsSL https://raw.githubusercontent.com/relux-works/curator/main/install.sh | sh
++```
++
++The installer verifies `checksums.txt` with `gh attestation verify` or, if
++`gh` is missing, with the release's keyless cosign signature, and then
++checks the archive's SHA-256. It refuses to install when neither verifier is
++available. Use `CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1` only in an emergency:
++it installs the executable with no integrity check. `CURATOR_VERSION` pins a
++release and `CURATOR_BIN_DIR` picks the directory (default `/usr/local/bin`,
++fallback `~/.local/bin`).
++
++```bash
++go install github.com/relux-works/curator-agent-launcher/cmd/curator-run@v0.1.0
++```
++
++Put `$(go env GOPATH)/bin` (or a dedicated `GOBIN`) on `PATH`. Do not install
++`curator-run` into `~/.local/bin` or under `~/.curator/environments`.
++Umbrella discovery refuses those locations with `subcommand_provider_untrusted`.
++
++## 3. Machine initialization
++
++```bash
++curator bootstrap --if-missing --non-interactive \
++  --skills-root ~/skills --default-agents claude_code,codex_cli
++curator global init
++```
++
++`--skills-root` is required when you pass `--non-interactive`. `curator global init` and every
++`profile`/`env` command fail with `global config not found` until
++`bootstrap` has written `~/.curator/config.json`.
++
++## 4. Managed-home profile
++
++A profile is a git repository or local directory that has an
++`agent-context.json` file at its root:
++
++```json
++{"schema_version": 1, "name": "myprofile", "version": "1.0.0",
++ "context": {"modules": [{"path": "a.md"}]}}
++```
++
++The modules are stored under `context/`, for example `context/a.md`. Install it and make it current:
++
++```bash
++curator profile install /path/to/profile --as myprofile --use   # local path
++curator profile install <git-url> --tag v1.0.0 --as myprofile --use
++curator profile list
++```
++
++A local path takes no `--tag/--range/--revision`, because it is refused with
++`profile_install_ref_conflict`. `--use` also switches the native homes
++(`~/.claude`, `~/.codex`, `~/.config/opencode`, `~/.pi`). It writes
++a marker and the rendered root context there.
++
++Provision and inspect the managed homes:
++
++```bash
++curator env resolve claude_code --repair --format json
++curator env resolve codex_cli --repair --format json
++curator env status
++```
++
++Without `--repair`, the first `env resolve` exits 1 with
++`environment_home_stale: home unprovisioned`. The homes live at
++`~/.curator/environments/<profile>/<env-id>`, and the fragment exports
++`CLAUDE_CONFIG_DIR` or `CODEX_HOME` pointing there.
++
++## 5. Credential passthrough
++
++Managed homes never copy credentials. They either link to the native store
++or rely on a store that is outside the filesystem. The per-tool facts come from
++`internal/envregistry/envregistry.go` (Claude `:240-243`, Codex `:263-265`,
++Pi `:317`), and `effectivePassthrough` applies them
++(`internal/envprofile/managed.go:545-575`).
++
++| Tool | macOS | Linux | What the operator does once |
++|---|---|---|---|
++| Claude Code | Nothing linked (`darwin: {}`). Claude keys its Keychain item per `CLAUDE_CONFIG_DIR` (service suffix sha256[0:8]), so the managed home has its own login (`per-home-keychain`, `managed.go:581-587`). | `.credentials.json` symlinked to `~/.claude/.credentials.json` (`file-link`). | macOS: run `/login` once inside each managed home, for example with the first `curator run claude`. Linux: log in natively once. |
++| Codex CLI | `auth.json` symlinked to `~/.codex/auth.json` when the native store is `file` (the default). When `~/.codex/config.toml` sets `cli_auth_credentials_store = "keyring"`, nothing is linked and the keyring is shared ambiently (`managed.go:559-567`). | Same | `codex login` natively once. |
++| Pi | `auth.json` linked to `~/.pi/agent/auth.json` | Same | Log in natively once. |
++
++What was observed on the walk (macOS): `codex_cli/auth.json ->
++~/.codex/auth.json` was a symlink, and the marker recorded
++`strategy keyring-preferred, backend file`. The `claude_code` home had no
++credential entry, and the fake native `~/.claude/.credentials.json` was not
++linked or copied. `env unmanage` and `profile remove` left both native
++credential files byte-identical. An isolated profile links nothing.
++
++## 6. `curator run`
++
++```bash
++curator run claude -- --print hello          # current profile
++curator run codex --profile myprofile -- exec hi
++```
++
++The launcher calls `curator env resolve <env> --repair --format json` and
++then execs the tool with the fragment's `CLAUDE_CONFIG_DIR`/`CODEX_HOME`, the
++lineup model and effort flags, and your arguments after `--`. The walk's stubs
++received `--model claude-opus-5-5 --effort high --print hello`
++and `-m gpt-6-astra -c model_reasoning_effort="max" exec hi`, the caller's
++cwd, and the full inherited environment.
++
++## 7. Update and removal
++
++```bash
++curator profile update myprofile
++curator env unmanage --restore-backups
++curator profile use default
++curator profile remove myprofile     # refused (profile_in_use) while current
++```
++
++## Troubleshooting
++
++| Symptom | Fix |
++|---|---|
++| `global config not found: ~/.curator/config.json` | Run `curator bootstrap` first (step 3). |
++| `bootstrap requires --skills-root` | Pass `--skills-root <dir>`. |
++| `profile_install_ref_conflict` | Drop `--tag/--range/--revision` for a local path. |
++| `environment_home_stale: home unprovisioned` | Add `--repair`. `curator run` always repairs. |
++| `profile_in_use` on remove | Run `curator profile use default` first. |
++| `env status --check` exits 1 on a healthy setup | Non-current profiles report `home unprovisioned`. Read the per-row findings rather than relying on the exit code. |
++| `security_posture_permissive` warning on every command | Set `"security_posture": "hardened"` in `~/.curator/config.json` if your policy allows it. |
++| Claude asks to log in inside `curator run` on macOS | Expected: the per-home Keychain item. Log in once for each managed home. |
++| `subcommand_provider_untrusted` | Move `curator-run` out of `~/.local/bin` or the managed directories. |
++
++## Unverified
++
++- Real `claude`/`codex` sessions. Only stubs were run, so the per-home
++  Keychain behaviour comes from registry facts verified on Claude 2.1.261,
++  not from a login.
++- Linux: the Claude `.credentials.json` link was not exercised.
++- The Codex `keyring` store branch was read from the code but not run.
++- The release installer (network download plus attestation) was not run.
