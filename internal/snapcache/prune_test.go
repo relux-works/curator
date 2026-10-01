@@ -286,3 +286,36 @@ func TestPruneRequiresTheHeldHomeLock(t *testing.T) {
 		t.Fatal("prune without the lock removed an entry")
 	}
 }
+
+func TestPruneUncertainLeftoversAndDryRunWarnings(t *testing.T) {
+	for _, uncertain := range []bool{false, true} {
+		home := t.TempDir()
+		leftover := filepath.Join(CacheRoot(home), "s", prunePrefix+commitOf("a")+"-0011")
+		if err := os.MkdirAll(filepath.Join(leftover, "snapshot"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		refs := References{}
+		if uncertain {
+			refs.Uncertain = []string{"unreadable source lock"}
+		}
+		req := Request{Home: home, Lock: heldLock{}, References: refs, Now: testNow, DryRun: true}
+		dry, err := Prune(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !exists(t, leftover) {
+			t.Fatal("dry run deleted a leftover")
+		}
+		req.DryRun = false
+		actual, err := Prune(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if exists(t, leftover) != uncertain {
+			t.Fatalf("leftover existence does not match uncertainty %t", uncertain)
+		}
+		if !reflect.DeepEqual(dry.Warnings, actual.Warnings) {
+			t.Fatalf("dry and real warnings differ: %q / %q", dry.Warnings, actual.Warnings)
+		}
+	}
+}

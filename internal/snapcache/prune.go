@@ -129,15 +129,18 @@ func Prune(request Request) (Report, error) {
 
 	var failures []error
 	for _, leftover := range inventory.Leftovers {
+		if !certain {
+			report.Warnings = append(report.Warnings, fmt.Sprintf("interrupted removal %s retained because references are uncertain", leftover))
+			continue
+		}
+		report.Warnings = append(report.Warnings, fmt.Sprintf("interrupted removal %s scheduled for cleanup", leftover))
 		if request.DryRun {
-			report.Warnings = append(report.Warnings, fmt.Sprintf("interrupted removal %s will be deleted by a real run", leftover))
 			continue
 		}
 		if err := os.RemoveAll(leftover); err != nil {
 			failures = append(failures, fmt.Errorf("delete interrupted removal %s: %w", leftover, err))
 			continue
 		}
-		report.Warnings = append(report.Warnings, fmt.Sprintf("deleted interrupted removal %s", leftover))
 	}
 	for _, decision := range decisions {
 		row := ReportEntry{
