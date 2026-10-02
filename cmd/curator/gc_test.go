@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -16,6 +18,80 @@ import (
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/scopes"
 )
+
+// TestGCRetainsLiveProcessBuild exercises run("gc") -> collectUnderLock ->
+// scopes.Collect -> Store.Sweep with a real process executing an old cache
+// image. No marker, journal reference or publication grace can protect it.
+func TestGCRetainsLiveProcessBuild(t *testing.T) {
+	requireNativeControlInventoryPlatform(t)
+	project, home := compiledProject(t)
+	skill := filepath.Join(filepath.Dir(home), "skills", "build-skill")
+	writeFile(t, filepath.Join(skill, "assets", "build-tool", "cmd", "tool", "main.go"),
+		"package main\nimport (\"fmt\"; \"io\"; \"os\")\nfunc main() { fmt.Println(\"ready\"); _, _ = io.Copy(io.Discard, os.Stdin) }\n")
+	runGit(t, skill, "add", ".")
+	runGit(t, skill, "commit", "-qm", "waiting executable fixture")
+	runGit(t, skill, "tag", "-f", "v1")
+	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
+		t.Fatalf("install = %d\n%s\n%s", code, stdout, stderr)
+	}
+	entries := cacheEntries(t, home)
+	if len(entries) != 1 {
+		t.Fatalf("cache entries = %v", entries)
+	}
+	bin := filepath.Join(entries[0], "bin")
+	files, err := os.ReadDir(bin)
+	if err != nil || len(files) != 1 {
+		t.Fatalf("bin files = %v, %v", files, err)
+	}
+	child := exec.Command(filepath.Join(bin, files[0].Name()))
+	stdin, err := child.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout, err := child.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := child.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = stdin.Close()
+		if err := child.Wait(); err != nil {
+			t.Errorf("cache executable exit: %v", err)
+		}
+	})
+	ready := make(chan bool, 1)
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		ready <- scanner.Scan() && scanner.Text() == "ready"
+	}()
+	select {
+	case ok := <-ready:
+		if !ok {
+			t.Fatal("cache executable did not signal readiness")
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("cache executable readiness timed out")
+	}
+	if err := os.Remove(filepath.Join(project, ".agents", "skills", "build-skill", marker.Name)); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-30 * 24 * time.Hour)
+	if err := os.Chtimes(entries[0], old, old); err != nil {
+		t.Fatal(err)
+	}
+	code, output, stderr := capture(t, filepath.Join(home, "config.json"), "gc")
+	if code != exitOK || !strings.Contains(output, "0 build entries removed") {
+		t.Fatalf("gc = %d\n%s\n%s", code, output, stderr)
+	}
+	if _, err := os.Stat(entries[0]); err != nil {
+		t.Fatalf("gc removed a live process executable: %v", err)
+	}
+	if strings.Contains(stderr, "live process executables could not be enumerated") {
+		t.Logf("native enumeration could not inspect every process; exercised fail-safe retention: %s", stderr)
+	}
+}
 
 // installTestMarker writes one valid install marker so a project counts as a
 // live consumer.

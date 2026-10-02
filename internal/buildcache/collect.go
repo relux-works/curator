@@ -18,11 +18,9 @@ import (
 // DefaultGrace is Curator's documented build-cache grace period. An
 // unreferenced protected entry younger than this is always retained.
 //
-// A swept entry costs a rebuild, never correctness, so the window only has to
-// exceed any operation that could still be publishing while holding no journal
-// — a crash between publication and journal preparation is the only such case.
-// One day is far beyond that and still bounds how long orphaned artifacts
-// occupy disk.
+// This protects a crash between publication and journal preparation. Live
+// process executables are retained independently of publication age so their
+// absolute paths remain available for re-exec.
 const DefaultGrace = 24 * time.Hour
 
 // sweepPrefix names a cache entry this collector already retired. The rename
@@ -72,7 +70,8 @@ type SweepResult struct {
 // Every decision fails safe. The cache root is revalidated as protected state
 // before traversal; an entry is removed only when it is itself protected,
 // structurally exact, and self-consistent with the logical key its directory
-// name encodes; anything unprovable is retained and reported. Entry content is
+// name encodes, and not used by the process snapshot; anything unprovable is
+// retained and reported. Entry content is
 // never executed, adopted, or permission-repaired.
 func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, error) {
 	if err := requireHomeLock(lock); err != nil {
@@ -96,6 +95,19 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 	}
 
 	result := SweepResult{}
+	enumerate := store.ExecutablePaths
+	if enumerate == nil {
+		enumerate = liveExecutablePaths
+	}
+	executables, err := enumerate()
+	if err == nil {
+		executables, err = normalizeExecutablePaths(executables)
+	}
+	if err != nil {
+		result.Warnings = append(result.Warnings, fmt.Sprintf(
+			"build cache sweep skipped: live process executables could not be enumerated: %v; all builds retained", err))
+		return result, nil
+	}
 	referenced := make(map[string]bool, len(request.Referenced))
 	for _, key := range request.Referenced {
 		name, ok := entryName(key)
@@ -115,7 +127,7 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 		if err != nil {
 			return result, err
 		}
-		if !store.sweepNamespace(base, referenced, now, grace, &result) {
+		if !store.sweepNamespace(base, referenced, executables, now, grace, &result) {
 			// The boundary below the manager home could not be proven; the
 			// same refusal applies to every namespace, so it is reported once.
 			return result, nil
@@ -127,7 +139,7 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 // sweepNamespace sweeps one protected cache root. It reports false only when
 // the root's boundary was refused (an absent root is simply empty); every
 // refusal is recorded as a warning on the result.
-func (store *Store) sweepNamespace(base string, referenced map[string]bool, now time.Time, grace time.Duration, result *SweepResult) bool {
+func (store *Store) sweepNamespace(base string, referenced map[string]bool, executables []string, now time.Time, grace time.Duration, result *SweepResult) bool {
 	root, err := openSweepRoot(store.home, base)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -141,6 +153,11 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, now 
 	// handle-relative mutator bound to it, so no removal can follow a pathname
 	// that was exchanged after the boundary was proven.
 	defer root.close()
+	canonicalBase, err := filepath.EvalSymlinks(base)
+	if err != nil {
+		result.Warnings = append(result.Warnings, fmt.Sprintf("build cache sweep skipped: resolve live executable boundary: %v", err))
+		return false
+	}
 
 	names, err := directoryNames(root.validated.dir)
 	if err != nil {
@@ -151,11 +168,14 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, now 
 	for _, name := range names {
 		switch {
 		case entryNameRE.MatchString(name):
-			if referenced[name] {
+			if referenced[name] || buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), executables) {
 				continue
 			}
 			store.sweepUnreferenced(root, name, now, grace, result)
 		case strings.HasPrefix(name, sweepPrefix):
+			if buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), executables) {
+				continue
+			}
 			// Manager-private wreckage of an interrupted removal: the entry is
 			// already unreachable by key, so finishing the deletion is safe.
 			if err := root.mutator.RemoveAll(name); err != nil {

@@ -84,6 +84,9 @@ func (result Result) DryRunOutcome() string {
 type Store struct {
 	home      string
 	supported func() bool
+	// ExecutablePaths optionally supplies the process-table dependency for a
+	// sweep. Nil uses native enumeration; any error retains all builds.
+	ExecutablePaths func() ([]string, error)
 	// faults is the deterministic in-package fault seam over the mutation
 	// boundaries of publication and reversal. New never sets it, so a store any
 	// caller outside this package can construct always takes the unhooked path.

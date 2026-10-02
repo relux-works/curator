@@ -3,6 +3,7 @@ package scopes
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -18,15 +19,52 @@ import (
 	"github.com/relux-works/curator/internal/stateread"
 )
 
+func TestCollectRetainsLiveProcessBuild(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		name := "in-use"
+		if fail {
+			name = "enumeration-error"
+		}
+		t.Run(name, func(t *testing.T) {
+			home := protectedTestHome(t)
+			store := openProtectedStore(t, home)
+			live := publishRealEntry(t, store, "runner", "live executable")
+			unused := publishRealEntry(t, store, "unused", "unused executable")
+			backdateEntry(t, home, live, 30*24*time.Hour)
+			backdateEntry(t, home, unused, 30*24*time.Hour)
+			store.ExecutablePaths = func() ([]string, error) {
+				if fail {
+					return nil, errors.New("injected process-table failure")
+				}
+				return []string{filepath.Join(realEntryPath(home, live), "bin", "runner")}, nil
+			}
+			result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(realEntryPath(home, live)); err != nil {
+				t.Fatalf("live process build swept: %v", err)
+			}
+			if fail {
+				if len(result.RemovedBuilds) != 0 || !warned(result, "injected process-table failure") {
+					t.Fatalf("unknown process table did not retain and warn: %+v", result)
+				}
+				if _, err := os.Stat(realEntryPath(home, unused)); err != nil {
+					t.Fatalf("uncertain build swept: %v", err)
+				}
+			} else if len(result.RemovedBuilds) != 1 || result.RemovedBuilds[0] != string(unused) || len(result.Warnings) != 0 {
+				t.Fatalf("unused build not swept: %+v", result)
+			}
+		})
+	}
+}
+
 // TestCollectSweepsOnlyUnreferencedProtectedEntries drives the whole chain —
 // mark from real markers, sweep the real protected store — instead of a stub,
 // so the logical key a marker records and the key the cache stores must agree.
 func TestCollectSweepsOnlyUnreferencedProtectedEntries(t *testing.T) {
 	home := protectedTestHome(t)
-	store, err := buildcache.New(home)
-	if err != nil {
-		t.Fatal(err)
-	}
+	store := openProtectedStore(t, home)
 	referenced := publishRealEntry(t, store, "kept-tool", "kept artifact")
 	orphan := publishRealEntry(t, store, "orphan-tool", "orphan artifact")
 
@@ -39,7 +77,7 @@ func TestCollectSweepsOnlyUnreferencedProtectedEntries(t *testing.T) {
 	backdateEntry(t, home, referenced, 30*24*time.Hour)
 	backdateEntry(t, home, orphan, 30*24*time.Hour)
 
-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}})
+	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,15 +107,12 @@ func TestCollectSweepsOnlyUnreferencedProtectedEntries(t *testing.T) {
 // transaction still depends on survives even with no marker naming it.
 func TestCollectRetainsAJournalOwnedEntry(t *testing.T) {
 	home := protectedTestHome(t)
-	store, err := buildcache.New(home)
-	if err != nil {
-		t.Fatal(err)
-	}
+	store := openProtectedStore(t, home)
 	inFlight := publishRealEntry(t, store, "in-flight-tool", "in-flight artifact")
 	backdateEntry(t, home, inFlight, 30*24*time.Hour)
 
 	result, err := Collect(MaintenanceRequest{
-		Home: home, Lock: testHomeLock{}, JournalKeys: []string{string(inFlight)},
+		Home: home, Lock: testHomeLock{}, Cache: store, JournalKeys: []string{string(inFlight)},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -95,10 +130,7 @@ func TestCollectRetainsAJournalOwnedEntry(t *testing.T) {
 // cache entry rather than sweeping artifacts it can no longer account for.
 func TestCollectRetainsBuildEntriesWhenAMarkerCannotBeRead(t *testing.T) {
 	home := protectedTestHome(t)
-	store, err := buildcache.New(home)
-	if err != nil {
-		t.Fatal(err)
-	}
+	store := openProtectedStore(t, home)
 	orphan := publishRealEntry(t, store, "orphan-tool", "orphan artifact")
 	backdateEntry(t, home, orphan, 30*24*time.Hour)
 
@@ -116,7 +148,7 @@ func TestCollectRetainsBuildEntriesWhenAMarkerCannotBeRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}})
+	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
 	if err != nil {
 		t.Fatal(err)
 	}

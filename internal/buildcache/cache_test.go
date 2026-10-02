@@ -570,6 +570,7 @@ func newTestStore(t *testing.T) *Store {
 	if err != nil {
 		t.Fatal(err)
 	}
+	store.ExecutablePaths = func() ([]string, error) { return nil, nil }
 	return store
 }
 

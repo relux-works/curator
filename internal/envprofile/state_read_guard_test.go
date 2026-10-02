@@ -181,6 +181,9 @@ func reviewedManagerReadExceptions() map[string]string {
 		"internal/yarnmodernsource/capture.go:reconcileCapturedAuthorities",
 		"internal/yarnmodernsource/materialize.go:cleanAbsentAbsolute",
 	)
+	allow("Reads the OS-owned Linux process table, not manager state; a missing exe requires stat evidence of exit, zombie or kernel thread, and unreadable or malformed observations fail safe by retaining builds.",
+		"internal/buildcache/process_linux.go:linuxExecutablePaths",
+	)
 	return exceptions
 }
 
