@@ -1,0 +1,13 @@
+# Integration preflight — marker-reader-cross-field-validation
+
+Bound integration run RUN-261002-858673, developer / implementer. Latest Integration Assignment governs: runner owns synchronous landing after producer exit; no integrate, checkpoint, handoff, or status mutation invoked. No repository files changed by this run.
+
+Board query exit 0: status integrating. Managed workspace status exit 0: CR-BUG-260923-2afgyq-2 revision 2 accepted, kind story_final, producer developer / implementer, reviewer RUN-261002-f26ac2; current lease RUN-261002-858673. Base/checkpoint/branch tip f40b77c19c01746bda8b9a610358d860f2ad20c5; accepted candidate tree b52821e954825c370ad6c72c69629ded28ed6e1d. Four accepted product paths. Board-copy changes are listed in dropped_board_paths and are outside the accepted product delta.
+
+Fresh verification: Python direct working-file versus candidate-blob assertions exited 0, 4/4 identical, including the untracked test file. git diff --check exited 0. An initial git diff candidate comparison reported the untracked test as deleted because it is absent from the index; the direct byte comparison resolves this false indication. That initial diff was followed by ls-remote in one shell, so its process exit was not independently captured and is not claimed green.
+
+Fresh git ls-remote --symref origin HEAD refs/heads/main exited 0 and advertised c085b4d22a0b6a51e3070277e7f3cffeb84e67e7 as HEAD/main. This differs from the accepted base. Landing freshness/authority is therefore NOT established by this preflight; the runner must perform its bound transaction checks and record any refusal. No refresh or acceptance rewrite attempted.
+
+Read attached review-verdict-rev2.md (exit 0): revision accepted; three pinned marker/conformancecoverage -work runs had exit 0; substantive rev1 acceptance includes five killed mutants and focused install/CLI evidence. Exact ledger data counts: old base 134, refreshed base 132, candidate 112; five distinct marker cases correspond to 20 rows across four suite/family groups, with two separate trunk hardlink rows removed. Full install-package green remains unknown under the recorded host timeouts. No tests, mutants, build, or lint rerun in this integration-only run; accepted evidence reused with 4/4 candidate byte identity.
+
+Host syspolicyd observed running, successive crashes 361. Directives query exit 0: none. The attempted get projection changeRequest exited 1 (unknown field); supported worktree status supplied the CR metadata. Task remains integrating for runner-owned landing; this artifact does not assert integration success.
