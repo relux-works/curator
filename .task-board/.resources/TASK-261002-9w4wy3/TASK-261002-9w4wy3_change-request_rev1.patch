@@ -1,0 +1,725 @@
+diff --git a/.github/ci/conformance-gaps.tsv b/.github/ci/conformance-gaps.tsv
+index 643dbec2..310feadc 100644
+--- a/.github/ci/conformance-gaps.tsv
++++ b/.github/ci/conformance-gaps.tsv
+@@ -37,8 +37,6 @@ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	marker/install-
+ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	marker/install-marker-v4/schema-cases	invalid-marker-network-identity-kind-mismatch.json	BUG-260923-2afgyq	marker.Read admits a network marker identity with the wrong repository identity kind
+ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	marker/install-marker-v4/schema-cases	invalid-marker-sha1-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-1 external revision with the wrong effective width
+ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	marker/install-marker-v4/schema-cases	invalid-marker-sha256-effective-revision-width.json	BUG-260923-2afgyq	marker.Read admits a SHA-256 external revision with the wrong effective width
+-be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	script-host-execution-policy/executable-identity-cases	windows-exec-noncomponent-store-hardlinks	STORY-260925-1v7pvn	The production resolver accepts multiply-linked System32 targets without proving every additional link belongs to the component store.
+-be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	script-host-execution-policy/executable-identity-cases	windows-exec-unowned-file-hardlinks	STORY-260925-1v7pvn	The production resolver accepts a multiply-linked file below captured SystemRoot\System32 without proving the target is platform-owned.
+ 
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-empty-backend-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-missing-backend-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index d1622664..43b94f10 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -798,3 +798,5 @@ cmd/curator	TestInstallGitignoreEntryPoint/git-ignore-negation	linux,darwin,wind
+ cmd/curator	TestInstallGitignoreEntryPoint/broken-git	linux,darwin,windows	-	-	corrupt .git metadata refuses with nonzero exit and no installed bytes
+ cmd/curator	TestInstallGitignoreEntryPoint/unexpected-exit-2	linux,darwin	windows	platform-control	unexpected Git exit 2 carrying the absence diagnostic refuses through the CLI; POSIX shim fixture
+ cmd/curator	TestInstallGitignoreEntryPoint/unexpected-exit-128	linux,darwin	windows	platform-control	unexpected Git exit 128 carrying an unrelated diagnostic refuses through the CLI; POSIX shim fixture
++internal/scriptworker	TestWindowsExecHardlinkOriginEvidence	linux,darwin,windows	-	-	Production exec resolution and launch revalidation refuse unknown owners and incomplete or foreign hard-link evidence
++internal/scriptworker	TestWindowsNativeExecHardlinkOrigins	windows	-	-	Hosted Windows exercises real file IDs, owner SIDs and hard-link enumeration at the production resolver
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 9c770a0a..14791cd9 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,8 @@ All notable implementation changes are recorded here.
+ 
+ ## Unreleased
+ 
++- Windows executable resolution now proves platform ownership and every component-store hard-link origin before granting the captured System32 exception.
++
+ - Unix HTTPS askpass requests the secret only after accepting the password prompt, preventing broken-pipe transport errors on refusal paths.
+ 
+ ### Added
+diff --git a/docs/ci-gates.md b/docs/ci-gates.md
+index 87c15631..17d279da 100644
+--- a/docs/ci-gates.md
++++ b/docs/ci-gates.md
+@@ -71,7 +71,7 @@ Consumers that iterate a complete published case family use the shared case-cove
+ 
+ The released v1.0.0-rc.13 root publishes the complete `skillfile-dev-v2` and `skill-build-v1` schema lists, external-repository fixtures, and the newly promoted config, environment marker, security-posture and launch-fragment cases. Measured family tallies and owned gaps were rechecked against v1.0.0-rc.13 tag commit `23435129ebc4c29e5b7f75ec72a0aa0cd3f16065`; the interim-to-release conformance diff changes protocol_version labels and manifest digests, not case IDs, so the pinned counts and gap rows remain unchanged. Tests that select one named case from a broader published vector set remain targeted checks; they do not claim to account for the complete family.
+ 
+-The 28 manager-config overlay gaps are attributed to the unsupported `permissions`, `source_signers`, and `require_source_signers` members added by 0017/0018 and E1. Those members are present in the updated overlay cases, so `Load` can report either new blocker first; it does not indicate an overlay path-kind failure. The config regression test checks all 14 schema inputs and 14 vectors against their production results and checks both owners in each ledger row. The rc.13 script-worker root also publishes eight Windows executable-identity cases: the manager resolver drives all eight, with two known gaps where the current System32 exception cannot establish component-store link targets or platform ownership.
++The 28 manager-config overlay gaps are attributed to the unsupported `permissions`, `source_signers`, and `require_source_signers` members added by 0017/0018 and E1. Those members are present in the updated overlay cases, so `Load` can report either new blocker first; it does not indicate an overlay path-kind failure. The config regression test checks all 14 schema inputs and 14 vectors against their production results and checks both owners in each ledger row. The rc.13 script-worker root also publishes eight Windows executable-identity cases: the manager resolver drives all eight, with all eight counted as driven; the System32 exception proves owner SID, matching file IDs, and complete component-store link enumeration.
+ 
+ ## Self-hosted runner prerequisites
+ 
+diff --git a/internal/scriptworker/exec.go b/internal/scriptworker/exec.go
+index 50555c93..4b130f94 100644
+--- a/internal/scriptworker/exec.go
++++ b/internal/scriptworker/exec.go
+@@ -257,6 +257,9 @@ func readExecIdentityAt(name, canonical, platform, trustedSystem32Root string) (
+ 	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
+ 		return ExecIdentity{}, false, nil
+ 	}
++	if multiple && !trustedWindowsExecHardlinks(file, canonical, trustedSystem32Root) {
++		return ExecIdentity{}, false, nil
++	}
+ 	digest := sha256.New()
+ 	written, err := io.CopyN(digest, file, opened.Size())
+ 	var extra [1]byte
+@@ -264,6 +267,15 @@ func readExecIdentityAt(name, canonical, platform, trustedSystem32Root string) (
+ 	if err != nil || written != opened.Size() || extraCount != 0 || (extraErr != nil && !errors.Is(extraErr, io.EOF)) {
+ 		return ExecIdentity{}, false, nil
+ 	}
++	// Repeat after reading: a new alias must not inherit an earlier proof.
++	latest, err := file.Stat()
++	if err != nil {
++		return ExecIdentity{}, false, nil
++	}
++	multiple, err = godriver.HasMultipleLinks(canonical, latest)
++	if err != nil || (multiple && (!trustedSystem32File || !trustedWindowsExecHardlinks(file, canonical, trustedSystem32Root))) {
++		return ExecIdentity{}, false, nil
++	}
+ 	return ExecIdentity{
+ 		Name:                name,
+ 		Path:                canonical,
+diff --git a/internal/scriptworker/exec_hardlinks.go b/internal/scriptworker/exec_hardlinks.go
+new file mode 100644
+index 00000000..ec341c45
+--- /dev/null
++++ b/internal/scriptworker/exec_hardlinks.go
+@@ -0,0 +1,55 @@
++package scriptworker
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++
++	"github.com/relux-works/curator/internal/godriver"
++)
++
++// The service SID is fixed by Windows, independent of localized account names.
++const trustedInstallerSID = "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464"
++const localSystemSID = "S-1-5-18"
++
++type windowsExecHardlinkOrigin struct {
++	OwnerSID string
++	Links    []string // complete, physical paths to the same file ID as the open executable
++	Count    uint32
++}
++
++// Tests substitute OS observations, while driving the production resolver and
++// VerifyExec. Neither callers nor package metadata can supply these observations.
++var inspectWindowsExecHardlinks = nativeWindowsExecHardlinks
++
++func trustedWindowsExecHardlinks(file *os.File, canonical, system32 string) bool {
++	origin, err := inspectWindowsExecHardlinks(file, canonical)
++	if err != nil || origin.Count < 2 || uint64(len(origin.Links)) != uint64(origin.Count) {
++		return false
++	}
++	if origin.OwnerSID != trustedInstallerSID && origin.OwnerSID != localSystemSID {
++		return false
++	}
++	store, err := godriver.CanonicalPhysicalPath(filepath.Join(filepath.Dir(system32), "WinSxS"))
++	// A redirected component store cannot authorize links outside captured root.
++	if err != nil || !strings.EqualFold(store, filepath.Join(filepath.Dir(system32), "WinSxS")) {
++		return false
++	}
++	seen := make(map[string]bool, len(origin.Links))
++	foundTarget := false
++	for _, link := range origin.Links {
++		key := strings.ToLower(filepath.Clean(link))
++		if !filepath.IsAbs(link) || seen[key] {
++			return false
++		}
++		seen[key] = true
++		if strings.EqualFold(link, canonical) {
++			foundTarget = true
++			continue
++		}
++		if !pathWithinPlatform(link, store, "windows") {
++			return false
++		}
++	}
++	return foundTarget
++}
+diff --git a/internal/scriptworker/exec_hardlinks_nonwindows.go b/internal/scriptworker/exec_hardlinks_nonwindows.go
+new file mode 100644
+index 00000000..d6cac234
+--- /dev/null
++++ b/internal/scriptworker/exec_hardlinks_nonwindows.go
+@@ -0,0 +1,12 @@
++//go:build !windows
++
++package scriptworker
++
++import (
++	"errors"
++	"os"
++)
++
++func nativeWindowsExecHardlinks(*os.File, string) (windowsExecHardlinkOrigin, error) {
++	return windowsExecHardlinkOrigin{}, errors.New("native Windows hard-link origin APIs are unavailable")
++}
+diff --git a/internal/scriptworker/exec_hardlinks_test.go b/internal/scriptworker/exec_hardlinks_test.go
+new file mode 100644
+index 00000000..a119b441
+--- /dev/null
++++ b/internal/scriptworker/exec_hardlinks_test.go
+@@ -0,0 +1,91 @@
++package scriptworker
++
++import (
++	"errors"
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++func fixtureWindowsExecOrigin(t *testing.T, target, alias string, owned bool) {
++	t.Helper()
++	origin := windowsExecHardlinkOrigin{OwnerSID: trustedInstallerSID, Links: []string{target, alias}, Count: 2}
++	if !owned {
++		origin.OwnerSID = "S-1-5-21-1-2-3-1001"
++	}
++	previous := inspectWindowsExecHardlinks
++	inspectWindowsExecHardlinks = func(file *os.File, path string) (windowsExecHardlinkOrigin, error) {
++		if path != target || file.Name() != target {
++			return windowsExecHardlinkOrigin{}, errors.New("unexpected executable at OS seam")
++		}
++		return origin, nil
++	}
++	t.Cleanup(func() { inspectWindowsExecHardlinks = previous })
++}
++
++// Every observation reaches resolveExecForPlatform, also used by DeriveProfile.
++// VerifyExec must repeat the origin proof even when content has not changed.
++func TestWindowsExecHardlinkOriginEvidence(t *testing.T) {
++	root := mustPhysical(t, t.TempDir())
++	target := filepath.Join(root, "System32", "cmd.exe")
++	alias := filepath.Join(root, "WinSxS", "cmd.exe")
++	writeTestFile(t, target, []byte("executable fixture"), 0o755)
++	if err := os.MkdirAll(filepath.Dir(alias), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Link(target, alias); err != nil {
++		t.Fatal(err)
++	}
++	good := windowsExecHardlinkOrigin{OwnerSID: trustedInstallerSID, Links: []string{target, alias}, Count: 2}
++	previous := inspectWindowsExecHardlinks
++	t.Cleanup(func() { inspectWindowsExecHardlinks = previous })
++	cases := []struct {
++		name string
++		edit func(*windowsExecHardlinkOrigin)
++		err  error
++		want bool
++	}{
++		{name: "trusted-installer", want: true},
++		{name: "local-system", edit: func(o *windowsExecHardlinkOrigin) { o.OwnerSID = localSystemSID }, want: true},
++		{name: "unknown-owner", edit: func(o *windowsExecHardlinkOrigin) { o.OwnerSID = "" }},
++		{name: "ordinary-owner", edit: func(o *windowsExecHardlinkOrigin) { o.OwnerSID = "S-1-5-21-1-2-3-1001" }},
++		{name: "read-failure", err: errors.New("access denied")},
++		{name: "partial-enumeration", edit: func(o *windowsExecHardlinkOrigin) { o.Count = 3 }},
++		{name: "duplicate-alias", edit: func(o *windowsExecHardlinkOrigin) { o.Links[1] = target }},
++		{name: "missing-target", edit: func(o *windowsExecHardlinkOrigin) { o.Links[0] = alias + "-other" }},
++		{name: "relative-alias", edit: func(o *windowsExecHardlinkOrigin) { o.Links[1] = "WinSxS/cmd.exe" }},
++		{name: "store-prefix-sibling", edit: func(o *windowsExecHardlinkOrigin) { o.Links[1] = filepath.Join(root, "WinSxS-other", "cmd.exe") }},
++		{name: "third-link-outside-store", edit: func(o *windowsExecHardlinkOrigin) {
++			o.Count = 3
++			o.Links = append(o.Links, filepath.Join(root, "OtherLinks", "cmd.exe"))
++		}},
++	}
++	for _, testCase := range cases {
++		t.Run(testCase.name, func(t *testing.T) {
++			origin := good
++			origin.Links = append([]string(nil), good.Links...)
++			if testCase.edit != nil {
++				testCase.edit(&origin)
++			}
++			inspectWindowsExecHardlinks = func(*os.File, string) (windowsExecHardlinkOrigin, error) { return origin, testCase.err }
++			identity, found, err := resolveExecForPlatform("cmd.exe", nil, nil, "windows", []string{"SYSTEMROOT=" + root}, true)
++			if err != nil || found != testCase.want {
++				t.Fatalf("production resolve found=%t err=%v, want %t", found, err, testCase.want)
++			}
++			if found {
++				if err := VerifyExec(identity); err != nil {
++					t.Fatal(err)
++				}
++				origin.OwnerSID = ""
++				if err := VerifyExec(identity); DiagnosticCode(err) != CodeWorkerIdentityInvalid {
++					t.Fatalf("changed owner at launch boundary: %v", err)
++				}
++				origin = good
++				origin.Links = []string{target, filepath.Join(root, "OtherLinks", "cmd.exe")}
++				if err := VerifyExec(identity); DiagnosticCode(err) != CodeWorkerIdentityInvalid {
++					t.Fatalf("changed link origin at launch boundary: %v", err)
++				}
++			}
++		})
++	}
++}
+diff --git a/internal/scriptworker/exec_hardlinks_windows.go b/internal/scriptworker/exec_hardlinks_windows.go
+new file mode 100644
+index 00000000..59920dc1
+--- /dev/null
++++ b/internal/scriptworker/exec_hardlinks_windows.go
+@@ -0,0 +1,121 @@
++//go:build windows
++
++package scriptworker
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++	"unsafe"
++
++	"github.com/relux-works/curator/internal/godriver"
++	"golang.org/x/sys/windows"
++)
++
++var hardlinkKernel = windows.NewLazySystemDLL("kernel32.dll")
++var findFirstExecLink = hardlinkKernel.NewProc("FindFirstFileNameW")
++var findNextExecLink = hardlinkKernel.NewProc("FindNextFileNameW")
++var execFileIDInfo = hardlinkKernel.NewProc("GetFileInformationByHandleEx")
++
++type windowsExecFileID struct {
++	Volume uint64
++	ID     [16]byte
++}
++
++func readWindowsExecFileID(handle windows.Handle) (windowsExecFileID, error) {
++	var id windowsExecFileID
++	// FileIdInfo (18) provides the full 128-bit ID, including on ReFS.
++	ok, _, err := execFileIDInfo.Call(uintptr(handle), 18, uintptr(unsafe.Pointer(&id)), unsafe.Sizeof(id)) // #nosec G103 -- fixed Win32 FILE_ID_INFO output layout
++	if ok == 0 {
++		return id, fmt.Errorf("read executable file ID: %w", err)
++	}
++	return id, nil
++}
++
++func nativeWindowsExecHardlinks(file *os.File, canonical string) (windowsExecHardlinkOrigin, error) {
++	var origin windowsExecHardlinkOrigin
++	handle := windows.Handle(file.Fd())
++	var before windows.ByHandleFileInformation
++	if err := windows.GetFileInformationByHandle(handle, &before); err != nil {
++		return origin, err
++	}
++	if before.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
++		return origin, fmt.Errorf("executable is a reparse point")
++	}
++	id, err := readWindowsExecFileID(handle)
++	if err != nil {
++		return origin, err
++	}
++	descriptor, err := windows.GetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION)
++	if err != nil {
++		return origin, err
++	}
++	owner, _, err := descriptor.Owner()
++	if err != nil || owner == nil || !owner.IsValid() {
++		return origin, fmt.Errorf("executable has no readable valid owner SID: %v", err)
++	}
++	origin.OwnerSID = owner.String()
++	encoded, err := windows.UTF16PtrFromString(canonical)
++	if err != nil {
++		return origin, err
++	}
++	// Windows path names cannot exceed 32767 UTF-16 units. A larger buffer
++	// avoids partial enumeration and ERROR_MORE_DATA retries on either API.
++	const bufferSize = 32768
++	buffer := make([]uint16, bufferSize)
++	if err := windows.GetVolumePathName(encoded, &buffer[0], bufferSize); err != nil {
++		return origin, err
++	}
++	volume := windows.UTF16ToString(buffer)
++	size := uint32(bufferSize)
++	// #nosec G103 -- Win32 UTF-16 input and bounded output buffer, live for the syscall
++	search, _, callErr := findFirstExecLink.Call(uintptr(unsafe.Pointer(encoded)), 0,
++		uintptr(unsafe.Pointer(&size)), uintptr(unsafe.Pointer(&buffer[0])))
++	if windows.Handle(search) == windows.InvalidHandle {
++		return origin, fmt.Errorf("enumerate executable hard links: %w", callErr)
++	}
++	defer func() { _ = windows.FindClose(windows.Handle(search)) }()
++	for {
++		name := windows.UTF16ToString(buffer)
++		if !strings.HasPrefix(name, `\`) || strings.HasPrefix(name, `\\`) || strings.Contains(name, ":") {
++			return origin, fmt.Errorf("invalid volume-relative hard-link name %q", name)
++		}
++		path := filepath.Join(volume, strings.TrimPrefix(name, `\`))
++		physical, err := godriver.CanonicalPhysicalPath(path)
++		if err != nil {
++			return origin, err
++		}
++		alias, err := os.Open(physical) // #nosec G304 -- enumerated platform path, file ID checked below
++		if err != nil {
++			return origin, err
++		}
++		aliasID, idErr := readWindowsExecFileID(windows.Handle(alias.Fd()))
++		_ = alias.Close()
++		if idErr != nil || aliasID != id {
++			return origin, fmt.Errorf("hard-link file ID differs from open executable: %v", idErr)
++		}
++		origin.Links = append(origin.Links, physical)
++		if uint64(len(origin.Links)) > uint64(before.NumberOfLinks) {
++			return origin, fmt.Errorf("executable hard-link count changed during enumeration")
++		}
++		size = bufferSize
++		// #nosec G103 -- Win32 bounded UTF-16 output buffer and DWORD size
++		ok, _, nextErr := findNextExecLink.Call(search, uintptr(unsafe.Pointer(&size)), uintptr(unsafe.Pointer(&buffer[0])))
++		if ok == 0 {
++			if nextErr != windows.ERROR_HANDLE_EOF {
++				return origin, fmt.Errorf("continue executable hard-link enumeration: %w", nextErr)
++			}
++			break
++		}
++	}
++	var after windows.ByHandleFileInformation
++	if err := windows.GetFileInformationByHandle(handle, &after); err != nil {
++		return origin, err
++	}
++	if before.NumberOfLinks != after.NumberOfLinks || uint64(len(origin.Links)) != uint64(after.NumberOfLinks) {
++		return origin, fmt.Errorf("incomplete or changed executable hard-link enumeration")
++	}
++	origin.Count = after.NumberOfLinks
++	return origin, nil
++}
+diff --git a/internal/scriptworker/exec_hardlinks_windows_test.go b/internal/scriptworker/exec_hardlinks_windows_test.go
+new file mode 100644
+index 00000000..7e4305d6
+--- /dev/null
++++ b/internal/scriptworker/exec_hardlinks_windows_test.go
+@@ -0,0 +1,134 @@
++//go:build windows
++
++package scriptworker
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++	"unsafe"
++
++	"golang.org/x/sys/windows"
++)
++
++func setWindowsExecFixtureOwner(t *testing.T, path, sidText string) {
++	t.Helper()
++	var token windows.Token
++	if err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_ADJUST_PRIVILEGES|windows.TOKEN_QUERY, &token); err != nil {
++		t.Fatal(err)
++	}
++	defer func() { _ = token.Close() }()
++	name, err := windows.UTF16PtrFromString("SeRestorePrivilege")
++	if err != nil {
++		t.Fatal(err)
++	}
++	state := windows.Tokenprivileges{PrivilegeCount: 1}
++	if err := windows.LookupPrivilegeValue(nil, name, &state.Privileges[0].Luid); err != nil {
++		t.Fatal(err)
++	}
++	state.Privileges[0].Attributes = windows.SE_PRIVILEGE_ENABLED
++	var previous windows.Tokenprivileges
++	var returned uint32
++	if err := windows.AdjustTokenPrivileges(token, false, &state, uint32(unsafe.Sizeof(previous)), &previous, &returned); err != nil {
++		t.Fatalf("hosted Windows fixture requires SeRestorePrivilege: %v", err)
++	}
++	defer func() {
++		if err := windows.AdjustTokenPrivileges(token, false, &previous, 0, nil, nil); err != nil {
++			t.Errorf("restore fixture token privileges: %v", err)
++		}
++	}()
++	sid, err := windows.StringToSid(sidText)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION, sid, nil, nil, nil); err != nil {
++		t.Fatalf("set real fixture owner %s: %v", sidText, err)
++	}
++}
++
++// This test never replaces the OS seam. Hosted Windows must exercise the real
++// file IDs, owner descriptor and complete FindFirst/NextFileName enumeration.
++func TestWindowsNativeExecHardlinkOrigins(t *testing.T) {
++	for _, testCase := range []struct {
++		name  string
++		owner string
++		extra bool
++		want  bool
++	}{
++		{name: "component-store", owner: trustedInstallerSID, want: true},
++		{name: "system-owned-component-store", owner: localSystemSID, want: true},
++		{name: "noncomponent-store", owner: trustedInstallerSID, extra: true},
++		{name: "unowned-file"},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			root := mustPhysical(t, t.TempDir())
++			target := filepath.Join(root, "System32", "cmd.exe")
++			alias := filepath.Join(root, "WinSxS", "cmd.exe")
++			writeTestFile(t, target, []byte("native executable fixture"), 0o755)
++			if err := os.MkdirAll(filepath.Dir(alias), 0o755); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.Link(target, alias); err != nil {
++				t.Fatal(err)
++			}
++			if testCase.extra {
++				outside := filepath.Join(root, "OtherLinks", "cmd.exe")
++				if err := os.MkdirAll(filepath.Dir(outside), 0o755); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Link(target, outside); err != nil {
++					t.Fatal(err)
++				}
++			}
++			if testCase.owner != "" {
++				setWindowsExecFixtureOwner(t, target, testCase.owner)
++			}
++			file, err := os.Open(target)
++			if err != nil {
++				t.Fatal(err)
++			}
++			origin, err := nativeWindowsExecHardlinks(file, target)
++			_ = file.Close()
++			if err != nil {
++				t.Fatalf("native observation: %v", err)
++			}
++			wantCount := uint32(2)
++			if testCase.extra {
++				wantCount = 3
++			}
++			if origin.Count != wantCount || len(origin.Links) != int(wantCount) {
++				t.Fatalf("native links = %+v, want %d", origin, wantCount)
++			}
++			if testCase.owner != "" && origin.OwnerSID != testCase.owner {
++				t.Fatalf("native owner = %q, want %q", origin.OwnerSID, testCase.owner)
++			}
++			t.Logf("native owner=%s links=%d paths=%q", origin.OwnerSID, origin.Count, origin.Links)
++			identity, found, err := resolveExecForPlatform("cmd.exe", nil, nil, "windows", []string{"SYSTEMROOT=" + root}, true)
++			if err != nil || found != testCase.want {
++				t.Fatalf("native production resolver found=%t err=%v, want %t", found, err, testCase.want)
++			}
++			if found {
++				if err := VerifyExec(identity); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Link(target, filepath.Join(root, "outside.exe")); err != nil {
++					t.Fatal(err)
++				}
++				if err := VerifyExec(identity); DiagnosticCode(err) != CodeWorkerIdentityInvalid {
++					t.Fatalf("native added alias at launch boundary: %v", err)
++				}
++			}
++		})
++	}
++
++	t.Run("real-system32-cmd", func(t *testing.T) {
++		identity, found, err := resolveExecForPlatform("cmd.exe", nil, nil, "windows", os.Environ(), true)
++		if err != nil || !found {
++			t.Fatalf("native System32 cmd.exe rejected: %v", err)
++		}
++		if err := VerifyExec(identity); err != nil {
++			t.Fatal(err)
++		}
++		t.Logf("native platform executable accepted at %s", identity.Path)
++	})
++}
+diff --git a/internal/scriptworker/exec_identity_conformance_test.go b/internal/scriptworker/exec_identity_conformance_test.go
+index 30756be1..c590689d 100644
+--- a/internal/scriptworker/exec_identity_conformance_test.go
++++ b/internal/scriptworker/exec_identity_conformance_test.go
+@@ -5,8 +5,6 @@ import (
+ 	"embed"
+ 	"encoding/hex"
+ 	"encoding/json"
+-	"os"
+-	"path/filepath"
+ 	"testing"
+ )
+ 
+@@ -15,24 +13,13 @@ var pinnedExecutableIdentityFixture embed.FS
+ 
+ const pinnedExecutableIdentityFixtureSHA256 = "sha256:124e00757b3add8c2ba639a8403cba97eec7f5d1bdd923d14b51db9a104292a2"
+ 
+-type pinnedExecutableIdentityCase struct {
+-	Accepted       bool    `json:"accepted"`
+-	AdditionalLink string  `json:"additional_links"`
+-	Interpreter    *string `json:"interpreter"`
+-	Name           string  `json:"name"`
+-	Platform       string  `json:"platform"`
+-	PlatformOwned  bool    `json:"platform_owned"`
+-	Reason         string  `json:"reason"`
+-	Resolution     string  `json:"resolution"`
+-	SystemRoot     *string `json:"system_root"`
+-	Target         string  `json:"target"`
+-	Use            string  `json:"use"`
+-}
++type pinnedExecutableIdentityCase = executableIdentityCase
+ 
+ // TestUncapturedSystemRootHardlinkRegression proves an ambient SYSTEMROOT
+ // cannot authorize the System32 hard-link exception. The exhaustive family
+-// driver accounts for the other published cases, including known gaps.
+-func TestUncapturedSystemRootHardlinkRegression(t *testing.T) {
++// driver accounts for the other published cases, without known gaps.
++func loadPinnedExecutableIdentityCases(t *testing.T) []executableIdentityCase {
++	t.Helper()
+ 	payload, err := pinnedExecutableIdentityFixture.ReadFile("testdata/executable_identity_cases.json")
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -48,6 +35,11 @@ func TestUncapturedSystemRootHardlinkRegression(t *testing.T) {
+ 	if len(cases) != 8 {
+ 		t.Fatalf("executable identity case count = %d, want 8", len(cases))
+ 	}
++	return cases
++}
++
++func TestUncapturedSystemRootHardlinkRegression(t *testing.T) {
++	cases := loadPinnedExecutableIdentityCases(t)
+ 	var target *pinnedExecutableIdentityCase
+ 	for i := range cases {
+ 		if cases[i].Name != "windows-exec-uncaptured-systemroot-hardlinks" {
+@@ -65,83 +57,7 @@ func TestUncapturedSystemRootHardlinkRegression(t *testing.T) {
+ 		target.Accepted || target.SystemRoot == nil || *target.SystemRoot != "caller-or-package-value" {
+ 		t.Fatalf("uncaptured-SystemRoot case has unexpected contract: %+v", *target)
+ 	}
+-	if drivePinnedDeclaredExecIdentityCase(t, *target) {
+-		t.Fatalf("production resolver accepted uncaptured SystemRoot hard-link case (reason %s)", target.Reason)
+-	}
+-}
+-
+-func drivePinnedDeclaredExecIdentityCase(t *testing.T, testCase pinnedExecutableIdentityCase) bool {
+-	t.Helper()
+-	fixture := newLaunchFixture(t, os.Args[0])
+-	root := mustPhysical(t, t.TempDir())
+-	system32 := filepath.Join(root, "System32")
+-	if err := os.MkdirAll(system32, 0o755); err != nil {
+-		t.Fatal(err)
+-	}
+-	var target string
+-	switch testCase.Target {
+-	case "physically-below-canonical-systemroot-system32", "physically-below-system32-from-uncaptured-value":
+-		target = filepath.Join(system32, "cmd.exe")
+-	case "outside-canonical-systemroot-system32":
+-		target = filepath.Join(root, "cmd.exe")
+-	default:
+-		t.Fatalf("unsupported executable target %q", testCase.Target)
+-	}
+-	copyTestFile(t, fixture.stub, target)
+-
+-	var aliasDir string
+-	switch testCase.AdditionalLink {
+-	case "systemroot-winsxs-component-store-only":
+-		aliasDir = filepath.Join(root, "WinSxS")
+-	case "not-platform-component-store-or-unknown":
+-		aliasDir = filepath.Join(root, "OtherLinks")
+-	default:
+-		t.Fatalf("unsupported executable additional_links %q", testCase.AdditionalLink)
+-	}
+-	if err := os.MkdirAll(aliasDir, 0o755); err != nil {
+-		t.Fatal(err)
+-	}
+-	if err := os.Link(target, filepath.Join(aliasDir, "cmd.exe")); err != nil {
+-		t.Fatalf("create executable hard-link fixture: %v", err)
+-	}
+-
+-	private, err := createPrivateArea(fixture.request.PrivateBase, fixture.request.ForbiddenRoots)
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	defer func() { _ = os.RemoveAll(private.base) }()
+-	interpreter, err := ResolveInterpreter("python3-v1", fixture.request.Interpreters, fixture.request.ForbiddenRoots)
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	declared, err := ParseDeclaredCapabilities(json.RawMessage(`{"exec":["cmd.exe"]}`))
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	var managerEnvironment []string
+-	if testCase.SystemRoot != nil && *testCase.SystemRoot == "manager-captured" {
+-		managerEnvironment = []string{"SYSTEMROOT=" + root}
+-	}
+-	if testCase.SystemRoot != nil && *testCase.SystemRoot == "caller-or-package-value" {
+-		// A nil manager snapshot uses ambient SYSTEMROOT for search, but it
+-		// must not turn that value into captured System32 authority.
+-		t.Setenv("SYSTEMROOT", root)
+-	}
+-	var searchDirs []string
+-	if testCase.Resolution == "caller-path-or-package-controlled" {
+-		searchDirs = []string{system32}
+-	} else if testCase.Resolution != "manager-default-windows-search-list" {
+-		t.Fatalf("unsupported exec resolution %q", testCase.Resolution)
+-	}
+-	profile, err := deriveProfileForPlatform(DerivationInput{
+-		Declared: declared, InterpreterID: "python3-v1", Interpreter: interpreter,
+-		HostEnv: managerEnvironment, ExecSearchDirs: searchDirs,
+-		ForbiddenRoots: fixture.request.ForbiddenRoots,
+-		Private:        private, FarmParent: private.base,
+-	}, "windows")
+-	if err != nil {
+-		t.Fatalf("derive Windows profile: %v", err)
++	if failure := driveDeclaredExecIdentityCase(t, *target); failure != "" {
++		t.Fatal(failure)
+ 	}
+-	_, resolved := profile.Report.ResolvedExec["cmd.exe"]
+-	return resolved
+ }
+diff --git a/internal/scriptworker/exec_test.go b/internal/scriptworker/exec_test.go
+index 71d0d6d7..f5520b89 100644
+--- a/internal/scriptworker/exec_test.go
++++ b/internal/scriptworker/exec_test.go
+@@ -45,6 +45,8 @@ func TestDeriveProfileUsesDefaultExecSearchDirsAndBuildsDeclaredExecFarm(t *test
+ 		t.Fatalf("create Windows component-store hard-link fixture: %v", err)
+ 	}
+ 
++	fixtureWindowsExecOrigin(t, execPath, filepath.Join(winsxs, "cmd.exe"), true)
++
+ 	private, err := createPrivateArea(fixture.request.PrivateBase, fixture.request.ForbiddenRoots)
+ 	if err != nil {
+ 		t.Fatal(err)
+diff --git a/internal/scriptworker/executable_identity_conformance_test.go b/internal/scriptworker/executable_identity_conformance_test.go
+index c1017c6a..eaf6d519 100644
+--- a/internal/scriptworker/executable_identity_conformance_test.go
++++ b/internal/scriptworker/executable_identity_conformance_test.go
+@@ -32,7 +32,7 @@ func loadExecutableIdentityVector(t *testing.T) executableIdentityVector {
+ 	t.Helper()
+ 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+ 	if root == "" {
+-		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++		return executableIdentityVector{Cases: loadPinnedExecutableIdentityCases(t)}
+ 	}
+ 	payload, err := os.ReadFile(filepath.Join(root, "vectors", "script-host-execution-policy.json")) // #nosec G304 -- explicit conformance input
+ 	if err != nil {
+@@ -54,7 +54,7 @@ func TestExecutableIdentityCasesAtProductionEntry(t *testing.T) {
+ 	if len(vector.Cases) != 8 {
+ 		t.Fatalf("executable_identity_cases has %d cases, want 8", len(vector.Cases))
+ 	}
+-	conformancecoverage.RunOutcomes(t, "script-host-execution-policy/executable-identity-cases", vector.Cases,
++	tally := conformancecoverage.RunOutcomes(t, "script-host-execution-policy/executable-identity-cases", vector.Cases,
+ 		func(testCase executableIdentityCase) string { return testCase.Name },
+ 		func(t *testing.T, testCase executableIdentityCase) conformancecoverage.Observation {
+ 			if testCase.Platform != "windows" {
+@@ -92,6 +92,9 @@ func TestExecutableIdentityCasesAtProductionEntry(t *testing.T) {
+ 			}
+ 			return conformancecoverage.Observation{}
+ 		})
++	if tally.Driven != 8 || tally.KnownGap != 0 || tally.Bound != 0 || tally.Skipped != 0 {
++		t.Fatalf("executable identity coverage = %+v, want 8/8 driven without gaps, bounds or skips", tally)
++	}
+ }
+ 
+ func driveDeclaredExecIdentityCase(t *testing.T, testCase executableIdentityCase) string {
+@@ -112,6 +115,9 @@ func driveDeclaredExecIdentityCase(t *testing.T, testCase executableIdentityCase
+ 		t.Fatalf("unsupported executable target %q", testCase.Target)
+ 	}
+ 	copyTestFile(t, fixture.stub, target)
++	if err := os.MkdirAll(filepath.Join(root, "WinSxS"), 0o755); err != nil {
++		t.Fatal(err)
++	}
+ 
+ 	var aliasDir string
+ 	switch testCase.AdditionalLinks {
+@@ -128,6 +134,7 @@ func driveDeclaredExecIdentityCase(t *testing.T, testCase executableIdentityCase
+ 	if err := os.Link(target, filepath.Join(aliasDir, "cmd.exe")); err != nil {
+ 		t.Fatalf("create executable hard-link fixture: %v", err)
+ 	}
++	fixtureWindowsExecOrigin(t, target, filepath.Join(aliasDir, "cmd.exe"), testCase.PlatformOwned)
+ 
+ 	private, err := createPrivateArea(fixture.request.PrivateBase, fixture.request.ForbiddenRoots)
+ 	if err != nil {
