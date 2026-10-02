@@ -943,7 +943,7 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
 			continue
 		}
 		if m.SchemaVersion == SchemaV5 {
-			if !validCoreV5Build(build) {
+			if !validV3Build(build) {
 				return false
 			}
 			continue
@@ -968,16 +968,11 @@ func hasRepositoryState(build Build) bool {
 		build.DescriptorTarget != ""
 }
 
+// validV3Build binds an external build's effective identity and revision to
+// its declaration or typed substitution. These rules also apply to v4 and
+// core v5, which retain the same build record and receipt versions.
 func validV3Build(build Build) bool {
-	return validDriverBuild(build, 1, 2)
-}
-
-// validCoreV5Build applies marker-v4 build rules plus the v5 substitution
-// identity binding. An un-substituted source stays on its declared identity
-// and commit; a substitution's effective identity kind follows its typed
-// substitution record.
-func validCoreV5Build(build Build) bool {
-	if !validV3Build(build) {
+	if !validDriverBuild(build, 1, 2) {
 		return false
 	}
 	if build.Driver != "go-repository-v1" {
@@ -996,13 +991,13 @@ func validCoreV5Build(build Build) bool {
 	case "local-path":
 		return build.EffectiveIdentity.Kind == "operator-local-git" && build.Substitution.Ref == nil
 	case "network-git":
-		return build.EffectiveIdentity.Kind == "network-git" && validCoreV5StructuredRef(build.Substitution.Ref, build.ObjectFormat)
+		return build.EffectiveIdentity.Kind == "network-git" && validRepositoryRef(build.Substitution.Ref, build.ObjectFormat)
 	default:
 		return false
 	}
 }
 
-func validCoreV5StructuredRef(ref *RepositoryRef, objectFormat string) bool {
+func validRepositoryRef(ref *RepositoryRef, objectFormat string) bool {
 	if ref == nil {
 		return false
 	}
