@@ -1,0 +1,806 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index f9ae5d0..11a613f 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -56,7 +56,7 @@ jobs:
+         run: go run ./tools/generate-vectors -root .
+ 
+       - name: Prove deterministic regeneration
+-        run: git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json release/1.0.0-rc.6.json release/1.0.0-rc.7.json release/1.0.0-rc.8.json release/1.0.0-rc.9.json release/1.0.0-rc.13.json conformance/skillfile-sources-v1/manifest.json
++        run: git diff --exit-code -- conformance/v1 conformance/candidate.json conformance/skillfile-sources-v1/manifest.json
+ 
+   formatting:
+     name: Formatting
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 1a0307a..bf06e45 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -49,7 +49,7 @@ jobs:
+           python -B -m unittest discover -s tools -p 'test_*.py'
+           go test ./tools/...
+           go run ./tools/generate-vectors -root .
+-          git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json release/1.0.0-rc.6.json release/1.0.0-rc.7.json release/1.0.0-rc.8.json release/1.0.0-rc.9.json release/1.0.0-rc.13.json conformance/skillfile-sources-v1/manifest.json
++          git diff --exit-code -- conformance/v1 conformance/candidate.json conformance/skillfile-sources-v1/manifest.json
+           version="${GITHUB_REF_NAME#v}"
+           python tools/release_gate.py --version "$version" --commit "$GITHUB_SHA"
+ 
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 5add102..2626393 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,8 @@ Versioning for the complete specification set.
+ 
+ ### Changed
+ 
++- Restore the published rc.13 record and freeze tagged release history; track current suite digests in candidate metadata.
++
+ - Record the operator's adoption of
+   [Decision 0019](decisions/0019-fragment-consumers-and-one-construction-site.md)
+   and [Decision 0021](decisions/0021-sessions-enter-through-curator-run.md)
+diff --git a/Makefile b/Makefile
+index 5128a4e..05a1851 100644
+--- a/Makefile
++++ b/Makefile
+@@ -9,8 +9,9 @@ regenerate:
+ 	go run ./tools/generate-vectors -root .
+ 
+ regenerate-check:
++	python3 tools/validate.py --release-history-only
+ 	go run ./tools/generate-vectors -root .
+-	git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json release/1.0.0-rc.6.json release/1.0.0-rc.7.json release/1.0.0-rc.8.json release/1.0.0-rc.9.json release/1.0.0-rc.13.json conformance/skillfile-sources-v1/manifest.json
++	git diff --exit-code -- conformance/v1 conformance/candidate.json conformance/skillfile-sources-v1/manifest.json
+ 
+ release-check: validate regenerate-check
+ 	test -n "$(VERSION)"
+diff --git a/README.md b/README.md
+index 3bebe5b..7efe277 100644
+--- a/README.md
++++ b/README.md
+@@ -73,6 +73,12 @@ and vectors remain in their own namespace; they are not merged into
+ 
+ ## Tools
+ 
++Published `release/<version>.json` records are byte-frozen against release
++tags. Regeneration updates [candidate metadata](conformance/candidate.json)
++with the current core and source-suite manifest digests, without selecting the
++next release version. Release preparation creates a new versioned record.
++Validation requires local release tags (fetch tags in shallow checkouts).
++
+ - Python 3 with `python3 -m pip install -r requirements-dev.txt`: run
+   `python3 tools/validate.py` and
+   `python3 -B -m unittest discover -s tools -p "test_*.py"` for the existing
+diff --git a/conformance/candidate.json b/conformance/candidate.json
+new file mode 100644
+index 0000000..44ab026
+--- /dev/null
++++ b/conformance/candidate.json
+@@ -0,0 +1,11 @@
++{
++  "core": {
++    "manifest_path": "conformance/v1/manifest.json",
++    "manifest_sha256": "sha256:bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783"
++  },
++  "skillfile_sources_v1": {
++    "manifest_path": "conformance/skillfile-sources-v1/manifest.json",
++    "manifest_sha256": "sha256:061ec05ddb1746b72168d157f81d2930047cd62371ffa46cf585844da61ee6be"
++  },
++  "status": "candidate"
++}
+diff --git a/release/1.0.0-rc.13.json b/release/1.0.0-rc.13.json
+index 5359796..e70f929 100644
+--- a/release/1.0.0-rc.13.json
++++ b/release/1.0.0-rc.13.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783",
++    "manifest_sha256": "sha256:be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783"
++    "required_manifest_sha256": "sha256:be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca"
+   },
+   "historical_release": {
+     "immutable": true,
+diff --git a/tools/generate-vectors/main.go b/tools/generate-vectors/main.go
+index b20e90f..41f1946 100644
+--- a/tools/generate-vectors/main.go
++++ b/tools/generate-vectors/main.go
+@@ -30,7 +30,6 @@ const (
+ 	conformanceClaimV3ProtocolVersion = "1.0.0-rc.5"
+ 	conformanceClaimV4ProtocolVersion = "1.0.0-rc.8"
+ 	conformanceClaimV2CreatedAt       = "2026-07-20T00:00:00Z"
+-	rc13CreatedAt                     = "2026-09-26T00:00:00Z"
+ 	fixedCommit                       = "0123456789abcdef0123456789abcdef01234567"
+ 	fixedTime                         = "2026-07-13T00:00:00Z"
+ 	genesis                           = "0000000000000000000000000000000000000000000000000000000000000000"
+@@ -210,7 +209,7 @@ func main() {
+ 	writeExternalRepositoryExpected(expected, marker)
+ 	writeManifest(suite)
+ 	skillfileSourcesManifestSHA256 := writeSkillfileSourcesManifest(*root)
+-	writeRC13ReleaseMetadata(*root, suite, skillfileSourcesManifestSHA256)
++	writeCandidateMetadata(*root, suite, skillfileSourcesManifestSHA256)
+ }
+ 
+ // writeModuleRootVectors emits the filesystem and build-graph cases that JSON
+@@ -2220,56 +2219,20 @@ func writeAssuranceVectors(dir string) {
+ 	})
+ }
+ 
+-func writeRC13ReleaseMetadata(root, suite, skillfileSourcesManifestSHA256 string) {
++// writeCandidateMetadata tracks the current corpus without creating or changing
++// a published release record. Release preparation owns release/<version>.json.
++func writeCandidateMetadata(root, suite, skillfileSourcesManifestSHA256 string) {
+ 	manifest, err := os.ReadFile(filepath.Join(suite, "manifest.json"))
+ 	must(err)
+-	digest := sha256.Sum256(manifest)
+-	pin := "sha256:" + hex.EncodeToString(digest[:])
+-	writeJSON(filepath.Join(root, "release", "1.0.0-rc.13.json"), map[string]any{
+-		"protocol_version": protocolVersion,
+-		"created_at":       rc13CreatedAt,
+-		"candidate_protocol_pin": map[string]any{
+-			"suite_root":      "conformance/v1",
+-			"manifest_sha256": pin,
+-		},
+-		"source_baseline_commit": rc9SourceCommit,
+-		"legacy_release":         conformanceClaimV5ProtocolVersion,
+-		"historical_release": map[string]any{
+-			"protocol_version": conformanceClaimV5ProtocolVersion,
+-			"metadata_path":    "release/1.0.0-rc.9.json",
+-			"metadata_sha256":  rc9ReleaseMetadataSHA256,
+-			"source_commit":    rc9SourceCommit,
+-			"immutable":        true,
+-		},
+-		"assurance": map[string]any{
+-			"default_mode":                    "portable",
+-			"portable_policy":                 portableAssurancePolicy,
+-			"portable_execution_policy":       portableExecutionPolicy,
+-			"verified_policy":                 verifiedAssurancePolicy,
+-			"verified_execution_policy":       verifiedExecutionPolicy,
+-			"verified_provider_contract":      verifiedProviderContract,
+-			"verified_implementations":        []any{},
+-			"verified_platform_claims":        []any{},
+-			"silent_downgrade_permitted":      false,
+-			"skill_vendored_provider_allowed": false,
+-		},
+-		"downstream_consumption": map[string]any{
+-			"environment":                    "CURATOR_CONFORMANCE_ROOT",
+-			"required_manifest_sha256":       pin,
+-			"committed_release_pin_advanced": false,
++	writeJSON(filepath.Join(root, "conformance", "candidate.json"), map[string]any{
++		"status": "candidate",
++		"core": map[string]any{
++			"manifest_path":   "conformance/v1/manifest.json",
++			"manifest_sha256": fmt.Sprintf("sha256:%x", sha256.Sum256(manifest)),
+ 		},
+ 		"skillfile_sources_v1": map[string]any{
+ 			"manifest_path":   "conformance/skillfile-sources-v1/manifest.json",
+ 			"manifest_sha256": skillfileSourcesManifestSHA256,
+-			"compatible_core": map[string]any{
+-				"tag":             "v1.0.0-rc.10",
+-				"manifest_sha256": rc10CoreManifestSHA256,
+-			},
+-		},
+-		"claim_v5": map[string]any{
+-			"claim_protocol_version": conformanceClaimV5ProtocolVersion,
+-			"schema":                 "schemas/v1/conformance-claim-v5.schema.json",
+-			"claims_emitted":         []any{},
+ 		},
+ 	})
+ }
+diff --git a/tools/generate-vectors/main_test.go b/tools/generate-vectors/main_test.go
+index f1e27ea..9901bfd 100644
+--- a/tools/generate-vectors/main_test.go
++++ b/tools/generate-vectors/main_test.go
+@@ -10,6 +10,7 @@ import (
+ 	"encoding/json"
+ 	"fmt"
+ 	"os"
++	"os/exec"
+ 	"path/filepath"
+ 	"reflect"
+ 	"runtime"
+@@ -845,9 +846,12 @@ func TestRC9ReleaseMetadataRemainsByteFrozen(t *testing.T) {
+ 	}
+ }
+ 
+-func TestRC13ReleaseMetadataPinsCoreAndAcceptedSourceSuites(t *testing.T) {
++func TestRC13ReleaseMetadataPinsPublishedCoreAndAcceptedSourceSuites(t *testing.T) {
+ 	root := repositoryRoot(t)
+-	manifest, err := os.ReadFile(filepath.Join(root, "conformance", "v1", "manifest.json"))
++	// Published metadata binds the tagged corpus, independently of today's candidate.
++	cmd := exec.Command("git", "show", "v1.0.0-rc.13:conformance/v1/manifest.json")
++	cmd.Dir = root
++	manifest, err := cmd.Output()
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -862,7 +866,9 @@ func TestRC13ReleaseMetadataPinsCoreAndAcceptedSourceSuites(t *testing.T) {
+ 	if pin["manifest_sha256"] != manifestIdentity || downstream["required_manifest_sha256"] != manifestIdentity {
+ 		t.Fatalf("rc.13 release does not pin core manifest %s", manifestIdentity)
+ 	}
+-	sourceManifest, err := os.ReadFile(filepath.Join(root, "conformance", "skillfile-sources-v1", "manifest.json"))
++	cmd = exec.Command("git", "show", "v1.0.0-rc.13:conformance/skillfile-sources-v1/manifest.json")
++	cmd.Dir = root
++	sourceManifest, err := cmd.Output()
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/tools/generate-vectors/schema_cases_preservation_test.go b/tools/generate-vectors/schema_cases_preservation_test.go
+index d2792a7..13441c9 100644
+--- a/tools/generate-vectors/schema_cases_preservation_test.go
++++ b/tools/generate-vectors/schema_cases_preservation_test.go
+@@ -31,6 +31,32 @@ func TestGeneratorPreservesHandAuthoredSchemaCases(t *testing.T) {
+ 			copyTree(t, filepath.Join(repo, name), filepath.Join(root, name))
+ 		}
+ 	}
++	// Freeze the complete release directory, including an unknown future version,
++	// so any generator write (even an identical-byte rewrite) is detected.
++	sentinelRelease := filepath.Join(root, "release", "9.0.0.json")
++	must(os.WriteFile(sentinelRelease, []byte("{}\n"), 0o644))
++	releaseEntries, err := os.ReadDir(filepath.Join(root, "release"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(releaseEntries) != 7 {
++		t.Fatalf("release coverage = %d/7", len(releaseEntries))
++	}
++	releaseBytes := map[string][]byte{}
++	releaseInfo := map[string]os.FileInfo{}
++	for _, entry := range releaseEntries {
++		path := filepath.Join(root, "release", entry.Name())
++		releaseBytes[path], err = os.ReadFile(path)
++		if err != nil {
++			t.Fatal(err)
++		}
++		releaseInfo[path], err = os.Stat(path)
++		if err != nil {
++			t.Fatal(err)
++		}
++	}
++	candidatePath := filepath.Join(root, "conformance", "candidate.json")
++	must(os.Remove(candidatePath))
+ 	caseRoot := filepath.Join(root, "conformance", "v1", "schema-cases")
+ 	released := []string{
+ 		"agent-environment-marker-v1/valid-no-composition.json",
+@@ -58,6 +84,49 @@ func TestGeneratorPreservesHandAuthoredSchemaCases(t *testing.T) {
+ 	if err := cmd.Run(); err != nil {
+ 		t.Fatalf("generator failed: %v\n%s", err, out.String())
+ 	}
++	for path, want := range releaseBytes {
++		got, err := os.ReadFile(path)
++		if err != nil {
++			t.Fatal(err)
++		}
++		info, err := os.Stat(path)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if !bytes.Equal(got, want) || !info.ModTime().Equal(releaseInfo[path].ModTime()) {
++			t.Fatalf("generator rewrote release record %s", path)
++		}
++	}
++	candidate := readObject(t, candidatePath)
++	if candidate["status"] != "candidate" || len(candidate) != 3 {
++		t.Fatalf("candidate metadata claims a release: %#v", candidate)
++	}
++	for name, relative := range map[string]string{
++		"core":                 "conformance/v1/manifest.json",
++		"skillfile_sources_v1": "conformance/skillfile-sources-v1/manifest.json",
++	} {
++		manifest, err := os.ReadFile(filepath.Join(root, relative))
++		if err != nil {
++			t.Fatal(err)
++		}
++		pin := candidate[name].(map[string]any)
++		if pin["manifest_path"] != relative || pin["manifest_sha256"] != sha256Identity(manifest) {
++			t.Fatalf("candidate %s does not pin its manifest: %#v", name, pin)
++		}
++	}
++	// Regeneration must not silently repair missing publication evidence either.
++	rc13Path := filepath.Join(root, "release", "1.0.0-rc.13.json")
++	must(os.Remove(rc13Path))
++	cmd = exec.Command("go", "run", ".", "-root", root)
++	if output, err := cmd.CombinedOutput(); err != nil {
++		t.Fatalf("second generator run failed: %v\n%s", err, output)
++	}
++	if _, err := os.Stat(rc13Path); !os.IsNotExist(err) {
++		t.Fatalf("generator recreated published rc.13 record: %v", err)
++	}
++	if _, err := os.Stat(filepath.Join(root, "release", "1.0.0-rc.14.json")); !os.IsNotExist(err) {
++		t.Fatalf("generator created an rc.14 record: %v", err)
++	}
+ 	// Assert the real CLI entry emits the Muse family and schema cases,
+ 	// rather than proving only that an uncalled helper can emit them.
+ 	for _, path := range []string{
+diff --git a/tools/test_release_gate.py b/tools/test_release_gate.py
+index c4de32e..7d8523d 100644
+--- a/tools/test_release_gate.py
++++ b/tools/test_release_gate.py
+@@ -282,7 +282,7 @@ class ProtocolRC13ReleaseGateTests(unittest.TestCase):
+             SOURCE_ROOT,
+             self.root,
+             dirs_exist_ok=True,
+-            ignore=shutil.ignore_patterns(".git", "__pycache__"),
++            ignore=shutil.ignore_patterns(".git", ".temp", ".venv", ".task-board", "__pycache__"),
+         )
+         self.root_patch = patch.object(release_gate, "ROOT", self.root)
+         self.root_patch.start()
+@@ -504,6 +504,14 @@ class ProtocolRC13ReleaseGateTests(unittest.TestCase):
+             release_gate.validate_version(self.VERSION)
+ 
+     def test_rejects_rc13_silent_downgrade_or_claim_fabrication(self) -> None:
++        # This publication-policy test uses rc.13's published corpus. The
++        # worktree corpus may have advanced independently as a new candidate.
++        manifest = subprocess.check_output(
++            ["git", "show", "v1.0.0-rc.13:conformance/v1/manifest.json"],
++            cwd=SOURCE_ROOT,
++        )
++        (self.root / "conformance" / "v1" / "manifest.json").write_bytes(manifest)
++        release_gate.validate_version(self.VERSION)
+         path = self.root / "release" / f"{self.VERSION}.json"
+         base = json.loads(path.read_text(encoding="utf-8"))
+         for field, value in (
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index ea18a0b..5f0a624 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -77,6 +77,118 @@ class ReleasedSchemaImmutabilityTests(unittest.TestCase):
+         self.assertIn(relative, stderr.getvalue())
+ 
+ 
++class ReleasedRecordImmutabilityTests(unittest.TestCase):
++    RECORDS = tuple(f"release/1.0.0-rc.{number}.json" for number in (5, 6, 7, 8, 9, 13))
++
++    def run_main(self) -> tuple[int, str]:
++        stdout, stderr = io.StringIO(), io.StringIO()
++        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
++            status = validate.main()
++        return status, stderr.getvalue()
++
++    def test_all_six_published_records_are_covered_and_unchanged(self) -> None:
++        records = validate.published_release_records()
++        self.assertEqual(set(records), set(self.RECORDS))
++        self.assertEqual(records["release/1.0.0-rc.13.json"][0], "v1.0.0-rc.13")
++        self.assertEqual(records["release/1.0.0-rc.6.json"][0], "v1.0.0-rc.7")
++        validate.validate_released_record_immutability()
++
++    def test_every_published_record_byte_drift_is_rejected_through_main(self) -> None:
++        # A whitespace-only mutant preserves the JSON value but changes history.
++        # Cover older records too: an rc.13-only guard must fail this test.
++        for relative in self.RECORDS:
++            with self.subTest(relative=relative):
++                path = validate.ROOT / relative
++                original = path.read_bytes()
++                try:
++                    path.write_bytes(original + b"\n")
++                    status, stderr = self.run_main()
++                    self.assertEqual(status, 1)
++                    self.assertIn("published release record bytes differ", stderr)
++                    self.assertIn(relative, stderr)
++                finally:
++                    path.write_bytes(original)
++
++    def test_deleted_published_record_is_rejected_through_main(self) -> None:
++        path = validate.ROOT / "release" / "1.0.0-rc.13.json"
++        original = path.read_bytes()
++        try:
++            path.unlink()
++            status, stderr = self.run_main()
++            self.assertEqual(status, 1)
++            self.assertIn("cannot read published release record", stderr)
++        finally:
++            path.write_bytes(original)
++
++    def test_unreadable_tag_inventory_is_not_an_empty_history(self) -> None:
++        failed = validate.subprocess.CompletedProcess([], 128, stdout=b"", stderr=b"unreadable tag")
++        with patch.object(validate.subprocess, "run", return_value=failed):
++            status, stderr = self.run_main()
++        self.assertEqual(status, 1)
++        self.assertIn("cannot inspect published release records: unreadable tag", stderr)
++
++    def test_absent_latest_record_evidence_is_rejected(self) -> None:
++        original = validate.subprocess.run
++
++        def without_records(args, **kwargs):
++            if args[1] == "ls-tree":
++                return validate.subprocess.CompletedProcess(args, 0, stdout=b"", stderr=b"")
++            return original(args, **kwargs)
++
++        with patch.object(validate.subprocess, "run", side_effect=without_records):
++            status, stderr = self.run_main()
++        self.assertEqual(status, 1)
++        self.assertIn("no published release record found", stderr)
++
++    def test_malformed_inventory_is_rejected_through_main(self) -> None:
++        original = validate.subprocess.run
++
++        def malformed_records(args, **kwargs):
++            if args[1] == "ls-tree":
++                return validate.subprocess.CompletedProcess(args, 0, stdout=b"100644 truncated\0", stderr=b"")
++            return original(args, **kwargs)
++
++        with patch.object(validate.subprocess, "run", side_effect=malformed_records):
++            status, stderr = self.run_main()
++        self.assertEqual(status, 1)
++        self.assertIn("cannot parse release inventory", stderr)
++
++
++class CandidateMetadataTests(unittest.TestCase):
++    def test_wrong_status_and_each_suite_pin_are_rejected_through_main(self) -> None:
++        path = validate.ROOT / "conformance" / "candidate.json"
++        original = path.read_bytes()
++        for field in ("status", "core", "skillfile_sources_v1"):
++            with self.subTest(field=field):
++                candidate = json.loads(original)
++                if field == "status":
++                    candidate[field] = "published"
++                else:
++                    candidate[field]["manifest_sha256"] = "sha256:" + "0" * 64
++                try:
++                    path.write_text(json.dumps(candidate), encoding="utf-8")
++                    stdout, stderr = io.StringIO(), io.StringIO()
++                    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
++                        status = validate.main()
++                    self.assertEqual(status, 1)
++                    self.assertIn("candidate", stderr.getvalue())
++                finally:
++                    path.write_bytes(original)
++
++    def test_missing_candidate_metadata_is_rejected_through_main(self) -> None:
++        path = validate.ROOT / "conformance" / "candidate.json"
++        original = path.read_bytes()
++        try:
++            path.unlink()
++            stdout, stderr = io.StringIO(), io.StringIO()
++            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
++                status = validate.main()
++            self.assertEqual(status, 1)
++            self.assertIn("cannot read candidate metadata", stderr.getvalue())
++        finally:
++            path.write_bytes(original)
++
++
+ class WireSemanticValidationTests(unittest.TestCase):
+     def test_manifest_requires_exact_declared_repository_selection(self) -> None:
+         valid = {
+@@ -1397,21 +1509,21 @@ class SkillfileSourcesSuiteManifestTests(unittest.TestCase):
+         finally:
+             path.write_bytes(original)
+ 
+-    def test_manifest_cannot_omit_a_case_even_with_a_recomputed_release_pin(self) -> None:
++    def test_manifest_cannot_omit_a_case_even_with_a_recomputed_candidate_pin(self) -> None:
+         manifest_path = validate.ROOT / "conformance" / "skillfile-sources-v1" / "manifest.json"
+-        release_path = validate.ROOT / "release" / f"{validate.PROTOCOL_VERSION}.json"
+-        originals = {path: path.read_bytes() for path in (manifest_path, release_path)}
++        candidate_path = validate.ROOT / "conformance" / "candidate.json"
++        originals = {path: path.read_bytes() for path in (manifest_path, candidate_path)}
+         try:
+             manifest = json.loads(originals[manifest_path].decode("utf-8"))
+             manifest["files"] = manifest["files"][1:]
+             manifest_bytes = (json.dumps(manifest, indent=2) + "\n").encode("utf-8")
+             manifest_path.write_bytes(manifest_bytes)
+-            release = json.loads(originals[release_path].decode("utf-8"))
+-            release["skillfile_sources_v1"]["manifest_sha256"] = (
++            candidate = json.loads(originals[candidate_path].decode("utf-8"))
++            candidate["skillfile_sources_v1"]["manifest_sha256"] = (
+                 "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
+             )
+-            release_path.write_bytes(
+-                (json.dumps(release, indent=2) + "\n").encode("utf-8")
++            candidate_path.write_bytes(
++                (json.dumps(candidate, indent=2) + "\n").encode("utf-8")
+             )
+             status, stderr = self.run_validation()
+             self.assertEqual(status, 1)
+@@ -1426,12 +1538,7 @@ class SkillfileSourcesSuiteManifestTests(unittest.TestCase):
+ class WorkflowRegenerationScopeTests(unittest.TestCase):
+     GENERATED_FILE_INVENTORY = (
+         "conformance/v1",
+-        "release/1.0.0-rc.5.json",
+-        "release/1.0.0-rc.6.json",
+-        "release/1.0.0-rc.7.json",
+-        "release/1.0.0-rc.8.json",
+-        "release/1.0.0-rc.9.json",
+-        "release/1.0.0-rc.13.json",
++        "conformance/candidate.json",
+         "conformance/skillfile-sources-v1/manifest.json",
+     )
+ 
+@@ -4253,14 +4360,14 @@ class WriteNofollowVectorTests(unittest.TestCase):
+         """Run the real validate.main() against a substituted on-disk corpus.
+ 
+         The mutated vector is written to the worktree with the manifest and
+-        rc.13 pins recomputed around it, so the only failing check can be the
++        candidate pins recomputed around it, so the only failing check can be the
+         nofollow gate itself; all three files are restored byte-identical
+         afterwards.
+         """
+         vector_path = validate.SUITE / "vectors" / "environments-write-nofollow.json"
+         manifest_path = validate.SUITE / "manifest.json"
+-        rc13_path = validate.ROOT / "release" / "1.0.0-rc.13.json"
+-        originals = {path: path.read_bytes() for path in (vector_path, manifest_path, rc13_path)}
++        candidate_path = validate.ROOT / "conformance" / "candidate.json"
++        originals = {path: path.read_bytes() for path in (vector_path, manifest_path, candidate_path)}
+         try:
+             vector_bytes = (json.dumps(vector, indent=2, sort_keys=True) + "\n").encode("utf-8")
+             vector_path.write_bytes(vector_bytes)
+@@ -4270,11 +4377,10 @@ class WriteNofollowVectorTests(unittest.TestCase):
+                     entry["sha256"] = "sha256:" + hashlib.sha256(vector_bytes).hexdigest()
+             manifest_bytes = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
+             manifest_path.write_bytes(manifest_bytes)
+-            release = json.loads(originals[rc13_path].decode("utf-8"))
++            candidate = json.loads(originals[candidate_path].decode("utf-8"))
+             manifest_digest = "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
+-            release["candidate_protocol_pin"]["manifest_sha256"] = manifest_digest
+-            release["downstream_consumption"]["required_manifest_sha256"] = manifest_digest
+-            rc13_path.write_bytes((json.dumps(release, indent=2, sort_keys=True) + "\n").encode("utf-8"))
++            candidate["core"]["manifest_sha256"] = manifest_digest
++            candidate_path.write_bytes((json.dumps(candidate, indent=2, sort_keys=True) + "\n").encode("utf-8"))
+             stdout, stderr = io.StringIO(), io.StringIO()
+             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                 status = validate.main()
+@@ -4423,14 +4529,14 @@ class DotfileManagersVectorTests(unittest.TestCase):
+         """Run the real validate.main() against a substituted on-disk corpus.
+ 
+         The mutated vector is written to the worktree with the manifest and
+-        rc.13 pins recomputed around it, so the only failing check can be the
++        candidate pins recomputed around it, so the only failing check can be the
+         dotfile-managers gate itself; all three files are restored
+         byte-identical afterwards.
+         """
+         vector_path = validate.SUITE / self.VECTOR_PATH
+         manifest_path = validate.SUITE / "manifest.json"
+-        rc13_path = validate.ROOT / "release" / "1.0.0-rc.13.json"
+-        originals = {path: path.read_bytes() for path in (vector_path, manifest_path, rc13_path)}
++        candidate_path = validate.ROOT / "conformance" / "candidate.json"
++        originals = {path: path.read_bytes() for path in (vector_path, manifest_path, candidate_path)}
+         try:
+             vector_bytes = (json.dumps(vector, indent=2, sort_keys=True) + "\n").encode("utf-8")
+             vector_path.write_bytes(vector_bytes)
+@@ -4440,11 +4546,10 @@ class DotfileManagersVectorTests(unittest.TestCase):
+                     entry["sha256"] = "sha256:" + hashlib.sha256(vector_bytes).hexdigest()
+             manifest_bytes = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
+             manifest_path.write_bytes(manifest_bytes)
+-            release = json.loads(originals[rc13_path].decode("utf-8"))
++            candidate = json.loads(originals[candidate_path].decode("utf-8"))
+             manifest_digest = "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
+-            release["candidate_protocol_pin"]["manifest_sha256"] = manifest_digest
+-            release["downstream_consumption"]["required_manifest_sha256"] = manifest_digest
+-            rc13_path.write_bytes((json.dumps(release, indent=2, sort_keys=True) + "\n").encode("utf-8"))
++            candidate["core"]["manifest_sha256"] = manifest_digest
++            candidate_path.write_bytes((json.dumps(candidate, indent=2, sort_keys=True) + "\n").encode("utf-8"))
+             stdout, stderr = io.StringIO(), io.StringIO()
+             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                 status = validate.main()
+@@ -4656,14 +4761,14 @@ class ReadFailureVectorTests(unittest.TestCase):
+         """Run the real validate.main() against a substituted on-disk corpus.
+ 
+         The mutated vector is written to the worktree with the manifest and
+-        rc.13 pins recomputed around it, so the only failing check can be the
++        candidate pins recomputed around it, so the only failing check can be the
+         read-failure gate itself; all three files are restored byte-identical
+         afterwards.
+         """
+         vector_path = validate.SUITE / "vectors" / "environments-read-failure.json"
+         manifest_path = validate.SUITE / "manifest.json"
+-        rc13_path = validate.ROOT / "release" / "1.0.0-rc.13.json"
+-        originals = {path: path.read_bytes() for path in (vector_path, manifest_path, rc13_path)}
++        candidate_path = validate.ROOT / "conformance" / "candidate.json"
++        originals = {path: path.read_bytes() for path in (vector_path, manifest_path, candidate_path)}
+         try:
+             vector_bytes = (json.dumps(vector, indent=2, sort_keys=True) + "\n").encode("utf-8")
+             vector_path.write_bytes(vector_bytes)
+@@ -4673,11 +4778,10 @@ class ReadFailureVectorTests(unittest.TestCase):
+                     entry["sha256"] = "sha256:" + hashlib.sha256(vector_bytes).hexdigest()
+             manifest_bytes = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
+             manifest_path.write_bytes(manifest_bytes)
+-            release = json.loads(originals[rc13_path].decode("utf-8"))
++            candidate = json.loads(originals[candidate_path].decode("utf-8"))
+             manifest_digest = "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
+-            release["candidate_protocol_pin"]["manifest_sha256"] = manifest_digest
+-            release["downstream_consumption"]["required_manifest_sha256"] = manifest_digest
+-            rc13_path.write_bytes((json.dumps(release, indent=2, sort_keys=True) + "\n").encode("utf-8"))
++            candidate["core"]["manifest_sha256"] = manifest_digest
++            candidate_path.write_bytes((json.dumps(candidate, indent=2, sort_keys=True) + "\n").encode("utf-8"))
+             stdout, stderr = io.StringIO(), io.StringIO()
+             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                 status = validate.main()
+diff --git a/tools/validate.py b/tools/validate.py
+index 904c26f..044cb01 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -216,6 +216,65 @@ def validate_released_schema_immutability() -> None:
+         )
+ 
+ 
++def published_release_records() -> dict[str, tuple[str, bytes]]:
++    """Inventory records shipped by local release tags, preferring their own tag.
++
++    Some historical records (for example rc.6) have no version tag; their first
++    tagged snapshot is still published history. Missing Git evidence is fatal.
++    """
++    def git(*args: str) -> bytes:
++        result = subprocess.run(
++            ["git", *args], cwd=ROOT, stdout=subprocess.PIPE,
++            stderr=subprocess.PIPE, check=False,
++        )
++        if result.returncode != 0:
++            detail = result.stderr.decode("utf-8", errors="replace").strip()
++            raise ValidationFailure(f"cannot inspect published release records: {detail}")
++        return result.stdout
++
++    latest = f"v{PROTOCOL_VERSION}"
++    git("rev-parse", "--verify", f"refs/tags/{latest}^{{commit}}")
++    tags = git("tag", "--list", "v*", "--sort=version:refname").decode("utf-8").splitlines()
++    records: dict[str, str] = {}
++    for tag in tags:
++        if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?", tag):
++            continue
++        tree = git("ls-tree", "-r", "-z", f"refs/tags/{tag}", "--", "release")
++        for record in tree.split(b"\0"):
++            if not record:
++                continue
++            try:
++                metadata, raw_path = record.split(b"\t", 1)
++                mode, kind, _oid = metadata.split(b" ")
++                relative = raw_path.decode("utf-8")
++            except (UnicodeError, ValueError) as exc:
++                raise ValidationFailure(f"cannot parse release inventory at {tag}") from exc
++            if not re.fullmatch(r"release/[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?\.json", relative):
++                continue
++            if kind != b"blob" or mode not in (b"100644", b"100755"):
++                raise ValidationFailure(f"published release record {relative} at {tag} is not a regular blob")
++            records.setdefault(relative, tag)
++            if relative == f"release/{tag[1:]}.json":
++                records[relative] = tag
++    if records.get(f"release/{PROTOCOL_VERSION}.json") != latest:
++        raise ValidationFailure(f"no published release record found for {latest}")
++    return {
++        relative: (tag, git("show", f"refs/tags/{tag}:{relative}"))
++        for relative, tag in sorted(records.items())
++    }
++
++
++def validate_released_record_immutability() -> None:
++    """Compare raw bytes, including whitespace, for every tagged release record."""
++    for relative, (tag, expected) in published_release_records().items():
++        path = ROOT / relative
++        try:
++            if path.is_symlink() or path.read_bytes() != expected:
++                raise ValidationFailure(f"published release record bytes differ from {tag}: {relative}")
++        except OSError as exc:
++            raise ValidationFailure(f"cannot read published release record {relative}: {exc}") from exc
++
++
+ def ccj1_bytes(value: Any) -> bytes:
+     if isinstance(value, dict):
+         value = dict(value)
+@@ -1003,70 +1062,22 @@ def validate_manifest() -> None:
+         raise ValidationFailure("rc.9 metadata does not preserve its published suite identity")
+ 
+     skillfile_sources_manifest_sha256 = validate_skillfile_sources_manifest()
+-    release = load_json(ROOT / f"release/{PROTOCOL_VERSION}.json")
+-    manifest_digest = "sha256:" + hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+-    if release.get("protocol_version") != PROTOCOL_VERSION:
+-        raise ValidationFailure("rc.13 release metadata identifies the wrong protocol version")
+-    pin = release.get("candidate_protocol_pin", {})
+-    if not isinstance(pin, dict) or pin.get("manifest_sha256") != manifest_digest:
+-        raise ValidationFailure("rc.13 candidate pin does not match the suite manifest")
+-    downstream = release.get("downstream_consumption", {})
+-    if (
+-        not isinstance(downstream, dict)
+-        or downstream.get("required_manifest_sha256") != manifest_digest
+-        or downstream.get("committed_release_pin_advanced") is not False
+-    ):
+-        raise ValidationFailure("rc.13 downstream consumption metadata is incomplete")
+-    history = release.get("historical_release", {})
+-    if (
+-        not isinstance(history, dict)
+-        or history.get("protocol_version") != RC9_PROTOCOL_VERSION
+-        or history.get("metadata_path") != "release/1.0.0-rc.9.json"
+-        or history.get("metadata_sha256") != RC9_RELEASE_METADATA_SHA256
+-        or history.get("source_commit") != RC9_SOURCE_COMMIT
+-        or history.get("immutable") is not True
+-        or release.get("source_baseline_commit") != RC9_SOURCE_COMMIT
+-        or release.get("legacy_release") != RC9_PROTOCOL_VERSION
+-    ):
+-        raise ValidationFailure("rc.13 metadata does not preserve historical rc.9 evidence")
+-    claim = release.get("claim_v5", {})
+-    if (
+-        not isinstance(claim, dict)
+-        or claim.get("claim_protocol_version") != RC9_PROTOCOL_VERSION
+-        or claim.get("schema") != "schemas/v1/conformance-claim-v5.schema.json"
+-        or claim.get("claims_emitted") != []
+-    ):
+-        raise ValidationFailure("rc.13 metadata fabricates a claim-v5 platform claim")
+-    suite_pin = release.get("skillfile_sources_v1", {})
++    try:
++        candidate = load_json(ROOT / "conformance" / "candidate.json")
++    except OSError as exc:
++        raise ValidationFailure(f"cannot read candidate metadata: {exc}") from exc
+     if (
+-        not isinstance(suite_pin, dict)
+-        or suite_pin.get("manifest_path")
+-        != "conformance/skillfile-sources-v1/manifest.json"
+-        or suite_pin.get("manifest_sha256") != skillfile_sources_manifest_sha256
+-        or suite_pin.get("compatible_core")
+-        != {
+-            "tag": "v1.0.0-rc.10",
+-            "manifest_sha256": RC10_CORE_MANIFEST_SHA256,
+-        }
++        not isinstance(candidate, dict)
++        or candidate.get("status") != "candidate"
++        or set(candidate) != {"status", "core", "skillfile_sources_v1"}
+     ):
+-        raise ValidationFailure("rc.13 metadata does not pin the accepted source suite separately")
+-    execution = release.get("assurance", {})
+-    if (
+-        not isinstance(execution, dict)
+-        or execution.get("default_mode") != "portable"
+-        or execution.get("portable_policy") != "portable-cli-policy-v1"
+-        or execution.get("portable_execution_policy") != PORTABLE_EXECUTION_POLICY
+-        or execution.get("verified_policy") != "verified-provider-policy-v1"
+-        or execution.get("verified_execution_policy") != "verified-provider-execution-v1"
+-        or execution.get("verified_provider_contract") != "host-execution-provider-v1"
+-        or execution.get("verified_implementations") != []
+-        or execution.get("verified_platform_claims") != []
+-        or execution.get("silent_downgrade_permitted") is not False
+-        or execution.get("skill_vendored_provider_allowed") is not False
++        raise ValidationFailure("candidate metadata has the wrong identity")
++    for name, path, digest in (
++        ("core", "conformance/v1/manifest.json", "sha256:" + hashlib.sha256(manifest_path.read_bytes()).hexdigest()),
++        ("skillfile_sources_v1", "conformance/skillfile-sources-v1/manifest.json", skillfile_sources_manifest_sha256),
+     ):
+-        raise ValidationFailure(
+-            "rc.13 release metadata does not honestly record assurance availability"
+-        )
++        if candidate.get(name) != {"manifest_path": path, "manifest_sha256": digest}:
++            raise ValidationFailure(f"candidate {name} pin does not match the suite manifest")
+ 
+ 
+ def validate_skillfile_sources_manifest() -> str:
+@@ -11502,8 +11513,9 @@ def validate_environments_muse_vectors(vector: Any = None) -> None:
+                 raise ValidationFailure(f"Muse passthrough case {name} violates resolve/repair refusal")
+ 
+ 
+-def main() -> int:
++def main(*, release_history_only: bool = False) -> int:
+     checks = [
++        validate_released_record_immutability,
+         validate_released_schema_immutability,
+         validate_schemas,
+         validate_repository_descriptor_identity,
+@@ -11538,15 +11550,25 @@ def main() -> int:
+         validate_takeover_closed_set_text,
+         validate_local_links,
+     ]
++    if release_history_only:
++        checks = [validate_released_record_immutability]
+     try:
+         for check in checks:
+             check()
+     except ValidationFailure as exc:
+         print(f"validation failed: {exc}", file=sys.stderr)
+         return 1
++    if release_history_only:
++        print("validated published release record bytes")
++        return 0
+     print(f"validated {len(list(SCHEMAS.glob('*.json')))} schemas and {len(load_json(SUITE / 'manifest.json')['files'])} vector files")
+     return 0
+ 
+ 
+ if __name__ == "__main__":
+-    raise SystemExit(main())
++    import argparse
++
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--release-history-only", action="store_true")
++    args = parser.parse_args()
++    raise SystemExit(main(release_history_only=args.release_history_only))
