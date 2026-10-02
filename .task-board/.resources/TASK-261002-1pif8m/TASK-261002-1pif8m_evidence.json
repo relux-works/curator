@@ -1,0 +1,1006 @@
+{
+  "task": "TASK-261002-1pif8m",
+  "captured_at": "2026-10-02T01:05:47.579612+00:00",
+  "commands": [
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator-spec/commits/main",
+        "--jq",
+        "{sha,signature_verified:.commit.verification.verified}"
+      ],
+      "exit_code": 0,
+      "result": {
+        "sha": "e41c561b3300a0a4d3425437fddc5a7048d7b11e",
+        "signature_verified": true
+      }
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator-spec/commits/e41c561b3300a0a4d3425437fddc5a7048d7b11e/check-runs",
+        "--jq",
+        "[.check_runs[]|{name,status,conclusion,html_url}]"
+      ],
+      "exit_code": 0,
+      "result": [
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-spec/actions/runs/36909506683/job/110528354848",
+          "name": "Implementations (ubuntu-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-spec/actions/runs/36909506683/job/110528354839",
+          "name": "Implementations (windows-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-spec/actions/runs/36909506732/job/110528354643",
+          "name": "Release target provenance",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-spec/actions/runs/36909506732/job/110528354612",
+          "name": "Specification (macos-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-spec/actions/runs/36909506732/job/110528354606",
+          "name": "Specification (ubuntu-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-spec/actions/runs/36909506732/job/110528354583",
+          "name": "Links",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-spec/actions/runs/36909506683/job/110528354577",
+          "name": "Implementations (macos-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-spec/actions/runs/36909506732/job/110528354573",
+          "name": "Specification (windows-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-spec/actions/runs/36909506732/job/110528354214",
+          "name": "Formatting",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator/commits/main",
+        "--jq",
+        "{sha,signature_verified:.commit.verification.verified}"
+      ],
+      "exit_code": 0,
+      "result": {
+        "sha": "2247509a476423bfdd9dd57a5098056fdd2be8cb",
+        "signature_verified": true
+      }
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator/commits/2247509a476423bfdd9dd57a5098056fdd2be8cb/check-runs",
+        "--jq",
+        "[.check_runs[]|{name,status,conclusion,html_url}]"
+      ],
+      "exit_code": 0,
+      "result": [
+        {
+          "conclusion": "skipped",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36948222988/job/110655046541",
+          "name": "Candidate suite (${{ matrix.os }})",
+          "status": "completed"
+        },
+        {
+          "conclusion": "skipped",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36948222988/job/110655046111",
+          "name": "Test (rose-air)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36948222988/job/110655045395",
+          "name": "Gate self-test (windows-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": null,
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36948222988/job/110655045342",
+          "name": "Test (macos-latest)",
+          "status": "in_progress"
+        },
+        {
+          "conclusion": null,
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36948222988/job/110655045303",
+          "name": "Test (windows-latest)",
+          "status": "in_progress"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36948222988/job/110655045291",
+          "name": "Gate self-test (ubuntu-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36948222988/job/110655045282",
+          "name": "Naming gate",
+          "status": "completed"
+        },
+        {
+          "conclusion": null,
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36948222988/job/110655045263",
+          "name": "Test (ubuntu-latest)",
+          "status": "in_progress"
+        },
+        {
+          "conclusion": null,
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36948222988/job/110655045248",
+          "name": "Race (macos-latest)",
+          "status": "in_progress"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36948222988/job/110655045167",
+          "name": "Gate self-test (macos-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": null,
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36948222988/job/110655045161",
+          "name": "Race (ubuntu-latest)",
+          "status": "in_progress"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36948222988/job/110655045127",
+          "name": "Interop conformance gate",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36948222988/job/110655045021",
+          "name": "Lint",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator-agent-launcher/commits/main",
+        "--jq",
+        "{sha,signature_verified:.commit.verification.verified}"
+      ],
+      "exit_code": 0,
+      "result": {
+        "sha": "1ac7eafba38d2a62bb679602401fb0db2f2e8e56",
+        "signature_verified": true
+      }
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator-agent-launcher/commits/1ac7eafba38d2a62bb679602401fb0db2f2e8e56/check-runs",
+        "--jq",
+        "[.check_runs[]|{name,status,conclusion,html_url}]"
+      ],
+      "exit_code": 0,
+      "result": [
+        {
+          "conclusion": "skipped",
+          "html_url": "https://github.com/relux-works/curator-agent-launcher/actions/runs/36944160548/job/110642265212",
+          "name": "Test (rose-air)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-agent-launcher/actions/runs/36944160548/job/110642263864",
+          "name": "Race (ubuntu-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-agent-launcher/actions/runs/36944160548/job/110642263719",
+          "name": "Test (macos-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-agent-launcher/actions/runs/36944160548/job/110642263691",
+          "name": "Test (ubuntu-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-agent-launcher/actions/runs/36944160548/job/110642263463",
+          "name": "Race (macos-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "skipped",
+          "html_url": "https://github.com/relux-works/curator-agent-launcher/actions/runs/36944026388/job/110641838131",
+          "name": "Test (rose-air)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-agent-launcher/actions/runs/36944026388/job/110641836859",
+          "name": "Test (macos-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-agent-launcher/actions/runs/36944026388/job/110641836761",
+          "name": "Race (macos-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-agent-launcher/actions/runs/36944026388/job/110641836759",
+          "name": "Test (ubuntu-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-agent-launcher/actions/runs/36944026388/job/110641836524",
+          "name": "Race (ubuntu-latest)",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator-spec/pulls/119",
+        "--jq",
+        "{number,title,state,merged,head:.head.sha,base:.base.sha,mergeable,mergeable_state,html_url}"
+      ],
+      "exit_code": 0,
+      "result": {
+        "base": "add50233fe64d29d1ba64e71b0538788efc79657",
+        "head": "51eb12008aae017e59a785d3d9965dadcbc86aef",
+        "html_url": "https://github.com/relux-works/curator-spec/pull/119",
+        "mergeable": false,
+        "mergeable_state": "dirty",
+        "merged": false,
+        "number": 119,
+        "state": "open",
+        "title": "Define snapshot-cache retention in manager profile section 10.1 (#75)"
+      }
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator/pulls/101",
+        "--jq",
+        "{number,title,state,merged,head:.head.sha,base:.base.sha,mergeable,mergeable_state,html_url}"
+      ],
+      "exit_code": 0,
+      "result": {
+        "base": "bab2433ba115a7eafb2298dba6ef16154e2cc62e",
+        "head": "d0e486f8f900995b19aa6c3192d4e0309e5047d8",
+        "html_url": "https://github.com/relux-works/curator/pull/101",
+        "mergeable": false,
+        "mergeable_state": "dirty",
+        "merged": false,
+        "number": 101,
+        "state": "open",
+        "title": "Add curator cache prune for the snapshot cache (#86)"
+      }
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator-agent-launcher/git/tags/7db30dd6b1e11e36826895ab75d7f32ef559a857",
+        "--jq",
+        "{tag,object,verified:.verification.verified,reason:.verification.reason}"
+      ],
+      "exit_code": 0,
+      "result": {
+        "object": {
+          "sha": "1ac7eafba38d2a62bb679602401fb0db2f2e8e56",
+          "type": "commit",
+          "url": "https://api.github.com/repos/relux-works/curator-agent-launcher/git/commits/1ac7eafba38d2a62bb679602401fb0db2f2e8e56"
+        },
+        "reason": "valid",
+        "tag": "v0.1.1",
+        "verified": true
+      }
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator-agent-launcher/compare/v0.1.1...main",
+        "--jq",
+        "{status,ahead_by,behind_by,total_commits}"
+      ],
+      "exit_code": 0,
+      "result": {
+        "ahead_by": 0,
+        "behind_by": 0,
+        "status": "identical",
+        "total_commits": 0
+      }
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator-spec/git/ref/tags/v1.0.0-rc.14",
+        "--jq",
+        ".object"
+      ],
+      "exit_code": 1,
+      "result": {
+        "message": "Not Found",
+        "documentation_url": "https://docs.github.com/rest/git/refs#get-a-reference",
+        "status": "404"
+      },
+      "error": "gh: Not Found (HTTP 404)"
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator/git/ref/tags/v0.15.0-rc.3",
+        "--jq",
+        ".object"
+      ],
+      "exit_code": 1,
+      "result": {
+        "message": "Not Found",
+        "documentation_url": "https://docs.github.com/rest/git/refs#get-a-reference",
+        "status": "404"
+      },
+      "error": "gh: Not Found (HTTP 404)"
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator/releases?per_page=3",
+        "--jq",
+        "[.[]|{tag_name,prerelease,published_at,html_url,assets:[.assets[].name]}]"
+      ],
+      "exit_code": 0,
+      "result": [
+        {
+          "assets": [
+            "checksums.txt",
+            "checksums.txt.pem",
+            "checksums.txt.sig",
+            "curator_0.15.0-rc.2_darwin_amd64.tar.gz",
+            "curator_0.15.0-rc.2_darwin_amd64.tar.gz.sbom.json",
+            "curator_0.15.0-rc.2_darwin_arm64.tar.gz",
+            "curator_0.15.0-rc.2_darwin_arm64.tar.gz.sbom.json",
+            "curator_0.15.0-rc.2_linux_amd64.deb",
+            "curator_0.15.0-rc.2_linux_amd64.rpm",
+            "curator_0.15.0-rc.2_linux_amd64.tar.gz",
+            "curator_0.15.0-rc.2_linux_amd64.tar.gz.sbom.json",
+            "curator_0.15.0-rc.2_linux_arm64.deb",
+            "curator_0.15.0-rc.2_linux_arm64.rpm",
+            "curator_0.15.0-rc.2_linux_arm64.tar.gz",
+            "curator_0.15.0-rc.2_linux_arm64.tar.gz.sbom.json",
+            "curator_0.15.0-rc.2_windows_amd64.zip",
+            "curator_0.15.0-rc.2_windows_amd64.zip.sbom.json",
+            "curator_0.15.0-rc.2_windows_arm64.zip",
+            "curator_0.15.0-rc.2_windows_arm64.zip.sbom.json"
+          ],
+          "html_url": "https://github.com/relux-works/curator/releases/tag/v0.15.0-rc.2",
+          "prerelease": true,
+          "published_at": "2026-09-26T19:20:10Z",
+          "tag_name": "v0.15.0-rc.2"
+        },
+        {
+          "assets": [
+            "checksums.txt",
+            "checksums.txt.pem",
+            "checksums.txt.sig",
+            "curator_0.15.0-rc.1_darwin_amd64.tar.gz",
+            "curator_0.15.0-rc.1_darwin_amd64.tar.gz.sbom.json",
+            "curator_0.15.0-rc.1_darwin_arm64.tar.gz",
+            "curator_0.15.0-rc.1_darwin_arm64.tar.gz.sbom.json",
+            "curator_0.15.0-rc.1_linux_amd64.deb",
+            "curator_0.15.0-rc.1_linux_amd64.rpm",
+            "curator_0.15.0-rc.1_linux_amd64.tar.gz",
+            "curator_0.15.0-rc.1_linux_amd64.tar.gz.sbom.json",
+            "curator_0.15.0-rc.1_linux_arm64.deb",
+            "curator_0.15.0-rc.1_linux_arm64.rpm",
+            "curator_0.15.0-rc.1_linux_arm64.tar.gz",
+            "curator_0.15.0-rc.1_linux_arm64.tar.gz.sbom.json",
+            "curator_0.15.0-rc.1_windows_amd64.zip",
+            "curator_0.15.0-rc.1_windows_amd64.zip.sbom.json",
+            "curator_0.15.0-rc.1_windows_arm64.zip",
+            "curator_0.15.0-rc.1_windows_arm64.zip.sbom.json"
+          ],
+          "html_url": "https://github.com/relux-works/curator/releases/tag/v0.15.0-rc.1",
+          "prerelease": true,
+          "published_at": "2026-09-08T14:27:29Z",
+          "tag_name": "v0.15.0-rc.1"
+        },
+        {
+          "assets": [
+            "checksums.txt",
+            "checksums.txt.pem",
+            "checksums.txt.sig",
+            "curator_0.14.0_darwin_amd64.tar.gz",
+            "curator_0.14.0_darwin_amd64.tar.gz.sbom.json",
+            "curator_0.14.0_darwin_arm64.tar.gz",
+            "curator_0.14.0_darwin_arm64.tar.gz.sbom.json",
+            "curator_0.14.0_linux_amd64.deb",
+            "curator_0.14.0_linux_amd64.rpm",
+            "curator_0.14.0_linux_amd64.tar.gz",
+            "curator_0.14.0_linux_amd64.tar.gz.sbom.json",
+            "curator_0.14.0_linux_arm64.deb",
+            "curator_0.14.0_linux_arm64.rpm",
+            "curator_0.14.0_linux_arm64.tar.gz",
+            "curator_0.14.0_linux_arm64.tar.gz.sbom.json",
+            "curator_0.14.0_windows_amd64.zip",
+            "curator_0.14.0_windows_amd64.zip.sbom.json",
+            "curator_0.14.0_windows_arm64.zip",
+            "curator_0.14.0_windows_arm64.zip.sbom.json"
+          ],
+          "html_url": "https://github.com/relux-works/curator/releases/tag/v0.14.0",
+          "prerelease": false,
+          "published_at": "2026-09-06T11:26:52Z",
+          "tag_name": "v0.14.0"
+        }
+      ]
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator-spec/releases?per_page=3",
+        "--jq",
+        "[.[]|{tag_name,prerelease,published_at,html_url,assets:[.assets[].name]}]"
+      ],
+      "exit_code": 0,
+      "result": [
+        {
+          "assets": [
+            "checksums.txt",
+            "curator-protocol-1.0.0-rc.13.tar.gz",
+            "curator-protocol-1.0.0-rc.13.zip"
+          ],
+          "html_url": "https://github.com/relux-works/curator-spec/releases/tag/v1.0.0-rc.13",
+          "prerelease": true,
+          "published_at": "2026-09-26T11:25:11Z",
+          "tag_name": "v1.0.0-rc.13"
+        },
+        {
+          "assets": [],
+          "html_url": "https://github.com/relux-works/curator-spec/releases/tag/v1.0.0-rc.11",
+          "prerelease": false,
+          "published_at": "2026-09-07T19:24:08Z",
+          "tag_name": "v1.0.0-rc.11"
+        },
+        {
+          "assets": [
+            "checksums.txt",
+            "curator-protocol-1.0.0-rc.9.tar.gz",
+            "curator-protocol-1.0.0-rc.9.zip"
+          ],
+          "html_url": "https://github.com/relux-works/curator-spec/releases/tag/v1.0.0-rc.9",
+          "prerelease": true,
+          "published_at": "2026-08-24T18:54:36Z",
+          "tag_name": "v1.0.0-rc.9"
+        }
+      ]
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator/commits/e4a6a8d5df879183c4d8b5c648aa440bd50ff7dc/check-runs",
+        "--jq",
+        "[.check_runs[]|{name,status,conclusion,html_url}]"
+      ],
+      "exit_code": 0,
+      "result": [
+        {
+          "conclusion": "skipped",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36901545094/job/110501672183",
+          "name": "Candidate suite (${{ matrix.os }})",
+          "status": "completed"
+        },
+        {
+          "conclusion": "skipped",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36901545094/job/110501671871",
+          "name": "Test (rose-air)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36901545094/job/110501670379",
+          "name": "Test (ubuntu-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36901545094/job/110501670359",
+          "name": "Gate self-test (macos-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36901545094/job/110501670327",
+          "name": "Gate self-test (ubuntu-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36901545094/job/110501670326",
+          "name": "Interop conformance gate",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36901545094/job/110501670224",
+          "name": "Naming gate",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36901545094/job/110501670191",
+          "name": "Gate self-test (windows-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36901545094/job/110501670168",
+          "name": "Test (windows-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36901545094/job/110501670076",
+          "name": "Race (macos-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36901545094/job/110501670061",
+          "name": "Race (ubuntu-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36901545094/job/110501670016",
+          "name": "Test (macos-latest)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator/actions/runs/36901545094/job/110501669911",
+          "name": "Lint",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/relux-works/curator-skill-registry/commits/d690bea6fab1c8e6392e05d3a3cdfcf1168bc914/check-runs",
+        "--jq",
+        "[.check_runs[]|{name,status,conclusion,html_url}]"
+      ],
+      "exit_code": 0,
+      "result": [
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-skill-registry/actions/runs/29270135842/job/86885949981",
+          "name": "Build distribution",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-skill-registry/actions/runs/29270135842/job/86885486123",
+          "name": "Tests / Python 3.11 on windows-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-skill-registry/actions/runs/29270135842/job/86885485651",
+          "name": "Tests / Python 3.14 on macos-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-skill-registry/actions/runs/29270135842/job/86885485617",
+          "name": "Tests / Python 3.14 on ubuntu-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-skill-registry/actions/runs/29270135842/job/86885485582",
+          "name": "Tests / Python 3.14 on windows-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-skill-registry/actions/runs/29270135842/job/86885485568",
+          "name": "Tests / Python 3.11 on macos-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-skill-registry/actions/runs/29270135842/job/86885485534",
+          "name": "Tests / Python 3.11 on ubuntu-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-skill-registry/actions/runs/29270135842/job/86885485519",
+          "name": "Docker build",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/relux-works/curator-skill-registry/actions/runs/29270135842/job/86885485426",
+          "name": "Type check / mypy strict",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/ivanopcode/cocoaskills/commits/4a88aa0e47ab2b34ded16162cec7f97d0c7cf6f1/check-runs",
+        "--jq",
+        "[.check_runs[]|{name,status,conclusion,html_url}]"
+      ],
+      "exit_code": 0,
+      "result": [
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108286418429",
+          "name": "merge",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276887/job/108279326790",
+          "name": "deploy",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276887/job/108279326768",
+          "name": "report-build-status",
+          "status": "completed"
+        },
+        {
+          "conclusion": "skipped",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108279098588",
+          "name": "fast",
+          "status": "completed"
+        },
+        {
+          "conclusion": "skipped",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108279036732",
+          "name": "Fast draft sources / Python 3.14 on ${{ matrix.os }}",
+          "status": "completed"
+        },
+        {
+          "conclusion": "skipped",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108279027962",
+          "name": "Fast ordinary / Python 3.14 on ${{ matrix.os }}",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276887/job/108279000967",
+          "name": "build",
+          "status": "completed"
+        },
+        {
+          "conclusion": "skipped",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278997464",
+          "name": "Floor syntax / requires-python floor on ubuntu-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "skipped",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278997099",
+          "name": "Fast Go E2E smoke / Python 3.14 on ${{ matrix.os }}",
+          "status": "completed"
+        },
+        {
+          "conclusion": "skipped",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278997026",
+          "name": "Fast protocol sentinels / Python 3.14 on ${{ matrix.os }}",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996576",
+          "name": "Merge ordinary / Python 3.13 on windows-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996572",
+          "name": "Merge ordinary / Python 3.11 on windows-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996520",
+          "name": "Merge ordinary / Python 3.13 on macos-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996476",
+          "name": "Merge ordinary / Python 3.12 on windows-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996431",
+          "name": "Merge ordinary / Python 3.11 on ubuntu-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996430",
+          "name": "Merge protocol / Python 3.14 / windows-p02-lifecycle-sabotage-a",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996427",
+          "name": "Merge ordinary / Python 3.14 on ubuntu-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996409",
+          "name": "Merge ordinary / Python 3.12 on macos-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996403",
+          "name": "Merge ordinary / Python 3.14 on windows-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996383",
+          "name": "Merge ordinary / Python 3.12 on ubuntu-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996367",
+          "name": "Merge ordinary / Python 3.11 on macos-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996365",
+          "name": "Merge protocol / Python 3.14 / windows-p01-lifecycle-cached-baseline",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996349",
+          "name": "Merge protocol / Python 3.14 / windows-p05-lifecycle-sabotage-d",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996340",
+          "name": "Merge protocol / Python 3.14 / windows-p04-lifecycle-sabotage-c",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996319",
+          "name": "Merge ordinary / Python 3.14 on macos-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996298",
+          "name": "Merge protocol / Python 3.14 / windows-p00-contract-and-registry",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996285",
+          "name": "Merge Go E2E / Python 3.14 on macos-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996265",
+          "name": "Merge draft sources / Python 3.14 on ubuntu-latest",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996258",
+          "name": "Merge protocol / Python 3.14 / windows-p03-lifecycle-sabotage-b",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "html_url": "https://github.com/ivanopcode/cocoaskills/actions/runs/36198276280/job/108278996254",
+          "name": "Merge protocol / Python 3.14 / macos-full",
+          "status": "completed"
+        }
+      ]
+    }
+  ],
+  "board_scopes": {
+    "EPIC-260910-2hw1xb": {
+      "total_leaves": 68,
+      "status_counts": {
+        "done": 62,
+        "closed": 1,
+        "backlog": 3,
+        "blocked": 1,
+        "analysis": 1
+      },
+      "active_leaves": [
+        {
+          "id": "TASK-260927-1e5qqm",
+          "title": "TASK-260927-1e5qqm: flip-codex-seed-to-revision-b",
+          "status": "backlog",
+          "parent": "STORY-260928-2n2ii7",
+          "blockedBy": [
+            "TASK-260927-31gaka"
+          ]
+        },
+        {
+          "id": "TASK-260927-25hk87",
+          "title": "TASK-260927-25hk87: flip-security-posture-default-hardened",
+          "status": "backlog",
+          "parent": "STORY-260928-oflbe1",
+          "blockedBy": [
+            "TASK-260927-4pv4au"
+          ]
+        },
+        {
+          "id": "TASK-260930-3ny11n",
+          "title": "TASK-260930-3ny11n: spec-skillfile-sources-content-hash-v2",
+          "status": "backlog",
+          "parent": "STORY-260930-3kchby",
+          "blockedBy": []
+        },
+        {
+          "id": "TASK-260930-fp8vx7",
+          "title": "TASK-260930-fp8vx7: diagnose-and-fix-windows-broker-realgit-flake",
+          "status": "blocked",
+          "parent": "STORY-260930-tetmq6",
+          "blockedBy": []
+        },
+        {
+          "id": "TASK-261002-1pif8m",
+          "title": "TASK-261002-1pif8m: rc14-rc3-readiness-checklist",
+          "status": "analysis",
+          "parent": "STORY-261002-2327ef",
+          "blockedBy": []
+        }
+      ]
+    },
+    "EPIC-260910-16qce1": {
+      "total_leaves": 12,
+      "status_counts": {
+        "done": 12
+      },
+      "active_leaves": []
+    }
+  },
+  "related_leaves": [
+    {
+      "id": "TASK-261001-2d1obt",
+      "title": "TASK-261001-2d1obt: review-b3-cache-prune-prs",
+      "status": "to-review",
+      "parent": "STORY-261001-1r2t7c",
+      "blockedBy": []
+    },
+    {
+      "id": "TASK-260927-4pv4au",
+      "title": "TASK-260927-4pv4au: manager-security-posture-revision-a",
+      "status": "done",
+      "parent": "STORY-260910-2qmrb8",
+      "blockedBy": []
+    },
+    {
+      "id": "TASK-260927-31gaka",
+      "title": "TASK-260927-31gaka: ship-codex-seed-revision-a",
+      "status": "done",
+      "parent": "STORY-260927-3qf8er",
+      "blockedBy": [
+        "TASK-260916-33abdk"
+      ]
+    },
+    {
+      "id": "TASK-260930-12i5zr",
+      "title": "TASK-260930-12i5zr: curator-accepts-content-hash-v2-candidate-suite",
+      "status": "done",
+      "parent": "STORY-260930-jzq0dx",
+      "blockedBy": []
+    },
+    {
+      "id": "TASK-260917-2tx81l",
+      "title": "TASK-260917-2tx81l: manager-content-hash-v2",
+      "status": "done",
+      "parent": "STORY-260930-klqikd",
+      "blockedBy": []
+    },
+    {
+      "id": "BUG-260923-2afgyq",
+      "title": "BUG-260923-2afgyq: marker-reader-cross-field-validation",
+      "status": "backlog",
+      "parent": "STORY-260822-2lvw0e",
+      "blockedBy": []
+    }
+  ],
+  "declared_gap_rows": {
+    "950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60": {
+      "rows": 16,
+      "by_owner": {
+        "TASK-260927-1e5qqm": 9,
+        "BUG-260923-2afgyq": 5,
+        "STORY-260925-1v7pvn": 2
+      }
+    },
+    "bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783": {
+      "rows": 97,
+      "by_owner": {
+        "TASK-260917-2tx81l": 81,
+        "TASK-260927-1e5qqm": 9,
+        "BUG-260923-2afgyq": 5,
+        "STORY-260925-1v7pvn": 2
+      }
+    },
+    "be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca": {
+      "rows": 16,
+      "by_owner": {
+        "TASK-260927-1e5qqm": 9,
+        "BUG-260923-2afgyq": 5,
+        "STORY-260925-1v7pvn": 2
+      }
+    }
+  },
+  "spec_file_hashes": {
+    "conformance/v1/manifest.json": "bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783",
+    "conformance/skillfile-sources-v1/manifest.json": "061ec05ddb1746b72168d157f81d2930047cd62371ffa46cf585844da61ee6be",
+    "release/1.0.0-rc.13.json": "510a5e8da6ce1ff6ae970ce574ef0de972566f5d846eca6f9da409a5bdab5ed8"
+  }
+}
