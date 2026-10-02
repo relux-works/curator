@@ -341,7 +341,7 @@ func (s *DiskProtectedStore) StoreArtifact(key string, input map[string]any, _ s
 			return hit.Receipt, nil
 		}
 		if e == nil && hit != nil {
-			_ = s.corrupt(final, CodeReceiptInvalid, true, fmt.Errorf("execution receipt or artifact differs for the same assured key"))
+			_ = s.corrupt(final, CodeReceiptInvalid, true, fmt.Errorf("execution receipt or artifact differs for the same build input key"))
 		}
 	}
 	stage, err := os.MkdirTemp(parent, ".stage-")

@@ -320,8 +320,14 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 		return result, nil
 	}
 
-	// Stage every build miss privately and finalize toolchain and build-source
-	// trust, all before the first live mutation below.
+	// The mixed plan stages external commands before local go-v1 commands, in
+	// the same command and receipt order as project installs. Both arms remain
+	// private until the serialized commit below.
+	externalStaged, externalStageErr := stageExternalBuilds(opts.context(), externalPlan, deps.Toolchain, deps.Builder, private)
+	if externalStageErr != nil {
+		result.failBuild(externalStageErr)
+		return result, nil
+	}
 	staged, stageErr := stageBuilds(opts.context(), plan, deps)
 	if stageErr != nil {
 		result.BuildDiagnostic = godriver.DiagnosticCode(stageErr)
@@ -336,12 +342,6 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 			return result, nil
 		}
 	}
-	externalStaged, externalStageErr := stageExternalBuilds(opts.context(), externalPlan, deps.Toolchain, deps.Builder, private)
-	if externalStageErr != nil {
-		result.failBuild(externalStageErr)
-		return result, nil
-	}
-
 	outcome, commitErr := runCommit(opts.context(), commitRequest{
 		scope:    "global",
 		home:     home,
@@ -365,7 +365,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 	result.Messages = append(result.Messages, outcome.warnings...)
 	result.BuildCacheRetained = outcome.retainedBuilds
 	if commitErr != nil {
-		return result.failCommit(commitErr)
+		return result.failCommit(externalTransactionFailure(commitErr, externalStaged))
 	}
 	return result, nil
 }

@@ -60,7 +60,7 @@ func TestAuthoritativeGarbageCollectionRootsAreRetained(t *testing.T) {
 	conformancecoverage.RunOutcomes(t, "external-repository-lifecycle/status-repair-gc-cases", authoritativeGCCases(t),
 		func(tc authoritativeGCCase) string { return tc.Name }, func(t *testing.T, published authoritativeGCCase) conformancecoverage.Observation {
 			if len(published.Roots) == 0 {
-				return conformancecoverage.Observation{BoundReason: "status and repair codes belong to the external-repository manager surface"}
+				return conformancecoverage.Observation{BoundReason: externalStatusRepairBound(published.Name)}
 			}
 			for _, root := range published.Roots {
 				root := root
@@ -68,6 +68,21 @@ func TestAuthoritativeGarbageCollectionRootsAreRetained(t *testing.T) {
 			}
 			return conformancecoverage.Observation{}
 		})
+}
+
+func externalStatusRepairBound(name string) string {
+	switch name {
+	case "status-current":
+		return "install.Project OperationStatus reaches planExternalBuilds, which invokes RunPipeline(OperationDryRun) and exact-source Acquire before cache inspection; it emits no external buildFacts, so cmd/curator status cannot report this external command current without remote contact"
+	case "status-missing-snapshot":
+		return "the manager status classifier consumes only local BuildPlan facts; external plan results are retained as messages and do not expose a non-current code for a missing protected snapshot"
+	case "status-unreadable-protected-state":
+		return "the manager status classifier has no external protected-state fact type for an unreadable entry; current external planning reacquires and audits source before the cache read, contrary to the vector's remote_contacted=false premise"
+	case "repair-reacquires-exact-source":
+		return "install.Operation and global manager entry points expose install, update, and status but no repair operation; buildrepo.OperationRepair is not wired to a manager reacquisition, audit, publication, and marker transaction"
+	default:
+		return "published external status/repair case has no roots and no matching manager entry-point binding"
+	}
 }
 
 func assertRootRetained(t *testing.T, root string) {

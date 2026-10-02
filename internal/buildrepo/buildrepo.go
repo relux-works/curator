@@ -222,6 +222,11 @@ func ParseDescriptor(payload []byte) (*Descriptor, error) {
 		if !ok {
 			return nil, verr.New(label, "must be an object")
 		}
+		for _, forbidden := range []string{"output", "path_entry", "path_entries"} {
+			if _, present := entry[forbidden]; present {
+				return nil, admissionError(CodePackageOutputForbidden, "package data cannot select artifact or PATH destinations")
+			}
+		}
 		if err := rejectUnknown(entry, label, "driver", "build_root", "source_dir"); err != nil {
 			return nil, err
 		}

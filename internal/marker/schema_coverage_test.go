@@ -97,6 +97,10 @@ func TestReadAuthoritativeMarkerV2SchemaCases(t *testing.T) {
 	runMarkerSchemaCases(t, "install-marker-v2")
 }
 
+func TestReadAuthoritativeMarkerV3SchemaCases(t *testing.T) {
+	runMarkerSchemaCases(t, "install-marker-v3")
+}
+
 func TestReadAuthoritativeMarkerV4SchemaCases(t *testing.T) {
 	runMarkerSchemaCases(t, "install-marker-v4")
 }

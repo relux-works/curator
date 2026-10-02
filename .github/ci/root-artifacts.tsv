@@ -58,6 +58,7 @@
 cmd/curator	vectors/umbrella-provider-resolution.json,vectors/manager-lifecycle.json,vectors/environments-read-failure.json,vectors/environments-source-signers.json	TestUmbrellaProviderResolutionVectors, both lifecycle consumers, TestEnvUnmanageBackupRecordVectors, and signer/update-confirmation production-entry tests bind their published case families
 internal/buildsource	vectors/build-drivers.json	TestBuildSourceConformanceVectors reads the vector directly
 internal/buildrepo	schema-cases/skill-build-v1,fixtures/external-repository/raw-objects.json,fixtures/external-repository/lfs-pointers.json,fixtures/external-repository/pack-index.json,fixtures/external-repository/local-config-and-refs.json,vectors/source-identities.json	complete skill-build-v1 and external-repository case consumers plus every published source identity
+internal/install	vectors/external-repository-lifecycle.json,expected/external-repository/build-receipt-v2.json,expected/external-repository/install-marker-v3-mixed.json,expected/external-repository/mixed-build-plan.json,expected/install-marker-v4.json	install lifecycle consumers bind mixed build, shim, signing, transaction and expected receipt/marker/plan fixtures
 internal/devsub	schema-cases/skillfile-dev-v2	TestSkillfileDevV2PublishedCasesUseCoverageRatchet drives every published developer Skillfile schema case
 internal/godriver	vectors/build-drivers.json,vectors/go-host-execution-policy.json,vectors/module-roots.json	full-list go-v1 identity, policy and module-root consumers read each published case
 internal/buildcache	vectors/build-drivers.json	TestCandidateCacheOutcomeVocabulary reads the vector directly
@@ -67,7 +68,7 @@ internal/runtimestore	vectors/manager-lifecycle.json	launcher contract consumers
 internal/contextmaterialize	vectors/environments.json	TestSystemModuleAdmissionVectors binds the published materialization family
 internal/contextresolve	vectors/environments-source-signers.json	TestSourceSignerVectorsAtResolve drives every signer vector through the resolver production entry
 internal/envprofile	vectors/environments-store-boundary.json	TestStoreBoundary vectors drive resolve, dry-run, repair and status production entries
-internal/marker	schema-cases/install-marker-v2,schema-cases/install-marker-v4,expected/build-driver/marker.json	the marker v2 and v4 schema cases and the authoritative compiled marker
+internal/marker	schema-cases/install-marker-v2,schema-cases/install-marker-v3,schema-cases/install-marker-v4,expected/build-driver/marker.json	the marker v2, v3 and v4 schema cases and the authoritative compiled marker
 internal/whitelist	fixtures/go-build-skill,expected/build-driver/context_files.json	the build-root context exclusion fixture and its expected file list
 internal/moduleroots	vectors/module-roots.json	TestModuleRootVectors reads the vector directly
 internal/scriptworker	vectors/script-host-execution-policy.json	TestExecutableIdentityCasesAtProductionEntry drives the published executable identity cases through the manager resolver

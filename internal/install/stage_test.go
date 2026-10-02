@@ -306,6 +306,10 @@ type fakeBuilder struct {
 	staged  []string
 	failOn  map[string]error
 	observe func(StageRequest)
+	// payloads lets launcher conformance tests publish a harmless executable
+	// fixture through the same real protected artifact path as an ordinary
+	// compiler result.
+	payloads map[string][]byte
 	// dropPackage makes the fake session bind the legacy context-only
 	// input digest instead of the receipt-3 package wrapper it was asked
 	// for: the negative row for "unable to bind that input MUST reject".
@@ -338,7 +342,10 @@ func (builder *fakeBuilder) Stage(_ context.Context, request StageRequest) (Stag
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return StagedArtifact{}, err
 	}
-	payload := []byte("artifact:" + request.Command)
+	payload, present := builder.payloads[request.Command]
+	if !present {
+		payload = []byte("artifact:" + request.Command)
+	}
 	if err := os.WriteFile(path, payload, 0o700); err != nil {
 		return StagedArtifact{}, err
 	}

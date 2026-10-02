@@ -133,6 +133,15 @@ type externalEntry struct {
 	existing     bool
 }
 
+const externalTransactionFailureCode = "build_repository_transaction_failed"
+
+func externalTransactionFailure(err error, staged stagedExternal) error {
+	if err == nil || len(staged.entries) == 0 {
+		return err
+	}
+	return fmt.Errorf("%s: %w", externalTransactionFailureCode, err)
+}
+
 func (deps ExternalDeps) resolved(home string) ExternalDeps {
 	if deps.StoreRoot == "" {
 		deps.StoreRoot = filepath.Join(home, "external-build-cache")

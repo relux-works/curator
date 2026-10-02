@@ -1,9 +1,11 @@
 package buildrepo
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -17,6 +19,7 @@ import (
 	"github.com/relux-works/curator/internal/buildsource"
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/closuregraph"
+	"github.com/relux-works/curator/internal/registry"
 )
 
 type recordingGo struct {
@@ -262,7 +265,7 @@ func TestExternalPipelineCacheHitRepeatsAdmissionValidationAndAudit(t *testing.T
 	assertBefore(t, events, "audit-call", "cache-call")
 }
 
-func TestExternalProtectedCacheSeparatesAssuranceModeProviderAndCapability(t *testing.T) {
+func TestExternalProtectedCacheRevalidatesAssuranceModeProviderAndCapability(t *testing.T) {
 	snapshot, declared, effective := pipelineFixture(t)
 	events := []string{}
 	store := &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}
@@ -284,7 +287,7 @@ func TestExternalProtectedCacheSeparatesAssuranceModeProviderAndCapability(t *te
 		t.Fatal(err)
 	}
 	if verifiedResult.State == "cache-hit" || verifiedResult.CacheKey == portable.CacheKey {
-		t.Fatalf("portable entry satisfied verified lookup: portable=%+v verified=%+v", portable, verifiedResult)
+		t.Fatalf("portable execution proof was adopted for verified assurance or execution policy did not affect the build key: portable=%s verified=%+v", portable.CacheKey, verifiedResult)
 	}
 	for name, change := range map[string]func(*closureexec.AssuranceBinding){
 		"provider": func(value *closureexec.AssuranceBinding) {
@@ -307,14 +310,14 @@ func TestExternalProtectedCacheSeparatesAssuranceModeProviderAndCapability(t *te
 			if err != nil {
 				t.Fatal(err)
 			}
-			if result.State == "cache-hit" || result.CacheKey == verifiedResult.CacheKey {
-				t.Fatalf("%s drift adopted verified cache: %+v", name, result)
+			if result.State == "cache-hit" || result.CacheKey != verifiedResult.CacheKey {
+				t.Fatalf("%s drift adopted verified execution proof or changed the build input key: %+v", name, result)
 			}
 		})
 	}
 }
 
-func TestExternalProtectedCacheDoesNotAdoptLegacyAssuranceBlindEntry(t *testing.T) {
+func TestExternalProtectedCacheDoesNotAdoptLegacyAssuranceBoundInput(t *testing.T) {
 	snapshot, declared, effective := pipelineFixture(t)
 	events := []string{}
 	store := &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}
@@ -328,7 +331,7 @@ func TestExternalProtectedCacheDoesNotAdoptLegacyAssuranceBlindEntry(t *testing.
 	}
 	target := Target{BuildRoot: "tools", SourceDir: "tools/cmd/tool"}
 	legacyInput := legacyReceiptInput(request, target, snapshot.Digest, goSession.Identity())
-	delete(legacyInput, "assurance")
+	legacyInput["assurance"] = request.Assurance.CanonicalValue()
 	legacyKey, err := cacheKey(legacyInput)
 	if err != nil {
 		t.Fatal(err)
@@ -537,15 +540,47 @@ func TestSubstitutionCannotAliasDeclaredCacheKey(t *testing.T) {
 }
 
 func TestExternalReceiptV2CacheKeyVector(t *testing.T) {
-	request := PipelineRequest{Assurance: closureexec.PortableAssuranceBinding(), Command: "golden-tool", Target: "golden-tool", Declared: DeclaredState{Repository: "golden-tools", Identity: "github.com/example/golden-tools", Transport: "https", ObjectFormat: "sha1", Commit: "0123456789abcdef0123456789abcdef01234567", Tag: "v1.4.0"}, Effective: EffectiveState{IdentityKind: "network-git", Identity: "github.com/example/golden-tools", Transport: "https", ObjectFormat: "sha1", Commit: "0123456789abcdef0123456789abcdef01234567"}}
-	target := Target{BuildRoot: ".", SourceDir: "cmd/golden-tool"}
-	tool := ToolchainIdentity{ContentSHA256: "sha256:" + strings.Repeat("c", 64), GoVersion: "go version go1.26.1 darwin/arm64", GoRelpath: "bin/go", GOOS: "darwin", GOARCH: "arm64", Tuning: map[string]string{"GOARM64": "v8.0"}}
-	key, err := cacheKey(legacyReceiptInput(request, target, "sha256:"+strings.Repeat("b", 64), tool))
+	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+	if root == "" {
+		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+	}
+	payload, err := os.ReadFile(filepath.Join(root, "expected", "external-repository", "build-receipt-v2.json")) // #nosec G304 -- explicit conformance root
 	if err != nil {
 		t.Fatal(err)
 	}
-	if key != "sha256:6ca1b6b00f0ab343901daa1c90ee78ed417b3a258efeff706b41210dd702dbf2" {
-		t.Fatalf("cache key=%s", key)
+	var expected struct {
+		CacheKey string         `json:"cache_key"`
+		Input    map[string]any `json:"input"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.UseNumber()
+	if err := decoder.Decode(&expected); err != nil {
+		t.Fatal(err)
+	}
+	request := PipelineRequest{Assurance: closureexec.PortableAssuranceBinding(), Command: "golden-tool", Target: "golden-tool", Declared: DeclaredState{Repository: "golden-tools", Identity: "github.com/example/golden-tools", Transport: "https", ObjectFormat: "sha1", Commit: "0123456789abcdef0123456789abcdef01234567", Tag: "v1.4.0"}, Effective: EffectiveState{IdentityKind: "network-git", Identity: "github.com/example/golden-tools", Transport: "https", ObjectFormat: "sha1", Commit: "0123456789abcdef0123456789abcdef01234567"}}
+	target := Target{BuildRoot: ".", SourceDir: "cmd/golden-tool"}
+	tool := ToolchainIdentity{ContentSHA256: "sha256:" + strings.Repeat("c", 64), GoVersion: "go version go1.26.1 darwin/arm64", GoRelpath: "bin/go", GOOS: "darwin", GOARCH: "arm64", Tuning: map[string]string{"GOARM64": "v8.0"}}
+	input, err := receiptInput(request, target, "sha256:"+strings.Repeat("b", 64), tool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotInput, err := registry.CanonicalBytesChecked(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantInput, err := registry.CanonicalBytesChecked(expected.Input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(gotInput, wantInput) {
+		t.Fatalf("receipt-v2 input differs from published bytes:\ngot  %s\nwant %s", gotInput, wantInput)
+	}
+	key, err := cacheKey(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if key != expected.CacheKey {
+		t.Fatalf("cache key=%s, published=%s", key, expected.CacheKey)
 	}
 }
 

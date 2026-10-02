@@ -35,6 +35,9 @@ const (
 	CodeSignerPolicyUnsupported = "build_repository_signer_policy_unsupported"
 	// CodePackageSigningForbidden reports signing credentials in package input.
 	CodePackageSigningForbidden = "build_repository_package_signing_forbidden"
+	// CodePackageOutputForbidden reports package-controlled artifact or PATH
+	// destinations, which are always derived by the manager.
+	CodePackageOutputForbidden = "build_repository_package_output_forbidden"
 )
 
 // Operation identifies the source-coverage and mutation promises of a run.
@@ -247,6 +250,9 @@ func RunPipeline(ctx context.Context, request PipelineRequest) (PipelineResult, 
 	result.BuildSource = snapshot.Digest
 	descriptor, err := LoadDescriptor(root)
 	if err != nil {
+		if ErrorCode(err) != "" {
+			return result, err
+		}
 		return result, admissionError(CodeDescriptorInvalid, "%v", err)
 	}
 	target, ok := descriptor.Targets[request.Target]
@@ -656,6 +662,10 @@ func driverInputOf(input map[string]any) map[string]any {
 func receiptInput(r PipelineRequest, target Target, digest string, tool ToolchainIdentity) (map[string]any, error) {
 	build := legacyReceiptInput(r, target, digest, tool)
 	if r.Package == nil {
+		// The receipt-2 contract pins reproducible build inputs and policy;
+		// assurance is carried by its execution receipt and revalidated at
+		// lookup, so it is not part of this cache key.
+		delete(build, "assurance")
 		return build, nil
 	}
 	if err := r.Package.Validate(); err != nil {
@@ -664,10 +674,10 @@ func receiptInput(r PipelineRequest, target Target, digest string, tool Toolchai
 	return map[string]any{"schema_version": SourceAwareReceiptSchemaVersion, "package": r.Package.Object(), "build": build}, nil
 }
 
-// legacyReceiptInput is the unchanged receipt-2 driver input; inside the
-// receipt-3 wrapper it keeps every declared/effective identity, locked
-// commit, transport, substitution, target, toolchain, policy and assurance
-// field exactly as before.
+// legacyReceiptInput is the pre-wrapper driver object retained inside the
+// source-aware receipt-3 arm. receiptInput projects the receipt-2 arm to its
+// published canonical shape by removing assurance evidence, which remains
+// bound by the execution receipt and checked at every cache lookup.
 func legacyReceiptInput(r PipelineRequest, target Target, digest string, tool ToolchainIdentity) map[string]any {
 	declared := map[string]any{"identity": map[string]any{"kind": "network-git", "value": r.Declared.Identity}, "transport": r.Declared.Transport, "locked_commit": map[string]any{"object_format": r.Declared.ObjectFormat, "hex": r.Declared.Commit}}
 	if r.Declared.Tag != "" {

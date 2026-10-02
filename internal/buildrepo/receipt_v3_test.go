@@ -84,9 +84,10 @@ func decodeReceiptObject(t *testing.T, payload []byte) map[string]any {
 
 // TestExternalReceipt3WrapsTheReceipt2InputOnTheExternalArm is the positive
 // row of the external arm: the pipeline publishes under artifacts-receipt-3
-// with input:{schema_version:3,package,build}, the build is the byte-identical
-// receipt-2 driver input, the cache key is SHA-256 over the CCJ-1 wrapper, and
-// the same request is a cache hit while a package-less request is not.
+// with input:{schema_version:3,package,build}; its nested driver object keeps
+// the source-aware assurance binding. The receipt-2 projection removes that
+// field, the cache key hashes the CCJ-1 wrapper, and a package-less request
+// remains in the separate receipt-2 namespace.
 func TestExternalReceipt3WrapsTheReceipt2InputOnTheExternalArm(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "cache")
 	events := []string{}
@@ -122,18 +123,25 @@ func TestExternalReceipt3WrapsTheReceipt2InputOnTheExternalArm(t *testing.T) {
 	if !bytes.Equal(wantPackage, gotPackage) {
 		t.Fatalf("package = %s, want %s", gotPackage, wantPackage)
 	}
-	legacyInput := legacyReceiptInput(request, Target{BuildRoot: "tools", SourceDir: "tools/cmd/tool"}, snapshot.Digest, request.Go.Identity())
+	target := Target{BuildRoot: "tools", SourceDir: "tools/cmd/tool"}
+	legacyInput := legacyReceiptInput(request, target, snapshot.Digest, request.Go.Identity())
 	wantBuild, _ := registry.CanonicalBytesChecked(legacyInput)
 	gotBuild, _ := registry.CanonicalBytesChecked(input["build"].(map[string]any))
 	if !bytes.Equal(wantBuild, gotBuild) {
-		t.Fatalf("wrapped build is not the unchanged receipt-2 input:\n%s\n%s", gotBuild, wantBuild)
+		t.Fatalf("wrapped build differs from the source-aware driver input:\n%s\n%s", gotBuild, wantBuild)
 	}
 	wrapper, _ := registry.CanonicalBytesChecked(input)
 	sum := sha256.Sum256(wrapper)
 	if result.CacheKey != "sha256:"+hex.EncodeToString(sum[:]) {
 		t.Fatalf("cache key %s is not SHA-256 of the wrapped input", result.CacheKey)
 	}
-	legacyKey, _ := cacheKey(legacyInput)
+	receipt2Request := request
+	receipt2Request.Package = nil
+	receipt2Input, err := receiptInput(receipt2Request, target, snapshot.Digest, request.Go.Identity())
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyKey, _ := cacheKey(receipt2Input)
 	if legacyKey == result.CacheKey {
 		t.Fatal("receipt-3 key aliases the receipt-2 key")
 	}
@@ -150,8 +158,7 @@ func TestExternalReceipt3WrapsTheReceipt2InputOnTheExternalArm(t *testing.T) {
 		t.Fatalf("cache hit compiled again: %v", events)
 	}
 
-	legacyRequest := request
-	legacyRequest.Package = nil
+	legacyRequest := receipt2Request
 	legacy, err := RunPipeline(context.Background(), legacyRequest)
 	if err != nil || legacy.State != "would-preflight-and-build" || legacy.ReceiptSchemaVersion != LegacyReceiptSchemaVersion || legacy.CacheKey != legacyKey {
 		t.Fatalf("legacy request = %+v, %v (no receipt-3 hit may satisfy it)", legacy, err)
@@ -170,8 +177,8 @@ func TestExternalReceipt3WrapsTheReceipt2InputOnTheExternalArm(t *testing.T) {
 // TestExternalReceipt3RefusesEveryEvidenceFieldMismatch mutates every
 // external-evidence field of a protected receipt-3 entry on disk — package,
 // declared identity and locked commit, effective identity/commit/transport,
-// substitution, build source, descriptor target, target, toolchain, policy,
-// assurance, both schema versions and the cache key — and requires the next
+// substitution, build source, descriptor target, target, toolchain, assurance,
+// policy, both schema versions and the cache key — and requires the next
 // lookup to refuse the entry and rebuild instead of adopting it.
 func TestExternalReceipt3RefusesEveryEvidenceFieldMismatch(t *testing.T) {
 	rows := map[string]func(input map[string]any){

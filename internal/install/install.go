@@ -735,6 +735,14 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	// build-source trust. Nothing below has run yet, so a staging or trust
 	// failure leaves the prior installation and the live build cache
 	// byte-for-byte unchanged once the plan releases its private root.
+	// The mixed plan orders external commands before local go-v1 commands, as
+	// the receipt namespaces and publication plan do. Both arms remain private
+	// until the same serialized commit below.
+	externalStaged, externalStageErr := stageExternalBuilds(opts.context(), externalPlan, deps.Toolchain, deps.Builder, private)
+	if externalStageErr != nil {
+		result.failBuild(externalStageErr)
+		return result, nil
+	}
 	staged, stageErr := stageBuilds(opts.context(), plan, deps)
 	if stageErr != nil {
 		result.BuildDiagnostic = godriver.DiagnosticCode(stageErr)
@@ -749,12 +757,6 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 			return result, nil
 		}
 	}
-	externalStaged, externalStageErr := stageExternalBuilds(opts.context(), externalPlan, deps.Toolchain, deps.Builder, private)
-	if externalStageErr != nil {
-		result.failBuild(externalStageErr)
-		return result, nil
-	}
-
 	// 20. Serialized publication and commit. Everything below the private build
 	// staging is derived and published under one manager-home mutation lock, in
 	// deterministic classes, with the machine-wide consumer ledger last.
@@ -795,7 +797,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	result.Messages = append(result.Messages, outcome.warnings...)
 	result.BuildCacheRetained = outcome.retainedBuilds
 	if commitErr != nil {
-		return result.failCommit(commitErr)
+		return result.failCommit(externalTransactionFailure(commitErr, externalStaged))
 	}
 	return result, nil
 }
@@ -1187,6 +1189,9 @@ func buildMarker(
 	for name := range node.Spec.Requirements {
 		requirements = append(requirements, name)
 	}
+	sort.Strings(commands)
+	sort.Strings(dependencies)
+	sort.Strings(requirements)
 	// Build state is all-or-nothing: a marker either records every compiled
 	// command with the frozen source they were built from, or records neither.
 	// A node with no published build must not carry a build source at all.

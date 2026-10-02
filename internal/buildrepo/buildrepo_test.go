@@ -192,6 +192,18 @@ func TestSkillBuildDescriptorClosedTargetsAndContainment(t *testing.T) {
 	}
 }
 
+func TestSkillBuildDescriptorRejectsPackageOutputAndPathDestinations(t *testing.T) {
+	for _, field := range []string{"output", "path_entry", "path_entries"} {
+		t.Run(field, func(t *testing.T) {
+			payload := `{"schema_version":1,"targets":{"tool":{"driver":"go-repository-v1","build_root":".","source_dir":"cmd/tool","` + field + `":"bin/tool"}}}`
+			_, err := ParseDescriptor([]byte(payload))
+			if ErrorCode(err) != CodePackageOutputForbidden {
+				t.Fatalf("error code=%q err=%v, want %s", ErrorCode(err), err, CodePackageOutputForbidden)
+			}
+		})
+	}
+}
+
 func TestLocalSelectorCanonicalization(t *testing.T) {
 	cases := map[string]string{
 		"tools/./golden":      "tools/golden",

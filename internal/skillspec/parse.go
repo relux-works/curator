@@ -348,6 +348,9 @@ func parseCommands(raw any, schema int, snapshot string, runtimeRoots []string) 
 				if schema < 7 {
 					return verr.New(label+".driver", "requires schema_version 7")
 				}
+				if _, present := entry["signing"]; present {
+					return fmt.Errorf("%s: package data cannot request artifact signing", buildrepo.CodePackageSigningForbidden)
+				}
 				if err := rejectUnknown(entry, map[string]bool{"type": true, "driver": true, "repository": true, "target": true}, label); err != nil {
 					return err
 				}
