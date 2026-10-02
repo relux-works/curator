@@ -1,0 +1,952 @@
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index 43b94f10..866fa303 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -800,3 +800,13 @@ cmd/curator	TestInstallGitignoreEntryPoint/unexpected-exit-2	linux,darwin	window
+ cmd/curator	TestInstallGitignoreEntryPoint/unexpected-exit-128	linux,darwin	windows	platform-control	unexpected Git exit 128 carrying an unrelated diagnostic refuses through the CLI; POSIX shim fixture
+ internal/scriptworker	TestWindowsExecHardlinkOriginEvidence	linux,darwin,windows	-	-	Production exec resolution and launch revalidation refuse unknown owners and incomplete or foreign hard-link evidence
+ internal/scriptworker	TestWindowsNativeExecHardlinkOrigins	windows	-	-	Hosted Windows exercises real file IDs, owner SIDs and hard-link enumeration at the production resolver
++
++# Build-cache live process retention and native process image queries.
++internal/buildcache	TestSweepLiveProcessBuilds	linux,darwin,windows	-	-	live, unused, uncertain and daemon builds in both protected namespaces
++internal/buildcache	TestSweepRejectsPartialProcessTable	linux,darwin,windows	-	-	partial or malformed process tables retain builds with a warning
++internal/buildcache	TestSweepRetainsExecutableThroughSymlink	linux,darwin,windows	windows	host-capability	canonical executable aliases retain the referenced build
++internal/buildcache	TestBuildInUseWindowsCase	windows	-	-	Windows image casing cannot hide a live executable
++internal/buildcache	TestWindowsNativeExecutablePath	windows	-	-	queries the current process image using the native Windows API
++internal/buildcache	TestDarwinSavedExecutablePath	darwin	-	-	saved executable path is independent of argv zero
++internal/buildcache	TestLinuxExecutablePaths	linux	-	-	proc exe enumeration distinguishes absent and unreadable images
++cmd/curator	TestGCRetainsLiveProcessBuild	darwin,windows	linux	platform-control	GC entry point retains an old executable used by a live child; Linux compilation lacks a native-control inventory record
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 14791cd9..76b832fb 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -5,6 +5,7 @@ All notable implementation changes are recorded here.
+ ## Unreleased
+ 
+ - Windows executable resolution now proves platform ownership and every component-store hard-link origin before granting the captured System32 exception.
++- Build-cache GC after global upgrade retains builds used by live processes and warns without deleting builds when process enumeration fails.
+ 
+ - Unix HTTPS askpass requests the secret only after accepting the password prompt, preventing broken-pipe transport errors on refusal paths.
+ 
+diff --git a/cmd/curator/gc_test.go b/cmd/curator/gc_test.go
+index 2b118065..fc41df70 100644
+--- a/cmd/curator/gc_test.go
++++ b/cmd/curator/gc_test.go
+@@ -1,9 +1,11 @@
+ package main
+ 
+ import (
++	"bufio"
+ 	"encoding/json"
+ 	"io"
+ 	"os"
++	"os/exec"
+ 	"path/filepath"
+ 	"strings"
+ 	"sync"
+@@ -17,6 +19,80 @@ import (
+ 	"github.com/relux-works/curator/internal/scopes"
+ )
+ 
++// TestGCRetainsLiveProcessBuild exercises run("gc") -> collectUnderLock ->
++// scopes.Collect -> Store.Sweep with a real process executing an old cache
++// image. No marker, journal reference or publication grace can protect it.
++func TestGCRetainsLiveProcessBuild(t *testing.T) {
++	requireNativeControlInventoryPlatform(t)
++	project, home := compiledProject(t)
++	skill := filepath.Join(filepath.Dir(home), "skills", "build-skill")
++	writeFile(t, filepath.Join(skill, "assets", "build-tool", "cmd", "tool", "main.go"),
++		"package main\nimport (\"fmt\"; \"io\"; \"os\")\nfunc main() { fmt.Println(\"ready\"); _, _ = io.Copy(io.Discard, os.Stdin) }\n")
++	runGit(t, skill, "add", ".")
++	runGit(t, skill, "commit", "-qm", "waiting executable fixture")
++	runGit(t, skill, "tag", "-f", "v1")
++	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
++		t.Fatalf("install = %d\n%s\n%s", code, stdout, stderr)
++	}
++	entries := cacheEntries(t, home)
++	if len(entries) != 1 {
++		t.Fatalf("cache entries = %v", entries)
++	}
++	bin := filepath.Join(entries[0], "bin")
++	files, err := os.ReadDir(bin)
++	if err != nil || len(files) != 1 {
++		t.Fatalf("bin files = %v, %v", files, err)
++	}
++	child := exec.Command(filepath.Join(bin, files[0].Name()))
++	stdin, err := child.StdinPipe()
++	if err != nil {
++		t.Fatal(err)
++	}
++	stdout, err := child.StdoutPipe()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := child.Start(); err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() {
++		_ = stdin.Close()
++		if err := child.Wait(); err != nil {
++			t.Errorf("cache executable exit: %v", err)
++		}
++	})
++	ready := make(chan bool, 1)
++	go func() {
++		scanner := bufio.NewScanner(stdout)
++		ready <- scanner.Scan() && scanner.Text() == "ready"
++	}()
++	select {
++	case ok := <-ready:
++		if !ok {
++			t.Fatal("cache executable did not signal readiness")
++		}
++	case <-time.After(30 * time.Second):
++		t.Fatal("cache executable readiness timed out")
++	}
++	if err := os.Remove(filepath.Join(project, ".agents", "skills", "build-skill", marker.Name)); err != nil {
++		t.Fatal(err)
++	}
++	old := time.Now().Add(-30 * 24 * time.Hour)
++	if err := os.Chtimes(entries[0], old, old); err != nil {
++		t.Fatal(err)
++	}
++	code, output, stderr := capture(t, filepath.Join(home, "config.json"), "gc")
++	if code != exitOK || !strings.Contains(output, "0 build entries removed") {
++		t.Fatalf("gc = %d\n%s\n%s", code, output, stderr)
++	}
++	if _, err := os.Stat(entries[0]); err != nil {
++		t.Fatalf("gc removed a live process executable: %v", err)
++	}
++	if strings.Contains(stderr, "live process executables could not be enumerated") {
++		t.Logf("native enumeration could not inspect every process; exercised fail-safe retention: %s", stderr)
++	}
++}
++
+ // installTestMarker writes one valid install marker so a project counts as a
+ // live consumer.
+ func installTestMarker(t *testing.T, skillsDir, name string) {
+diff --git a/internal/buildcache/cache.go b/internal/buildcache/cache.go
+index c98d1c19..c613d0af 100644
+--- a/internal/buildcache/cache.go
++++ b/internal/buildcache/cache.go
+@@ -84,6 +84,9 @@ func (result Result) DryRunOutcome() string {
+ type Store struct {
+ 	home      string
+ 	supported func() bool
++	// ExecutablePaths optionally supplies the process-table dependency for a
++	// sweep. Nil uses native enumeration; any error retains all builds.
++	ExecutablePaths func() ([]string, error)
+ 	// faults is the deterministic in-package fault seam over the mutation
+ 	// boundaries of publication and reversal. New never sets it, so a store any
+ 	// caller outside this package can construct always takes the unhooked path.
+diff --git a/internal/buildcache/cache_test.go b/internal/buildcache/cache_test.go
+index 82f21974..99e89bf0 100644
+--- a/internal/buildcache/cache_test.go
++++ b/internal/buildcache/cache_test.go
+@@ -570,6 +570,7 @@ func newTestStore(t *testing.T) *Store {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
++	store.ExecutablePaths = func() ([]string, error) { return nil, nil }
+ 	return store
+ }
+ 
+diff --git a/internal/buildcache/collect.go b/internal/buildcache/collect.go
+index 092273f1..12bead57 100644
+--- a/internal/buildcache/collect.go
++++ b/internal/buildcache/collect.go
+@@ -18,11 +18,9 @@ import (
+ // DefaultGrace is Curator's documented build-cache grace period. An
+ // unreferenced protected entry younger than this is always retained.
+ //
+-// A swept entry costs a rebuild, never correctness, so the window only has to
+-// exceed any operation that could still be publishing while holding no journal
+-// — a crash between publication and journal preparation is the only such case.
+-// One day is far beyond that and still bounds how long orphaned artifacts
+-// occupy disk.
++// This protects a crash between publication and journal preparation. Live
++// process executables are retained independently of publication age so their
++// absolute paths remain available for re-exec.
+ const DefaultGrace = 24 * time.Hour
+ 
+ // sweepPrefix names a cache entry this collector already retired. The rename
+@@ -72,7 +70,8 @@ type SweepResult struct {
+ // Every decision fails safe. The cache root is revalidated as protected state
+ // before traversal; an entry is removed only when it is itself protected,
+ // structurally exact, and self-consistent with the logical key its directory
+-// name encodes; anything unprovable is retained and reported. Entry content is
++// name encodes, and not used by the process snapshot; anything unprovable is
++// retained and reported. Entry content is
+ // never executed, adopted, or permission-repaired.
+ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, error) {
+ 	if err := requireHomeLock(lock); err != nil {
+@@ -96,6 +95,19 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
+ 	}
+ 
+ 	result := SweepResult{}
++	enumerate := store.ExecutablePaths
++	if enumerate == nil {
++		enumerate = liveExecutablePaths
++	}
++	executables, err := enumerate()
++	if err == nil {
++		executables, err = normalizeExecutablePaths(executables)
++	}
++	if err != nil {
++		result.Warnings = append(result.Warnings, fmt.Sprintf(
++			"build cache sweep skipped: live process executables could not be enumerated: %v; all builds retained", err))
++		return result, nil
++	}
+ 	referenced := make(map[string]bool, len(request.Referenced))
+ 	for _, key := range request.Referenced {
+ 		name, ok := entryName(key)
+@@ -115,7 +127,7 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
+ 		if err != nil {
+ 			return result, err
+ 		}
+-		if !store.sweepNamespace(base, referenced, now, grace, &result) {
++		if !store.sweepNamespace(base, referenced, executables, now, grace, &result) {
+ 			// The boundary below the manager home could not be proven; the
+ 			// same refusal applies to every namespace, so it is reported once.
+ 			return result, nil
+@@ -127,7 +139,7 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
+ // sweepNamespace sweeps one protected cache root. It reports false only when
+ // the root's boundary was refused (an absent root is simply empty); every
+ // refusal is recorded as a warning on the result.
+-func (store *Store) sweepNamespace(base string, referenced map[string]bool, now time.Time, grace time.Duration, result *SweepResult) bool {
++func (store *Store) sweepNamespace(base string, referenced map[string]bool, executables []string, now time.Time, grace time.Duration, result *SweepResult) bool {
+ 	root, err := openSweepRoot(store.home, base)
+ 	if err != nil {
+ 		if errors.Is(err, os.ErrNotExist) {
+@@ -141,6 +153,11 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, now
+ 	// handle-relative mutator bound to it, so no removal can follow a pathname
+ 	// that was exchanged after the boundary was proven.
+ 	defer root.close()
++	canonicalBase, err := filepath.EvalSymlinks(base)
++	if err != nil {
++		result.Warnings = append(result.Warnings, fmt.Sprintf("build cache sweep skipped: resolve live executable boundary: %v", err))
++		return false
++	}
+ 
+ 	names, err := directoryNames(root.validated.dir)
+ 	if err != nil {
+@@ -151,11 +168,14 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, now
+ 	for _, name := range names {
+ 		switch {
+ 		case entryNameRE.MatchString(name):
+-			if referenced[name] {
++			if referenced[name] || buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), executables) {
+ 				continue
+ 			}
+ 			store.sweepUnreferenced(root, name, now, grace, result)
+ 		case strings.HasPrefix(name, sweepPrefix):
++			if buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), executables) {
++				continue
++			}
+ 			// Manager-private wreckage of an interrupted removal: the entry is
+ 			// already unreachable by key, so finishing the deletion is safe.
+ 			if err := root.mutator.RemoveAll(name); err != nil {
+diff --git a/internal/buildcache/process.go b/internal/buildcache/process.go
+new file mode 100644
+index 00000000..1d9b9aa1
+--- /dev/null
++++ b/internal/buildcache/process.go
+@@ -0,0 +1,47 @@
++package buildcache
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++)
++
++// Keep both the reported path and its canonical spelling (notably /var and
++// /private/var on macOS). A disappeared executable still protects its reported
++// build; every other resolution failure is uncertainty, never proof of absence.
++func normalizeExecutablePaths(paths []string) ([]string, error) {
++	var normalized []string
++	for _, path := range paths {
++		if !filepath.IsAbs(path) {
++			return nil, fmt.Errorf("process image path is not absolute: %q", path)
++		}
++		normalized = append(normalized, filepath.Clean(path))
++		resolved, err := filepath.EvalSymlinks(path)
++		if err != nil && !os.IsNotExist(err) {
++			return nil, fmt.Errorf("resolve process image %q: %w", path, err)
++		}
++		if err == nil {
++			normalized = append(normalized, resolved)
++		}
++	}
++	return normalized, nil
++}
++
++func buildInUse(path, canonical string, executables []string) bool {
++	for _, executable := range executables {
++		for _, dir := range []string{path, canonical} {
++			if runtime.GOOS == "windows" {
++				dir, executable = strings.ToLower(dir), strings.ToLower(executable)
++			}
++			// A separator boundary prevents a sibling with a shared prefix
++			// from retaining the wrong build. Any file below the build counts,
++			// regardless of command name or daemon registration.
++			if strings.HasPrefix(executable, filepath.Clean(dir)+string(filepath.Separator)) {
++				return true
++			}
++		}
++	}
++	return false
++}
+diff --git a/internal/buildcache/process_darwin.go b/internal/buildcache/process_darwin.go
+new file mode 100644
+index 00000000..3b6a92c6
+--- /dev/null
++++ b/internal/buildcache/process_darwin.go
+@@ -0,0 +1,64 @@
++package buildcache
++
++import (
++	"bytes"
++	"errors"
++	"fmt"
++	"path/filepath"
++
++	"golang.org/x/sys/unix"
++)
++
++func liveExecutablePaths() ([]string, error) {
++	processes, err := unix.SysctlKinfoProcSlice("kern.proc.all")
++	if err != nil {
++		return nil, err
++	}
++	var paths []string
++	for _, process := range processes {
++		pid := int(process.Proc.P_pid)
++		// PID zero is the kernel; zombies no longer execute an image.
++		if pid == 0 || process.Proc.P_stat == 5 { // SZOMB
++			continue
++		}
++		path, err := darwinExecutablePath(pid)
++		if errors.Is(err, unix.ESRCH) {
++			continue // process exited during enumeration
++		}
++		if err != nil {
++			// procargs2 can return EINVAL after the original snapshot. Prove
++			// exit or zombie state before treating that read as absence.
++			if errors.Is(unix.Kill(pid, 0), unix.ESRCH) {
++				continue
++			}
++			current, stateErr := unix.SysctlKinfoProc("kern.proc.pid", pid)
++			if stateErr == nil && current.Proc.P_stat == 5 {
++				continue
++			}
++			return nil, fmt.Errorf("read executable of process %d: %w", pid, err)
++		}
++		paths = append(paths, path)
++	}
++	return paths, nil
++}
++
++func darwinExecutablePath(pid int) (string, error) {
++	args, err := unix.SysctlRaw("kern.procargs2", pid)
++	if err != nil {
++		return "", err
++	}
++	return executableFromDarwinArgs(args)
++}
++
++func executableFromDarwinArgs(args []byte) (string, error) {
++	// KERN_PROCARGS2 starts with a 32-bit argc and the saved exec_path,
++	// followed by argv and environment. Read only exec_path, never argv[0].
++	if len(args) <= 4 {
++		return "", fmt.Errorf("truncated process arguments")
++	}
++	end := bytes.IndexByte(args[4:], 0)
++	if end < 0 || !filepath.IsAbs(string(args[4:4+end])) {
++		return "", fmt.Errorf("missing or invalid saved executable path")
++	}
++	return string(args[4 : 4+end]), nil
++}
+diff --git a/internal/buildcache/process_darwin_test.go b/internal/buildcache/process_darwin_test.go
+new file mode 100644
+index 00000000..5751f9c5
+--- /dev/null
++++ b/internal/buildcache/process_darwin_test.go
+@@ -0,0 +1,26 @@
++package buildcache
++
++import (
++	"os"
++	"testing"
++)
++
++func TestDarwinSavedExecutablePath(t *testing.T) {
++	want, err := os.Executable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	got, err := darwinExecutablePath(os.Getpid())
++	if err != nil || got != want {
++		t.Fatalf("native executable = %q, %v; want %q", got, err, want)
++	}
++	path, err := executableFromDarwinArgs([]byte("\x01\x00\x00\x00/real/image\x00\x00/forged/argv0\x00"))
++	if err != nil || path != "/real/image" {
++		t.Fatalf("saved path = %q, %v", path, err)
++	}
++	for _, input := range []string{"", "1234", "1234/unterminated", "1234relative\x00"} {
++		if _, err := executableFromDarwinArgs([]byte(input)); err == nil {
++			t.Fatalf("malformed process arguments accepted: %q", input)
++		}
++	}
++}
+diff --git a/internal/buildcache/process_linux.go b/internal/buildcache/process_linux.go
+new file mode 100644
+index 00000000..5cff79c0
+--- /dev/null
++++ b/internal/buildcache/process_linux.go
+@@ -0,0 +1,70 @@
++package buildcache
++
++import (
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strconv"
++	"strings"
++)
++
++func liveExecutablePaths() ([]string, error) {
++	return linuxExecutablePaths("/proc")
++}
++
++func linuxExecutablePaths(proc string) ([]string, error) {
++	entries, err := os.ReadDir(proc)
++	if err != nil {
++		return nil, err
++	}
++	var paths []string
++	for _, entry := range entries {
++		pid, err := strconv.Atoi(entry.Name())
++		if err != nil || pid <= 0 {
++			continue
++		}
++		dir := filepath.Join(proc, entry.Name())
++		path, err := os.Readlink(filepath.Join(dir, "exe"))
++		if err == nil {
++			paths = append(paths, strings.TrimSuffix(path, " (deleted)"))
++			continue
++		}
++		if errors.Is(err, os.ErrNotExist) {
++			// A missing exe can be an exited process, a zombie or a kernel
++			// thread. Prove which; a live userspace process is uncertainty.
++			stat, statErr := os.ReadFile(filepath.Join(dir, "stat")) // #nosec G304 -- fixed proc root and validated numeric PID; reads only kernel process metadata.
++			if errors.Is(statErr, os.ErrNotExist) {
++				continue
++			}
++			if statErr != nil {
++				return nil, statErr
++			}
++			noImage, statErr := linuxProcessHasNoImage(string(stat))
++			if statErr != nil {
++				return nil, statErr
++			}
++			if noImage {
++				continue
++			}
++		}
++		return nil, fmt.Errorf("read executable of process %d: %w", pid, err)
++	}
++	return paths, nil
++}
++
++func linuxProcessHasNoImage(stat string) (bool, error) {
++	end := strings.LastIndexByte(stat, ')')
++	if end < 0 {
++		return false, fmt.Errorf("malformed process stat")
++	}
++	fields := strings.Fields(stat[end+1:])
++	if len(fields) < 7 {
++		return false, fmt.Errorf("truncated process stat")
++	}
++	flags, err := strconv.ParseUint(fields[6], 10, 64) // field 9
++	if err != nil {
++		return false, err
++	}
++	return fields[0] == "Z" || fields[0] == "X" || flags&0x00200000 != 0, nil // PF_KTHREAD
++}
+diff --git a/internal/buildcache/process_linux_test.go b/internal/buildcache/process_linux_test.go
+new file mode 100644
+index 00000000..64857c01
+--- /dev/null
++++ b/internal/buildcache/process_linux_test.go
+@@ -0,0 +1,50 @@
++package buildcache
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++func TestLinuxExecutablePaths(t *testing.T) {
++	for _, row := range []struct {
++		name, image, stat string
++		fail              bool
++	}{
++		{name: "live", image: "/cache/build/bin/runner"},
++		{name: "deleted", image: "/cache/build/bin/runner (deleted)"},
++		{name: "exited"},
++		{name: "kernel", stat: "12 (kernel worker) S 0 0 0 0 0 2097152"},
++		{name: "zombie", stat: "12 (runner) Z 0 0 0 0 0 0"},
++		{name: "missing-live-image", stat: "12 (runner) S 0 0 0 0 0 0", fail: true},
++		{name: "malformed-stat", stat: "malformed", fail: true},
++	} {
++		t.Run(row.name, func(t *testing.T) {
++			proc := t.TempDir()
++			dir := filepath.Join(proc, "12")
++			if err := os.Mkdir(dir, 0o700); err != nil {
++				t.Fatal(err)
++			}
++			if row.image != "" {
++				if err := os.Symlink(row.image, filepath.Join(dir, "exe")); err != nil {
++					t.Fatal(err)
++				}
++			}
++			if row.stat != "" {
++				if err := os.WriteFile(filepath.Join(dir, "stat"), []byte(row.stat), 0o600); err != nil {
++					t.Fatal(err)
++				}
++			}
++			paths, err := linuxExecutablePaths(proc)
++			if (err != nil) != row.fail {
++				t.Fatalf("paths=%v error=%v", paths, err)
++			}
++			if row.image != "" && (len(paths) != 1 || paths[0] != "/cache/build/bin/runner") {
++				t.Fatalf("paths=%v", paths)
++			}
++		})
++	}
++	if _, err := linuxExecutablePaths(filepath.Join(t.TempDir(), "missing")); err == nil {
++		t.Fatal("unreadable process table accepted")
++	}
++}
+diff --git a/internal/buildcache/process_other.go b/internal/buildcache/process_other.go
+new file mode 100644
+index 00000000..c5766aa6
+--- /dev/null
++++ b/internal/buildcache/process_other.go
+@@ -0,0 +1,9 @@
++//go:build !darwin && !linux && !windows
++
++package buildcache
++
++import "fmt"
++
++func liveExecutablePaths() ([]string, error) {
++	return nil, fmt.Errorf("process image enumeration is unavailable on this platform")
++}
+diff --git a/internal/buildcache/process_test.go b/internal/buildcache/process_test.go
+new file mode 100644
+index 00000000..cb16ba76
+--- /dev/null
++++ b/internal/buildcache/process_test.go
+@@ -0,0 +1,123 @@
++package buildcache
++
++import (
++	"errors"
++	"os"
++	"path/filepath"
++	"testing"
++	"time"
++)
++
++// Drive Sweep itself against protected publications in both namespaces; the
++// fake table supplies only process images, never marker or journal references.
++func TestSweepLiveProcessBuilds(t *testing.T) {
++	for _, sourceAware := range []bool{false, true} {
++		for _, row := range []struct {
++			name, command, image string
++			err                  error
++			keep, warn           bool
++		}{
++			{name: "in-use", command: "runner", image: "bin/runner", keep: true},
++			{name: "other-file-under-build", command: "runner", image: "other/image", keep: true},
++			{name: "unused", command: "runner"},
++			{name: "sibling-prefix", command: "runner", image: "../prefix/bin/runner"},
++			{name: "enumeration-error", command: "runner", err: errors.New("injected process-table failure"), keep: true, warn: true},
++			{name: "daemon", command: "tb-sessiond", image: "bin/tb-sessiond", keep: true},
++			{name: "unused-daemon", command: "tb-sessiond"},
++		} {
++			namespace := "legacy"
++			if sourceAware {
++				namespace = "receipt-3"
++			}
++			t.Run(namespace+"/"+row.name, func(t *testing.T) {
++				store := newSweepStore(t)
++				input := testInput(row.command)
++				if sourceAware {
++					input = sourceAwareTestInput(row.command)
++				}
++				publication, _ := testPublication(t, store.Home(), input, []byte("executable"))
++				published, err := store.Publish(publication, testHomeLock{})
++				if err != nil {
++					t.Fatal(err)
++				}
++				dir, _, err := store.pathsIn(published.CacheKey, sourceAware)
++				if err != nil {
++					t.Fatal(err)
++				}
++				backdate(t, dir, 30*24*time.Hour)
++				calls := 0
++				store.ExecutablePaths = func() ([]string, error) {
++					calls++
++					if row.image == "" {
++						return nil, row.err
++					}
++					image := filepath.Join(dir, filepath.FromSlash(row.image))
++					if row.name == "sibling-prefix" {
++						image = dir + "-sibling" + string(filepath.Separator) + "runner"
++					}
++					return []string{image}, row.err
++				}
++				result, err := store.Sweep(SweepRequest{}, testHomeLock{})
++				if err != nil {
++					t.Fatal(err)
++				}
++				_, statErr := os.Stat(dir)
++				if row.keep && statErr != nil {
++					t.Fatalf("in-use or uncertain build removed: %v; %+v", statErr, result)
++				}
++				if !row.keep && (!os.IsNotExist(statErr) || len(result.Removed) != 1 || result.Removed[0] != string(published.CacheKey)) {
++					t.Fatalf("unused build not swept: %v; %+v", statErr, result)
++				}
++				if row.keep && len(result.Removed) != 0 {
++					t.Fatalf("retained build reported removed: %+v", result)
++				}
++				if calls != 1 || (len(result.Warnings) > 0) != row.warn {
++					t.Fatalf("table calls=%d warnings=%v", calls, result.Warnings)
++				}
++				if row.warn && !warningsContaining(result, "injected process-table failure") {
++					t.Fatalf("enumeration failure not explained: %+v", result)
++				}
++			})
++		}
++	}
++}
++
++func TestSweepRejectsPartialProcessTable(t *testing.T) {
++	store := newSweepStore(t)
++	key := publishTestEntry(t, store, "runner", "executable")
++	backdate(t, entryPathOf(store, key), 30*24*time.Hour)
++	for _, image := range []string{"", "runner"} {
++		store.ExecutablePaths = func() ([]string, error) { return []string{image}, nil }
++		result, err := store.Sweep(SweepRequest{}, testHomeLock{})
++		if err != nil || len(result.Removed) != 0 || !entryExists(t, store, key) || !warningsContaining(result, "not absolute") {
++			t.Fatalf("malformed image accepted: %+v, %v", result, err)
++		}
++	}
++	store.ExecutablePaths = func() ([]string, error) {
++		return []string{filepath.Join(t.TempDir(), "unrelated")}, errors.New("partial read")
++	}
++	result, err := store.Sweep(SweepRequest{}, testHomeLock{})
++	if err != nil || len(result.Removed) != 0 || !entryExists(t, store, key) || !warningsContaining(result, "partial read") {
++		t.Fatalf("partial process table accepted: %+v, %v", result, err)
++	}
++}
++
++func TestSweepRetainsExecutableThroughSymlink(t *testing.T) {
++	store := newSweepStore(t)
++	key := publishTestEntry(t, store, "runner", "executable")
++	dir := entryPathOf(store, key)
++	backdate(t, dir, 30*24*time.Hour)
++	link := filepath.Join(t.TempDir(), "alias")
++	if err := os.Symlink(dir, link); err != nil {
++		t.Skipf("symlinks unavailable: %v", err)
++	}
++	files, err := os.ReadDir(filepath.Join(dir, "bin"))
++	if err != nil || len(files) != 1 {
++		t.Fatalf("bin files: %v, %v", files, err)
++	}
++	store.ExecutablePaths = func() ([]string, error) { return []string{filepath.Join(link, "bin", files[0].Name())}, nil }
++	result, err := store.Sweep(SweepRequest{}, testHomeLock{})
++	if err != nil || len(result.Removed) != 0 || !entryExists(t, store, key) {
++		t.Fatalf("symlink executable swept: %+v, %v", result, err)
++	}
++}
+diff --git a/internal/buildcache/process_windows.go b/internal/buildcache/process_windows.go
+new file mode 100644
+index 00000000..be52156c
+--- /dev/null
++++ b/internal/buildcache/process_windows.go
+@@ -0,0 +1,47 @@
++package buildcache
++
++import (
++	"errors"
++	"fmt"
++	"unsafe"
++
++	"golang.org/x/sys/windows"
++)
++
++func liveExecutablePaths() ([]string, error) {
++	snapshot, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
++	if err != nil {
++		return nil, err
++	}
++	defer func() { _ = windows.CloseHandle(snapshot) }()
++	entry := windows.ProcessEntry32{Size: uint32(unsafe.Sizeof(windows.ProcessEntry32{}))}
++	var paths []string
++	for err = windows.Process32First(snapshot, &entry); err == nil; err = windows.Process32Next(snapshot, &entry) {
++		if entry.ProcessID == 0 || entry.ProcessID == 4 {
++			continue // System Idle Process and the kernel System process
++		}
++		path, imageErr := windowsExecutablePath(entry.ProcessID)
++		if imageErr != nil {
++			return nil, fmt.Errorf("read executable of process %d: %w", entry.ProcessID, imageErr)
++		}
++		paths = append(paths, path)
++	}
++	if !errors.Is(err, windows.ERROR_NO_MORE_FILES) {
++		return nil, err
++	}
++	return paths, nil
++}
++
++func windowsExecutablePath(pid uint32) (string, error) {
++	process, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
++	if err != nil {
++		return "", err
++	}
++	defer func() { _ = windows.CloseHandle(process) }()
++	buffer := make([]uint16, 32768)
++	size := uint32(len(buffer))
++	if err := windows.QueryFullProcessImageName(process, 0, &buffer[0], &size); err != nil {
++		return "", err
++	}
++	return windows.UTF16ToString(buffer[:size]), nil
++}
+diff --git a/internal/buildcache/process_windows_test.go b/internal/buildcache/process_windows_test.go
+new file mode 100644
+index 00000000..32636834
+--- /dev/null
++++ b/internal/buildcache/process_windows_test.go
+@@ -0,0 +1,26 @@
++package buildcache
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++func TestWindowsNativeExecutablePath(t *testing.T) {
++	want, err := os.Executable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	got, err := windowsExecutablePath(uint32(os.Getpid()))
++	if err != nil || !strings.EqualFold(got, want) {
++		t.Fatalf("native executable = %q, %v; want %q", got, err, want)
++	}
++}
++
++func TestBuildInUseWindowsCase(t *testing.T) {
++	dir := filepath.Join(t.TempDir(), "Build")
++	if !buildInUse(dir, dir, []string{strings.ToUpper(filepath.Join(dir, "bin", "runner.exe"))}) {
++		t.Fatal("image path casing hid an in-use build")
++	}
++}
+diff --git a/internal/envprofile/state_read_guard_test.go b/internal/envprofile/state_read_guard_test.go
+index 6fa3815f..33dc09ba 100644
+--- a/internal/envprofile/state_read_guard_test.go
++++ b/internal/envprofile/state_read_guard_test.go
+@@ -181,6 +181,9 @@ func reviewedManagerReadExceptions() map[string]string {
+ 		"internal/yarnmodernsource/capture.go:reconcileCapturedAuthorities",
+ 		"internal/yarnmodernsource/materialize.go:cleanAbsentAbsolute",
+ 	)
++	allow("Reads the OS-owned Linux process table, not manager state; a missing exe requires stat evidence of exit, zombie or kernel thread, and unreadable or malformed observations fail safe by retaining builds.",
++		"internal/buildcache/process_linux.go:linuxExecutablePaths",
++	)
+ 	return exceptions
+ }
+ 
+diff --git a/internal/scopes/gc_conformance_test.go b/internal/scopes/gc_conformance_test.go
+index 506c581f..7461c74b 100644
+--- a/internal/scopes/gc_conformance_test.go
++++ b/internal/scopes/gc_conformance_test.go
+@@ -19,6 +19,7 @@ func openProtectedStore(t *testing.T, home string) *buildcache.Store {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
++	store.ExecutablePaths = func() ([]string, error) { return nil, nil }
+ 	return store
+ }
+ 
+@@ -121,7 +122,7 @@ func assertReceiptRootRetained(t *testing.T) {
+ 	backdateEntry(t, home, referenced, 30*24*time.Hour)
+ 	backdateEntry(t, home, orphan, 30*24*time.Hour)
+ 
+-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}})
++	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -153,7 +154,7 @@ func assertJournalRootRetained(t *testing.T) {
+ 	backdateEntry(t, home, orphan, 30*24*time.Hour)
+ 
+ 	result, err := Collect(MaintenanceRequest{
+-		Home: home, Lock: testHomeLock{}, JournalKeys: []string{string(inFlight)},
++		Home: home, Lock: testHomeLock{}, Cache: store, JournalKeys: []string{string(inFlight)},
+ 	})
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -186,7 +187,7 @@ func assertMarkerRootRetained(t *testing.T) {
+ 			t.Fatal(err)
+ 		}
+ 	}
+-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}})
++	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: openProtectedStore(t, home)})
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -225,7 +226,7 @@ func assertSnapshotRootRetained(t *testing.T) {
+ 	if err := os.MkdirAll(filepath.Join(home, "runtime", "skill-a", strings.Repeat("4", 40)), 0o755); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}})
++	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: openProtectedStore(t, home)})
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -260,7 +261,7 @@ func assertUncertainRootRetained(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 
+-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}})
++	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/internal/scopes/gc_integration_test.go b/internal/scopes/gc_integration_test.go
+index a840516e..4ae2fe95 100644
+--- a/internal/scopes/gc_integration_test.go
++++ b/internal/scopes/gc_integration_test.go
+@@ -3,6 +3,7 @@ package scopes
+ import (
+ 	"crypto/sha256"
+ 	"encoding/hex"
++	"errors"
+ 	"os"
+ 	"path/filepath"
+ 	"runtime"
+@@ -18,15 +19,52 @@ import (
+ 	"github.com/relux-works/curator/internal/stateread"
+ )
+ 
++func TestCollectRetainsLiveProcessBuild(t *testing.T) {
++	for _, fail := range []bool{false, true} {
++		name := "in-use"
++		if fail {
++			name = "enumeration-error"
++		}
++		t.Run(name, func(t *testing.T) {
++			home := protectedTestHome(t)
++			store := openProtectedStore(t, home)
++			live := publishRealEntry(t, store, "runner", "live executable")
++			unused := publishRealEntry(t, store, "unused", "unused executable")
++			backdateEntry(t, home, live, 30*24*time.Hour)
++			backdateEntry(t, home, unused, 30*24*time.Hour)
++			store.ExecutablePaths = func() ([]string, error) {
++				if fail {
++					return nil, errors.New("injected process-table failure")
++				}
++				return []string{filepath.Join(realEntryPath(home, live), "bin", "runner")}, nil
++			}
++			result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
++			if err != nil {
++				t.Fatal(err)
++			}
++			if _, err := os.Stat(realEntryPath(home, live)); err != nil {
++				t.Fatalf("live process build swept: %v", err)
++			}
++			if fail {
++				if len(result.RemovedBuilds) != 0 || !warned(result, "injected process-table failure") {
++					t.Fatalf("unknown process table did not retain and warn: %+v", result)
++				}
++				if _, err := os.Stat(realEntryPath(home, unused)); err != nil {
++					t.Fatalf("uncertain build swept: %v", err)
++				}
++			} else if len(result.RemovedBuilds) != 1 || result.RemovedBuilds[0] != string(unused) || len(result.Warnings) != 0 {
++				t.Fatalf("unused build not swept: %+v", result)
++			}
++		})
++	}
++}
++
+ // TestCollectSweepsOnlyUnreferencedProtectedEntries drives the whole chain —
+ // mark from real markers, sweep the real protected store — instead of a stub,
+ // so the logical key a marker records and the key the cache stores must agree.
+ func TestCollectSweepsOnlyUnreferencedProtectedEntries(t *testing.T) {
+ 	home := protectedTestHome(t)
+-	store, err := buildcache.New(home)
+-	if err != nil {
+-		t.Fatal(err)
+-	}
++	store := openProtectedStore(t, home)
+ 	referenced := publishRealEntry(t, store, "kept-tool", "kept artifact")
+ 	orphan := publishRealEntry(t, store, "orphan-tool", "orphan artifact")
+ 
+@@ -39,7 +77,7 @@ func TestCollectSweepsOnlyUnreferencedProtectedEntries(t *testing.T) {
+ 	backdateEntry(t, home, referenced, 30*24*time.Hour)
+ 	backdateEntry(t, home, orphan, 30*24*time.Hour)
+ 
+-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}})
++	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -69,15 +107,12 @@ func TestCollectSweepsOnlyUnreferencedProtectedEntries(t *testing.T) {
+ // transaction still depends on survives even with no marker naming it.
+ func TestCollectRetainsAJournalOwnedEntry(t *testing.T) {
+ 	home := protectedTestHome(t)
+-	store, err := buildcache.New(home)
+-	if err != nil {
+-		t.Fatal(err)
+-	}
++	store := openProtectedStore(t, home)
+ 	inFlight := publishRealEntry(t, store, "in-flight-tool", "in-flight artifact")
+ 	backdateEntry(t, home, inFlight, 30*24*time.Hour)
+ 
+ 	result, err := Collect(MaintenanceRequest{
+-		Home: home, Lock: testHomeLock{}, JournalKeys: []string{string(inFlight)},
++		Home: home, Lock: testHomeLock{}, Cache: store, JournalKeys: []string{string(inFlight)},
+ 	})
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -95,10 +130,7 @@ func TestCollectRetainsAJournalOwnedEntry(t *testing.T) {
+ // cache entry rather than sweeping artifacts it can no longer account for.
+ func TestCollectRetainsBuildEntriesWhenAMarkerCannotBeRead(t *testing.T) {
+ 	home := protectedTestHome(t)
+-	store, err := buildcache.New(home)
+-	if err != nil {
+-		t.Fatal(err)
+-	}
++	store := openProtectedStore(t, home)
+ 	orphan := publishRealEntry(t, store, "orphan-tool", "orphan artifact")
+ 	backdateEntry(t, home, orphan, 30*24*time.Hour)
+ 
+@@ -116,7 +148,7 @@ func TestCollectRetainsBuildEntriesWhenAMarkerCannotBeRead(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 
+-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}})
++	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}

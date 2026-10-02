@@ -1,0 +1,9 @@
+Integration preconditions for RUN-261002-b49486, 2026-10-02. No repository files changed by this run. Board remains integrating. Latest Integration Assignment supersedes earlier direct integrate and generic FIRST/LAST commands; landing is runner-owned.
+
+Fresh checks: task-board spawn status exited 0, running as developer/implementer. task-board spawn directives exited 0, no directives. Board status/activity query exited 0: integrating; CR-BUG-261002-ot3ea1-5 revision 5 accepted by RUN-261002-e2f897. task-board worktree status STORY-261002-1pd460 --json exited 0: accepted story_final candidate, tree f7dda90c9112460dcc30b1dcf573277fac8366db, base/checkpoint c085b4d22a0b6a51e3070277e7f3cffeb84e67e7, active lease RUN-261002-b49486.
+
+Exact candidate verification: git diff --cached --quiet f7dda90c9112460dcc30b1dcf573277fac8366db -- exited 0. git diff --quiet exited 0. git ls-files --others --exclude-standard exited 0 with no output. git diff --quiet c085b4d2 -- CHANGELOG.md LOGBOOK.md exited 0. git diff --stat c085b4d2 exited 0: 17 files, 637 insertions, 29 deletions.
+
+No tests/builds rerun: integration-only run with unchanged accepted candidate; prior review/hosted gate evidence remains the validation basis. Fresh protected-trunk freshness and transaction gates remain runner-owned; stored authority observation is not claimed as current. No integrate, checkpoint, generic handoff, or status mutation invoked.
+
+Discovery diagnostics: unsupported schema(operation=change_request) exited 1; recovered through supported activity query and worktree status. Initial file discovery rg returned 1 for no matching AGENTS.md. These are not validation successes. Runner may now attempt synchronous bound landing; landing success is not yet established.
