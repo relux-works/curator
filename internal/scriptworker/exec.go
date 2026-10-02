@@ -257,11 +257,23 @@ func readExecIdentityAt(name, canonical, platform, trustedSystem32Root string) (
 	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
 		return ExecIdentity{}, false, nil
 	}
+	if multiple && !trustedWindowsExecHardlinks(file, canonical, trustedSystem32Root) {
+		return ExecIdentity{}, false, nil
+	}
 	digest := sha256.New()
 	written, err := io.CopyN(digest, file, opened.Size())
 	var extra [1]byte
 	extraCount, extraErr := file.Read(extra[:])
 	if err != nil || written != opened.Size() || extraCount != 0 || (extraErr != nil && !errors.Is(extraErr, io.EOF)) {
+		return ExecIdentity{}, false, nil
+	}
+	// Repeat after reading: a new alias must not inherit an earlier proof.
+	latest, err := file.Stat()
+	if err != nil {
+		return ExecIdentity{}, false, nil
+	}
+	multiple, err = godriver.HasMultipleLinks(canonical, latest)
+	if err != nil || (multiple && (!trustedSystem32File || !trustedWindowsExecHardlinks(file, canonical, trustedSystem32Root))) {
 		return ExecIdentity{}, false, nil
 	}
 	return ExecIdentity{

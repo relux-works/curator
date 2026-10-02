@@ -45,6 +45,8 @@ func TestDeriveProfileUsesDefaultExecSearchDirsAndBuildsDeclaredExecFarm(t *test
 		t.Fatalf("create Windows component-store hard-link fixture: %v", err)
 	}
 
+	fixtureWindowsExecOrigin(t, execPath, filepath.Join(winsxs, "cmd.exe"), true)
+
 	private, err := createPrivateArea(fixture.request.PrivateBase, fixture.request.ForbiddenRoots)
 	if err != nil {
 		t.Fatal(err)

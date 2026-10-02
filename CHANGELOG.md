@@ -4,6 +4,8 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+- Windows executable resolution now proves platform ownership and every component-store hard-link origin before granting the captured System32 exception.
+
 - Unix HTTPS askpass requests the secret only after accepting the password prompt, preventing broken-pipe transport errors on refusal paths.
 
 ### Added

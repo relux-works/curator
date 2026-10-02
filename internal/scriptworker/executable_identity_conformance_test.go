@@ -32,7 +32,7 @@ func loadExecutableIdentityVector(t *testing.T) executableIdentityVector {
 	t.Helper()
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
 	if root == "" {
-		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+		return executableIdentityVector{Cases: loadPinnedExecutableIdentityCases(t)}
 	}
 	payload, err := os.ReadFile(filepath.Join(root, "vectors", "script-host-execution-policy.json")) // #nosec G304 -- explicit conformance input
 	if err != nil {
@@ -54,7 +54,7 @@ func TestExecutableIdentityCasesAtProductionEntry(t *testing.T) {
 	if len(vector.Cases) != 8 {
 		t.Fatalf("executable_identity_cases has %d cases, want 8", len(vector.Cases))
 	}
-	conformancecoverage.RunOutcomes(t, "script-host-execution-policy/executable-identity-cases", vector.Cases,
+	tally := conformancecoverage.RunOutcomes(t, "script-host-execution-policy/executable-identity-cases", vector.Cases,
 		func(testCase executableIdentityCase) string { return testCase.Name },
 		func(t *testing.T, testCase executableIdentityCase) conformancecoverage.Observation {
 			if testCase.Platform != "windows" {
@@ -92,6 +92,9 @@ func TestExecutableIdentityCasesAtProductionEntry(t *testing.T) {
 			}
 			return conformancecoverage.Observation{}
 		})
+	if tally.Driven != 8 || tally.KnownGap != 0 || tally.Bound != 0 || tally.Skipped != 0 {
+		t.Fatalf("executable identity coverage = %+v, want 8/8 driven without gaps, bounds or skips", tally)
+	}
 }
 
 func driveDeclaredExecIdentityCase(t *testing.T, testCase executableIdentityCase) string {
@@ -112,6 +115,9 @@ func driveDeclaredExecIdentityCase(t *testing.T, testCase executableIdentityCase
 		t.Fatalf("unsupported executable target %q", testCase.Target)
 	}
 	copyTestFile(t, fixture.stub, target)
+	if err := os.MkdirAll(filepath.Join(root, "WinSxS"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	var aliasDir string
 	switch testCase.AdditionalLinks {
@@ -128,6 +134,7 @@ func driveDeclaredExecIdentityCase(t *testing.T, testCase executableIdentityCase
 	if err := os.Link(target, filepath.Join(aliasDir, "cmd.exe")); err != nil {
 		t.Fatalf("create executable hard-link fixture: %v", err)
 	}
+	fixtureWindowsExecOrigin(t, target, filepath.Join(aliasDir, "cmd.exe"), testCase.PlatformOwned)
 
 	private, err := createPrivateArea(fixture.request.PrivateBase, fixture.request.ForbiddenRoots)
 	if err != nil {

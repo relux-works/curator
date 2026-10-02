@@ -798,3 +798,5 @@ cmd/curator	TestInstallGitignoreEntryPoint/git-ignore-negation	linux,darwin,wind
 cmd/curator	TestInstallGitignoreEntryPoint/broken-git	linux,darwin,windows	-	-	corrupt .git metadata refuses with nonzero exit and no installed bytes
 cmd/curator	TestInstallGitignoreEntryPoint/unexpected-exit-2	linux,darwin	windows	platform-control	unexpected Git exit 2 carrying the absence diagnostic refuses through the CLI; POSIX shim fixture
 cmd/curator	TestInstallGitignoreEntryPoint/unexpected-exit-128	linux,darwin	windows	platform-control	unexpected Git exit 128 carrying an unrelated diagnostic refuses through the CLI; POSIX shim fixture
+internal/scriptworker	TestWindowsExecHardlinkOriginEvidence	linux,darwin,windows	-	-	Production exec resolution and launch revalidation refuse unknown owners and incomplete or foreign hard-link evidence
+internal/scriptworker	TestWindowsNativeExecHardlinkOrigins	windows	-	-	Hosted Windows exercises real file IDs, owner SIDs and hard-link enumeration at the production resolver
