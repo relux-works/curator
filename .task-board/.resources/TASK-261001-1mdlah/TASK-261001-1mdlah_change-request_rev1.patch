@@ -1,0 +1,591 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 9b48d29..d41b6f0 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -5,8 +5,18 @@
+ ### Added
+ 
+ - Register the Muse launcher/provider mapping and read v3 launch fragments
+-  with four XDG parents, preserving the inherited `HOME`. The pinned Muse
+-  plugin still refuses interactive launch plans and has no permission mapping.
++  with four XDG parents, preserving inherited `HOME`. The v0.5.37 module
++  admits interactive Muse plans with release probing and native/yolo
++  permissions: native adds no posture flag; yolo adds `--yolo` once.
++  Unlisted releases fail closed. Add native, yolo, and yolo-alias Muse goldens
++  for this newly admitted interactive path.
++
++### Changed
++
++- Pin `github.com/relux-works/skill-agents-management v0.5.37`. Claude plans
++  now own `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false`; update direct and
++  tracked Claude goldens, delivering the launcher half of curator#102.
++  Existing argv and other existing goldens are unchanged from v0.5.22.
+ 
+ ### Security
+ 
+diff --git a/README.md b/README.md
+index 3a724b5..c3fbed8 100644
+--- a/README.md
++++ b/README.md
+@@ -11,9 +11,11 @@ The executable supports `claude_code` (alias `claude`), `codex_cli`
+ 
+ Muse has a registered `muse` system/provider mapping and accepts
+ `launch-env-fragment-v3` with four XDG parents under one managed home,
+-preserving inherited `HOME`. With agents-management v0.5.22, `curator-run muse`
+-still refuses: the module has no Muse permission mapping and declares no
+-interactive launch mode. Exec/serve mode is not substituted.
++preserving inherited `HOME`. The pinned agents-management v0.5.37 plugin
++declares interactive mode, probes the installed release, and maps native/yolo
++permissions for its verified releases (1.4.1 and 1.4.2). `curator-run muse` builds
++an interactive plan with XDG overrides and inherited `HOME`; native adds no
++posture flag and yolo adds exactly one `--yolo`. Unlisted releases fail closed.
+ 
+ The launch pipeline follows these steps:
+ 
+@@ -48,7 +50,7 @@ The launch pipeline follows these steps:
+    starts neither provider nor ax.
+ 
+ The permission interface is implemented against upstream
+-`skill-agents-management v0.5.22` (F-M1). It owns
++`skill-agents-management v0.5.37` (F-M1). It owns
+ `LaunchRequest.PermissionMode`, the release-bound mapping, versioned native
+ argument classification, stored-policy inspection, and the capability table.
+ Claude Code and Codex CLI use `permission-grammar-v2`; Pi uses
+diff --git a/SPEC.md b/SPEC.md
+index 10fb280..75d81f5 100644
+--- a/SPEC.md
++++ b/SPEC.md
+@@ -372,8 +372,8 @@ native-Pi design (TASK-260908-ggxfte) is now landed in
+ commit `a2a6e9f377f62a5872d99ecdfff0d1690e385f2a`: system `pi-native`
+ provides native interactive Pi plans for managed homes. This mapping does
+ not require a Go import. The published v0.5.11 tag (tag object
+-`0ea486e46765ecf12fff7c2ac526e12da02e95ed`) carries that commit and is
+-pinned by this revision. §4.3 registers the real native-Pi plugin.
++`0ea486e46765ecf12fff7c2ac526e12da02e95ed`) introduced that support;
++this revision pins v0.5.37. §4.3 registers the real native-Pi plugin.
+ 
+ An env-id outside this table that Curator nevertheless resolves is
+ `env_unsupported`: the launcher refuses rather than guessing a system or
+@@ -383,9 +383,12 @@ are filled — the launcher does not exec untracked what it could not hand
+ off tracked.
+ 
+ The Muse row follows the binding 2026-10-01 task decision. Mapping does
+-not attest launch-mode support. The pinned agents-management v0.5.22
+-plugin declares exec/dry-run only and lacks a release-pinned permission
+-mapping: the launcher preserves those refusals. Its declaration-owned
++not attest launch-mode support. The pinned agents-management v0.5.37
++plugin declares interactive mode, implements ToolReleaseProber, and supplies
++release-pinned native/yolo permissions for Muse 1.4.1 and 1.4.2. The launcher
++probes the installed release before permission mapping and refuses unlisted
++releases. Interactive plans preserve inherited HOME and overlay only the four
++fragment XDG parents. Its declaration-owned
+ model rows are the module's system-only launch authority, without a
+ resolved vendor; defaults consumes those rows as BuildLaunch does.
+ 
+@@ -537,9 +540,9 @@ different pair.
+ ### 4.4 Obtain the launch plan (spawn plane)
+ 
+ The launcher obtains the plan through
+-`vendorplugin.BuildLaunch(ctx, registry, request, agentic.LaunchModeInteractive)`,
+-the entry point verified at `agents-management` tag `v0.5.18`.
+-`BuildLaunch` resolves the runtime and vendor model row, admits the model
++`vendorplugin.BuildLaunchWithEnvironment(ctx, registry, request, agentic.LaunchModeInteractive)`,
++the entry point verified at `agents-management` tag `v0.5.37`.
++`BuildLaunchWithEnvironment` resolves the runtime and vendor model row, admits the model
+ and effort word against that row, and calls `agentic.BuildPlan` with the
+ resulting `LaunchRequest`. The launcher MUST NOT bypass that admission
+ by calling `BuildPlan` with a bare model id or reconstructing the row's
+@@ -572,7 +575,7 @@ by calling `BuildPlan` with a bare model id or reconstructing the row's
+ 
+ The mode is requested **by name**, `agentic.LaunchModeInteractive`
+ (Decision 0013 D5). `LaunchRequest.PermissionMode` carries the resolved
+-mode. In agents-management v0.5.18, `LaunchRequest.ToolRelease` and
++mode. In agents-management v0.5.37, `LaunchRequest.ToolRelease` and
+ `LaunchRequest.NativeArgs` bind the request to the release-specific
+ `permission-grammar-v1`; agents-management owns the permission mapping,
+ argv grammar, and capability table. The launcher passes the request and
+@@ -1129,10 +1132,10 @@ rather than sharing the read failure's. Second, no
+ diagnostic downgrades the launch: every failure is terminal for that
+ invocation, and the operator retries deliberately.
+ 
+-## 7. Planned dependency
++## 7. Pinned dependency
+ 
+-The permission interface requires
+-`github.com/relux-works/skill-agents-management v0.5.18` (F-M1 release `149569d`), which carries
++The launcher pins
++`github.com/relux-works/skill-agents-management v0.5.37`, which carries
+ `LaunchModeInteractive`, `LaunchRequest.PermissionMode`,
+ `LaunchRequest.ToolRelease`, `LaunchRequest.NativeArgs`, the
+ `permission-grammar-v1` token, and `ErrPermissionModeUnverifiedRelease`.
+diff --git a/cmd/curator-run/muse_test.go b/cmd/curator-run/muse_test.go
+index 21972ad..1d6a862 100644
+--- a/cmd/curator-run/muse_test.go
++++ b/cmd/curator-run/muse_test.go
+@@ -43,132 +43,127 @@ func museFixture(t *testing.T) (*pipelineFixture, *fragment.Fragment) {
+ 	writeFixture(t, curator, helper, 0700)
+ 	f.binary = filepath.Join(f.dir, "muse")
+ 	writeFixture(t, f.binary, helper, 0700)
++	writeFixture(t, filepath.Join(f.dir, "muse-version"), []byte("Muse Code 1.4.2 (1.4.2-R4684.1)\n"), 0600)
+ 	t.Setenv("CURATOR_TEST_FRAGMENT", fragmentPath)
+ 	t.Setenv("CURATOR_TEST_RESOLVE_ARGV", filepath.Join(f.dir, "resolve-argv"))
+ 	f.deps.resolver = fragment.NewWithRunner(curator, fragment.ExecRunner{})
+ 	f.deps.environ = func() []string {
+-		return []string{"PATH=" + f.dir, "HOME=" + f.dir, "CURATOR_TEST_RELEASE=1.4.1", "XDG_CONFIG_HOME=/foreign/config"}
++		return []string{"PATH=" + f.dir, "HOME=" + f.dir, "XDG_CONFIG_HOME=/foreign/config"}
+ 	}
+ 	f.deps.isTerminal = func() bool { return false }
+ 	f.args = []string{"muse", "--permissions=native"}
+ 	return f, frag
+ }
+ 
+-// Production call sites: run -> fragment.Resolver.Resolve -> resolvePermission.
+-// Today's release has no Muse permission mapping, even for native mode.
+-func TestMuseV3ThroughRunPermissionBound(t *testing.T) {
+-	f, frag := museFixture(t)
+-	code, out, stderr := f.run()
+-	argv, err := os.ReadFile(filepath.Join(f.dir, "resolve-argv"))
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	if string(argv) != "env\nresolve\nmuse\n--repair\n--format\njson" {
+-		t.Fatalf("resolve argv=%q", argv)
+-	}
+-	_, mappingErr := agentic.Default.PermissionMapping("muse", "1.4.1", agentic.PermissionModeNative)
+-	if mappingErr != nil {
+-		const refusal = "curator-run: permission_mode_unsupported: agentic: system maps no permission-mode bypass flag: muse has no release-pinned permission mapping\n"
+-		if code != 1 || !strings.HasSuffix(string(stderr), refusal) || len(out) != 0 || f.builds != 0 || f.verdicts != 0 {
+-			t.Fatalf("permission bound changed: exit=%d stderr=%s", code, stderr)
+-		}
+-		if !strings.Contains(string(stderr), "model=muse-spark-1.3-contributor (lineup) effort=max (lineup)") {
+-			t.Fatalf("Muse declaration rows not resolved: %s", stderr)
+-		}
+-		f.assertNoChild(t)
+-		return
+-	}
+-	if f.builds != 1 || f.request.Runtime != "muse" || f.request.Home != frag.Home() || f.request.PermissionMode != agentic.PermissionModeNative || !reflect.DeepEqual(f.request.Env, f.deps.environ()) {
+-		t.Fatalf("wrong Muse request: %+v stderr=%s", f.request, stderr)
+-	}
+-	system, ok := agentic.Default.Lookup("muse")
+-	if !ok {
+-		t.Fatal("Muse plugin not registered")
+-	}
+-	if !system.Capabilities().SupportsMode(agentic.LaunchModeInteractive) {
+-		const refusal = "plan_refused: spawn plane refused the launch: agentic: system does not support launch mode: muse does not declare interactive"
+-		if code != 1 || !strings.Contains(string(stderr), refusal+"\n") || len(out) != 0 || f.verdicts != 0 {
+-			t.Fatalf("exact interactive bound changed: exit=%d verdicts=%d stdout=%s stderr=%s", code, f.verdicts, out, stderr)
+-		}
+-		f.assertNoChild(t)
+-		return
+-	}
+-	if code != 0 || f.verdicts != 1 {
+-		t.Fatalf("interactive-capable pin refused: exit=%d stderr=%s", code, stderr)
+-	}
+-	var child childCapture
+-	if err := json.Unmarshal(out, &child); err != nil {
+-		t.Fatal(err)
++// Production call sites: run -> Resolve -> resolvePermission -> plan.Build
++// (real BuildLaunchWithEnvironment in Interactive mode) -> Compose -> fake Muse.
++// These rows require admission; a plugin regression to exec-only must fail.
++func TestMuseV3InteractiveThroughRun(t *testing.T) {
++	for _, tc := range []struct {
++		name string
++		args []string
++		mode agentic.PermissionMode
++	}{
++		{"native", []string{"muse", "--permissions", "native"}, agentic.PermissionModeNative},
++		{"yolo", []string{"muse", "--permissions", "yolo"}, agentic.PermissionModeYolo},
++		{"yolo-alias", []string{"muse", "--yolo"}, agentic.PermissionModeYolo},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			f, frag := museFixture(t)
++			f.args = tc.args
++			code, out, stderr := f.run()
++			if code != 0 || f.builds != 1 || f.verdicts != 1 {
++				t.Fatalf("interactive admission: exit=%d builds=%d verdicts=%d stderr=%s", code, f.builds, f.verdicts, stderr)
++			}
++			argv, err := os.ReadFile(filepath.Join(f.dir, "resolve-argv"))
++			if err != nil || string(argv) != "env\nresolve\nmuse\n--repair\n--format\njson" {
++				t.Fatalf("resolve argv=%q err=%v", argv, err)
++			}
++			if f.request.Runtime != "muse" || f.request.Model != "muse-spark-1.3-contributor" || f.request.Effort != "max" || f.request.Home != frag.Home() || f.request.ToolRelease != "1.4.2" || f.request.PermissionMode != tc.mode || !reflect.DeepEqual(f.request.Env, f.deps.environ()) {
++				t.Fatalf("wrong Muse request: %+v", f.request)
++			}
++			wantArgv := museArgv(f.dir, tc.mode)
++			if !reflect.DeepEqual(f.plan.Argv, wantArgv) {
++				t.Fatalf("plan argv=%q want=%q", f.plan.Argv, wantArgv)
++			}
++			var child childCapture
++			if err := json.Unmarshal(out, &child); err != nil {
++				t.Fatal(err)
++			}
++			if !reflect.DeepEqual(child.Argv, wantArgv) || child.WorkDir != f.dir || !reflect.DeepEqual(child.Stdin, []byte("parent stdin\n\x00\xff")) {
++				t.Fatalf("interactive child=%+v want argv=%q", child, wantArgv)
++			}
++			assertMuseEnv(t, child.Env, f.dir, frag)
++			mapped := "none"
++			if tc.mode == agentic.PermissionModeYolo {
++				mapped = "--yolo"
++			}
++			if !strings.Contains(string(stderr), "curator-run: permissions="+string(tc.mode)+" source=flag mapped="+mapped+"\n") {
++				t.Fatalf("permission diagnostic: %s", stderr)
++			}
++			golden(t, "pipeline-muse-"+tc.name, child, f.dir)
++		})
+ 	}
+-	if !reflect.DeepEqual(child.Argv, f.plan.Argv) {
+-		t.Fatalf("argv=%q plan=%q", child.Argv, f.plan.Argv)
++}
++
++func museArgv(workdir string, mode agentic.PermissionMode) []string {
++	args := []string{"--model", "muse-spark-1.3-contributor", "--reasoning-effort", "max", "--workspace", workdir}
++	if mode == agentic.PermissionModeYolo {
++		args = append(args, "--yolo")
+ 	}
+-	assertMuseEnv(t, child.Env, f.dir, frag)
++	return args
+ }
+ 
+ // Production call site: plan.Build with the real tagged BuildLaunch API.
+-// Separate from run's earlier permission bound. This row flips to admission
+-// when a pinned plugin declares interactive; no mode substitution is allowed.
+-func TestMuseV3PlanBuildInteractiveBound(t *testing.T) {
+-	f, frag := museFixture(t)
+-	deps := plan.DefaultDeps(nil)
+-	deps.Registry = f.deps.registry
+-	reads := 0
+-	deps.Availability = func(providerlimits.VerdictQuery) (vendorplugin.Availability, error) {
+-		reads++
+-		return vendorplugin.Availability{State: vendorplugin.AvailabilityHealthy}, nil
+-	}
+-	req := plan.Request{Runtime: "muse", Model: "muse-spark-1.3-contributor", Effort: "max", PermissionMode: agentic.PermissionModeNative, Home: frag.Home(), WorkDir: f.dir, Env: f.deps.environ()}
+-	built, err := plan.Build(context.Background(), deps, req)
+-	system, _ := agentic.Default.Lookup("muse")
+-	if !system.Capabilities().SupportsMode(agentic.LaunchModeInteractive) {
+-		const refusal = "plan_refused: spawn plane refused the launch: agentic: system does not support launch mode: muse does not declare interactive"
+-		if err == nil || err.Error() != refusal || reads != 0 {
+-			t.Fatalf("interactive refusal=%v reads=%d", err, reads)
+-		}
+-		f.assertNoChild(t)
+-		return
+-	}
+-	if err != nil || reads != 1 || built.Plan.Binary != f.binary {
+-		t.Fatalf("interactive-capable pin: plan=%+v err=%v reads=%d", built.Plan, err, reads)
+-	}
+-	if !reflect.DeepEqual(plan.SpawnRequest(req).Env, f.deps.environ()) {
+-		t.Fatal("plan request changed HOME/env")
++func TestMuseV3PlanBuildInteractive(t *testing.T) {
++	for _, mode := range []agentic.PermissionMode{agentic.PermissionModeNative, agentic.PermissionModeYolo} {
++		t.Run(string(mode), func(t *testing.T) {
++			f, frag := museFixture(t)
++			deps := plan.DefaultDeps(nil)
++			deps.Registry = f.deps.registry
++			reads := 0
++			deps.Availability = func(providerlimits.VerdictQuery) (vendorplugin.Availability, error) {
++				reads++
++				return vendorplugin.Availability{State: vendorplugin.AvailabilityHealthy}, nil
++			}
++			req := plan.Request{Runtime: "muse", Model: "muse-spark-1.3-contributor", Effort: "max", PermissionMode: mode, ToolRelease: "1.4.2", Home: frag.Home(), WorkDir: f.dir, Env: f.deps.environ()}
++			built, err := plan.Build(context.Background(), deps, req)
++			if err != nil || reads != 1 || built.Plan.Binary != f.binary || !reflect.DeepEqual(built.Plan.Argv, museArgv(f.dir, mode)) {
++				t.Fatalf("interactive plan=%+v err=%v reads=%d", built.Plan, err, reads)
++			}
++			wantEnv := []string{"PATH=" + f.dir, "HOME=" + f.dir, "XDG_CONFIG_HOME=/foreign/config", "MUSE_NO_AUTO_UPDATE=1"}
++			if !reflect.DeepEqual(built.Plan.Env, wantEnv) || !reflect.DeepEqual(built.OwnedEnv, []string{"MUSE_NO_AUTO_UPDATE=1"}) {
++				t.Fatalf("plan env=%q owned=%q", built.Plan.Env, built.OwnedEnv)
++			}
++			f.assertNoChild(t)
++		})
+ 	}
+ }
+ 
+ func assertMuseEnv(t *testing.T, env []string, nativeHome string, frag *fragment.Fragment) {
+ 	t.Helper()
+-	values := map[string]string{}
+-	for _, entry := range env {
+-		k, v, _ := strings.Cut(entry, "=")
+-		values[k] = v
+-	}
+-	if values["HOME"] != nativeHome {
+-		t.Fatalf("HOME replaced: %q", values["HOME"])
+-	}
+-	for k, v := range frag.Env {
+-		if values[k] != v {
+-			t.Fatalf("%s=%q want %q", k, values[k], v)
+-		}
++	want := []string{"HOME=" + nativeHome, "MUSE_NO_AUTO_UPDATE=1", "PATH=" + nativeHome,
++		"XDG_CACHE_HOME=" + frag.Env["XDG_CACHE_HOME"], "XDG_CONFIG_HOME=" + frag.Env["XDG_CONFIG_HOME"],
++		"XDG_DATA_HOME=" + frag.Env["XDG_DATA_HOME"], "XDG_STATE_HOME=" + frag.Env["XDG_STATE_HOME"]}
++	if !reflect.DeepEqual(env, want) {
++		t.Fatalf("Muse env=%q want=%q", env, want)
+ 	}
+ }
+ 
+-// Composition is independently reachable for admitted plans of other systems.
+-// Test the v3 overlay here without claiming today's Muse plugin admits a plan.
+ func TestMuseV3CompositionPreservesHOME(t *testing.T) {
+ 	f, frag := museFixture(t)
+-	p := agentic.Plan{Binary: f.binary, WorkDir: f.dir, Argv: []string{"opaque"}, Env: f.deps.environ()}
+-	v, err := composition.Compose(p, nil, *frag, composition.PromptApplication{}, nil)
++	p := agentic.Plan{Binary: f.binary, WorkDir: f.dir, Argv: []string{"opaque"}, Env: []string{"HOME=" + f.dir, "PATH=" + f.dir, "MUSE_NO_AUTO_UPDATE=1"}}
++	v, err := composition.Compose(p, []string{"MUSE_NO_AUTO_UPDATE=1"}, *frag, composition.PromptApplication{}, nil)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	assertMuseEnv(t, v.Env, f.dir, frag)
+-	if _, ok := v.EnvLiterals["HOME"]; ok {
+-		t.Fatal("HOME serialized as an override")
++	wantLiterals := map[string]string{"MUSE_NO_AUTO_UPDATE": "1"}
++	for k, value := range frag.Env {
++		wantLiterals[k] = value
+ 	}
+-	if !reflect.DeepEqual(v.EnvLiterals, frag.Env) || !reflect.DeepEqual(v.Argv, p.Argv) {
+-		t.Fatalf("v3 composition=%+v", v)
++	if !reflect.DeepEqual(v.EnvLiterals, wantLiterals) || !reflect.DeepEqual(v.Argv, p.Argv) {
++		t.Fatalf("XDG-only overrides (no HOME): %+v", v)
+ 	}
+ 	target, err := mapping.Resolve(frag.Environment)
+ 	if err != nil || target.System != "muse" || target.Provider != "muse" {
+@@ -176,14 +171,38 @@ func TestMuseV3CompositionPreservesHOME(t *testing.T) {
+ 	}
+ }
+ 
+-func TestMuseV3PermissionTransportThroughRun(t *testing.T) {
+-	f, _ := museFixture(t)
+-	f.args = []string{"muse", "--yolo"}
+-	code, _, stderr := f.run()
+-	// v3 carries the policy to the real module. Its current interactive Muse
+-	// permission capability is unsupported; do not build exec --yolo here.
+-	if code != 1 || !strings.Contains(string(stderr), "permission_mode_unsupported:") || strings.Contains(string(stderr), "permission_policy_unsupported:") || f.builds != 0 {
+-		t.Fatalf("v3 permission transport: exit=%d builds=%d stderr=%s", code, f.builds, stderr)
++func TestMuseV3UnlistedReleaseRefusedThroughRun(t *testing.T) {
++	// v0.5.37 muse/policy.go lists 1.4.1 and 1.4.2; 1.4.0 is unlisted.
++	for _, mode := range []string{"native", "yolo"} {
++		for _, release := range []string{"1.4.0", "9.9.9", ""} {
++			t.Run(mode+"/release="+release, func(t *testing.T) {
++				f, _ := museFixture(t)
++				f.args = []string{"muse", "--permissions", mode}
++				version := ""
++				if release != "" {
++					version = "Muse Code " + release + " (" + release + "-R1.1)\n"
++				}
++				writeFixture(t, filepath.Join(f.dir, "muse-version"), []byte(version), 0600)
++				code, out, stderr := f.run()
++				if code != 1 || len(out) != 0 || f.builds != 0 || f.verdicts != 0 || !strings.Contains(string(stderr), "permission_mode_unsupported:") || !strings.Contains(string(stderr), agentic.ErrPermissionModeUnverifiedRelease.Error()) {
++					t.Fatalf("unlisted release admitted: exit=%d builds=%d verdicts=%d stdout=%s stderr=%s", code, f.builds, f.verdicts, out, stderr)
++				}
++				f.assertNoChild(t)
++			})
++		}
++	}
++}
++
++func TestMuseV3DuplicateYoloRefusedThroughRun(t *testing.T) {
++	for _, args := range [][]string{{"--yolo"}, {"--yolo=true"}, {"--disable-approval", "--disable-sandbox"}} {
++		t.Run(strings.Join(args, ","), func(t *testing.T) {
++			f, _ := museFixture(t)
++			f.args = append([]string{"muse", "--permissions", "yolo", "--"}, args...)
++			code, out, stderr := f.run()
++			if code != 2 || len(out) != 0 || f.builds != 1 || f.verdicts != 0 || !strings.Contains(string(stderr), agentic.ErrPermissionModeDuplicate.Error()) {
++				t.Fatalf("duplicate admitted: exit=%d builds=%d verdicts=%d stdout=%s stderr=%s", code, f.builds, f.verdicts, out, stderr)
++			}
++			f.assertNoChild(t)
++		})
+ 	}
+-	f.assertNoChild(t)
+ }
+diff --git a/cmd/curator-run/testdata/pipeline-claude_code-false.golden b/cmd/curator-run/testdata/pipeline-claude_code-false.golden
+index dfe9aa5..595d6a6 100644
+--- a/cmd/curator-run/testdata/pipeline-claude_code-false.golden
++++ b/cmd/curator-run/testdata/pipeline-claude_code-false.golden
+@@ -15,6 +15,7 @@
+       "a\nb"
+     ],
+     "Env": [
++      "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false",
+       "CLAUDE_CONFIG_DIR=<ROOT>/managed",
+       "CODEX_THREAD_ID=nested",
+       "FIGMA_API_KEY=source-secret",
+diff --git a/cmd/curator-run/testdata/pipeline-claude_code-true.golden b/cmd/curator-run/testdata/pipeline-claude_code-true.golden
+index f74ee92..83061d0 100644
+--- a/cmd/curator-run/testdata/pipeline-claude_code-true.golden
++++ b/cmd/curator-run/testdata/pipeline-claude_code-true.golden
+@@ -26,6 +26,7 @@
+       "a\nb"
+     ],
+     "env_literals": {
++      "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false",
+       "CLAUDE_CONFIG_DIR": "<ROOT>/managed"
+     },
+     "env_names": [
+diff --git a/cmd/curator-run/testdata/pipeline-muse-native.golden b/cmd/curator-run/testdata/pipeline-muse-native.golden
+new file mode 100644
+index 0000000..b44b670
+--- /dev/null
++++ b/cmd/curator-run/testdata/pipeline-muse-native.golden
+@@ -0,0 +1,21 @@
++{
++  "Argv": [
++    "--model",
++    "muse-spark-1.3-contributor",
++    "--reasoning-effort",
++    "max",
++    "--workspace",
++    "<ROOT>"
++  ],
++  "Env": [
++    "HOME=<ROOT>",
++    "MUSE_NO_AUTO_UPDATE=1",
++    "PATH=<ROOT>",
++    "XDG_CACHE_HOME=<ROOT>/managed/cache",
++    "XDG_CONFIG_HOME=<ROOT>/managed/config",
++    "XDG_DATA_HOME=<ROOT>/managed/data",
++    "XDG_STATE_HOME=<ROOT>/managed/state"
++  ],
++  "Stdin": "cGFyZW50IHN0ZGluCgD/",
++  "WorkDir": "<ROOT>"
++}
+diff --git a/cmd/curator-run/testdata/pipeline-muse-yolo-alias.golden b/cmd/curator-run/testdata/pipeline-muse-yolo-alias.golden
+new file mode 100644
+index 0000000..0c9e0d8
+--- /dev/null
++++ b/cmd/curator-run/testdata/pipeline-muse-yolo-alias.golden
+@@ -0,0 +1,22 @@
++{
++  "Argv": [
++    "--model",
++    "muse-spark-1.3-contributor",
++    "--reasoning-effort",
++    "max",
++    "--workspace",
++    "<ROOT>",
++    "--yolo"
++  ],
++  "Env": [
++    "HOME=<ROOT>",
++    "MUSE_NO_AUTO_UPDATE=1",
++    "PATH=<ROOT>",
++    "XDG_CACHE_HOME=<ROOT>/managed/cache",
++    "XDG_CONFIG_HOME=<ROOT>/managed/config",
++    "XDG_DATA_HOME=<ROOT>/managed/data",
++    "XDG_STATE_HOME=<ROOT>/managed/state"
++  ],
++  "Stdin": "cGFyZW50IHN0ZGluCgD/",
++  "WorkDir": "<ROOT>"
++}
+diff --git a/cmd/curator-run/testdata/pipeline-muse-yolo.golden b/cmd/curator-run/testdata/pipeline-muse-yolo.golden
+new file mode 100644
+index 0000000..0c9e0d8
+--- /dev/null
++++ b/cmd/curator-run/testdata/pipeline-muse-yolo.golden
+@@ -0,0 +1,22 @@
++{
++  "Argv": [
++    "--model",
++    "muse-spark-1.3-contributor",
++    "--reasoning-effort",
++    "max",
++    "--workspace",
++    "<ROOT>",
++    "--yolo"
++  ],
++  "Env": [
++    "HOME=<ROOT>",
++    "MUSE_NO_AUTO_UPDATE=1",
++    "PATH=<ROOT>",
++    "XDG_CACHE_HOME=<ROOT>/managed/cache",
++    "XDG_CONFIG_HOME=<ROOT>/managed/config",
++    "XDG_DATA_HOME=<ROOT>/managed/data",
++    "XDG_STATE_HOME=<ROOT>/managed/state"
++  ],
++  "Stdin": "cGFyZW50IHN0ZGluCgD/",
++  "WorkDir": "<ROOT>"
++}
+diff --git a/cmd/curator-run/testdata/provider/main.go b/cmd/curator-run/testdata/provider/main.go
+index 031ad20..9d9ea6b 100644
+--- a/cmd/curator-run/testdata/provider/main.go
++++ b/cmd/curator-run/testdata/provider/main.go
+@@ -6,6 +6,7 @@ import (
+ 	"fmt"
+ 	"io"
+ 	"os"
++	"path/filepath"
+ 	"strconv"
+ 	"strings"
+ 	"syscall"
+@@ -25,6 +26,19 @@ func main() {
+ 		return
+ 	}
+ 	if len(os.Args) > 1 && os.Args[1] == "--version" {
++		if filepath.Base(os.Args[0]) == "muse" {
++			if len(os.Args) != 2 {
++				os.Exit(8)
++			}
++			// Muse filters test-only environment variables before probing. Serve
++			// the fixture beside this fake binary without widening its allowlist.
++			data, err := os.ReadFile(filepath.Join(filepath.Dir(os.Args[0]), "muse-version"))
++			if err != nil {
++				os.Exit(1)
++			}
++			os.Stdout.Write(data)
++			return
++		}
+ 		fmt.Fprintln(os.Stdout, os.Getenv("CURATOR_TEST_RELEASE"))
+ 		return
+ 	}
+diff --git a/go.mod b/go.mod
+index 2806749..a384b06 100644
+--- a/go.mod
++++ b/go.mod
+@@ -3,7 +3,7 @@ module github.com/relux-works/curator-agent-launcher
+ go 1.25.5
+ 
+ require (
+-	github.com/relux-works/skill-agents-management v0.5.22
++	github.com/relux-works/skill-agents-management v0.5.37
+ 	golang.org/x/sys v0.47.0
+ )
+ 
+diff --git a/go.sum b/go.sum
+index 9ac4bca..f0d0292 100644
+--- a/go.sum
++++ b/go.sum
+@@ -1,6 +1,6 @@
+ github.com/pelletier/go-toml/v2 v2.4.3 h1:GTRvJQutkOSftxIFD5xw9aepkYNuPWmVJpffdDPYVpY=
+ github.com/pelletier/go-toml/v2 v2.4.3/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8t9Stt+h56mCY=
+-github.com/relux-works/skill-agents-management v0.5.22 h1:0DXd6usDJG15LGruDq4X0YXIUS/rneOorRaYijKbhII=
+-github.com/relux-works/skill-agents-management v0.5.22/go.mod h1:wi+oH6fVUBF0bBOPs2bU7iyUhJveSAFh369CQB91ryk=
++github.com/relux-works/skill-agents-management v0.5.37 h1:AV9Tk+bQfduINDwFNk+PvqLYcC5qNOOr5U3vC+zInSc=
++github.com/relux-works/skill-agents-management v0.5.37/go.mod h1:+WXoKeo9R5EWN/X/diQkbNUV8cnPXDpHjpGFY+RnxTM=
+ golang.org/x/sys v0.47.0 h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+ golang.org/x/sys v0.47.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
+diff --git a/internal/defaults/lineup_test.go b/internal/defaults/lineup_test.go
+index 022cc3e..65b542d 100644
+--- a/internal/defaults/lineup_test.go
++++ b/internal/defaults/lineup_test.go
+@@ -69,7 +69,7 @@ func TestNewRegistryResolvesLaunchableSystems(t *testing.T) {
+ 	}
+ }
+ 
+-// TestCompleteLineupTops pins the observed v0.5.22 fallback values. The
++// TestCompleteLineupTops pins the observed v0.5.37 fallback values. The
+ // model is the Lineup leader by capability score, not the vendor's
+ // display Recommended row (claude-opus-5 for anthropic); re-verify these
+ // pins when the module pin changes. Pi ranks only the preferred runtime
+diff --git a/internal/plan/plan_test.go b/internal/plan/plan_test.go
+index a6aee48..f25a58f 100644
+--- a/internal/plan/plan_test.go
++++ b/internal/plan/plan_test.go
+@@ -434,10 +434,9 @@ func TestUnresolvedVendorScope(t *testing.T) {
+ }
+ 
+ // TestInteractiveDeclaredForMappedSystems pins the established interactive
+-// systems. Muse's separately tested bound lives in the entry-point v3 tests:
+-// the mapping alone does not imply a plugin declares interactive mode.
++// systems, including Muse after the v0.5.37 admission flip.
+ func TestInteractiveDeclaredForMappedSystems(t *testing.T) {
+-	for _, id := range []agentic.SystemID{"claude-code", "codex", "pi-native"} {
++	for _, id := range []agentic.SystemID{"claude-code", "codex", "pi-native", "muse"} {
+ 		sys, ok := agentic.Default.Lookup(id)
+ 		if !ok {
+ 			t.Fatalf("mapped system %q not registered", id)
