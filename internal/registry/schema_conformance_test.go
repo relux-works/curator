@@ -25,7 +25,7 @@ func TestAuditRecordV2SchemaCases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
+	if !conformancecoverage.IsImplementedContentHashV2Suite(suiteID) {
 		return
 	}
 	indexBytes, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))
@@ -73,7 +73,7 @@ func TestRegistryV2CarrierSchemaCases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
+	if !conformancecoverage.IsImplementedContentHashV2Suite(suiteID) {
 		return
 	}
 	indexBytes, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))

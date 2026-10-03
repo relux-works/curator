@@ -222,7 +222,7 @@ func TestMuseFragmentV3PublishedCases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if digest != conformancecoverage.MuseCandidateManifestSHA256 {
+	if !conformancecoverage.IsMuseCandidate(digest) {
 		t.Log("selected suite has no fragment-v3 family; rc.13 unchanged")
 		return
 	}

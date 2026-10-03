@@ -36,7 +36,7 @@ func TestDeferredContentHashV2CarrierCasesAreAbsentAndUnowned(t *testing.T) {
 		if !isContentHashV2Gap(gap) {
 			continue
 		}
-		if suiteID != ContentHashV2CandidateManifestSHA256 {
+		if !IsImplementedContentHashV2Suite(suiteID) {
 			t.Errorf("content-hash-v2 gap %s/%s leaked into non-candidate suite %s", gap.Family, gap.CaseID, suiteID)
 			continue
 		}
@@ -45,7 +45,7 @@ func TestDeferredContentHashV2CarrierCasesAreAbsentAndUnowned(t *testing.T) {
 	if deferredRows != 0 {
 		t.Errorf("deferred carrier gap rows = %d, want 0 for selected suite %s", deferredRows, suiteID)
 	}
-	if suiteID != ContentHashV2CandidateManifestSHA256 {
+	if !IsImplementedContentHashV2Suite(suiteID) {
 		return
 	}
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
@@ -210,13 +210,13 @@ func TestContentHashV2VectorsWhenPublished(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if suiteID != ContentHashV2CandidateManifestSHA256 {
+	if !IsImplementedContentHashV2Suite(suiteID) {
 		return
 	}
 	path := filepath.Join(root, "vectors", "content-hashes-v2.json")
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		if suiteID == ContentHashV2CandidateManifestSHA256 {
+		if IsImplementedContentHashV2Suite(suiteID) {
 			t.Fatal("candidate suite lost vectors/content-hashes-v2.json")
 		}
 		return
@@ -235,7 +235,7 @@ func TestContentHashV2VectorsWhenPublished(t *testing.T) {
 		}
 		cases = append(cases, contentHashVector{ID: id})
 	}
-	if suiteID == ContentHashV2CandidateManifestSHA256 && len(cases) != 5 {
+	if IsImplementedContentHashV2Suite(suiteID) && len(cases) != 5 {
 		t.Fatalf("candidate content-hash-v2 executable vectors = %d, want 5", len(cases))
 	}
 	RunOutcomes(t, "content-hashes-v2/vectors", cases, func(testCase contentHashVector) string {

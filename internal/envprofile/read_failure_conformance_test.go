@@ -51,8 +51,16 @@ func TestEnvironmentsReadFailureVectors(t *testing.T) {
 	if err := json.Unmarshal(payload, &vectors); err != nil {
 		t.Fatal(err)
 	}
-	if vectors.ProtocolVersion != "1.0.0-rc.13" || len(vectors.Cases) != 39 {
-		t.Fatalf("pinned read-failure vectors = protocol %q, %d cases; want rc.13 and 39 cases", vectors.ProtocolVersion, len(vectors.Cases))
+	suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantProtocol := "1.0.0-rc.13"
+	if suiteID == conformancecoverage.RC14CandidateManifestSHA256 {
+		wantProtocol = "1.0.0-rc.14"
+	}
+	if vectors.ProtocolVersion != wantProtocol || len(vectors.Cases) != 39 {
+		t.Fatalf("pinned read-failure vectors = protocol %q, %d cases; want %s and 39 cases", vectors.ProtocolVersion, len(vectors.Cases), wantProtocol)
 	}
 	var profileCases []readFailureVectorCase
 	var restoreCases []string

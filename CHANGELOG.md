@@ -5,6 +5,7 @@ All notable implementation changes are recorded here.
 ## Unreleased
 
 - Marker v3/v4 readers reject inconsistent external repository identities, substitution kinds, and effective revision widths.
+- Accept the rc.14 candidate conformance digest with exact counts and gap accounting, including the snapshot v2-write gap owned by the pin cut-over; keep rc.13 pinned and v2 writers off.
 - Windows executable resolution now proves platform ownership and every component-store hard-link origin before granting the captured System32 exception.
 
 - Unix HTTPS askpass requests the secret only after accepting the password prompt, preventing broken-pipe transport errors on refusal paths.

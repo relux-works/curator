@@ -114,7 +114,7 @@ func TestReadAuthoritativeMarkerV5SchemaCases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
+	if !conformancecoverage.IsImplementedContentHashV2Suite(suiteID) {
 		return
 	}
 	runMarkerSchemaCases(t, "install-marker-v5")
