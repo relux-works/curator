@@ -1,0 +1,521 @@
+diff --git a/.github/ci/conformance-case-counts.tsv b/.github/ci/conformance-case-counts.tsv
+index 63763a53..f8f1eb69 100644
+--- a/.github/ci/conformance-case-counts.tsv
++++ b/.github/ci/conformance-case-counts.tsv
+@@ -145,6 +145,10 @@ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	umbrella-provid
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments/header-cases	4
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments/materialization-cases	24
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	external-repository-lifecycle/status-repair-gc-cases	5
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	external-repository-lifecycle/mixed_build_cases	6
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	external-repository-lifecycle/path_shim_cases	3
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	external-repository-lifecycle/signing_cases	4
++950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	external-repository-lifecycle/transaction_cases	4
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	external-repository/lfs-pointers	10
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	external-repository/local-config-and-refs	15
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	external-repository/pack-index	8
+@@ -244,6 +248,10 @@ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-wr
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments/header-cases	4
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments/materialization-cases	24
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository-lifecycle/status-repair-gc-cases	5
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository-lifecycle/mixed_build_cases	6
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository-lifecycle/path_shim_cases	3
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository-lifecycle/signing_cases	4
++bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository-lifecycle/transaction_cases	4
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository/lfs-pointers	10
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository/local-config-and-refs	15
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository/pack-index	8
+@@ -302,3 +310,112 @@ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-reposi
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository/acquisition/clean-environment	17
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository/acquisition/common-fetch-argv	55
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository/acquisition/forbidden-fetch-features	11
++
++# rc.14 candidate: authenticated Muse corpus with updated protocol metadata.
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	agent-environment-marker-v1/schema-cases	61
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	agent-environment-marker-v2/schema-cases	27
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	agent-environment-marker-v3/schema-cases	29
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	agent-skill-v7/schema-cases	37
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	agent-skill-v8/schema-cases	66
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	audit-record-v1/schema-cases	3
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	audit-record-v2/schema-cases	3
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	build-drivers/argv-cases	5
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	build-drivers/fixed-environment-cases	3
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	build-drivers/positive-cases	8
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	build-drivers/rejection-cases	77
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	build-drivers/toolchain-cases	12
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	build-source/build-source-cases	10
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	closure/ordering-cases	3
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	content-hashes-v2/vectors	5
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	context-detectors/cases	12
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	context-lock-v1/schema-cases	32
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	context-lock-v2/schema-cases	4
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	context-versions/lock-cases	3
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	context-versions/ordering-cases	1
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	context-versions/range-cases	50
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	context-versions/resolution-cases	23
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	context-versions/satisfies-cases	63
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	context-versions/version-cases	15
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	csk-skill-v7/schema-cases	37
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	csk-skill-v8/schema-cases	66
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/posture-cases	8
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/provisioning-cases	7
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-env-passthrough/allowlist-empty-cases	6
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-env-passthrough/default-resolution-cases	7
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-env-passthrough/schema-cases	4
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-env-passthrough/surfacing-cases	6
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-env-passthrough/surfacing-order-cases	2
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-path-kind-admission/dry_run_cases	3
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-path-kind-admission/mcp_kind_cases	5
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-path-kind-admission/path_boundary_cases	14
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-read-failure/cases	37
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-read-failure/restore	2
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-store-boundary/dry_run_cases	4
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-store-boundary/repair_cases	10
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-store-boundary/resolve_cases	20
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-store-boundary/status_cases	4
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-write-nofollow/cases	11
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments/header-cases	4
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments/materialization-cases	24
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	external-repository-lifecycle/status-repair-gc-cases	5
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	external-repository-lifecycle/mixed_build_cases	6
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	external-repository-lifecycle/path_shim_cases	3
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	external-repository-lifecycle/signing_cases	4
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	external-repository-lifecycle/transaction_cases	4
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	external-repository/lfs-pointers	10
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	external-repository/local-config-and-refs	15
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	external-repository/pack-index	8
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	external-repository/raw-objects	12
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	go-host-execution-policy/capability-evidence-cases	11
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	go-host-execution-policy/identity-and-protocol-cases	14
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	go-host-execution-policy/package-influence-cases	8
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	install/dry-run-cases	3
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	interop/canonical-invalid-vectors	5
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	interop/canonical-valid-vectors	3
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	interop/identifier-vectors	13
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	interop/locale-selector-vectors	10
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	interop/manager-config-vectors	15
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	interop/source-identity-vectors	10
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	launch-env-fragment-v1/schema-cases	50
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	log-response-v3/schema-cases	2
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	manager-config-v2/schema-cases	107
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	manager-config-v2/vectors	56
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	manager-config-v3/schema-cases	5
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	manager-lifecycle/bootstrap-cases	3
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	manager-lifecycle/build-order-cases	1
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	manager-lifecycle/launcher-cases	2
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	manager-lifecycle/upgrade-cases	3
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	marker/install-marker-v2/schema-cases	14
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	marker/install-marker-v3/schema-cases	28
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	marker/install-marker-v4/schema-cases	28
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	marker/install-marker-v5/schema-cases	29
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	module-roots/vectors	10
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	portable-paths/vectors	18
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	registry-bundle-v2/schema-cases	2
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	registry-client/bootstrap-cases	10
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	registry-client/mirror-comparison-cases	5
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	registry-log-entry-v1/schema-cases	3
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	registry-log-entry-v2/schema-cases	2
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	script-host-execution-policy/executable-identity-cases	8
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	script-host-execution-policy/opt-in-cases	6
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	security-posture/vectors	17
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	shell-hook-trust/vectors	14
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	skill-build-v1/schema-cases	13
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	skillfile-dev-v2/schema-cases	16
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	skillfile-sources-v1/schema-cases	121
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	skillfile-sources-v1/semantic-cases/0	21
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	skillfile-sources-v1/semantic-cases/1	28
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	skillfile-sources-v1/semantic-cases/2	14
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	skillfile-sources-v1/semantic-cases/3	19
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	skillfile-sources-v1/semantic-cases/4	23
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	skillfile-sources-v1/snapshot-cases	3
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	snapshot-acquisition/cases	1
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	source-identities/vectors	10
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	system-config-v2/schema-cases	42
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	umbrella-provider-resolution/cases	14
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-muse/cases	16
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	launch-env-fragment-v3/schema-cases	36
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	external-repository/acquisition/cases	12
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	external-repository/acquisition/clean-environment	17
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	external-repository/acquisition/common-fetch-argv	55
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	external-repository/acquisition/forbidden-fetch-features	11
+diff --git a/.github/ci/conformance-gaps.tsv b/.github/ci/conformance-gaps.tsv
+index c4b7916b..d66d43ca 100644
+--- a/.github/ci/conformance-gaps.tsv
++++ b/.github/ci/conformance-gaps.tsv
+@@ -11,8 +11,6 @@ suite_manifest_sha256	family	case_id	owner	reason
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/provisioning-cases	b-strips-servers-keeps-rest	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/provisioning-cases	b-subtable-only-form-stripped	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ 950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/provisioning-cases	b-without-servers-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	script-host-execution-policy/executable-identity-cases	windows-exec-noncomponent-store-hardlinks	STORY-260925-1v7pvn	The production resolver accepts multiply-linked System32 targets without proving every additional link belongs to the component store.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	script-host-execution-policy/executable-identity-cases	windows-exec-unowned-file-hardlinks	STORY-260925-1v7pvn	The production resolver accepts a multiply-linked file below captured SystemRoot\System32 without proving the target is platform-owned.
+ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	a-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	b-home-empty-snapshot-no-rows	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	b-home-lists-not-inherited	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+@@ -112,6 +110,16 @@ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	registry-bundle
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	registry-bundle-v2/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	registry-log-entry-v2/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	registry-log-entry-v2/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	script-host-execution-policy/executable-identity-cases	windows-exec-noncomponent-store-hardlinks	STORY-260925-1v7pvn	The production resolver accepts multiply-linked System32 targets without proving every additional link belongs to the component store.
+-bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	script-host-execution-policy/executable-identity-cases	windows-exec-unowned-file-hardlinks	STORY-260925-1v7pvn	The production resolver accepts a multiply-linked file below captured SystemRoot\System32 without proving the target is platform-owned.
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	valid-muse-shared.json	TASK-260917-2tx81l	v3 marker emission requires the separately owned content-hash-v2 implementation; Muse emits the current v2 marker without claiming v3 support.
++
++# rc.14 retains current implementation gaps; historical Muse hash-v2 gaps do not apply.
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/posture-cases	a-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/posture-cases	b-home-empty-snapshot-no-rows	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/posture-cases	b-home-lists-not-inherited	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/posture-cases	non-codex-home-without-record-no-rows	TASK-260927-1e5qqm	The manager posture row is revision B in this vector; it remains pending the registry flip owned by this leaf.
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/posture-cases	pre-rule-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/provisioning-cases	b-empty-mcp-servers-table-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/provisioning-cases	b-strips-servers-keeps-rest	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/provisioning-cases	b-subtable-only-form-stripped	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/provisioning-cases	b-without-servers-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	snapshot-acquisition/cases	byte-exact-snapshot	TASK-261002-1foyf3	rc.14 expects curator-content-v2 writes; writer enabled at the rc.14 pin cut-over
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 1632d132..e3d44007 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -5,6 +5,7 @@ All notable implementation changes are recorded here.
+ ## Unreleased
+ 
+ - Marker v3/v4 readers reject inconsistent external repository identities, substitution kinds, and effective revision widths.
++- Accept the rc.14 candidate conformance digest with exact counts and gap accounting, including the snapshot v2-write gap owned by the pin cut-over; keep rc.13 pinned and v2 writers off.
+ - Windows executable resolution now proves platform ownership and every component-store hard-link origin before granting the captured System32 exception.
+ 
+ - Unix HTTPS askpass requests the secret only after accepting the password prompt, preventing broken-pipe transport errors on refusal paths.
+diff --git a/cmd/curator/muse_test.go b/cmd/curator/muse_test.go
+index e9248944..95412d34 100644
+--- a/cmd/curator/muse_test.go
++++ b/cmd/curator/muse_test.go
+@@ -222,7 +222,7 @@ func TestMuseFragmentV3PublishedCases(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if digest != conformancecoverage.MuseCandidateManifestSHA256 {
++	if !conformancecoverage.IsMuseCandidate(digest) {
+ 		t.Log("selected suite has no fragment-v3 family; rc.13 unchanged")
+ 		return
+ 	}
+diff --git a/internal/buildrepo/acquisition_conformance_test.go b/internal/buildrepo/acquisition_conformance_test.go
+index 2ed0dc1a..752408f3 100644
+--- a/internal/buildrepo/acquisition_conformance_test.go
++++ b/internal/buildrepo/acquisition_conformance_test.go
+@@ -51,18 +51,21 @@ type externalRepositoryAcquisitionCase struct {
+ 
+ func TestExternalRepositoryAcquisitionConformance(t *testing.T) {
+ 	vector := loadExternalRepositoryAcquisitionVector(t)
+-	if vector.ProtocolVersion != "1.0.0-rc.13" {
+-		t.Fatalf("acquisition vector protocol_version = %q, want 1.0.0-rc.13", vector.ProtocolVersion)
+-	}
+ 	manifestID, err := conformancecoverage.SelectedSuiteManifestSHA256()
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	// The Muse candidate carries byte-identical rc.13 acquisition vectors.
+-	// Admit that exact digest alongside the release, retaining refusal of
+-	// unknown suites and the digest-keyed case counts below.
+-	if manifestID != acquisitionManifestID && manifestID != conformancecoverage.MuseCandidateManifestSHA256 {
+-		t.Fatalf("selected conformance manifest = %s, want pinned rc.13 %s or Muse candidate %s", manifestID, acquisitionManifestID, conformancecoverage.MuseCandidateManifestSHA256)
++	// rc.14 changes protocol metadata while retaining the acquisition cases.
++	wantProtocol := "1.0.0-rc.13"
++	switch manifestID {
++	case acquisitionManifestID, conformancecoverage.MuseCandidateManifestSHA256:
++	case conformancecoverage.RC14CandidateManifestSHA256:
++		wantProtocol = "1.0.0-rc.14"
++	default:
++		t.Fatalf("unrecognised acquisition conformance manifest %s", manifestID)
++	}
++	if vector.ProtocolVersion != wantProtocol {
++		t.Fatalf("acquisition vector protocol_version = %q, want %s", vector.ProtocolVersion, wantProtocol)
+ 	}
+ 
+ 	t.Run("cases", func(t *testing.T) {
+diff --git a/internal/config/environments_conformance_test.go b/internal/config/environments_conformance_test.go
+index 2dacf302..1668897b 100644
+--- a/internal/config/environments_conformance_test.go
++++ b/internal/config/environments_conformance_test.go
+@@ -134,7 +134,7 @@ func TestManagerConfigV3SchemaCases(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++	if !conformancecoverage.IsImplementedContentHashV2Suite(suiteID) {
+ 		return
+ 	}
+ 	cases := schemaCaseValidity(t, root, "manager-config-v3")
+diff --git a/internal/conformancecoverage/content_hash_v2_gaps_test.go b/internal/conformancecoverage/content_hash_v2_gaps_test.go
+index 2e44d1eb..3a1c7453 100644
+--- a/internal/conformancecoverage/content_hash_v2_gaps_test.go
++++ b/internal/conformancecoverage/content_hash_v2_gaps_test.go
+@@ -36,7 +36,7 @@ func TestDeferredContentHashV2CarrierCasesAreAbsentAndUnowned(t *testing.T) {
+ 		if !isContentHashV2Gap(gap) {
+ 			continue
+ 		}
+-		if suiteID != ContentHashV2CandidateManifestSHA256 {
++		if !IsImplementedContentHashV2Suite(suiteID) {
+ 			t.Errorf("content-hash-v2 gap %s/%s leaked into non-candidate suite %s", gap.Family, gap.CaseID, suiteID)
+ 			continue
+ 		}
+@@ -45,7 +45,7 @@ func TestDeferredContentHashV2CarrierCasesAreAbsentAndUnowned(t *testing.T) {
+ 	if deferredRows != 0 {
+ 		t.Errorf("deferred carrier gap rows = %d, want 0 for selected suite %s", deferredRows, suiteID)
+ 	}
+-	if suiteID != ContentHashV2CandidateManifestSHA256 {
++	if !IsImplementedContentHashV2Suite(suiteID) {
+ 		return
+ 	}
+ 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+@@ -210,13 +210,13 @@ func TestContentHashV2VectorsWhenPublished(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if suiteID != ContentHashV2CandidateManifestSHA256 {
++	if !IsImplementedContentHashV2Suite(suiteID) {
+ 		return
+ 	}
+ 	path := filepath.Join(root, "vectors", "content-hashes-v2.json")
+ 	data, err := os.ReadFile(path)
+ 	if os.IsNotExist(err) {
+-		if suiteID == ContentHashV2CandidateManifestSHA256 {
++		if IsImplementedContentHashV2Suite(suiteID) {
+ 			t.Fatal("candidate suite lost vectors/content-hashes-v2.json")
+ 		}
+ 		return
+@@ -235,7 +235,7 @@ func TestContentHashV2VectorsWhenPublished(t *testing.T) {
+ 		}
+ 		cases = append(cases, contentHashVector{ID: id})
+ 	}
+-	if suiteID == ContentHashV2CandidateManifestSHA256 && len(cases) != 5 {
++	if IsImplementedContentHashV2Suite(suiteID) && len(cases) != 5 {
+ 		t.Fatalf("candidate content-hash-v2 executable vectors = %d, want 5", len(cases))
+ 	}
+ 	RunOutcomes(t, "content-hashes-v2/vectors", cases, func(testCase contentHashVector) string {
+diff --git a/internal/conformancecoverage/coverage.go b/internal/conformancecoverage/coverage.go
+index 59a2ac19..4d7ca1ed 100644
+--- a/internal/conformancecoverage/coverage.go
++++ b/internal/conformancecoverage/coverage.go
+@@ -36,9 +36,23 @@ const ContentHashV2CandidateManifestSHA256 = "950ee74ad148615c273fe95bbb93f1bc0f
+ // MuseCandidateManifestSHA256 identifies spec-muse-environment at d373078a.
+ const MuseCandidateManifestSHA256 = "bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783"
+ 
++// RC14CandidateManifestSHA256 identifies candidate-rc14 at e3a88ced.
++const RC14CandidateManifestSHA256 = "6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5"
++
++// IsImplementedContentHashV2Suite identifies suites whose hash-v2 cases are
++// driven through the implemented readers rather than historical gap accounting.
++func IsImplementedContentHashV2Suite(digest string) bool {
++	return digest == ContentHashV2CandidateManifestSHA256 || digest == RC14CandidateManifestSHA256
++}
++
++// IsMuseCandidate identifies suites publishing the Muse and fragment-v3 cases.
++func IsMuseCandidate(digest string) bool {
++	return digest == MuseCandidateManifestSHA256 || digest == RC14CandidateManifestSHA256
++}
++
+ // IsContentHashV2Candidate identifies suites that publish the separately owned hash-v2 families.
+ func IsContentHashV2Candidate(digest string) bool {
+-	return digest == ContentHashV2CandidateManifestSHA256 || digest == MuseCandidateManifestSHA256
++	return IsImplementedContentHashV2Suite(digest) || digest == MuseCandidateManifestSHA256
+ }
+ 
+ // Observation is the result of one published case. A failure may be accepted
+diff --git a/internal/contextlock/schema_conformance_test.go b/internal/contextlock/schema_conformance_test.go
+index 0bbfe7aa..b8355867 100644
+--- a/internal/contextlock/schema_conformance_test.go
++++ b/internal/contextlock/schema_conformance_test.go
+@@ -24,7 +24,7 @@ func TestContextLockV2SchemaCases(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++	if !conformancecoverage.IsImplementedContentHashV2Suite(suiteID) {
+ 		return
+ 	}
+ 	indexBytes, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))
+diff --git a/internal/envmarker/marker_env_schema_test.go b/internal/envmarker/marker_env_schema_test.go
+index 75bb3cd9..f41e7506 100644
+--- a/internal/envmarker/marker_env_schema_test.go
++++ b/internal/envmarker/marker_env_schema_test.go
+@@ -159,7 +159,7 @@ func TestParseAuthoritativeEnvMarkerV3SchemaCases(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++	if !conformancecoverage.IsImplementedContentHashV2Suite(suiteID) {
+ 		return
+ 	}
+ 	cases := schemaCaseValidity(t, root, "agent-environment-marker-v3")
+diff --git a/internal/envprofile/muse_test.go b/internal/envprofile/muse_test.go
+index a92dbe33..d2fc9117 100644
+--- a/internal/envprofile/muse_test.go
++++ b/internal/envprofile/muse_test.go
+@@ -13,8 +13,6 @@ import (
+ 	"github.com/relux-works/curator/internal/stateread"
+ )
+ 
+-const museSuiteDigest = "bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783"
+-
+ type museVector struct {
+ 	Name     string `json:"name"`
+ 	State    string `json:"state"`
+@@ -55,7 +53,7 @@ func TestMusePublishedLinkStates(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if digest != museSuiteDigest {
++	if !conformancecoverage.IsMuseCandidate(digest) {
+ 		t.Log("selected suite has no Muse family; rc.13 remains unchanged")
+ 		return
+ 	}
+@@ -431,7 +429,7 @@ func TestMusePublishedRegistryLayout(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if digest != museSuiteDigest {
++	if !conformancecoverage.IsMuseCandidate(digest) {
+ 		t.Log("selected suite has no Muse registry/layout; rc.13 unchanged")
+ 		return
+ 	}
+diff --git a/internal/envprofile/read_failure_conformance_test.go b/internal/envprofile/read_failure_conformance_test.go
+index dc62437a..d85c33a1 100644
+--- a/internal/envprofile/read_failure_conformance_test.go
++++ b/internal/envprofile/read_failure_conformance_test.go
+@@ -51,8 +51,16 @@ func TestEnvironmentsReadFailureVectors(t *testing.T) {
+ 	if err := json.Unmarshal(payload, &vectors); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if vectors.ProtocolVersion != "1.0.0-rc.13" || len(vectors.Cases) != 39 {
+-		t.Fatalf("pinned read-failure vectors = protocol %q, %d cases; want rc.13 and 39 cases", vectors.ProtocolVersion, len(vectors.Cases))
++	suiteID, err := conformancecoverage.SelectedSuiteManifestSHA256()
++	if err != nil {
++		t.Fatal(err)
++	}
++	wantProtocol := "1.0.0-rc.13"
++	if suiteID == conformancecoverage.RC14CandidateManifestSHA256 {
++		wantProtocol = "1.0.0-rc.14"
++	}
++	if vectors.ProtocolVersion != wantProtocol || len(vectors.Cases) != 39 {
++		t.Fatalf("pinned read-failure vectors = protocol %q, %d cases; want %s and 39 cases", vectors.ProtocolVersion, len(vectors.Cases), wantProtocol)
+ 	}
+ 	var profileCases []readFailureVectorCase
+ 	var restoreCases []string
+diff --git a/internal/interop/environments/snapshot_acquisition_test.go b/internal/interop/environments/snapshot_acquisition_test.go
+index 6f4d6bcb..2ad8a7ad 100644
+--- a/internal/interop/environments/snapshot_acquisition_test.go
++++ b/internal/interop/environments/snapshot_acquisition_test.go
+@@ -5,6 +5,7 @@ import (
+ 	"crypto/sha256"
+ 	"encoding/hex"
+ 	"encoding/json"
++	"fmt"
+ 	"io/fs"
+ 	"os"
+ 	"os/exec"
+@@ -73,8 +74,8 @@ func TestConformanceSnapshotAcquisition(t *testing.T) {
+ 	if len(vector.Cases) == 0 {
+ 		t.Fatalf("%s declares no cases", vectorPath)
+ 	}
+-	conformancecoverage.Run(t, "snapshot-acquisition/cases", vector.Cases,
+-		func(tc snapshotAcquisitionCase) string { return tc.Name }, func(t *testing.T, tc snapshotAcquisitionCase) {
++	conformancecoverage.RunOutcomes(t, "snapshot-acquisition/cases", vector.Cases,
++		func(tc snapshotAcquisitionCase) string { return tc.Name }, func(t *testing.T, tc snapshotAcquisitionCase) conformancecoverage.Observation {
+ 			fixture := rootPath(t, root, tc.Fixture)
+ 			wantHash := readRootFile(t, root, tc.Expected)
+ 			if wantHash != tc.ExpectedSHA256 {
+@@ -104,6 +105,7 @@ func TestConformanceSnapshotAcquisition(t *testing.T) {
+ 			commit := acquisitionGit(t, repo, "commit-tree", tree, "-m", "vector")
+ 			acquisitionGit(t, repo, "update-ref", "refs/heads/main", commit)
+ 
++			var hashFailures []string
+ 			for _, autocrlf := range []string{"true", "false"} {
+ 				t.Run("autocrlf="+autocrlf, func(t *testing.T) {
+ 					acquisitionGit(t, repo, "config", "core.autocrlf", autocrlf)
+@@ -156,9 +158,15 @@ func TestConformanceSnapshotAcquisition(t *testing.T) {
+ 						t.Fatal(err)
+ 					}
+ 					if got != wantHash {
+-						t.Fatalf("content hash %s, want %s", got, wantHash)
++						// Keep exercising extraction and byte checks for both
++						// settings. Only the measured hash mismatch is eligible
++						// for exact case/digest gap accounting at the parent gate.
++						reason := fmt.Sprintf("autocrlf=%s: content hash %s, want %s", autocrlf, got, wantHash)
++						t.Log(reason)
++						hashFailures = append(hashFailures, reason)
+ 					}
+ 				})
+ 			}
++			return conformancecoverage.Observation{FailureReason: strings.Join(hashFailures, "; ")}
+ 		})
+ }
+diff --git a/internal/marker/schema_coverage_test.go b/internal/marker/schema_coverage_test.go
+index d3e4b432..a2eb1c84 100644
+--- a/internal/marker/schema_coverage_test.go
++++ b/internal/marker/schema_coverage_test.go
+@@ -114,7 +114,7 @@ func TestReadAuthoritativeMarkerV5SchemaCases(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++	if !conformancecoverage.IsImplementedContentHashV2Suite(suiteID) {
+ 		return
+ 	}
+ 	runMarkerSchemaCases(t, "install-marker-v5")
+diff --git a/internal/registry/schema_conformance_test.go b/internal/registry/schema_conformance_test.go
+index 0a44025d..3a3d2e5b 100644
+--- a/internal/registry/schema_conformance_test.go
++++ b/internal/registry/schema_conformance_test.go
+@@ -25,7 +25,7 @@ func TestAuditRecordV2SchemaCases(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++	if !conformancecoverage.IsImplementedContentHashV2Suite(suiteID) {
+ 		return
+ 	}
+ 	indexBytes, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))
+@@ -73,7 +73,7 @@ func TestRegistryV2CarrierSchemaCases(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if suiteID != conformancecoverage.ContentHashV2CandidateManifestSHA256 {
++	if !conformancecoverage.IsImplementedContentHashV2Suite(suiteID) {
+ 		return
+ 	}
+ 	indexBytes, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))
+diff --git a/internal/scriptpolicy/conformance_test.go b/internal/scriptpolicy/conformance_test.go
+index 9d4c6c51..f3f2726d 100644
+--- a/internal/scriptpolicy/conformance_test.go
++++ b/internal/scriptpolicy/conformance_test.go
+@@ -493,12 +493,12 @@ func TestScriptHostExecutionPolicyProductionConsumersCoverAllCases(t *testing.T)
+ 	}
+ }
+ 
+-// The rc.13 suite changes only the release label for the unchanged
++// The rc.13 and rc.14 suites change only the release label for the unchanged
+ // script-worker-v1 identity. Keep the current and legacy labels closed so
+ // an unrelated future protocol is not admitted on the policy name alone.
+ func scriptWorkerProtocolVersionSupported(version string) bool {
+ 	switch version {
+-	case "1.0.0-rc.9", "1.0.0-rc.13":
++	case "1.0.0-rc.9", "1.0.0-rc.13", "1.0.0-rc.14":
+ 		return true
+ 	default:
+ 		return false
+@@ -513,7 +513,9 @@ func TestScriptWorkerProtocolVersionAcceptanceIsClosed(t *testing.T) {
+ 	}{
+ 		{name: "legacy rc.9 label", version: "1.0.0-rc.9", want: true},
+ 		{name: "rc.13 with unchanged identity", version: "1.0.0-rc.13", want: true},
+-		{name: "future rc.14", version: "1.0.0-rc.14", want: false},
++		{name: "rc.14 with unchanged identity", version: "1.0.0-rc.14", want: true},
++		{name: "future rc.15", version: "1.0.0-rc.15", want: false},
++		{name: "empty", version: "", want: false},
+ 	}
+ 	for _, test := range tests {
+ 		t.Run(test.name, func(t *testing.T) {
+@@ -540,7 +542,7 @@ func TestScriptExecutionPolicyIdentityMatchesTheSuite(t *testing.T) {
+ 		t.Fatalf("the suite schema_version = %d, want 1", vector.SchemaVersion)
+ 	}
+ 	if !scriptWorkerProtocolVersionSupported(vector.ProtocolVersion) {
+-		t.Fatalf("the suite protocol_version = %q, want one of the unchanged script-worker-v1 labels [1.0.0-rc.9, 1.0.0-rc.13]", vector.ProtocolVersion)
++		t.Fatalf("the suite protocol_version = %q, want one of the unchanged script-worker-v1 labels [1.0.0-rc.9, 1.0.0-rc.13, 1.0.0-rc.14]", vector.ProtocolVersion)
+ 	}
+ 	if vector.ExecutionPolicy != skillspec.ScriptExecutionPolicy {
+ 		t.Fatalf("the suite names execution policy %q; this build hard-codes %q",
