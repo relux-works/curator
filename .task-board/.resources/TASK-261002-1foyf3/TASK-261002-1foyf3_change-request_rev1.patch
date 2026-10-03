@@ -1,0 +1,185 @@
+diff --git a/.github/ci/conformance-case-counts.tsv b/.github/ci/conformance-case-counts.tsv
+index f8f1eb69..5c42754d 100644
+--- a/.github/ci/conformance-case-counts.tsv
++++ b/.github/ci/conformance-case-counts.tsv
+@@ -311,7 +311,7 @@ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-reposi
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository/acquisition/common-fetch-argv	55
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	external-repository/acquisition/forbidden-fetch-features	11
+ 
+-# rc.14 candidate: authenticated Muse corpus with updated protocol metadata.
++# Default pin: released rc.14 at 43bf0a2506d5c354a73bbc3ea4623d4653db10c7; exact manifest-scoped counts.
+ 6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	agent-environment-marker-v1/schema-cases	61
+ 6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	agent-environment-marker-v2/schema-cases	27
+ 6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	agent-environment-marker-v3/schema-cases	29
+diff --git a/.github/ci/conformance-gaps.tsv b/.github/ci/conformance-gaps.tsv
+index d66d43ca..a54453b6 100644
+--- a/.github/ci/conformance-gaps.tsv
++++ b/.github/ci/conformance-gaps.tsv
+@@ -122,4 +122,4 @@ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environme
+ 6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/provisioning-cases	b-strips-servers-keeps-rest	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ 6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/provisioning-cases	b-subtable-only-form-stripped	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ 6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/provisioning-cases	b-without-servers-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	snapshot-acquisition/cases	byte-exact-snapshot	TASK-261002-1foyf3	rc.14 expects curator-content-v2 writes; writer enabled at the rc.14 pin cut-over
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	snapshot-acquisition/cases	byte-exact-snapshot	TASK-261003-1uzji7	rc.14 expects curator-content-v2 writes; writer enabled after the atomic v1→v2 profile hash migration
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 429f1ae8..b93a8c64 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -35,12 +35,12 @@ permissions:
+ env:
+   # The one immutable committed conformance-root pin, referenced by every
+   # default and comparison job. This is curator-spec commit
+-  # curator-spec v1.0.0-rc.13 tag commit 23435129ebc4c29e5b7f75ec72a0aa0cd3f16065; its conformance/v1
+-  # manifest digest is sha256:be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca.
++  # curator-spec v1.0.0-rc.14 peeled tag commit 43bf0a2506d5c354a73bbc3ea4623d4653db10c7; its conformance/v1
++  # manifest digest is sha256:6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5.
+   # The pin is not a release qualification or a conformance claim. Candidate
+   # suites enter through the non-default `candidate-conformance` job only.
+   # The root serves the whole module; suite-plan.sh defers nothing against it.
+-  SPEC_PIN: 23435129ebc4c29e5b7f75ec72a0aa0cd3f16065
++  SPEC_PIN: 43bf0a2506d5c354a73bbc3ea4623d4653db10c7
+   # actions/setup-go only began forcing GOTOOLCHAIN=local in v6.0.0; this
+   # workflow pins @v5, so without these two lines a job may download a
+   # toolchain or read a per-user go env file. The identity step below reads
+diff --git a/docs/ci-gates.md b/docs/ci-gates.md
+index 17d279da..c9c555d0 100644
+--- a/docs/ci-gates.md
++++ b/docs/ci-gates.md
+@@ -41,7 +41,7 @@ Later contention events show why 30m was insufficient: Test (ubuntu-latest) reac
+ 
+ ## Protocol-suite pin and verification
+ 
+-The module's immutable release pin ([`internal/buildrepo/release_pin.go`](../internal/buildrepo/release_pin.go), verified by `curator-spec-pin`) remains curator-spec `v1.0.0-rc.8`. The CI conformance pin is independent and follows curator-spec v1.0.0-rc.13 tag commit `23435129ebc4c29e5b7f75ec72a0aa0cd3f16065` (conformance/v1 manifest SHA-256 `be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca`); see `SPEC_PIN` in [../.github/workflows/ci.yml](../.github/workflows/ci.yml). This is a conformance root pin, not a release qualification. The released skillfile-sources-v1 corpus is vendored from the same tag commit; its source manifest SHA-256 is `061ec05ddb1746b72168d157f81d2930047cd62371ffa46cf585844da61ee6be`.
++The module's immutable release pin ([`internal/buildrepo/release_pin.go`](../internal/buildrepo/release_pin.go), verified by `curator-spec-pin`) remains curator-spec `v1.0.0-rc.8`. The CI conformance pin is independent and follows curator-spec v1.0.0-rc.14 peeled tag commit `43bf0a2506d5c354a73bbc3ea4623d4653db10c7` (conformance/v1 manifest SHA-256 `6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5`); see `SPEC_PIN` in [../.github/workflows/ci.yml](../.github/workflows/ci.yml). This is a conformance root pin, not a release qualification. The released skillfile-sources-v1 corpus is vendored from rc.13 commit `23435129ebc4c29e5b7f75ec72a0aa0cd3f16065`; its source manifest SHA-256 is `061ec05ddb1746b72168d157f81d2930047cd62371ffa46cf585844da61ee6be`.
+ 
+ The module's separate release-check suite remains pinned to curator-spec `v1.0.0-rc.8` at commit `f8c405aa3ad0a39d260c2ed93684e55c5a346359`. `curator-spec-pin` verifies the suite manifest SHA-256 `d14e3a16bb4a01ff282791f08e3aefa269210234f41072beae6fe59b642595a1` and release metadata SHA-256 `293f101d10665061aa049efa72141f9e3c5d608bbde300e882f6e3e095e31ede`, including the empty published implementation, platform, and conformance claim sets. Run it locally with `make verify-spec-pin SPEC_PIN=f8c405aa3ad0a39d260c2ed93684e55c5a346359 CURATOR_CONFORMANCE_ROOT=/path/to/curator-spec/conformance/v1`.
+ 
+@@ -69,7 +69,7 @@ The committed protocol-suite pin is declared as `SPEC_PIN` in the workflow `env:
+ 
+ Consumers that iterate a complete published case family use the shared case-coverage harness. [`conformance-case-counts.tsv`](../.github/ci/conformance-case-counts.tsv) pins the expected case count for each family at its selected corpus revision; each run classifies every published case as driven, known-gap, bound, or skipped and requires the tally to equal that count. [`conformance-gaps.tsv`](../.github/ci/conformance-gaps.tsv) is the only place a known gap may be declared. A row is an owed implementation, never an accepted deviation: an unlisted failure fails the test, a listed case that starts passing fails until its row is removed, and a row whose case disappears fails the count or row-presence check.
+ 
+-The released v1.0.0-rc.13 root publishes the complete `skillfile-dev-v2` and `skill-build-v1` schema lists, external-repository fixtures, and the newly promoted config, environment marker, security-posture and launch-fragment cases. Measured family tallies and owned gaps were rechecked against v1.0.0-rc.13 tag commit `23435129ebc4c29e5b7f75ec72a0aa0cd3f16065`; the interim-to-release conformance diff changes protocol_version labels and manifest digests, not case IDs, so the pinned counts and gap rows remain unchanged. Tests that select one named case from a broader published vector set remain targeted checks; they do not claim to account for the complete family.
++The released v1.0.0-rc.14 root adds the content-hash-v2 vectors and versioned carriers to the rc.13 families. Manager writes remain `curator-content-v1` until the atomic v1→v2 profile hash migration in TASK-261003-1uzji7; readers retain frozen v1 compatibility and accept versioned v2 artifacts. Exact family counts are keyed by the released manifest digest in `.github/ci/conformance-case-counts.tsv`. The `snapshot-acquisition/cases` family accounts for 1/1 published cases: 0 driven, 1 known-gap (`byte-exact-snapshot`, owned by TASK-261003-1uzji7), 0 bound, 0 skipped. The production extraction path preserves exact bytes under both autocrlf settings; the expected rc.14 v2 hash remains a gap while v1 writers are selected. The nine rc.14 seed/posture B gaps remain owned by their separate flip task: `CodexSeedRevision` and `SecurityPostureRevision` remain A. Tests that select one named case from a broader published vector set remain targeted checks; they do not claim to account for the complete family.
+ 
+ The 28 manager-config overlay gaps are attributed to the unsupported `permissions`, `source_signers`, and `require_source_signers` members added by 0017/0018 and E1. Those members are present in the updated overlay cases, so `Load` can report either new blocker first; it does not indicate an overlay path-kind failure. The config regression test checks all 14 schema inputs and 14 vectors against their production results and checks both owners in each ledger row. The rc.13 script-worker root also publishes eight Windows executable-identity cases: the manager resolver drives all eight, with all eight counted as driven; the System32 exception proves owner SID, matching file IDs, and complete component-store link enumeration.
+ 
+diff --git a/internal/conformancecoverage/coverage.go b/internal/conformancecoverage/coverage.go
+index 4d7ca1ed..def6078c 100644
+--- a/internal/conformancecoverage/coverage.go
++++ b/internal/conformancecoverage/coverage.go
+@@ -36,7 +36,8 @@ const ContentHashV2CandidateManifestSHA256 = "950ee74ad148615c273fe95bbb93f1bc0f
+ // MuseCandidateManifestSHA256 identifies spec-muse-environment at d373078a.
+ const MuseCandidateManifestSHA256 = "bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783"
+ 
+-// RC14CandidateManifestSHA256 identifies candidate-rc14 at e3a88ced.
++// RC14CandidateManifestSHA256 identifies the released rc.14 default CI root
++// at 43bf0a2506d5c354a73bbc3ea4623d4653db10c7 (unchanged candidate manifest).
+ const RC14CandidateManifestSHA256 = "6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5"
+ 
+ // IsImplementedContentHashV2Suite identifies suites whose hash-v2 cases are
+diff --git a/internal/conformancecoverage/coverage_test.go b/internal/conformancecoverage/coverage_test.go
+index db090d36..c8d62004 100644
+--- a/internal/conformancecoverage/coverage_test.go
++++ b/internal/conformancecoverage/coverage_test.go
+@@ -122,3 +122,42 @@ func assertStateReadKind(t *testing.T, err error, want stateread.Kind) {
+ 		t.Fatalf("state-read kind = %q, want %q (error %v)", got.Kind, want, err)
+ 	}
+ }
++
++func TestRC14SnapshotGapRemainsOwnedByProfileHashMigration(t *testing.T) {
++	root, err := repositoryRoot()
++	if err != nil {
++		t.Fatal(err)
++	}
++	allCounts, err := readCounts(filepath.Join(root, ".github", "ci", "conformance-case-counts.tsv"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	const family = "snapshot-acquisition/cases"
++	if got := allCounts[RC14CandidateManifestSHA256][family]; got != 1 {
++		t.Fatalf("rc.14 snapshot count = %d, want 1", got)
++	}
++	gaps, err := readGaps(filepath.Join(root, ".github", "ci", "conformance-gaps.tsv"), RC14CandidateManifestSHA256)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var snapshotGaps []Gap
++	for _, gap := range gaps {
++		if gap.Family == family {
++			snapshotGaps = append(snapshotGaps, gap)
++		}
++	}
++	want := Gap{
++		Family: family, CaseID: "byte-exact-snapshot", Owner: "TASK-261003-1uzji7",
++		Reason: "rc.14 expects curator-content-v2 writes; writer enabled after the atomic v1→v2 profile hash migration",
++	}
++	if len(snapshotGaps) != 1 || snapshotGaps[0] != want {
++		t.Fatalf("rc.14 snapshot gaps = %+v, want exactly %+v", snapshotGaps, want)
++	}
++	tally, err := Check(family, []string{want.CaseID}, []Result{{CaseID: want.CaseID, FailureReason: "v1 writer remains selected"}}, snapshotGaps, 1)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if tally != (Tally{KnownGap: 1}) {
++		t.Fatalf("snapshot tally = %+v, want exactly one known gap", tally)
++	}
++}
+diff --git a/internal/hashing/hashing.go b/internal/hashing/hashing.go
+index 6d923c51..6e88f090 100644
+--- a/internal/hashing/hashing.go
++++ b/internal/hashing/hashing.go
+@@ -38,9 +38,9 @@ const (
+ )
+ 
+ // EnableV2Writers is the sole manager write cut-over for content-hash v2 and
+-// its versioned carrier shapes. SPEC_PIN remains rc.13, so production writes
+-// stay at v1 until that pin advances. TODO: enable with the rc.14 SPEC_PIN
+-// bump after the v2 carrier schemas are released.
++// its versioned carrier shapes. Production writes stay at v1 with the rc.14
++// conformance pin until the atomic v1→v2 profile hash migration ships in
++// TASK-261003-1uzji7.
+ //
+ // Tests that exercise v2 writer shapes may set this explicitly and restore it
+ // before returning.
+diff --git a/internal/hashing/hashing_v2_test.go b/internal/hashing/hashing_v2_test.go
+index 105fba02..5c1401b4 100644
+--- a/internal/hashing/hashing_v2_test.go
++++ b/internal/hashing/hashing_v2_test.go
+@@ -8,7 +8,7 @@ import (
+ 
+ func TestManagedWriterVersionDefaultsToV1(t *testing.T) {
+ 	if EnableV2Writers {
+-		t.Fatal("v2 writer switch is on by default while SPEC_PIN is rc.13")
++		t.Fatal("v2 writer switch is on before the atomic v1→v2 profile hash migration")
+ 	}
+ 	if got := WriteVersion(); got != VersionV1 {
+ 		t.Fatalf("default write version = %d, want v1", got)
+diff --git a/internal/interop/environments/snapshot_acquisition_test.go b/internal/interop/environments/snapshot_acquisition_test.go
+index 2ad8a7ad..b816f435 100644
+--- a/internal/interop/environments/snapshot_acquisition_test.go
++++ b/internal/interop/environments/snapshot_acquisition_test.go
+@@ -35,7 +35,8 @@ type snapshotAcquisitionCase struct {
+ // snapshotAcquisitionVector mirrors vectors/snapshot-acquisition.json
+ // (environments §1.2). Fields the test does not consume are left undeclared.
+ type snapshotAcquisitionVector struct {
+-	Cases []snapshotAcquisitionCase `json:"cases"`
++	Cases           []snapshotAcquisitionCase `json:"cases"`
++	ProtocolVersion string                    `json:"protocol_version"`
+ }
+ 
+ func acquisitionGit(t *testing.T, dir string, args ...string) string {
+@@ -153,7 +154,13 @@ func TestConformanceSnapshotAcquisition(t *testing.T) {
+ 					if !bytes.Contains(mixed, []byte("\r\n")) || !bytes.Contains(bytes.ReplaceAll(mixed, []byte("\r\n"), nil), []byte("\n")) {
+ 						t.Fatalf("mixed.txt lost mixed endings: %q", mixed)
+ 					}
+-					got, err := hashing.ContentSHA256(dest, nil)
++					// Historical vectors pin the frozen v1 algorithm. rc.14
++					// exercises the manager's actual new-write selection.
++					version := hashing.VersionV1
++					if vector.ProtocolVersion == "1.0.0-rc.14" {
++						version = hashing.WriteVersion()
++					}
++					got, err := hashing.ContentSHA256WithVersion(dest, nil, version)
+ 					if err != nil {
+ 						t.Fatal(err)
+ 					}
