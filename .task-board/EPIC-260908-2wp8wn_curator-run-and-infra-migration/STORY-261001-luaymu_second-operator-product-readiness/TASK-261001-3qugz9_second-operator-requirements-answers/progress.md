@@ -47,19 +47,14 @@ spawn queued: [reviewer] reviewer (claude) (run=RUN-261001-66b1d7, max_parallel=
 spawn run started: [reviewer] reviewer (claude) (run=RUN-261001-66b1d7)
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-261001-66b1d7, pid=13198, exit=0)
+Second-operator product material for this task is archived privately (relux-works/wiki, private/second-operator-migration/) under tb-R162/tb-R163; it is intentionally not kept on this public board.
 
 ## Precondition Resources
-- [op2-product-requirements.md](file://TASK-261001-3qugz9/op2-product-requirements.md)
-- [op2-product-migration-report.md](file://TASK-261001-3qugz9/op2-product-migration-report.md)
-- [op2-product-brief.md](file://TASK-261001-3qugz9/op2-product-brief.md)
 - [3qugz9-review-note.md](file://TASK-261001-3qugz9/3qugz9-review-note.md)
 
 ## Outcome Resources
 - [TASK-261001-3qugz9_spawn-log_-analyst--researcher--codex-_RUN-261001-0a854c.log](file://TASK-261001-3qugz9/TASK-261001-3qugz9_spawn-log_-analyst--researcher--codex-_RUN-261001-0a854c.log) — System spawn log captured by task-board
 - [TASK-261001-3qugz9_results.md](file://TASK-261001-3qugz9/TASK-261001-3qugz9_results.md)
-- [TASK-261001-3qugz9_evidence.json](file://TASK-261001-3qugz9/TASK-261001-3qugz9_evidence.json)
-- [TASK-261001-3qugz9_probe.py](file://TASK-261001-3qugz9/TASK-261001-3qugz9_probe.py) — Reproduction runner using prebuilt binaries and isolated HOME/config/non-git fixtures
-- [TASK-261001-3qugz9_capture-provider.py](file://TASK-261001-3qugz9/TASK-261001-3qugz9_capture-provider.py) — Stub provider captures only argv, working directory and explicit home paths
 - [TASK-261001-3qugz9_change-request_rev1.patch](file://TASK-261001-3qugz9/TASK-261001-3qugz9_change-request_rev1.patch) — Change Request CR-TASK-261001-3qugz9-1 revision 1 candidate patch (repository_delta=present, 5 changed paths)
 - [TASK-261001-3qugz9_change-request_rev1-validation.log](file://TASK-261001-3qugz9/TASK-261001-3qugz9_change-request_rev1-validation.log) — Change Request CR-TASK-261001-3qugz9-1 revision 1 bounded validation log
 - [TASK-261001-3qugz9_spawn-log_-reviewer--reviewer--claude-_RUN-261001-66b1d7.log](file://TASK-261001-3qugz9/TASK-261001-3qugz9_spawn-log_-reviewer--reviewer--claude-_RUN-261001-66b1d7.log) — System spawn log captured by task-board
@@ -69,7 +64,7 @@ spawn run completed: claude (run=RUN-261001-66b1d7, pid=13198, exit=0)
 2026-10-01T09:44:09Z
 
 ## Last Update
-2026-10-01T21:02:37Z
+2026-10-03T11:51:26Z
 
 ## Assigned To
 [reviewer] reviewer (claude)
