@@ -1,0 +1,985 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 11a613f..6c158a4 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -56,7 +56,7 @@ jobs:
+         run: go run ./tools/generate-vectors -root .
+ 
+       - name: Prove deterministic regeneration
+-        run: git diff --exit-code -- conformance/v1 conformance/candidate.json conformance/skillfile-sources-v1/manifest.json
++        run: git diff --exit-code -- conformance/v1 conformance/candidate.json conformance/skillfile-sources-v1/manifest.json release/1.0.0-rc.14.json
+ 
+   formatting:
+     name: Formatting
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index bf06e45..969b013 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -49,7 +49,7 @@ jobs:
+           python -B -m unittest discover -s tools -p 'test_*.py'
+           go test ./tools/...
+           go run ./tools/generate-vectors -root .
+-          git diff --exit-code -- conformance/v1 conformance/candidate.json conformance/skillfile-sources-v1/manifest.json
++          git diff --exit-code -- conformance/v1 conformance/candidate.json conformance/skillfile-sources-v1/manifest.json release/1.0.0-rc.14.json
+           version="${GITHUB_REF_NAME#v}"
+           python tools/release_gate.py --version "$version" --commit "$GITHUB_SHA"
+ 
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 2626393..1232768 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -5,15 +5,21 @@ Versioning for the complete specification set.
+ 
+ ## Unreleased
+ 
++## 1.0.0-rc.14 - 2026-10-02
++
+ ### Changed
+ 
+-- Restore the published rc.13 record and freeze tagged release history; track current suite digests in candidate metadata.
++- Restore the published rc.13 record and freeze tagged release history; track
++  current suite digests in candidate metadata (#122). Prepare rc.14 with its own
++  exact suite pin; unsupported implementation, platform and claim sets stay
++  empty. B3 cache pruning (#119) and source-suite content-hash v2
++  (TASK-260930-3ny11n) remain deferred.
+ 
+ - Record the operator's adoption of
+   [Decision 0019](decisions/0019-fragment-consumers-and-one-construction-site.md)
+   and [Decision 0021](decisions/0021-sessions-enter-through-curator-run.md)
+   on 2026-10-01. Add amendment backlinks in Decision 0013 and update the
+-  decision status index. Preserve proposal and normative text; protocol
++  decision status index (#120). Preserve proposal and normative text; protocol
+   and launcher specification amendments remain follow-ups.
+ 
+ ### Added
+@@ -23,11 +29,11 @@ Versioning for the complete specification set.
+   file-link liveness and refresh-fork refusals. Record the unverified refresh
+   and context surfaces, permission interface, and foreign personal context
+   isolation gap. Add `launch-env-fragment-v3` and generated Muse vectors
+-  with positive/negative cases; released schemas remain byte-identical.
++  with positive/negative cases; released schemas remain byte-identical (#121).
+ 
+ - Add an informative "Threat review for a new build driver" checklist to
+   `docs/external-build-repositories.md`, citing the normative clause behind
+-  each item. No new requirement, vector, or schema.
++  each item. No new requirement, vector, or schema (#118).
+ - Resolve K1 by defining the length-delimited `curator-content-v2` framing,
+   versioning content identities across markers, locks, audit state and registry
+   records, and requiring equal framing versions for registry matches. Add
+@@ -38,26 +44,26 @@ Versioning for the complete specification set.
+   and `source-audit-v2` adopt `hash_version` in follow-up TASK-260930-3ny11n.
+   Keep every schema in rc.13 byte-frozen, add the
+   collision/empty/ordinary/mismatch vectors, and specify the blocking NUL
+-  guard for v1 readers.
++  guard for v1 readers (#116).
+ 
+ - Specify that global add/install publish the extended profile lock before
+   in-place materialization and retain it on
+   `environment_surface_unmanaged_conflict`, with transactional surface
+   rollback and sync takeover recovery. Add ordering, lock-preservation,
+-  and `profile sync --takeover` recovery vectors.
++  and `profile sync --takeover` recovery vectors (#113).
+ - Gate `skillfile-sources-v1` schema references and protocol citations against
+   the `v1.0.0-rc.10` core baseline, preserving partial-client independence in
+   Specification CI. Its sole conditional-citation exception is the exact
+   environments §9.4 profile-lock sentence in `protocol/skillfile-sources.md`;
+   the same citation without its condition and every other post-rc.10 citation
+-  fail the gate.
++  fail the gate (#99).
+ - Clarify the S5 §10.1 repair persistence bound: a passing store entry is
+   replayed whenever a stale home is repaired, with pin verification and the
+   operator-owned protected-state boundary remaining the accepted limit. Add a
+   §7.8 row stating that Claude's strict MCP channel excludes other
+   configuration when supplied, while Codex's profile layer merges over a
+   manager-owned base. No conformance vector changed because no requirement
+-  changed.
++  changed (#115).
+ 
+ ## 1.0.0-rc.13 - 2026-09-26
+ 
+diff --git a/COMPATIBILITY.md b/COMPATIBILITY.md
+index 57030a8..12f02ae 100644
+--- a/COMPATIBILITY.md
++++ b/COMPATIBILITY.md
+@@ -272,8 +272,34 @@ root and observed consumer cases.
+ 
+ Rc.9 and earlier release metadata remain byte-frozen. The rc.13 candidate
+ metadata records rc.9 as the preceding protocol release, and the signed
+-v1.0.0-rc.13 tag is created only on the release-prep merge commit after its
+-required checks pass.
++v1.0.0-rc.13 tag preserves the published release-prep bytes.
++
++## Rc.14 release boundary
++
++Rc.14 adds length-framed `curator-content-v2` identities and new carrier
++schemas without modifying any released schema. Writers record `hash_version`;
++registry matches require equal framing versions, and v1 readers reject NUL
++paths that could alias an unframed identity. The source-suite hash-v2 carriers
++remain deferred: `skillfile-sources-v1` keeps its exact manifest and rc.10 core
++baseline. B3 cache pruning is also deferred.
++
++Muse uses the new `launch-env-fragment-v3` with four XDG parents and preserved
++HOME. Earlier fragment and marker schemas retain their bytes and meaning.
++Global add/install publish the extended profile lock before materialization
++and keep it on unmanaged conflict; transactional rollback and explicit
++`profile sync --takeover` provide recovery. Repair persistence and MCP channel
++notes clarify the existing contract. Adoption of Decisions 0019/0021 records
++the operator's decision; their normative and launcher amendments remain
++follow-ups.
++
++The [rc.14 record](release/1.0.0-rc.14.json) pins the generated candidate suite.
++Rc.13 and all earlier published records remain byte-frozen. Implementation CI
++qualifies each pin's declared scope: Go consumes the candidate core, the Python
++manager consumes rc.10 core plus the unchanged source suite, and the registry
++consumes its registry profile. Green scoped runs do not establish full rc.14
++conformance, close declared implementation gaps, or provide native evidence.
++Unsupported implementation, platform and claim sets remain empty. Portable is
++the default; no reserved hardened execution policy is claimed.
+ 
+ ## Partial-client baseline: rc.10 core plus skillfile-sources-v1
+ 
+diff --git a/Makefile b/Makefile
+index 05a1851..f12f105 100644
+--- a/Makefile
++++ b/Makefile
+@@ -11,7 +11,7 @@ regenerate:
+ regenerate-check:
+ 	python3 tools/validate.py --release-history-only
+ 	go run ./tools/generate-vectors -root .
+-	git diff --exit-code -- conformance/v1 conformance/candidate.json conformance/skillfile-sources-v1/manifest.json
++	git diff --exit-code -- conformance/v1 conformance/candidate.json conformance/skillfile-sources-v1/manifest.json release/1.0.0-rc.14.json
+ 
+ release-check: validate regenerate-check
+ 	test -n "$(VERSION)"
+diff --git a/README.md b/README.md
+index 7efe277..f493bf4 100644
+--- a/README.md
++++ b/README.md
+@@ -1,8 +1,8 @@
+ # Curator Protocol Specification
+ 
+-**Version:** 1.0.0-rc.13
++**Version:** 1.0.0-rc.14
+ 
+-**Date:** 2026-09-26
++**Date:** 2026-10-02
+ 
+ **Status:** Draft release candidate
+ 
+@@ -115,7 +115,7 @@ own result stream and against this suite's published manifest.
+ 
+ ## Release status
+ 
+-`1.0.0-rc.13` is a draft candidate. Portable remains the default CLI-only mode.
++`1.0.0-rc.14` is a draft candidate. Portable remains the default CLI-only mode.
+ Verified mode is explicit, requires the platform-neutral
+ `host-execution-provider-v1` contract, and fails before execution rather than
+ silently downgrading. Provider binaries are separately installed trusted host
+@@ -123,11 +123,12 @@ components and are never skill-vendored artifacts. This candidate specifies
+ the common contract for macOS, Linux, and Windows but ships no provider and
+ emits no verified platform claim. Exact core-suite and accepted
+ skillfile-sources-v1 identities are recorded in
+-[`release/1.0.0-rc.13.json`](release/1.0.0-rc.13.json). The source suite is
++[`release/1.0.0-rc.14.json`](release/1.0.0-rc.14.json). The source suite is
+ separately pinnable and remains consumable with core v1.0.0-rc.10; it does not
+-add a manifest schema v9 `directory` field to the core suite. Rc.9 and earlier
+-release metadata remain byte-frozen historical evidence. Review evidence is
+-published under [`reviews/`](reviews/). See
++add a manifest schema v9 `directory` field to the core suite. Rc.13 and earlier
++release metadata remain byte-frozen historical evidence. Scoped implementation
++CI does not establish full rc.14 conformance or native platform claims.
++Review evidence is published under [`reviews/`](reviews/). See
+ [COMPATIBILITY.md](COMPATIBILITY.md),
+ [SECURITY.md](SECURITY.md), and [GOVERNANCE.md](GOVERNANCE.md).
+ 
+diff --git a/SECURITY.md b/SECURITY.md
+index 1d67119..24c8ede 100644
+--- a/SECURITY.md
++++ b/SECURITY.md
+@@ -12,6 +12,28 @@ updates before publication.
+ 
+ ## Security model
+ 
++### Rc.14 security impact and claim boundary
++
++Rc.14's `curator-content-v2` length framing removes concatenation ambiguity.
++Versioned carrier identities and equal-version registry matching prevent v1/v2
++aliasing; v1 readers apply the blocking NUL-path guard. Released schemas remain
++unchanged, and the independent source suite retains its rc.10 baseline; its
++hash-v2 transition and B3 cache pruning remain deferred.
++
++Muse's shared auth file link requires liveness checks and refuses unsupported
++refresh forks. Refresh, context surfaces and foreign personal-context isolation
++remain unverified; the adapter is not evidence of fresh-login isolation. Profile
++lock publication precedes materialization, while conflict rollback preserves
++the published lock for explicit takeover recovery. The new-driver threat
++checklist is informative, and adopted Decisions 0019/0021 do not attest their
++pending implementation amendments.
++
++The [rc.14 record](release/1.0.0-rc.14.json) emits no unsupported implementation,
++verified platform or conformance claim. Scoped implementation CI establishes
++only the exercised declared scope, not full rc.14 conformance or immutable
++native provider evidence. Portable remains the default, verified mode remains
++explicit and fail-closed, and no reserved hardened execution policy is claimed.
++
+ The protocol treats skill repositories, manifests, registry responses, cache
+ entries, and bundles as untrusted input. Conforming implementations MUST apply
+ the parsing limits and validation rules in the normative documents before
+diff --git a/conformance/candidate.json b/conformance/candidate.json
+index 44ab026..0aed0ca 100644
+--- a/conformance/candidate.json
++++ b/conformance/candidate.json
+@@ -1,7 +1,7 @@
+ {
+   "core": {
+     "manifest_path": "conformance/v1/manifest.json",
+-    "manifest_sha256": "sha256:bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783"
++    "manifest_sha256": "sha256:6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5"
+   },
+   "skillfile_sources_v1": {
+     "manifest_path": "conformance/skillfile-sources-v1/manifest.json",
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index 1099215..8e72926 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -5034,7 +5034,7 @@
+     },
+     {
+       "path": "vectors/conformance-claim-v3-qualification.json",
+-      "sha256": "sha256:a601d4b561332b98ffbcc40c295bc7925f7cff1bd50bc892b6b31d6411075826"
++      "sha256": "sha256:b1fae4666fe585a85a5877414c9284c917b4e82df521ef495d006361597e66b3"
+     },
+     {
+       "path": "vectors/content-hashes-v2.json",
+@@ -5042,31 +5042,31 @@
+     },
+     {
+       "path": "vectors/context-detectors.json",
+-      "sha256": "sha256:e6cd7b1ef381afdabb533ad4530fd531931280c1ccda544a6f1f39d4b0de4d1f"
++      "sha256": "sha256:4721d928a612e3b6e38a8ef1da34845ff8a4c8789159eb7ed329b642fdd8ee3d"
+     },
+     {
+       "path": "vectors/context-versions.json",
+-      "sha256": "sha256:099b1b2f7bf73fc12d8dae63e8cfa84f732a4fa40265480e5575067136d208c4"
++      "sha256": "sha256:167644293abb19f729efdacb7534bda63acf46517d9a7036dc9b64bddacf4bce"
+     },
+     {
+       "path": "vectors/environments-codex-seed.json",
+-      "sha256": "sha256:e8fefe0f7eb8fe5692d3a5858367fbe3254f79c7acd4144635f726a35d081c83"
++      "sha256": "sha256:28a3be29763888b96cd505152b09c0ea83bad9c737420e3264e6c2a3cee41295"
+     },
+     {
+       "path": "vectors/environments-dotfile-managers.json",
+-      "sha256": "sha256:2a1501ea4af0f34955b3df8588a91c39acc4ee0649be3e044c74d61460f64d2e"
++      "sha256": "sha256:f9f9f6c3b4da54629254ab54be6fb11157ca12aaff5ea7e53d1f498fb9edccaa"
+     },
+     {
+       "path": "vectors/environments-env-passthrough.json",
+-      "sha256": "sha256:14af7a2647807280522ffc6d51d6607418c32408861932a59dc0f42d36381155"
++      "sha256": "sha256:20da88823d6c8a38ee9c9e0f0e7540631d10401c438a21db59c5c4f786886f6a"
+     },
+     {
+       "path": "vectors/environments-global-lock-publication.json",
+-      "sha256": "sha256:ad82da00fb9c70919e85c2022c1d36028219101601702ef131b6439181d14165"
++      "sha256": "sha256:1a1211058a089586538c3b5e4a4117fd2d1ee06722e04604d28e442456280dbc"
+     },
+     {
+       "path": "vectors/environments-muse.json",
+-      "sha256": "sha256:e4c3f52884751c6af96e43b73e9f80e1a1ac796f851013d5fb49974db1c754ed"
++      "sha256": "sha256:e58e22e5048c7141e584eab746c9fdf28f2ddb1b3aa6ec53177c57d89927cf22"
+     },
+     {
+       "path": "vectors/environments-path-kind-admission.json",
+@@ -5074,11 +5074,11 @@
+     },
+     {
+       "path": "vectors/environments-read-failure.json",
+-      "sha256": "sha256:d46cf7f5ca619bf0f9b6993d77171c2f95912f6f2b43bcc3c9b1043371a8a87d"
++      "sha256": "sha256:2bf951b1cc364465369e3d4c36174ce2f0d279ca4643a8b59f824dd2327cb424"
+     },
+     {
+       "path": "vectors/environments-source-signers.json",
+-      "sha256": "sha256:672c5e1a3dd28e493dbdaf7e120df422d7449c6df923e2b39931d0e517a54e10"
++      "sha256": "sha256:f6736c824f5a999888adbd9ce997c380a4d76837c88a7fbd103b7449156f7dca"
+     },
+     {
+       "path": "vectors/environments-store-boundary.json",
+@@ -5086,15 +5086,15 @@
+     },
+     {
+       "path": "vectors/environments-write-nofollow.json",
+-      "sha256": "sha256:f29c25c0f25f763a37718eff0f4b1d8b065d41ec1eb290a03961f3bb854e89b0"
++      "sha256": "sha256:8e4273fc4a6c93c8d08581c59652ae83d725cb6b4c47e541795fc6699801e6b8"
+     },
+     {
+       "path": "vectors/environments.json",
+-      "sha256": "sha256:89347fc494ad681e4193e86f4009cb5d078f61e4b3ee8aec350c3885637cb750"
++      "sha256": "sha256:adc14604b86307499014f5218b9044466a1c920c4d973c51e339bdd02913a1fa"
+     },
+     {
+       "path": "vectors/external-repository-acquisition.json",
+-      "sha256": "sha256:e8fb4420bb1d17322a50a4a87fa2dfc4ac87991afb59cab784549fd0bd35e0f1"
++      "sha256": "sha256:713d749f42ca4341d62ead1dcddded2cabbf6d24831c4652b31ec5c231e7a573"
+     },
+     {
+       "path": "vectors/external-repository-lifecycle.json",
+@@ -5102,7 +5102,7 @@
+     },
+     {
+       "path": "vectors/go-host-execution-policy.json",
+-      "sha256": "sha256:7ad40f1158fd086e5f255628f92059971fcbbfe15f15b034c0c2cde81e97a718"
++      "sha256": "sha256:45a25803620a5c1032f3f01351860cc46f541d0fad42ad18f4237f3a5dd34769"
+     },
+     {
+       "path": "vectors/identifiers.json",
+@@ -5126,7 +5126,7 @@
+     },
+     {
+       "path": "vectors/module-roots.json",
+-      "sha256": "sha256:b435878ac0c181fa655f0f3f23af400bbff969a6232e686b7ceece59df3c54b3"
++      "sha256": "sha256:bd2167cdf63760d2cad6533527e39d6991407b76d93875a89a22a8217d07cdb6"
+     },
+     {
+       "path": "vectors/portable-paths.json",
+@@ -5150,15 +5150,15 @@
+     },
+     {
+       "path": "vectors/script-host-execution-policy.json",
+-      "sha256": "sha256:ae9373879fbdc780cabaadb8ccd2a8ad2b1802f2c8caa56861163547fd4d9d00"
++      "sha256": "sha256:d9b62329401cc64db67c6515830c26381e484749ed792b525c73bfe3373cab75"
+     },
+     {
+       "path": "vectors/security-posture.json",
+-      "sha256": "sha256:1195bd85d46e877f1388bc8d7e07069a59bbc2ea9021bec22661f68f8460e0fa"
++      "sha256": "sha256:59320063359d601b815c62bb61824a4dac5bbe2aeb708840f3f80e8cb13726f4"
+     },
+     {
+       "path": "vectors/shell-hook-trust.json",
+-      "sha256": "sha256:5aae6282a7d20705cced934e811da9135dfa7e222c7411b212b1f73288c0238c"
++      "sha256": "sha256:a2b62282b33fcee8ca3f90139e4bb78d82054b20062ad0cfeacdf6b46509c453"
+     },
+     {
+       "path": "vectors/skill-manifest-resolution.json",
+@@ -5166,7 +5166,7 @@
+     },
+     {
+       "path": "vectors/snapshot-acquisition.json",
+-      "sha256": "sha256:700033ebfe7288496c9e4579a5cc33b2053ae5fba5fa3ac0b2e161ae5d5ceff3"
++      "sha256": "sha256:82ab06b761560d84b9b10daa8034823f88e399101e32ba8c5cce128cfb313d08"
+     },
+     {
+       "path": "vectors/source-identities.json",
+@@ -5174,10 +5174,10 @@
+     },
+     {
+       "path": "vectors/umbrella-provider-resolution.json",
+-      "sha256": "sha256:5758af70c9231261892ba102fe018ca1d9efad636e4443db7b0e61a4d768b332"
++      "sha256": "sha256:de5902cf15ee3cc3ed8939ed1f3ea7f98f9f6278ff26eb4e567017de5246a1af"
+     }
+   ],
+-  "generated_at": "2026-07-13T00:00:00Z",
++  "generated_at": "2026-10-02T00:00:00Z",
+   "generator": "tools/generate-vectors",
+-  "protocol_version": "1.0.0-rc.13"
++  "protocol_version": "1.0.0-rc.14"
+ }
+diff --git a/conformance/v1/vectors/conformance-claim-v3-qualification.json b/conformance/v1/vectors/conformance-claim-v3-qualification.json
+index 59d7b36..f5e1a2d 100644
+--- a/conformance/v1/vectors/conformance-claim-v3-qualification.json
++++ b/conformance/v1/vectors/conformance-claim-v3-qualification.json
+@@ -16,7 +16,7 @@
+       "status": "pending-downstream-native-evidence"
+     }
+   ],
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "rules": [
+     {
+       "name": "schema-valid-is-not-qualified",
+diff --git a/conformance/v1/vectors/context-detectors.json b/conformance/v1/vectors/context-detectors.json
+index 99790cd..de89bed 100644
+--- a/conformance/v1/vectors/context-detectors.json
++++ b/conformance/v1/vectors/context-detectors.json
+@@ -393,7 +393,7 @@
+     }
+   ],
+   "placeholder_rule": "a match whose body, after the class's placeholder_prefix, is one repeated character or ends in EXAMPLE is a placeholder and is not reported",
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "schema_version": 1,
+   "scope": [
+     "context/**",
+diff --git a/conformance/v1/vectors/context-versions.json b/conformance/v1/vectors/context-versions.json
+index 5b065c1..cb39d14 100644
+--- a/conformance/v1/vectors/context-versions.json
++++ b/conformance/v1/vectors/context-versions.json
+@@ -221,7 +221,7 @@
+       "name": "semver-precedence"
+     }
+   ],
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "range_cases": [
+     {
+       "comparator_sets": [
+diff --git a/conformance/v1/vectors/environments-codex-seed.json b/conformance/v1/vectors/environments-codex-seed.json
+index 235062e..daf2367 100644
+--- a/conformance/v1/vectors/environments-codex-seed.json
++++ b/conformance/v1/vectors/environments-codex-seed.json
+@@ -1,6 +1,6 @@
+ {
+   "schema_version": 1,
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "capability": "agent-environments",
+   "capability_revision": 1,
+   "rule": "codex provisioning seed mcp_servers handling (sections 7.4, 7.7, 7.8, 8.2, 12)",
+diff --git a/conformance/v1/vectors/environments-dotfile-managers.json b/conformance/v1/vectors/environments-dotfile-managers.json
+index 5e8a8d5..69201af 100644
+--- a/conformance/v1/vectors/environments-dotfile-managers.json
++++ b/conformance/v1/vectors/environments-dotfile-managers.json
+@@ -455,7 +455,7 @@
+     "linux",
+     "windows"
+   ],
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "rule": "environments section 9.5 dotfile-manager state table",
+   "schema_version": 1,
+   "table": [
+diff --git a/conformance/v1/vectors/environments-env-passthrough.json b/conformance/v1/vectors/environments-env-passthrough.json
+index 469d0bd..9518cb8 100644
+--- a/conformance/v1/vectors/environments-env-passthrough.json
++++ b/conformance/v1/vectors/environments-env-passthrough.json
+@@ -173,7 +173,7 @@
+       ]
+     }
+   ],
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "s4_profiles": [
+     "s4-enforce",
+     "s4-warn"
+diff --git a/conformance/v1/vectors/environments-global-lock-publication.json b/conformance/v1/vectors/environments-global-lock-publication.json
+index f5d4d04..fe6f8a0 100644
+--- a/conformance/v1/vectors/environments-global-lock-publication.json
++++ b/conformance/v1/vectors/environments-global-lock-publication.json
+@@ -112,7 +112,7 @@
+     "global add",
+     "global install"
+   ],
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "rule": "protocol/environments.md section 9.4 and profiles/manager.md sections 2.5, 2.6, and 12.3",
+   "schema_version": 1,
+   "takeover_carriers": [
+diff --git a/conformance/v1/vectors/environments-muse.json b/conformance/v1/vectors/environments-muse.json
+index 995ef4a..7de4558 100644
+--- a/conformance/v1/vectors/environments-muse.json
++++ b/conformance/v1/vectors/environments-muse.json
+@@ -200,7 +200,7 @@
+     "marker": "expected/environments-muse/muse-marker.json"
+   },
+   "normative": "protocol/environments.md sections 7.1, 7.4, and 10.2",
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "registry": {
+     "environment": "muse",
+     "exec_yolo": [
+diff --git a/conformance/v1/vectors/environments-read-failure.json b/conformance/v1/vectors/environments-read-failure.json
+index 49481e5..8e3d535 100644
+--- a/conformance/v1/vectors/environments-read-failure.json
++++ b/conformance/v1/vectors/environments-read-failure.json
+@@ -601,7 +601,7 @@
+     "absent",
+     "present"
+   ],
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "rule": "protocol/environments.md section 8.4.1: a failed read, stat, or parse of any state or surface file is never reported as absence. Each case pins one file class (marker, lock, provisioning seed, credential passthrough entry, backup-record inventory) to its typed, present-or-absent discriminating inputs and the expected diagnostic. Failure classes: permission-denied (EACCES-class), io-error (EIO-class), unparseable-content (bytes fail decoding or parsing), schema-invalid-content (parsed content fails schema validation for a reason other than version), symlink-where-regular-required, directory-where-file-expected, parent-not-directory (ENOTDIR-class: the entry exists but a path component above it is not a directory, so the open fails). presence/entry_kind are ground truth: permission-denied and io-error strike at the open/read stage after lstat. Boundary verification precedes readability classification (sections 1.3, 4, 8.2, 10.1): a marker failure that violates the section 4 contract, or that prevents proving the boundary (symlink, directory, or unstatable marker path), is environment_store_untrusted and is outside this family; the marker cases therefore cover the open/read/parse stages only. Seed unparseable-content applies where the seed path parses (the codex_cli revision-B mcp_servers strip, which MUST parse as TOML); elsewhere seeds are unparsed byte copies. Passthrough entries carry no content and require a link, so unparseable-content, schema-invalid-content, and symlink-where-regular-required do not apply to them; a directory at the entry path is 'no longer a symlink' and stays detached-side. currency 'unknown' pins the section 8.4.1 rule that an unreadable file makes the affected row non-current with currency unknown; absence-side outcomes carry currency 'known'. repair_relinks pins that --repair re-links a detached entry and leaves an unreadable entry untouched. repair is env resolve --repair and update is profile update (sections 10.1, 9.2): against an unreadable lock both refuse with environment_store_untrusted and rebuild nothing (rebuilt) and write nothing (written), repair emitting no fragment; restore restores the newest backup generation (env unmanage --restore-backups, section 9.2) and stops before mutating (written) when the generations inventory cannot be established. The backup-record class covers the generations inventory: an unreadable inventory is environment_backup_record_unreadable with currency unknown, while a known-empty inventory is current with currency known.",
+   "schema_version": 1,
+   "story": "STORY-260916-1ll22r"
+diff --git a/conformance/v1/vectors/environments-source-signers.json b/conformance/v1/vectors/environments-source-signers.json
+index 3e0728b..484ba25 100644
+--- a/conformance/v1/vectors/environments-source-signers.json
++++ b/conformance/v1/vectors/environments-source-signers.json
+@@ -1,6 +1,6 @@
+ {
+   "schema_version": 1,
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "capability": "agent-environments",
+   "capability_revision": 1,
+   "rule": "source signer allowlist and update-delta confirmation (sections 1.4, 9.2, 12)",
+diff --git a/conformance/v1/vectors/environments-write-nofollow.json b/conformance/v1/vectors/environments-write-nofollow.json
+index 6cd84e5..5d20f96 100644
+--- a/conformance/v1/vectors/environments-write-nofollow.json
++++ b/conformance/v1/vectors/environments-write-nofollow.json
+@@ -288,7 +288,7 @@
+     "replaced",
+     "refused"
+   ],
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "rule": "protocol/environments.md section 8.3.1: a materialization, takeover, repair, or backup write replaces the directory entry (operation-private temp file plus rename) and MUST NOT follow a symlink at the target path or at any path component below the managed root that the manager did not create in this operation. link_points 'outside' means outside the managed root (hence outside the profile store, the section 9.5 foreign-manager stop); link_points 'store' means into the profile store.",
+   "schema_version": 1,
+   "target_kinds": [
+diff --git a/conformance/v1/vectors/environments.json b/conformance/v1/vectors/environments.json
+index c9b372f..2428c6f 100644
+--- a/conformance/v1/vectors/environments.json
++++ b/conformance/v1/vectors/environments.json
+@@ -2885,6 +2885,6 @@
+     }
+   ],
+   "part_rule": "every part ends with exactly one LF; the document is the parts joined with exactly one additional LF between adjacent parts",
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "schema_version": 1
+ }
+diff --git a/conformance/v1/vectors/external-repository-acquisition.json b/conformance/v1/vectors/external-repository-acquisition.json
+index 1f07cc8..9889f7d 100644
+--- a/conformance/v1/vectors/external-repository-acquisition.json
++++ b/conformance/v1/vectors/external-repository-acquisition.json
+@@ -209,5 +209,5 @@
+     "stdin-refspec",
+     "tag-auto-follow"
+   ],
+-  "protocol_version": "1.0.0-rc.13"
++  "protocol_version": "1.0.0-rc.14"
+ }
+diff --git a/conformance/v1/vectors/go-host-execution-policy.json b/conformance/v1/vectors/go-host-execution-policy.json
+index f91da7a..97804bf 100644
+--- a/conformance/v1/vectors/go-host-execution-policy.json
++++ b/conformance/v1/vectors/go-host-execution-policy.json
+@@ -1050,7 +1050,7 @@
+     "fingerprinted-goroot-bin-go",
+     "fingerprinted-goroot-pkg-tool-child"
+   ],
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "reserved_hardened_execution_policy": "hardened-worker-v1",
+   "schema_version": 1,
+   "session_states": [
+diff --git a/conformance/v1/vectors/module-roots.json b/conformance/v1/vectors/module-roots.json
+index 68e893c..8585669 100644
+--- a/conformance/v1/vectors/module-roots.json
++++ b/conformance/v1/vectors/module-roots.json
+@@ -388,6 +388,6 @@
+     "go-list-vendor-consistency",
+     "directive-form-and-bijection-before-go-build"
+   ],
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "schema_version": 1
+ }
+diff --git a/conformance/v1/vectors/script-host-execution-policy.json b/conformance/v1/vectors/script-host-execution-policy.json
+index 52c976a..4c082c8 100644
+--- a/conformance/v1/vectors/script-host-execution-policy.json
++++ b/conformance/v1/vectors/script-host-execution-policy.json
+@@ -799,6 +799,6 @@
+       "worker_started": true
+     }
+   ],
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "schema_version": 1
+ }
+diff --git a/conformance/v1/vectors/security-posture.json b/conformance/v1/vectors/security-posture.json
+index f4abc95..14c2b0e 100644
+--- a/conformance/v1/vectors/security-posture.json
++++ b/conformance/v1/vectors/security-posture.json
+@@ -1,6 +1,6 @@
+ {
+   "schema_version": 1,
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "capability": "security-posture",
+   "findings": [
+     "S1",
+diff --git a/conformance/v1/vectors/shell-hook-trust.json b/conformance/v1/vectors/shell-hook-trust.json
+index d58f0ae..a7dee7c 100644
+--- a/conformance/v1/vectors/shell-hook-trust.json
++++ b/conformance/v1/vectors/shell-hook-trust.json
+@@ -36,7 +36,7 @@
+     ".agents/env.ps1"
+   ],
+   "finding": "S6",
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "rollout_profiles": [
+     {
+       "description": "Revision A warning release: sources unapproved and changed files but emits the diagnostic with a migration hint naming curator hook approve <path>; shipped first",
+diff --git a/conformance/v1/vectors/snapshot-acquisition.json b/conformance/v1/vectors/snapshot-acquisition.json
+index 978d30c..bfc4039 100644
+--- a/conformance/v1/vectors/snapshot-acquisition.json
++++ b/conformance/v1/vectors/snapshot-acquisition.json
+@@ -42,7 +42,7 @@
+       "name": "byte-exact-snapshot"
+     }
+   ],
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "rule": "environments.md section 1.2: a snapshot produced from a commit contains, for every regular-file entry of the commit's tree, exactly the committed blob bytes; working-tree conversion and attribute-driven archive processing never alter, add, or omit an entry",
+   "schema_version": 1
+ }
+diff --git a/conformance/v1/vectors/umbrella-provider-resolution.json b/conformance/v1/vectors/umbrella-provider-resolution.json
+index 5e80025..d980cce 100644
+--- a/conformance/v1/vectors/umbrella-provider-resolution.json
++++ b/conformance/v1/vectors/umbrella-provider-resolution.json
+@@ -590,7 +590,7 @@
+       "unreadable_dirs": []
+     }
+   ],
+-  "protocol_version": "1.0.0-rc.13",
++  "protocol_version": "1.0.0-rc.14",
+   "revision_a_profile": "warning release: PATH selects, outside trust roots warns with subcommand_provider_outside_trust_roots",
+   "revision_b_profile": "flip release: trust roots only, PATH probe diagnostic, refused with subcommand_provider_untrusted",
+   "rule": "umbrella provider trust roots (section 11)",
+diff --git a/release/1.0.0-rc.14.json b/release/1.0.0-rc.14.json
+new file mode 100644
+index 0000000..29d8995
+--- /dev/null
++++ b/release/1.0.0-rc.14.json
+@@ -0,0 +1,47 @@
++{
++  "assurance": {
++    "default_mode": "portable",
++    "portable_execution_policy": "manager-worker-v1",
++    "portable_policy": "portable-cli-policy-v1",
++    "silent_downgrade_permitted": false,
++    "skill_vendored_provider_allowed": false,
++    "verified_execution_policy": "verified-provider-execution-v1",
++    "verified_implementations": [],
++    "verified_platform_claims": [],
++    "verified_policy": "verified-provider-policy-v1",
++    "verified_provider_contract": "host-execution-provider-v1"
++  },
++  "candidate_protocol_pin": {
++    "manifest_sha256": "sha256:6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5",
++    "suite_root": "conformance/v1"
++  },
++  "claim_v5": {
++    "claim_protocol_version": "1.0.0-rc.9",
++    "claims_emitted": [],
++    "schema": "schemas/v1/conformance-claim-v5.schema.json"
++  },
++  "created_at": "2026-10-02T00:00:00Z",
++  "downstream_consumption": {
++    "committed_release_pin_advanced": false,
++    "environment": "CURATOR_CONFORMANCE_ROOT",
++    "required_manifest_sha256": "sha256:6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5"
++  },
++  "historical_release": {
++    "immutable": true,
++    "metadata_path": "release/1.0.0-rc.9.json",
++    "metadata_sha256": "sha256:a0c58ff5e44bc93c013e4c7526573c2fc7e2467a67455b6898647db6a0879f82",
++    "protocol_version": "1.0.0-rc.9",
++    "source_commit": "0ed5c691e9208eea52f21db2fc05e226ce3516fd"
++  },
++  "legacy_release": "1.0.0-rc.9",
++  "protocol_version": "1.0.0-rc.14",
++  "skillfile_sources_v1": {
++    "compatible_core": {
++      "manifest_sha256": "sha256:803918bf8672f76cf990985e51db213b826674cd5bb54fbf47731b8404b44403",
++      "tag": "v1.0.0-rc.10"
++    },
++    "manifest_path": "conformance/skillfile-sources-v1/manifest.json",
++    "manifest_sha256": "sha256:061ec05ddb1746b72168d157f81d2930047cd62371ffa46cf585844da61ee6be"
++  },
++  "source_baseline_commit": "0ed5c691e9208eea52f21db2fc05e226ce3516fd"
++}
+diff --git a/tools/generate-vectors/main.go b/tools/generate-vectors/main.go
+index 41f1946..367c1d7 100644
+--- a/tools/generate-vectors/main.go
++++ b/tools/generate-vectors/main.go
+@@ -23,7 +23,8 @@ import (
+ )
+ 
+ const (
+-	protocolVersion                   = "1.0.0-rc.13"
++	protocolVersion                   = "1.0.0-rc.14"
++	releaseTime                       = "2026-10-02T00:00:00Z"
+ 	conformanceClaimV5ProtocolVersion = "1.0.0-rc.9"
+ 	conformanceClaimV1ProtocolVersion = "1.0.0-rc.3"
+ 	conformanceClaimV2ProtocolVersion = "1.0.0-rc.4"
+@@ -4767,7 +4768,7 @@ func writeManifest(suite string) {
+ 		parts := strings.SplitN(line, "\t", 2)
+ 		entries = append(entries, map[string]any{"path": parts[0], "sha256": parts[1]})
+ 	}
+-	writeJSON(filepath.Join(suite, "manifest.json"), map[string]any{"protocol_version": protocolVersion, "generated_at": fixedTime, "generator": "tools/generate-vectors", "files": entries})
++	writeJSON(filepath.Join(suite, "manifest.json"), map[string]any{"protocol_version": protocolVersion, "generated_at": releaseTime, "generator": "tools/generate-vectors", "files": entries})
+ }
+ 
+ func writeJSON(path string, value any) {
+diff --git a/tools/generate-vectors/main_test.go b/tools/generate-vectors/main_test.go
+index 9901bfd..20e4170 100644
+--- a/tools/generate-vectors/main_test.go
++++ b/tools/generate-vectors/main_test.go
+@@ -858,8 +858,8 @@ func TestRC13ReleaseMetadataPinsPublishedCoreAndAcceptedSourceSuites(t *testing.
+ 	sum := sha256.Sum256(manifest)
+ 	manifestIdentity := "sha256:" + hex.EncodeToString(sum[:])
+ 	metadata := readObject(t, filepath.Join(root, "release", "1.0.0-rc.13.json"))
+-	if metadata["protocol_version"] != protocolVersion {
+-		t.Fatalf("rc.13 release protocol_version = %v, want %s", metadata["protocol_version"], protocolVersion)
++	if metadata["protocol_version"] != "1.0.0-rc.13" {
++		t.Fatalf("rc.13 release protocol_version = %v, want 1.0.0-rc.13", metadata["protocol_version"])
+ 	}
+ 	pin := metadata["candidate_protocol_pin"].(map[string]any)
+ 	downstream := metadata["downstream_consumption"].(map[string]any)
+@@ -898,6 +898,35 @@ func TestRC13ReleaseMetadataPinsPublishedCoreAndAcceptedSourceSuites(t *testing.
+ 	}
+ }
+ 
++func TestRC14ReleaseMetadataPinsCandidateAndPreservesSourceBaseline(t *testing.T) {
++	root := repositoryRoot(t)
++	manifest, err := os.ReadFile(filepath.Join(root, "conformance", "v1", "manifest.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	metadata := readObject(t, filepath.Join(root, "release", "1.0.0-rc.14.json"))
++	if metadata["protocol_version"] != protocolVersion || metadata["created_at"] != releaseTime {
++		t.Fatalf("rc.14 version/date mismatch: %#v", metadata)
++	}
++	manifestObject := readObject(t, filepath.Join(root, "conformance", "v1", "manifest.json"))
++	if manifestObject["protocol_version"] != protocolVersion || manifestObject["generated_at"] != releaseTime {
++		t.Fatalf("rc.14 manifest version/date mismatch: %#v", manifestObject)
++	}
++	pin := metadata["candidate_protocol_pin"].(map[string]any)
++	downstream := metadata["downstream_consumption"].(map[string]any)
++	if pin["suite_root"] != "conformance/v1" || pin["manifest_sha256"] != sha256Identity(manifest) ||
++		downstream["required_manifest_sha256"] != sha256Identity(manifest) ||
++		downstream["committed_release_pin_advanced"] != false {
++		t.Fatalf("rc.14 does not pin the generated candidate: %#v", metadata)
++	}
++	historical := readObject(t, filepath.Join(root, "release", "1.0.0-rc.13.json"))
++	for _, field := range []string{"skillfile_sources_v1", "historical_release", "claim_v5", "assurance", "source_baseline_commit", "legacy_release"} {
++		if !reflect.DeepEqual(metadata[field], historical[field]) {
++			t.Fatalf("rc.14 changed the source baseline, historical identity or claim boundary: %s", field)
++		}
++	}
++}
++
+ func TestAssuranceModesAreClosedFailClosedAndNonAliasing(t *testing.T) {
+ 	root := repositoryRoot(t)
+ 	vector := readObject(t, filepath.Join(root, "conformance", "v1", "vectors", "assurance-modes.json"))
+@@ -938,7 +967,7 @@ func TestAssuranceModesAreClosedFailClosedAndNonAliasing(t *testing.T) {
+ 		}
+ 	}
+ 	if claims := vector["release_claims"].([]any); len(claims) != 0 {
+-		t.Fatalf("rc.13 fabricates verified claims: %#v", claims)
++		t.Fatalf("current candidate fabricates verified claims: %#v", claims)
+ 	}
+ }
+ 
+diff --git a/tools/generate-vectors/schema_cases_preservation_test.go b/tools/generate-vectors/schema_cases_preservation_test.go
+index 13441c9..ae03fc9 100644
+--- a/tools/generate-vectors/schema_cases_preservation_test.go
++++ b/tools/generate-vectors/schema_cases_preservation_test.go
+@@ -39,8 +39,8 @@ func TestGeneratorPreservesHandAuthoredSchemaCases(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if len(releaseEntries) != 7 {
+-		t.Fatalf("release coverage = %d/7", len(releaseEntries))
++	if len(releaseEntries) != 8 {
++		t.Fatalf("release coverage = %d/8", len(releaseEntries))
+ 	}
+ 	releaseBytes := map[string][]byte{}
+ 	releaseInfo := map[string]os.FileInfo{}
+@@ -116,7 +116,9 @@ func TestGeneratorPreservesHandAuthoredSchemaCases(t *testing.T) {
+ 	}
+ 	// Regeneration must not silently repair missing publication evidence either.
+ 	rc13Path := filepath.Join(root, "release", "1.0.0-rc.13.json")
++	rc14Path := filepath.Join(root, "release", "1.0.0-rc.14.json")
+ 	must(os.Remove(rc13Path))
++	must(os.Remove(rc14Path))
+ 	cmd = exec.Command("go", "run", ".", "-root", root)
+ 	if output, err := cmd.CombinedOutput(); err != nil {
+ 		t.Fatalf("second generator run failed: %v\n%s", err, output)
+@@ -124,8 +126,11 @@ func TestGeneratorPreservesHandAuthoredSchemaCases(t *testing.T) {
+ 	if _, err := os.Stat(rc13Path); !os.IsNotExist(err) {
+ 		t.Fatalf("generator recreated published rc.13 record: %v", err)
+ 	}
+-	if _, err := os.Stat(filepath.Join(root, "release", "1.0.0-rc.14.json")); !os.IsNotExist(err) {
+-		t.Fatalf("generator created an rc.14 record: %v", err)
++	if _, err := os.Stat(rc14Path); !os.IsNotExist(err) {
++		t.Fatalf("generator recreated candidate rc.14 record: %v", err)
++	}
++	if _, err := os.Stat(filepath.Join(root, "release", "1.0.0-rc.15.json")); !os.IsNotExist(err) {
++		t.Fatalf("generator created an rc.15 record: %v", err)
+ 	}
+ 	// Assert the real CLI entry emits the Muse family and schema cases,
+ 	// rather than proving only that an uncalled helper can emit them.
+diff --git a/tools/release_gate.py b/tools/release_gate.py
+index e6cf9f4..db01042 100644
+--- a/tools/release_gate.py
++++ b/tools/release_gate.py
+@@ -39,7 +39,7 @@ RETIRED_DESCRIPTOR_STEM = "curator" + "-build"
+ # The schema-6 build-source digest algorithm namespace shares the retired stem
+ # but is a different, byte-frozen identifier.
+ BUILD_SOURCE_ALGORITHM_NAMESPACE = RETIRED_DESCRIPTOR_STEM + "-source"
+-PROTOCOL_VERSION = "1.0.0-rc.13"
++PROTOCOL_VERSION = "1.0.0-rc.14"
+ RC9_PROTOCOL_VERSION = "1.0.0-rc.9"
+ RC8_PROTOCOL_VERSION = "1.0.0-rc.8"
+ RC7_PROTOCOL_VERSION = "1.0.0-rc.7"
+@@ -579,7 +579,7 @@ def validate_protocol_artifacts(version: str) -> None:
+         or assurance.get("skill_vendored_provider_allowed") is not False
+     ):
+         raise ReleaseFailure(
+-            "rc.13 metadata rewrites rc.9 evidence or fabricates a verified claim"
++            f"{PROTOCOL_VERSION} metadata rewrites rc.9 evidence or fabricates a verified claim"
+         )
+     validate_skillfile_sources_manifest(release)
+ 
+@@ -674,7 +674,7 @@ def validate_skillfile_sources_manifest(release: dict[str, Any]) -> None:
+             "manifest_sha256": RC10_CORE_MANIFEST_SHA256,
+         }
+     ):
+-        raise ReleaseFailure("rc.13 metadata does not pin the accepted source suite separately")
++        raise ReleaseFailure(f"{PROTOCOL_VERSION} metadata does not pin the accepted source suite separately")
+ 
+ 
+ def validate_conformance_claim(path: Path, version: str) -> None:
+diff --git a/tools/test_release_gate.py b/tools/test_release_gate.py
+index 7d8523d..0720e07 100644
+--- a/tools/test_release_gate.py
++++ b/tools/test_release_gate.py
+@@ -272,8 +272,8 @@ class StableReleaseGateTests(unittest.TestCase):
+                 release_gate.validate_version(version)
+ 
+ 
+-class ProtocolRC13ReleaseGateTests(unittest.TestCase):
+-    VERSION = "1.0.0-rc.13"
++class ProtocolRC14ReleaseGateTests(unittest.TestCase):
++    VERSION = "1.0.0-rc.14"
+ 
+     def setUp(self) -> None:
+         self.temporary = tempfile.TemporaryDirectory()
+@@ -310,7 +310,7 @@ class ProtocolRC13ReleaseGateTests(unittest.TestCase):
+             self.fail(f"manifest does not list {relative}")
+         self._write_json(manifest_path, manifest)
+ 
+-    def test_accepts_complete_rc13_artifact_set(self) -> None:
++    def test_accepts_complete_rc14_artifact_set(self) -> None:
+         release_gate.validate_protocol_artifacts(self.VERSION)
+ 
+     def test_rejects_changed_published_rc9_release_metadata(self) -> None:
+@@ -471,7 +471,7 @@ class ProtocolRC13ReleaseGateTests(unittest.TestCase):
+         ):
+             release_gate.validate_protocol_artifacts(self.VERSION)
+ 
+-    def test_rejects_rc13_history_rewriting_rc9_identity(self) -> None:
++    def test_rejects_rc14_history_rewriting_rc9_identity(self) -> None:
+         path = self.root / "release" / f"{self.VERSION}.json"
+         metadata = json.loads(path.read_text(encoding="utf-8"))
+         metadata["historical_release"]["metadata_sha256"] = "sha256:" + "0" * 64
+@@ -491,7 +491,7 @@ class ProtocolRC13ReleaseGateTests(unittest.TestCase):
+         ):
+             release_gate.validate_conformance_claim(path, "1.0.0-rc.6")
+ 
+-    def test_rejects_stale_rc13_suite_pin(self) -> None:
++    def test_rejects_stale_rc14_suite_pin(self) -> None:
+         path = self.root / "release" / f"{self.VERSION}.json"
+         metadata = json.loads(path.read_text(encoding="utf-8"))
+         metadata["candidate_protocol_pin"]["manifest_sha256"] = (
+@@ -503,18 +503,13 @@ class ProtocolRC13ReleaseGateTests(unittest.TestCase):
+         ):
+             release_gate.validate_version(self.VERSION)
+ 
+-    def test_rejects_rc13_silent_downgrade_or_claim_fabrication(self) -> None:
+-        # This publication-policy test uses rc.13's published corpus. The
+-        # worktree corpus may have advanced independently as a new candidate.
+-        manifest = subprocess.check_output(
+-            ["git", "show", "v1.0.0-rc.13:conformance/v1/manifest.json"],
+-            cwd=SOURCE_ROOT,
+-        )
+-        (self.root / "conformance" / "v1" / "manifest.json").write_bytes(manifest)
++    def test_rejects_rc14_silent_downgrade_or_claim_fabrication(self) -> None:
+         release_gate.validate_version(self.VERSION)
+         path = self.root / "release" / f"{self.VERSION}.json"
+         base = json.loads(path.read_text(encoding="utf-8"))
+         for field, value in (
++            ("default_mode", "verified"),
++            ("portable_execution_policy", "hardened-worker-v1"),
+             ("silent_downgrade_permitted", True),
+             ("verified_implementations", ["unqualified"]),
+             ("verified_platform_claims", ["linux"]),
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index 5f0a624..ebe4b48 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -80,6 +80,22 @@ class ReleasedSchemaImmutabilityTests(unittest.TestCase):
+ class ReleasedRecordImmutabilityTests(unittest.TestCase):
+     RECORDS = tuple(f"release/1.0.0-rc.{number}.json" for number in (5, 6, 7, 8, 9, 13))
+ 
++    def test_rc14_candidate_keeps_rc13_as_published_history_anchor(self) -> None:
++        self.assertEqual(validate.PROTOCOL_VERSION, "1.0.0-rc.14")
++        self.assertEqual(validate.LATEST_RELEASED_PROTOCOL_VERSION, "1.0.0-rc.13")
++        self.assertNotIn("release/1.0.0-rc.14.json", validate.published_release_records())
++        validate.validate_released_schema_immutability()
++
++    def test_missing_published_baseline_tag_is_rejected(self) -> None:
++        with patch.object(validate, "LATEST_RELEASED_PROTOCOL_VERSION", "99.0.0"):
++            status, stderr = self.run_main()
++            with self.assertRaisesRegex(
++                validate.ValidationFailure, "cannot inspect released schemas at v99.0.0"
++            ):
++                validate.validate_released_schema_immutability()
++        self.assertEqual(status, 1)
++        self.assertIn("cannot inspect published release records", stderr)
++
+     def run_main(self) -> tuple[int, str]:
+         stdout, stderr = io.StringIO(), io.StringIO()
+         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+@@ -1540,6 +1556,7 @@ class WorkflowRegenerationScopeTests(unittest.TestCase):
+         "conformance/v1",
+         "conformance/candidate.json",
+         "conformance/skillfile-sources-v1/manifest.json",
++        "release/1.0.0-rc.14.json",
+     )
+ 
+     def regeneration_diff_scope(self, path: Path) -> tuple[str, ...]:
+diff --git a/tools/validate.py b/tools/validate.py
+index 044cb01..cf0adaf 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -26,7 +26,10 @@ SUITE = ROOT / "conformance" / "v1"
+ REVIEWS = ROOT / "reviews"
+ _VALID_SCHEMA_DOCUMENTS: set[bytes] = set()
+ SAFE_INTEGER = 9_007_199_254_740_991
+-PROTOCOL_VERSION = "1.0.0-rc.13"
++PROTOCOL_VERSION = "1.0.0-rc.14"
++# Release preparation advances the candidate before its tag exists. Historical
++# guards remain anchored to the latest published release until publication.
++LATEST_RELEASED_PROTOCOL_VERSION = "1.0.0-rc.13"
+ RC9_PROTOCOL_VERSION = "1.0.0-rc.9"
+ RC8_PROTOCOL_VERSION = "1.0.0-rc.8"
+ RC7_PROTOCOL_VERSION = "1.0.0-rc.7"
+@@ -136,7 +139,7 @@ def load_json(path: Path) -> Any:
+ 
+ def validate_released_schema_immutability() -> None:
+     """Require every schema shipped by the latest release tag to remain byte-identical."""
+-    tag = f"v{PROTOCOL_VERSION}"
++    tag = f"v{LATEST_RELEASED_PROTOCOL_VERSION}"
+     listed = subprocess.run(
+         ["git", "ls-tree", "-r", "-z", tag, "--", "schemas"],
+         cwd=ROOT,
+@@ -232,7 +235,7 @@ def published_release_records() -> dict[str, tuple[str, bytes]]:
+             raise ValidationFailure(f"cannot inspect published release records: {detail}")
+         return result.stdout
+ 
+-    latest = f"v{PROTOCOL_VERSION}"
++    latest = f"v{LATEST_RELEASED_PROTOCOL_VERSION}"
+     git("rev-parse", "--verify", f"refs/tags/{latest}^{{commit}}")
+     tags = git("tag", "--list", "v*", "--sort=version:refname").decode("utf-8").splitlines()
+     records: dict[str, str] = {}
+@@ -256,7 +259,7 @@ def published_release_records() -> dict[str, tuple[str, bytes]]:
+             records.setdefault(relative, tag)
+             if relative == f"release/{tag[1:]}.json":
+                 records[relative] = tag
+-    if records.get(f"release/{PROTOCOL_VERSION}.json") != latest:
++    if records.get(f"release/{LATEST_RELEASED_PROTOCOL_VERSION}.json") != latest:
+         raise ValidationFailure(f"no published release record found for {latest}")
+     return {
+         relative: (tag, git("show", f"refs/tags/{tag}:{relative}"))

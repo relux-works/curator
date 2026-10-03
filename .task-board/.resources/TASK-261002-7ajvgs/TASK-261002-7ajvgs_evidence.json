@@ -1,0 +1,114 @@
+{
+  "base_commit": "045ceb202062a46135492278dc8666a26f6ec2bd",
+  "candidate_inputs_sha256": {
+    ".github/workflows/ci.yml": "sha256:073ecdc066689dde4a0c9af0f71bc1d7782ae50e56818328ae55f1bf4c7d5838",
+    ".github/workflows/release.yml": "sha256:75a20b7c8cbf6663cb0948dc67b26dbcd6efed450015107f4b8c5dc02ee72e7e",
+    "CHANGELOG.md": "sha256:6287d4ad048c07f9da04625fb074d3c361fda902c8f51fdd0a30dc9c28a69fa6",
+    "COMPATIBILITY.md": "sha256:76bbb1f98a4c439ff065d2bbf9bcd4e0a1b9390c885f017b0794af6ac085943d",
+    "Makefile": "sha256:ad1bf61e5b7765eb10659be68791358f28e8ff435e16ad1a1f2b4a158f43b1a2",
+    "README.md": "sha256:283d8192d1ece9094fa4dfe2c8e8f248789ce5b90da9cc4329852664317e509a",
+    "SECURITY.md": "sha256:59c8fc9fcd9933e5d26add83543f39ab56f5fd3e11b085041c199e1a6d9107c5",
+    "conformance/candidate.json": "sha256:cd6f9509e506955d2734e87ab0cdcbbb4981bed420a8c91f0ad5556de25e4d86",
+    "conformance/v1/manifest.json": "sha256:6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5",
+    "conformance/v1/vectors/conformance-claim-v3-qualification.json": "sha256:b1fae4666fe585a85a5877414c9284c917b4e82df521ef495d006361597e66b3",
+    "conformance/v1/vectors/context-detectors.json": "sha256:4721d928a612e3b6e38a8ef1da34845ff8a4c8789159eb7ed329b642fdd8ee3d",
+    "conformance/v1/vectors/context-versions.json": "sha256:167644293abb19f729efdacb7534bda63acf46517d9a7036dc9b64bddacf4bce",
+    "conformance/v1/vectors/environments-codex-seed.json": "sha256:28a3be29763888b96cd505152b09c0ea83bad9c737420e3264e6c2a3cee41295",
+    "conformance/v1/vectors/environments-dotfile-managers.json": "sha256:f9f9f6c3b4da54629254ab54be6fb11157ca12aaff5ea7e53d1f498fb9edccaa",
+    "conformance/v1/vectors/environments-env-passthrough.json": "sha256:20da88823d6c8a38ee9c9e0f0e7540631d10401c438a21db59c5c4f786886f6a",
+    "conformance/v1/vectors/environments-global-lock-publication.json": "sha256:1a1211058a089586538c3b5e4a4117fd2d1ee06722e04604d28e442456280dbc",
+    "conformance/v1/vectors/environments-muse.json": "sha256:e58e22e5048c7141e584eab746c9fdf28f2ddb1b3aa6ec53177c57d89927cf22",
+    "conformance/v1/vectors/environments-read-failure.json": "sha256:2bf951b1cc364465369e3d4c36174ce2f0d279ca4643a8b59f824dd2327cb424",
+    "conformance/v1/vectors/environments-source-signers.json": "sha256:f6736c824f5a999888adbd9ce997c380a4d76837c88a7fbd103b7449156f7dca",
+    "conformance/v1/vectors/environments-write-nofollow.json": "sha256:8e4273fc4a6c93c8d08581c59652ae83d725cb6b4c47e541795fc6699801e6b8",
+    "conformance/v1/vectors/environments.json": "sha256:adc14604b86307499014f5218b9044466a1c920c4d973c51e339bdd02913a1fa",
+    "conformance/v1/vectors/external-repository-acquisition.json": "sha256:713d749f42ca4341d62ead1dcddded2cabbf6d24831c4652b31ec5c231e7a573",
+    "conformance/v1/vectors/go-host-execution-policy.json": "sha256:45a25803620a5c1032f3f01351860cc46f541d0fad42ad18f4237f3a5dd34769",
+    "conformance/v1/vectors/module-roots.json": "sha256:bd2167cdf63760d2cad6533527e39d6991407b76d93875a89a22a8217d07cdb6",
+    "conformance/v1/vectors/script-host-execution-policy.json": "sha256:d9b62329401cc64db67c6515830c26381e484749ed792b525c73bfe3373cab75",
+    "conformance/v1/vectors/security-posture.json": "sha256:59320063359d601b815c62bb61824a4dac5bbe2aeb708840f3f80e8cb13726f4",
+    "conformance/v1/vectors/shell-hook-trust.json": "sha256:a2b62282b33fcee8ca3f90139e4bb78d82054b20062ad0cfeacdf6b46509c453",
+    "conformance/v1/vectors/snapshot-acquisition.json": "sha256:82ab06b761560d84b9b10daa8034823f88e399101e32ba8c5cce128cfb313d08",
+    "conformance/v1/vectors/umbrella-provider-resolution.json": "sha256:de5902cf15ee3cc3ed8939ed1f3ea7f98f9f6278ff26eb4e567017de5246a1af",
+    "release/1.0.0-rc.14.json": "sha256:72e0e41b69caaefa330cc6dcbe3bd8b0076ba8bdcfa35afa545c78d7ee634d88",
+    "tools/generate-vectors/main.go": "sha256:c16f4abebcbcc4b346b38c5ec61dc4088e4a6df2634c781e089685aa16e6a520",
+    "tools/generate-vectors/main_test.go": "sha256:49fc8203110a2f9d6005802bc00b466bb7b65d12c6be9fef1c50a4d04d7507bb",
+    "tools/generate-vectors/schema_cases_preservation_test.go": "sha256:83d8819caa9e6f97d3c139427355ba35b73a861e8c6a13be226a7e0cd644c943",
+    "tools/release_gate.py": "sha256:b6342d54a1f80e68f93206b4e97690157a999bc6eb37a43d6e4c52ef03a80dcc",
+    "tools/test_release_gate.py": "sha256:63520059d8fe05fb68f73f5d1984f843fb1b62a6fff915823da14f0cd41bcba9",
+    "tools/test_validate.py": "sha256:a88b00865c70280f54005b63aee96f4632817aa04e4a841a93df9b6b64d101b4",
+    "tools/validate.py": "sha256:699f4a4fb6180965cac5011f3b1605639841530895a7910defc736c703654494"
+  },
+  "failed_validate_attempts": [
+    {
+      "attempt": 1,
+      "exit_code": 2,
+      "reason": "missing jsonschema dependency; validator exit 1"
+    },
+    {
+      "attempt": 2,
+      "exit_code": 2,
+      "reason": "hand-authored vector protocol_version rc.13; validator exit 1"
+    },
+    {
+      "attempt": 3,
+      "exit_code": 2,
+      "reason": "671 Python tests with 2 assertion failures; Python exit 1; Go not reached"
+    }
+  ],
+  "go_version": "go version go1.26.0 darwin/amd64",
+  "host": "macOS-15.7.4-x86_64-i386-64bit-Mach-O",
+  "implementation_pins_unchanged": true,
+  "manifest_sha256": "sha256:6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5",
+  "protocol_version": "1.0.0-rc.14",
+  "python_version": "3.14.6",
+  "rc13_record_sha256": "sha256:09b5bcfcb4e03df3bd10c6c328704fe3d387ac35beca3b832afb82801445f3dc",
+  "released_schema_comparison": {
+    "matched": 73,
+    "tag": "v1.0.0-rc.13",
+    "total": 73
+  },
+  "source_compatible_core": {
+    "manifest_sha256": "sha256:803918bf8672f76cf990985e51db213b826674cd5bb54fbf47731b8404b44403",
+    "tag": "v1.0.0-rc.10"
+  },
+  "source_manifest_sha256": "sha256:061ec05ddb1746b72168d157f81d2930047cd62371ffa46cf585844da61ee6be",
+  "task": "TASK-261002-7ajvgs",
+  "title": "prepare-spec-rc14",
+  "validation": [
+    {
+      "command": "make validate",
+      "exit_code": 0,
+      "go_package": "tools/generate-vectors",
+      "go_seconds": 23.299,
+      "python_seconds": 2083.107,
+      "python_tests": 671
+    },
+    {
+      "command": "make regenerate-check",
+      "exit_code": 0
+    },
+    {
+      "command": "unittest discover -s tools -p test_validate.py -k ReleasedRecordImmutabilityTests",
+      "exit_code": 0,
+      "tests": 8
+    },
+    {
+      "command": "unittest discover -s tools -p test_validate.py -k WorkflowRegenerationScopeTests",
+      "exit_code": 0,
+      "tests": 2
+    },
+    {
+      "command": "test -z \"$(gofmt -l tools)\"",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check HEAD",
+      "exit_code": 0
+    },
+    {
+      "command": "inspect_release.py",
+      "exit_code": 0
+    }
+  ]
+}
