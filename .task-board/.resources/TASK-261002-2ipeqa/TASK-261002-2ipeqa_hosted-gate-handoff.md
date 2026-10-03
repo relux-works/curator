@@ -1,0 +1,17 @@
+# TASK-261002-2ipeqa — accept-rc14-candidate-suite: Revision 2 review handoff
+
+### Revision 2 hosted-gate handoff update
+
+The source tree remains exactly the previously validated Revision 2 tree: all 16 changed-file SHA256 hashes and base match `source-identity.json` (identity verification exit **0**). No product code was changed in this handoff run. This run independently re-authenticated/recounted the candidate corpus: **103/103 configured families, 1,870 entries**, count audit exit **0** (0.187s). Presence gate rerun exit **0** for all eight declared Go consumption claims. Whitespace, protected-file comparison and formatting reruns each exit **0** with no findings. Writer remains OFF; SPEC_PIN and LOGBOOK.md are unchanged.
+
+Accepted from already-attached Revision 2 evidence, rather than rerun here: candidate coverage command exit **0** (22.436s) and default-pin command exit **0** (16.202s), both with GOFLAGS=-work, shared-lock ownership, and syspolicyd running / crashes **366 → 366**. Previously recorded marker/scriptworker attempts remain failing/interrupted: wrapper exits **130**, underlying Go numeric exits and exact durations **unknown**, first raw log contains a ten-minute timeout. Recovery crash counts were **366 → 367 → 368**. This session observed syspolicyd running at **368**, then performed only the non-Go checks above. No additional long build/test was started, so no new build/test crash-count pair exists.
+
+Unrun on Revision 2: the exact six-package Implementations Go command and consumption gate, fresh lint/build, full candidate matrix, fresh historical policy/production reruns and narrowing probes. Revision 1 evidence stays historical. Local lint/build remain unverified and are routed to hosted validation as explained in the checklist alignment below. The required hosted CR gate is responsible for validation before acceptance. It is initiated by the board validation/review flow, not by this developer run.
+
+Exact pending spec Go command: `CURATOR_CONFORMANCE_ROOT=/tmp/TASK-261002-2ipeqa-spec-rc14/conformance/v1 GOFLAGS=-work go test -count=1 -json ./internal/interop ./internal/closure ./internal/skillspec ./internal/marker ./internal/moduleroots ./internal/scriptpolicy`, followed by `python3 <candidate-spec>/tools/implementation_coverage.py go --stream <captured-json>`. The presence half passed independently. No Python-manager or registry conformance is claimed by this Curator task.
+
+Findings are saved in board notes and task-scoped outcomes because the binding host rules prohibit LOGBOOK.md edits. The later hosted-gate decision supersedes the earlier recovery recommendation; no human decision is required to route this revision to review.
+
+### Revision 2 checklist alignment for the authorized handoff
+
+The first `task-board handoff TASK-261002-2ipeqa --role developer` exited **1**, refusing unchecked local lint/build and generic logbook items. Under the later binding hosted-gate decision, those local execution requirements were replaced with a checked evidence requirement: record unrun local lint/build and stalled tests explicitly in outcomes and route validation to the hosted CR gate. This checkbox attests only that reporting/routing; it does not attest that lint/build passed. The generic logbook item was removed because host-rules prohibit LOGBOOK.md edits; the checked board-notes/outcome/LOGBOOK-unchanged item remains. Required hosted validation is still pending before acceptance. No additional Go retry was attempted.
