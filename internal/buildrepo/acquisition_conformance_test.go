@@ -51,18 +51,21 @@ type externalRepositoryAcquisitionCase struct {
 
 func TestExternalRepositoryAcquisitionConformance(t *testing.T) {
 	vector := loadExternalRepositoryAcquisitionVector(t)
-	if vector.ProtocolVersion != "1.0.0-rc.13" {
-		t.Fatalf("acquisition vector protocol_version = %q, want 1.0.0-rc.13", vector.ProtocolVersion)
-	}
 	manifestID, err := conformancecoverage.SelectedSuiteManifestSHA256()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The Muse candidate carries byte-identical rc.13 acquisition vectors.
-	// Admit that exact digest alongside the release, retaining refusal of
-	// unknown suites and the digest-keyed case counts below.
-	if manifestID != acquisitionManifestID && manifestID != conformancecoverage.MuseCandidateManifestSHA256 {
-		t.Fatalf("selected conformance manifest = %s, want pinned rc.13 %s or Muse candidate %s", manifestID, acquisitionManifestID, conformancecoverage.MuseCandidateManifestSHA256)
+	// rc.14 changes protocol metadata while retaining the acquisition cases.
+	wantProtocol := "1.0.0-rc.13"
+	switch manifestID {
+	case acquisitionManifestID, conformancecoverage.MuseCandidateManifestSHA256:
+	case conformancecoverage.RC14CandidateManifestSHA256:
+		wantProtocol = "1.0.0-rc.14"
+	default:
+		t.Fatalf("unrecognised acquisition conformance manifest %s", manifestID)
+	}
+	if vector.ProtocolVersion != wantProtocol {
+		t.Fatalf("acquisition vector protocol_version = %q, want %s", vector.ProtocolVersion, wantProtocol)
 	}
 
 	t.Run("cases", func(t *testing.T) {

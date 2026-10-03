@@ -493,12 +493,12 @@ func TestScriptHostExecutionPolicyProductionConsumersCoverAllCases(t *testing.T)
 	}
 }
 
-// The rc.13 suite changes only the release label for the unchanged
+// The rc.13 and rc.14 suites change only the release label for the unchanged
 // script-worker-v1 identity. Keep the current and legacy labels closed so
 // an unrelated future protocol is not admitted on the policy name alone.
 func scriptWorkerProtocolVersionSupported(version string) bool {
 	switch version {
-	case "1.0.0-rc.9", "1.0.0-rc.13":
+	case "1.0.0-rc.9", "1.0.0-rc.13", "1.0.0-rc.14":
 		return true
 	default:
 		return false
@@ -513,7 +513,9 @@ func TestScriptWorkerProtocolVersionAcceptanceIsClosed(t *testing.T) {
 	}{
 		{name: "legacy rc.9 label", version: "1.0.0-rc.9", want: true},
 		{name: "rc.13 with unchanged identity", version: "1.0.0-rc.13", want: true},
-		{name: "future rc.14", version: "1.0.0-rc.14", want: false},
+		{name: "rc.14 with unchanged identity", version: "1.0.0-rc.14", want: true},
+		{name: "future rc.15", version: "1.0.0-rc.15", want: false},
+		{name: "empty", version: "", want: false},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -540,7 +542,7 @@ func TestScriptExecutionPolicyIdentityMatchesTheSuite(t *testing.T) {
 		t.Fatalf("the suite schema_version = %d, want 1", vector.SchemaVersion)
 	}
 	if !scriptWorkerProtocolVersionSupported(vector.ProtocolVersion) {
-		t.Fatalf("the suite protocol_version = %q, want one of the unchanged script-worker-v1 labels [1.0.0-rc.9, 1.0.0-rc.13]", vector.ProtocolVersion)
+		t.Fatalf("the suite protocol_version = %q, want one of the unchanged script-worker-v1 labels [1.0.0-rc.9, 1.0.0-rc.13, 1.0.0-rc.14]", vector.ProtocolVersion)
 	}
 	if vector.ExecutionPolicy != skillspec.ScriptExecutionPolicy {
 		t.Fatalf("the suite names execution policy %q; this build hard-codes %q",

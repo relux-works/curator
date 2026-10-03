@@ -13,8 +13,6 @@ import (
 	"github.com/relux-works/curator/internal/stateread"
 )
 
-const museSuiteDigest = "bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783"
-
 type museVector struct {
 	Name     string `json:"name"`
 	State    string `json:"state"`
@@ -55,7 +53,7 @@ func TestMusePublishedLinkStates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if digest != museSuiteDigest {
+	if !conformancecoverage.IsMuseCandidate(digest) {
 		t.Log("selected suite has no Muse family; rc.13 remains unchanged")
 		return
 	}
@@ -431,7 +429,7 @@ func TestMusePublishedRegistryLayout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if digest != museSuiteDigest {
+	if !conformancecoverage.IsMuseCandidate(digest) {
 		t.Log("selected suite has no Muse registry/layout; rc.13 unchanged")
 		return
 	}

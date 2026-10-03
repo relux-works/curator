@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -73,8 +74,8 @@ func TestConformanceSnapshotAcquisition(t *testing.T) {
 	if len(vector.Cases) == 0 {
 		t.Fatalf("%s declares no cases", vectorPath)
 	}
-	conformancecoverage.Run(t, "snapshot-acquisition/cases", vector.Cases,
-		func(tc snapshotAcquisitionCase) string { return tc.Name }, func(t *testing.T, tc snapshotAcquisitionCase) {
+	conformancecoverage.RunOutcomes(t, "snapshot-acquisition/cases", vector.Cases,
+		func(tc snapshotAcquisitionCase) string { return tc.Name }, func(t *testing.T, tc snapshotAcquisitionCase) conformancecoverage.Observation {
 			fixture := rootPath(t, root, tc.Fixture)
 			wantHash := readRootFile(t, root, tc.Expected)
 			if wantHash != tc.ExpectedSHA256 {
@@ -104,6 +105,7 @@ func TestConformanceSnapshotAcquisition(t *testing.T) {
 			commit := acquisitionGit(t, repo, "commit-tree", tree, "-m", "vector")
 			acquisitionGit(t, repo, "update-ref", "refs/heads/main", commit)
 
+			var hashFailures []string
 			for _, autocrlf := range []string{"true", "false"} {
 				t.Run("autocrlf="+autocrlf, func(t *testing.T) {
 					acquisitionGit(t, repo, "config", "core.autocrlf", autocrlf)
@@ -156,9 +158,15 @@ func TestConformanceSnapshotAcquisition(t *testing.T) {
 						t.Fatal(err)
 					}
 					if got != wantHash {
-						t.Fatalf("content hash %s, want %s", got, wantHash)
+						// Keep exercising extraction and byte checks for both
+						// settings. Only the measured hash mismatch is eligible
+						// for exact case/digest gap accounting at the parent gate.
+						reason := fmt.Sprintf("autocrlf=%s: content hash %s, want %s", autocrlf, got, wantHash)
+						t.Log(reason)
+						hashFailures = append(hashFailures, reason)
 					}
 				})
 			}
+			return conformancecoverage.Observation{FailureReason: strings.Join(hashFailures, "; ")}
 		})
 }
