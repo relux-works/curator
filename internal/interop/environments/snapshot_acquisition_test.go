@@ -35,7 +35,8 @@ type snapshotAcquisitionCase struct {
 // snapshotAcquisitionVector mirrors vectors/snapshot-acquisition.json
 // (environments §1.2). Fields the test does not consume are left undeclared.
 type snapshotAcquisitionVector struct {
-	Cases []snapshotAcquisitionCase `json:"cases"`
+	Cases           []snapshotAcquisitionCase `json:"cases"`
+	ProtocolVersion string                    `json:"protocol_version"`
 }
 
 func acquisitionGit(t *testing.T, dir string, args ...string) string {
@@ -153,7 +154,13 @@ func TestConformanceSnapshotAcquisition(t *testing.T) {
 					if !bytes.Contains(mixed, []byte("\r\n")) || !bytes.Contains(bytes.ReplaceAll(mixed, []byte("\r\n"), nil), []byte("\n")) {
 						t.Fatalf("mixed.txt lost mixed endings: %q", mixed)
 					}
-					got, err := hashing.ContentSHA256(dest, nil)
+					// Historical vectors pin the frozen v1 algorithm. rc.14
+					// exercises the manager's actual new-write selection.
+					version := hashing.VersionV1
+					if vector.ProtocolVersion == "1.0.0-rc.14" {
+						version = hashing.WriteVersion()
+					}
+					got, err := hashing.ContentSHA256WithVersion(dest, nil, version)
 					if err != nil {
 						t.Fatal(err)
 					}

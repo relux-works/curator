@@ -38,9 +38,9 @@ const (
 )
 
 // EnableV2Writers is the sole manager write cut-over for content-hash v2 and
-// its versioned carrier shapes. SPEC_PIN remains rc.13, so production writes
-// stay at v1 until that pin advances. TODO: enable with the rc.14 SPEC_PIN
-// bump after the v2 carrier schemas are released.
+// its versioned carrier shapes. Production writes stay at v1 with the rc.14
+// conformance pin until the atomic v1→v2 profile hash migration ships in
+// TASK-261003-1uzji7.
 //
 // Tests that exercise v2 writer shapes may set this explicitly and restore it
 // before returning.

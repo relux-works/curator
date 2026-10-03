@@ -8,7 +8,7 @@ import (
 
 func TestManagedWriterVersionDefaultsToV1(t *testing.T) {
 	if EnableV2Writers {
-		t.Fatal("v2 writer switch is on by default while SPEC_PIN is rc.13")
+		t.Fatal("v2 writer switch is on before the atomic v1→v2 profile hash migration")
 	}
 	if got := WriteVersion(); got != VersionV1 {
 		t.Fatalf("default write version = %d, want v1", got)

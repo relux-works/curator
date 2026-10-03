@@ -36,7 +36,8 @@ const ContentHashV2CandidateManifestSHA256 = "950ee74ad148615c273fe95bbb93f1bc0f
 // MuseCandidateManifestSHA256 identifies spec-muse-environment at d373078a.
 const MuseCandidateManifestSHA256 = "bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783"
 
-// RC14CandidateManifestSHA256 identifies candidate-rc14 at e3a88ced.
+// RC14CandidateManifestSHA256 identifies the released rc.14 default CI root
+// at 43bf0a2506d5c354a73bbc3ea4623d4653db10c7 (unchanged candidate manifest).
 const RC14CandidateManifestSHA256 = "6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5"
 
 // IsImplementedContentHashV2Suite identifies suites whose hash-v2 cases are

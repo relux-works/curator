@@ -122,3 +122,42 @@ func assertStateReadKind(t *testing.T, err error, want stateread.Kind) {
 		t.Fatalf("state-read kind = %q, want %q (error %v)", got.Kind, want, err)
 	}
 }
+
+func TestRC14SnapshotGapRemainsOwnedByProfileHashMigration(t *testing.T) {
+	root, err := repositoryRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	allCounts, err := readCounts(filepath.Join(root, ".github", "ci", "conformance-case-counts.tsv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const family = "snapshot-acquisition/cases"
+	if got := allCounts[RC14CandidateManifestSHA256][family]; got != 1 {
+		t.Fatalf("rc.14 snapshot count = %d, want 1", got)
+	}
+	gaps, err := readGaps(filepath.Join(root, ".github", "ci", "conformance-gaps.tsv"), RC14CandidateManifestSHA256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var snapshotGaps []Gap
+	for _, gap := range gaps {
+		if gap.Family == family {
+			snapshotGaps = append(snapshotGaps, gap)
+		}
+	}
+	want := Gap{
+		Family: family, CaseID: "byte-exact-snapshot", Owner: "TASK-261003-1uzji7",
+		Reason: "rc.14 expects curator-content-v2 writes; writer enabled after the atomic v1→v2 profile hash migration",
+	}
+	if len(snapshotGaps) != 1 || snapshotGaps[0] != want {
+		t.Fatalf("rc.14 snapshot gaps = %+v, want exactly %+v", snapshotGaps, want)
+	}
+	tally, err := Check(family, []string{want.CaseID}, []Result{{CaseID: want.CaseID, FailureReason: "v1 writer remains selected"}}, snapshotGaps, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tally != (Tally{KnownGap: 1}) {
+		t.Fatalf("snapshot tally = %+v, want exactly one known gap", tally)
+	}
+}
