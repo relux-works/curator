@@ -52,7 +52,16 @@ type unmanagePlan struct {
 	markerPath  string
 	backupPath  string
 	removals    map[string]bool
-	restores    map[string][]byte
+	restores    map[string]backupRestoreEntry
+}
+
+// backupRestoreEntry retains the lstat entry type separately from permission
+// bits. Regular files are supported here; link restoration is a separate
+// operation and must never be implemented by reading through the link.
+type backupRestoreEntry struct {
+	kind    fs.FileMode
+	mode    fs.FileMode
+	payload []byte
 }
 
 // Unmanage removes only native surfaces recorded by their environment marker
@@ -152,7 +161,7 @@ func planUnmanageHomes(req UnmanageRequest) ([]unmanagePlan, error) {
 			markerPath:  filepath.Join(native, envmarker.Name),
 			backupPath:  filepath.Join(native, ".agent-environment-backup"),
 			removals:    map[string]bool{},
-			restores:    map[string][]byte{},
+			restores:    map[string]backupRestoreEntry{},
 		}
 		if marker != nil {
 			for _, key := range marker.SortedSurfaceKeys() {
@@ -176,13 +185,13 @@ func planUnmanageHomes(req UnmanageRequest) ([]unmanagePlan, error) {
 	return plans, nil
 }
 
-func newestBackupFiles(req UnmanageRequest, environment, backupRoot string) (map[string][]byte, error) {
+func newestBackupFiles(req UnmanageRequest, environment, backupRoot string) (map[string]backupRestoreEntry, error) {
 	metadata, err := readBackupLstat(req, backupRoot)
 	if err != nil {
 		return nil, backupRecordUnreadable(backupRoot, err)
 	}
 	if metadata.Kind == stateread.KindAbsent {
-		return map[string][]byte{}, nil
+		return map[string]backupRestoreEntry{}, nil
 	}
 	if metadata.Kind != stateread.KindPresent || metadata.Info == nil || !metadata.Info.IsDir() || metadata.Info.Mode()&os.ModeSymlink != 0 {
 		return nil, backupRecordUnreadable(backupRoot, stateread.UnusableError(backupRoot, fmt.Errorf("backup inventory is not a directory")))
@@ -206,7 +215,7 @@ func newestBackupFiles(req UnmanageRequest, environment, backupRoot string) (map
 		}
 	}
 	if newest == 0 {
-		return map[string][]byte{}, nil
+		return map[string]backupRestoreEntry{}, nil
 	}
 
 	generationRoot := filepath.Join(backupRoot, strconv.Itoa(newest))
@@ -224,7 +233,7 @@ func newestBackupFiles(req UnmanageRequest, environment, backupRoot string) (map
 	return files, nil
 }
 
-func readBackupTree(req UnmanageRequest, environment, directory, prefix string) (map[string][]byte, error) {
+func readBackupTree(req UnmanageRequest, environment, directory, prefix string) (map[string]backupRestoreEntry, error) {
 	listing, err := readBackupDir(req, directory)
 	if err != nil {
 		return nil, backupRecordUnreadable(directory, err)
@@ -232,7 +241,7 @@ func readBackupTree(req UnmanageRequest, environment, directory, prefix string) 
 	if listing.Kind != stateread.KindPresent {
 		return nil, backupRecordUnreadable(directory, stateread.UnusableError(directory, fmt.Errorf("backup generation directory is absent or unusable")))
 	}
-	files := map[string][]byte{}
+	files := map[string]backupRestoreEntry{}
 	for _, entry := range listing.Entries {
 		name := entry.Name()
 		rel := path.Join(prefix, name)
@@ -270,7 +279,11 @@ func readBackupTree(req UnmanageRequest, environment, directory, prefix string) 
 		if state.Kind != stateread.KindPresent {
 			return nil, backupRecordUnreadable(full, stateread.UnusableError(full, fmt.Errorf("backup file is absent")))
 		}
-		files[rel] = append([]byte(nil), state.Bytes...)
+		files[rel] = backupRestoreEntry{
+			kind:    metadata.Info.Mode().Type(),
+			mode:    metadata.Info.Mode().Perm(),
+			payload: append([]byte(nil), state.Bytes...),
+		}
 	}
 	return files, nil
 }
@@ -301,9 +314,12 @@ func preflightUnmanagePlan(plan unmanagePlan) error {
 	for rel := range plan.removals {
 		paths[rel] = true
 	}
-	for rel := range plan.restores {
+	for rel, entry := range plan.restores {
 		if !safeBackupPath(rel) || reservedRestorePath(rel) {
 			return backupRecordUnreadable(filepath.Join(plan.backupPath, rel), stateread.UnusableError(filepath.Join(plan.backupPath, rel), fmt.Errorf("invalid backup path %q", rel)))
+		}
+		if !entry.kind.IsRegular() {
+			return backupRecordUnreadable(filepath.Join(plan.backupPath, rel), fmt.Errorf("unsupported backup entry type %v", entry.kind))
 		}
 		paths[rel] = true
 	}
@@ -367,15 +383,13 @@ func applyUnmanagePlan(plan unmanagePlan) (UnmanageHome, error) {
 	sort.Strings(paths)
 	for _, rel := range paths {
 		full := filepath.Join(plan.home, filepath.FromSlash(rel))
-		payload, restore := plan.restores[rel]
+		entry, restore := plan.restores[rel]
 		if restore {
-			if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-				return outcome, err
-			}
-			if err := os.Remove(full); err != nil && !os.IsNotExist(err) {
-				return outcome, err
-			}
-			if err := os.WriteFile(full, payload, 0o644); err != nil {
+			// Stage privately, preserve the saved permission bits, and replace
+			// the entry without opening the current managed link's target.
+			// On Windows the writer creates an owner-only protected DACL;
+			// FileMode does not encode or restore the original Windows ACL.
+			if err := atomicManagedFile(plan.home, rel, entry.payload, entry.mode); err != nil {
 				return outcome, err
 			}
 			outcome.Restored = append(outcome.Restored, rel)

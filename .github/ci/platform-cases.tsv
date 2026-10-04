@@ -698,6 +698,9 @@ cmd/curator	TestCLIAuditMixedSkillRecordsBothPolicies	linux,darwin,windows	-	-	c
 cmd/curator	TestCLIAuditJSONCarriesScriptLabels	linux,darwin,windows	-	-	curator audit JSON carries warning labels and per-command policy identities
 cmd/curator	TestCLIAuditJSONRecordsExplicitAbsence	linux,darwin,windows	-	-	curator audit JSON records declared-only policy absence explicitly
 cmd/curator	TestEnvUnmanageBackupRecordVectors	linux,darwin,windows	linux,darwin,windows	root-unset	rc.13 backup-record restore vectors drive curator env unmanage through the CLI; unreadable inventory refuses before mutation and absent inventory restores nothing
+cmd/curator	TestEnvUnmanageTakeoverPreservesFileMode	linux,darwin	-	-	CLI install, takeover and unmanage restore preserve regular-file modes 0600, 0644, 0751 and 0400; Windows DACLs are not Unix permission bits
+internal/envprofile	TestUnmanageRestorePlanRetainsMetadata	linux,darwin	-	-	restore plan retains each supported backup entry's type, mode and bytes
+internal/envprofile	TestUnmanageRestoreRefusesLinkedParent	linux,darwin	-	-	production Unmanage refuses a linked restore parent before changing external context
 
 # ===========================================================================
 # Decision 0017 credential-link repairs and explicit migration (F-C1/F-C2/F-C3).
