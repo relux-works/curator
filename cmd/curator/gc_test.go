@@ -2,11 +2,13 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -16,8 +18,107 @@ import (
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/scopes"
+	"github.com/relux-works/curator/internal/stateread"
 )
+
+// TestGCPreservesRuntimeOnUncertainMarks drives run(gc) with production locks
+// and a real launcher. Each uncertainty must survive two maintenance passes;
+// the control must still collect an unreferenced runtime with complete marks.
+func TestGCPreservesRuntimeOnUncertainMarks(t *testing.T) {
+	for _, state := range []string{"truncated registry", "invalid marker", "unreadable marker", "complete references"} {
+		t.Run(state, func(t *testing.T) {
+			home, project := gcHome(t), t.TempDir()
+			installTestMarker(t, filepath.Join(project, ".agents", "skills"), "skill-a")
+			if err := scopes.RecordConsumer(home, project); err != nil {
+				t.Fatal(err)
+			}
+			platform, executable, payload := "unix", "tool", "#!/bin/sh\nprintf 'runtime-ok\\n'\n"
+			if runtime.GOOS == "windows" {
+				platform, executable, payload = "windows", "tool.cmd", "@echo off\r\necho runtime-ok\r\n"
+			}
+			runtimePath := filepath.Join(home, "runtime", "skill-a", strings.Repeat("1", 40), executable)
+			writeFile(t, runtimePath, payload)
+			if err := os.Chmod(runtimePath, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			shim, err := runtimestore.WriteBinShim(filepath.Join(project, ".agents", "bin"), "tool", runtimePath, platform, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			runShim := func() {
+				t.Helper()
+				command := exec.Command(shim)
+				if runtime.GOOS == "windows" {
+					command = exec.Command("cmd", "/c", shim)
+				}
+				output, err := command.CombinedOutput()
+				if err != nil || strings.TrimSpace(string(output)) != "runtime-ok" {
+					t.Errorf("shim = %q, %v; want runtime-ok", output, err)
+				}
+			}
+			runShim()
+			orphan := filepath.Join(home, "runtime", "orphan", strings.Repeat("2", 40), executable)
+			writeFile(t, orphan, payload)
+			registry := filepath.Join(home, scopes.ConsumersName)
+			markerPath := filepath.Join(project, ".agents", "skills", "skill-a", marker.Name)
+			var reason string
+			switch state {
+			case "truncated registry":
+				writeFile(t, registry, "{")
+				reason = "cannot be trusted"
+			case "invalid marker":
+				writeFile(t, markerPath, "{")
+				reason = marker.DiagInvalid
+			case "unreadable marker":
+				// A directory produces a real, portable read failure even as root.
+				if err := os.Remove(markerPath); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Mkdir(markerPath, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				reason = stateread.DiagUnreadable
+			}
+			registryBefore, err := os.ReadFile(registry)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for pass := 1; pass <= 2; pass++ {
+				runShim()
+				var stdout, stderr bytes.Buffer
+				code := run([]string{"gc"}, fileConfigSource(filepath.Join(home, "config.json")), &stdout, &stderr)
+				t.Logf("pass %d: gc exit=%d stdout=%q stderr=%q", pass, code, stdout.String(), stderr.String())
+				if code != exitOK {
+					t.Errorf("gc exit = %d, want 0", code)
+				}
+				runShim()
+				if reason != "" {
+					for _, warning := range []string{reason, "runtime sweep skipped", "live reference set could not be proven complete", "build cache sweep skipped"} {
+						if !strings.Contains(stderr.String(), warning) {
+							t.Errorf("pass %d: missing warning %q", pass, warning)
+						}
+					}
+					if _, err := os.Stat(orphan); err != nil {
+						t.Errorf("pass %d: uncertain marks removed an unreferenced runtime too: %v", pass, err)
+					}
+				} else {
+					if _, err := os.Stat(orphan); !os.IsNotExist(err) {
+						t.Errorf("pass %d: unreferenced runtime was not collected: %v", pass, err)
+					}
+					if strings.Contains(stderr.String(), "runtime sweep skipped") {
+						t.Errorf("complete reference set skipped runtime sweep: %s", &stderr)
+					}
+				}
+				registryAfter, err := os.ReadFile(registry)
+				if err != nil || !bytes.Equal(registryBefore, registryAfter) {
+					t.Errorf("pass %d: consumer registry changed: %v", pass, err)
+				}
+			}
+		})
+	}
+}
 
 // TestGCRetainsLiveProcessBuild exercises run("gc") -> collectUnderLock ->
 // scopes.Collect -> Store.Sweep with a real process executing an old cache

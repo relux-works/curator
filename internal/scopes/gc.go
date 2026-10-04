@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/relux-works/curator/internal/buildcache"
@@ -25,6 +26,9 @@ func CollectRuntime(home string) ([]string, error) {
 	marked := markScopes(home)
 	if err := pruneConsumers(home, marked); err != nil {
 		return nil, err
+	}
+	if len(marked.uncertain) > 0 {
+		return nil, fmt.Errorf("runtime sweep skipped: the live reference set could not be proven complete: %s", strings.Join(marked.uncertain, "; "))
 	}
 	return sweepRuntime(home, marked.runtime)
 }
@@ -74,7 +78,7 @@ type MaintenanceResult struct {
 //
 // Uncertainty fails safe, and it stays that way across passes. A consumer
 // registry, skill scope, or marker that exists but cannot be trusted leaves the
-// reference set unprovable, so the build cache is not swept at all. Crucially,
+// reference set unprovable, so neither runtime nor build caches are swept. Crucially,
 // nothing that could still hold a reference is forgotten either: an unreadable
 // registry is never rewritten, and a consumer whose scope could not be proven
 // empty stays registered. A second pass therefore sees the same uncertainty and
@@ -94,17 +98,18 @@ func Collect(request MaintenanceRequest) (MaintenanceResult, error) {
 	if err := pruneConsumers(request.Home, marked); err != nil {
 		return result, err
 	}
+	if len(marked.uncertain) > 0 {
+		result.Warnings = append(result.Warnings,
+			"runtime sweep skipped: the live reference set could not be proven complete",
+			"build cache sweep skipped: the live reference set could not be proven complete")
+		return result, nil
+	}
 	removedRuntime, err := sweepRuntime(request.Home, marked.runtime)
 	result.RemovedRuntime = removedRuntime
 	if err != nil {
 		return result, err
 	}
 
-	if len(marked.uncertain) > 0 {
-		result.Warnings = append(result.Warnings,
-			"build cache sweep skipped: the live reference set could not be proven complete")
-		return result, nil
-	}
 	cache := request.Cache
 	if cache == nil {
 		store, storeErr := buildcache.New(request.Home)
@@ -160,7 +165,7 @@ type marks struct {
 	builds    []string
 	// uncertain describes state that exists but could not be trusted, so the
 	// reference set derived from it is incomplete. Any entry here blocks the
-	// build sweep and protects every consumer it came from.
+	// runtime and build sweeps and protects every consumer it came from.
 	uncertain []string
 	// notes describe state that was ignored but cannot hide a reference, so
 	// they are reported without blocking maintenance.

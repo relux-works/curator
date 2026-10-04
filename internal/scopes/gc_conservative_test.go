@@ -61,6 +61,13 @@ func runFailSafeAcrossTwoPasses(t *testing.T, test failSafeCase) {
 		t.Fatal(err)
 	}
 	test.arrange(t, home, project)
+	runtimeFile := filepath.Join(home, "runtime", "unmarked", strings.Repeat("f", 40), "tool")
+	if err := os.MkdirAll(filepath.Dir(runtimeFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(runtimeFile, []byte("runtime retained\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	cache := &recordingCache{}
 	for pass := 1; pass <= 2; pass++ {
@@ -71,6 +78,15 @@ func runFailSafeAcrossTwoPasses(t *testing.T, test failSafeCase) {
 		if cache.calls != 0 {
 			t.Fatalf("pass %d swept the build cache with an unprovable reference set", pass)
 		}
+		if len(result.RemovedRuntime) != 0 {
+			t.Errorf("pass %d removed runtime with uncertain marks: %v", pass, result.RemovedRuntime)
+		}
+		if _, err := os.Stat(runtimeFile); err != nil {
+			t.Errorf("pass %d removed runtime with uncertain marks: %v", pass, err)
+		}
+		if !warned(result, "runtime sweep skipped") {
+			t.Errorf("pass %d did not report the skipped runtime sweep: %v", pass, result.Warnings)
+		}
 		if !warned(result, test.warning) {
 			t.Fatalf("pass %d lost the warning %q: %v", pass, test.warning, result.Warnings)
 		}
@@ -78,6 +94,10 @@ func runFailSafeAcrossTwoPasses(t *testing.T, test failSafeCase) {
 			t.Fatalf("pass %d did not report the skipped sweep: %v", pass, result.Warnings)
 		}
 		test.verify(t, home, project)
+		removed, err := CollectRuntime(home)
+		if err == nil || !strings.Contains(err.Error(), "runtime sweep skipped") || len(removed) != 0 {
+			t.Errorf("pass %d: runtime-only collection = (%v, %v), want skipped sweep", pass, removed, err)
+		}
 	}
 }
 
