@@ -1,0 +1,40 @@
+{
+  "task": "BUG-261004-16a407",
+  "hosted_run": 37170471503,
+  "hosted_snapshot": "cc3ba67211bc533558c3a6d0fe8bb6bce2ad7a2f",
+  "url": "https://github.com/relux-works/curator/actions/runs/37170471503",
+  "platform_gate_exit_lines": {
+    "Test (macos-latest)": [
+      "2026-10-04T02:38:01.4605140Z test-gate: stage served exit=0 (stream: .temp/ci-evidence/test/go-test-served.json)",
+      "2026-10-04T02:38:01.4608820Z test-gate: go test overall exit=0 (merged stream: .temp/ci-evidence/test/go-test.json)",
+      "2026-10-04T02:38:06.0375620Z platform-case gate: ok",
+      "2026-10-04T02:38:06.0375970Z test-gate: go test exit=0, platform-case gate exit=0"
+    ],
+    "Race (ubuntu-latest)": [
+      "2026-10-04T02:42:36.2775026Z test-gate: stage served exit=0 (stream: .temp/ci-evidence/race/go-test-served.json)",
+      "2026-10-04T02:42:39.5483420Z test-gate: stage assert-godriver exit=0 (stream: .temp/ci-evidence/race/go-test-assert-godriver.json)",
+      "2026-10-04T02:42:39.5488666Z test-gate: go test overall exit=0 (merged stream: .temp/ci-evidence/race/go-test.json)",
+      "2026-10-04T02:42:41.7383308Z platform-case gate: ok",
+      "2026-10-04T02:42:41.7383670Z test-gate: go test exit=0, platform-case gate exit=0"
+    ],
+    "Test (windows-latest)": [
+      "2026-10-04T02:59:43.4445001Z test-gate: stage served exit=0 (stream: .temp/ci-evidence/test/go-test-served.json)\r",
+      "2026-10-04T02:59:43.4450796Z test-gate: go test overall exit=0 (merged stream: .temp/ci-evidence/test/go-test.json)\r",
+      "2026-10-04T02:59:46.1768735Z platform-case gate: ok\r",
+      "2026-10-04T02:59:46.1769130Z test-gate: go test exit=0, platform-case gate exit=0\r"
+    ],
+    "Test (ubuntu-latest)": [
+      "2026-10-04T02:34:51.3817671Z test-gate: stage served exit=0 (stream: .temp/ci-evidence/test/go-test-served.json)",
+      "2026-10-04T02:35:14.0124763Z test-gate: stage assert-godriver exit=0 (stream: .temp/ci-evidence/test/go-test-assert-godriver.json)",
+      "2026-10-04T02:35:14.0471304Z test-gate: go test overall exit=0 (merged stream: .temp/ci-evidence/test/go-test.json)",
+      "2026-10-04T02:35:21.5015640Z platform-case gate: ok",
+      "2026-10-04T02:35:21.5015921Z test-gate: go test exit=0, platform-case gate exit=0"
+    ],
+    "Race (macos-latest)": [
+      "2026-10-04T02:52:34.9964130Z test-gate: stage served exit=0 (stream: .temp/ci-evidence/race/go-test-served.json)",
+      "2026-10-04T02:52:34.9965760Z test-gate: go test overall exit=0 (merged stream: .temp/ci-evidence/race/go-test.json)",
+      "2026-10-04T02:52:39.7153560Z platform-case gate: ok",
+      "2026-10-04T02:52:39.7153950Z test-gate: go test exit=0, platform-case gate exit=0"
+    ]
+  }
+}
