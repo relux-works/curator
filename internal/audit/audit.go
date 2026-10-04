@@ -330,9 +330,8 @@ func decideWithPins(cfg *config.Config, subject Subject, contentHash string, fin
 	if cfg.Audit.Mode == "strict" && subject.SchemaVersion < 3 && !pinned {
 		return DecisionRequirePin
 	}
-	if pinned {
-		return DecisionAllow
-	}
+	// A pin satisfies only the pre-capability requirement; findings still
+	// follow the current mode and fail_on threshold on fresh and cached paths.
 	return Decide(findings, cfg.Audit.Mode, cfg.Audit.FailOn)
 }
 
