@@ -1,0 +1,7 @@
+Integration preflight for CR-BUG-261004-33fnzw-1 revision 1, run RUN-261004-abb065. Latest Integration Assignment supersedes manual integration and generic lifecycle commands. No status mutation, handoff, checkpoint, or integrate invoked.
+
+Verified: task and Story status integrating (board query exit 0); tracked run executing with developer/implementer binding (spawn status exit 0); no directives (exit 0). HEAD ca1b776fb580ec0cee0173bf150daf063023aeaa matches accepted base. Four candidate paths are present. Recomputed tree using an isolated temporary Git index: 7d4cb634db059c154dade477f9d9985c9a23e8c8, exactly matching accepted revision (identity assertion exit 0). No source, LOGBOOK, or CHANGELOG edits made by this run.
+
+Read attached accepted review verdict (resource retrieval and read exit 0). It records exact-tree hosted gate https://github.com/relux-works/curator/actions/runs/37171121482 as successful, including Unix regression coverage and Windows ACL bounds. This run relies on that accepted evidence; it did not independently rerun the hosted gate or local Go commands.
+
+Additional task-board worktree status --json produced no output and was terminated with SIGTERM: exit 143, not a passing precondition check. Initial unsupported query/CLI discovery attempts exited 1; corrected board reads succeeded. Landing freshness, delivery mode, final-leaf admission and transaction checks remain for the synchronous runner. No landing result is claimed. Board remains integrating. Runner must execute the bound landing after this producer exits.

@@ -1,0 +1,278 @@
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index 866fa303..15e267e9 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -698,6 +698,9 @@ cmd/curator	TestCLIAuditMixedSkillRecordsBothPolicies	linux,darwin,windows	-	-	c
+ cmd/curator	TestCLIAuditJSONCarriesScriptLabels	linux,darwin,windows	-	-	curator audit JSON carries warning labels and per-command policy identities
+ cmd/curator	TestCLIAuditJSONRecordsExplicitAbsence	linux,darwin,windows	-	-	curator audit JSON records declared-only policy absence explicitly
+ cmd/curator	TestEnvUnmanageBackupRecordVectors	linux,darwin,windows	linux,darwin,windows	root-unset	rc.13 backup-record restore vectors drive curator env unmanage through the CLI; unreadable inventory refuses before mutation and absent inventory restores nothing
++cmd/curator	TestEnvUnmanageTakeoverPreservesFileMode	linux,darwin	-	-	CLI install, takeover and unmanage restore preserve regular-file modes 0600, 0644, 0751 and 0400; Windows DACLs are not Unix permission bits
++internal/envprofile	TestUnmanageRestorePlanRetainsMetadata	linux,darwin	-	-	restore plan retains each supported backup entry's type, mode and bytes
++internal/envprofile	TestUnmanageRestoreRefusesLinkedParent	linux,darwin	-	-	production Unmanage refuses a linked restore parent before changing external context
+ 
+ # ===========================================================================
+ # Decision 0017 credential-link repairs and explicit migration (F-C1/F-C2/F-C3).
+diff --git a/cmd/curator/env_unmanage_mode_unix_test.go b/cmd/curator/env_unmanage_mode_unix_test.go
+new file mode 100644
+index 00000000..30089ce8
+--- /dev/null
++++ b/cmd/curator/env_unmanage_mode_unix_test.go
+@@ -0,0 +1,65 @@
++//go:build unix
++
++package main
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++// Drive run(), including install and takeover: the mode must survive both
++// backup creation and unmanage restoration, not just a helper invocation.
++// Windows FileMode does not express DACLs; these are Unix permission checks.
++func TestEnvUnmanageTakeoverPreservesFileMode(t *testing.T) {
++	for _, mode := range []os.FileMode{0o600, 0o644, 0o751, 0o400} {
++		t.Run(fmt.Sprintf("%04o", mode), func(t *testing.T) {
++			source, _ := profileHome(t)
++			pkg := t.TempDir()
++			writeContextPackage(t, pkg, "acme", "1.0.0", "managed context\n")
++			if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++				t.Fatalf("profile install exit %d: %s", code, stderr)
++			}
++			// Install may activate the first profile. Unmanage before placing the
++			// hand-maintained file so --takeover sees an operator-owned entry.
++			if code, _, stderr := runProfile(t, source, "env", "unmanage", "--env", "claude_code"); code != exitOK {
++				t.Fatalf("initial unmanage exit %d: %s", code, stderr)
++			}
++			native := os.Getenv("CLAUDE_CONFIG_DIR")
++			full := filepath.Join(native, "CLAUDE.md")
++			original := "operator-owned private context\n"
++			if err := os.WriteFile(full, []byte(original), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			// Set exact bits independently of the process umask.
++			if err := os.Chmod(full, mode); err != nil {
++				t.Fatal(err)
++			}
++			if code, _, stderr := runProfile(t, source, "profile", "use", "acme", "--takeover", "--env", "claude_code"); code != exitOK {
++				t.Fatalf("profile use --takeover exit %d: %s", code, stderr)
++			}
++			backup := filepath.Join(native, ".agent-environment-backup", "1", "CLAUDE.md")
++			assertUnmanageFileMode(t, backup, mode)
++			if code, _, stderr := runProfile(t, source, "env", "unmanage", "--restore-backups", "--env", "claude_code"); code != exitOK {
++				t.Fatalf("env unmanage --restore-backups exit %d: %s", code, stderr)
++			}
++			assertUnmanageFileMode(t, full, mode)
++			assertUnmanageFileMode(t, backup, mode)
++			if got := string(readFileForUnmanageTest(t, full)); got != original {
++				t.Fatalf("restored bytes = %q, want %q", got, original)
++			}
++		})
++	}
++}
++
++func assertUnmanageFileMode(t *testing.T, full string, want os.FileMode) {
++	t.Helper()
++	info, err := os.Lstat(full)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !info.Mode().IsRegular() || info.Mode().Perm() != want {
++		t.Fatalf("%s: type/mode = %v, want regular file %04o", filepath.Base(full), info.Mode(), want)
++	}
++}
+diff --git a/internal/envprofile/unmanage.go b/internal/envprofile/unmanage.go
+index 9e73c760..a5e3005d 100644
+--- a/internal/envprofile/unmanage.go
++++ b/internal/envprofile/unmanage.go
+@@ -52,7 +52,16 @@ type unmanagePlan struct {
+ 	markerPath  string
+ 	backupPath  string
+ 	removals    map[string]bool
+-	restores    map[string][]byte
++	restores    map[string]backupRestoreEntry
++}
++
++// backupRestoreEntry retains the lstat entry type separately from permission
++// bits. Regular files are supported here; link restoration is a separate
++// operation and must never be implemented by reading through the link.
++type backupRestoreEntry struct {
++	kind    fs.FileMode
++	mode    fs.FileMode
++	payload []byte
+ }
+ 
+ // Unmanage removes only native surfaces recorded by their environment marker
+@@ -152,7 +161,7 @@ func planUnmanageHomes(req UnmanageRequest) ([]unmanagePlan, error) {
+ 			markerPath:  filepath.Join(native, envmarker.Name),
+ 			backupPath:  filepath.Join(native, ".agent-environment-backup"),
+ 			removals:    map[string]bool{},
+-			restores:    map[string][]byte{},
++			restores:    map[string]backupRestoreEntry{},
+ 		}
+ 		if marker != nil {
+ 			for _, key := range marker.SortedSurfaceKeys() {
+@@ -176,13 +185,13 @@ func planUnmanageHomes(req UnmanageRequest) ([]unmanagePlan, error) {
+ 	return plans, nil
+ }
+ 
+-func newestBackupFiles(req UnmanageRequest, environment, backupRoot string) (map[string][]byte, error) {
++func newestBackupFiles(req UnmanageRequest, environment, backupRoot string) (map[string]backupRestoreEntry, error) {
+ 	metadata, err := readBackupLstat(req, backupRoot)
+ 	if err != nil {
+ 		return nil, backupRecordUnreadable(backupRoot, err)
+ 	}
+ 	if metadata.Kind == stateread.KindAbsent {
+-		return map[string][]byte{}, nil
++		return map[string]backupRestoreEntry{}, nil
+ 	}
+ 	if metadata.Kind != stateread.KindPresent || metadata.Info == nil || !metadata.Info.IsDir() || metadata.Info.Mode()&os.ModeSymlink != 0 {
+ 		return nil, backupRecordUnreadable(backupRoot, stateread.UnusableError(backupRoot, fmt.Errorf("backup inventory is not a directory")))
+@@ -206,7 +215,7 @@ func newestBackupFiles(req UnmanageRequest, environment, backupRoot string) (map
+ 		}
+ 	}
+ 	if newest == 0 {
+-		return map[string][]byte{}, nil
++		return map[string]backupRestoreEntry{}, nil
+ 	}
+ 
+ 	generationRoot := filepath.Join(backupRoot, strconv.Itoa(newest))
+@@ -224,7 +233,7 @@ func newestBackupFiles(req UnmanageRequest, environment, backupRoot string) (map
+ 	return files, nil
+ }
+ 
+-func readBackupTree(req UnmanageRequest, environment, directory, prefix string) (map[string][]byte, error) {
++func readBackupTree(req UnmanageRequest, environment, directory, prefix string) (map[string]backupRestoreEntry, error) {
+ 	listing, err := readBackupDir(req, directory)
+ 	if err != nil {
+ 		return nil, backupRecordUnreadable(directory, err)
+@@ -232,7 +241,7 @@ func readBackupTree(req UnmanageRequest, environment, directory, prefix string)
+ 	if listing.Kind != stateread.KindPresent {
+ 		return nil, backupRecordUnreadable(directory, stateread.UnusableError(directory, fmt.Errorf("backup generation directory is absent or unusable")))
+ 	}
+-	files := map[string][]byte{}
++	files := map[string]backupRestoreEntry{}
+ 	for _, entry := range listing.Entries {
+ 		name := entry.Name()
+ 		rel := path.Join(prefix, name)
+@@ -270,7 +279,11 @@ func readBackupTree(req UnmanageRequest, environment, directory, prefix string)
+ 		if state.Kind != stateread.KindPresent {
+ 			return nil, backupRecordUnreadable(full, stateread.UnusableError(full, fmt.Errorf("backup file is absent")))
+ 		}
+-		files[rel] = append([]byte(nil), state.Bytes...)
++		files[rel] = backupRestoreEntry{
++			kind:    metadata.Info.Mode().Type(),
++			mode:    metadata.Info.Mode().Perm(),
++			payload: append([]byte(nil), state.Bytes...),
++		}
+ 	}
+ 	return files, nil
+ }
+@@ -301,10 +314,13 @@ func preflightUnmanagePlan(plan unmanagePlan) error {
+ 	for rel := range plan.removals {
+ 		paths[rel] = true
+ 	}
+-	for rel := range plan.restores {
++	for rel, entry := range plan.restores {
+ 		if !safeBackupPath(rel) || reservedRestorePath(rel) {
+ 			return backupRecordUnreadable(filepath.Join(plan.backupPath, rel), stateread.UnusableError(filepath.Join(plan.backupPath, rel), fmt.Errorf("invalid backup path %q", rel)))
+ 		}
++		if !entry.kind.IsRegular() {
++			return backupRecordUnreadable(filepath.Join(plan.backupPath, rel), fmt.Errorf("unsupported backup entry type %v", entry.kind))
++		}
+ 		paths[rel] = true
+ 	}
+ 	for rel := range paths {
+@@ -367,15 +383,13 @@ func applyUnmanagePlan(plan unmanagePlan) (UnmanageHome, error) {
+ 	sort.Strings(paths)
+ 	for _, rel := range paths {
+ 		full := filepath.Join(plan.home, filepath.FromSlash(rel))
+-		payload, restore := plan.restores[rel]
++		entry, restore := plan.restores[rel]
+ 		if restore {
+-			if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+-				return outcome, err
+-			}
+-			if err := os.Remove(full); err != nil && !os.IsNotExist(err) {
+-				return outcome, err
+-			}
+-			if err := os.WriteFile(full, payload, 0o644); err != nil {
++			// Stage privately, preserve the saved permission bits, and replace
++			// the entry without opening the current managed link's target.
++			// On Windows the writer creates an owner-only protected DACL;
++			// FileMode does not encode or restore the original Windows ACL.
++			if err := atomicManagedFile(plan.home, rel, entry.payload, entry.mode); err != nil {
+ 				return outcome, err
+ 			}
+ 			outcome.Restored = append(outcome.Restored, rel)
+diff --git a/internal/envprofile/unmanage_mode_unix_test.go b/internal/envprofile/unmanage_mode_unix_test.go
+new file mode 100644
+index 00000000..3a9670f6
+--- /dev/null
++++ b/internal/envprofile/unmanage_mode_unix_test.go
+@@ -0,0 +1,63 @@
++//go:build unix
++
++package envprofile
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++func TestUnmanageRestorePlanRetainsMetadata(t *testing.T) {
++	native := t.TempDir()
++	backup := filepath.Join(native, ".agent-environment-backup", "1", "CLAUDE.md")
++	if err := os.MkdirAll(filepath.Dir(backup), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(backup, []byte("private context\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	plans, err := planUnmanageHomes(UnmanageRequest{
++		EnvID: "claude_code", RestoreBackups: true,
++		NativeHomeOf: func(string) (string, error) { return native, nil },
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	entry, ok := plans[0].restores["CLAUDE.md"]
++	if !ok || entry.kind != 0 || entry.mode != 0o600 || string(entry.payload) != "private context\n" {
++		t.Fatalf("restore entry = %+v, present = %v; want regular 0600 with backup bytes", entry, ok)
++	}
++}
++
++// The production Unmanage entry point must refuse a parent link before any
++// restore writes, even though the final regular-file replacement is atomic.
++func TestUnmanageRestoreRefusesLinkedParent(t *testing.T) {
++	native, outside := t.TempDir(), t.TempDir()
++	backup := filepath.Join(native, ".agent-environment-backup", "1", "context", "private.md")
++	if err := os.MkdirAll(filepath.Dir(backup), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(backup, []byte("backup context\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	external := filepath.Join(outside, "private.md")
++	if err := os.WriteFile(external, []byte("external context\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink(outside, filepath.Join(native, "context")); err != nil {
++		t.Fatal(err)
++	}
++	_, err := Unmanage(UnmanageRequest{
++		Home: t.TempDir(), EnvID: "claude_code", RestoreBackups: true,
++		NativeHomeOf: func(string) (string, error) { return native, nil },
++	})
++	if err == nil || !strings.Contains(err.Error(), DiagWriteWouldFollowLink) {
++		t.Fatalf("Unmanage error = %v, want parent-link refusal", err)
++	}
++	payload, err := os.ReadFile(external)
++	if err != nil || string(payload) != "external context\n" {
++		t.Fatalf("external context changed: %q (%v)", payload, err)
++	}
++}
