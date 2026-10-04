@@ -58,6 +58,18 @@ spawn queued: [implementer] developer (codex) (run=RUN-261004-78c874, max_parall
 spawn run started: [implementer] developer (codex) (run=RUN-261004-78c874)
 agent completed: [implementer] developer (codex) (exit=0)
 spawn run completed: codex (run=RUN-261004-78c874, pid=18358, exit=0)
+spawn run RUN-261004-78c874 failed; operator action required; failure: board_publication_pending: runner integrate refused: board_publication_pending: STORY-261004-o4s9aq is landed and its board state is committed as 7347499843dc7f0d2bc80f025d5eba4342d8060f on the local trunk, but the publication push did not land (board_publish_foreign_lane_overlap); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: 7347499843dc7f0d2bc80f025d5eba4342d8060f
+  cause_code: board_publish_foreign_lane_overlap
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 371f250d725f987e52f8f21c8ed7b78997bb4d2d
+  story_id: STORY-261004-o4s9aq
+  cause: board_publish_foreign_lane_overlap: the unpublished 7347499843dc7f0d2bc80f025d5eba4342d8060f reaches outside board_paths(STORY-261004-o4s9aq) on 2 path(s) — starting with .task-board/EPIC-260910-2hw1xb_security-audit-remediation-manager-and-spec/STORY-261004-3oognx_inline-audit-2026-10-remediation/BUG-261004-2v9pbz_expanded-snapshot-budget-bypass-repeated-blobs/README.md; a Story record carries its own lane only, and a delta spanning lanes needs an Epic Record subject covering them — nothing was projected and nothing was pushed
+  element_id: STORY-261004-o4s9aq
+  link_oid: 7347499843dc7f0d2bc80f025d5eba4342d8060f
+  paths: .task-board/EPIC-260910-2hw1xb_security-audit-remediation-manager-and-spec/STORY-261004-3oognx_inline-audit-2026-10-remediation/BUG-261004-2v9pbz_expanded-snapshot-budget-bypass-repeated-blobs/README.md,.task-board/EPIC-260910-2hw1xb_security-audit-remediation-manager-and-spec/STORY-261004-3oognx_inline-audit-2026-10-remediation/BUG-261004-2v9pbz_expanded-snapshot-budget-bypass-repeated-blobs/progress.md
+  remedy: re-record the bytes at the owning scope, or land the chain through integrate/reconcile-trunk
 
 ## Precondition Resources
 - [n2-budget-brief.md](file://BUG-261004-2v9pbz/n2-budget-brief.md)
@@ -80,7 +92,7 @@ spawn run completed: codex (run=RUN-261004-78c874, pid=18358, exit=0)
 2026-10-03T20:52:08Z
 
 ## Last Update
-2026-10-04T05:25:59Z
+2026-10-04T05:28:22Z
 
 ## Assigned To
 [implementer] developer (codex)
