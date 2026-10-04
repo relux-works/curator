@@ -65,13 +65,14 @@ func ErrorCode(err error) string {
 	return ""
 }
 
-// Limits bounds raw-object expansion and repository processing.
+// Limits bounds unique raw objects and each expanded snapshot allocation.
 type Limits struct {
 	Timeout          time.Duration
 	MaxObjects       int
 	MaxObjectBytes   int64
 	MaxExpandedBytes int64
 	MaxFiles         int
+	MaxTreeEntries   int // Counts every expanded entry, including repeated trees.
 	MaxPathBytes     int
 	MaxTreeDepth     int
 	MaxTagDepth      int
@@ -82,7 +83,8 @@ func DefaultLimits() Limits {
 	return Limits{
 		Timeout: 2 * time.Minute, MaxObjects: 200_000,
 		MaxObjectBytes: 512 << 20, MaxExpandedBytes: 2 << 30,
-		MaxFiles: 200_000, MaxPathBytes: 4096, MaxTreeDepth: 128, MaxTagDepth: 16,
+		MaxFiles: 200_000, MaxTreeEntries: 400_000,
+		MaxPathBytes: 4096, MaxTreeDepth: 128, MaxTagDepth: 16,
 	}
 }
 
@@ -625,6 +627,9 @@ func normalizedLimits(l Limits) Limits {
 	if l.MaxFiles > 0 {
 		d.MaxFiles = l.MaxFiles
 	}
+	if l.MaxTreeEntries > 0 {
+		d.MaxTreeEntries = l.MaxTreeEntries
+	}
 	if l.MaxPathBytes > 0 {
 		d.MaxPathBytes = l.MaxPathBytes
 	}
@@ -735,7 +740,7 @@ func (r *objectReader) read(oid string) (rawObject, error) {
 		return rawObject{}, admissionError(CodeIncompleteSource, "non-canonical object size")
 	}
 	size, err := strconv.ParseInt(parts[2], 10, 64)
-	if err != nil || size < 0 || size > r.limits.MaxObjectBytes || r.expanded+size > r.limits.MaxExpandedBytes {
+	if err != nil || size < 0 || size > r.limits.MaxObjectBytes || size > r.limits.MaxExpandedBytes-r.expanded {
 		return rawObject{}, admissionError(CodeIncompleteSource, "object size limit exceeded")
 	}
 	data := make([]byte, size)
@@ -802,11 +807,17 @@ func proveRepository(ctx context.Context, tool GitTool, env []string, paths priv
 	}
 	files := make([]File, 0)
 	seenPaths := map[string]string{}
-	if err := walkTree(reader, tree, "", 0, limits, seenPaths, &files); err != nil {
+	budget := snapshotBudget{canonical: int64(len(snapshotHeader))}
+	if budget.canonical > limits.MaxExpandedBytes {
+		return nil, admissionError(CodeIncompleteSource, "snapshot framing limit exceeded")
+	}
+	if err := walkTree(ctx, reader, tree, "", 0, limits, &budget, seenPaths, &files); err != nil {
 		return nil, err
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
-	canonical := frameSnapshot(files)
+	// All framing bytes were reserved before emitting files. Allocate exactly
+	// that size, avoiding append growth beyond the admitted canonical budget.
+	canonical := frameSnapshotSized(files, int(budget.canonical))
 	digest := sha256.Sum256(canonical)
 	return &Snapshot{ObjectFormat: format, Commit: commit, Files: files, CanonicalBytes: canonical, Digest: "sha256:" + hex.EncodeToString(digest[:])}, nil
 }
@@ -990,7 +1001,49 @@ func parseTag(object rawObject, format string) (target, targetType, tag string, 
 	return
 }
 
-func walkTree(r *objectReader, oid, prefix string, depth int, limits Limits, seen map[string]string, files *[]File) error {
+const snapshotHeader = "curator-build-source-v1\x00"
+
+// The cache has its own unique-object budget. These counters instead charge
+// every emitted path, so a blob or tree alias cannot bypass expansion limits.
+// Each byte buffer is bounded by MaxExpandedBytes; entry/file limits also
+// bound path maps and slice metadata independently of blob contents.
+type snapshotBudget struct {
+	entries, files      int
+	expanded, canonical int64
+}
+
+func (b *snapshotBudget) reserveFile(path string, contentBytes int64, limits Limits) error {
+	if b.files >= limits.MaxFiles {
+		return admissionError(CodeIncompleteSource, "file count limit exceeded")
+	}
+	if contentBytes > limits.MaxExpandedBytes-b.expanded {
+		return admissionError(CodeIncompleteSource, "expanded snapshot size limit exceeded")
+	}
+	// Canonical framing also counts the header, type byte, two uint64 lengths
+	// and UTF-8 path bytes. Subtract before adding to avoid integer overflow.
+	maxCanonical := limits.MaxExpandedBytes
+	if maxInt := int64(int(^uint(0) >> 1)); maxCanonical > maxInt {
+		maxCanonical = maxInt
+	}
+	remaining := maxCanonical - b.canonical
+	const lengthsAndType = 1 + 8 + 8
+	if remaining < lengthsAndType || int64(len(path)) > remaining-lengthsAndType {
+		return admissionError(CodeIncompleteSource, "snapshot framing limit exceeded")
+	}
+	framing := int64(lengthsAndType) + int64(len(path))
+	if contentBytes > remaining-framing {
+		return admissionError(CodeIncompleteSource, "snapshot framing limit exceeded")
+	}
+	b.files++
+	b.expanded += contentBytes
+	b.canonical += framing + contentBytes
+	return nil
+}
+
+func walkTree(ctx context.Context, r *objectReader, oid, prefix string, depth int, limits Limits, budget *snapshotBudget, seen map[string]string, files *[]File) error {
+	if err := ctx.Err(); err != nil {
+		return admissionError(CodeIncompleteSource, "repository walk canceled: %w", err)
+	}
 	if depth > limits.MaxTreeDepth {
 		return admissionError(CodeIncompleteSource, "tree depth limit exceeded")
 	}
@@ -1008,6 +1061,13 @@ func walkTree(r *objectReader, oid, prefix string, depth int, limits Limits, see
 	data := object.data
 	local := map[string]bool{}
 	for len(data) > 0 {
+		if err := ctx.Err(); err != nil {
+			return admissionError(CodeIncompleteSource, "repository walk canceled: %w", err)
+		}
+		if budget.entries >= limits.MaxTreeEntries {
+			return admissionError(CodeIncompleteSource, "expanded tree entry limit exceeded")
+		}
+		budget.entries++
 		space := bytes.IndexByte(data, ' ')
 		nul := bytes.IndexByte(data, 0)
 		if space <= 0 || nul <= space+1 || len(data) < nul+1+idBytes {
@@ -1041,7 +1101,7 @@ func walkTree(r *objectReader, oid, prefix string, depth int, limits Limits, see
 		seen[collisionKey(path)] = path
 		switch mode {
 		case "40000":
-			if err := walkTree(r, child, path, depth+1, limits, seen, files); err != nil {
+			if err := walkTree(ctx, r, child, path, depth+1, limits, budget, seen, files); err != nil {
 				return err
 			}
 		case "100644", "100755":
@@ -1055,8 +1115,8 @@ func walkTree(r *objectReader, oid, prefix string, depth int, limits Limits, see
 			if isLFSPointer(blob.data) {
 				return admissionError(CodeLFSUnsupported, "reachable Git LFS pointer is unsupported")
 			}
-			if len(*files) >= limits.MaxFiles {
-				return admissionError(CodeIncompleteSource, "file count limit exceeded")
+			if err := budget.reserveFile(path, int64(len(blob.data)), limits); err != nil {
+				return err
 			}
 			content := append([]byte(nil), blob.data...)
 			*files = append(*files, File{Path: path, Content: content, Executable: mode == "100755"})
@@ -1070,7 +1130,16 @@ func walkTree(r *objectReader, oid, prefix string, depth int, limits Limits, see
 func collisionKey(path string) string { return strings.ToLower(norm.NFC.String(path)) }
 
 func frameSnapshot(files []File) []byte {
-	result := append([]byte(nil), []byte("curator-build-source-v1\x00")...)
+	size := len(snapshotHeader)
+	for _, file := range files {
+		size += 1 + 8 + len(file.Path) + 8 + len(file.Content)
+	}
+	return frameSnapshotSized(files, size)
+}
+
+func frameSnapshotSized(files []File, size int) []byte {
+	result := make([]byte, 0, size)
+	result = append(result, snapshotHeader...)
 	for _, file := range files {
 		result = append(result, 'F')
 		result = binary.BigEndian.AppendUint64(result, uint64(len([]byte(file.Path))))
