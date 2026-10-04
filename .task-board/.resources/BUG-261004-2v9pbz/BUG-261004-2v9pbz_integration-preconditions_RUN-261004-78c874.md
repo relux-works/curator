@@ -1,0 +1,9 @@
+Integration preconditions for CR-BUG-261004-2v9pbz-1 revision 1. No repository files changed by this run. No status mutation, handoff, checkpoint, or integrate command executed.
+
+Observed through task-board worktree status (exit 0): revision 1 accepted; kind story_final; producer role developer, archetype implementer; candidate tree 438f9c753fdbc238e7125a5440ce73710b98ca77; base and branch tip ca1b776fb580ec0cee0173bf150daf063023aeaa; active lease RUN-261004-78c874. Board query (exit 0): bug and parent story both integrating. Spawn status and directives (exit 0): current run executing, no directives.
+
+Git status --short (exit 0) reports exactly the accepted three changed paths: docs/repository-admission-limits.md, internal/buildrepo/admission.go, internal/buildrepo/snapshot_budget_test.go. Direct Python byte comparison of each file against git show candidate:path exited 0: all three MATCH. Git diff candidate -- internal/buildrepo/admission.go exited 0 with no output.
+
+No tests or builds rerun in this integration-only assignment; accepted review evidence is retained, not independently reasserted. Hosted gate result not checked here. Recorded protected-authority observation is historical; freshness and transactional landing must be verified by the bound runner. Workspace status also reports unrelated board debt for TASK-261002-2ipeqa, left untouched.
+
+CLI discovery attempts schema(operation=change_request), task-board cr --help, and task-board change-request --help each exited 1 because those interfaces are unsupported; these were not validation gates. Preconditions inspected above support runner handoff, not a claim that landing succeeded. The bound runner must integrate synchronously after producer exit and record its actual result.
