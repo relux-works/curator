@@ -56,12 +56,12 @@ type unmanagePlan struct {
 }
 
 // backupRestoreEntry retains the lstat entry type separately from permission
-// bits. Regular files are supported here; link restoration is a separate
-// operation and must never be implemented by reading through the link.
+// bits. Link targets are text, never payload read through the saved link.
 type backupRestoreEntry struct {
-	kind    fs.FileMode
-	mode    fs.FileMode
-	payload []byte
+	kind       fs.FileMode
+	mode       fs.FileMode
+	payload    []byte
+	linkTarget string
 }
 
 // Unmanage removes only native surfaces recorded by their environment marker
@@ -266,11 +266,23 @@ func readBackupTree(req UnmanageRequest, environment, directory, prefix string) 
 			}
 			continue
 		}
-		if !metadata.Info.Mode().IsRegular() {
-			return nil, backupRecordUnreadable(full, stateread.UnusableError(full, fmt.Errorf("backup entry is not a regular file")))
+		kind := metadata.Info.Mode().Type()
+		if !kind.IsRegular() && kind != fs.ModeSymlink {
+			return nil, backupRecordUnreadable(full, stateread.UnusableError(full, fmt.Errorf("backup entry is not a regular file or link")))
 		}
 		if credentialPath(environment, rel) {
 			return nil, backupRecordUnreadable(full, stateread.UnusableError(full, fmt.Errorf("backup record names a credential path")))
+		}
+		if kind == fs.ModeSymlink {
+			link, err := stateread.Readlink(full)
+			if err != nil {
+				return nil, backupRecordUnreadable(full, err)
+			}
+			if link.Kind != stateread.KindPresent {
+				return nil, backupRecordUnreadable(full, stateread.UnusableError(full, fmt.Errorf("backup link is absent")))
+			}
+			files[rel] = backupRestoreEntry{kind: kind, linkTarget: link.Target}
+			continue
 		}
 		state, err := stateread.ReadFile(full)
 		if err != nil {
@@ -318,12 +330,19 @@ func preflightUnmanagePlan(plan unmanagePlan) error {
 		if !safeBackupPath(rel) || reservedRestorePath(rel) {
 			return backupRecordUnreadable(filepath.Join(plan.backupPath, rel), stateread.UnusableError(filepath.Join(plan.backupPath, rel), fmt.Errorf("invalid backup path %q", rel)))
 		}
-		if !entry.kind.IsRegular() {
+		if !entry.kind.IsRegular() && entry.kind != fs.ModeSymlink {
 			return backupRecordUnreadable(filepath.Join(plan.backupPath, rel), fmt.Errorf("unsupported backup entry type %v", entry.kind))
 		}
 		paths[rel] = true
 	}
 	for rel := range paths {
+		// A restored directory link must not turn a later restore or
+		// recorded removal into a traversal of its external target.
+		for parent := path.Dir(rel); parent != "."; parent = path.Dir(parent) {
+			if entry, restore := plan.restores[parent]; restore && entry.kind == fs.ModeSymlink {
+				return fmt.Errorf("%s: %s: refusing to traverse restored link at %s", plan.environment, DiagWriteWouldFollowLink, filepath.Join(plan.home, filepath.FromSlash(parent)))
+			}
+		}
 		if err := inspectUnmanagePath(plan.home, rel); err != nil {
 			return fmt.Errorf("%s: %w", plan.environment, err)
 		}
@@ -382,14 +401,19 @@ func applyUnmanagePlan(plan unmanagePlan) (UnmanageHome, error) {
 	}
 	sort.Strings(paths)
 	for _, rel := range paths {
-		full := filepath.Join(plan.home, filepath.FromSlash(rel))
 		entry, restore := plan.restores[rel]
 		if restore {
-			// Stage privately, preserve the saved permission bits, and replace
-			// the entry without opening the current managed link's target.
+			// Stage privately and replace the entry without opening either
+			// the saved link's target or the current managed link's target.
 			// On Windows the writer creates an owner-only protected DACL;
 			// FileMode does not encode or restore the original Windows ACL.
-			if err := atomicManagedFile(plan.home, rel, entry.payload, entry.mode); err != nil {
+			var err error
+			if entry.kind == fs.ModeSymlink {
+				err = atomicManagedLink(plan.home, rel, entry.linkTarget)
+			} else {
+				err = atomicManagedFile(plan.home, rel, entry.payload, entry.mode)
+			}
+			if err != nil {
 				return outcome, err
 			}
 			outcome.Restored = append(outcome.Restored, rel)
@@ -398,7 +422,7 @@ func applyUnmanagePlan(plan unmanagePlan) (UnmanageHome, error) {
 		if !plan.removals[rel] {
 			continue
 		}
-		if err := os.Remove(full); err != nil && !os.IsNotExist(err) {
+		if err := removeManagedEntry(plan.home, rel); err != nil {
 			return outcome, err
 		}
 		outcome.Removed = append(outcome.Removed, rel)
