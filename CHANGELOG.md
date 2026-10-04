@@ -4,13 +4,132 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
-- Marker v3/v4 readers reject inconsistent external repository identities, substitution kinds, and effective revision widths.
-- Accept the rc.14 candidate conformance digest with exact counts and gap accounting, including the snapshot v2-write gap owned by the pin cut-over; keep rc.13 pinned and v2 writers off.
-- Windows executable resolution now proves platform ownership and every component-store hard-link origin before granting the captured System32 exception.
-
-- Unix HTTPS askpass requests the secret only after accepting the password prompt, preventing broken-pipe transport errors on refusal paths.
+## 0.15.0-rc.3 - 2026-10-04
 
 ### Added
+
+- Muse environment adapter and `launch-env-fragment-v3` (curator#100,
+  curator-spec#121): managed XDG configuration, cache, data, and state parents
+  preserve `HOME`; credential passthrough is validated without copying secrets.
+  Muse prompt and MCP channels remain unverified and are refused.
+- `launch-env-fragment-v2` carries Decision 0018 permission selections as
+  `{mode, locked, source}`, including explicit yolo and locked native policy.
+  Existing explicit `env migrate` credential ownership migration remains the
+  route for credential conflicts; repair does not silently migrate ownership.
+- `curator env unmanage --restore-backups` restores saved native context files
+  when returning to ambient management, with a read-only dry run and conflict
+  checks. The restore limitations found by the inline audit are listed below.
+- `curator global adopt` explicitly takes ownership of conflicting global
+  command shims after showing the plan, with dry-run support and rollback.
+- Operator guidance for external build repositories and a second-operator
+  bootstrap/profile/environment walkthrough. README and SECURITY now explain
+  portable worker bounds and the separately installed verified-provider path;
+  this release ships no verified provider.
+- Release-readiness, spec-review, build-leaf reconciliation, and launch-context
+  research records document qualification and ownership boundaries. Public-board
+  guidance keeps other operators' product material private.
+- Expanded production-entry regression coverage for profile reinstall,
+  collection installs, bounded MCP declaration exposure, protected-store named
+  absence, and nofollow parent writes. The test harness and CI isolate user and
+  system Git configuration to keep host settings out of fixtures.
+
+### Changed
+
+- CI conformance pin advances to curator-spec `1.0.0-rc.14`, peeled tag commit
+  `43bf0a2506d5c354a73bbc3ea4623d4653db10c7`, manifest SHA-256
+  `6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5`.
+  Candidate and released families retain exact case counts and owned gap
+  accounting; the pin alone is not a conformance or release qualification.
+- Content-hash v2 readers and versioned marker, context, environment, and
+  registry carriers are supported with frozen v1 read compatibility. Production
+  hashes are still written as `curator-content-v1`; the v2 writer remains off.
+- Codex seed revision A ships for the first time in a tagged warning release:
+  native `config.toml` is copied whole, inherited MCP servers are recorded and
+  reported as ungoverned, and provisioning warns
+  `mcp_native_servers_ungoverned`. Revision B remains deferred.
+- Machine `security_posture` revision A also ships for the first time in a
+  tagged warning release. The default remains `permissive`, with
+  `security_posture_permissive` warnings; explicitly selected `hardened`
+  applies its stricter defaults and locked policy. When a trusted registry is
+  unreachable, permissive install/update names artifacts without registry
+  evidence in a gate notice, while hardened refuses. Default-hardened revision
+  B remains deferred.
+- Global profile/environment operations serialize plan revalidation and
+  publication under the manager-home mutation lock, publishing configuration,
+  scope records, and managed homes in transaction order.
+- External-repository acquisition and install lifecycle consumers now account
+  for the published cases. Malformed repository requests refuse before Git is
+  started; Windows cache artifacts retain their `.exe` suffix. Mixed
+  external/local builds stage external commands first, receipt-2 cache keys
+  omit execution assurance while cache lookup still verifies its receipt, and
+  package-selected signing or artifact/PATH output destinations receive
+  explicit refusal diagnostics.
+
+### Fixed
+
+- Project install materializes skills at non-git product roots with a hygiene
+  notice; unexpected Git failures still refuse installation. First-run help
+  works without machine configuration, missing configuration points to
+  bootstrap, and inactive profiles' unprovisioned homes no longer fail
+  `env status --check`.
+- Global-upgrade and GC build-cache sweeps preserve binaries used by live
+  processes and skip deletion when process inspection cannot establish
+  safety. This does not repair the separate runtime-reference audit finding N1.
+- Marker v3/v4 readers reject inconsistent external repository identities,
+  substitution kinds, and effective revision widths; core v5 shares these
+  cross-field checks.
+- Unix HTTPS askpass requests the secret only after accepting the password
+  prompt, preventing broken-pipe (`EPIPE`) transport errors on refusal paths.
+- Hosted/self-hosted CI follow-ups preserve the selected Go and Node paths when
+  adding Rust tools, verify toolchain/shim adoption, select the explicit self-hosted
+  runner label, and remove hard-link assumptions from worker identity tests.
+  The naming gate ignores binary-patch payloads and machine echo records.
+
+### Security
+
+- Managed writes refuse symlinks/reparse points in parent routes and recheck
+  boundaries before publication. Profile path sources and private stores now
+  validate path kinds, ownership, permissions, and containment, including
+  entries that disappear during a boundary walk. Read failures remain distinct
+  from absence and cannot select an absence fallback.
+- Audit-registry page/checkpoint records are bound to their protected store
+  boundaries. Operator bootstrap checkpoints and mirror groups provide TOFU
+  and equivocation checks, with their state surfaced by status commands.
+- Profile source signer allowlists and required signers are enforced; updates
+  surface system-prompt and MCP deltas for confirmation. Direct-only system
+  module admission and trust-root provider status now honor their policy and
+  report dropped, refused, missing, and unreadable rows accurately. Existing
+  warning-stage provider, hook, and MCP passthrough policies remain in effect.
+- Windows executable resolution proves platform ownership and every
+  component-store hard-link origin before granting the captured System32
+  exception; matching file identity alone is insufficient.
+- Scoped HTTPS build-repository credentials now travel through a broker pipe
+  rather than the child environment, with host-pinned credential selection.
+- The release installer verifies attested or signed checksums and then the
+  archive digest, refusing missing verifiers or failed verification. The
+  explicit `CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1` emergency bypass warns.
+  The interim content audit also reports NUL-containing opaque inputs rather
+  than treating them as safely scanned text.
+
+### Known issues
+
+- Windows broker real-Git flake `TASK-260930-fp8vx7`: two historical failures
+  were not reproduced in approximately 21,000 hosted passes. No root cause is
+  established; rc.3 ships this as a documented risk.
+- Content-hash v2 writing is deferred to rc.4, owned by `TASK-261003-1uzji7`;
+  atomic v1→v2 profile hash migration must land first. The rc.14 snapshot
+  v2-write case remains an owned known gap while production writers select v1.
+- The 2026-10 inline security audit found N1–N4: runtime GC with incomplete
+  references, expanded-snapshot budget bypass through repeated blobs, restored
+  file permissions widened, and inability to restore a saved symlink. These
+  are not fixed in rc.3. See [issue #106](https://github.com/relux-works/curator/issues/106)
+  and [the audit report](docs/security-audit-2026-10-inline.md); remediation is
+  tracked in `STORY-261004-3oognx`.
+- B3 cache-prune PRs are excluded from this release.
+
+### Shipped in 0.15.0-rc.2 but not recorded in its notes
+
+These entries were listed under Unreleased when 0.15.0-rc.2 was tagged; the changes are part of 0.15.0-rc.2.
 
 - R5 script-worker-v1 runtime conformance qualification. All 33 named
   behavioral vector cases and 11 mandatory controls map to registered
@@ -30,6 +149,7 @@ All notable implementation changes are recorded here.
   per-invocation probes. Piped input remains capped at 64 MiB and combined
   captured output at 16 MiB; interactive and pass-through streams are outside
   this bounded model.
+
 - E4: umbrella provider lookup from trust roots (warning release,
   revision A). Unknown subcommands still resolve `curator-<name>` on the
   ambient `PATH`, but the manager now computes the trust verdict against
@@ -47,6 +167,7 @@ All notable implementation changes are recorded here.
   non-current for `--check`. Revision B (trust roots only, `PATH`
   never selects) follows in a later release; this story blocks proposal
   0016 / `path_prepend`.
+
 - R4 script audit warning classes for `script-worker-v1` (manager profile
   §7). Every declared-only script command — schema 7 and schema 8 without
   `execution_policy` — now warns `script-command-declared-only` through
@@ -62,6 +183,7 @@ All notable implementation changes are recorded here.
   identity or its explicit absence (`audit info` lines, `script_policies`
   in `audit --json`, and the stored verdict), independent of warning
   eligibility. Operator guidance in `docs/troubleshooting.md`.
+
 - R3 native probes, capability evidence, and preflight for
   `script-worker-v1`. Every enforced invocation probes the exhaustive
   eight-control native inventory once, before the worker starts, with no
@@ -98,6 +220,7 @@ All notable implementation changes are recorded here.
   filesystem mutation right the probed Landlock ABI provides (write,
   truncation, entry creation/removal/reparenting, device ioctl) while
   reads stay unrestricted.
+
 - R2 declaration-derived enforcement for `script-worker-v1`. Every enforced
   invocation derives its containment profile from the declared capabilities,
   deny by default: a manager-built environment (empty bootstrap plus
@@ -117,6 +240,7 @@ All notable implementation changes are recorded here.
   records each command's derivation in its result messages. Operator
   documentation for the `script_interpreters` bindings in
   `docs/script-interpreters.md`.
+
 - R1 script manager/worker invocation path (`script-worker-v1`). The manager
   resolves the closed `node-v1`/`python3-v1` interpreter identifiers from the
   new operator-trusted `script_interpreters` machine-configuration mapping
@@ -134,6 +258,7 @@ All notable implementation changes are recorded here.
   at resolution and at the worker before the interpreter runs. Enforced
   launch remains refused until the R2/R3 control set is complete; no
   enforced script launches uncontained.
+
 - Scoped HTTPS credentials for external build repositories. A `build_https`
   configuration section maps a source scope to a token source — the operator's
   own Git credential for the host, a manager-namespaced keyring entry, or a
@@ -143,16 +268,19 @@ All notable implementation changes are recorded here.
   and is never selectable by a package; a private HTTPS fetch is answered by a
   manager-owned, host-pinned askpass broker, and an uncovered repository stays
   anonymous (`Spec core §12.2`).
+
 - Operator documentation for scoped HTTPS build-repository token sources,
   credential resolution, and the `curator config build-https` command.
   `CURATOR_BUILD_HTTPS_TOKEN` without `CURATOR_BUILD_HTTPS_HOST` is
   identity-unbound and may be offered to every HTTPS build-repository
   host reached by the run; bind it to one host or use a `build_https` scope
   (`Spec core §12.2`).
+
 - Schema-8 first-party module roots for the `go-v1` driver: a build root may
   replace declared module directories elsewhere in the snapshot, and those
   directories join the directive, cgo, and assembly scan surface
   (Protocol Core §4.2.3).
+
 - S6: shell-hook trust gate — warning release (`A-warning`). The POSIX and
   PowerShell hooks now verify a project `.agents/env.sh` / `.agents/env.ps1`
   against the manager-home approval state before sourcing it, and warn once
@@ -180,6 +308,7 @@ All notable implementation changes are recorded here.
   enforcing revision (`B-enforcing`,
   refuse without sourcing) follows in a later release
   (Manager profile §8).
+
 - CI guard for the GoReleaser rc channel values.
   `tools/goreleaserconfig` parses `.goreleaser.yml` with `gopkg.in/yaml.v3`
   (not a text search) and requires every `homebrew_casks`/`scoops` entry's
@@ -190,6 +319,7 @@ All notable implementation changes are recorded here.
   the tap and bucket. The check runs as a Go test in the lint lane on
   every push (and in every `go list ./...` lane); `gate-selftest.sh`
   pins the lint wiring structurally (TASK-260908-2kqa77).
+
 - E2: direct-only `class: system` modules. Only the system modules of direct
   packages — the root, the active overlays, and the packages their
   `requires.contexts` name — plus packages admitted by a
@@ -203,6 +333,7 @@ All notable implementation changes are recorded here.
   knob locks to `error` only; waivers are not lockable. `curator env
   status` reports the effective policy value with every dropped module by
   package and path (Protocol environments §3, §5.5, §12).
+
 - S4 warning release (`s4-warn`, audit finding S4): `profile install`,
   `profile update`, and `env status` now surface every resolved MCP
   declaration package — package, version, transport, stdio command, args,
@@ -221,6 +352,7 @@ All notable implementation changes are recorded here.
   same option and follows in a later release; this release keeps the
   pre-S4 unbounded behaviour and only warns
   (Spec environments §2.2, §2.3, §10.3, §12).
+
 - Conformance pin → v1.0.0-rc.12 (`dced9b8`): the hosted gate now runs
   the manager-config-v2, environments (with the E2 system-module
   admission cases), umbrella-provider-resolution, and
@@ -229,8 +361,6 @@ All notable implementation changes are recorded here.
   families are removed — an absent family now fails instead of
   skipping.
 
-### Changed
-
 - The install transaction engine now caches canonical namespace resolutions
   per transaction across journal saves in one per-write recheck epoch
   (invalidated by `checkBoundary` before every publication write; legacy
@@ -238,6 +368,7 @@ All notable implementation changes are recorded here.
   performance fix: the draft failure-at-every-target-class sweep and late
   rollbacks spend far less time in `filepath.EvalSymlinks` on Windows, with
   every rollback and boundary proof unchanged.
+
 - A `go-v1` build root whose `vendor/modules.txt` carries a directory
   replacement the command does not declare is now refused with
   `build_module_root_directive_undeclared`. §4.2.3 requires a command with an
@@ -246,10 +377,6 @@ All notable implementation changes are recorded here.
   directive exactly as it does for a used one. A schema-6 or schema-7 skill
   that carried an unused directory `replace` therefore built before and now
   fails; declare the directory under `modules`, or drop the directive.
-
-### Fixed
-
-- Project install now materializes skills at non-git product roots with a hygiene notice, while unexpected Git failures refuse installation.
 
 - E4: the user-bin shim directory counts as manager-published — and
   refuses providers under revision A — only once the manager has
@@ -263,6 +390,7 @@ All notable implementation changes are recorded here.
   Trust-root and refused-directory comparisons now also match by
   filesystem identity, so an 8.3 short spelling and a case variant
   name the same directory (environments §11).
+
 - Git snapshots are extracted from the object database (`git ls-tree -r -z`
   plus `git cat-file --batch`) instead of `git archive`, so every regular file
   carries exactly its committed blob bytes. `git archive` applied
@@ -279,6 +407,7 @@ All notable implementation changes are recorded here.
   before waiting on it and removes what the call wrote. Closure scratch
   snapshots are extracted into a sibling staging directory and renamed into
   place only on success.
+
 - Git snapshot extraction now folds directory components per component when
   gating platform-path collisions. The gate compared only folded full paths,
   so two tree entries whose directories fold together but whose basenames
@@ -298,19 +427,23 @@ All notable implementation changes are recorded here.
   The old remedy was self-contradictory as well: it told an operator holding a
   marker v4 to reinstall so the manager would record marker schema 2, a schema
   it would never write for that band.
+
 - Garbage collection no longer drops the live build references of a marker v4.
   A schema-8 installation's recorded cache keys went unmarked, so a
   maintenance pass could delete protected cache entries the installation was
   still running from.
+
 - A marker document at a readable schema that is nonetheless invalid is now
   reported as an invalid document rather than as one from a newer manager.
   Schemas 3 and 4 are read by this release, so `upgrade the manager` was never
   the remedy for them.
+
 - A snapshot-extraction spawn failure of `git cat-file --batch` is now
   reported with its operation context (`git cat-file --batch failed in ...`)
   like every other product git spawn, instead of surfacing the bare fork/exec
   text. The underlying cause is preserved in the message and the error chain;
   success-path behaviour is unchanged.
+
 - Draft Skillfile acquisition no longer consults user or system Git
   configuration when cloning or fetching a literal `git:` source
   (`project resolve`/`project refresh`). A hostile
@@ -326,6 +459,7 @@ All notable implementation changes are recorded here.
   now fails `repository_endpoint_unavailable` instead of prompting —
   provide a non-interactive `GIT_ASKPASS` program or an SSH endpoint
   with an agent (docs/cli.md, docs/troubleshooting.md).
+
 - Draft literal-URL acquisition now builds git's environment from an
   explicit allow-list and runs SSH under a curator-owned command
   (`project resolve`/`project refresh`). Per-invocation ambient
@@ -348,6 +482,7 @@ All notable implementation changes are recorded here.
   `ssh-keyscan` or a first manual `ssh`); proxy environment is not
   honoured. `GIT_ASKPASS` stays the only HTTPS credential channel
   (docs/cli.md, docs/troubleshooting.md).
+
 - Audit-registry snapshot verification no longer mistakes a snapshot
   published while a fetch is in flight for a future-dated
   snapshot. The future-timestamp bound was evaluated against a clock
@@ -361,6 +496,7 @@ All notable implementation changes are recorded here.
   with the same class and text, and the stale check is unchanged. This
   removes the nondeterministic refusal-class flip on both the draft
   and legacy lanes (BUG-260920-2d9gfv).
+
 - A `git check-ignore` spawn failure in the managed `.gitignore` gate is no
   longer reported as "generated paths are not ignored by git". A git that
   cannot be executed (a spawn error or a missing git binary) returns a `git
