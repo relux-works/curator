@@ -81,6 +81,9 @@ spawn selection rationale for gpt-6-astra/low: tb-R164 developer gpt-6-astra low
 spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [implementer] developer (codex) (run=RUN-261005-6bf2d3, max_parallel=8)
 spawn run started: [implementer] developer (codex) (run=RUN-261005-6bf2d3)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-261005-6bf2d3, pid=66352, exit=0)
+spawn run RUN-261005-6bf2d3 failed; operator action required; failure: integration_binding_state_invalid: Change Request CR-TASK-261005-22yioq-2 revision 2 is integrated, want accepted or checkpointed
 
 ## Precondition Resources
 - [cip-publish-brief.md](file://TASK-261005-22yioq/cip-publish-brief.md)
@@ -104,12 +107,13 @@ spawn run started: [implementer] developer (codex) (run=RUN-261005-6bf2d3)
 - [TASK-261005-22yioq_spawn-log_-reviewer--reviewer--codex-_RUN-261005-c5b436.log](file://TASK-261005-22yioq/TASK-261005-22yioq_spawn-log_-reviewer--reviewer--codex-_RUN-261005-c5b436.log) — System spawn log captured by task-board
 - [TASK-261005-22yioq_review-verdict-rev2.md](file://TASK-261005-22yioq/TASK-261005-22yioq_review-verdict-rev2.md) — Revision 2 acceptance: both prior findings resolved, merged checklist, full surface sweep, independent docs/link/render/privacy gates and evidence limits
 - [TASK-261005-22yioq_spawn-log_-implementer--developer--codex-_RUN-261005-6bf2d3.log](file://TASK-261005-22yioq/TASK-261005-22yioq_spawn-log_-implementer--developer--codex-_RUN-261005-6bf2d3.log) — System spawn log captured by task-board
+- [TASK-261005-22yioq_complete-integration.log](file://TASK-261005-22yioq/TASK-261005-22yioq_complete-integration.log) — Bound worktree complete output; exit code 0. Landing proven, board commit published; cleanup_pending and shared_plane_deferred reported.
 
 ## Created
 2026-10-05T12:28:54Z
 
 ## Last Update
-2026-10-05T16:44:07Z
+2026-10-05T16:48:06Z
 
 ## Assigned To
 [implementer] developer (codex)
