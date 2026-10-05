@@ -1,0 +1,2413 @@
+diff --git a/.github/ci/conformance-gaps.tsv b/.github/ci/conformance-gaps.tsv
+index a54453b6..bc9cac4e 100644
+--- a/.github/ci/conformance-gaps.tsv
++++ b/.github/ci/conformance-gaps.tsv
+@@ -122,4 +122,3 @@ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environme
+ 6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/provisioning-cases	b-strips-servers-keeps-rest	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ 6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/provisioning-cases	b-subtable-only-form-stripped	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ 6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/provisioning-cases	b-without-servers-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	snapshot-acquisition/cases	byte-exact-snapshot	TASK-261003-1uzji7	rc.14 expects curator-content-v2 writes; writer enabled after the atomic v1→v2 profile hash migration
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index 15e267e9..fbae714b 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -813,3 +813,14 @@ internal/buildcache	TestWindowsNativeExecutablePath	windows	-	-	queries the curr
+ internal/buildcache	TestDarwinSavedExecutablePath	darwin	-	-	saved executable path is independent of argv zero
+ internal/buildcache	TestLinuxExecutablePaths	linux	-	-	proc exe enumeration distinguishes absent and unreadable images
+ cmd/curator	TestGCRetainsLiveProcessBuild	darwin,windows	linux	platform-control	GC entry point retains an old executable used by a live child; Linux compilation lacks a native-control inventory record
++
++# Atomic profile content-hash migration and v2 writer cutover.
++internal/envprofile	TestRC14MigrationRehashesLegacyIdentities	linux,darwin,windows	windows	host-capability	Resolve provisions genuine v1 identities; ApplyMigration rehashes lock, store and generated surfaces into v2
++internal/envprofile	TestRC14ResolveRepairMigratesSiblingHomes	linux,darwin,windows	windows	host-capability	Resolve --repair upgrades all managed sibling homes while retaining the legacy shared store
++internal/envprofile	TestRC14IdentityMigrationRollsBackEveryEntry	linux,darwin,windows	windows	host-capability	a transaction publication failure restores profile, managed surfaces and credential links exactly
++internal/envprofile	TestRC14IdentityMigrationRefusesSiblingPlanDrift	linux,darwin,windows	windows	host-capability	a changed sibling surface outside the credential environment filter refuses the planned apply
++internal/envprofile	TestRC14IdentityMigrationRefusesVersionAndPinMismatch	linux,darwin,windows	windows	host-capability	version relabelling and tampered store pins cannot authorize migration
++internal/envprofile	TestRC14IdentityMigrationRecoversInterruptedCommit	linux,darwin,windows	windows	host-capability	a process interruption resumes the joint identity and credential transaction on the next mutation
++internal/envprofile	TestRC14Schema1IdentityMigrationWithoutCredentialOperations	linux,darwin,windows	windows	host-capability	schema-1 metadata upgrades through both production migration entries when no credential link operation is needed
++internal/envprofile	TestRC14IdentityMigrationPreservesFallbackCopies	linux,darwin,windows	windows	host-capability	identity migration preserves directory copies and their symlink-fallback metadata
++internal/envprofile	TestRC14UseMigratesLegacyProfileBeforeNativePublication	linux,darwin,windows	windows	host-capability	Use rehashes the legacy profile before publishing v2 in-place markers and native generation headers
+diff --git a/.research/TASK-261003-1uzji7_handoff-blocker.md b/.research/TASK-261003-1uzji7_handoff-blocker.md
+new file mode 100644
+index 00000000..80657b08
+--- /dev/null
++++ b/.research/TASK-261003-1uzji7_handoff-blocker.md
+@@ -0,0 +1,58 @@
++# TASK-261003-1uzji7 — developer handoff policy conflict
++
++Implementation and targeted local verification are ready for review, but no
++Change Request was published and no to-review transition is claimed.
++
++The required command ran directly:
++
++`task-board handoff TASK-261003-1uzji7 --role developer`
++
++Actual exit: **1**. The CLI waited without output; it was not retried or
++backgrounded across the end of a turn. Its terminal refusal was:
++
++```
++cannot hand off TASK-261003-1uzji7: unchecked checklist items [2 5 8]
++(Every acceptance criterion proven with real exit codes; hosted gate green;
++Lint clean; Important findings, decisions, anomalies, or regressions recorded
++in logbook when relevant): handoff evidence missing
++```
++
++It also warned that board content comparison could not record progress for
++the command. That warning is not a successful handoff.
++
++## Constraint and failed assumption
++
++The current, binding produce-mode brief requires ONLY targeted local tests,
++uses the hosted Change Request gate as the arbiter, and explicitly forbids
++LOGBOOK.md and CHANGELOG.md edits. The generic role checklist requires hosted
++green and a logbook entry before the CLI will publish that Change Request.
++Assuming that the current brief would permit deferred developer checklist
++items at handoff was disproven by the real exit-1 refusal.
++
++All local test/build evidence is already attached. Scoped gofmt and vet are
++passing; full lint and hosted/cross-platform/race acceptance are pending, so
++the full-lint checklist was also deliberately not represented as green.
++No unrun gate was checked, no failing gate was represented as passing, and
++no checklist gate was removed or weakened to get around this refusal.
++LOGBOOK.md and CHANGELOG.md remain untouched.
++
++## Options and recommendation
++
++1. Recommended: the orchestrator reconciles this task's developer handoff
++   checklist with the binding produce mode, explicitly assigning hosted
++   acceptance/full lint to review and recording that logbook edits are
++   prohibited for this task. Then route the persisted candidate to its
++   hosted Change Request gate and review.
++2. Change the produce-mode instruction and authorize the conflicting work.
++   This still needs a supported route to hosted validation before the
++   current handoff gate, and must not be inferred by the developer.
++
++Exact external action needed: reconcile the handoff checklist/role policy so
++that a producer can publish the Change Request with targeted evidence while
++hosted acceptance remains pending and LOGBOOK.md is excluded, or provide a
++replacement binding instruction and a valid hosted pre-handoff route.
++
++The separate landing prerequisite remains unchanged: integrate only after
++curator v0.15.0-rc.3. No branch commit, switch, merge, rebase, or release tag was
++performed in this run. Code and task-scoped research/evidence remain
++uncommitted in the assigned Story worktree.
+diff --git a/.research/TASK-261003-1uzji7_handoff-validation.md b/.research/TASK-261003-1uzji7_handoff-validation.md
+new file mode 100644
+index 00000000..1ef13712
+--- /dev/null
++++ b/.research/TASK-261003-1uzji7_handoff-validation.md
+@@ -0,0 +1,67 @@
++# TASK-261003-1uzji7: developer handoff verification
++
++This follow-up follows uzji7-handoff.md: finish scoped lint, record findings in
++the task outcome, reconcile the checklist, and hand off the existing candidate.
++The prior implementation and red-first/targeted evidence in
++TASK-261003-1uzji7_validation.md are accepted as prior-run evidence, not claimed
++as commands rerun here. No full suite or hosted gate ran in this follow-up.
++
++## Lint findings and changes
++
++The first command below exited **1**, reporting three gosec findings and two
++staticcheck findings. The signed-int to uint64 conversions preserve the version
++number for nonnegative ints; negative versions cannot alias supported v1/v2
++values. Added narrowly named G115 explanations at those two casts. Added a
++narrow G304 explanation for the fallback read of a store target recomputed by
++the verified materialization plan, matching existing store reads. Removed the
++unused pre-lock lock/hash parameters from repairUnderLock: it already reloads
++both values after taking the mutation lock. No migration semantics changed.
++
++## Commands run here and actual exits
++
++Each validation ran directly, without tee or a pipe chain.
++
++- **Lint:** `GOFLAGS=-work golangci-lint run ./cmd/curator
++  ./internal/conformancecoverage ./internal/contextlock ./internal/envprofile
++  ./internal/hashing ./internal/install ./internal/marker`. First exit **1**;
++  after the fixes, exit **0**, output `0 issues.` This is repository-configured
++  lint over all seven touched Go packages, not a full repository lint run.
++- **Targeted tests:** `GOFLAGS=-work go test ./internal/contextlock
++  ./internal/envprofile -run
++  '^(TestUnversionedLockObjectFollowsManagedWriterSwitch|TestResolvedDeltaIncludesStatePinWhenHashVersionChanges|TestParseRejectsHashVersionOnFrozenContextLock|TestRC14MigrationRehashesLegacyIdentities|TestRC14ResolveRepairMigratesSiblingHomes|TestRC14IdentityMigrationRefusesVersionAndPinMismatch|TestRC14IdentityMigrationPreservesFallbackCopies)$'
++  -count=1 -timeout=4m -v`. Exit **0**. Two contextlock cases and four
++  production migration cases passed, including marker-version, lock-version,
++  and store-pin negatives. No migration test skipped. The named conformance
++  lock case **skipped** because CURATOR_CONFORMANCE_ROOT was unset: this
++  follow-up supplies no evidence for that case. Package times: contextlock
++  0.840s; envprofile 29.680s.
++- **Build:** `GOFLAGS=-work go build -o .temp/TASK-261003-1uzji7/curator
++  ./cmd/curator`. Exit **0**. The ignored local binary is not attached.
++- **Suppression policy:** `bash .github/ci/no-broad-suppression.sh cmd/curator
++  internal/conformancecoverage internal/contextlock internal/envprofile
++  internal/hashing internal/install internal/marker`. Exit **0**;
++  `no-broad-suppression: ok`.
++- `gofmt -w internal/contextlock/contextlock.go
++  internal/envprofile/identity_migration.go internal/envprofile/managed.go`:
++  exit **0**. `git diff --check`: exit **0**.
++
++## Findings, decisions, and handoff limits
++
++Findings and decisions are recorded here and in the existing design/validation
++outcomes instead of LOGBOOK.md, as expressly required by the binding brief and
++handoff instruction. LOGBOOK.md and CHANGELOG.md remain untouched.
++
++The live checklist retained the old hosted-green item alongside the operator's
++new targeted-checks item. The binding operator decision assigns hosted
++acceptance to the CR gate. Remove only that superseded checklist entry; do not
++represent an unrun hosted gate as passing. Scoped lint now supports the lint
++item. The outcome record supports the logbook item under the explicit handoff
++instruction.
++
++Full suite, full repository lint, hosted/platform/race validation, and landing
++after curator v0.15.0-rc.3 remain pending. The exact snapshot count and production
++case were proven in the prior attached validation, not rerun here. The existing
++handoff-blocker outcome is historical and superseded by this follow-up's scoped
++lint and the operator's handoff policy decision. No commit, branch switch,
++rebase, merge, or tag creation was performed. The candidate remains uncommitted
++for the developer handoff snapshot.
+diff --git a/.research/TASK-261003-1uzji7_identity-migration.md b/.research/TASK-261003-1uzji7_identity-migration.md
+new file mode 100644
+index 00000000..eecd5ec8
+--- /dev/null
++++ b/.research/TASK-261003-1uzji7_identity-migration.md
+@@ -0,0 +1,47 @@
++# Atomic profile identity migration (rc.4)
++
++The rc.3 release remains a landing prerequisite; integration owns tag ordering.
++This change leaves release pinning, seed/posture revisions, and release notes alone.
++
++WriteVersion reaches install target planning/publication (install/targets.go,
++install.go), core marker shape and content identity (marker.go), context resolver
++state pins (contextresolve.go), state-store acquisition (contextstore.go), default
++lock shape (contextlock.go), materialized surface hashing (contextmaterialize.go),
++and managed-home marker/credential publication (managed.go, migrate.go).
++New installs use v2. Existing carriers select their own reader version; a writer
++switch never changes the interpretation of a stored pin.
++
++The atomic unit is a profile lock plus every provisioned managed environment for that
++profile: immutable state trees are verified with the old framing, copied and
++rehash-keyed with v2, then the lock, generated documents/headers, surface entries,
++and schema-3 markers publish in one durable transaction under the home lock.
++Machine-native in-place projections retain their explicit old version and become
++stale when the lock changes, as on an ordinary profile update; Use regenerates
++them with the lock-declared framing. Native credential and seed files stay
++tool-owned. Old store entries remain available to other profiles and the previous lock.
++New immutable cache entries may survive a refused publication; they do not
++activate a profile. Credential migration includes its requested link changes and
++credential records in this same transaction when a legacy profile is involved.
++Resolve --repair uses the same profile migration before ordinary repair.
++Use performs the same identity migration before its existing native scope
++materialization; partial native switch semantics remain those of M11.
++
++The transaction engine owns exact entry preimages, rollback, and restart recovery:
++a syscall/commit failure restores the old lock/surfaces/markers/credential links;
++an interrupted durable commit resumes under the next home mutation lock. No
++seed files or credential payloads are read/copied. Lock-free readers may observe
++a transient mismatch and must refuse it, never accept an inconsistent profile.
++Migration plans bind the lock, immutable store and all affected managed surface
++entry identities, including siblings outside the credential environment filter.
++
++State pins change only after verified snapshot rehashing. Git commit pins remain
++commits. Generated headers bind the new canonical lock hash. Every surface is
++regenerated from the pinned store and its v2 hash recomputed. Prior seed and
++credential metadata survive unless the explicit credential operation changes
++it. A marker/lock version mismatch is refused; neither v1 hashes labelled v2 nor
++v2 hashes labelled v1 are fallback identities.
++
++Validation is limited to targeted GOFLAGS=-work tests and a CLI build. Full
++suite, cross-platform/race and hosted lint and hosted acceptance are the Change Request
++gate's responsibility. Evidence records actual exit codes and does not assert
++hosted green before that gate runs.
+diff --git a/.research/TASK-261003-1uzji7_validation.md b/.research/TASK-261003-1uzji7_validation.md
+new file mode 100644
+index 00000000..37647f70
+--- /dev/null
++++ b/.research/TASK-261003-1uzji7_validation.md
+@@ -0,0 +1,180 @@
++# TASK-261003-1uzji7 — atomic v1-to-v2 identity migration and writer flip
++
++Handoff follow-up: TASK-261003-1uzji7_handoff-validation.md records scoped lint
++exit 1 followed by exit 0, lint-only fixes, targeted regression exit 0, and a
++fresh build exit 0. It supersedes the earlier pending scoped-lint/logbook
++checklist statements below. Findings are recorded in outcomes under the
++explicit prohibition on LOGBOOK.md edits. Hosted acceptance remains pending.
++
++Ready-for-review evidence; hosted acceptance and integration are pending.
++The candidate is uncommitted in the assigned Story worktree. No commit,
++branch switch, merge, rebase, or release tag was created. LOGBOOK.md and
++CHANGELOG.md were not edited, per the binding produce-mode instruction.
++The remote query for v0.15.0-rc.3 returned no advertised tag (exit 0);
++integration must satisfy the post-rc.3 landing condition.
++
++## Implementation
++
++- EnableV2Writers=true. Parsed locks select reader framing independently of
++  the writer switch. Managed and in-place marker writers use lock-declared
++  framing, preventing a carrier-only relabel.
++- Resolve --repair, ApplyMigration and Use invoke the coordinated identity
++  transaction. Genuine legacy state snapshots are verified with v1, copied
++  under recomputed v2 store keys, and retained at their old keys for sharing.
++  Lock-v2, regenerated headers/documents, surface entries and marker-v3 publish
++  together. Explicit credential link/record changes join that transaction.
++- All provisioned managed sibling environments participate, including those
++  outside --env. Plans bind their markers, surfaces, rendered bytes and pinned
++  store trees. Drift and invalid/mismatched identities fail before activation.
++- Durable transaction rollback/recovery covers exact file and symlink
++  preimages. Tool-owned seeds/credential payloads are neither copied nor read
++  by identity migration. Symlink fallback copies and their metadata survive.
++- Schema-1 credential metadata is expanded using observed declarations, with
++  identity-only siblings retaining their recorded credential mode.
++- Nine migration regressions are required in the platform-case ledger;
++  only Windows may skip for unavailable symlink capability. No local skip was
++  observed. Full platform-ledger verification belongs to the hosted gate.
++- Only the rc.14 snapshot-acquisition/cases/byte-exact-snapshot gap row was
++  removed; exact published count remains 1. Other gap/count rows are unchanged.
++
++The detailed ownership and recovery design is in
++TASK-261003-1uzji7_identity-migration.md. Native in-place surfaces follow ordinary
++profile-update semantics: their old explicitly versioned markers become stale
++until Use regenerates them after first invoking the same profile identity migration. The atomic conversion unit covers the profile lock
++and its manager-owned homes, without adopting arbitrary native tool state.
++
++## Commands and actual exits
++
++All Go commands below ran directly with GOFLAGS=-work, without tee or a pipe
++chain. Each test command used -count=1 -timeout=4m; the verbose checks also
++used -v. Scratch WORK paths and local root paths are omitted from this public
++artifact. No already-attached validation evidence substitutes for these runs.
++
++### Red baseline and implementation diagnostics
++
++The same command, `go test ./internal/envprofile -run
++'^TestRC14MigrationRehashesLegacyIdentities$' -count=1 -timeout=4m`, ran six times:
++
++1. Exit **1**: test compilation diagnostic, incorrect fixture request signature.
++2. Exit **1**: fixture lacked Repair=true and refused an unprovisioned home.
++3. Exit **1**: genuine production red baseline. ApplyMigration retained the v1
++   state pin, published the v1 surface hash as v2, and left the lock at v1.
++4. Exit **1**: implementation compilation diagnostic, unused import.
++5. Exit **1**: strict lock reader rejected a newline appended to CCJ-1 bytes.
++6. Exit **0**: genuine transition passed after canonical-byte publication.
++
++These failures are failing checks, not passing expected-red gates.
++
++### Scoped integration checks
++
++- Exit **1**: envprofile selection of RC14, marker-version mismatch, legacy
++  schema migration, NUL, credential publication/recovery, Pi provisioning and
++  linked Use. Only the NUL legacy assertions failed: they implicitly used the
++  new v2 writer. Their intended v1 writer is now explicit; rejection assertions
++  remain intact.
++- Exit **0**: `go test ./internal/envprofile -run
++  '^(TestRC14|TestMigrateSchema1UnlinkPublishesCompleteSchema|TestInstallBlocksBothV1CollidingSkillTrees|TestInstallBlocksDeepNULFileInContextPathSnapshot|TestUpdateBlocksDeepNULFileInNewContextMember)'
++  -count=1 -timeout=4m -v`. Includes both collision shapes, a clean-skill control,
++  deep NUL install/update negatives, genuine legacy migrations, siblings,
++  rollback, plan drift and version/store-pin mismatch negatives. Package time
++  89.278s.
++- Exit **0**: `go test ./internal/envprofile -run '^TestRC14' -count=1
++  -timeout=4m -v`. Seven then-present top-level migration cases passed,
++  including interrupted-commit recovery and schema-1 no-op credential migration
++  through Resolve and ApplyMigration. Package time 133.170s.
++- Exit **0**: `go test ./internal/envprofile -run
++  '^TestRC14IdentityMigrationPreservesFallbackCopies$' -count=1 -timeout=4m -v`.
++  The added eighth case preserves an actual directory fallback copy and checks
++  the resulting home through Resolve. Package time 9.834s.
++- Exit **0**: `go test ./internal/envprofile -run
++  '^(TestRC14MigrationRehashesLegacyIdentities|TestRC14IdentityMigrationPreservesFallbackCopies)$'
++  -count=1 -timeout=4m -v`. Repeated after adding the explicit platform-capability
++  probe. Both executed without skips; package time 18.518s.
++- The last credential-mode preservation recheck is recorded below.
++
++### Hash/carrier and production install checks
++
++- Exit **0**: `go test ./internal/hashing ./internal/contextlock ./internal/marker
++  -run '^(TestManagedWriterVersion|TestContentSHA256V2|TestIdentityEqualityRequiresHashVersion|TestUnversionedLockObjectFollowsManagedWriterSwitch|TestResolvedDeltaIncludesStatePinWhenHashVersionChanges|TestWritePreservesContentHashInRC13Mode|TestReadLegacyV1AndRewrite|TestCurrentRejectsV1MarkerForV2Expectation|TestWriteAlwaysProducesCanonicalMarkerV2|TestMarkerV[34]|TestWriteUsesWireCompatibleEmptyValues)'
++  -count=1 -timeout=4m`. Versioned identity comparison, NUL collision separation,
++  unknown versions, legacy readers/writers and carrier mismatches executed.
++- Exit **1**: `go test ./internal/install ./internal/contextresolve
++  ./internal/contextstore ./internal/envprofile -run
++  '^(TestEndToEndInstall|TestV2RegistryAttestationUsesVersionedInstallPath|TestV1InstallRejectsV2RegistryEvidence|TestStateEntryIsContentKeyed|TestContentHashUsesVersion2Framing|TestMinimalResolution|TestRC14IdentityMigrationRecoversInterruptedCommit)$'
++  -count=1 -timeout=4m -v`. The v1-artifact/v2-registry negative fixture did not
++  select v1 under the new default. The helper now selects the requested artifact
++  framing explicitly. Context resolution, content-keyed state storage, v2
++  framing, default Project install, v2 registry install, and recovery passed in
++  this run; the overall command remains a failure.
++- Exit **1**: `go test ./internal/install ./cmd/curator -run
++  '^(TestEndToEndInstall|TestV2RegistryAttestationUsesVersionedInstallPath|TestV1InstallRejectsV2RegistryEvidence|TestEnvMigratePlanApplyPi|TestEnvMigrateConflictRefuses|TestEnvMigrateApplyRequiresPlan|TestEnvMigratePrintBeforeWrite)$'
++  -count=1 -timeout=4m -v`. All three install cases passed after correcting
++  version selection. The CLI positive case still expected marker schema 2;
++  updated to require schema 3 with hash_version 2. All CLI negatives passed.
++- Exit **0**: `go test ./cmd/curator -run
++  '^(TestEnvMigratePlanApplyPi|TestEnvMigrateConflictRefuses|TestEnvMigrateApplyRequiresPlan|TestEnvMigratePrintBeforeWrite)$'
++  -count=1 -timeout=4m -v`. All four actual run() entry-point checks passed;
++  package time 57.628s.
++
++### Exact published snapshot
++
++The local root was the committed CI rc.14 pin
++43bf0a2506d5c354a73bbc3ea4623d4653db10c7, with manifest SHA-256
++6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5.
++CURATOR_CONFORMANCE_ROOT was set to that private local checkout.
++
++- Exit **1**: `go test ./internal/interop/environments -run
++  '^TestConformanceSnapshotAcquisition$' -count=1 -timeout=4m -v`.
++  Both autocrlf cases passed through gitops.Extract; the coverage gate truthfully
++  failed because the now-passing case still had a stale known-gap row.
++- Exit **0**, after removing only that row: `go test
++  ./internal/interop/environments ./internal/conformancecoverage -run
++  '^(TestConformanceSnapshotAcquisition|TestRC14SnapshotCaseIsDrivenAfterProfileHashMigration)$'
++  -count=1 -timeout=4m -v`. Exact measured tally: **1 driven / 1 published**,
++  **0 known-gap, 0 bound, 0 skipped**. autocrlf=true and false both passed.
++
++### Build and scoped validation
++
++- `GOFLAGS=-work go build -o .temp/TASK-261003-1uzji7/curator ./cmd/curator`:
++  first and second invocations each exit **0**. The binary remains ignored and
++  is not attached. The post-preservation recheck is recorded below.
++- `GOFLAGS=-work go vet ./internal/envprofile ./internal/contextlock
++  ./internal/hashing ./internal/marker ./internal/conformancecoverage`:
++  first and second invocations each exit **0**. The post-preservation recheck
++  is recorded below.
++- Every executed `git diff --check` exited **0**.
++- Scoped gofmt validation over tracked changed and untracked Go files exited
++  **0**; the final recheck is recorded below.
++
++No full local suite, full lint, cross-platform/race matrix, or hosted gate ran
++in this produce-mode session. Hosted gate green and release/tag ordering are
++**unknown/pending**, not inferred from these targeted checks. The logbook
++checklist stays unchecked because the current task explicitly forbids edits.
++
++## Last scoped rechecks
++
++- Exit **0**: `GOFLAGS=-work go test ./internal/envprofile -run
++  '^(TestRC14ResolveRepairMigratesSiblingHomes|TestRC14Schema1IdentityMigrationWithoutCredentialOperations|TestRC14MigrationRehashesLegacyIdentities)$'
++  -count=1 -timeout=4m -v`. Repeated after preserving credential mode for
++  siblings outside the explicit credential inventory; package time 55.560s.
++- Exit **0**: `GOFLAGS=-work go test ./internal/install -run
++  '^(TestEndToEndInstall|TestV2RegistryAttestationUsesVersionedInstallPath|TestV1InstallRejectsV2RegistryEvidence|TestRegistryAuditedInstall)$'
++  -count=1 -timeout=4m -v`. The three existing named cases executed and passed;
++  TestRegistryAuditedInstall matches no test and supplies no evidence.
++  Package time 17.346s. Registry fixtures that mutate the writer selection
++  run serially, so parallel install tests start after selection is restored.
++- Exit **0**: `GOFLAGS=-work go test ./internal/envprofile -run
++  '^(TestRC14UseMigratesLegacyProfileBeforeNativePublication|TestUseMaterializesLinkedHomes)$'
++  -count=1 -timeout=4m -v`. Both production Use paths passed; package time
++  8.884s. The native writer never relabels a legacy state pin.
++- The third CLI build and scoped vet invocations exited **0** after the
++  credential-mode preservation change.
++- The fourth CLI build exited **0** after the Use entry-point change.
++- The fourth scoped vet exited **0**, additionally including ./internal/install.
++- Both additional scoped gofmt validations exited **0**, including the last
++  check over every changed/untracked Go source. All additional whitespace
++  validations exited **0**.
++
++Every required local command has returned; no background verification is left
++running. The hosted gate, full lint, full suite, race/platform execution and
++post-rc.3 integration remain pending and are not claimed green.
+diff --git a/cmd/curator/env_migrate_test.go b/cmd/curator/env_migrate_test.go
+index 97fed037..f9fb0556 100644
+--- a/cmd/curator/env_migrate_test.go
++++ b/cmd/curator/env_migrate_test.go
+@@ -132,8 +132,8 @@ func TestEnvMigratePlanApplyPi(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
+-		t.Fatalf("migration marker carries one schema-2 record: %+v", marker)
++	if marker.Version != envmarker.VersionV3 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
++		t.Fatalf("migration marker carries one schema-3 credential record: %+v", marker)
+ 	}
+ 	credential := (*marker.Passthrough)[0]
+ 	if credential.Path != "auth.json" || credential.Isolation != "shared" || credential.Strategy != "file-link" ||
+diff --git a/internal/conformancecoverage/coverage_test.go b/internal/conformancecoverage/coverage_test.go
+index c8d62004..a75b1f85 100644
+--- a/internal/conformancecoverage/coverage_test.go
++++ b/internal/conformancecoverage/coverage_test.go
+@@ -123,41 +123,37 @@ func assertStateReadKind(t *testing.T, err error, want stateread.Kind) {
+ 	}
+ }
+ 
+-func TestRC14SnapshotGapRemainsOwnedByProfileHashMigration(t *testing.T) {
++func TestRC14SnapshotCaseIsDrivenAfterProfileHashMigration(t *testing.T) {
+ 	root, err := repositoryRoot()
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	allCounts, err := readCounts(filepath.Join(root, ".github", "ci", "conformance-case-counts.tsv"))
++	counts, err := readCounts(filepath.Join(root, ".github", "ci", "conformance-case-counts.tsv"))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	const family = "snapshot-acquisition/cases"
+-	if got := allCounts[RC14CandidateManifestSHA256][family]; got != 1 {
++	if got := counts[RC14CandidateManifestSHA256][family]; got != 1 {
+ 		t.Fatalf("rc.14 snapshot count = %d, want 1", got)
+ 	}
+ 	gaps, err := readGaps(filepath.Join(root, ".github", "ci", "conformance-gaps.tsv"), RC14CandidateManifestSHA256)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	var snapshotGaps []Gap
+ 	for _, gap := range gaps {
+ 		if gap.Family == family {
+-			snapshotGaps = append(snapshotGaps, gap)
++			t.Fatalf("snapshot gap remains: %+v", gap)
+ 		}
+ 	}
+-	want := Gap{
+-		Family: family, CaseID: "byte-exact-snapshot", Owner: "TASK-261003-1uzji7",
+-		Reason: "rc.14 expects curator-content-v2 writes; writer enabled after the atomic v1→v2 profile hash migration",
+-	}
+-	if len(snapshotGaps) != 1 || snapshotGaps[0] != want {
+-		t.Fatalf("rc.14 snapshot gaps = %+v, want exactly %+v", snapshotGaps, want)
+-	}
+-	tally, err := Check(family, []string{want.CaseID}, []Result{{CaseID: want.CaseID, FailureReason: "v1 writer remains selected"}}, snapshotGaps, 1)
++	const caseID = "byte-exact-snapshot"
++	tally, err := Check(family, []string{caseID}, []Result{{CaseID: caseID}}, nil, 1)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if tally != (Tally{KnownGap: 1}) {
+-		t.Fatalf("snapshot tally = %+v, want exactly one known gap", tally)
++	if tally != (Tally{Driven: 1}) {
++		t.Fatalf("snapshot tally = %+v, want 1 driven", tally)
++	}
++	if _, err := Check(family, []string{caseID}, []Result{{CaseID: caseID, FailureReason: "wrong framing"}}, nil, 1); err == nil {
++		t.Fatal("wrong-framing failure was accepted after gap removal")
+ 	}
+ }
+diff --git a/internal/contextlock/contextlock.go b/internal/contextlock/contextlock.go
+index 9e7536c1..8bee2c2e 100644
+--- a/internal/contextlock/contextlock.go
++++ b/internal/contextlock/contextlock.go
+@@ -375,6 +375,12 @@ func lockVersions(lock *Lock) (int, int) {
+ 	return schemaVersion, hashVersion
+ }
+ 
++// ContentHashVersion returns the framing declared by this lock, including v1
++// for legacy carriers. It never infers a reader version from the writer switch.
++func (lock *Lock) ContentHashVersion() hashing.Version {
++	return hashing.Version(lockHashVersion(lock)) // #nosec G115 -- nonnegative int versions fit uint64; negative versions cannot alias v1 or v2
++}
++
+ func lockHashVersion(lock *Lock) int {
+ 	_, hashVersion := lockVersions(lock)
+ 	return hashVersion
+diff --git a/internal/envprofile/credential_link_test.go b/internal/envprofile/credential_link_test.go
+index da0ae637..3a0c7eb2 100644
+--- a/internal/envprofile/credential_link_test.go
++++ b/internal/envprofile/credential_link_test.go
+@@ -408,6 +408,7 @@ func TestCodexUnknownStoreSharedRefuses(t *testing.T) {
+ // refusal. A mutant that reports the pending link stale fails the bare
+ // resolve; one that silences it fails the warning assertions.
+ func TestPiProvisionTargetsAgentRoot(t *testing.T) {
++	enableV1WritersForTest(t)
+ 	requireLinkCapability(t)
+ 	fx := writeManagedFixture(t, "acme")
+ 	req := fx.request("pi")
+diff --git a/internal/envprofile/credential_record_test.go b/internal/envprofile/credential_record_test.go
+index 075b300d..38ec80bc 100644
+--- a/internal/envprofile/credential_record_test.go
++++ b/internal/envprofile/credential_record_test.go
+@@ -18,6 +18,7 @@ import (
+ // observes a sibling staged file while a second manager-home lock acquisition
+ // is refused.
+ func TestResolvePublishesCredentialMarkerThroughLockedJournal(t *testing.T) {
++	enableV1WritersForTest(t)
+ 	fx := writeManagedFixture(t, "acme")
+ 	seedLiveNativeCredentials(t, fx)
+ 	req := fx.request("codex_cli")
+@@ -79,6 +80,7 @@ func TestResolvePublishesCredentialMarkerThroughLockedJournal(t *testing.T) {
+ // journal and same-directory staging file at the exact before-rename boundary,
+ // then drives Resolve again to recover and verify the complete v2 marker.
+ func TestResolveRecoversCredentialMarkerAfterRenameCrash(t *testing.T) {
++	enableV1WritersForTest(t)
+ 	fx := writeManagedFixture(t, "acme")
+ 	seedLiveNativeCredentials(t, fx)
+ 	req := fx.request("codex_cli")
+diff --git a/internal/envprofile/hash_v2_test_helpers_test.go b/internal/envprofile/hash_v2_test_helpers_test.go
+index 110b60f9..e060a055 100644
+--- a/internal/envprofile/hash_v2_test_helpers_test.go
++++ b/internal/envprofile/hash_v2_test_helpers_test.go
+@@ -12,3 +12,10 @@ func enableV2WritersForTest(t *testing.T) {
+ 	hashing.EnableV2Writers = true
+ 	t.Cleanup(func() { hashing.EnableV2Writers = prior })
+ }
++
++func enableV1WritersForTest(t *testing.T) {
++	t.Helper()
++	prior := hashing.EnableV2Writers
++	hashing.EnableV2Writers = false
++	t.Cleanup(func() { hashing.EnableV2Writers = prior })
++}
+diff --git a/internal/envprofile/identity_migration.go b/internal/envprofile/identity_migration.go
+new file mode 100644
+index 00000000..f7c910ea
+--- /dev/null
++++ b/internal/envprofile/identity_migration.go
+@@ -0,0 +1,498 @@
++package envprofile
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++	"sort"
++	"strings"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextmaterialize"
++	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/pathboundary"
++	"github.com/relux-works/curator/internal/transaction"
++)
++
++// identityMigration stages complete entry replacements. Immutable v2 store
++// entries are populated before activation; existing v1 entries are never moved
++// or renamed, because another profile or a retained lock can still name them.
++type identityMigration struct {
++	root    string
++	serial  int
++	targets map[string]string // empty staged path means removal
++}
++
++func (m *identityMigration) nextStage() string {
++	m.serial++
++	return filepath.Join(m.root, fmt.Sprintf("entry-%d", m.serial))
++}
++
++func (m *identityMigration) cleanup() { _ = os.RemoveAll(m.root) }
++
++func (m *identityMigration) bytes(live string, payload []byte) error {
++	staged := m.nextStage()
++	if err := os.WriteFile(staged, payload, 0o600); err != nil {
++		return err
++	}
++	m.targets[live] = staged
++	return nil
++}
++
++func (m *identityMigration) link(live, target string) error {
++	staged := m.nextStage()
++	if err := os.Symlink(target, staged); err != nil {
++		return err
++	}
++	m.targets[live] = staged
++	return nil
++}
++
++func (m *identityMigration) publish(op *operation) error {
++	plan := transaction.Plan{TransactionID: newTransactionID(), ProjectIdentity: "profile-hash-migration"}
++	paths := make([]string, 0, len(m.targets))
++	for path := range m.targets {
++		paths = append(paths, path)
++	}
++	sort.Strings(paths)
++	for _, path := range paths {
++		digest, err := transaction.DigestTarget(transaction.KindEntry, path)
++		if err != nil {
++			return err
++		}
++		plan.Targets = append(plan.Targets, transaction.Target{Class: "profile-identity", Identifier: path, Kind: transaction.KindEntry, LivePath: path, StagedSource: m.targets[path], PreimageDigest: digest})
++	}
++	if _, err := op.engine.Prepare(op.lock, plan); err != nil {
++		return fmt.Errorf("prepare profile identity migration: %w", err)
++	}
++	if err := op.engine.Commit(op.lock, plan.TransactionID); err != nil {
++		return fmt.Errorf("publish profile identity migration: %w", err)
++	}
++	return nil
++}
++
++func markerHashVersion(marker *envmarker.Marker) hashing.Version {
++	if marker.Version == envmarker.VersionV3 {
++		return hashing.Version(marker.HashVersion) // #nosec G115 -- nonnegative int versions fit uint64; negative versions cannot alias v1 or v2
++	}
++	return hashing.VersionV1
++}
++
++// identityMigrationInputs binds every legacy profile dependency to a read-only
++// plan, including siblings outside --env. It never hashes credential payloads.
++func identityMigrationInputs(req *MigrateRequest, profiles []string) (map[string]string, error) {
++	inputs := map[string]string{}
++	if hashing.WriteVersion() != hashing.VersionV2 {
++		return inputs, nil
++	}
++	adapters, err := migrationAdapters("")
++	if err != nil {
++		return nil, err
++	}
++	for _, profile := range profiles {
++		if err := validateProfileStoreState(req.Home, profile, nil, nil); err != nil {
++			return nil, err
++		}
++		_, lock, _, err := loadResolveInputs(req.Home, profile)
++		if err != nil {
++			return nil, err
++		}
++		if lock.ContentHashVersion() != hashing.VersionV1 {
++			continue
++		}
++		paths := map[string]bool{lockPath(req.Home, profile): true, sourcePath(req.Home, profile): true}
++		for _, member := range lock.Members {
++			paths[contextstore.EntryDir(req.Home, member.Kind, member.Name, member.PinKey())] = true
++		}
++		for _, adapter := range adapters {
++			if err := validateMarkerBoundary(req.Home, profile, adapter.ID, nil); err != nil {
++				return nil, err
++			}
++			home := ManagedHomeDir(req.Home, profile, adapter.ID)
++			marker, err := envmarker.Read(home)
++			if err != nil {
++				return nil, err
++			}
++			paths[filepath.Join(home, envmarker.Name)] = true
++			if marker == nil {
++				continue
++			}
++			if markerHashVersion(marker) != lock.ContentHashVersion() {
++				return nil, fmt.Errorf("marker/lock hash version mismatch for %s/%s", profile, adapter.ID)
++			}
++			for _, surface := range marker.Surfaces {
++				for _, path := range surface.Paths {
++					live := filepath.Join(home, filepath.FromSlash(path))
++					rel, err := managedRelative(EnvRoot(req.Home), live)
++					if err != nil {
++						return nil, err
++					}
++					if _, err := managedPath(EnvRoot(req.Home), rel, false); err != nil {
++						return nil, err
++					}
++					paths[live] = true
++					target, err := os.Readlink(live)
++					if err == nil && sameStoreTree(target, ProfileDir(req.Home, profile)) {
++						paths[target] = true
++					}
++
++				}
++			}
++		}
++		for path := range paths {
++			digest, err := transaction.DigestTarget(transaction.KindEntry, path)
++			if err != nil {
++				return nil, err
++			}
++			inputs[path] = digest
++		}
++	}
++	return inputs, nil
++}
++
++// prepareIdentityMigration rebuilds the full profile projection from verified
++// pinned snapshots, retaining unrelated metadata. Credential changes, when
++// supplied, join this same transaction rather than a separate marker rewrite.
++func prepareIdentityMigration(req *ResolveRequest, profiles []string, report *MigrateReport) (_ *identityMigration, resultErr error) {
++	root, err := os.MkdirTemp("", "curator-identity-migration-*")
++	if err != nil {
++		return nil, err
++	}
++	migration := &identityMigration{root: root, targets: map[string]string{}}
++	defer func() {
++		if resultErr != nil {
++			migration.cleanup()
++		}
++	}()
++	adapters, err := migrationAdapters("")
++	if err != nil {
++		return nil, err
++	}
++	for _, profile := range profiles {
++		if err := validateProfileStoreState(req.Home, profile, nil, req.boundaryOwnerLookup); err != nil {
++			return nil, err
++		}
++		source, oldLock, oldHash, err := loadResolveInputs(req.Home, profile)
++		if err != nil {
++			return nil, err
++		}
++		if oldLock.ContentHashVersion() != hashing.VersionV1 {
++			continue
++		}
++		lock := *oldLock
++		lock.Members = append([]contextlock.Member{}, oldLock.Members...)
++		lock.SchemaVersion = contextlock.SchemaVersion2
++		lock.HashVersion = 2
++		for i, member := range lock.Members {
++			if member.StateHash == "" {
++				continue
++			}
++			entry := contextstore.EntryDir(req.Home, member.Kind, member.Name, member.PinKey())
++			dir, key, err := contextstore.EnsureState(req.Home, member.Kind, member.Name, entry)
++			if err != nil {
++				return nil, err
++			}
++			actual, err := hashing.ContentSHA256WithVersion(dir, map[string]bool{}, hashing.VersionV2)
++			if err != nil {
++				return nil, err
++			}
++			if hashing.Normalize(actual) != key {
++				return nil, fmt.Errorf("v2 state entry does not match its rehashed pin")
++			}
++			lock.Members[i].StateHash = key
++		}
++		canonical, err := lock.Canonical()
++		if err != nil {
++			return nil, err
++		}
++		hash := contextlock.HashBytes(canonical)
++		if err := migration.bytes(lockPath(req.Home, profile), canonical); err != nil {
++			return nil, err
++		}
++		for _, adapter := range adapters {
++			if err := validateMarkerBoundary(req.Home, profile, adapter.ID, req.boundaryOwnerLookup); err != nil {
++				return nil, err
++			}
++			home := ManagedHomeDir(req.Home, profile, adapter.ID)
++			prior, err := envmarker.Read(home)
++			if err != nil {
++				return nil, err
++			}
++			if prior == nil {
++				continue
++			}
++			if prior.Mode != envmarker.ModeManagedHome || prior.Profile.Name != profile || prior.Profile.LockSHA256 != hashing.Normalize(oldHash) || markerHashVersion(prior) != hashing.VersionV1 {
++				return nil, fmt.Errorf("profile identity migration refuses inconsistent marker for %s/%s", profile, adapter.ID)
++			}
++			orderBefore, err := contextmaterialize.EmittedOrder(oldLock, contextmaterialize.Precedence{Winner: prior.Precedence.Winner, Placement: prior.Precedence.Placement})
++			if err != nil {
++				return nil, err
++			}
++			if len(prior.Members) != len(orderBefore) {
++				return nil, fmt.Errorf("marker member count does not match legacy lock")
++			}
++			for i, member := range orderBefore {
++				recorded := prior.Members[i]
++				if recorded.Name != member.Name || recorded.StateSHA256 != member.StateHash || recorded.Commit != member.Commit || recorded.Weight != member.Weight || recorded.Overlay != member.Overlay {
++					return nil, fmt.Errorf("marker member %s does not match legacy lock", member.Name)
++				}
++			}
++			rr := *req
++			rr.Profile = profile
++			rr.EnvID = adapter.ID
++			rr.Policy.PrecedenceWinner = prior.Precedence.Winner
++			rr.Policy.PrecedencePlacement = prior.Precedence.Placement
++			var credentialHome *MigrateHome
++			if report != nil {
++				for i := range report.Homes {
++					h := &report.Homes[i]
++					if h.Profile == profile && h.EnvID == adapter.ID {
++						credentialHome = h
++						break
++					}
++				}
++			}
++			// Identity-only siblings retain their recorded credential mode. Only an
++			// inventoried credential home may adopt the migration plan's new mode.
++			isolation := ""
++			if prior.Passthrough != nil && len(*prior.Passthrough) > 0 {
++				isolation = (*prior.Passthrough)[0].Isolation
++				if prior.Version == envmarker.VersionV1 {
++					isolation = envregistry.IsolationShared
++				}
++			}
++			if credentialHome != nil {
++				isolation = credentialHome.Isolation
++			}
++			if isolation != "" {
++				rr.Machine.Isolation = map[string]map[string]string{profile: {adapter.ID: isolation}}
++			}
++			rr.Machine.Forms = map[string]string{}
++			if surface, ok := prior.Surfaces[envmarker.SurfaceRootContext]; ok {
++				rr.Machine.Forms[adapter.ID] = surface.Form
++			}
++			rr.Machine.SystemPromptFiles = map[string]string{}
++			for _, path := range prior.Surfaces[envmarker.SurfaceSystemPrompt].Paths {
++				if path == "APPEND_SYSTEM.md" {
++					rr.Machine.SystemPromptFiles[profile] = "append"
++				}
++				if path == "SYSTEM.md" {
++					rr.Machine.SystemPromptFiles[profile] = "replace"
++				}
++			}
++			precedence := rr.Policy.Precedence()
++			order, err := contextmaterialize.EmittedOrder(&lock, precedence)
++			if err != nil {
++				return nil, err
++			}
++			plan, err := assembleHome(&rr, source, &lock, hash, precedence, order, adapter, prior)
++			if err != nil {
++				return nil, err
++			}
++			// Managed entry ownership is established by the old marker. Newly
++			// generated paths must be absent; no implicit takeover is permitted.
++			recorded := map[string]bool{}
++			for _, surface := range prior.Surfaces {
++				for _, path := range surface.Paths {
++					recorded[path] = true
++				}
++			}
++			for path := range plan.copies {
++				if !recorded[path] {
++					return nil, fmt.Errorf("identity migration cannot add unrecorded surface %s", path)
++				}
++			}
++			for path := range plan.links {
++				if !recorded[path] {
++					return nil, fmt.Errorf("identity migration cannot add unrecorded surface %s", path)
++				}
++			}
++			// Preserve symlink fallback copies, including whole skill trees.
++			for name, surface := range prior.Surfaces {
++				if surface.Copies == nil {
++					continue
++				}
++				for _, copy := range *surface.Copies {
++					if copy.Reason != envmarker.ReasonSymlinkFallback {
++						continue
++					}
++					target, ok := plan.links[copy.Path]
++					if !ok {
++						continue
++					}
++					live := filepath.Join(home, filepath.FromSlash(copy.Path))
++					if data, ok := plan.docs[target]; ok {
++						if err := migration.bytes(live, data); err != nil {
++							return nil, err
++						}
++					} else {
++						staged := migration.nextStage()
++						info, err := os.Stat(target)
++						if err != nil {
++							return nil, err
++						}
++						if info.IsDir() {
++							if err := copyTree(target, root, filepath.Base(staged)); err != nil {
++								return nil, err
++							}
++						} else {
++							data, err := os.ReadFile(target) // #nosec G304 -- store link target recomputed from the verified materialization plan
++							if err != nil {
++								return nil, err
++							}
++							if err := os.WriteFile(staged, data, 0o600); err != nil {
++								return nil, err
++							}
++						}
++						migration.targets[live] = staged
++					}
++					delete(plan.links, copy.Path)
++					updated := plan.marker.Surfaces[name]
++					copies := append([]envmarker.Copy{}, (*updated.Copies)...)
++					copies = append(copies, copy)
++					updated.Copies = &copies
++					plan.marker.Surfaces[name] = updated
++				}
++			}
++			for path, data := range plan.docs {
++				if err := pathboundary.ValidateRouteWithOwner(ProfilesDir(req.Home), filepath.Dir(path), boundaryOwner(req.boundaryOwnerLookup)); err != nil {
++					return nil, err
++				}
++				if err := migration.bytes(path, data); err != nil {
++					return nil, err
++				}
++			}
++			for path, data := range plan.copies {
++				if err := migration.bytes(filepath.Join(home, filepath.FromSlash(path)), data); err != nil {
++					return nil, err
++				}
++			}
++			for path, target := range plan.links {
++				if err := migration.link(filepath.Join(home, filepath.FromSlash(path)), target); err != nil {
++					return nil, err
++				}
++			}
++			for path := range recorded {
++				if _, ok := plan.copies[path]; ok {
++					continue
++				}
++				if _, ok := plan.links[path]; ok {
++					continue
++				}
++				live := filepath.Join(home, filepath.FromSlash(path))
++				if _, ok := migration.targets[live]; !ok {
++					migration.targets[live] = ""
++				}
++			}
++			marker := *prior
++			marker.Version = envmarker.VersionV3
++			marker.HashVersion = 2
++			marker.Profile = plan.marker.Profile
++			marker.Members = plan.marker.Members
++			marker.Surfaces = plan.marker.Surfaces
++			if prior.Version == envmarker.VersionV1 {
++				records, err := rr.credentialRecords(adapter, plan.isolation, "migrated")
++				if err != nil {
++					return nil, err
++				}
++				if credentialHome == nil && !legacyCredentialProjectionMatches(*prior.Passthrough, records) {
++					return nil, fmt.Errorf("%s: legacy credentials require explicit env migrate before repair", envregistry.DiagCredentialConflict)
++				}
++				marker.Passthrough = &records
++			}
++			if report != nil {
++				for _, h := range report.Homes {
++					if h.Profile == profile && h.EnvID == adapter.ID && (len(h.Ops) > 0 || prior.Version == envmarker.VersionV1) {
++						records := append([]envmarker.Passthrough{}, h.credentialRecords...)
++						marker.Passthrough = &records
++					}
++				}
++			}
++			payload, err := marker.Marshal()
++			if err != nil {
++				return nil, err
++			}
++			if err := migration.bytes(filepath.Join(home, envmarker.Name), payload); err != nil {
++				return nil, err
++			}
++		}
++	}
++	// Validate every live route without following a leaf symlink. The
++	// transaction engine records and restores the leaf as an entry.
++	for path := range migration.targets {
++		if err := pathboundary.ValidateRouteWithOwner(req.Home, filepath.Dir(path), boundaryOwner(req.boundaryOwnerLookup)); err != nil {
++			return nil, err
++		}
++	}
++	if report != nil {
++		for _, operation := range report.Ops() {
++			live := filepath.Join(ManagedHomeDir(req.Home, operation.Profile, operation.EnvID), filepath.FromSlash(operation.Path))
++			if err := validateMigrationOp(live, operation); err != nil {
++				return nil, err
++			}
++			if operation.Kind == MigrateOpUnlink {
++				migration.targets[live] = ""
++			} else {
++				if err := migration.link(live, operation.To); err != nil {
++					return nil, err
++				}
++			}
++		}
++		// v2 homes participating in a mixed-profile credential plan still need
++		// their credential record updates in the joint transaction.
++		changed, _, err := changedMarkers(report)
++		if err != nil {
++			return nil, err
++		}
++		for path, payload := range changed {
++			if _, ok := migration.targets[path]; !ok {
++				if err := migration.bytes(path, payload); err != nil {
++					return nil, err
++				}
++			}
++		}
++	}
++	return migration, nil
++}
++
++func identityInputHash(inputs map[string]string) string {
++	var text strings.Builder
++	paths := make([]string, 0, len(inputs))
++	for path := range inputs {
++		paths = append(paths, path)
++	}
++	sort.Strings(paths)
++	for _, path := range paths {
++		fmt.Fprintf(&text, "%q %s\n", path, inputs[path])
++	}
++	return contextmaterialize.FileHash([]byte(text.String()))
++}
++
++// Schema-1 metadata can be expanded only if its recorded link strategies are
++// exactly the projection of the current declaration; never invent evidence for
++// a changed credential binding during an identity-only repair.
++func legacyCredentialProjectionMatches(legacy, records []envmarker.Passthrough) bool {
++	projected := map[string]string{}
++	for _, entry := range records {
++		if entry.Path == "" {
++			continue
++		}
++		strategy := entry.Strategy
++		if strategy == envregistry.StrategyKeyringPreferred && entry.Backend == "file" {
++			strategy = envregistry.StrategyFileLink
++		}
++		projected[entry.Path] = strategy
++	}
++	if len(legacy) != len(projected) {
++		return false
++	}
++	for _, entry := range legacy {
++		if projected[entry.Path] != entry.Strategy {
++			return false
++		}
++	}
++	return true
++}
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index af770bea..d8258b00 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -251,7 +251,7 @@ func skillsOf(home string, manager *gitManager, lock *contextlock.Lock) ([]skill
+ 		}
+ 		entry := manager.entryPath(home, resolvedOf(member))
+ 		root := packageRoot(entry, member.Directory)
+-		hash, err := contextstore.ContentHash(root)
++		hash, err := hashing.ContentSHA256WithVersion(root, map[string]bool{}, lock.ContentHashVersion())
+ 		if err != nil {
+ 			return nil, fmt.Errorf("%s: member %s %v", DiagRepairFailed, member.Name, err)
+ 		}
+@@ -271,18 +271,19 @@ func storeDocPath(home, profile, envID, rel string) string {
+ // homePlan is the fully assembled managed home: every write, link, and
+ // removal, with the marker recording them.
+ type homePlan struct {
+-	adapter    envregistry.Adapter
+-	parent     string
+-	homeDir    string
+-	storeRoot  string
+-	form       string
+-	isolation  string
+-	copies     map[string][]byte
+-	links      map[string]string
+-	docs       map[string][]byte
+-	marker     *envmarker.Marker
+-	fileHashes map[string][]byte
+-	warnings   []string
++	adapter     envregistry.Adapter
++	hashVersion hashing.Version
++	parent      string
++	homeDir     string
++	storeRoot   string
++	form        string
++	isolation   string
++	copies      map[string][]byte
++	links       map[string]string
++	docs        map[string][]byte
++	marker      *envmarker.Marker
++	fileHashes  map[string][]byte
++	warnings    []string
+ }
+ 
+ // assembleHome builds the desired managed home purely from the lock, the
+@@ -324,16 +325,17 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
+ 		return nil, err
+ 	}
+ 	plan := &homePlan{
+-		adapter:    adapter,
+-		parent:     ManagedParent(req.Home, req.Profile, adapter.ID),
+-		homeDir:    ManagedHomeDir(req.Home, req.Profile, adapter.ID),
+-		storeRoot:  ProfilesDir(req.Home),
+-		form:       form,
+-		isolation:  isolation,
+-		copies:     map[string][]byte{},
+-		links:      map[string]string{},
+-		docs:       map[string][]byte{},
+-		fileHashes: map[string][]byte{},
++		adapter:     adapter,
++		hashVersion: lock.ContentHashVersion(),
++		parent:      ManagedParent(req.Home, req.Profile, adapter.ID),
++		homeDir:     ManagedHomeDir(req.Home, req.Profile, adapter.ID),
++		storeRoot:   ProfilesDir(req.Home),
++		form:        form,
++		isolation:   isolation,
++		copies:      map[string][]byte{},
++		links:       map[string]string{},
++		docs:        map[string][]byte{},
++		fileHashes:  map[string][]byte{},
+ 	}
+ 	if form == envregistry.FormReferenced && adapter.ID == envregistry.OpenCode {
+ 		if blocked, err := referencedBlocked(plan.homeDir, prior); err != nil {
+@@ -357,7 +359,7 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
+ 	}
+ 	markerVersion := envmarker.VersionV1
+ 	hashVersion := 0
+-	if hashing.WriteVersion() == hashing.VersionV2 {
++	if lock.ContentHashVersion() == hashing.VersionV2 {
+ 		markerVersion = envmarker.VersionV3
+ 		hashVersion = int(hashing.VersionV2)
+ 	}
+@@ -388,6 +390,11 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
+ 	return plan, nil
+ }
+ 
++func (p *homePlan) surfaceHash(files map[string][]byte) string {
++	digest, _ := contextmaterialize.SurfaceHashWithVersion(files, p.hashVersion)
++	return digest
++}
++
+ // referencedBlocked reports whether an unmanaged opencode.json blocks the
+ // referenced form: the file exists and the preceding marker does not
+ // record it, so the adapter warns environment_form_unavailable and
+@@ -469,7 +476,7 @@ func (p *homePlan) rootContext(req *ResolveRequest, lock *contextlock.Lock, hash
+ 		surfaces[envmarker.SurfaceRootContext] = envmarker.Surface{
+ 			Paths:         ordered,
+ 			Form:          p.form,
+-			ContentSHA256: contextmaterialize.SurfaceHash(p.fileHashesFor(paths)),
++			ContentSHA256: p.surfaceHash(p.fileHashesFor(paths)),
+ 			Copies:        &copies,
+ 		}
+ 		return nil
+@@ -498,7 +505,7 @@ func (p *homePlan) rootContext(req *ResolveRequest, lock *contextlock.Lock, hash
+ 	surfaces[envmarker.SurfaceRootContext] = envmarker.Surface{
+ 		Paths:         []string{target},
+ 		Form:          p.form,
+-		ContentSHA256: contextmaterialize.SurfaceHash(map[string][]byte{target: document}),
++		ContentSHA256: p.surfaceHash(map[string][]byte{target: document}),
+ 		Copies:        &copies,
+ 	}
+ 	return nil
+@@ -1326,7 +1333,7 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
+ 		return nil, err
+ 	}
+ 	marker := plan.marker
+-	if hashing.WriteVersion() == hashing.VersionV2 {
++	if plan.hashVersion == hashing.VersionV2 {
+ 		marker.Version = envmarker.VersionV3
+ 		marker.HashVersion = int(hashing.VersionV2)
+ 	} else {
+@@ -2504,6 +2511,9 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 		}
+ 		return nil, failure
+ 	}
++	if req.Repair && !req.DryRun && hashing.WriteVersion() == hashing.VersionV2 && lock.ContentHashVersion() == hashing.VersionV1 {
++		return repairUnderLock(&req, adapter, source)
++	}
+ 	verdict := verifyHome(&req, adapter, source, lock, hash)
+ 	if verdict.markerReadFailed {
+ 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
+@@ -2528,7 +2538,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 	if req.DryRun {
+ 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", DiagHomeStale, strings.Join(verdict.reasons, "; "))
+ 	}
+-	return repairUnderLock(&req, adapter, source, lock, hash)
++	return repairUnderLock(&req, adapter, source)
+ }
+ 
+ // repairUnderLock takes the mutation lock with the bounded wait and a
+@@ -2537,7 +2547,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ // the fragment (§10.1). A current home emits without touching any state;
+ // repair restores managed bytes from the store and never adopts candidate
+ // bytes found in the home.
+-func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source Source, lock *contextlock.Lock, hash string) (*ResolveResult, error) {
++func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source Source) (*ResolveResult, error) {
+ 	op, err := beginOperation(req.Home, req.transactionOptions...)
+ 	if err != nil {
+ 		return nil, err
+@@ -2546,6 +2556,24 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 	if err := validateProfilePathSources(req.Profile, source, req.Policy); err != nil {
+ 		return nil, err
+ 	}
++	source, lock, hash, err := loadResolveInputs(req.Home, req.Profile)
++	if err != nil {
++		return nil, err
++	}
++	if hashing.WriteVersion() == hashing.VersionV2 && lock.ContentHashVersion() == hashing.VersionV1 {
++		migration, err := prepareIdentityMigration(req, []string{req.Profile}, nil)
++		if err != nil {
++			return nil, err
++		}
++		defer migration.cleanup()
++		if err := migration.publish(op); err != nil {
++			return nil, err
++		}
++		source, lock, hash, err = loadResolveInputs(req.Home, req.Profile)
++		if err != nil {
++			return nil, err
++		}
++	}
+ 	verdict := verifyHome(req, adapter, source, lock, hash)
+ 	if verdict.markerReadFailed {
+ 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
+@@ -2845,7 +2873,7 @@ func (p *homePlan) systemPrompt(req *ResolveRequest, lock *contextlock.Lock, pre
+ 	copies := []envmarker.Copy{}
+ 	surfaces[envmarker.SurfaceSystemPrompt] = envmarker.Surface{
+ 		Paths:         paths,
+-		ContentSHA256: contextmaterialize.SurfaceHash(p.fileHashesFor(paths)),
++		ContentSHA256: p.surfaceHash(p.fileHashesFor(paths)),
+ 		Copies:        &copies,
+ 	}
+ 	return nil
+@@ -2873,7 +2901,7 @@ func (p *homePlan) skills(req *ResolveRequest, skills []skillOf, surfaces map[st
+ 	}
+ 	surfaces[envmarker.SurfaceSkills] = envmarker.Surface{
+ 		Paths:         paths,
+-		ContentSHA256: contextmaterialize.SurfaceHash(hashes),
++		ContentSHA256: p.surfaceHash(hashes),
+ 		Copies:        &copies,
+ 	}
+ }
+@@ -2899,7 +2927,7 @@ func (p *homePlan) mcp(req *ResolveRequest, servers []contextmaterialize.MCPServ
+ 	copies := []envmarker.Copy{}
+ 	surfaces[envmarker.SurfaceMCP] = envmarker.Surface{
+ 		Paths:         []string{path},
+-		ContentSHA256: contextmaterialize.SurfaceHash(map[string][]byte{path: document}),
++		ContentSHA256: p.surfaceHash(map[string][]byte{path: document}),
+ 		Copies:        &copies,
+ 	}
+ 	return nil
+diff --git a/internal/envprofile/migrate.go b/internal/envprofile/migrate.go
+index 0425c49f..41c9a4e6 100644
+--- a/internal/envprofile/migrate.go
++++ b/internal/envprofile/migrate.go
+@@ -42,6 +42,7 @@ import (
+ 	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/stateread"
++	"github.com/relux-works/curator/internal/transaction"
+ )
+ 
+ // Migration render phases for MigrateReport.Text. Inspect prints the
+@@ -106,17 +107,18 @@ const (
+ // MigrateApplyResult.Report instead. InjectFault, symlink, and rename
+ // are test seams: production never sets them.
+ type MigrateRequest struct {
+-	Home         string
+-	Profile      string
+-	EnvID        string
+-	Machine      envregistry.MachineConfig
+-	Detect       func(envregistry.Adapter) string
+-	NativeHomeOf func(string) (string, error)
+-	Expect       string
+-	InjectFault  func(point string, applied int) error
+-	Print        io.Writer
+-	symlink      func(oldname, newpath string) error
+-	rename       func(oldpath, newpath string) error
++	Home               string
++	Profile            string
++	EnvID              string
++	Machine            envregistry.MachineConfig
++	Detect             func(envregistry.Adapter) string
++	NativeHomeOf       func(string) (string, error)
++	Expect             string
++	InjectFault        func(point string, applied int) error
++	Print              io.Writer
++	symlink            func(oldname, newpath string) error
++	rename             func(oldpath, newpath string) error
++	transactionOptions []transaction.Option
+ }
+ 
+ // symlinkFn resolves the link-creation primitive: os.Symlink unless a
+@@ -240,12 +242,13 @@ func (rec *MigrateRecovery) notice(home string) string {
+ // inventoried home plus the plan hash over the canonical inventory,
+ // operations, and conflicts.
+ type MigrateReport struct {
+-	Home      string
+-	ScopeProf string
+-	ScopeEnv  string
+-	Homes     []MigrateHome
+-	Recovery  *MigrateRecovery
+-	Hash      string
++	Home           string
++	ScopeProf      string
++	ScopeEnv       string
++	Homes          []MigrateHome
++	Recovery       *MigrateRecovery
++	Hash           string
++	identityInputs map[string]string
+ }
+ 
+ // Ops flattens the report's operations in plan order.
+@@ -285,6 +288,10 @@ func PlanMigration(req MigrateRequest) (*MigrateReport, error) {
+ 			report.Homes = append(report.Homes, inventoryHome(&req, profile, adapter))
+ 		}
+ 	}
++	report.identityInputs, err = identityMigrationInputs(&req, profiles)
++	if err != nil {
++		return nil, err
++	}
+ 	report.Recovery = readRecoveryBestEffort(req.Home)
+ 	report.Hash = migrationHash(report)
+ 	return report, nil
+@@ -728,7 +735,8 @@ func statRoot(path string) string {
+ // re-hashes, so --expect refuses on plan drift.
+ func migrationHash(report *MigrateReport) string {
+ 	var canonical strings.Builder
+-	canonical.WriteString("migration-plan-v2\n")
++	canonical.WriteString("migration-plan-v3\n")
++	fmt.Fprintf(&canonical, "writer %d identity-inputs %s\n", hashing.WriteVersion(), identityInputHash(report.identityInputs))
+ 	for _, home := range report.Homes {
+ 		provisioned := "0"
+ 		if home.provisioned {
+@@ -812,6 +820,9 @@ func (r *MigrateReport) Text(phase string) string {
+ 			out.WriteString("no operations, conflicts, or warnings\n")
+ 		}
+ 	}
++	if len(r.identityInputs) > 0 {
++		fmt.Fprintf(&out, "atomic v1-to-v2 profile identity migration: %d bound inputs; all provisioned environments of each selected legacy profile participate\n", len(r.identityInputs))
++	}
+ 	ops := len(r.Ops())
+ 	conflicts := len(r.Conflicts())
+ 	migrating := 0
+@@ -950,7 +961,7 @@ type MigrateApplyResult struct {
+ // a mix; a kill between mutations leaves the journal for the next apply
+ // carrying a plan hash to recover.
+ func ApplyMigration(req MigrateRequest) (*MigrateApplyResult, error) {
+-	op, err := beginOperation(req.Home)
++	op, err := beginOperation(req.Home, req.transactionOptions...)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -1001,6 +1012,35 @@ func ApplyMigration(req MigrateRequest) (*MigrateApplyResult, error) {
+ 			envregistry.DiagCredentialConflict, len(conflicts), where, first.Detail, first.Choice, extra)
+ 	}
+ 	ops := report.Ops()
++	if len(report.identityInputs) > 0 {
++		profiles, err := migrationProfiles(req.Home, req.Profile)
++		if err != nil {
++			return result, err
++		}
++		rr := req.resolveFor(req.Profile, req.EnvID)
++		migration, err := prepareIdentityMigration(rr, profiles, report)
++		if err != nil {
++			return result, err
++		}
++		defer migration.cleanup()
++		if req.InjectFault != nil {
++			if err := req.InjectFault(MigrateFaultPublishBegin, 0); err != nil {
++				return result, err
++			}
++		}
++		inputs, err := identityMigrationInputs(&req, profiles)
++		if err != nil {
++			return result, err
++		}
++		if identityInputHash(inputs) != identityInputHash(report.identityInputs) {
++			return result, fmt.Errorf("migration plan drift during identity staging; re-run --plan")
++		}
++		if err := migration.publish(op); err != nil {
++			return result, err
++		}
++		result.Applied = ops
++		return result, nil
++	}
+ 	if len(ops) == 0 {
+ 		return result, nil
+ 	}
+@@ -1286,8 +1326,15 @@ func changedMarkers(report *MigrateReport) (map[string][]byte, map[string][]byte
+ 		if home.marker.Version == envmarker.VersionV1 && len(dropped) == 0 {
+ 			continue
+ 		}
++		_, lock, _, err := loadResolveInputs(report.Home, home.Profile)
++		if err != nil {
++			return nil, nil, err
++		}
++		if markerHashVersion(home.marker) != lock.ContentHashVersion() {
++			return nil, nil, fmt.Errorf("marker/lock hash version mismatch for %s/%s", home.Profile, home.EnvID)
++		}
+ 		updated := *home.marker
+-		if hashing.WriteVersion() == hashing.VersionV2 {
++		if markerHashVersion(home.marker) == hashing.VersionV2 {
+ 			updated.Version = envmarker.VersionV3
+ 			updated.HashVersion = int(hashing.VersionV2)
+ 		} else {
+diff --git a/internal/envprofile/migrate_test.go b/internal/envprofile/migrate_test.go
+index 22c6ee19..84817b01 100644
+--- a/internal/envprofile/migrate_test.go
++++ b/internal/envprofile/migrate_test.go
+@@ -292,6 +292,7 @@ func TestMigratePiWrongTargetToAgentRoot(t *testing.T) {
+ // for an unlink; that replacement upgrades once and records the complete v2
+ // credential set for the new isolated state.
+ func TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker(t *testing.T) {
++	enableV1WritersForTest(t)
+ 	requireLinkCapability(t)
+ 	fx := writeManagedFixture(t, "acme")
+ 	seedLiveNativeCredentials(t, fx)
+@@ -1985,7 +1986,7 @@ func TestMigrateRecoveryCleansOwnedTemp(t *testing.T) {
+ // switch explicitly on, the required marker replacement upgrades a schema-1
+ // marker straight to v3 carrying hash_version 2.
+ func TestMigrateSchema1UnlinkPublishesCompleteSchema3MarkerV2WriterMode(t *testing.T) {
+-	enableV2WritersForTest(t)
++	enableV1WritersForTest(t)
+ 	requireLinkCapability(t)
+ 	fx := writeManagedFixture(t, "acme")
+ 	seedLiveNativeCredentials(t, fx)
+@@ -2015,6 +2016,7 @@ func TestMigrateSchema1UnlinkPublishesCompleteSchema3MarkerV2WriterMode(t *testi
+ 	if _, err := os.Lstat(link); err != nil {
+ 		t.Fatalf("schema-1 marker's recorded link is present: %v", err)
+ 	}
++	enableV2WritersForTest(t)
+ 	config := envregistry.DefaultMachineConfig()
+ 	config.Isolation = map[string]map[string]string{"acme": {"pi": envregistry.IsolationIsolated}}
+ 	req := fx.migrateRequest()
+diff --git a/internal/envprofile/nul_opaque_test.go b/internal/envprofile/nul_opaque_test.go
+index f3adf988..02005458 100644
+--- a/internal/envprofile/nul_opaque_test.go
++++ b/internal/envprofile/nul_opaque_test.go
+@@ -16,6 +16,7 @@ import (
+ // contextresolve.Resolve -> auditAndStore -> auditMember. Both trees have the
+ // same v1 hash, but each has a regular NUL-bearing file in a different path.
+ func TestInstallBlocksBothV1CollidingSkillTrees(t *testing.T) {
++	enableV1WritersForTest(t)
+ 	pinHomes(t)
+ 	ids := newGitIdentities(t)
+ 	collision := []struct {
+@@ -93,6 +94,7 @@ func TestInstallBlocksBothV1CollidingSkillTrees(t *testing.T) {
+ }
+ 
+ func TestInstallBlocksDeepNULFileInContextPathSnapshot(t *testing.T) {
++	enableV1WritersForTest(t)
+ 	home := t.TempDir()
+ 	pinHomes(t)
+ 	source := t.TempDir()
+@@ -121,6 +123,7 @@ func TestInstallBlocksDeepNULFileInContextPathSnapshot(t *testing.T) {
+ }
+ 
+ func TestUpdateBlocksDeepNULFileInNewContextMember(t *testing.T) {
++	enableV1WritersForTest(t)
+ 	home, _, oldHash := installBlockingOverlayRoot(t)
+ 	overlay := filepath.Join(t.TempDir(), "overlay")
+ 	writeManifestPackage(t, overlay,
+diff --git a/internal/envprofile/rc14_cutover_test.go b/internal/envprofile/rc14_cutover_test.go
+new file mode 100644
+index 00000000..b51da676
+--- /dev/null
++++ b/internal/envprofile/rc14_cutover_test.go
+@@ -0,0 +1,436 @@
++package envprofile
++
++import (
++	"errors"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextmaterialize"
++	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/transaction"
++)
++
++// Genuine v1 provisioning via Resolve, followed by the production credential
++// migration; changing just the marker schema cannot satisfy this regression.
++func TestRC14MigrationRehashesLegacyIdentities(t *testing.T) {
++	requireLinkCapability(t)
++	prior := hashing.EnableV2Writers
++	hashing.EnableV2Writers = false
++	t.Cleanup(func() { hashing.EnableV2Writers = prior })
++	fx := writeManagedFixture(t, "sample")
++	seedLiveNativeCredentials(t, fx)
++	rr := fx.request("pi")
++	rr.Repair = true
++	if _, err := Resolve(rr); err != nil {
++		t.Fatal(err)
++	}
++	legacy, err := envmarker.Read(ManagedHomeDir(fx.home, fx.profile, "pi"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	oldPin := legacy.Members[0].StateSHA256
++	hashing.EnableV2Writers = true
++	req := fx.migrateRequest()
++	req.Profile = fx.profile
++	req.EnvID = "pi"
++	req.Machine.Isolation[fx.profile] = map[string]string{"pi": "isolated"}
++	report, err := PlanMigration(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	req.Expect = report.Hash
++	if _, err := ApplyMigration(req); err != nil {
++		t.Fatal(err)
++	}
++	published, err := envmarker.Read(ManagedHomeDir(fx.home, fx.profile, "pi"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if published.Version != envmarker.VersionV3 || published.HashVersion != 2 {
++		t.Fatalf("marker is not v2: %+v", published)
++	}
++	if published.Members[0].StateSHA256 == oldPin {
++		t.Error("migration relabelled a v1 state identity as v2 without rehashing")
++	}
++	surface := published.Surfaces[envmarker.SurfaceRootContext]
++	files := map[string][]byte{}
++	for _, path := range surface.Paths {
++		raw, err := os.ReadFile(filepath.Join(ManagedHomeDir(fx.home, fx.profile, "pi"), filepath.FromSlash(path)))
++		if err != nil {
++			t.Fatal(err)
++		}
++		files[path] = raw
++	}
++	want, err := contextmaterialize.SurfaceHashWithVersion(files, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if surface.ContentSHA256 != want {
++		t.Errorf("migration surface hash = %s, actual v2 = %s", surface.ContentSHA256, want)
++	}
++	lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if lock.HashVersion != 2 {
++		t.Errorf("lock hash version = %d, want 2", lock.HashVersion)
++	}
++	member, _ := lock.RootMember()
++	entry := contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey())
++	actual, err := hashing.ContentSHA256WithVersion(entry, map[string]bool{}, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if member.StateHash != hashing.Normalize(actual) {
++		t.Errorf("lock state pin = %s, actual v2 = %s", member.StateHash, actual)
++	}
++}
++
++func legacyIdentityFixture(t *testing.T, envs ...string) *managedFixture {
++	requireLinkCapability(t)
++	t.Helper()
++	prior := hashing.EnableV2Writers
++	hashing.EnableV2Writers = false
++	t.Cleanup(func() { hashing.EnableV2Writers = prior })
++	fx := writeManagedFixture(t, "sample")
++	seedLiveNativeCredentials(t, fx)
++	for _, id := range envs {
++		provision(t, fx, id, fx.request(id).Machine)
++	}
++	hashing.EnableV2Writers = true
++	return fx
++}
++
++func TestRC14ResolveRepairMigratesSiblingHomes(t *testing.T) {
++	fx := legacyIdentityFixture(t, "pi", "claude_code", "opencode")
++	before, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++	if err != nil {
++		t.Fatal(err)
++	}
++	oldMember, _ := before.RootMember()
++	// Read-only Resolve still accepts a genuinely v1 profile under v2 writers.
++	if _, err := Resolve(fx.request("pi")); err != nil {
++		t.Fatalf("legacy reader: %v", err)
++	}
++	req := fx.request("pi")
++	req.Repair = true
++	if _, err := Resolve(req); err != nil {
++		t.Fatal(err)
++	}
++	for _, id := range []string{"pi", "claude_code", "opencode"} {
++		marker := readManagedMarker(t, fx, id)
++		if marker.Version != 3 || marker.HashVersion != 2 || marker.Members[0].StateSHA256 == oldMember.StateHash {
++			t.Fatalf("sibling %s retained legacy identities: %+v", id, marker)
++		}
++		if _, err := Resolve(fx.request(id)); err != nil {
++			t.Fatalf("migrated %s verification: %v", id, err)
++		}
++	}
++	if _, err := os.Stat(contextstore.EntryDir(fx.home, oldMember.Kind, oldMember.Name, oldMember.PinKey())); err != nil {
++		t.Fatalf("shared legacy store entry was removed: %v", err)
++	}
++}
++
++func TestRC14IdentityMigrationRollsBackEveryEntry(t *testing.T) {
++	fx := legacyIdentityFixture(t, "pi", "claude_code")
++	before := snapshotCredentialScope(t, fx)
++	req := fx.migrateRequest()
++	req.Profile = fx.profile
++	req.EnvID = "pi"
++	req.Machine.Isolation[fx.profile] = map[string]string{"pi": "isolated"}
++	report, err := PlanMigration(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	req.Expect = report.Hash
++	req.transactionOptions = []transaction.Option{transaction.WithHooks(transaction.Hooks{Fault: func(event transaction.Event) error {
++		if event.Point == transaction.PointTargetCommitted && event.TargetIndex == 2 {
++			return errors.New("injected joint publication failure")
++		}
++		return nil
++	}})}
++	if _, err := ApplyMigration(req); err == nil {
++		t.Fatal("publication failure was accepted")
++	}
++	after := snapshotCredentialScope(t, fx)
++	added, removed, changed := snapshotDiff(before, after)
++	if len(added)+len(removed)+len(changed) != 0 {
++		t.Fatalf("rollback changed entries: added=%v removed=%v changed=%v", added, removed, changed)
++	}
++	req.transactionOptions = nil
++	if _, err := ApplyMigration(req); err != nil {
++		t.Fatalf("retry of rolled-back plan: %v", err)
++	}
++}
++
++func TestRC14IdentityMigrationRefusesSiblingPlanDrift(t *testing.T) {
++	fx := legacyIdentityFixture(t, "pi", "claude_code")
++	req := fx.migrateRequest()
++	req.Profile = fx.profile
++	req.EnvID = "pi"
++	report, err := PlanMigration(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	req.Expect = report.Hash
++	marker := readManagedMarker(t, fx, "claude_code")
++	path := filepath.Join(ManagedHomeDir(fx.home, fx.profile, "claude_code"), marker.Surfaces[envmarker.SurfaceRootContext].Paths[0])
++	if err := os.WriteFile(path, []byte("edited sibling\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	before := snapshotCredentialScope(t, fx)
++	if _, err := ApplyMigration(req); err == nil || !strings.Contains(err.Error(), "plan drift") {
++		t.Fatalf("sibling drift error = %v", err)
++	}
++	added, removed, changed := snapshotDiff(before, snapshotCredentialScope(t, fx))
++	if len(added)+len(removed)+len(changed) != 0 {
++		t.Fatal("refused plan mutated the profile")
++	}
++}
++
++func TestRC14IdentityMigrationRefusesVersionAndPinMismatch(t *testing.T) {
++	for _, scenario := range []string{"marker-version", "lock-version", "store-pin"} {
++		t.Run(scenario, func(t *testing.T) {
++			fx := legacyIdentityFixture(t, "pi")
++			switch scenario {
++			case "marker-version":
++				marker := readManagedMarker(t, fx, "pi")
++				marker.Version = 3
++				marker.HashVersion = 2
++				payload, err := marker.Marshal()
++				if err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(filepath.Join(ManagedHomeDir(fx.home, fx.profile, "pi"), envmarker.Name), payload, 0o600); err != nil {
++					t.Fatal(err)
++				}
++			case "lock-version":
++				lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++				if err != nil {
++					t.Fatal(err)
++				}
++				lock.SchemaVersion = 2
++				lock.HashVersion = 2
++				if _, err := contextlock.Write(lockPath(fx.home, fx.profile), lock); err != nil {
++					t.Fatal(err)
++				}
++			case "store-pin":
++				lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++				if err != nil {
++					t.Fatal(err)
++				}
++				member, _ := lock.RootMember()
++				if err := os.WriteFile(filepath.Join(contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey()), "context", "a.md"), []byte("tampered\n"), 0o600); err != nil {
++					t.Fatal(err)
++				}
++			}
++			req := fx.migrateRequest()
++			req.Profile = fx.profile
++			if _, err := PlanMigration(req); err == nil {
++				t.Fatal("mismatched identity was accepted")
++			}
++		})
++	}
++}
++
++func TestRC14IdentityMigrationRecoversInterruptedCommit(t *testing.T) {
++	fx := legacyIdentityFixture(t, "pi", "claude_code")
++	req := fx.migrateRequest()
++	req.Profile = fx.profile
++	req.EnvID = "pi"
++	req.Machine.Isolation[fx.profile] = map[string]string{"pi": "isolated"}
++	report, err := PlanMigration(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	req.Expect = report.Hash
++	crash := false
++	req.transactionOptions = []transaction.Option{transaction.WithHooks(transaction.Hooks{Fault: func(event transaction.Event) error {
++		if event.Point == transaction.PointTargetCommitted && event.TargetIndex == 2 {
++			crash = true
++			panic("simulated process interruption")
++		}
++		return nil
++	}})}
++	func() {
++		defer func() {
++			if recovered := recover(); recovered != "simulated process interruption" {
++				t.Fatalf("unexpected interruption: %v", recovered)
++			}
++		}()
++		_, _ = ApplyMigration(req)
++	}()
++	if !crash {
++		t.Fatal("production migration never entered the transaction")
++	}
++	// A subsequent mutation recovers the prepared sibling staging even though
++	// the original assembly scratch directory no longer exists.
++	rr := fx.request("pi")
++	rr.Repair = true
++	rr.Machine = req.Machine
++	if _, err := Resolve(rr); err != nil {
++		t.Fatalf("restart recovery: %v", err)
++	}
++	for _, id := range []string{"pi", "claude_code"} {
++		marker := readManagedMarker(t, fx, id)
++		if marker.Version != 3 || marker.HashVersion != 2 {
++			t.Fatalf("recovery stranded %s in v1", id)
++		}
++	}
++	if _, err := os.Lstat(filepath.Join(ManagedHomeDir(fx.home, fx.profile, "pi"), "auth.json")); !os.IsNotExist(err) {
++		t.Fatalf("credential unlink was not recovered: %v", err)
++	}
++}
++
++func TestRC14Schema1IdentityMigrationWithoutCredentialOperations(t *testing.T) {
++	for _, operation := range []string{"resolve", "migrate"} {
++		t.Run(operation, func(t *testing.T) {
++			fx := legacyIdentityFixture(t, "pi")
++			marker := readManagedMarker(t, fx, "pi")
++			marker.Version = 1
++			marker.HashVersion = 0
++			records := []envmarker.Passthrough{}
++			for _, record := range *marker.Passthrough {
++				if record.Path != "" {
++					records = append(records, envmarker.Passthrough{Path: record.Path, Strategy: record.Strategy})
++				}
++			}
++			marker.Passthrough = &records
++			payload, err := marker.Marshal()
++			if err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(filepath.Join(ManagedHomeDir(fx.home, fx.profile, "pi"), envmarker.Name), payload, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			if operation == "resolve" {
++				req := fx.request("pi")
++				req.Repair = true
++				if _, err := Resolve(req); err != nil {
++					t.Fatal(err)
++				}
++			} else {
++				req := fx.migrateRequest()
++				req.Profile = fx.profile
++				req.EnvID = "pi"
++				report, err := PlanMigration(req)
++				if err != nil {
++					t.Fatal(err)
++				}
++				req.Expect = report.Hash
++				if len(report.Ops()) != 0 {
++					t.Fatalf("unexpected credential operations: %+v", report.Ops())
++				}
++				if _, err := ApplyMigration(req); err != nil {
++					t.Fatal(err)
++				}
++			}
++			if _, err := Resolve(fx.request("pi")); err != nil {
++				t.Fatal(err)
++			}
++			published := readManagedMarker(t, fx, "pi")
++			if published.Version != 3 || (*published.Passthrough)[0].BackendVersion == "" {
++				t.Fatalf("schema-1 metadata not upgraded: %+v", published)
++			}
++		})
++	}
++}
++
++func TestRC14IdentityMigrationPreservesFallbackCopies(t *testing.T) {
++	fx := legacyIdentityFixture(t, "pi")
++	marker := readManagedMarker(t, fx, "pi")
++	surface := marker.Surfaces[envmarker.SurfaceSkills]
++	path := surface.Paths[0]
++	live := filepath.Join(ManagedHomeDir(fx.home, fx.profile, "pi"), filepath.FromSlash(path))
++	target, err := os.Readlink(live)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Remove(live); err != nil {
++		t.Fatal(err)
++	}
++	if err := copyTree(target, ManagedHomeDir(fx.home, fx.profile, "pi"), path); err != nil {
++		t.Fatal(err)
++	}
++	copies := append([]envmarker.Copy{}, *surface.Copies...)
++	copies = append(copies, envmarker.Copy{Path: path, Reason: envmarker.ReasonSymlinkFallback})
++	surface.Copies = &copies
++	marker.Surfaces[envmarker.SurfaceSkills] = surface
++	payload, err := marker.Marshal()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(ManagedHomeDir(fx.home, fx.profile, "pi"), envmarker.Name), payload, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	rr := fx.request("pi")
++	rr.Repair = true
++	if _, err := Resolve(rr); err != nil {
++		t.Fatal(err)
++	}
++	info, err := os.Lstat(live)
++	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
++		t.Fatalf("fallback copy became a link: %v", err)
++	}
++	published := readManagedMarker(t, fx, "pi")
++	got := published.Surfaces[envmarker.SurfaceSkills]
++	if len(*got.Copies) != 1 || (*got.Copies)[0].Reason != envmarker.ReasonSymlinkFallback {
++		t.Fatalf("fallback metadata lost: %+v", got)
++	}
++	if _, err := Resolve(fx.request("pi")); err != nil {
++		t.Fatalf("migrated copy verification: %v", err)
++	}
++}
++
++func TestRC14UseMigratesLegacyProfileBeforeNativePublication(t *testing.T) {
++	requireLinkCapability(t)
++	native := pinHomes(t)
++	prior := hashing.EnableV2Writers
++	hashing.EnableV2Writers = false
++	t.Cleanup(func() { hashing.EnableV2Writers = prior })
++	fx := writeManagedFixture(t, "sample")
++	before, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++	if err != nil {
++		t.Fatal(err)
++	}
++	old, _ := before.RootMember()
++	hashing.EnableV2Writers = true
++	if _, err := UseWithPolicy(fx.home, fx.profile, "pi", "", false, Policy{}); err != nil {
++		t.Fatal(err)
++	}
++	lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++	if err != nil {
++		t.Fatal(err)
++	}
++	member, _ := lock.RootMember()
++	if lock.ContentHashVersion() != 2 || member.StateHash == old.StateHash {
++		t.Fatal("Use did not migrate the old profile identity")
++	}
++	marker, err := envmarker.Read(native["pi"])
++	if err != nil {
++		t.Fatal(err)
++	}
++	if marker.Version != 3 || marker.HashVersion != 2 || marker.Members[0].StateSHA256 != member.StateHash {
++		t.Fatalf("native marker retains a legacy identity: %+v", marker)
++	}
++	files := map[string][]byte{}
++	for _, path := range marker.Surfaces[envmarker.SurfaceRootContext].Paths {
++		data, err := os.ReadFile(filepath.Join(native["pi"], path))
++		if err != nil {
++			t.Fatal(err)
++		}
++		files[path] = data
++	}
++	want, err := contextmaterialize.SurfaceHashWithVersion(files, 2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if marker.Surfaces[envmarker.SurfaceRootContext].ContentSHA256 != want {
++		t.Fatal("native surface hash was relabelled")
++	}
++}
+diff --git a/internal/envprofile/store_boundary.go b/internal/envprofile/store_boundary.go
+index 1172ba1e..108fc7d4 100644
+--- a/internal/envprofile/store_boundary.go
++++ b/internal/envprofile/store_boundary.go
+@@ -15,6 +15,7 @@ import (
+ 	"github.com/relux-works/curator/internal/envmarker"
+ 	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/gitops"
++	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/pathboundary"
+ 	"github.com/relux-works/curator/internal/privatedir"
+ 	"github.com/relux-works/curator/internal/stateread"
+@@ -159,7 +160,7 @@ func validateNamedStoreBoundaries(home string, lock *contextlock.Lock, owner pat
+ func validateNamedStorePins(home string, lock *contextlock.Lock) *storeEntryFailure {
+ 	for _, member := range lock.Members {
+ 		entry := contextstore.EntryDir(home, member.Kind, member.Name, member.PinKey())
+-		actual, expected, err := storeEntryPinHashes(home, member, entry)
++		actual, expected, err := storeEntryPinHashes(home, member, entry, lock.ContentHashVersion())
+ 		if err != nil {
+ 			return &storeEntryFailure{Member: member, Path: entry, Check: diagPinHash, Err: err}
+ 		}
+@@ -201,7 +202,7 @@ func expectedStoreHash(home string, member contextlock.Member) (string, string,
+ 	return "", "", fmt.Errorf("member %s/%s has no expected state or commit pin", member.Kind, member.Name)
+ }
+ 
+-func storeEntryPinHashes(home string, member contextlock.Member, entry string) (actual, expected string, err error) {
++func storeEntryPinHashes(home string, member contextlock.Member, entry string, version hashing.Version) (actual, expected string, err error) {
+ 	expected, format, err := expectedStoreHash(home, member)
+ 	if err != nil {
+ 		return "", "", err
+@@ -213,7 +214,7 @@ func storeEntryPinHashes(home string, member contextlock.Member, entry string) (
+ 		}
+ 		return actual, expected, nil
+ 	}
+-	actual, err = contextstore.ContentHash(entry)
++	actual, err = hashing.ContentSHA256WithVersion(entry, map[string]bool{}, version)
+ 	if err != nil {
+ 		return "", "", err
+ 	}
+diff --git a/internal/envprofile/switch.go b/internal/envprofile/switch.go
+index c0006722..4d85a648 100644
+--- a/internal/envprofile/switch.go
++++ b/internal/envprofile/switch.go
+@@ -49,6 +49,7 @@ import (
+ 	"github.com/relux-works/curator/internal/contextstore"
+ 	"github.com/relux-works/curator/internal/envmarker"
+ 	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/identifiers"
+ 	"github.com/relux-works/curator/internal/stateread"
+ )
+@@ -253,6 +254,23 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
+ 			return nil, err
+ 		}
+ 	}
++	if hashing.WriteVersion() == hashing.VersionV2 {
++		lock, _, err := readLock(home, effective)
++		if err != nil {
++			return nil, err
++		}
++		if lock.ContentHashVersion() == hashing.VersionV1 {
++			req := &ResolveRequest{Home: home, Profile: effective, Machine: envregistry.DefaultMachineConfig(), Policy: policy}
++			migration, err := prepareIdentityMigration(req, []string{effective}, nil)
++			if err != nil {
++				return nil, err
++			}
++			defer migration.cleanup()
++			if err := migration.publish(op); err != nil {
++				return nil, err
++			}
++		}
++	}
+ 	results, err := materializeScope(home, effective, environment, policy)
+ 	if err != nil {
+ 		return results, err
+@@ -814,7 +832,10 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 			}
+ 		}
+ 		surface.Paths = []string{adapter.Target}
+-		surface.ContentSHA256 = contextmaterialize.SurfaceHash(map[string][]byte{adapter.Target: document})
++		surface.ContentSHA256 = func() string {
++			digest, _ := contextmaterialize.SurfaceHashWithVersion(map[string][]byte{adapter.Target: document}, lock.ContentHashVersion())
++			return digest
++		}()
+ 	}
+ 	surface.Copies = &copies
+ 	marker := &envmarker.Marker{
+@@ -830,6 +851,10 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 		Mode:       envmarker.ModeLinked,
+ 		Surfaces:   map[string]envmarker.Surface{},
+ 	}
++	if lock.ContentHashVersion() == 2 {
++		marker.Version = envmarker.VersionV3
++		marker.HashVersion = 2
++	}
+ 	for _, member := range order {
+ 		entry := envmarker.Member{Name: member.Name, Version: member.Version, Weight: member.Weight, Overlay: member.Overlay}
+ 		if member.Commit != "" {
+@@ -874,7 +899,10 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 	}
+ 	if len(skillPaths) > 0 {
+ 		marker.Surfaces[envmarker.SurfaceSkills] = envmarker.Surface{
+-			Paths: skillPaths, ContentSHA256: contextmaterialize.SurfaceHash(skillHashes), Copies: &skillCopies,
++			Paths: skillPaths, ContentSHA256: func() string {
++				digest, _ := contextmaterialize.SurfaceHashWithVersion(skillHashes, lock.ContentHashVersion())
++				return digest
++			}(), Copies: &skillCopies,
+ 		}
+ 	}
+ 	payload, err := marker.Marshal()
+diff --git a/internal/hashing/hashing.go b/internal/hashing/hashing.go
+index 6e88f090..4cf518fd 100644
+--- a/internal/hashing/hashing.go
++++ b/internal/hashing/hashing.go
+@@ -38,13 +38,12 @@ const (
+ )
+ 
+ // EnableV2Writers is the sole manager write cut-over for content-hash v2 and
+-// its versioned carrier shapes. Production writes stay at v1 with the rc.14
+-// conformance pin until the atomic v1→v2 profile hash migration ships in
+-// TASK-261003-1uzji7.
++// its versioned carrier shapes. Legacy profile identities migrate through the
++// coordinated profile transaction before publishing a v2 carrier.
+ //
+ // Tests that exercise v2 writer shapes may set this explicitly and restore it
+ // before returning.
+-var EnableV2Writers = false
++var EnableV2Writers = true
+ 
+ // WriteVersion returns the content-hash framing selected for new manager
+ // state. Readers continue to accept explicitly versioned v2 state regardless
+diff --git a/internal/hashing/hashing_v2_test.go b/internal/hashing/hashing_v2_test.go
+index 5c1401b4..951f3c50 100644
+--- a/internal/hashing/hashing_v2_test.go
++++ b/internal/hashing/hashing_v2_test.go
+@@ -6,12 +6,12 @@ import (
+ 	"testing"
+ )
+ 
+-func TestManagedWriterVersionDefaultsToV1(t *testing.T) {
+-	if EnableV2Writers {
+-		t.Fatal("v2 writer switch is on before the atomic v1→v2 profile hash migration")
++func TestManagedWriterVersionDefaultsToV2(t *testing.T) {
++	if !EnableV2Writers {
++		t.Fatal("v2 writer switch is off after the atomic profile hash migration")
+ 	}
+-	if got := WriteVersion(); got != VersionV1 {
+-		t.Fatalf("default write version = %d, want v1", got)
++	if got := WriteVersion(); got != VersionV2 {
++		t.Fatalf("default write version = %d, want v2", got)
+ 	}
+ }
+ 
+diff --git a/internal/install/registry_e2e_test.go b/internal/install/registry_e2e_test.go
+index ea60f929..8fce4811 100644
+--- a/internal/install/registry_e2e_test.go
++++ b/internal/install/registry_e2e_test.go
+@@ -185,13 +185,13 @@ func registryEnvWithSigner(t *testing.T, status string, options ...registryOptio
+ 	return registryEnvWithVersions(t, status, hashing.VersionV1, hashing.VersionV1, options...)
+ }
+ 
++// These fixtures select the package writer switch and therefore run serially;
++// parallel install tests start after their writer selection has been restored.
+ func registryEnvWithVersions(t *testing.T, status string, artifactVersion, recordVersion hashing.Version, options ...registryOption) (*env, *httptest.Server, ed25519.PrivateKey, string) {
+ 	t.Helper()
+-	if artifactVersion == hashing.VersionV2 {
+-		prior := hashing.EnableV2Writers
+-		hashing.EnableV2Writers = true
+-		t.Cleanup(func() { hashing.EnableV2Writers = prior })
+-	}
++	prior := hashing.EnableV2Writers
++	hashing.EnableV2Writers = artifactVersion == hashing.VersionV2
++	t.Cleanup(func() { hashing.EnableV2Writers = prior })
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -220,7 +220,6 @@ func registryEnvWithVersions(t *testing.T, status string, artifactVersion, recor
+ }
+ 
+ func TestRegistryRevocationDeniesInstall(t *testing.T) {
+-	t.Parallel()
+ 	e, server := registryEnv(t, "revoked")
+ 	defer server.Close()
+ 	result := e.install(Options{})
+@@ -230,7 +229,6 @@ func TestRegistryRevocationDeniesInstall(t *testing.T) {
+ }
+ 
+ func TestRegistryAttestationLandsInMarker(t *testing.T) {
+-	t.Parallel()
+ 	e, server := registryEnv(t, "audited")
+ 	defer server.Close()
+ 	result := e.install(Options{})
+@@ -571,7 +569,6 @@ func registryStateDigest(registryURL string) string {
+ }
+ 
+ func TestStrictRegistryPolicyFailsUnknown(t *testing.T) {
+-	t.Parallel()
+ 	e, server := registryEnv(t, "pending") // pending resolves as unknown
+ 	defer server.Close()
+ 	e.cfg.Audit.RegistryPolicy = "strict"
+@@ -791,7 +788,6 @@ func seedRegistryHighWater(t *testing.T, home string, urls, roots []string) {
+ // any positive difference read as tampering. The hook makes that crossing
+ // certain instead of leaving it to the runner's speed.
+ func TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch(t *testing.T) {
+-	t.Parallel()
+ 	e, server := registryEnv(t, "audited", beforeSnapshotResponse(crossSecondBoundary))
+ 	defer server.Close()
+ 	result := e.install(Options{})
+@@ -817,7 +813,6 @@ func TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch(t *testing.T) {
+ // shape the crossconformance harness uses, so it is also the legacy-lane
+ // proof that the fix only removes the false "future" refusal.
+ func TestRegistrySnapshotMintedDuringFetchIsNotFuture(t *testing.T) {
+-	t.Parallel()
+ 	e, server := registryEnv(t, "audited", snapshotMintedAtServeTime(), beforeSnapshotResponse(crossSecondBoundary))
+ 	defer server.Close()
+ 	e.cfg.Audit.SnapshotClockSkewSeconds = 0
+@@ -843,7 +838,6 @@ func TestRegistrySnapshotMintedDuringFetchIsNotFuture(t *testing.T) {
+ // start accepts it. It runs through the frozen v1 lane with a literal zero
+ // skew, like the row above.
+ func TestRegistrySnapshotSlowSiblingDoesNotFlipInstantRegistry(t *testing.T) {
+-	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -892,7 +886,6 @@ func TestRegistrySnapshotSlowSiblingDoesNotFlipInstantRegistry(t *testing.T) {
+ // into the past before `now` is sampled. Dropping the future check entirely
+ // admits this row.
+ func TestRegistrySnapshotTwoSecondsPastSkewStillRefuses(t *testing.T) {
+-	t.Parallel()
+ 	e, server := registryEnv(t, "audited", snapshotFutureBy(2*time.Second))
+ 	defer server.Close()
+ 	e.cfg.Audit.SnapshotClockSkewSeconds = 0
+@@ -914,7 +907,6 @@ func TestRegistrySnapshotTwoSecondsPastSkewStillRefuses(t *testing.T) {
+ // deny the install, not warn: it names the call site the gate has to be
+ // reachable from (install.resolveRegistries -> registry.CheckSnapshotsWithPolicy).
+ func TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries(t *testing.T) {
+-	t.Parallel()
+ 	e, server := registryEnv(t, "audited", snapshotCreatedAt(time.Now().Add(time.Hour)))
+ 	defer server.Close()
+ 	result := e.install(Options{})
+@@ -935,7 +927,6 @@ func TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries(t *testing.
+ // is pinned in internal/registry -- and its job here is to stop the refusal
+ // above being satisfied by a gate that rejects every snapshot.
+ func TestRegistrySnapshotWithinTheBoundIsAcceptedThroughInstall(t *testing.T) {
+-	t.Parallel()
+ 	e, server := registryEnv(t, "audited", snapshotCreatedAt(time.Now().Add(-time.Minute)))
+ 	defer server.Close()
+ 	e.cfg.Audit.SnapshotClockSkewSeconds = 0
+diff --git a/internal/marker/marker_hash_v2_test.go b/internal/marker/marker_hash_v2_test.go
+index 7bad2431..e992ed3c 100644
+--- a/internal/marker/marker_hash_v2_test.go
++++ b/internal/marker/marker_hash_v2_test.go
+@@ -14,6 +14,13 @@ import (
+ 	"github.com/relux-works/curator/internal/hashing"
+ )
+ 
++func enableV1Writers(t *testing.T) {
++	t.Helper()
++	prior := hashing.EnableV2Writers
++	hashing.EnableV2Writers = false
++	t.Cleanup(func() { hashing.EnableV2Writers = prior })
++}
++
+ func enableV2Writers(t *testing.T) {
+ 	t.Helper()
+ 	prior := hashing.EnableV2Writers
+@@ -22,6 +29,7 @@ func enableV2Writers(t *testing.T) {
+ }
+ 
+ func TestWritePreservesContentHashInRC13Mode(t *testing.T) {
++	enableV1Writers(t)
+ 	for _, tc := range []struct {
+ 		skillSchema int
+ 		marker      int
+diff --git a/internal/marker/marker_test.go b/internal/marker/marker_test.go
+index d371ac63..75e36d1f 100644
+--- a/internal/marker/marker_test.go
++++ b/internal/marker/marker_test.go
+@@ -10,6 +10,7 @@ import (
+ )
+ 
+ func TestWriteUsesWireCompatibleEmptyValues(t *testing.T) {
++	enableV1Writers(t)
+ 	dir := t.TempDir()
+ 	m := validMarkerV2()
+ 	m.Locale = ""
+@@ -63,6 +64,7 @@ func install(t *testing.T) (string, *Marker) {
+ }
+ 
+ func TestCurrentRoundTrip(t *testing.T) {
++	enableV1Writers(t)
+ 	dir, m := install(t)
+ 	current, err := Current(dir, m)
+ 	if err != nil || !current {
+@@ -71,6 +73,7 @@ func TestCurrentRoundTrip(t *testing.T) {
+ }
+ 
+ func TestTamperDetectedByRehash(t *testing.T) {
++	enableV1Writers(t)
+ 	dir, m := install(t)
+ 	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("edited locally"), 0o644); err != nil {
+ 		t.Fatal(err)
+@@ -85,6 +88,7 @@ func TestTamperDetectedByRehash(t *testing.T) {
+ }
+ 
+ func TestDriftFieldsInvalidate(t *testing.T) {
++	enableV1Writers(t)
+ 	dir, m := install(t)
+ 	cases := []func(x Marker) Marker{
+ 		func(x Marker) Marker { x.Commit = "def"; return x },
+@@ -111,6 +115,7 @@ func TestDriftFieldsInvalidate(t *testing.T) {
+ }
+ 
+ func TestActivationOrderInsensitive(t *testing.T) {
++	enableV1Writers(t)
+ 	dir, m := install(t)
+ 	expected := *m
+ 	expected.Activation = &Activation{Context: true, Commands: []string{"x"}}
+@@ -121,6 +126,7 @@ func TestActivationOrderInsensitive(t *testing.T) {
+ }
+ 
+ func TestUnsupportedSchemaErrors(t *testing.T) {
++	enableV1Writers(t)
+ 	dir, m := install(t)
+ 	m.SchemaVersion = 99
+ 	payload := `{"schema_version": 99, "name": "skill-a"}`
+@@ -133,6 +139,7 @@ func TestUnsupportedSchemaErrors(t *testing.T) {
+ }
+ 
+ func TestReplaceDirSwapsAndCleans(t *testing.T) {
++	enableV1Writers(t)
+ 	parent := t.TempDir()
+ 	target := filepath.Join(parent, "skill-a")
+ 	if err := os.MkdirAll(target, 0o755); err != nil {
+@@ -166,6 +173,7 @@ func TestReplaceDirSwapsAndCleans(t *testing.T) {
+ }
+ 
+ func TestReadAbsentAndCorrupt(t *testing.T) {
++	enableV1Writers(t)
+ 	if Read(t.TempDir()) != nil {
+ 		t.Fatal("absent marker must read nil")
+ 	}
+@@ -179,6 +187,7 @@ func TestReadAbsentAndCorrupt(t *testing.T) {
+ }
+ 
+ func TestReadRejectsSchemaViolations(t *testing.T) {
++	enableV1Writers(t)
+ 	dir, _ := install(t)
+ 	payload, err := os.ReadFile(filepath.Join(dir, Name))
+ 	if err != nil {
+diff --git a/internal/marker/marker_v2_test.go b/internal/marker/marker_v2_test.go
+index e8b103dd..8f1a0a23 100644
+--- a/internal/marker/marker_v2_test.go
++++ b/internal/marker/marker_v2_test.go
+@@ -31,6 +31,7 @@ func validMarkerV2() *Marker {
+ }
+ 
+ func TestWriteAlwaysProducesCanonicalMarkerV2(t *testing.T) {
++	enableV1Writers(t)
+ 	dir := t.TempDir()
+ 	m := validMarkerV2()
+ 	m.SchemaVersion = LegacySchemaVersion
+@@ -70,6 +71,7 @@ func TestWriteAlwaysProducesCanonicalMarkerV2(t *testing.T) {
+ }
+ 
+ func TestAuthoritativeCompiledMarkerRoundTripsThroughWriter(t *testing.T) {
++	enableV1Writers(t)
+ 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+ 	if root == "" {
+ 		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+@@ -107,6 +109,7 @@ func TestAuthoritativeCompiledMarkerRoundTripsThroughWriter(t *testing.T) {
+ }
+ 
+ func TestWriteRejectsInvalidV2State(t *testing.T) {
++	enableV1Writers(t)
+ 	tests := map[string]func(*Marker){
+ 		"unsatisfied build source": func(m *Marker) {
+ 			m.Builds["tool"] = Build{Driver: buildmeta.DriverGoV1}
+@@ -127,6 +130,7 @@ func TestWriteRejectsInvalidV2State(t *testing.T) {
+ }
+ 
+ func TestReadLegacyV1AndRewriteAsV2WithoutChangingContentHash(t *testing.T) {
++	enableV1Writers(t)
+ 	dir := t.TempDir()
+ 	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("legacy"), 0o644); err != nil {
+ 		t.Fatal(err)
+@@ -193,6 +197,7 @@ func TestReadLegacyV1AndRewriteAsV2WithoutChangingContentHash(t *testing.T) {
+ }
+ 
+ func TestReadLegacyV1AndRewriteV2PreservesEmptyRequirer(t *testing.T) {
++	enableV1Writers(t)
+ 	dir := t.TempDir()
+ 	legacy := validMarkerV2()
+ 	legacy.SchemaVersion = LegacySchemaVersion
+@@ -222,6 +227,7 @@ func TestReadLegacyV1AndRewriteV2PreservesEmptyRequirer(t *testing.T) {
+ }
+ 
+ func TestCompiledCurrentnessRoundTripAndCallbackOrder(t *testing.T) {
++	enableV1Writers(t)
+ 	fixture := compiledFixture(t)
+ 	order := []string{}
+ 	options := fixture.options
+@@ -245,6 +251,7 @@ func TestCompiledCurrentnessRoundTripAndCallbackOrder(t *testing.T) {
+ }
+ 
+ func TestCompiledCurrentnessFailureMatrix(t *testing.T) {
++	enableV1Writers(t)
+ 	tests := map[string]func(*compiledState){
+ 		"missing raw snapshot": func(state *compiledState) {
+ 			state.options.RawSnapshot = func() (*buildsource.Token, error) { return nil, nil }
+@@ -295,6 +302,7 @@ func TestCompiledCurrentnessFailureMatrix(t *testing.T) {
+ }
+ 
+ func TestCompiledCurrentnessTreatsSnapshotIOAsUnknown(t *testing.T) {
++	enableV1Writers(t)
+ 	fixture := compiledFixture(t)
+ 	fixture.options.RawSnapshot = func() (*buildsource.Token, error) { return nil, errors.New("storage unavailable") }
+ 	if current, err := Current(fixture.installed, fixture.marker, fixture.options); err == nil || current {
+@@ -303,6 +311,7 @@ func TestCompiledCurrentnessTreatsSnapshotIOAsUnknown(t *testing.T) {
+ }
+ 
+ func TestBuildCurrentnessResultPropagatesSnapshotCloseFailure(t *testing.T) {
++	enableV1Writers(t)
+ 	closeErr := errors.New("close snapshot")
+ 	current, err := buildCurrentnessResult(true, buildsource.ErrSnapshotMutated, closeErr)
+ 	if current || !errors.Is(err, closeErr) || !errors.Is(err, buildsource.ErrSnapshotMutated) {
+@@ -311,6 +320,7 @@ func TestBuildCurrentnessResultPropagatesSnapshotCloseFailure(t *testing.T) {
+ }
+ 
+ func TestPackageRootMarkerBytesAffectBuildSourceButNotInstalledContentHash(t *testing.T) {
++	enableV1Writers(t)
+ 	fixture := compiledFixture(t)
+ 	before, err := hashing.ContentSHA256(fixture.installed, nil)
+ 	if err != nil {
+@@ -333,6 +343,7 @@ func TestPackageRootMarkerBytesAffectBuildSourceButNotInstalledContentHash(t *te
+ }
+ 
+ func TestSnapshotMutationDuringCacheInspectionIsNonCurrent(t *testing.T) {
++	enableV1Writers(t)
+ 	fixture := compiledFixture(t)
+ 	inspect := fixture.options.InspectCache
+ 	fixture.options.InspectCache = func(command string, expectation buildcache.Expectation) buildcache.Result {
+@@ -487,6 +498,7 @@ func marshalLegacy(marker *Marker) ([]byte, error) {
+ }
+ 
+ func TestV2WriterSortsEverySetLikeField(t *testing.T) {
++	enableV1Writers(t)
+ 	m := validMarkerV2()
+ 	m.Agents = []string{"zed", "alpha"}
+ 	m.Commands = []string{"zed", "alpha"}
+diff --git a/internal/marker/marker_v3_test.go b/internal/marker/marker_v3_test.go
+index ca9c44b4..19263037 100644
+--- a/internal/marker/marker_v3_test.go
++++ b/internal/marker/marker_v3_test.go
+@@ -23,6 +23,7 @@ func v3Base() *Marker {
+ }
+ 
+ func TestMarkerV3ExternalCurrentnessIsReadOnlyAndFailsClosed(t *testing.T) {
++	enableV1Writers(t)
+ 	dir := t.TempDir()
+ 	m := v3Base()
+ 	m.Commands, m.BuildRoots, m.BuildSource = []string{"external"}, []string{}, nil
+@@ -73,6 +74,7 @@ func externalV3Build() Build {
+ }
+ 
+ func TestMarkerV3StructurallyRepresentsLocalExternalAndMixed(t *testing.T) {
++	enableV1Writers(t)
+ 	for _, testCase := range []struct {
+ 		name string
+ 		set  func(*Marker)
+@@ -118,6 +120,7 @@ func TestMarkerV3StructurallyRepresentsLocalExternalAndMixed(t *testing.T) {
+ }
+ 
+ func TestMarkerV3RejectsReceiptInterpretationAliasing(t *testing.T) {
++	enableV1Writers(t)
+ 	dir := t.TempDir()
+ 	m := v3Base()
+ 	aliased := externalV3Build()
+diff --git a/internal/marker/marker_v4_test.go b/internal/marker/marker_v4_test.go
+index 50f676d9..0fd466b7 100644
+--- a/internal/marker/marker_v4_test.go
++++ b/internal/marker/marker_v4_test.go
+@@ -21,6 +21,7 @@ func v4Base() *Marker {
+ }
+ 
+ func TestMarkerV4IsWrittenForSchema8Installations(t *testing.T) {
++	enableV1Writers(t)
+ 	for _, testCase := range []struct {
+ 		name string
+ 		set  func(*Marker)
+@@ -74,6 +75,7 @@ func TestMarkerV4IsWrittenForSchema8Installations(t *testing.T) {
+ // manifest band it was defined for: v4 never represents schema 7, and v3 never
+ // represents schema 8.
+ func TestMarkerV4BandIsExact(t *testing.T) {
++	enableV1Writers(t)
+ 	for _, testCase := range []struct {
+ 		name          string
+ 		markerVersion int
+@@ -108,6 +110,7 @@ func TestMarkerV4BandIsExact(t *testing.T) {
+ // TestMarkerV4CurrentnessRequiresBuildProof proves a schema-8 marker fails
+ // closed exactly as a schema-7 one does when the build evidence is missing.
+ func TestMarkerV4CurrentnessRequiresBuildProof(t *testing.T) {
++	enableV1Writers(t)
+ 	dir := t.TempDir()
+ 	m := v4Base()
+ 	m.Commands, m.BuildRoots, m.BuildSource = []string{"external"}, []string{}, nil
+@@ -146,6 +149,7 @@ func TestMarkerV4CurrentnessRequiresBuildProof(t *testing.T) {
+ // marker v3 in force for v4: a recorded go-v1 build without a frozen source
+ // identity is not a representable marker.
+ func TestMarkerV4LocalBuildRequiresBuildSource(t *testing.T) {
++	enableV1Writers(t)
+ 	dir := t.TempDir()
+ 	m := v4Base()
+ 	m.Commands = []string{"local"}

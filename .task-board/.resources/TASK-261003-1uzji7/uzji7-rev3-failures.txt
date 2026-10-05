@@ -1,0 +1,277 @@
+===== ubuntu-latest: 46 failed
+-- cmd/curator TestCLIEndToEndInstallStatusAndTamperCheck
+       main_test.go:794: clean status = 1
+       main_test.go:794: clean status = 1
+-- cmd/curator TestClassifyDraftMemberPresenceRows/legacy-marker
+       draft_status_test.go:657: classifyDraftMember = "content-drift", want needs-install
+       draft_status_test.go:657: classifyDraftMember = "content-drift", want needs-install
+-- cmd/curator TestCuratorStatusProviderPostureAndCheck
+       status_test.go:1872: current warning rows made status --check fail: 1
+       status_test.go:1872: current warning rows made status --check fail: 1
+-- cmd/curator TestDraftStatusLegacyMarkerNeedsInstall
+       draft_status_test.go:242: stdout lacks the needs-install row for a legacy marker:
+       draft_status_test.go:242: stdout lacks the needs-install row for a legacy marker:
+-- cmd/curator TestEnvResolveCredentialRecordPathlessKeyring
+       env_credential_marker_test.go:89: expected a schema-2 pathless record: &{Version:3 HashVersion:2 Profile:{Name:acme Root:acme Kind:path LockSHA256:e13ef5a9cd5f1afaedb4c29010a731b26caed36f798fb6396b14db3ea456ea9d Source: Requirement:<nil> Directory: SourcePath:/tmp/TestEnvResolveCredentialRecordPathlessKeyring2929663323/003 ImportedFromNative:false importedSet:false} Members:[{Name:acme Version
+       env_credential_marker_test.go:89: expected a schema-2 pathless record: &{Version:3 HashVersion:2 Profile:{Name:acme Root:acme Kind:path LockSHA256:e13ef5a9cd5f1afaedb4c29010a731b26caed36f798fb6396b14db3ea456ea9d Source: Requirement:<nil> Directory: SourcePath:/tmp/TestEnvResolveCredentialRecordPathlessKeyring2929663323/003 ImportedFromNative:false importedSet:false} Members:[{Name:acme Version
+-- cmd/curator TestEnvResolveCredentialRecordProvisionAndRepair
+       env_credential_marker_test.go:60: expected one schema-2 credential record, got &{Version:3 HashVersion:2 Profile:{Name:acme Root:acme Kind:path LockSHA256:e13ef5a9cd5f1afaedb4c29010a731b26caed36f798fb6396b14db3ea456ea9d Source: Requirement:<nil> Directory: SourcePath:/tmp/TestEnvResolveCredentialRecordProvisionAndRepair915017868/003 ImportedFromNative:false importedSet:false} Members:[{Name:ac
+       env_credential_marker_test.go:60: expected one schema-2 credential record, got &{Version:3 HashVersion:2 Profile:{Name:acme Root:acme Kind:path LockSHA256:e13ef5a9cd5f1afaedb4c29010a731b26caed36f798fb6396b14db3ea456ea9d Source: Requirement:<nil> Directory: SourcePath:/tmp/TestEnvResolveCredentialRecordProvisionAndRepair915017868/003 ImportedFromNative:false importedSet:false} Members:[{Name:ac
+-- cmd/curator TestEnvResolveKeepsSchema1BytesForMetadataOnly
+       env_credential_marker_test.go:173: schema-1 fixture must parse: environment_marker_invalid: versions 1 and 2 do not carry hash_version
+       env_credential_marker_test.go:173: schema-1 fixture must parse: environment_marker_invalid: versions 1 and 2 do not carry hash_version
+-- cmd/curator TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome
+       env_credential_marker_test.go:228: pre-rule schema-1 fixture must parse: environment_marker_invalid: versions 1 and 2 do not carry hash_version
+       env_credential_marker_test.go:228: pre-rule schema-1 fixture must parse: environment_marker_invalid: versions 1 and 2 do not carry hash_version
+-- cmd/curator TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven
+       global_status_test.go:753: global status suppressed the declared-skill report:
+       global_status_test.go:753: global status suppressed the declared-skill report:
+-- cmd/curator TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands
+       global_status_test.go:639: global status changed the pre-existing declared-skill output:
+       global_status_test.go:639: global status changed the pre-existing declared-skill output:
+-- cmd/curator TestStatusAcceptsAnUnchangedLegacyMarkerSchema
+       status_test.go:1973: the rewritten marker is no longer a valid marker:
+       status_test.go:1973: the rewritten marker is no longer a valid marker:
+-- cmd/curator TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands
+       status_test.go:1832: skills = map[skill-a:content-drift]
+       status_test.go:1832: skills = map[skill-a:content-drift]
+-- cmd/curator TestStatusReportFindsASchema8InstallationCurrent/skill_schema_6
+       builds_test.go:1053: install marker is invalid for schema 5
+       builds_test.go:1053: install marker is invalid for schema 5
+-- cmd/curator TestStatusReportFindsASchema8InstallationCurrent/skill_schema_7
+       builds_test.go:1062: skill schema 7 wrote marker schema 5, want 3
+       builds_test.go:1062: skill schema 7 wrote marker schema 5, want 3
+-- cmd/curator TestStatusReportFindsASchema8InstallationCurrent/skill_schema_8
+       builds_test.go:1062: skill schema 8 wrote marker schema 5, want 4
+       builds_test.go:1062: skill schema 8 wrote marker schema 5, want 4
+-- cmd/curator TestStatusReportMarksCompiledStateThatMovedDuringTheCheck
+       builds_test.go:882: install marker is invalid for schema 5
+       builds_test.go:882: install marker is invalid for schema 5
+-- internal/crossconformance TestDraftSourcesSemanticCasesBatch4/legacy-substitution-current
+       draftsources_semantic_currentness_test.go:182: install = 1
+           error: review: install marker is invalid for schema 5
+       draftsources_semantic_currentness_test.go:182: install = 1
+           error: review: install marker is invalid for schema 5
+-- internal/install TestAuthoritativeMixedBuildCasesUseProjectInstallEntry
+
+-- internal/install TestDevSubstitutionAppearingBeforeHomeLockRestartsClosureResolution
+       revalidation_test.go:264: install failed: {Alias:test Path:/tmp/TestDevSubstitutionAppearingBeforeHomeLockRestartsClosureResolut3361437423/003 Status:failed Messages:[test: shared state changed; restarting from closure resolution: generation of substitutions/project changed test: SUBSTITUTION skill-a -> path /tmp/TestDevSubstitutionAppearingBeforeHomeLockRestartsClosureResolut3361437423/001/sk
+   ust resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional] Errors:[skill-a: install marker is invalid for schema 5] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[]}
+       revalidation_test.go:264: install failed: {Alias:test Path:/tmp/TestDevSubstitutionAppearingBeforeHomeLockRestartsClosureResolut3361437423/003 Status:failed Messages:[test: shared state changed; restarting from closure resolution: generation of substitutions/project changed test: SUBSTITUTION skill-a -> path /tmp/TestDevSubstitutionAppearingBeforeHomeLockRestartsClosureResolut3361437423/001/sk
+   ust resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional] Errors:[skill-a: install marker is invalid for schema 5] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[]}
+-- internal/install TestGlobalMixedBuildStagesExternalBeforeLocal
+       external_lifecycle_conformance_test.go:201: global mixed marker=&{SchemaVersion:5 HashVersion:2 Name:golden-skill Source:golden-skill RefKind:tag Ref:v1 Commit:c898da2fb826712edaaee465fe6e53a35da4f9f5 Package:<nil> LockSHA256: ContentSHA256:sha256:72da2b39924285bd8092d37a83513094b074ebcb86e8e5b7142e770cd0f68e89 Locale: Agents:[claude_code] Commands:[golden-tool local-helper] Dependencies:[] Sk
+       external_lifecycle_conformance_test.go:201: global mixed marker=&{SchemaVersion:5 HashVersion:2 Name:golden-skill Source:golden-skill RefKind:tag Ref:v1 Commit:c898da2fb826712edaaee465fe6e53a35da4f9f5 Package:<nil> LockSHA256: ContentSHA256:sha256:72da2b39924285bd8092d37a83513094b074ebcb86e8e5b7142e770cd0f68e89 Locale: Agents:[claude_code] Commands:[golden-tool local-helper] Dependencies:[] Sk
+-- internal/install TestLegacyBuildsKeepReceipt1
+       draftbuild_test.go:436: legacy marker = &{SchemaVersion:5 HashVersion:2 Name:build-skill Source:build-skill RefKind:tag Ref:v1 Commit:3b0a94b7766677fa936b767c2fe52b9fc6aba045 Package:<nil> LockSHA256: ContentSHA256:sha256:7c028a1240f4e744047b640842bd4da162c2bd41992f181a9585b4c98179475b Locale: Agents:[claude_code] Commands:[alpha] Dependencies:[] SkillSchemaVersion:6 RuntimeRoots:[] BuildRoots
+       draftbuild_test.go:436: legacy marker = &{SchemaVersion:5 HashVersion:2 Name:build-skill Source:build-skill RefKind:tag Ref:v1 Commit:3b0a94b7766677fa936b767c2fe52b9fc6aba045 Package:<nil> LockSHA256: ContentSHA256:sha256:7c028a1240f4e744047b640842bd4da162c2bd41992f181a9585b4c98179475b Locale: Agents:[claude_code] Commands:[alpha] Dependencies:[] SkillSchemaVersion:6 RuntimeRoots:[] BuildRoots
+-- internal/install TestLegacyMixedBuildProjectInstallProducesMarkerV3
+       external_lifecycle_conformance_test.go:140: marker = &{SchemaVersion:5 HashVersion:2 Name:golden-skill Source:golden-skill RefKind:tag Ref:v1 Commit:24d6b20d69215f999f53f49fda4c008bfed8c025 Package:<nil> LockSHA256: ContentSHA256:sha256:72da2b39924285bd8092d37a83513094b074ebcb86e8e5b7142e770cd0f68e89 Locale: Agents:[claude_code] Commands:[golden-tool local-helper] Dependencies:[] SkillSchemaVe
+       external_lifecycle_conformance_test.go:140: marker = &{SchemaVersion:5 HashVersion:2 Name:golden-skill Source:golden-skill RefKind:tag Ref:v1 Commit:24d6b20d69215f999f53f49fda4c008bfed8c025 Package:<nil> LockSHA256: ContentSHA256:sha256:72da2b39924285bd8092d37a83513094b074ebcb86e8e5b7142e770cd0f68e89 Locale: Agents:[claude_code] Commands:[golden-tool local-helper] Dependencies:[] SkillSchemaVe
+-- internal/install TestProjectNonGitWithDevSubstitution/substituted
+       gitignore_spawn_test.go:79: non-git install = {Alias:test Path:/tmp/TestProjectNonGitWithDevSubstitutionsubstituted1567102373/003 Status:failed Messages:[test: notice: gitignore hygiene check does not apply: project root is not a git repository test: SUBSTITUTION skill-a -> path /tmp/TestProjectNonGitWithDevSubstitutionsubstituted1567102373/001/skill-a test: skill-a: warning: script-command-de
+   ims, then a validated bare command; shell profile activation is optional] Errors:[skill-a: install marker is invalid for schema 5] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[]}
+       gitignore_spawn_test.go:79: non-git install = {Alias:test Path:/tmp/TestProjectNonGitWithDevSubstitutionsubstituted1567102373/003 Status:failed Messages:[test: notice: gitignore hygiene check does not apply: project root is not a git repository test: SUBSTITUTION skill-a -> path /tmp/TestProjectNonGitWithDevSubstitutionsubstituted1567102373/001/skill-a test: skill-a: warning: script-command-de
+   ims, then a validated bare command; shell profile activation is optional] Errors:[skill-a: install marker is invalid for schema 5] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[]}
+-- internal/install TestRegistrySnapshotSlowSiblingDoesNotFlipInstantRegistry
+       registry_e2e_test.go:876: the audited registry must stay usable: {Alias:test Path:/tmp/TestRegistrySnapshotSlowSiblingDoesNotFlipInstantRegistry1463348985/003 Status:failed Messages:[test: skill-a: warning: script-command-declared-only (commands.skill-a-tool.execution_policy): command 'skill-a-tool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execu
+   er from first use; configure bootstrap_checkpoint to pin its initial view test: registry: registry_bootstrap_tofu: registry reg-b (http://127.0.0.1:44067) fixed its high-water from first use; configure bootstrap_checkpoint to pin its initial view] Errors:[skill-a is not audited by any trusted registry (registry_policy is strict)] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnos
+       registry_e2e_test.go:876: the audited registry must stay usable: {Alias:test Path:/tmp/TestRegistrySnapshotSlowSiblingDoesNotFlipInstantRegistry1463348985/003 Status:failed Messages:[test: skill-a: warning: script-command-declared-only (commands.skill-a-tool.execution_policy): command 'skill-a-tool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execu
+   er from first use; configure bootstrap_checkpoint to pin its initial view test: registry: registry_bootstrap_tofu: registry reg-b (http://127.0.0.1:44067) fixed its high-water from first use; configure bootstrap_checkpoint to pin its initial view] Errors:[skill-a is not audited by any trusted registry (registry_policy is strict)] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnos
+-- internal/scopes TestARepeatedRegistryMemberNeverEmptiesTheRegistry
+       gc_conservative_test.go:359: install marker is invalid for schema 5
+       gc_conservative_test.go:359: install marker is invalid for schema 5
+-- internal/scopes TestAuthoritativeGarbageCollectionRootsAreRetained/gc-retains-roots/artifact-receipts
+       gc_conformance_test.go:68: install marker is invalid for schema 5
+       gc_conformance_test.go:68: install marker is invalid for schema 5
+-- internal/scopes TestCollectMarksBuildKeysFromEveryBuildBearingMarkerSchema
+       gc_test.go:132: install marker is invalid for schema 5
+       gc_test.go:132: install marker is invalid for schema 5
+-- internal/scopes TestCollectMarksBuildKeysFromEveryLiveScope
+       gc_test.go:220: install marker is invalid for schema 5
+       gc_test.go:220: install marker is invalid for schema 5
+-- internal/scopes TestCollectMarksRuntimeFromEverySupportedMarkerSchema
+       gc_test.go:259: the downgraded marker is not a valid schema-1 marker: <nil>
+       gc_test.go:259: the downgraded marker is not a valid schema-1 marker: <nil>
+-- internal/scopes TestCollectSkipsTheBuildSweepOnUnprovableReferences/corrupt_consumer_registry
+       gc_test.go:343: install marker is invalid for schema 5
+       gc_test.go:343: install marker is invalid for schema 5
+-- internal/scopes TestCollectSkipsTheBuildSweepOnUnprovableReferences/invalid_marker
+       gc_test.go:343: install marker is invalid for schema 5
+       gc_test.go:343: install marker is invalid for schema 5
+-- internal/scopes TestCollectSkipsTheBuildSweepOnUnprovableReferences/unreadable_global_skills_directory
+       gc_test.go:343: install marker is invalid for schema 5
+       gc_test.go:343: install marker is invalid for schema 5
+-- internal/scopes TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_global_scope_root
+       gc_conservative_unix_test.go:55: install marker is invalid for schema 5
+       gc_conservative_unix_test.go:55: install marker is invalid for schema 5
+-- internal/scopes TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_hybrid_scope_root
+       gc_conservative_unix_test.go:69: install marker is invalid for schema 5
+       gc_conservative_unix_test.go:69: install marker is invalid for schema 5
+-- internal/scopes TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_installed_skill
+       gc_conservative_unix_test.go:40: install marker is invalid for schema 5
+       gc_conservative_unix_test.go:40: install marker is invalid for schema 5
+-- internal/scopes TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_project_skill_root
+       gc_conservative_unix_test.go:26: install marker is invalid for schema 5
+       gc_conservative_unix_test.go:26: install marker is invalid for schema 5
+-- internal/scopes TestCollectSweepsOnlyUnreferencedProtectedEntries
+       gc_integration_test.go:72: install marker is invalid for schema 5
+       gc_integration_test.go:72: install marker is invalid for schema 5
+-- internal/scopes TestNonDirectoryScopeMembersDoNotBlockMaintenance
+       gc_conservative_test.go:246: install marker is invalid for schema 5
+       gc_conservative_test.go:246: install marker is invalid for schema 5
+===== macos-latest: 59 failed
+-- cmd/curator TestCLIEndToEndInstallStatusAndTamperCheck
+       main_test.go:794: clean status = 1
+       main_test.go:794: clean status = 1
+-- cmd/curator TestClassifyDraftMemberPresenceRows/legacy-marker
+       draft_status_test.go:657: classifyDraftMember = "content-drift", want needs-install
+       draft_status_test.go:657: classifyDraftMember = "content-drift", want needs-install
+-- cmd/curator TestCompiledProjectRepairsCorruptCompiledState/install
+       status_test.go:928: status --check after repairing cache state = 1, want 0
+       status_test.go:928: status --check after repairing cache state = 1, want 0
+-- cmd/curator TestCompiledProjectRepairsCorruptCompiledState/upgrade
+       status_test.go:928: status --check after repairing cache state = 1, want 0
+       status_test.go:928: status --check after repairing cache state = 1, want 0
+-- cmd/curator TestCompiledProjectRestoresCacheWhenCommitFails/install
+       status_test.go:1036: status --check after the repair = 1, want 0
+       status_test.go:1036: status --check after the repair = 1, want 0
+-- cmd/curator TestCompiledProjectRestoresCacheWhenCommitFails/upgrade
+       status_test.go:1036: status --check after the repair = 1, want 0
+       status_test.go:1036: status --check after the repair = 1, want 0
+-- cmd/curator TestCompiledProjectStatusAndUntrustedRecovery
+       status_test.go:601: skills = map[build-skill:content-drift]
+       status_test.go:601: skills = map[build-skill:content-drift]
+-- cmd/curator TestCuratorStatusProviderPostureAndCheck
+       status_test.go:1872: current warning rows made status --check fail: 1
+       status_test.go:1872: current warning rows made status --check fail: 1
+-- cmd/curator TestDraftStatusLegacyMarkerNeedsInstall
+       draft_status_test.go:242: stdout lacks the needs-install row for a legacy marker:
+       draft_status_test.go:242: stdout lacks the needs-install row for a legacy marker:
+-- cmd/curator TestEnvResolveCredentialRecordIsolatedKeychain
+       env_credential_marker_test.go:122: expected one schema-2 credential record: &{Version:3 HashVersion:2 Profile:{Name:acme Root:acme Kind:path LockSHA256:e13ef5a9cd5f1afaedb4c29010a731b26caed36f798fb6396b14db3ea456ea9d Source: Requirement:<nil> Directory: SourcePath:/var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/TestEnvResolveCredentialRecordIsolatedKeychain2479378185/004 ImportedFromNative:fa
+       env_credential_marker_test.go:122: expected one schema-2 credential record: &{Version:3 HashVersion:2 Profile:{Name:acme Root:acme Kind:path LockSHA256:e13ef5a9cd5f1afaedb4c29010a731b26caed36f798fb6396b14db3ea456ea9d Source: Requirement:<nil> Directory: SourcePath:/var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/TestEnvResolveCredentialRecordIsolatedKeychain2479378185/004 ImportedFromNative:fa
+-- cmd/curator TestEnvResolveCredentialRecordPathlessKeyring
+       env_credential_marker_test.go:89: expected a schema-2 pathless record: &{Version:3 HashVersion:2 Profile:{Name:acme Root:acme Kind:path LockSHA256:e13ef5a9cd5f1afaedb4c29010a731b26caed36f798fb6396b14db3ea456ea9d Source: Requirement:<nil> Directory: SourcePath:/var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/TestEnvResolveCredentialRecordPathlessKeyring709778583/003 ImportedFromNative:false imp
+       env_credential_marker_test.go:89: expected a schema-2 pathless record: &{Version:3 HashVersion:2 Profile:{Name:acme Root:acme Kind:path LockSHA256:e13ef5a9cd5f1afaedb4c29010a731b26caed36f798fb6396b14db3ea456ea9d Source: Requirement:<nil> Directory: SourcePath:/var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/TestEnvResolveCredentialRecordPathlessKeyring709778583/003 ImportedFromNative:false imp
+-- cmd/curator TestEnvResolveCredentialRecordProvisionAndRepair
+       env_credential_marker_test.go:60: expected one schema-2 credential record, got &{Version:3 HashVersion:2 Profile:{Name:acme Root:acme Kind:path LockSHA256:e13ef5a9cd5f1afaedb4c29010a731b26caed36f798fb6396b14db3ea456ea9d Source: Requirement:<nil> Directory: SourcePath:/var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/TestEnvResolveCredentialRecordProvisionAndRepair1820674045/003 ImportedFromNati
+       env_credential_marker_test.go:60: expected one schema-2 credential record, got &{Version:3 HashVersion:2 Profile:{Name:acme Root:acme Kind:path LockSHA256:e13ef5a9cd5f1afaedb4c29010a731b26caed36f798fb6396b14db3ea456ea9d Source: Requirement:<nil> Directory: SourcePath:/var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/TestEnvResolveCredentialRecordProvisionAndRepair1820674045/003 ImportedFromNati
+-- cmd/curator TestEnvResolveKeepsSchema1BytesForMetadataOnly
+       env_credential_marker_test.go:173: schema-1 fixture must parse: environment_marker_invalid: versions 1 and 2 do not carry hash_version
+       env_credential_marker_test.go:173: schema-1 fixture must parse: environment_marker_invalid: versions 1 and 2 do not carry hash_version
+-- cmd/curator TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome
+       env_credential_marker_test.go:228: pre-rule schema-1 fixture must parse: environment_marker_invalid: versions 1 and 2 do not carry hash_version
+       env_credential_marker_test.go:228: pre-rule schema-1 fixture must parse: environment_marker_invalid: versions 1 and 2 do not carry hash_version
+-- cmd/curator TestGCRetainsAndReportsReferencedCompiledState
+       status_test.go:1627: status --check after gc = 1, want 0
+       status_test.go:1627: status --check after gc = 1, want 0
+-- cmd/curator TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven
+       global_status_test.go:753: global status suppressed the declared-skill report:
+       global_status_test.go:753: global status suppressed the declared-skill report:
+-- cmd/curator TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands
+       global_status_test.go:639: global status changed the pre-existing declared-skill output:
+       global_status_test.go:639: global status changed the pre-existing declared-skill output:
+-- cmd/curator TestGlobalStatusReportsATransitivelyResolvedCompiledCommand
+       global_status_test.go:595: clean transitive compiled global status --json --check = 1
+       global_status_test.go:595: clean transitive compiled global status --json --check = 1
+-- cmd/curator TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck
+       global_status_test.go:349: clean compiled global status --json --check = 1
+       global_status_test.go:349: clean compiled global status --json --check = 1
+-- cmd/curator TestStatusAcceptsAnUnchangedLegacyMarkerSchema
+       status_test.go:1973: the rewritten marker is no longer a valid marker:
+       status_test.go:1973: the rewritten marker is no longer a valid marker:
+-- cmd/curator TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands
+       status_test.go:1832: skills = map[skill-a:content-drift]
+       status_test.go:1832: skills = map[skill-a:content-drift]
+-- cmd/curator TestStatusReportFindsASchema8InstallationCurrent/skill_schema_6
+       builds_test.go:1053: install marker is invalid for schema 5
+       builds_test.go:1053: install marker is invalid for schema 5
+-- cmd/curator TestStatusReportFindsASchema8InstallationCurrent/skill_schema_7
+       builds_test.go:1062: skill schema 7 wrote marker schema 5, want 3
+       builds_test.go:1062: skill schema 7 wrote marker schema 5, want 3
+-- cmd/curator TestStatusReportFindsASchema8InstallationCurrent/skill_schema_8
+       builds_test.go:1062: skill schema 8 wrote marker schema 5, want 4
+       builds_test.go:1062: skill schema 8 wrote marker schema 5, want 4
+-- cmd/curator TestStatusReportMarksCompiledStateThatMovedDuringTheCheck
+       builds_test.go:882: install marker is invalid for schema 5
+       builds_test.go:882: install marker is invalid for schema 5
+-- cmd/curator TestStatusReportsATransitivelyResolvedCompiledCommand
+       status_test.go:1282: clean transitive compiled status --check = 1, want 0
+       status_test.go:1282: clean transitive compiled status --check = 1, want 0
+-- cmd/curator TestStatusReportsAnUnusableToolchainPerCompiledCommand
+       status_test.go:1353: skills = map[build-skill:content-drift]
+       status_test.go:1353: skills = map[build-skill:content-drift]
+-- internal/crossconformance TestDraftSourcesSemanticCasesBatch4/legacy-substitution-current
+       draftsources_semantic_currentness_test.go:182: install = 1
+           error: review: install marker is invalid for schema 5
+       draftsources_semantic_currentness_test.go:182: install = 1
+           error: review: install marker is invalid for schema 5
+-- internal/install TestAuthoritativeMixedBuildCasesUseProjectInstallEntry
+
+-- internal/install TestDevSubstitutionAppearingBeforeHomeLockRestartsClosureResolution
+       revalidation_test.go:264: install failed: {Alias:test Path:/var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/TestDevSubstitutionAppearingBeforeHomeLockRestartsClosureResolut1362573641/003 Status:failed Messages:[test: shared state changed; restarting from closure resolution: generation of substitutions/project changed test: SUBSTITUTION skill-a -> path /var/folders/36/tjdph2t965j8snz9_vkdnw0r00
+   lidated POSIX and PowerShell bare-command fallbacks, Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional] Errors:[skill-a: install marker is invalid for schema 5] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[]}
+       revalidation_test.go:264: install failed: {Alias:test Path:/var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/TestDevSubstitutionAppearingBeforeHomeLockRestartsClosureResolut1362573641/003 Status:failed Messages:[test: shared state changed; restarting from closure resolution: generation of substitutions/project changed test: SUBSTITUTION skill-a -> path /var/folders/36/tjdph2t965j8snz9_vkdnw0r00
+   lidated POSIX and PowerShell bare-command fallbacks, Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional] Errors:[skill-a: install marker is invalid for schema 5] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[]}
+-- internal/install TestGlobalMixedBuildStagesExternalBeforeLocal
+       external_lifecycle_conformance_test.go:201: global mixed marker=&{SchemaVersion:5 HashVersion:2 Name:golden-skill Source:golden-skill RefKind:tag Ref:v1 Commit:a4e5186cbab8e8b432db98c6a9bb65fa37697ec4 Package:<nil> LockSHA256: ContentSHA256:sha256:72da2b39924285bd8092d37a83513094b074ebcb86e8e5b7142e770cd0f68e89 Locale: Agents:[claude_code] Commands:[golden-tool local-helper] Dependencies:[] Sk
+       external_lifecycle_conformance_test.go:201: global mixed marker=&{SchemaVersion:5 HashVersion:2 Name:golden-skill Source:golden-skill RefKind:tag Ref:v1 Commit:a4e5186cbab8e8b432db98c6a9bb65fa37697ec4 Package:<nil> LockSHA256: ContentSHA256:sha256:72da2b39924285bd8092d37a83513094b074ebcb86e8e5b7142e770cd0f68e89 Locale: Agents:[claude_code] Commands:[golden-tool local-helper] Dependencies:[] Sk
+-- internal/install TestLegacyBuildsKeepReceipt1
+       draftbuild_test.go:436: legacy marker = &{SchemaVersion:5 HashVersion:2 Name:build-skill Source:build-skill RefKind:tag Ref:v1 Commit:c81ebf30f9072fed3c6d69690830a36d4df21de4 Package:<nil> LockSHA256: ContentSHA256:sha256:7c028a1240f4e744047b640842bd4da162c2bd41992f181a9585b4c98179475b Locale: Agents:[claude_code] Commands:[alpha] Dependencies:[] SkillSchemaVersion:6 RuntimeRoots:[] BuildRoots
+       draftbuild_test.go:436: legacy marker = &{SchemaVersion:5 HashVersion:2 Name:build-skill Source:build-skill RefKind:tag Ref:v1 Commit:c81ebf30f9072fed3c6d69690830a36d4df21de4 Package:<nil> LockSHA256: ContentSHA256:sha256:7c028a1240f4e744047b640842bd4da162c2bd41992f181a9585b4c98179475b Locale: Agents:[claude_code] Commands:[alpha] Dependencies:[] SkillSchemaVersion:6 RuntimeRoots:[] BuildRoots
+-- internal/install TestLegacyMixedBuildProjectInstallProducesMarkerV3
+       external_lifecycle_conformance_test.go:140: marker = &{SchemaVersion:5 HashVersion:2 Name:golden-skill Source:golden-skill RefKind:tag Ref:v1 Commit:f07a9fb041a99acd8d5d9cf54a7fd13da7d88619 Package:<nil> LockSHA256: ContentSHA256:sha256:72da2b39924285bd8092d37a83513094b074ebcb86e8e5b7142e770cd0f68e89 Locale: Agents:[claude_code] Commands:[golden-tool local-helper] Dependencies:[] SkillSchemaVe
+       external_lifecycle_conformance_test.go:140: marker = &{SchemaVersion:5 HashVersion:2 Name:golden-skill Source:golden-skill RefKind:tag Ref:v1 Commit:f07a9fb041a99acd8d5d9cf54a7fd13da7d88619 Package:<nil> LockSHA256: ContentSHA256:sha256:72da2b39924285bd8092d37a83513094b074ebcb86e8e5b7142e770cd0f68e89 Locale: Agents:[claude_code] Commands:[golden-tool local-helper] Dependencies:[] SkillSchemaVe
+-- internal/install TestProjectNonGitWithDevSubstitution/substituted
+       gitignore_spawn_test.go:79: non-git install = {Alias:test Path:/var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/TestProjectNonGitWithDevSubstitutionsubstituted173903752/003 Status:failed Messages:[test: notice: gitignore hygiene check does not apply: project root is not a git repository test: SUBSTITUTION skill-a -> path /var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/TestProjectNonGitWithDev
+   ks, Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional] Errors:[skill-a: install marker is invalid for schema 5] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[]}
+       gitignore_spawn_test.go:79: non-git install = {Alias:test Path:/var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/TestProjectNonGitWithDevSubstitutionsubstituted173903752/003 Status:failed Messages:[test: notice: gitignore hygiene check does not apply: project root is not a git repository test: SUBSTITUTION skill-a -> path /var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/TestProjectNonGitWithDev
+   ks, Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional] Errors:[skill-a: install marker is invalid for schema 5] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[]}
+-- internal/install TestRegistrySnapshotSlowSiblingDoesNotFlipInstantRegistry
+       registry_e2e_test.go:876: the audited registry must stay usable: {Alias:test Path:/var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/TestRegistrySnapshotSlowSiblingDoesNotFlipInstantRegistry1903915278/003 Status:failed Messages:[test: skill-a: warning: script-command-declared-only (commands.skill-a-tool.execution_policy): command 'skill-a-tool' is declared-only (no execution_policy); its capabil
+    (http://127.0.0.1:49467) fixed its high-water from first use; configure bootstrap_checkpoint to pin its initial view test: registry: registry_bootstrap_tofu: registry reg-b (http://127.0.0.1:49468) fixed its high-water from first use; configure bootstrap_checkpoint to pin its initial view] Errors:[skill-a is not audited by any trusted registry (registry_policy is strict)] Diagnostics:[] Builds:[]
+       registry_e2e_test.go:876: the audited registry must stay usable: {Alias:test Path:/var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/TestRegistrySnapshotSlowSiblingDoesNotFlipInstantRegistry1903915278/003 Status:failed Messages:[test: skill-a: warning: script-command-declared-only (commands.skill-a-tool.execution_policy): command 'skill-a-tool' is declared-only (no execution_policy); its capabil
+    (http://127.0.0.1:49467) fixed its high-water from first use; configure bootstrap_checkpoint to pin its initial view test: registry: registry_bootstrap_tofu: registry reg-b (http://127.0.0.1:49468) fixed its high-water from first use; configure bootstrap_checkpoint to pin its initial view] Errors:[skill-a is not audited by any trusted registry (registry_policy is strict)] Diagnostics:[] Builds:[]
+-- internal/scopes TestARepeatedRegistryMemberNeverEmptiesTheRegistry
+       gc_conservative_test.go:359: install marker is invalid for schema 5
+       gc_conservative_test.go:359: install marker is invalid for schema 5
+-- internal/scopes TestAuthoritativeGarbageCollectionRootsAreRetained/gc-retains-roots/artifact-receipts
+       gc_conformance_test.go:68: install marker is invalid for schema 5
+       gc_conformance_test.go:68: install marker is invalid for schema 5
+-- internal/scopes TestCollectMarksBuildKeysFromEveryBuildBearingMarkerSchema
+       gc_test.go:132: install marker is invalid for schema 5
+       gc_test.go:132: install marker is invalid for schema 5
+-- internal/scopes TestCollectMarksBuildKeysFromEveryLiveScope
+       gc_test.go:220: install marker is invalid for schema 5
+       gc_test.go:220: install marker is invalid for schema 5
+-- internal/scopes TestCollectMarksRuntimeFromEverySupportedMarkerSchema
+       gc_test.go:259: the downgraded marker is not a valid schema-1 marker: <nil>
+       gc_test.go:259: the downgraded marker is not a valid schema-1 marker: <nil>
+-- internal/scopes TestCollectSkipsTheBuildSweepOnUnprovableReferences/corrupt_consumer_registry
+       gc_test.go:343: install marker is invalid for schema 5
+       gc_test.go:343: install marker is invalid for schema 5
+-- internal/scopes TestCollectSkipsTheBuildSweepOnUnprovableReferences/invalid_marker
+       gc_test.go:343: install marker is invalid for schema 5
+       gc_test.go:343: install marker is invalid for schema 5
+-- internal/scopes TestCollectSkipsTheBuildSweepOnUnprovableReferences/unreadable_global_skills_directory
+       gc_test.go:343: install marker is invalid for schema 5
+       gc_test.go:343: install marker is invalid for schema 5
+-- internal/scopes TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_global_scope_root
+       gc_conservative_unix_test.go:55: install marker is invalid for schema 5
+       gc_conservative_unix_test.go:55: install marker is invalid for schema 5
+-- internal/scopes TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_hybrid_scope_root
+       gc_conservative_unix_test.go:69: install marker is invalid for schema 5
+       gc_conservative_unix_test.go:69: install marker is invalid for schema 5
+-- internal/scopes TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_installed_skill
+       gc_conservative_unix_test.go:40: install marker is invalid for schema 5
+       gc_conservative_unix_test.go:40: install marker is invalid for schema 5
+-- internal/scopes TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_project_skill_root
+       gc_conservative_unix_test.go:26: install marker is invalid for schema 5
+       gc_conservative_unix_test.go:26: install marker is invalid for schema 5
+-- internal/scopes TestCollectSweepsOnlyUnreferencedProtectedEntries
+       gc_integration_test.go:72: install marker is invalid for schema 5
+       gc_integration_test.go:72: install marker is invalid for schema 5
+-- internal/scopes TestNonDirectoryScopeMembersDoNotBlockMaintenance
+       gc_conservative_test.go:246: install marker is invalid for schema 5
+       gc_conservative_test.go:246: install marker is invalid for schema 5
