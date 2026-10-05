@@ -1,0 +1,6 @@
+# THE ONLY CURRENT INSTRUCTION — TASK-261005-22yioq rework 1 (developer, docs; curator-spec)
+The reviewer (sol high, RUN-261005-5cea72) requested two bounded fixes. Read the attached TASK-261005-22yioq_review-verdict-rev1.md in full. Everything else passed and must stay byte-identical.
+1. **[P2] Research links.** In every CIP (0002 line 23, 0003 line 23, 0004 line 25, 0005 line 23, 0006 line 24), replace the code-span evidence references with real Markdown links. Pin each link to the curator commit: `https://github.com/relux-works/curator/blob/<commit>/.research/<file>`, one for the source draft and one for its `_evidence.md` companion. Use the commit the reviewer verified (fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6) or any commit where both files exist unchanged.
+2. **[P2] Table pipes.** In `cips/CIP-0002-*.md` lines 77, 80, 81 and 82, escape the inline pipes (`off \| admitted`, `enabled \| disabled`, `deny \| review`, `off \| private`) so that GFM renders one cell each.
+Rerun `python -B tools/validate.py` and a table-render or width check. Record the exit codes in your validation resource. No other edits.
+Then `task-board handoff TASK-261005-22yioq --role developer` and END YOUR TURN.
