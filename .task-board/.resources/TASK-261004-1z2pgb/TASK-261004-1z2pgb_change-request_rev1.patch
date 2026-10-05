@@ -1,0 +1,799 @@
+diff --git a/.research/261004_CIP-0004-shell-hook-no-source-path-append.md b/.research/261004_CIP-0004-shell-hook-no-source-path-append.md
+new file mode 100644
+index 00000000..fa5cdc9f
+--- /dev/null
++++ b/.research/261004_CIP-0004-shell-hook-no-source-path-append.md
+@@ -0,0 +1,158 @@
++# CIP-0004: Shell hooks without env-file sourcing and with PATH append
++
++- **Status:** Draft — design pending; not accepted for execution
++- **Owner:** ivan-curator (orchestrator); decision: operator
++- **Created:** 2026-10-04
++- **Related:** TASK-261004-1z2pgb — shell-hook-no-source-and-path-append-design; STORY-261004-7fglii — shell-hook-path-and-backend-env-hardening; K3 / historical S6; reviewer input `shell-hook-test-matrix.md`
++- **Affects:** curator-spec rc.14 Manager §§3, 8, 10 and environment-exposure text; Environments §§11–12; shell conformance vectors; curator hook generation, generated env helpers, cache installation and status. Launcher and launch-fragment contracts require boundary clarification, not a PATH-policy change here.
++- **Evidence:** [companion evidence and reproduction](261004_CIP-0004-shell-hook-no-source-path-append_evidence.md). References C1–C10, S1–S7 and P1–P4 below resolve there.
++
++## Summary
++
++Adopt an interactive hook that discovers the project root and assigns its environment directly, without reading or sourcing project or global env files. Append the project `.agents/bin` at the end of PATH, after inherited entries and any optional global bin. Remove the warning-and-source exception immediately in the adopting revision, replacing the K3 staged A→B plan with a single `no-source-v1` contract. Preserve optional activation and opt-outs, retire approvals as an activation dependency, and make all human-facing paths and remedy commands safe to display. This draft asks for a design decision; it authorizes neither implementation nor scheduling.
++
++## Motivation and user stories
++
++1. Entering a checkout, including a nested directory or a symlinked checkout, must not execute its `.agents/env.sh` or `.agents/env.ps1`, even if an old approval record exists.
++2. A checkout containing `git`, `ssh`, `curl` or `python3` in `.agents/bin` must not displace an executable already reachable through the inherited PATH.
++3. Leaving or switching projects must restore PATH predictably, clear the old project root, and avoid duplicate hook registrations or bin entries.
++4. A path containing shell syntax or terminal controls must not turn a notice into a second command or a forged terminal line.
++5. An existing user must retain `--no-global` and `CURATOR_AUTO_ENV=0` when updating a cached hook, and must be told accurately whether the cache still contains the legacy hook.
++
++Research bounds: one design decision, one CIP plus evidence below 100 KB combined, no archives or serial research prerequisite; an initial 60-minute worker budget. The frozen baseline is curator `ca1b776fb580ec0cee0173bf150daf063023aeaa` and curator-spec rc.14 `43bf0a2506d5c354a73bbc3ea4623d4653db10c7`. No new grammar is accepted by this research. The consuming production slice is L2 below: CLI-generated bash/zsh activation without sourcing, with append and restore tested together. Exit criterion is a decision-ready option comparison and proposed contract, not implementation conformance.
++
++## Current state
++
++| Verified behavior | Evidence and consequence |
++|---|---|
++| Project and global helper files prepend their bin directories in POSIX and PowerShell. | C1: `internal/envfiles/envfiles.go:24–63`. The project test explicitly requires a PATH prefix at `envfiles_test.go:79`. |
++| The CLI emits and caches `A-warning`; unapproved and changed project files can still be sourced. | C2–C3: `internal/shell/shell.go:48–70,464–506,552–560`; production call site `cmd/curator/main.go:2331–2372`. P1 reproduced execution in both shells. |
++| Global env files bypass the project trust gate. | C3: `shell.go:187–194,601–605`; P1 executed a hostile global file in both shells. Merely changing the default to B would not close this path. |
++| Approval is an arbitrary-current-bytes operation, not canonical-template verification. | C4: `cmd/curator/hook.go:58–89`. The hook hashes a path and later sources it separately; the Go writer's atomic 0600 publication does not bind those two reads (C3, C7). |
++| Notices print candidate paths and approval arguments without safe display escaping or argument quoting. | C3: `shell.go:452–461,734–744`. P2's pasted hint created an unintended scratch file; raw control bytes were emitted in C and UTF-8 locales. |
++| PATH restoration can leave `CSK_PROJECT_ROOT` set after leaving a project. | C3: `shell.go:534–564,776–807`; P3 observed PATH restoration but a stale root in both shells. |
++| `--no-global` is a generation argument; project scanning is disabled by `CURATOR_AUTO_ENV=0`. | C2–C3. `InstallHook` writes one shell-specific cache file; the reviewed install package has no caller that refreshes that hook. Preservation during a future refresh needs a contract, not an assumption. |
++| Existing tests deliberately accept the warning exception. | C6: `shell_hook_trust_test.go:570–585` requires B to refuse and A to execute. The focused test exited 0; that is a baseline-contract result, not a K3 safety result. |
++| rc.14 requires the present behavior. | S1–S3: Manager §3 requires prepend; §8 requires env-file discovery/sourcing and explicitly forbids combining A and B in one release. Its 14 shell-trust vectors include warning-and-source cases. A code-only default change would contradict the pinned contract. |
++
++P4 measured the old approved-project warm path at approximately 1.90 ms/call in bash and 2.00 ms/call in zsh, using the median of five 1,000-call batch averages. These include startup and one activation amortized over each batch; they are not per-prompt percentiles or a measurement of the proposed design. Windows was not executed.
++
++## Design
++
++### Options considered
++
++All three options must append PATH, remove every warning-and-source fallback, close the global sourcing exception, and repair display/command escaping. None can claim the stronger “repository code never runs” invariant merely by changing a profile name.
++
++| Option | Mechanism | Benefits | Security, compatibility and cost |
++|---|---|---|---|
++| **A. B-enforcing by default + existing digest approvals** | Keep `approve`, `approvals`, `revoke`; trust canonical realpath plus digest. Unapproved, changed, unreadable or indeterminate candidates never execute. | Smallest conceptual migration; deliberately approved custom scripts continue to work. Existing unchanged records can remain meaningful after state validation. | Approving hostile code still authorizes its execution. Current hash-then-source has a TOCTOU window. All POSIX/Git Bash/PowerShell consumers need hardened state reads, global gating, safe notices and execution of the exact verified snapshot. Appended templates change digests; old approved prepending/custom scripts defeat the PATH guarantee unless invalidated or constrained. Least suitable for an unconditional no-repository-code invariant. |
++| **B. Explicit verify-and-trust-on-first-use of canonical bytes** | An explicit verification command generates the manager's exact template for the shell and resolved root, compares bytes exactly, then records digest + realpath. The root is the only project-controlled template parameter; template version and shell are manager-selected. First use is verification, never blind approval. | Rejects arbitrary repository scripts even when their header claims to be generated. Can support a transition from canonical existing helpers. | Still needs an approval store, ownership/ACL rules and race-safe execution. A file can change after the command returns or between hook verification and sourcing. Execute an immutable private copy of the verified bytes, or manager-generated bytes, never reopen the repository path for execution. The latter converges toward C while retaining unnecessary state. Exact old prepending templates cannot remain automatically admissible. Three shell families require separate byte-exact templates, quoting and migration. |
++| **C. Compute root and bin; source no env file — recommended** | Trusted generated hook performs metadata-only discovery, constructs literal root/bin values, assigns PATH and root variables, and maintains activation state itself. Global activation uses the same mechanism. | Removes repository shell parsing, approval-store dependencies and the env-file verification/use race. Hostile, changed, unreadable, symlinked or approved env files are irrelevant. Simplest default and warm path. | Custom env-file side effects cease to activate automatically. Must specify discovery, restoration, global order and cache migration. Appending still makes previously absent command names available; it is not a command sandbox. bash/zsh and PowerShell still require real-shell validation. |
++
++For A and B, “digest + realpath” is necessary but insufficient: a retained store must reject symlinks, foreign owners, group/other writes, malformed/control-bearing records and uncertain reads; use a 0600 store in a 0700 directory. Apply the reviewer's conservative macOS rule: any ACL marker `+` rejects the store, as does an inability to inspect it; specify an equivalent native Windows ACL policy before qualification. Cached checks must not survive inode/size/mtime/ctime changes, including same-size same-second writes; only cache strictly older timestamps at the finest available resolution. Even that metadata policy does not make reopening the path race-free. A retained installer must warn on approval-store trouble rather than turn an already committed installation into a reported failure; curator's post-commit recording already follows that rule (C5). These are obligations if A/B is chosen, not claims about present coverage.
++
++Snapshot execution also changes compatibility: today's POSIX canonical helper discovers its root from its own source location (C1), so simply copying it to a private approval directory changes the root it computes. B needs a new canonical template with the verified project root encoded as a literal; A cannot transparently relocate every arbitrary approved script that depends on its source filename. This is another cost of retaining sourcing, not a solved property of a digest store.
++
++### Recommendation
++
++Select **C**, with one supported behavior, `no-source-v1`, and no configurable unsafe mode. In particular `_CURATOR_TRUST_PROFILE`, an old record, a file header or a “permissive” security profile must not re-enable sourcing.
++
++**Discovery and roots.** The nearest ancestor containing a `.agents` directory is the project root; a symlink to a directory counts. The hook examines metadata only and never opens an env file, Skillfile, approval store or launch fragment. Start from the physical current directory; validate POSIX `PWD` is absolute and non-empty first, then obtain the physical location using shell builtins. Return one absolute physical root independent of checkout aliases. Preserve literal bytes, including trailing newlines when capturing shell output. A missing marker continues the bounded parent walk; an inaccessible/indeterminate directory stops activation, not a fallback to a different project. `.agents/bin` may be absent at discovery: its literal path can be appended and becomes usable after installation. An env file's absence or unreadability cannot prevent activation.
++
++**PATH ownership and order.** From a clean inherited PATH, render `inherited → global/bin → project/.agents/bin`, omitting disabled scopes and adding no duplicate entry. The project addition is the last entry. Joining an empty or unset PATH introduces no empty component; preserve the original set/unset state for restoration where the shell supports it. Record the exact pre-activation PATH and which entries were added. Repeated activation is a no-op; switching first removes the previous activation and then appends the new project; leaving or opting out clears `CSK_PROJECT_ROOT` and project state, retaining only a still-enabled global scope. Never remove a bin entry already present before this hook acquired it. Keep rc.14's snapshot-restoration semantics for independent PATH edits made while a scope is active; preserving arbitrary concurrent edits is not claimed by this revision. Test that boundary explicitly instead of inferring ownership from substring replacement.
++
++This order changes the current project-over-global precedence: a global command wins a name collision with a project command, while both lose to inherited commands. A user who needs a particular project command uses its portable explicit path. A bin already put at the front by the user's profile or an old manually sourced helper is inherited state; the new hook cannot promise to repair that history. Migration must explain this limitation.
++
++**Global activation and controls.** Compute `<manager-home>/global` and its bin without sourcing `global/env.sh` or `global/env.ps1`. Bind an absolute manager-home from the CLI-selected configuration location when generating/loading the hook; never reinterpret a relative config location after each `cd`, and never parse config contents at a prompt. Preserve `--no-global` and the runtime `CURATOR_AUTO_ENV=0` project-scan opt-out. No new public configuration knob, approval command or trust store is required for activation. The manager-owned cached hook itself remains executable code explicitly loaded by the user's profile, under the existing manager-install trust boundary.
++
++**Unrepresentable paths.** POSIX PATH cannot encode a directory containing `:` as one entry; Windows PATH cannot encode one containing `;` as one entry. Refuse automatic activation of that scope, leave the caller's PATH unchanged, and emit a fixed one-line diagnostic with no interpolated path from the prompt hook. Do not split such a name into multiple search directories. NUL cannot be represented as an environment value; CLI/data readers reject it. Spaces, globs, quotes and other representable path bytes are literal data.
++
++**Shell integration.** Keep bash string/array `PROMPT_COMMAND`, zsh `precmd`/`chpwd`, and PowerShell prompt wrapping. Preserve registration idempotence, existing prompt output and an in-progress guard. Use builtins and quoted literal operands; external utilities, if unavoidable, use a trusted system search (`command -p` on POSIX), never project PATH. zsh hook functions run on directory changes and alias expansion happens when functions are read, so qualifying runtime calls alone is insufficient: establish alias-safe parsing as well ([zsh Functions](https://zsh.sourceforge.io/Doc/Release/Functions.html)). PowerShell uses literal filesystem operands, native path separators, and module-qualified commands or .NET APIs; it must not rely on ambient aliases/functions. No manager subprocess is required on the warm prompt path.
++
++## Security considerations
++
++The attacker controls checkout names, env files, `.agents` contents and symlinks, and may forge repository-local approval records. Trusted inputs are the installed manager/generator, its cached hook and the user's preexisting shell environment. The change makes directory/prompt activation incapable of executing repository or global env-file bytes. No approval or verification/use interval exists for those bytes. It does not make the filesystem immutable or authenticate executable shims: symlinks/bin contents can still change before an explicitly requested command runs.
++
++Appending protects the precedence of inherited executables, not aliases/functions or command names missing from the inherited PATH. Existing manager provider trust-root checks, reserved command names and explicit launcher boundaries remain necessary. Environments §11's provider policy must not be weakened on the assumption that append solves all executable discovery (S4). PowerShell resolves aliases/functions/cmdlets as well as external commands; native negative tests must account for that documented order ([command precedence](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_command_precedence?view=powershell-7.5)).
++
++**Display is separate from execution.** Prompt activation is silent on success and needs no approval notice. Any remaining CLI status, install notice, error or deprecated approval output must use an ASCII-safe path display: escape C0 controls, DEL, raw C1 bytes, Unicode C1/bidi controls, Unicode line separators and invalid encodings; escaping all non-ASCII bytes/code points is an acceptable locale-independent policy. Escape backslashes too, and bound/truncate display only with an explicit truncation mark. A diagnostic must remain one physical line in both C and UTF-8 locales. Underlying error strings are untrusted display inputs too.
++
++A displayed escaped path is not automatically an executable shell argument. For printable ASCII operands, printed copy-paste commands use single quotes: POSIX replaces an embedded apostrophe with `'"'"'`; PowerShell doubles it. Use `--` where the target command accepts it. Never use bare or double-quoted untrusted operands. For operands requiring control/non-ASCII escaping, omit the path-bearing executable hint and give static instructions, rather than printing a lossy command or raw controls; generated machine-consumed hook code must still encode its constants losslessly. This also avoids PowerShell's additional smart-quote parsing rules ([quoting rules](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_quoting_rules?view=powershell-7.5)). Test copying every emitted executable hint in a fresh real shell.
++
++No credential, token, Keychain entry or operator configuration content is required for this research or for the hook. All probes used newly created scratch homes and synthetic payloads. Findings belong in this CIP, its evidence and task notes; `LOGBOOK.md` is explicitly out of scope under the binding task instruction.
++
++## Compatibility and migration
++
++1. **Existing env helpers:** keep them as deprecated, explicit-use compatibility artifacts for one release; new manager-generated bytes append and handle empty PATH in both scopes/shells. The automatic hook ignores all of them. Do not inspect custom env contents merely to activate a directory, and do not describe manual sourcing of an arbitrary repository file as safe. Existing old bytes are not silently rewritten by read-only status; regeneration occurs through existing write/install operations. Custom variable exports move to an explicitly controlled user setup outside automatic repository activation.
++2. **Existing approvals:** ignore them during activation, stop manager recording of new shell approvals, and leave old state on disk for an explicit cleanup decision. `approve` must not report that it enabled activation: retire it with an explanatory non-zero result and no new record. `approvals`/`revoke` may remain deprecated inspection/cleanup commands for one release, with escaped human output. No config, Skillfile, marker or launch-fragment schema bump is needed merely to stop sourcing. Approval-state schema changes are unnecessary for C.
++3. **Cached hooks:** a binary update alone cannot repair an already cached script. Add manager-owned cache metadata, proposed closed shape `{schema_version: 1, shell, hook_revision: "no-source-v1", include_global: bool}`; this is generation metadata, not an approval store. Refresh only existing managed caches during the applicable install/update path, and preserve their `include_global` selection. For `shell-init --install`, omission of `--no-global` preserves a recognized existing cache's choice; first installation defaults to global enabled. An explicitly supplied `--no-global` disables it, and `--no-global=false` re-enables it, using the existing boolean flag rather than a new mode. Direct non-cached generation retains its explicit flag/default semantics. `CURATOR_AUTO_ENV` remains a runtime choice. For old caches without metadata, infer options only from exact known legacy generated bytes; never source the cache to discover options. Unknown/custom or unreadable caches are reported as legacy/unknown and require explicit regeneration with an explicit global choice, without failing an otherwise committed package install or claiming the cache is current.
++4. **Reloading:** new shells using refreshed caches get the new contract. Existing shells keep loaded old functions until reload/restart; old global prefixes cannot always be distinguished from user-owned entries. Recommend a fresh shell with a clean profile after refresh; do not promise complete live-state cleanup. Direct profile lines sourcing `.agents/env.*` also require user removal. Installation must not edit a user profile automatically.
++5. **Status and versioning:** report `hook-trust=no-source-v1` with shipped provenance and separately report managed-cache revision/currentness. A cache is current only when its actual bytes equal the generator's canonical output for its retained options and manager-home binding; metadata or a revision comment alone is insufficient. A partial cache/metadata publication is non-current. A manager executable's shipped revision is not evidence of a live shell's loaded code; that state is unknown unless explicitly observed. Stop using env-file digest drift to fail `--check` for the new hook; obsolete/unknown managed caches remain actionable. Version the new conformance contract and retain rc.14 vectors as historical, not simultaneous requirements.
++6. **Windows:** include Git Bash path spelling and native PowerShell. Keep the currently supported shell families; native Windows PowerShell 5.1 behavior and PowerShell 7 must be tested or explicitly revised by the operator, not silently replaced by a macOS `pwsh` run. Use the platform's PATH separator; distinguish empty/unset according to runtime capabilities ([PowerShell environment variables](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables?view=powershell-7.5)).
++
++## Specification changes
++
++The following is a normative sketch to publish in curator-spec only after review and operator acceptance:
++
++> **Manager §8, no-source-v1.** Shell activation is optional. A hook MUST NOT source, dot-source, evaluate, import or otherwise execute any project or global env-file content. No approval record or rollout mode may relax this rule. Discovery MUST use directory metadata and MUST NOT depend on env-file bytes, readability or approval. The nearest `.agents` directory identifies the physical project root; invalid or indeterminate discovery disables activation for that scope. The hook MUST append its bin entries after inherited PATH entries, with the project bin last, MUST NOT introduce empty entries, and MUST clear project-root state when leaving. Reloading MUST be idempotent. Global activation follows the same no-source rule, is enabled by default, and respects an explicitly retained opt-out.
++
++> **Manager §§3 and environment exposure.** Newly generated optional env helpers append their scope bin and correctly join empty PATH; they are deprecated explicit-use compatibility artifacts. Automatic activation does not consume them. Interactive PATH ordering is inherited, optional global, optional project. The command-launcher child-environment rules remain separately scoped: this CIP does not change the self-contained launcher prepend at §3 lines 665–669, enforced-worker PATH construction, or the reserved launch-fragment `path_prepend` field.
++
++> **Manager §§8.1–8.7 and §10.** Replace the approval gate, warning diagnostics and A/B rollout contract with no-source behavior, safe output, cache migration/currentness and real-shell execution vectors. Retain legacy approval CLI only as explicitly deprecated inspection/cleanup. The `hook-trust` posture value is `no-source-v1`, with `shipped` provenance; it must not attest live-shell state. Introduce a closed diagnostic for unrepresentable/indeterminate activation and cache migration states as needed, without raw path output. Update the compiled-repository environment-exposure prepend sentence (S6) to distinguish interactive append from explicit launcher construction.
++
++> **Environments §§11–12.** Describe historical S6/K3 env-file execution as removed by Manager §8's new hook while retaining the provider trust-root requirement for all untrusted PATH entries. Cross-reference `no-source-v1` in the shared posture inventory and distinguish cache status from live-shell status. Do not revise Environments §9.2's independent update-confirmation A→B plan, §10.2's reserved `path_prepend`, or §11's provider rollout through this decision.
++
++**Proposed decision record — replace the K3 warn-first plan.** Status: Pending operator acceptance. Context: rc.14 Manager §8.5 requires warning-and-source before enforcement; measured directory entry executes hostile bytes and prepend displaces inherited commands. Decision: adopt C, with no-source activation and append together in the adopting release; supersede §8.5's staged A→B rule only for shell activation/K3. Consequences: custom automatic env scripts and approval authorization end; helpers/approval cleanup get a bounded deprecation window; caches and open shells need explicit migration; inherited-before-global-before-project becomes normative. Rejected alternatives: A keeps arbitrary approved code and verification/use risk; B restricts code but retains store/snapshot complexity. Acceptance must name the target release and approve the global collision behavior. The orchestrator assigns the decision filename/number when publishing this reviewed CIP under `cips/`; this research edits neither spec nor decision files.
++
++## Implementation plan
++
++These are **proposed leaves, not scheduled or authorized tasks**. Sizes are relative estimates: S is one focused surface; M spans several related production paths and platform tests. Implementation starts only after the operator accepts the design.
++
++| Order | Proposed leaf | Size | Deliverable and gate |
++|---|---|---|---|
++| L1 | Spec contract and K3 replacement decision | S | Publish the accepted CIP, revised Manager/Environments text, a versioned no-source vector family and posture/cache contracts. Freeze the row inventory and path grammar; pin the implementation's candidate corpus. |
++| L2 | POSIX production activation | M | `curator shell-init bash/zsh` produces discovery/assignment code with no project/global source, append/restore, root clearing and idempotence. Includes real bash/zsh A/B/C/D tests and narrowing mutants, not just helper tests. |
++| L3 | Native PowerShell activation | M | Equivalent CLI-generated hook using literal paths, platform separator, native prompt wrapping and no dot-source; Git Bash path interoperability qualified with L2. Include native Windows lanes and version bounds. |
++| L4 | Migration, helpers, output and posture | M | Append-only generated helpers; retired approval authorization; managed-cache refresh retaining options; safe display/command rendering; accurate status. Tests cover real CLI cache install/update and committed-install warning behavior. No live-shell or profile repair by inference. |
++| L5 | Cross-platform qualification and release evidence | S | Run the frozen inventory through production generators, cache/profile loading and native shells; publish executed/required counts, skips, mutation results and measured before/after latency. Update docs and corpus pins in lockstep with the adopting release. |
++
++L2/L3 can be implemented independently after L1, but the new release must not advertise the invariant before L2–L4 agree and L5 qualifies it. The first slice needs no additional research prerequisite. This task launches no producers and creates no implementation leaves on the board.
++
++## Test plan
++
++Use the attached reviewer's A1–D5 identifiers. The 18 mandatory rows below are the initial inventory, not an assertion of 18 passing tests. Every behavior test loads bytes obtained from `curator shell-init <shell>` or the real `shell-init --install` cache path. Run bash with `--noprofile --norc`, zsh with `-f`, and native PowerShell with `-NoProfile -NonInteractive`; drive actual prompt callbacks and zsh directory-change callbacks. Use bounded processes, scratch HOME/config and literal synthetic fixtures. No fixture may need a real credential.
++
++| Rows | Required assertions and extra bounds |
++|---|---|
++| **A1–A2** | Hostile project env file at root and nested entry: no stdout marker/file side effect, but correct root/PATH activation. Repeat with matching old operator/manager records, forged local records, missing env file and unreadable env file. New hook behavior must be independent of all records. |
++| **A3** | `.agents`, env file and project-root symlinks separately and combined; retain activation without executing payloads. Include broken links, cycles, alias reentry and physical-root expectations. |
++| **A4** | Hostile global env files never execute, with/without legacy approvals and when project scanning is off. Global root/bin still activate unless `--no-global` is selected. |
++| **A5** | Controlled mutant that reintroduces project sourcing must make A1 fail. Narrow it to nested-only and symlink-only sourcing; A2/A3 must also fail. Test the corresponding global-only mutant with A4. |
++| **B1** | Install inert marker-writing `git`, `ssh`, `curl`, `python3` stubs in project bin; seed known executable equivalents in inherited/system locations. Assert resolution and invocation for all four. Test global/project collisions and an absent inherited command separately; append does not imply denial of the latter. |
++| **B2** | Empty and unset PATH produce bin entries only, without leading/trailing/double separators introduced by the hook. On leaving, restore original empty/unset state within native runtime semantics. A bare shell with empty PATH must still activate using builtins. |
++| **B3** | Enter, repeat, leave, reenter, switch siblings and nested projects: exact restoration, cleared root, no duplicates. Include preexisting identical bin entries, inherited empty components, PATH edits under the declared snapshot semantics, path-separator-containing roots and opt-out while active. |
++| **B4** | `--no-global` and `CURATOR_AUTO_ENV=0` survive managed cache refresh/install. Test omitted flag on first install versus recognized refresh, explicit `--no-global` and `--no-global=false`, metadata-backed and recognized legacy caches, corrupt/unreadable metadata, unknown custom cache, and a load in a fresh shell. Ensure refresh actually runs from the production update/install call site. |
++| **C1** | Path `x;touch PWNED;y`, apostrophes, dollars, backticks and command substitutions. Copy every printed executable hint into the relevant real shell with harmless target/marker stubs: one intended command/operand, no additional side effect. |
++| **C2** | Byte-exact stderr/stdout checks in C and UTF-8 locales for all C0/C1, DEL, U+202A–U+202E and U+2066–U+2069, CR/LF, Unicode line separators and invalid UTF-8 on POSIX. One physical notice line; no raw controls. Include PowerShell smart quotes and safe-hint suppression. |
++| **C3** | Spaces, glob characters, leading dash, apostrophes, trailing newline, long paths and non-ASCII names handled literally. Activation data is lossless even when diagnostic display is escaped/truncated. |
++| **C4** | Empty, `.` and relative POSIX `PWD`: bounded no-activation. Include inaccessible parents and non-filesystem PowerShell locations; no treating a read failure as absence followed by parent fallback. |
++| **D1** | Before loading the hook and at runtime, define aliases/functions named `ls`, `tr`, `cd`, `readlink` and relevant PowerShell commands. Decisions remain unchanged; no project stub used as an internal utility. |
++| **D2–D3** | Load twice with populated bash string/array prompts and zsh hooks; only one registration. Preserve user prompt output/status. Inject a directory change during activation to prove the guard, even though canonical activation no longer needs an env-file `cd`. |
++| **D4** | Compare baseline and candidate on the same host/depth. Report individual warm samples or clearly labelled batch averages, startup separately, and command count. Target warm p95 below 10 ms; investigate/report slow filesystems rather than turn this into a universal timing guarantee. |
++| **D5** | Native Windows CI executes applicable A/B/C rows with PowerShell, including junction/drive/UNC forms; Git Bash gets its own lane. Mark OS-invalid filename cases inapplicable with reasons, never silently skip. Native pwsh evidence is mandatory, with Windows PowerShell 5.1 separately qualified if support is retained. |
++
++Also kill prepend, empty-PATH separator, stale-root, lost-opt-out, duplicate-array-registration and partial-escaping mutants. A mutant that escapes only ESC but misses bidi/C1 must fail C2; deleting the whole formatter alone is insufficient. Publish per-shell executed/required counts and mutant killed/attempted counts, with each gate's actual exit code. Spec-vector structural validation does not establish shell behavior.
++
++For A/B instead of C, add every reviewer section E condition: store ownership/mode/symlink/ACL refusal; malformed/NUL/control records; racy timestamps and metadata cache invalidation; changed-after-approval and replacement-between-verification-and-use; committed installation continues with warning on bad/locked store. For B, also reject every one-byte/comment/whitespace/template-version mismatch, a self-minted matching digest for noncanonical content, incorrect root substitution, and a verified path retargeted before execution. Failures to read are distinct from absence.
++
++Research coverage is intentionally bounded: P1–P4 touched 9/18 reviewer rows, with partial B1/B3/C2/D4 coverage; no candidate hook exists, so candidate qualification is **0/18**. The evidence states exactly what ran and what remains unrun.
++
++## Open questions for the operator
++
++1. **Accept C as the sole default, with no warning-and-source or approval escape hatch? Recommended: yes.** A preserves arbitrary approved scripts; B requires canonical verification plus race-safe snapshot execution and state hardening. Neither has a demonstrated benefit for a two-variable PATH helper.
++2. **Accept inherited → global → project, making the project addition literally last? Recommended: yes.** This changes project/global collision behavior. Preserving project-over-global precedence would instead require inherited → project → global and relaxing the literal-last requirement.
++3. **Accept physical-root discovery by nearest `.agents` directory and refusal of PATH-separator-containing roots? Recommended: yes.** This removes env-file presence as a prerequisite and avoids splitting one hostile name into search entries. Inaccessible discovery disables that scope.
++4. **Accept the one-release compatibility window for explicit-use helpers and approval inspection/cleanup, with approval authorization retired immediately? Recommended: yes.** Keep old files/state untouched until normal regeneration or explicit cleanup; do not retain a mode that sources them automatically. Preserve the existing snapshot-restoration semantics for PATH edits while a scope is active.
++5. **Which release adopts the new contract, and does Windows PowerShell 5.1 remain supported? Recommended: the first jointly qualified spec/manager release after acceptance, with current shell support retained until native evidence justifies a separate support decision.** Refresh existing managed caches with retained options and tell users to restart/reload; do not attest that a running shell has changed merely because the manager was upgraded.
++
++Recommended decision package: **C + literal-tail project append + no global sourcing + safe output + explicit cache migration**. Acceptance enables the proposed L1–L5 leaves; prioritization remains the operator's next decision.
+diff --git a/.research/261004_CIP-0004-shell-hook-no-source-path-append_evidence.md b/.research/261004_CIP-0004-shell-hook-no-source-path-append_evidence.md
+new file mode 100644
+index 00000000..0613b1f7
+--- /dev/null
++++ b/.research/261004_CIP-0004-shell-hook-no-source-path-append_evidence.md
+@@ -0,0 +1,629 @@
++# CIP-0004 evidence: shell-hook no-source and PATH append
++
++- Task: TASK-261004-1z2pgb — shell-hook-no-source-and-path-append-design
++- Parent: STORY-261004-7fglii — shell-hook-path-and-backend-env-hardening
++- Date: 2026-10-04
++- Companion: [CIP draft](261004_CIP-0004-shell-hook-no-source-path-append.md)
++- Scope: source inspection and scratch probes of current behavior; no candidate implementation, product-code changes, account operations, real credential/operator-manager-config reads, or `LOGBOOK.md` edit.
++
++## Identity and limits
++
++The initial researcher recorded a clean worktree at research start. `git rev-parse HEAD main` returned `ca1b776fb580ec0cee0173bf150daf063023aeaa` twice (exit 0). A fresh `git ls-remote https://github.com/relux-works/curator.git refs/heads/main refs/tags/v1.0.0-rc.14` returned that same main OID (exit 0; there was no matching curator tag row). This is a research source identity, not an integration-authority or landing attestation. The recovery run started with exactly these two untracked research artifacts; its fresh main-ref read returned the same OID (exit 0), and its standalone product/logbook diff against main exited 0.
++
++For curator-spec, `git ls-remote https://github.com/relux-works/curator-spec.git refs/tags/v1.0.0-rc.14 'refs/tags/v1.0.0-rc.14^{}'` returned tag object `661bead088186db70c9f57ad0b115305ec2bef35` and peeled commit `43bf0a2506d5c354a73bbc3ea4623d4653db10c7` (exit 0). Text was read with `git show v1.0.0-rc.14:<path>` from the available spec checkout. Its HEAD was the same peeled commit. No checkout, fetch, commit or spec write was needed. Curator's `.github/workflows/ci.yml:35–43` pins this commit as its current corpus.
++
++Host observations: Darwin x86_64; bash 3.2.57(1)-release; zsh 5.9; Go 1.26.0 darwin/amd64. Each version command exited 0. The module declares Go 1.25.5; these results use the installed 1.26.0 compiler, not a claim of qualification under 1.25.5. No `pwsh` executable was available. A combined `command -v go bash zsh python3 pwsh` discovery call exited 1 because of the missing last executable; it was not a validation gate. Personal executable paths are omitted here.
++
++All `<scratch>` path spellings below replace one newly created temporary directory. `HOME`, `CURATOR_CONFIG`, PATH, locale and marker operands of every CLI/shell probe were explicit scratch values, not the operator's environment. Generated hooks came from the freshly built CLI. The reviewer matrix is an input requirement, not accepted prior execution evidence; the referenced cocoaskills revision and six review rounds were not independently reproduced. The GitHub browser fetch of that upstream test file failed, so no claim relies on its unseen contents.
++
++## Source evidence index
++
++Line numbers are at the frozen revisions above. Source-file links identify the first relevant line; ranges below describe what was inspected.
++
++| ID | Source | Fact established |
++|---|---|---|
++| C1 | [`internal/envfiles/envfiles.go:24–63; 72–123`](https://github.com/relux-works/curator/blob/ca1b776fb580ec0cee0173bf150daf063023aeaa/internal/envfiles/envfiles.go#L24) | ProjectContent and GlobalContent prepend in both shells; direct writers record digests. Project POSIX bytes locate their source at runtime and contain no literal project root. |
++| C2 | [`cmd/curator/main.go:2331–2372`](https://github.com/relux-works/curator/blob/ca1b776fb580ec0cee0173bf150daf063023aeaa/cmd/curator/main.go#L2331) | Production shell-init entry calls Hook or InstallHook; --no-global is a generation flag; install output includes a raw cache path and SourceCommand. |
++| C3 | [`internal/shell/shell.go:48–70, 90–152, 165–197, 204–248, 267–369, 373–434, 452–568, 588–821`](https://github.com/relux-works/curator/blob/ca1b776fb580ec0cee0173bf150daf063023aeaa/internal/shell/shell.go#L48) | Default A-warning; project check-then-source; global source bypass; raw warnings; env-file discovery; saved PATH restoration; root variable not cleared; shell integration and cache writer. |
++| C4 | [`cmd/curator/hook.go:44–113`](https://github.com/relux-works/curator/blob/ca1b776fb580ec0cee0173bf150daf063023aeaa/cmd/curator/hook.go#L44) | approve reads any selected current bytes and stores their digest; no canonical-template equality check; raw human paths in approval output. |
++| C5 | [`internal/install/commit.go:695–718`](https://github.com/relux-works/curator/blob/ca1b776fb580ec0cee0173bf150daf063023aeaa/internal/install/commit.go#L695) | Post-commit live env-file digest recording; failures become warnings. This is not hook-cache refresh. |
++| C6 | [`internal/shell/shell_hook_trust_test.go:521–594`](https://github.com/relux-works/curator/blob/ca1b776fb580ec0cee0173bf150daf063023aeaa/internal/shell/shell_hook_trust_test.go#L521) | Existing hostile-checkout test explicitly expects B refusal and A execution; PowerShell skips when unavailable. |
++| C7 | [`internal/hookapproval/hookapproval.go:602–631`](https://github.com/relux-works/curator/blob/ca1b776fb580ec0cee0173bf150daf063023aeaa/internal/hookapproval/hookapproval.go#L602) | Go approval state writer stages, chmods 0600, syncs and atomically renames; this alone proves no hook read-side ownership/ACL policy and no execution snapshot binding. |
++| C8 | [`internal/shell/shell_test.go:40–122, 141–248, 302–335, 413–466`](https://github.com/relux-works/curator/blob/ca1b776fb580ec0cee0173bf150daf063023aeaa/internal/shell/shell_test.go#L40) | Existing nested activation, saved-PATH, invalid-PWD, registration and cache tests. The leave assertion checks active state and PATH, not CSK_PROJECT_ROOT. |
++| C9 | [`internal/envfiles/envfiles_test.go:34–115`](https://github.com/relux-works/curator/blob/ca1b776fb580ec0cee0173bf150daf063023aeaa/internal/envfiles/envfiles_test.go#L34) | Generated helper test demands a PATH prefix at line 79; tested helper behavior is currently prepend. |
++| C10 | [`cmd/curator/security_posture.go:10–20`](https://github.com/relux-works/curator/blob/ca1b776fb580ec0cee0173bf150daf063023aeaa/cmd/curator/security_posture.go#L10) | Status currently derives HookTrust from the binary DefaultTrustProfile, not proof of a cached or live hook revision. |
++| S1 | [`profiles/manager.md:§3, 665–701`](https://github.com/relux-works/curator-spec/blob/43bf0a2506d5c354a73bbc3ea4623d4653db10c7/profiles/manager.md#L665) | Distinguishes self-contained child launchers (prepend) from generated interactive env helpers (also currently prepend). Direct command locations remain shell independent. |
++| S2 | [`profiles/manager.md:§§8–8.7, 1242–1427`](https://github.com/relux-works/curator-spec/blob/43bf0a2506d5c354a73bbc3ea4623d4653db10c7/profiles/manager.md#L1242) | Optional activation, nearest env-file search, global precedence, closed digest approvals and commands, warning-only diagnostics, explicit staged A→B prohibition on an immediate flip, status and downstream real-shell binding. |
++| S3 | [`conformance/v1/vectors/shell-hook-trust.json:43–105 and cases from 108`](https://github.com/relux-works/curator-spec/blob/43bf0a2506d5c354a73bbc3ea4623d4653db10c7/conformance/v1/vectors/shell-hook-trust.json#L43) | Closed A/B rollout expectations. Parsed JSON contains 14 cases. Spec validation is structural, not hook execution. |
++| S4 | [`protocol/environments.md:§11, 3440–3498`](https://github.com/relux-works/curator-spec/blob/43bf0a2506d5c354a73bbc3ea4623d4653db10c7/protocol/environments.md#L3440) | Historical env-sourcing/PATH injection is motivation for independent provider trust roots; provider discovery has a separate staged rollout. |
++| S5 | [`protocol/environments.md:§12, 3575–3592`](https://github.com/relux-works/curator-spec/blob/43bf0a2506d5c354a73bbc3ea4623d4653db10c7/protocol/environments.md#L3575) | env status shares the manager posture inventory and must remain read-only; --check signals non-current state. |
++| S6 | [`profiles/manager.md:2237–2244`](https://github.com/relux-works/curator-spec/blob/43bf0a2506d5c354a73bbc3ea4623d4653db10c7/profiles/manager.md#L2237) | Compiled-repository environment exposure also says prepend; it needs an explicit interactive-versus-launcher distinction. |
++| S7 | [`profiles/manager.md:§10, 1502–1514`](https://github.com/relux-works/curator-spec/blob/43bf0a2506d5c354a73bbc3ea4623d4653db10c7/profiles/manager.md#L1502) | Closed hook-trust posture values are A-warning/B-enforcing; other gates have their own independent revision values. |
++
++Additional inspected boundary: Environments §10.2, `protocol/environments.md:3234–3236`, reserves the child launch fragment's `path_prepend`. This proposal does not rename it or change its semantics. `internal/envfiles/stage.go:13–21` uses the same helper generators as direct writes. Scoped `rg` over `internal/install` and `cmd/curator/main.go` found InstallHook only at the shell-init install call; absence of automatic refresh is bounded to those production surfaces, not a claim about every external updater. [`cmd/curator/main.go:416–459`](https://github.com/relux-works/curator/blob/ca1b776fb580ec0cee0173bf150daf063023aeaa/cmd/curator/main.go#L416) passes `--flag=value` through the standard boolean flag parser: the proposed explicit `--no-global=false` uses existing syntax, while preserving an omitted flag on a cache refresh is new proposed behavior.
++
++## Validation ledger
++
++The following ledger and P1–P4 raw observations were inherited from the initial researcher's already-attached task-scoped evidence. They report standalone processes without tee or pipelines. Recovery rechecked the cited source/spec, reran the two focused Go tests and audited the revised artifacts; it did not rebuild the CLI or repeat the P1–P4 scripts. See the recovery ledger below for that distinction. No full repository gate, native Windows suite, proposed mutant or candidate implementation gate is claimed.
++
++| Command (temporary prefix normalized) | Actual exit | Interpretation |
++|---|---:|---|
++| `go build -o <scratch>/curator ./cmd/curator` | 0 | Built this source revision for production-entry probes. |
++| `go test ./internal/shell -run '^TestShellHookRefusesHostileCheckout$' -count=1 -v` | 0 | Current A/B contract passes on sh, dash, bash, zsh. PowerShell subtest skipped. A deliberately executes payloads. |
++| `go test ./internal/envfiles -run '^TestWrite(ProjectShapesAndSourcing\|Global)$' -count=1 -v` | 0 | Current generated project/global helpers pass existing tests; the project test asserts prepend. |
++| `python3 <scratch>/probe.py` | 0 | Observation harness ran; exit 0 means collection succeeded, not that the requested no-source properties passed. All child exits are in the JSON below. |
++| `python3 <scratch>/controls.py` | 0 | Collected raw stderr bytes in two locales; both hooks emit unsafe raw controls. |
++| `git diff --no-index --check /dev/null <CIP-path>` and the corresponding evidence-file command | 1 each | New-file comparisons report differences; no whitespace diagnostic was emitted. These are non-zero comparisons, not green validation gates. The independent audit below checks the new files directly. |
++| `python3 <scratch>/check_artifacts.py` after first embedding of its own source | 1 | Failed on its own literal forbidden-prefix examples; corrected as described in the audit recipe. |
++| `python3 <scratch>/check_artifacts.py` with equivalent split literals | 0 | Both artifacts have template sections, valid companion links, no trailing whitespace or raw control/personal paths; Git reports only the two new research files, with no product or logbook changes. |
++| Pasted vulnerable approval hint, bash and zsh subprocesses | 127 each | Failing command in both shells, expected while demonstrating injection: the injected `touch PWNED` succeeds, then the synthetic trailing `y/...` command is absent. Never a passing safety gate. |
++
++Focused existing-test stdout (durations are observed, not budgets):
++
++```text
++=== RUN   TestShellHookRefusesHostileCheckout
++=== RUN   TestShellHookRefusesHostileCheckout/posix
++=== RUN   TestShellHookRefusesHostileCheckout/posix/sh
++=== RUN   TestShellHookRefusesHostileCheckout/posix/dash
++=== RUN   TestShellHookRefusesHostileCheckout/posix/bash
++=== RUN   TestShellHookRefusesHostileCheckout/posix/zsh
++=== RUN   TestShellHookRefusesHostileCheckout/powershell
++    shell_hook_trust_test.go:594: PowerShell is unavailable (no pwsh on this runner)
++--- PASS: TestShellHookRefusesHostileCheckout (0.99s)
++    --- PASS: TestShellHookRefusesHostileCheckout/posix (0.99s)
++        --- PASS: TestShellHookRefusesHostileCheckout/posix/sh (0.25s)
++        --- PASS: TestShellHookRefusesHostileCheckout/posix/dash (0.18s)
++        --- PASS: TestShellHookRefusesHostileCheckout/posix/bash (0.23s)
++        --- PASS: TestShellHookRefusesHostileCheckout/posix/zsh (0.26s)
++    --- SKIP: TestShellHookRefusesHostileCheckout/powershell (0.00s)
++PASS
++ok  github.com/relux-works/curator/internal/shell 1.779s
++
++=== RUN   TestWriteProjectShapesAndSourcing
++--- PASS: TestWriteProjectShapesAndSourcing (0.23s)
++=== RUN   TestWriteGlobal
++--- PASS: TestWriteGlobal (0.26s)
++PASS
++ok  github.com/relux-works/curator/internal/envfiles 1.191s
++```
++
++## P1 — repository/global execution through the production generator
++
++For each of bash and zsh, the built CLI emitted a fresh hook into a scratch file. A clean shell loaded that hook, entered a synthetic checkout and ran activation; zsh also exercised chpwd. Five project shapes were measured: direct root, nested entry, symlinked `.agents`, symlinked env file and symlinked project root. All **10/10** project runs printed `K3-SOURCE-MARKER` and created the scratch marker; both **2/2** global runs did too. Those observations contradict the requested no-source invariant. Each generator and activation child exited 0. The marker payload was only a printf and scratch-file creation.
++
++## P2 — notice injection and terminal controls
++
++Both **2/2** semicolon-name notices included an unquoted approval operand. Pasting the emitted command into a fresh shell (with a harmless `curator` function) created `PWNED` in that shell's scratch cwd, then exited 127 on the remainder. No real approval/account command was executed by the pasted text.
++
++The original text-mode collector normalizes carriage return during decoding; therefore it is not evidence of the exact CR byte. `controls.py` reran the shells with binary capture. In **4/4** shell/locale combinations (`bash`, `zsh` × `C`, `en_US.UTF-8`), raw LF, ESC, CR and DEL and UTF-8 encodings of U+0085, U+202E and U+2066 were present in stderr. Each single notice had three LF bytes because the path occurred twice. This samples those characters only, not the whole requested C0/C1/bidi ranges. JSON below contains escaped representations; it does not reproduce terminal-active bytes.
++
++## P3 — prepend and stale root
++
++The probe reconstructs the literal POSIX ProjectContent concatenation from `internal/envfiles/envfiles.go:25–36` using JSON decoding of Go string literals. This is a fixture, not a second implementation of activation or a call to an invented generator API. Its SHA-256 is `ebe6c8ce75ef68bf4ff8eff7c549cccebf1c5c72b0671a3c82afb2a9b395b88c`; the actual Go generator is independently exercised by the existing envfiles test above. The fixture is approved through the real CLI in scratch state.
++
++With PATH `/usr/bin:/bin`, both hooks inserted `<project>/.agents/bin` first. `command -v git` selected the project stub and calling `git` created the tool marker (**2/2** shells). Four stub names were materialized, but only git resolution/invocation was measured: **1/4** requested B1 command names per shell. Leaving restored `/usr/bin:/bin` but left `CSK_PROJECT_ROOT` pointing at the old project (**2/2**). B3 switching/reentry/duplicates and B2 empty PATH were not measured by this probe.
++
++## P4 — current warm baseline
++
++Each measurement starts a new real shell in the approved project, loads the actual generated hook, then invokes `_curator_auto_env` 1,000 times. Five batches ran per shell, **10,000/10,000** loop calls in total, all batch subprocess exits 0. Wall time uses Python `perf_counter`; startup and initial activation are included and amortized. Bash per-call batch averages were 2.2892, 1.8999, 2.5098, 1.8921 and 1.7840 ms (median 1.8999). Zsh averages were 2.0047, 2.1476, 2.2576, 1.8213 and 1.7923 ms (median 2.0047). No new-hook speedup, individual-sample p95 or cross-machine budget pass is inferred.
++
++## Coverage bound
++
++These baseline observations touched A1, A2, A3, A4, B1, B3, C1, C2 and D4: **9/18** reviewer rows, with the partial bounds above. A5, B2, B4, C3, C4, D1, D2, D3 and D5 were not probed here; targeted baseline unit tests are not relabelled as those new-vector results. No TOCTOU exploit, hardened approval store, candidate no-source implementation, candidate mutation test or native Windows behavior was qualified. Candidate conformance is **0/18**, as expected for a design-only task. The CIP defines all 18 rows and the alternative-only E obligations for future implementation.
++
++## Reproduction scripts and raw observations
++
++Create a fresh temporary directory, build the CLI there from the pinned curator checkout, save the following scripts beside it, and run from that checkout. Reproduce only in a disposable scratch home. The script uses subprocess argument arrays, a closed environment, bounded 15-second children and scratch-only markers. The Python harness follows the attached reviewer probe format; permanent downstream tests should use the repository's Go test stack and existing real-shell runners.
++
++`probe.py`:
++
++```python
++from pathlib import Path
++import hashlib, json, re, subprocess, sys, time, statistics
++base=Path(__file__).resolve().parent
++binary=base/'curator'
++source=Path.cwd()
++fixture=source.joinpath('internal/envfiles/envfiles.go').read_text().split('envSh :=',1)[1].split('envPs1 :=',1)[0]
++canonical=''.join(json.loads(s) for s in re.findall(r'"(?:\\.|[^"\\])*"',fixture))
++rows=[]
++def env(root, **extra):
++    home=root/'home'; home.mkdir(parents=True,exist_ok=True)
++    return {'HOME':str(home),'CURATOR_CONFIG':str(home/'manager/config.json'),'PATH':'/usr/bin:/bin','LC_ALL':'C',**{k:str(v) for k,v in extra.items()}}
++def call(argv, e, cwd):
++    return subprocess.run(argv,env=e,cwd=cwd,capture_output=True,text=True,timeout=15)
++def record(label,r,**values):
++    rows.append({'case':label,'exit':r.returncode,**values})
++def cli(args,e,root,label):
++    r=call([str(binary),*args],e,root); record(label,r)
++    if r.returncode: raise RuntimeError(label+': '+repr(r.stderr))
++    return r
++for name in ('bash','zsh'):
++    exe='/bin/'+name
++    prefix=[exe,'--noprofile','--norc','-c'] if name=='bash' else [exe,'-f','-c']
++    for kind in ('root','nested','agents-link','env-link','root-link','global','notice-semicolon','notice-controls','path-order'):
++        root=base/(name+'-'+kind); root.mkdir(exist_ok=True)
++        proj=root/'repo'; (proj/'nested').mkdir(parents=True,exist_ok=True)
++        agents=proj/'.agents'
++        if kind=='agents-link':
++            real=root/'agents-target'; real.mkdir(exist_ok=True); agents.symlink_to(real,target_is_directory=True)
++        else: agents.mkdir(exist_ok=True)
++        (agents/'bin').mkdir(exist_ok=True)
++        if kind=='notice-semicolon':
++            p=root/'x;touch PWNED;y'; proj.rename(p); proj=p; agents=proj/'.agents'
++        if kind=='notice-controls':
++            p=root/('x\n\x1b\r\x7f\u0085\u202e\u2066z'); proj.rename(p); proj=p; agents=proj/'.agents'
++        e=env(root,HOOK=root/'hook',TARGET=proj/'nested' if kind=='nested' else proj,CANARY=root/'marker',OUTSIDE=root,TOOL_CANARY=root/'tool-marker')
++        script="printf '%s\\n' K3-SOURCE-MARKER\n: > \"$CANARY\"\n"
++        if kind=='path-order': script=canonical
++        file=agents/'env.sh'
++        if kind=='env-link':
++            target=root/'payload'; target.write_text(script); file.symlink_to(target)
++        else: file.write_text(script)
++        if kind=='root-link':
++            alias=root/'alias'; alias.symlink_to(proj,target_is_directory=True); e['TARGET']=str(alias/'nested')
++        if kind=='global':
++            global_file=root/'home/manager/global/env.sh'; global_file.parent.mkdir(parents=True,exist_ok=True); global_file.write_text(script)
++            file.unlink(); e['TARGET']=str(root)
++        args=['shell-init',name]+([] if kind=='global' else ['--no-global'])
++        generated=cli(args,e,root,name+'/'+kind+'/generate'); (root/'hook').write_text(generated.stdout)
++        body='. "$HOOK"; builtin cd "$TARGET"; _curator_auto_env; printf "END\\n"'
++        if kind=='path-order':
++            cli(['hook','approve',str(file)],e,root,name+'/path-order/approve')
++            for tool in ('git','ssh','curl','python3'):
++                stub=agents/'bin'/tool; stub.write_text('#!/bin/sh\n: > "$TOOL_CANARY"\n'); stub.chmod(0o755)
++            body='. "$HOOK"; builtin cd "$TARGET"; _curator_auto_env; printf "PATH=%s\\n" "$PATH"; command -v git; git; builtin cd "$OUTSIDE"; _curator_auto_env; printf "LEAVE_ROOT=%s\\n" "${CSK_PROJECT_ROOT-unset}"; printf "LEAVE_PATH=%s\\n" "$PATH"'
++        r=call(prefix+[body],e,root)
++        values={'marker_stdout':'K3-SOURCE-MARKER' in r.stdout,'marker_file':(root/'marker').exists()}
++        if kind.startswith('notice'):
++            values['stderr_ascii']=ascii(r.stderr.replace(str(base),'<scratch>'))
++        if kind=='notice-semicolon':
++            notice=r.stderr.split('run curator hook approve ',1)[1].split(' to approve it',1)[0]
++            paste=call(prefix+['curator() { :; }; curator hook approve '+notice],e,root)
++            record(name+'/notice-semicolon/pasted-hint',paste,unexpected_file=(root/'PWNED').exists())
++        if kind=='path-order':
++            values.update(stdout=r.stdout.replace(str(base),'<scratch>'),stub_executed=(root/'tool-marker').exists())
++        record(name+'/'+kind,r,**values)
++    # Warm baseline: approved generated fixture, repeated actual prompt hook calls.
++    e=env(base/(name+'-path-order'),HOOK=base/(name+'-path-order')/'hook',TARGET=base/(name+'-path-order')/'repo')
++    samples=[]
++    for n in range(5):
++        body='builtin cd "$TARGET"; . "$HOOK"; i=0; while [ "$i" -lt 1000 ]; do _curator_auto_env; i=$((i+1)); done'
++        started=time.perf_counter(); r=call(prefix+[body],e,base); elapsed=time.perf_counter()-started
++        samples.append(elapsed*1000/1000); record(name+'/warm-batch-'+str(n+1),r,calls=1000,ms_per_call=round(samples[-1],4))
++    rows.append({'case':name+'/warm-summary','median_batch_ms_per_call':round(statistics.median(samples),4),'min':round(min(samples),4),'max':round(max(samples),4)})
++summary={'fixture_sha256':hashlib.sha256(canonical.encode()).hexdigest(),'source_revision':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'rows':rows}
++(base/'probe-results.json').write_text(json.dumps(summary,ensure_ascii=True,indent=2)+'\n')
++print(json.dumps(summary,ensure_ascii=True,indent=2))
++```
++
++`probe-results.json` (scratch prefix normalized by the collector):
++
++```json
++{
++  "fixture_sha256": "ebe6c8ce75ef68bf4ff8eff7c549cccebf1c5c72b0671a3c82afb2a9b395b88c",
++  "source_revision": "ca1b776fb580ec0cee0173bf150daf063023aeaa",
++  "rows": [
++    {
++      "case": "bash/root/generate",
++      "exit": 0
++    },
++    {
++      "case": "bash/root",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true
++    },
++    {
++      "case": "bash/nested/generate",
++      "exit": 0
++    },
++    {
++      "case": "bash/nested",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true
++    },
++    {
++      "case": "bash/agents-link/generate",
++      "exit": 0
++    },
++    {
++      "case": "bash/agents-link",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true
++    },
++    {
++      "case": "bash/env-link/generate",
++      "exit": 0
++    },
++    {
++      "case": "bash/env-link",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true
++    },
++    {
++      "case": "bash/root-link/generate",
++      "exit": 0
++    },
++    {
++      "case": "bash/root-link",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true
++    },
++    {
++      "case": "bash/global/generate",
++      "exit": 0
++    },
++    {
++      "case": "bash/global",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true
++    },
++    {
++      "case": "bash/notice-semicolon/generate",
++      "exit": 0
++    },
++    {
++      "case": "bash/notice-semicolon/pasted-hint",
++      "exit": 127,
++      "unexpected_file": true
++    },
++    {
++      "case": "bash/notice-semicolon",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true,
++      "stderr_ascii": "'curator: shell_hook_env_unapproved: <scratch>/bash-notice-semicolon/x;touch PWNED;y/.agents/env.sh is not approved; run curator hook approve <scratch>/bash-notice-semicolon/x;touch PWNED;y/.agents/env.sh to approve it\\n'"
++    },
++    {
++      "case": "bash/notice-controls/generate",
++      "exit": 0
++    },
++    {
++      "case": "bash/notice-controls",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true,
++      "stderr_ascii": "'curator: shell_hook_env_unapproved: <scratch>/bash-notice-controls/x\\n\\x1b\\n\\x7f\\x85\\u202e\\u2066z/.agents/env.sh is not approved; run curator hook approve <scratch>/bash-notice-controls/x\\n\\x1b\\n\\x7f\\x85\\u202e\\u2066z/.agents/env.sh to approve it\\n'"
++    },
++    {
++      "case": "bash/path-order/generate",
++      "exit": 0
++    },
++    {
++      "case": "bash/path-order/approve",
++      "exit": 0
++    },
++    {
++      "case": "bash/path-order",
++      "exit": 0,
++      "marker_stdout": false,
++      "marker_file": false,
++      "stdout": "PATH=<scratch>/bash-path-order/repo/.agents/bin:/usr/bin:/bin\n<scratch>/bash-path-order/repo/.agents/bin/git\nLEAVE_ROOT=<scratch>/bash-path-order/repo\nLEAVE_PATH=/usr/bin:/bin\n",
++      "stub_executed": true
++    },
++    {
++      "case": "bash/warm-batch-1",
++      "exit": 0,
++      "calls": 1000,
++      "ms_per_call": 2.2892
++    },
++    {
++      "case": "bash/warm-batch-2",
++      "exit": 0,
++      "calls": 1000,
++      "ms_per_call": 1.8999
++    },
++    {
++      "case": "bash/warm-batch-3",
++      "exit": 0,
++      "calls": 1000,
++      "ms_per_call": 2.5098
++    },
++    {
++      "case": "bash/warm-batch-4",
++      "exit": 0,
++      "calls": 1000,
++      "ms_per_call": 1.8921
++    },
++    {
++      "case": "bash/warm-batch-5",
++      "exit": 0,
++      "calls": 1000,
++      "ms_per_call": 1.784
++    },
++    {
++      "case": "bash/warm-summary",
++      "median_batch_ms_per_call": 1.8999,
++      "min": 1.784,
++      "max": 2.5098
++    },
++    {
++      "case": "zsh/root/generate",
++      "exit": 0
++    },
++    {
++      "case": "zsh/root",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true
++    },
++    {
++      "case": "zsh/nested/generate",
++      "exit": 0
++    },
++    {
++      "case": "zsh/nested",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true
++    },
++    {
++      "case": "zsh/agents-link/generate",
++      "exit": 0
++    },
++    {
++      "case": "zsh/agents-link",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true
++    },
++    {
++      "case": "zsh/env-link/generate",
++      "exit": 0
++    },
++    {
++      "case": "zsh/env-link",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true
++    },
++    {
++      "case": "zsh/root-link/generate",
++      "exit": 0
++    },
++    {
++      "case": "zsh/root-link",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true
++    },
++    {
++      "case": "zsh/global/generate",
++      "exit": 0
++    },
++    {
++      "case": "zsh/global",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true
++    },
++    {
++      "case": "zsh/notice-semicolon/generate",
++      "exit": 0
++    },
++    {
++      "case": "zsh/notice-semicolon/pasted-hint",
++      "exit": 127,
++      "unexpected_file": true
++    },
++    {
++      "case": "zsh/notice-semicolon",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true,
++      "stderr_ascii": "'curator: shell_hook_env_unapproved: <scratch>/zsh-notice-semicolon/x;touch PWNED;y/.agents/env.sh is not approved; run curator hook approve <scratch>/zsh-notice-semicolon/x;touch PWNED;y/.agents/env.sh to approve it\\n'"
++    },
++    {
++      "case": "zsh/notice-controls/generate",
++      "exit": 0
++    },
++    {
++      "case": "zsh/notice-controls",
++      "exit": 0,
++      "marker_stdout": true,
++      "marker_file": true,
++      "stderr_ascii": "'curator: shell_hook_env_unapproved: <scratch>/zsh-notice-controls/x\\n\\x1b\\n\\x7f\\x85\\u202e\\u2066z/.agents/env.sh is not approved; run curator hook approve <scratch>/zsh-notice-controls/x\\n\\x1b\\n\\x7f\\x85\\u202e\\u2066z/.agents/env.sh to approve it\\n'"
++    },
++    {
++      "case": "zsh/path-order/generate",
++      "exit": 0
++    },
++    {
++      "case": "zsh/path-order/approve",
++      "exit": 0
++    },
++    {
++      "case": "zsh/path-order",
++      "exit": 0,
++      "marker_stdout": false,
++      "marker_file": false,
++      "stdout": "PATH=<scratch>/zsh-path-order/repo/.agents/bin:/usr/bin:/bin\n<scratch>/zsh-path-order/repo/.agents/bin/git\nLEAVE_ROOT=<scratch>/zsh-path-order/repo\nLEAVE_PATH=/usr/bin:/bin\n",
++      "stub_executed": true
++    },
++    {
++      "case": "zsh/warm-batch-1",
++      "exit": 0,
++      "calls": 1000,
++      "ms_per_call": 2.0047
++    },
++    {
++      "case": "zsh/warm-batch-2",
++      "exit": 0,
++      "calls": 1000,
++      "ms_per_call": 2.1476
++    },
++    {
++      "case": "zsh/warm-batch-3",
++      "exit": 0,
++      "calls": 1000,
++      "ms_per_call": 2.2576
++    },
++    {
++      "case": "zsh/warm-batch-4",
++      "exit": 0,
++      "calls": 1000,
++      "ms_per_call": 1.8213
++    },
++    {
++      "case": "zsh/warm-batch-5",
++      "exit": 0,
++      "calls": 1000,
++      "ms_per_call": 1.7923
++    },
++    {
++      "case": "zsh/warm-summary",
++      "median_batch_ms_per_call": 2.0047,
++      "min": 1.7923,
++      "max": 2.2576
++    }
++  ]
++}
++```
++
++`controls.py`:
++
++```python
++from pathlib import Path
++import json, subprocess
++base=Path(__file__).resolve().parent
++rows=[]
++for name in ('bash','zsh'):
++    root=base/(name+'-notice-controls'); project=next(p for p in root.iterdir() if p.name.startswith('x'))
++    prefix=['/bin/bash','--noprofile','--norc','-c'] if name=='bash' else ['/bin/zsh','-f','-c']
++    for locale in ('C','en_US.UTF-8'):
++        e={'PATH':'/usr/bin:/bin','HOME':str(root/'home'),'CURATOR_CONFIG':str(root/'home/manager/config.json'),'HOOK':str(root/'hook'),'TARGET':str(project),'CANARY':str(root/'raw-canary'),'LC_ALL':locale}
++        r=subprocess.run(prefix+['. "$HOOK"; builtin cd "$TARGET"; _curator_auto_env'],env=e,cwd=root,capture_output=True,timeout=15)
++        rows.append({'shell':name,'locale':locale,'exit':r.returncode,'raw_LF_count':r.stderr.count(b'\n'),'raw_ESC':b'\x1b' in r.stderr,'raw_CR':b'\r' in r.stderr,'raw_DEL':b'\x7f' in r.stderr,'utf8_C1':b'\xc2\x85' in r.stderr,'utf8_bidi':b'\xe2\x80\xae' in r.stderr and b'\xe2\x81\xa6' in r.stderr,'stderr_repr':repr(r.stderr.replace(str(base).encode(),b'<scratch>'))})
++(base/'controls-results.json').write_text(json.dumps(rows,indent=2)+'\n')
++print(json.dumps(rows,indent=2))
++```
++
++`controls-results.json`:
++
++```json
++[
++  {
++    "shell": "bash",
++    "locale": "C",
++    "exit": 0,
++    "raw_LF_count": 3,
++    "raw_ESC": true,
++    "raw_CR": true,
++    "raw_DEL": true,
++    "utf8_C1": true,
++    "utf8_bidi": true,
++    "stderr_repr": "b'curator: shell_hook_env_unapproved: <scratch>/bash-notice-controls/x\\n\\x1b\\r\\x7f\\xc2\\x85\\xe2\\x80\\xae\\xe2\\x81\\xa6z/.agents/env.sh is not approved; run curator hook approve <scratch>/bash-notice-controls/x\\n\\x1b\\r\\x7f\\xc2\\x85\\xe2\\x80\\xae\\xe2\\x81\\xa6z/.agents/env.sh to approve it\\n'"
++  },
++  {
++    "shell": "bash",
++    "locale": "en_US.UTF-8",
++    "exit": 0,
++    "raw_LF_count": 3,
++    "raw_ESC": true,
++    "raw_CR": true,
++    "raw_DEL": true,
++    "utf8_C1": true,
++    "utf8_bidi": true,
++    "stderr_repr": "b'curator: shell_hook_env_unapproved: <scratch>/bash-notice-controls/x\\n\\x1b\\r\\x7f\\xc2\\x85\\xe2\\x80\\xae\\xe2\\x81\\xa6z/.agents/env.sh is not approved; run curator hook approve <scratch>/bash-notice-controls/x\\n\\x1b\\r\\x7f\\xc2\\x85\\xe2\\x80\\xae\\xe2\\x81\\xa6z/.agents/env.sh to approve it\\n'"
++  },
++  {
++    "shell": "zsh",
++    "locale": "C",
++    "exit": 0,
++    "raw_LF_count": 3,
++    "raw_ESC": true,
++    "raw_CR": true,
++    "raw_DEL": true,
++    "utf8_C1": true,
++    "utf8_bidi": true,
++    "stderr_repr": "b'curator: shell_hook_env_unapproved: <scratch>/zsh-notice-controls/x\\n\\x1b\\r\\x7f\\xc2\\x85\\xe2\\x80\\xae\\xe2\\x81\\xa6z/.agents/env.sh is not approved; run curator hook approve <scratch>/zsh-notice-controls/x\\n\\x1b\\r\\x7f\\xc2\\x85\\xe2\\x80\\xae\\xe2\\x81\\xa6z/.agents/env.sh to approve it\\n'"
++  },
++  {
++    "shell": "zsh",
++    "locale": "en_US.UTF-8",
++    "exit": 0,
++    "raw_LF_count": 3,
++    "raw_ESC": true,
++    "raw_CR": true,
++    "raw_DEL": true,
++    "utf8_C1": true,
++    "utf8_bidi": true,
++    "stderr_repr": "b'curator: shell_hook_env_unapproved: <scratch>/zsh-notice-controls/x\\n\\x1b\\r\\x7f\\xc2\\x85\\xe2\\x80\\xae\\xe2\\x81\\xa6z/.agents/env.sh is not approved; run curator hook approve <scratch>/zsh-notice-controls/x\\n\\x1b\\r\\x7f\\xc2\\x85\\xe2\\x80\\xae\\xe2\\x81\\xa6z/.agents/env.sh to approve it\\n'"
++  }
++]
++```
++
++## External primary references
++
++The following documentation was read for platform semantics, not as proof of curator behavior:
++
++- [zsh Functions](https://zsh.sourceforge.io/Doc/Release/Functions.html): alias parsing and precmd/chpwd hook behavior.
++- [Microsoft command precedence](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_command_precedence?view=powershell-7.5): alias/function/cmdlet/external-command distinctions.
++- [Microsoft quoting rules](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_quoting_rules?view=powershell-7.5): single-quoted strings, embedded apostrophes and smart quotes.
++- [Microsoft environment variables](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables?view=powershell-7.5): platform PATH separators and PowerShell-version differences for empty environment values.
++
++GNU Bash manual requests timed out and POSIX website requests returned 403; no unobserved page is cited as evidence. Bash behavior claims above come from source and measured real-shell results. Advisory comparisons of A/B versus C are design reasoning, not measurements of an unbuilt candidate.
++
++## Recovery verification and provenance
++
++The initial researcher attached the CIP and this evidence but did not publish a role handoff. Recovery resumed the same research task, retained its source pins and observation corpus, and revised the two artifacts. It introduced no implementation, additional research prerequisite or scheduled leaf. The P1–P4 measurements, build result, earlier audit history and original test stdout above are **inherited evidence**, not claims that recovery reran them.
++
++The old evidence was fetched through `task-board resource get` before replacement. Its section from P1 through the scripts/raw observations matched this document byte-for-byte, SHA-256 `a8a9851e0db671cb1a12ce262af65963e1d752e8db4ed33d01253a86c0aec675`. The comparison subprocess exited 0. This preserves provenance for the original measurements; it does not turn them into a new execution. The cited product sources still match main `ca1b776fb580ec0cee0173bf150daf063023aeaa`; the clean available spec checkout and peeled rc.14 tag remain `43bf0a2506d5c354a73bbc3ea4623d4653db10c7`. The four primary platform documentation links above were reopened during recovery.
++
++Recovery ran the following commands itself. Each validation was a standalone process, without a tee or pipeline. The two Go invocations use the installed Go 1.26.0 and unset shell startup-file overrides; test fixtures select temporary manager state. They validate the **existing** contract, including its unsafe A-warning expectation, rather than the proposed design.
++
++| Recovery command | Actual exit | Result and bound |
++|---|---:|---|
++| `git ls-remote https://github.com/relux-works/curator.git refs/heads/main` | 0 | Same main source OID as the initial evidence. |
++| `git diff --exit-code main -- internal cmd go.mod go.sum .github LOGBOOK.md` | 0 | No changes on those tracked product/check/logbook surfaces. |
++| `env -u BASH_ENV -u ENV -u ZDOTDIR GOENV=off GOTOOLCHAIN=local GOWORK=off go test ./internal/shell -run '^TestShellHookRefusesHostileCheckout$' -count=1 -v` | 0 | sh, dash, bash and zsh subtests passed; PowerShell skipped because pwsh was unavailable. Package time 1.747 s. |
++| `env -u BASH_ENV -u ENV -u ZDOTDIR GOENV=off GOTOOLCHAIN=local GOWORK=off go test ./internal/envfiles -run '^TestWrite(ProjectShapesAndSourcing\|Global)$' -count=1 -v` | 0 | Both named tests passed, package time 0.857 s; assertions still require prepend. |
++| `python3` inline rc.14 vector-count check | 0 | Parsed the pinned JSON and asserted 14 cases and the ordered A-warning/B-enforcing profile set. Structural observation only. |
++| `python3` inline attached-evidence comparison | 0 | P1–P4, coverage, scripts and raw observations equal the already-attached evidence section; digest above. |
++| `git diff --check` | 0 | No tracked whitespace errors; this alone does not inspect untracked research files. |
++| `python3 <recovery-scratch>/check_artifacts.py` | 0 | Executed the documented audit below against both research files; rerun after editing this recovery ledger. Checks template sections, links, whitespace, unsafe characters, personal-path patterns, artifact budget, and exactly two untracked research files. No product/logbook changes. |
++
++The complete proposed real-shell inventory remains unexecuted: candidate coverage is still 0/18. Recovery did not rerun the warm-path measurements, perform a TOCTOU exploit, or qualify Windows. The recommendation continues to be a draft for the operator's decision after review.
++
++## Review handoff boundaries
++
++This artifact and the CIP are the only intended repository changes. No commit, branch switch, merge, spec publication, implementation scheduling or producer spawn belongs to this task. No product material from another operator was copied into the public board. Only the supplied public matrix's case identifiers and requirements are summarized.
++
++The generic checklist's conditional logbook item is inapplicable because the task's binding research rules explicitly require `LOGBOOK.md` untouched. Findings are recorded in these outcomes and task notes instead; no logbook write is asserted. The design remains pending operator acceptance after research review.
++
++## Artifact audit recipe
++
++The standalone audit below checks only the two documents and Git change names; it does not read a credential store. The initial audit exited 0. After its script was embedded in this evidence, the next run exited 1 because its own literal forbidden-prefix examples matched the disclosure check. The literals were split in the embedded script without changing the regular expression's meaning; the corrected audit was then rerun. This was an artifact-validation failure, not a product failure or a passing gate. The ledger's zero result refers to the corrected audit of the revised files.
++
++```python
++from pathlib import Path
++import hashlib,json,re,subprocess
++stem='261004_CIP-0004-shell-hook-no-source-path-append'
++paths=[Path('.research')/(stem+'.md'),Path('.research')/(stem+'_evidence.md')]
++expected={str(p) for p in paths}
++r=subprocess.run(['git','status','--porcelain=v1','-z'],capture_output=True,check=True)
++changes=[entry.decode() for entry in r.stdout.split(b'\0') if entry]
++assert {s[3:] for s in changes}==expected, 'Unexpected repository change'
++assert all(s.startswith('?? ') for s in changes), 'Expected only new research artifacts'
++headings=['Summary','Motivation and user stories','Current state','Design','Security considerations','Compatibility and migration','Specification changes','Implementation plan','Test plan','Open questions for the operator']
++cip=paths[0].read_text()
++assert all('\n## '+h+'\n' in cip for h in headings), 'Missing CIP template section'
++for p in paths:
++    raw=p.read_bytes(); value=raw.decode('utf-8')
++    assert raw.endswith(b'\n'), 'Missing final newline'
++    assert not any(line.rstrip(' \t') != line for line in value.split('\n')), 'Trailing whitespace'
++    assert not re.search(r'[\x00-\x08\x0b-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]',value), 'Raw unsafe display character'
++    assert not re.search(r'/Us' + r'ers/|/ho' + r'me/administrator|curator-cip0004\.[A-Za-z0-9]+',value), 'Personal or unredacted scratch path'
++    for target in re.findall(r'\]\(([^)]+)\)',value):
++        if target.startswith(('https://','http://','#')): continue
++        assert (p.parent/target.split('#',1)[0]).exists(), 'Broken companion link'
++assert sum(p.stat().st_size for p in paths)<100000, 'Research artifact budget exceeded'
++print(json.dumps({'result':'artifact-audit-pass','files':len(paths),'product_changes':0,'logbook_changes':0,'bytes':sum(p.stat().st_size for p in paths),'artifacts':[{'path':str(p),'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in paths]},indent=2))
++```
++
++Republished for review
