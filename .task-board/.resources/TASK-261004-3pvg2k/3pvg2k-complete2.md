@@ -1,0 +1,6 @@
+# THE ONLY CURRENT INSTRUCTION — complete STORY-261004-1lk8e9 via TASK-261004-3pvg2k (bound developer run, curator-spec)
+The board's "Integration Assignment" tells you to "run the bound checkpoint or integration command". In THIS repository that command is `worktree complete`, NOT `worktree integrate`. spawn.worktree_isolation.board_repository declares a separate board owner, and the runner's automatic post-run `integrate` always refuses here with board_owner_separate. The previous run RUN-261005-6a7ea0 deferred to the runner and failed for exactly that reason. You must run `complete` YOURSELF, inside this tracked run, before you exit.
+The code has ALREADY landed: signed commit b0caf8db9bf14b7da2541cd729751631d05d8a26 is on curator-spec main via fast-forward (PR #131, CI green), and its tree equals the accepted candidate tree cd8e895fe3 (your predecessor verified this).
+From /Users/administrator/Developer/ReluxWorks/curator/curator-spec, run exactly:
+    task-board worktree complete STORY-261004-1lk8e9 --cr TASK-261004-3pvg2k --revision 1 --landed-commit b0caf8db9bf14b7da2541cd729751631d05d8a26 2>&1 | tee .temp/complete-3pvg2k.log
+Then attach the log tail as an outcome resource and END YOUR TURN. Do not call handoff and do not set status. If complete refuses, record the exact refusal and end; do not work around it. Do not edit or push anything else.
