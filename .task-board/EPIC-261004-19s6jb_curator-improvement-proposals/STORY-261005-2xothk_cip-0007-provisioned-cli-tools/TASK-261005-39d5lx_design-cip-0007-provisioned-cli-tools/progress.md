@@ -112,6 +112,9 @@ spawn selection rationale for gpt-6-astra/low: tb-R164 researcher gpt-6-astra lo
 spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [analyst] researcher (codex) (run=RUN-261005-5ed199, max_parallel=8)
 spawn run started: [analyst] researcher (codex) (run=RUN-261005-5ed199)
+agent completed: [analyst] researcher (codex) (exit=0)
+spawn run completed: codex (run=RUN-261005-5ed199, pid=98926, exit=0)
+spawn run RUN-261005-5ed199 failed; operator action required; failure: integration_binding_state_invalid: Change Request CR-TASK-261005-39d5lx-3 revision 3 is integrated, want accepted or checkpointed
 
 ## Precondition Resources
 - [cip0007-brief.md](file://TASK-261005-39d5lx/cip0007-brief.md)
@@ -143,12 +146,13 @@ spawn run started: [analyst] researcher (codex) (run=RUN-261005-5ed199)
 - [TASK-261005-39d5lx_spawn-log_-reviewer--reviewer--codex-_RUN-261005-2cbde4.log](file://TASK-261005-39d5lx/TASK-261005-39d5lx_spawn-log_-reviewer--reviewer--codex-_RUN-261005-2cbde4.log) — System spawn log captured by task-board
 - [TASK-261005-39d5lx_review-verdict-rev3.md](file://TASK-261005-39d5lx/TASK-261005-39d5lx_review-verdict-rev3.md) — Revision 3 accepted: repeated scan finding fixed; 7/7 surfaces held; independent validator and note-only negative control passed
 - [TASK-261005-39d5lx_spawn-log_-analyst--researcher--codex-_RUN-261005-5ed199.log](file://TASK-261005-39d5lx/TASK-261005-39d5lx_spawn-log_-analyst--researcher--codex-_RUN-261005-5ed199.log) — System spawn log captured by task-board
+- [TASK-261005-39d5lx_completion-log.txt](file://TASK-261005-39d5lx/TASK-261005-39d5lx_completion-log.txt) — worktree complete revision 3: exit code 0; landed commit verified, board commit published; cleanup_pending. Full short log contains the log tail.
 
 ## Created
 2026-10-05T17:47:33Z
 
 ## Last Update
-2026-10-05T19:31:22Z
+2026-10-05T19:36:06Z
 
 ## Assigned To
 [analyst] researcher (codex)
