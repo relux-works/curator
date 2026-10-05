@@ -1,0 +1,388 @@
+diff --git a/cmd/curator/env_unmanage_symlink_unix_test.go b/cmd/curator/env_unmanage_symlink_unix_test.go
+new file mode 100644
+index 00000000..5eb077db
+--- /dev/null
++++ b/cmd/curator/env_unmanage_symlink_unix_test.go
+@@ -0,0 +1,192 @@
++//go:build unix
++
++package main
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envprofile"
++)
++
++// Drive run() through install, takeover, and unmanage. Seed a current profile
++// first so the subsequent install does not implicitly activate over the link.
++func TestEnvUnmanageTakeoverRestoresSymlink(t *testing.T) {
++	for _, shape := range []string{"absolute", "relative", "dangling", "directory"} {
++		t.Run(shape, func(t *testing.T) {
++			source, _ := profileHome(t)
++			seed := t.TempDir()
++			writeContextPackage(t, seed, "seed", "1.0.0", "seed context\n")
++			if code, _, stderr := runProfile(t, source, "profile", "install", seed); code != exitOK {
++				t.Fatalf("seed install exit %d: %s", code, stderr)
++			}
++			if code, _, stderr := runProfile(t, source, "env", "unmanage", "--env", "claude_code"); code != exitOK {
++				t.Fatalf("seed unmanage exit %d: %s", code, stderr)
++			}
++			native := os.Getenv("CLAUDE_CONFIG_DIR")
++			full := filepath.Join(native, "CLAUDE.md")
++			outside := t.TempDir()
++			external := filepath.Join(outside, "private.md")
++			original := "external operator context\n"
++			if err := os.WriteFile(external, []byte(original), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			before, err := os.Stat(external)
++			if err != nil {
++				t.Fatal(err)
++			}
++			target := external
++			switch shape {
++			case "relative":
++				target, err = filepath.Rel(native, external)
++				if err != nil {
++					t.Fatal(err)
++				}
++			case "dangling":
++				target = filepath.Join(outside, "absent.md")
++			case "directory":
++				target = outside
++			}
++			if err := os.Symlink(target, full); err != nil {
++				t.Fatal(err)
++			}
++			pkg := t.TempDir()
++			writeContextPackage(t, pkg, "acme", "1.0.0", "managed context\n")
++			if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++				t.Fatalf("profile install exit %d: %s", code, stderr)
++			}
++			assertUnmanageSymlink(t, full, target)
++			if code, _, stderr := runProfile(t, source, "profile", "use", "acme", "--takeover", "--env", "claude_code"); code != exitOK {
++				t.Fatalf("profile use --takeover exit %d: %s", code, stderr)
++			}
++			backup := filepath.Join(native, ".agent-environment-backup", "1", "CLAUDE.md")
++			assertUnmanageSymlink(t, backup, target)
++			if code, _, stderr := runProfile(t, source, "env", "unmanage", "--restore-backups", "--env", "claude_code"); code != exitOK {
++				t.Fatalf("env unmanage --restore-backups exit %d: %s", code, stderr)
++			}
++			assertUnmanageSymlink(t, full, target)
++			assertUnmanageSymlink(t, backup, target)
++			if got := string(readFileForUnmanageTest(t, external)); got != original {
++				t.Fatalf("external bytes = %q, want %q", got, original)
++			}
++			after, err := os.Stat(external)
++			if err != nil || !os.SameFile(before, after) || before.Mode() != after.Mode() || !before.ModTime().Equal(after.ModTime()) {
++				t.Fatalf("external file identity, mode, or modification time changed: %v", err)
++			}
++			if shape == "dangling" {
++				if _, err := os.Lstat(target); !os.IsNotExist(err) {
++					t.Fatalf("restore created dangling target: %v", err)
++				}
++			}
++		})
++	}
++}
++
++func assertUnmanageSymlink(t *testing.T, full, target string) {
++	t.Helper()
++	info, err := os.Lstat(full)
++	if err != nil || info.Mode()&os.ModeSymlink == 0 {
++		t.Fatalf("%s is not a symlink: %v", filepath.Base(full), err)
++	}
++	got, err := os.Readlink(full)
++	if err != nil || got != target {
++		t.Fatalf("%s link target = %q (%v), want %q", filepath.Base(full), got, err, target)
++	}
++}
++
++func TestEnvUnmanageSymlinkRestoreRefusesLinkedParent(t *testing.T) {
++	for _, route := range []string{"context", "nested/context"} {
++		t.Run(route, func(t *testing.T) {
++			fixture := newUnmanageFixture(t, true)
++			outside := t.TempDir()
++			external := filepath.Join(outside, "private.md")
++			if err := os.WriteFile(external, []byte("external context\n"), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			backup := filepath.Join(filepath.Dir(fixture.backupFile), filepath.FromSlash(route), "private.md")
++			if err := os.MkdirAll(filepath.Dir(backup), 0o700); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.Symlink(external, backup); err != nil {
++				t.Fatal(err)
++			}
++			parent := filepath.Join(fixture.nativeHome, filepath.FromSlash(route))
++			if err := os.MkdirAll(filepath.Dir(parent), 0o700); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.Symlink(outside, parent); err != nil {
++				t.Fatal(err)
++			}
++			beforeSurface := readFileForUnmanageTest(t, fixture.surfacePath)
++			beforeMarker := readFileForUnmanageTest(t, fixture.markerPath)
++			code, _, stderr := runProfile(t, fixture.source, "env", "unmanage", "--restore-backups", "--env", "claude_code")
++			if code != exitFail || !strings.Contains(stderr, envprofile.DiagWriteWouldFollowLink) {
++				t.Fatalf("unmanage exit %d: %s; want linked-parent refusal", code, stderr)
++			}
++			if string(readFileForUnmanageTest(t, fixture.surfacePath)) != string(beforeSurface) ||
++				string(readFileForUnmanageTest(t, fixture.markerPath)) != string(beforeMarker) {
++				t.Fatal("parent refusal changed the managed surface or marker")
++			}
++			assertUnmanageSymlink(t, backup, external)
++			info, err := os.Lstat(external)
++			if err != nil || !info.Mode().IsRegular() || string(readFileForUnmanageTest(t, external)) != "external context\n" {
++				t.Fatalf("parent refusal changed the external entry: %v", err)
++			}
++		})
++	}
++}
++
++func TestEnvUnmanageSymlinkRestoreRefusesPlannedLinkedParent(t *testing.T) {
++	for _, child := range []string{"private.md", "nested/private.md"} {
++		t.Run(child, func(t *testing.T) {
++			fixture := newUnmanageFixture(t, true)
++			outside := t.TempDir()
++			external := filepath.Join(outside, filepath.FromSlash(child))
++			if err := os.MkdirAll(filepath.Dir(external), 0o700); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(external, []byte("external context\n"), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			// A stale recorded child is absent in the native home. The saved parent
++			// link must not make that later removal address an external child.
++			marker, err := envmarker.Read(fixture.nativeHome)
++			if err != nil {
++				t.Fatal(err)
++			}
++			surface := marker.Surfaces[envmarker.SurfaceRootContext]
++			surface.Paths = append(surface.Paths, "context/"+child)
++			marker.Surfaces[envmarker.SurfaceRootContext] = surface
++			payload, err := marker.Marshal()
++			if err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(fixture.markerPath, payload, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			backup := filepath.Join(filepath.Dir(fixture.backupFile), "context")
++			if err := os.Symlink(outside, backup); err != nil {
++				t.Fatal(err)
++			}
++			beforeSurface := readFileForUnmanageTest(t, fixture.surfacePath)
++			code, _, stderr := runProfile(t, fixture.source, "env", "unmanage", "--restore-backups", "--env", "claude_code")
++			if got := string(readFileForUnmanageTest(t, external)); got != "external context\n" {
++				t.Fatalf("restore followed its newly restored parent link: %q", got)
++			}
++			if code != exitFail || !strings.Contains(stderr, envprofile.DiagWriteWouldFollowLink) {
++				t.Fatalf("unmanage exit %d: %s; want planned parent-link refusal", code, stderr)
++			}
++			if string(readFileForUnmanageTest(t, fixture.surfacePath)) != string(beforeSurface) ||
++				string(readFileForUnmanageTest(t, fixture.markerPath)) != string(payload) {
++				t.Fatal("planned parent-link refusal changed the managed surface or marker")
++			}
++			if _, err := os.Lstat(filepath.Join(fixture.nativeHome, "context")); !os.IsNotExist(err) {
++				t.Fatalf("planned parent-link refusal created a native parent: %v", err)
++			}
++			assertUnmanageSymlink(t, backup, outside)
++		})
++	}
++}
+diff --git a/internal/envprofile/unmanage.go b/internal/envprofile/unmanage.go
+index a5e3005d..3ea4a235 100644
+--- a/internal/envprofile/unmanage.go
++++ b/internal/envprofile/unmanage.go
+@@ -56,12 +56,12 @@ type unmanagePlan struct {
+ }
+ 
+ // backupRestoreEntry retains the lstat entry type separately from permission
+-// bits. Regular files are supported here; link restoration is a separate
+-// operation and must never be implemented by reading through the link.
++// bits. Link targets are text, never payload read through the saved link.
+ type backupRestoreEntry struct {
+-	kind    fs.FileMode
+-	mode    fs.FileMode
+-	payload []byte
++	kind       fs.FileMode
++	mode       fs.FileMode
++	payload    []byte
++	linkTarget string
+ }
+ 
+ // Unmanage removes only native surfaces recorded by their environment marker
+@@ -266,12 +266,24 @@ func readBackupTree(req UnmanageRequest, environment, directory, prefix string)
+ 			}
+ 			continue
+ 		}
+-		if !metadata.Info.Mode().IsRegular() {
+-			return nil, backupRecordUnreadable(full, stateread.UnusableError(full, fmt.Errorf("backup entry is not a regular file")))
++		kind := metadata.Info.Mode().Type()
++		if !kind.IsRegular() && kind != fs.ModeSymlink {
++			return nil, backupRecordUnreadable(full, stateread.UnusableError(full, fmt.Errorf("backup entry is not a regular file or link")))
+ 		}
+ 		if credentialPath(environment, rel) {
+ 			return nil, backupRecordUnreadable(full, stateread.UnusableError(full, fmt.Errorf("backup record names a credential path")))
+ 		}
++		if kind == fs.ModeSymlink {
++			link, err := stateread.Readlink(full)
++			if err != nil {
++				return nil, backupRecordUnreadable(full, err)
++			}
++			if link.Kind != stateread.KindPresent {
++				return nil, backupRecordUnreadable(full, stateread.UnusableError(full, fmt.Errorf("backup link is absent")))
++			}
++			files[rel] = backupRestoreEntry{kind: kind, linkTarget: link.Target}
++			continue
++		}
+ 		state, err := stateread.ReadFile(full)
+ 		if err != nil {
+ 			return nil, backupRecordUnreadable(full, err)
+@@ -318,12 +330,19 @@ func preflightUnmanagePlan(plan unmanagePlan) error {
+ 		if !safeBackupPath(rel) || reservedRestorePath(rel) {
+ 			return backupRecordUnreadable(filepath.Join(plan.backupPath, rel), stateread.UnusableError(filepath.Join(plan.backupPath, rel), fmt.Errorf("invalid backup path %q", rel)))
+ 		}
+-		if !entry.kind.IsRegular() {
++		if !entry.kind.IsRegular() && entry.kind != fs.ModeSymlink {
+ 			return backupRecordUnreadable(filepath.Join(plan.backupPath, rel), fmt.Errorf("unsupported backup entry type %v", entry.kind))
+ 		}
+ 		paths[rel] = true
+ 	}
+ 	for rel := range paths {
++		// A restored directory link must not turn a later restore or
++		// recorded removal into a traversal of its external target.
++		for parent := path.Dir(rel); parent != "."; parent = path.Dir(parent) {
++			if entry, restore := plan.restores[parent]; restore && entry.kind == fs.ModeSymlink {
++				return fmt.Errorf("%s: %s: refusing to traverse restored link at %s", plan.environment, DiagWriteWouldFollowLink, filepath.Join(plan.home, filepath.FromSlash(parent)))
++			}
++		}
+ 		if err := inspectUnmanagePath(plan.home, rel); err != nil {
+ 			return fmt.Errorf("%s: %w", plan.environment, err)
+ 		}
+@@ -382,14 +401,19 @@ func applyUnmanagePlan(plan unmanagePlan) (UnmanageHome, error) {
+ 	}
+ 	sort.Strings(paths)
+ 	for _, rel := range paths {
+-		full := filepath.Join(plan.home, filepath.FromSlash(rel))
+ 		entry, restore := plan.restores[rel]
+ 		if restore {
+-			// Stage privately, preserve the saved permission bits, and replace
+-			// the entry without opening the current managed link's target.
++			// Stage privately and replace the entry without opening either
++			// the saved link's target or the current managed link's target.
+ 			// On Windows the writer creates an owner-only protected DACL;
+ 			// FileMode does not encode or restore the original Windows ACL.
+-			if err := atomicManagedFile(plan.home, rel, entry.payload, entry.mode); err != nil {
++			var err error
++			if entry.kind == fs.ModeSymlink {
++				err = atomicManagedLink(plan.home, rel, entry.linkTarget)
++			} else {
++				err = atomicManagedFile(plan.home, rel, entry.payload, entry.mode)
++			}
++			if err != nil {
+ 				return outcome, err
+ 			}
+ 			outcome.Restored = append(outcome.Restored, rel)
+@@ -398,7 +422,7 @@ func applyUnmanagePlan(plan unmanagePlan) (UnmanageHome, error) {
+ 		if !plan.removals[rel] {
+ 			continue
+ 		}
+-		if err := os.Remove(full); err != nil && !os.IsNotExist(err) {
++		if err := removeManagedEntry(plan.home, rel); err != nil {
+ 			return outcome, err
+ 		}
+ 		outcome.Removed = append(outcome.Removed, rel)
+diff --git a/internal/envprofile/unmanage_symlink_unix_test.go b/internal/envprofile/unmanage_symlink_unix_test.go
+new file mode 100644
+index 00000000..b3eb27c9
+--- /dev/null
++++ b/internal/envprofile/unmanage_symlink_unix_test.go
+@@ -0,0 +1,68 @@
++//go:build unix
++
++package envprofile
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++func TestUnmanageRestoreSymlinkReplacesDestinationEntry(t *testing.T) {
++	native, outside := t.TempDir(), t.TempDir()
++	backup := filepath.Join(native, ".agent-environment-backup", "1", "CLAUDE.md")
++	if err := os.MkdirAll(filepath.Dir(backup), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	// Preserve the literal relative target, even though it dangles at the
++	// backup location. Restoring must not read or copy target bytes.
++	want := "../operator-context.md"
++	if err := os.Symlink(want, backup); err != nil {
++		t.Fatal(err)
++	}
++	external := filepath.Join(outside, "managed-target.md")
++	if err := os.WriteFile(external, []byte("external managed context\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	before, err := os.Stat(external)
++	if err != nil {
++		t.Fatal(err)
++	}
++	full := filepath.Join(native, "CLAUDE.md")
++	if err := os.Symlink(external, full); err != nil {
++		t.Fatal(err)
++	}
++	req := UnmanageRequest{
++		Home: t.TempDir(), EnvID: "claude_code", RestoreBackups: true,
++		NativeHomeOf: func(string) (string, error) { return native, nil },
++	}
++	plans, err := planUnmanageHomes(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	entry := plans[0].restores["CLAUDE.md"]
++	if entry.kind != os.ModeSymlink || entry.linkTarget != want || len(entry.payload) != 0 {
++		t.Fatalf("restore entry = %+v; want symlink with literal target", entry)
++	}
++	result, err := Unmanage(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(result.Homes) != 1 || len(result.Homes[0].Restored) != 1 || result.Homes[0].Restored[0] != "CLAUDE.md" {
++		t.Fatalf("restore report = %+v", result)
++	}
++	payload, err := os.ReadFile(external)
++	if err != nil || string(payload) != "external managed context\n" {
++		t.Fatalf("restore changed destination link target: %q (%v)", payload, err)
++	}
++	after, err := os.Stat(external)
++	if err != nil || !os.SameFile(before, after) || before.Mode() != after.Mode() || !before.ModTime().Equal(after.ModTime()) {
++		t.Fatalf("restore changed destination target metadata: %v", err)
++	}
++	for _, name := range []string{full, backup} {
++		got, err := os.Readlink(name)
++		if err != nil || got != want {
++			t.Fatalf("link target = %q (%v), want %q", got, err, want)
++		}
++	}
++}
+diff --git a/scripts/remote-gate.sh b/scripts/remote-gate.sh
+index a3a0776a..b4cc0d3a 100755
+--- a/scripts/remote-gate.sh
++++ b/scripts/remote-gate.sh
+@@ -42,7 +42,7 @@ tree=$(GIT_INDEX_FILE="$tmpindex" git write-tree)
+ if [ "$tree" = "$(git rev-parse "$head^{tree}")" ]; then
+   commit=$head
+ else
+-  commit=$(printf 'remote gate snapshot of %s\n\nworking tree of %s on top of %s\n' "$name" "$root" "$head" \
++  commit=$(printf 'remote gate snapshot of %s\n\nworking tree on top of %s\n' "$name" "$head" \
+     | GIT_COMMITTER_NAME="remote-gate" GIT_COMMITTER_EMAIL="remote-gate@localhost" \
+       GIT_AUTHOR_NAME="remote-gate" GIT_AUTHOR_EMAIL="remote-gate@localhost" \
+       git -c commit.gpgsign=false commit-tree "$tree" -p "$head")
