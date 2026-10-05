@@ -1,0 +1,10 @@
+# TASK-261004-3qgmvx: csk-gap-analysis-follow-ups-design
+
+## Description
+DESIGN PENDING — NOT ACCEPTED FOR EXECUTION (operator 2026-10-04: design first, then prioritise). Static comparison of curator main 876127f vs cocoaskills main 0da153a (a2a #curator topic csk-gap-analysis-top10), unconfirmed until a red-first probe: (3) manager tools resolved through PATH can come from skill shim dirs: gitops.go runs bare git, buildsshcandidates uses LookPath for ssh-add; proposal: one absolute-tool resolver rejecting relative PATH entries and shim-dir ancestry on every symlink hop. (4) no reserved command names in the ordinary closure (closure.go): reserve system and manager names case-insensitively, ignoring .exe/.cmd/.bat/.ps1, at plan time; core §4.1 has no list. (6) launcher prefix includes declared system-dependency dirs (install.go, runtimestore.go), so manifest content steers the prefix; proposal: prefix = manager runtime dirs only, dependency dirs as a suffix (spec §3 change). (8) audit backends configured but never invoked: implement with env allowlist/canary/request cap/egress, or refuse an unsupported configured backend explicitly; never label static findings with a backend that never ran. (9) global --only NAME selective install keeping unrelated state. (10) Go families: qualify 1.26/1.27 (curator#87). Follow-up: aggregate file-count/byte budgets for legacy tree extraction (gitops.go per-file 512 MiB cap only). Spec sentences needed: missing system command failure scope; backend child env; unsupported configured backend; CLI secret transport; reserved system-name list; --only retained-state rules; aggregate snapshot budgets. Items 1/2/5/7 are tracked elsewhere: N1 BUG-261004-bknio5, N5 trust pin, TASK-261004-1z2pgb (PATH order), TASK-261004-hy8zmn (--token).
+
+## Scope
+(define task scope)
+
+## Acceptance Criteria
+Research document (CIP draft per cip-template.md where the brief says so) under .research/ with options, tradeoffs, recommendation, evidence (file:line or measured probes) and decision-ready open questions; no product code changes; no secrets read or printed; LOGBOOK.md untouched.

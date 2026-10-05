@@ -1,0 +1,453 @@
+{
+  "task": "TASK-261004-3qgmvx — csk-gap-analysis-follow-ups-design",
+  "recorded": "2026-10-04",
+  "curator_main": "ca1b776fb580ec0cee0173bf150daf063023aeaa",
+  "spec_rc14": "43bf0a2506d5c354a73bbc3ea4623d4653db10c7",
+  "spec_tag_object": "661bead088186db70c9f57ad0b115305ec2bef35",
+  "spec_sha256": {
+    "protocol/core.md": "a52a79e34fd6a81c6f4eff11ba2d44bfd9e9acf3b5e1516a2cf7c409ad05118a",
+    "profiles/manager.md": "ddce969595b09904874d51975e5f4906df349363fe0a95ab56779ec4e97105bc"
+  },
+  "host": "darwin/amd64; Go 1.26.0",
+  "scope": "One clean git archive of pinned curator cmd/, internal/, go.mod and go.sum; only scratch probe test files added. No workspace product changes or operator account access. Sources are synthetic; all commands ran standalone without tee or a pipe. Logs replace only the generated scratch-root path. The Git resolver mask was rerun after the aggregate scratch test was added; both attempts returned 1. Process execution temporarily stalled during packaging and later recovered; no stalled command was counted as a passing gate.",
+  "reproduction": "Export pinned curator cmd internal go.mod go.sum into a fresh temporary source directory, add the included test files, and use the listed empty-environment invocations. Go executable used was /usr/local/bin/go. Existing module dependencies downloaded from the public Go proxy. CLI configs are synthetic; replace <scratch> with the fresh temporary root. Initial discarded attempts are retained for honesty and are not coverage.",
+  "scratch_cli_config": {
+    "schema_version": 1,
+    "skills_root": "<scratch>/skills",
+    "default_agents": [
+      "claude_code"
+    ],
+    "projects": {}
+  },
+  "scratch_system_config": {
+    "schema_version": 1,
+    "locked": []
+  },
+  "probe_sources": {
+    "internal/audit/research_gap_probe_test.go": "package audit\nimport(\"encoding/json\";\"os\";\"path/filepath\";\"testing\";\"github.com/relux-works/curator/internal/capabilities\")\nfunc TestResearchConfiguredBackendMustRunOrRefuse(t *testing.T){\n subject:=subjectWith(t,\"#!/bin/sh\\necho harmless\\n\",capabilities.ImplicitNone(),3)\n cfg:=newCfg(t,\"strict\",\"high\");cfg.Audit.Backend=\"synthetic-unimplemented\";cfg.Audit.Model=\"synthetic-model\"\n _,errs:=Gate(cfg,[]Subject{subject});files,err:=filepath.Glob(filepath.Join(cfg.Home(),\"audit\",\"*\",\"verdict-*.json\"));if err!=nil{t.Fatal(err)}\n label:=\"\";for _,f:=range files{b,err:=os.ReadFile(f);if err!=nil{t.Fatal(err)};var v map[string]any;if err:=json.Unmarshal(b,&v);err!=nil{t.Fatal(err)};label,_=v[\"backend\"].(string)}\n t.Logf(\"Gate blocking-errors=%d verdicts=%d backend-label=%s\",len(errs),len(files),label)\n if len(errs)==0{t.Fatal(\"expected explicit unsupported-backend refusal; static audit returned allow\")}\n}\n",
+    "internal/gitops/research_gap_probe_test.go": "package gitops\nimport(\"os\";\"path/filepath\";\"testing\";\"strings\")\nfunc TestResearchGitRejectsSkillShim(t *testing.T) {\n for _, shape := range []string{\"direct\", \"intermediate-link\"} { t.Run(shape,func(t *testing.T){\n  root:=t.TempDir(); if err:=os.Mkdir(filepath.Join(root,\".git\"),0755);err!=nil{t.Fatal(err)}; shim:=filepath.Join(root,\".agents\",\"bin\"); trusted:=filepath.Join(root,\"trusted\"); marker:=filepath.Join(root,\"called\")\n  for _,d:=range []string{shim,trusted}{if err:=os.MkdirAll(d,0755);err!=nil{t.Fatal(err)}}\n  payload:=\"#!/bin/sh\\nprintf called > '\"+marker+\"'\\nprintf 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\\n'\\n\"\n  pathEntry:=shim\n  if shape==\"direct\" { if err:=os.WriteFile(filepath.Join(shim,\"git\"),[]byte(payload),0755);err!=nil{t.Fatal(err)} } else {\n   real:=filepath.Join(trusted,\"real-git\"); if err:=os.WriteFile(real,[]byte(payload),0755);err!=nil{t.Fatal(err)}\n   if err:=os.Symlink(real,filepath.Join(shim,\"git\"));err!=nil{t.Fatal(err)}\n   if err:=os.Symlink(filepath.Join(shim,\"git\"),filepath.Join(trusted,\"git\"));err!=nil{t.Fatal(err)}; pathEntry=trusted\n  }\n  t.Setenv(\"PATH\",pathEntry+\":/usr/bin:/bin\")\n  _,err:=Resolve(root,\"revision\",strings.Repeat(\"a\",40)); _,called:=os.Stat(marker)\n  t.Logf(\"Resolve accepted=%v; shim-chain executable invoked=%v\",err==nil,called==nil)\n  if called==nil {t.Fatal(\"expected rejection before executing a skill-shim path\")}\n })}\n}\n\nfunc TestResearchAggregateSnapshotBudget(t *testing.T){\n entries:=[]treeEntry{}\n for _,name:=range []string{\"a\",\"b\",\"c\",\"d\",\"e\"}{entries=append(entries,treeEntry{mode:\"100644\",kind:\"blob\",path:name,size:512<<20})}\n plan,err:=planWrites(t.TempDir(),entries)\n t.Logf(\"preflight entries=%d declared-total-bytes=%d accepted=%v; no blob payload written\",len(plan),int64(5)*(512<<20),err==nil)\n if err==nil{t.Fatal(\"expected proposed 2 GiB aggregate refusal; actual implementation has only per-file bound\")}\n}\n",
+    "internal/godriver/research_gap_probe_test.go": "package godriver\nimport(\"context\";\"go/build\";\"testing\")\nfunc TestResearchHostGoQualification(t *testing.T){\n t.Logf(\"TestedFamilies=%v\",TestedFamilies())\n _,err:=Probe(context.Background(),Config{PrivateBase:t.TempDir(),GOROOT:build.Default.GOROOT})\n t.Logf(\"real host Go probe diagnostic=%s\",DiagnosticCode(err))\n if err!=nil{t.Fatalf(\"qualification candidate refused: %s\",DiagnosticCode(err))}\n}\n",
+    "internal/install/research_gap_probe_test.go": "package install\nimport(\"encoding/json\";\"os\";\"os/exec\";\"path/filepath\";\"strings\";\"testing\")\nfunc researchManifest(t *testing.T,e *env, commands map[string]any, dependencies map[string]any, script string) {\n t.Helper(); dir:=filepath.Join(e.skillsRoot,\"consumer\")\n e.write(dir,\"scripts/consumer-tool\",script)\n spec:=map[string]any{\"schema_version\":4,\"capabilities\":map[string]any{},\"runtime_roots\":[]string{\"scripts\"},\"commands\":commands}\n if dependencies!=nil {spec[\"dependencies\"]=map[string]any{\"commands\":dependencies}}\n b,err:=json.Marshal(spec);if err!=nil{t.Fatal(err)};e.write(dir,\"csk-skill.json\",string(b));e.git(dir,\"commit\",\"-qam\",\"probe\");e.git(dir,\"tag\",\"-f\",\"v1\");e.declare(\"consumer\")\n}\nfunc TestResearchReservedCommandsRejected(t *testing.T) {\n for _,name:=range []string{\"git\",\"curator\",\"ssh-add\",\"GiT.ExE\"}{t.Run(name,func(t *testing.T){\n  e:=newEnv(t);e.skill(\"consumer\");researchManifest(t,e,map[string]any{name:map[string]any{\"type\":\"script\",\"unix_path\":\"scripts/consumer-tool\"}},nil,\"#!/bin/sh\\nprintf harmless\\\\n\\n\")\n  result:=e.install(Options{DryRun:true});t.Logf(\"Project dry-run status=%s\",result.Status)\n  if result.Status==\"ok\"{t.Fatal(\"expected reserved-command refusal; ordinary plan accepted name\")}\n  if !strings.Contains(strings.Join(result.Errors,\" \"),\"reserved\"){t.Fatalf(\"unrelated refusal: %v\",result.Errors)}\n })}\n}\nfunc TestResearchSystemDependencyDoesNotPreemptAmbient(t *testing.T){\n e:=newEnv(t);e.skill(\"consumer\");root:=t.TempDir();preferred:=filepath.Join(root,\"preferred\");dependency:=filepath.Join(root,\"dependency\")\n for _,dir:=range []string{preferred,dependency}{if err:=os.MkdirAll(dir,0755);err!=nil{t.Fatal(err)}}\n for _,f:=range []struct{dir,name,answer string}{{preferred,\"gap-choice\",\"preferred\"},{dependency,\"gap-choice\",\"dependency\"},{dependency,\"declared-helper\",\"helper\"}}{if err:=os.WriteFile(filepath.Join(f.dir,f.name),[]byte(\"#!/bin/sh\\nprintf '\"+f.answer+\"\\\\n'\\n\"),0755);err!=nil{t.Fatal(err)}}\n t.Setenv(\"PATH\",preferred+\":\"+dependency+\":/usr/bin:/bin\")\n researchManifest(t,e,map[string]any{\"consumer-tool\":map[string]any{\"type\":\"script\",\"unix_path\":\"scripts/consumer-tool\"}},map[string]any{\"declared-helper\":map[string]any{\"type\":\"system\",\"command\":\"declared-helper\"}},\"#!/bin/sh\\ngap-choice\\n\")\n result:=e.install(Options{});if result.Status!=\"ok\"{t.Fatalf(\"fixture install failed: %v\",result.Errors)}\n cmd:=exec.Command(filepath.Join(e.project,\".agents\",\"bin\",\"consumer-tool\"));cmd.Env=[]string{\"PATH=\"+preferred+\":/usr/bin:/bin\"};out,err:=cmd.CombinedOutput();if err!=nil{t.Fatal(err)}\n t.Logf(\"installed launcher selected=%s\",strings.TrimSpace(string(out)))\n if strings.TrimSpace(string(out))!=\"preferred\"{t.Fatal(\"expected inherited PATH before dependency suffix\")}\n}\nfunc TestResearchSSHAddRejectsSkillShim(t *testing.T){\n root:=t.TempDir();shim:=filepath.Join(root,\".agents\",\"bin\");if err:=os.MkdirAll(shim,0755);err!=nil{t.Fatal(err)}\n if err:=os.WriteFile(filepath.Join(shim,\"ssh-add\"),[]byte(\"#!/bin/sh\\nprintf 'synthetic-entry\\\\n'\\n\"),0755);err!=nil{t.Fatal(err)}\n t.Setenv(\"PATH\",shim+\":/usr/bin:/bin\");count,known:=sshAgentKeyCount(filepath.Join(root,\"nonexistent-synthetic-socket\"))\n t.Logf(\"sshAgentKeyCount count=%d known=%v\",count,known)\n if known{t.Fatal(\"expected no execution of ssh-add from skill shim; no real agent was used\")}\n}\n"
+  },
+  "probe_source_sha256": {
+    "internal/audit/research_gap_probe_test.go": "84a504e7f270c68fc4e343b1266ffd17ca88b70eae6f1e81bc8919a9ed951bbf",
+    "internal/gitops/research_gap_probe_test.go": "f1c4af08ca4f2ad16f0ac553009c8efda47c403b84c602b815097d13481e8494",
+    "internal/godriver/research_gap_probe_test.go": "160938143eac709aaff7596aca5b99944e2472a3a9a7dfbf71b2575ba9fbe7be",
+    "internal/install/research_gap_probe_test.go": "e4e7fdeef0dee75ee006ee12f36f9d462edd03ac583c6e2260a2480ea5630127"
+  },
+  "commands": [
+    {
+      "id": "build",
+      "argv": [
+        "go",
+        "build",
+        "-o",
+        "<scratch>/curator",
+        "./cmd/curator"
+      ],
+      "cwd": "<scratch>/src",
+      "environment_mode": "empty environment plus listed values",
+      "environment": {
+        "HOME": "<scratch>/home",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "TMPDIR": "<scratch>/tmp",
+        "GOCACHE": "<scratch>/gocache",
+        "GOMODCACHE": "<scratch>/gomodcache",
+        "GOTOOLCHAIN": "local",
+        "GOENV": "off",
+        "GOPROXY": "https://proxy.golang.org",
+        "GOSUMDB": "sum.golang.org"
+      },
+      "real_exit_code": 0,
+      "interpretation": "Production CLI build",
+      "output": "go: downloading github.com/charmbracelet/bubbletea v1.3.10\ngo: downloading github.com/charmbracelet/x/term v0.2.1\ngo: downloading github.com/charmbracelet/lipgloss v1.1.0\ngo: downloading github.com/muesli/cancelreader v0.2.2\ngo: downloading github.com/charmbracelet/x/ansi v0.10.1\ngo: downloading github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6\ngo: downloading github.com/rivo/uniseg v0.4.7\ngo: downloading github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd\ngo: downloading github.com/muesli/termenv v0.16.0\ngo: downloading github.com/mattn/go-runewidth v0.0.16\ngo: downloading github.com/lucasb-eyer/go-colorful v1.2.0\ngo: downloading github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc\ngo: downloading github.com/aymanbagabas/go-osc52/v2 v2.0.1\ngo: downloading github.com/mattn/go-isatty v0.0.20\ngo: downloading github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e\n",
+      "output_sha256": "14bf1c9895348df281a3c712bf34b5e1076df2d5a857639ba4ad560e148eac54"
+    },
+    {
+      "id": "gitops-probe-initial",
+      "argv": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/gitops",
+        "-run",
+        "^TestResearchGitRejectsSkillShim$"
+      ],
+      "cwd": "<scratch>/src",
+      "environment_mode": "empty environment plus listed values",
+      "environment": {
+        "HOME": "<scratch>/home",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "TMPDIR": "<scratch>/tmp",
+        "GOCACHE": "<scratch>/gocache",
+        "GOMODCACHE": "<scratch>/gomodcache",
+        "GOTOOLCHAIN": "local",
+        "GOENV": "off",
+        "GOPROXY": "https://proxy.golang.org",
+        "GOSUMDB": "sum.golang.org"
+      },
+      "real_exit_code": 0,
+      "interpretation": "Discarded: initial EnsureRepo helper did not execute Git; source was corrected before the next row",
+      "output": "go: downloading golang.org/x/sys v0.36.0\n=== RUN   TestResearchGitRejectsSkillShim\n=== RUN   TestResearchGitRejectsSkillShim/direct\n    research_gap_probe_test.go:16: EnsureRepo accepted=false; shim-chain executable invoked=false\n=== RUN   TestResearchGitRejectsSkillShim/intermediate-link\n    research_gap_probe_test.go:16: EnsureRepo accepted=false; shim-chain executable invoked=false\n--- PASS: TestResearchGitRejectsSkillShim (0.00s)\n    --- PASS: TestResearchGitRejectsSkillShim/direct (0.00s)\n    --- PASS: TestResearchGitRejectsSkillShim/intermediate-link (0.00s)\nPASS\nok  \tgithub.com/relux-works/curator/internal/gitops\t1.190s\n",
+      "output_sha256": "a1592c12ba53d01f0ae57c166f109a8cb4397b8965adb2ab6b00ce5d47569af8"
+    },
+    {
+      "id": "gitops-probe",
+      "argv": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/gitops",
+        "-run",
+        "^TestResearchGitRejectsSkillShim$"
+      ],
+      "cwd": "<scratch>/src",
+      "environment_mode": "empty environment plus listed values",
+      "environment": {
+        "HOME": "<scratch>/home",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "TMPDIR": "<scratch>/tmp",
+        "GOCACHE": "<scratch>/gocache",
+        "GOMODCACHE": "<scratch>/gomodcache",
+        "GOTOOLCHAIN": "local",
+        "GOENV": "off",
+        "GOPROXY": "https://proxy.golang.org",
+        "GOSUMDB": "sum.golang.org"
+      },
+      "real_exit_code": 1,
+      "interpretation": "Expected-red: production Resolve executes both synthetic shim chains",
+      "output": "=== RUN   TestResearchGitRejectsSkillShim\n=== RUN   TestResearchGitRejectsSkillShim/direct\n    research_gap_probe_test.go:16: Resolve accepted=true; shim-chain executable invoked=true\n    research_gap_probe_test.go:17: expected rejection before executing a skill-shim path\n=== RUN   TestResearchGitRejectsSkillShim/intermediate-link\n    research_gap_probe_test.go:16: Resolve accepted=true; shim-chain executable invoked=true\n    research_gap_probe_test.go:17: expected rejection before executing a skill-shim path\n--- FAIL: TestResearchGitRejectsSkillShim (0.91s)\n    --- FAIL: TestResearchGitRejectsSkillShim/direct (0.43s)\n    --- FAIL: TestResearchGitRejectsSkillShim/intermediate-link (0.48s)\nFAIL\nFAIL\tgithub.com/relux-works/curator/internal/gitops\t1.301s\nFAIL\n",
+      "output_sha256": "3ec5283b3fe3dcd9b5b6593a545ee1d120ff91121e09e504cd9f502e271d9f51"
+    },
+    {
+      "id": "install-probe",
+      "argv": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/install",
+        "-run",
+        "^TestResearch(ReservedCommandsRejected|SystemDependencyDoesNotPreemptAmbient|SSHAddRejectsSkillShim)$"
+      ],
+      "cwd": "<scratch>/src",
+      "environment_mode": "empty environment plus listed values",
+      "environment": {
+        "HOME": "<scratch>/home",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "TMPDIR": "<scratch>/tmp",
+        "GOCACHE": "<scratch>/gocache",
+        "GOMODCACHE": "<scratch>/gomodcache",
+        "GOTOOLCHAIN": "local",
+        "GOENV": "off",
+        "GOPROXY": "https://proxy.golang.org",
+        "GOSUMDB": "sum.golang.org"
+      },
+      "real_exit_code": 1,
+      "interpretation": "Expected-red: four names admitted; published launcher chooses dependency sibling; SSH helper executes synthetic shim",
+      "output": "go: downloading github.com/BurntSushi/toml v1.6.0\ngo: downloading gopkg.in/yaml.v3 v3.0.1\n=== RUN   TestResearchReservedCommandsRejected\n=== RUN   TestResearchReservedCommandsRejected/git\n    research_gap_probe_test.go:13: Project dry-run status=ok\n    research_gap_probe_test.go:14: expected reserved-command refusal; ordinary plan accepted name\n=== RUN   TestResearchReservedCommandsRejected/curator\n    research_gap_probe_test.go:13: Project dry-run status=ok\n    research_gap_probe_test.go:14: expected reserved-command refusal; ordinary plan accepted name\n=== RUN   TestResearchReservedCommandsRejected/ssh-add\n    research_gap_probe_test.go:13: Project dry-run status=ok\n    research_gap_probe_test.go:14: expected reserved-command refusal; ordinary plan accepted name\n=== RUN   TestResearchReservedCommandsRejected/GiT.ExE\n    research_gap_probe_test.go:13: Project dry-run status=ok\n    research_gap_probe_test.go:14: expected reserved-command refusal; ordinary plan accepted name\n--- FAIL: TestResearchReservedCommandsRejected (3.90s)\n    --- FAIL: TestResearchReservedCommandsRejected/git (1.65s)\n    --- FAIL: TestResearchReservedCommandsRejected/curator (1.24s)\n    --- FAIL: TestResearchReservedCommandsRejected/ssh-add (0.51s)\n    --- FAIL: TestResearchReservedCommandsRejected/GiT.ExE (0.50s)\n=== RUN   TestResearchSystemDependencyDoesNotPreemptAmbient\n    research_gap_probe_test.go:26: installed launcher selected=dependency\n    research_gap_probe_test.go:27: expected inherited PATH before dependency suffix\n--- FAIL: TestResearchSystemDependencyDoesNotPreemptAmbient (8.38s)\n=== RUN   TestResearchSSHAddRejectsSkillShim\n    research_gap_probe_test.go:33: sshAgentKeyCount count=1 known=true\n    research_gap_probe_test.go:34: expected no execution of ssh-add from skill shim; no real agent was used\n--- FAIL: TestResearchSSHAddRejectsSkillShim (0.39s)\nFAIL\nFAIL\tgithub.com/relux-works/curator/internal/install\t13.477s\nFAIL\n",
+      "output_sha256": "0873b1d4f5e151465a029e33f9814c963b84997be0dc1ffe5660100802c10264"
+    },
+    {
+      "id": "audit-probe",
+      "argv": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/audit",
+        "-run",
+        "^TestResearchConfiguredBackendMustRunOrRefuse$"
+      ],
+      "cwd": "<scratch>/src",
+      "environment_mode": "empty environment plus listed values",
+      "environment": {
+        "HOME": "<scratch>/home",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "TMPDIR": "<scratch>/tmp",
+        "GOCACHE": "<scratch>/gocache",
+        "GOMODCACHE": "<scratch>/gomodcache",
+        "GOTOOLCHAIN": "local",
+        "GOENV": "off",
+        "GOPROXY": "https://proxy.golang.org",
+        "GOSUMDB": "sum.golang.org"
+      },
+      "real_exit_code": 1,
+      "interpretation": "Expected-red: Gate writes selected backend label without backend invocation or unsupported refusal",
+      "output": "go: downloading golang.org/x/text v0.14.0\n=== RUN   TestResearchConfiguredBackendMustRunOrRefuse\n    research_gap_probe_test.go:8: Gate blocking-errors=0 verdicts=1 backend-label=synthetic-unimplemented\n    research_gap_probe_test.go:9: expected explicit unsupported-backend refusal; static audit returned allow\n--- FAIL: TestResearchConfiguredBackendMustRunOrRefuse (1.06s)\nFAIL\nFAIL\tgithub.com/relux-works/curator/internal/audit\t1.645s\nFAIL\n",
+      "output_sha256": "65f9ec45252b9a35ef88e0528e8ddbae8d2301c42fae6e88df942894726699f5"
+    },
+    {
+      "id": "only-probe-initial",
+      "argv": [
+        "<scratch>/curator",
+        "global",
+        "install",
+        "--only",
+        "sample"
+      ],
+      "cwd": "<worktree>",
+      "environment_mode": "empty environment plus listed values",
+      "environment": {
+        "HOME": "<scratch>/home",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "TMPDIR": "<scratch>/tmp",
+        "CURATOR_CONFIG": "<scratch>/config.json",
+        "CURATOR_SYSTEM_CONFIG": "<scratch>/absent-system-config.json"
+      },
+      "real_exit_code": 1,
+      "interpretation": "Discarded: selected synthetic system config absent; flag parser not reached",
+      "output": "curator: global config not found: <scratch>/absent-system-config.json\ncurator: run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap)\n",
+      "output_sha256": "4419ab7270aa018447afd23180637caa0d02bdf4b0e7c2487068161e4bcdcef7"
+    },
+    {
+      "id": "only-probe",
+      "argv": [
+        "<scratch>/curator",
+        "global",
+        "install",
+        "--only",
+        "sample"
+      ],
+      "cwd": "<worktree>",
+      "environment_mode": "empty environment plus listed values",
+      "environment": {
+        "HOME": "<scratch>/home",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "TMPDIR": "<scratch>/tmp",
+        "CURATOR_CONFIG": "<scratch>/config.json",
+        "CURATOR_SYSTEM_CONFIG": "<scratch>/system-config.json"
+      },
+      "real_exit_code": 2,
+      "interpretation": "Expected refusal: only flag unsupported; flag parser reached with valid scratch configs",
+      "output": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\nflag provided but not defined: -only\nUsage of install:\n  -all\n    \toperate on all configured projects\n  -audit\n    \trun the audit gate in advisory or strict mode\n  -build-ssh-agent string\n    \tagent socket for external SSH build repositories, or \"auto\" for your own agent (or CURATOR_BUILD_SSH_AGENT)\n  -build-ssh-identity string\n    \tidentity file for external SSH build repositories (or CURATOR_BUILD_SSH_IDENTITY)\n  -build-ssh-known-hosts string\n    \thost keys external SSH build repositories are verified against (or CURATOR_BUILD_SSH_KNOWN_HOSTS)\n  -dry-run\n    \tplan work without modifying files\n  -fix-gitignore\n    \tappend missing managed gitignore entries\n  -strict-tags\n    \tfail if an installed tag moved to another commit\n  -verbose\n    \tprint detailed progress\n\nSkillfile schema 2 project sources:\n  Schema 2 source declarations resolve with the project commands below.\n  Skillfile schema 1 retains its exact meaning; no on-disk migration is implicit.\n\n  curator project resolve [path]   freeze declared sources into Skillfile.lock.json\n  curator install [path]           materialize the locked snapshot (repairs drift)\n  curator status [path]            compare installed state against the lock (--check, --json)\n  curator project refresh [path]   re-resolve refs, bytes, and membership explicitly\n  curator install [path]           install the refreshed lock (refresh alone changes nothing live)\n\n  Launch and status never rescan collections, advance branches, or\n  replace a local snapshot: installed shims execute the frozen runtime\n  until an explicit refresh plus install republishes it. A Skillfile\n  edited after resolve fails source_lock_stale until refresh; run\n  install again after refresh to repair drifted bytes from the lock.\ncurator: flag provided but not defined: -only\n",
+      "output_sha256": "25722013ee8e0500735c09ef8eb04d243ca523290051ec545230b498124a5502"
+    },
+    {
+      "id": "go-probe",
+      "argv": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/godriver",
+        "-run",
+        "^TestResearchHostGoQualification$"
+      ],
+      "cwd": "<scratch>/src",
+      "environment_mode": "empty environment plus listed values",
+      "environment": {
+        "HOME": "<scratch>/home",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "TMPDIR": "<scratch>/tmp",
+        "GOCACHE": "<scratch>/gocache",
+        "GOMODCACHE": "<scratch>/gomodcache",
+        "GOTOOLCHAIN": "local",
+        "GOENV": "off",
+        "GOPROXY": "https://proxy.golang.org",
+        "GOSUMDB": "sum.golang.org"
+      },
+      "real_exit_code": 1,
+      "interpretation": "Expected-red: actual host Go 1.26.0 refused by production Probe; not qualification",
+      "output": "=== RUN   TestResearchHostGoQualification\n    research_gap_probe_test.go:4: TestedFamilies=[1.25]\n    research_gap_probe_test.go:6: real host Go probe diagnostic=unsupported_go_family\n    research_gap_probe_test.go:7: qualification candidate refused: unsupported_go_family\n--- FAIL: TestResearchHostGoQualification (0.28s)\nFAIL\nFAIL\tgithub.com/relux-works/curator/internal/godriver\t0.678s\nFAIL\n",
+      "output_sha256": "03aaa7241a49befdb337c3c38e0105f9c3752a1f4530b801d2d08609c0b72bbd"
+    },
+    {
+      "id": "budget-probe",
+      "argv": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/gitops",
+        "-run",
+        "^TestResearchAggregateSnapshotBudget$"
+      ],
+      "cwd": "<scratch>/src",
+      "environment_mode": "empty environment plus listed values",
+      "environment": {
+        "HOME": "<scratch>/home",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "TMPDIR": "<scratch>/tmp",
+        "GOCACHE": "<scratch>/gocache",
+        "GOMODCACHE": "<scratch>/gomodcache",
+        "GOTOOLCHAIN": "local",
+        "GOENV": "off",
+        "GOPROXY": "https://proxy.golang.org",
+        "GOSUMDB": "sum.golang.org"
+      },
+      "real_exit_code": 1,
+      "interpretation": "Expected-red against proposed 2 GiB policy; planWrites only, metadata without blob bytes",
+      "output": "=== RUN   TestResearchAggregateSnapshotBudget\n    research_gap_probe_test.go:25: preflight entries=5 declared-total-bytes=2684354560 accepted=true; no blob payload written\n    research_gap_probe_test.go:26: expected proposed 2 GiB aggregate refusal; actual implementation has only per-file bound\n--- FAIL: TestResearchAggregateSnapshotBudget (0.04s)\nFAIL\nFAIL\tgithub.com/relux-works/curator/internal/gitops\t0.479s\nFAIL\n",
+      "output_sha256": "855e38ffaf138c80d26adf89c49efe9dade8ff02e37cecedcd6a56366916e757"
+    },
+    {
+      "id": "install-controls",
+      "argv": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/install",
+        "-run",
+        "^(TestEndToEndInstall|TestRuntimeLauncherCapturesDeclaredSystemDependency|TestMissingSystemCommandFails)$"
+      ],
+      "cwd": "<scratch>/src",
+      "environment_mode": "empty environment plus listed values",
+      "environment": {
+        "HOME": "<scratch>/home",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "TMPDIR": "<scratch>/tmp",
+        "GOCACHE": "<scratch>/gocache",
+        "GOMODCACHE": "<scratch>/gomodcache",
+        "GOTOOLCHAIN": "local",
+        "GOENV": "off",
+        "GOPROXY": "https://proxy.golang.org",
+        "GOSUMDB": "sum.golang.org"
+      },
+      "real_exit_code": 0,
+      "interpretation": "Three existing top-level controls pass",
+      "output": "=== RUN   TestEndToEndInstall\n=== PAUSE TestEndToEndInstall\n=== RUN   TestRuntimeLauncherCapturesDeclaredSystemDependency\n--- PASS: TestRuntimeLauncherCapturesDeclaredSystemDependency (11.50s)\n=== RUN   TestMissingSystemCommandFails\n=== PAUSE TestMissingSystemCommandFails\n=== CONT  TestEndToEndInstall\n=== CONT  TestMissingSystemCommandFails\n--- PASS: TestMissingSystemCommandFails (1.69s)\n--- PASS: TestEndToEndInstall (10.05s)\nPASS\nok  \tgithub.com/relux-works/curator/internal/install\t22.114s\n",
+      "output_sha256": "a0de8d031eb55efc7608d7aa28e5e066c912326a7b3b91315937c895128c5c91"
+    },
+    {
+      "id": "gitops-controls",
+      "argv": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/gitops",
+        "-run",
+        "^(TestCloneAndResolve|TestExtractProducesExactTree)$"
+      ],
+      "cwd": "<scratch>/src",
+      "environment_mode": "empty environment plus listed values",
+      "environment": {
+        "HOME": "<scratch>/home",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "TMPDIR": "<scratch>/tmp",
+        "GOCACHE": "<scratch>/gocache",
+        "GOMODCACHE": "<scratch>/gomodcache",
+        "GOTOOLCHAIN": "local",
+        "GOENV": "off",
+        "GOPROXY": "https://proxy.golang.org",
+        "GOSUMDB": "sum.golang.org"
+      },
+      "real_exit_code": 0,
+      "interpretation": "Two existing top-level controls pass",
+      "output": "=== RUN   TestCloneAndResolve\n--- PASS: TestCloneAndResolve (0.80s)\n=== RUN   TestExtractProducesExactTree\n--- PASS: TestExtractProducesExactTree (0.64s)\nPASS\nok  \tgithub.com/relux-works/curator/internal/gitops\t1.797s\n",
+      "output_sha256": "cf3ec0513df9de7cb60f75f73fb28c7092ca31571b139bac22d23dd8afb15bfb"
+    },
+    {
+      "id": "audit-controls",
+      "argv": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/audit",
+        "-run",
+        "^(TestGateModes|TestCanaryFires)$"
+      ],
+      "cwd": "<scratch>/src",
+      "environment_mode": "empty environment plus listed values",
+      "environment": {
+        "HOME": "<scratch>/home",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "TMPDIR": "<scratch>/tmp",
+        "GOCACHE": "<scratch>/gocache",
+        "GOMODCACHE": "<scratch>/gomodcache",
+        "GOTOOLCHAIN": "local",
+        "GOENV": "off",
+        "GOPROXY": "https://proxy.golang.org",
+        "GOSUMDB": "sum.golang.org"
+      },
+      "real_exit_code": 0,
+      "interpretation": "Two existing top-level controls pass",
+      "output": "=== RUN   TestGateModes\n--- PASS: TestGateModes (0.01s)\n=== RUN   TestCanaryFires\n--- PASS: TestCanaryFires (0.00s)\nPASS\nok  \tgithub.com/relux-works/curator/internal/audit\t0.605s\n",
+      "output_sha256": "f9aab4a2c9bca3df29415d89207df3dc44a474d749547c20835c491b3691d7fd"
+    },
+    {
+      "id": "gitops-probe-rerun",
+      "argv": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/gitops",
+        "-run",
+        "^TestResearchGitRejectsSkillShim$"
+      ],
+      "cwd": "<scratch>/src",
+      "environment_mode": "empty environment plus listed values",
+      "environment": {
+        "HOME": "<scratch>/home",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "TMPDIR": "<scratch>/tmp",
+        "GOCACHE": "<scratch>/gocache",
+        "GOMODCACHE": "<scratch>/gomodcache",
+        "GOTOOLCHAIN": "local",
+        "GOENV": "off",
+        "GOPROXY": "https://proxy.golang.org",
+        "GOSUMDB": "sum.golang.org"
+      },
+      "real_exit_code": 1,
+      "interpretation": "Expected-red again after adding the aggregate scratch test to the same file; validates the archived probe source without reusing evidence across that harness edit.",
+      "output": "=== RUN   TestResearchGitRejectsSkillShim\n=== RUN   TestResearchGitRejectsSkillShim/direct\n    research_gap_probe_test.go:16: Resolve accepted=true; shim-chain executable invoked=true\n    research_gap_probe_test.go:17: expected rejection before executing a skill-shim path\n=== RUN   TestResearchGitRejectsSkillShim/intermediate-link\n    research_gap_probe_test.go:16: Resolve accepted=true; shim-chain executable invoked=true\n    research_gap_probe_test.go:17: expected rejection before executing a skill-shim path\n--- FAIL: TestResearchGitRejectsSkillShim (1.56s)\n    --- FAIL: TestResearchGitRejectsSkillShim/direct (0.87s)\n    --- FAIL: TestResearchGitRejectsSkillShim/intermediate-link (0.69s)\nFAIL\nFAIL\tgithub.com/relux-works/curator/internal/gitops\t3.229s\nFAIL\n",
+      "output_sha256": "b643e20229131dd7bc02240fe560f3e50865653235fe59eed3a29e235246f705"
+    }
+  ],
+  "coverage": {
+    "items_inspected": "7/7",
+    "items_with_production_API_or_CLI_observation": "6/7",
+    "items_with_only_helper_probe": "1/7 (aggregate extraction bytes)",
+    "additional_helper_bound": "ssh-add subcase bypasses discovery menu",
+    "expected_red_Go_assertion_scenarios": 11,
+    "existing_top_level_controls_passed": 7,
+    "real_Go_127_qualification": "not run",
+    "cross_platform_qualification": "not run"
+  },
+  "public_sources": [
+    "https://github.com/relux-works/curator/issues/87",
+    "https://go.dev/doc/devel/release"
+  ],
+  "source_refresh": {
+    "public_main_before_handoff": "ca1b776fb580ec0cee0173bf150daf063023aeaa",
+    "ls_remote_exit_code": 0
+  },
+  "artifact_checks": [
+    {
+      "command": "python3 <scratch>/verify_research.py (initial)",
+      "exit_code": 1,
+      "reason": "Incorrect arbitrary minimum of 25 citations; discarded as an unjustified test requirement."
+    },
+    {
+      "command": "python3 <scratch>/verify_research.py (corrected)",
+      "exit_code": 0,
+      "coverage": "7/7 finding sections anchored; 21 paths and line bounds; evidence digests; byte limits; scoped privacy patterns; exactly one uncommitted research file and no tracked changes."
+    },
+    {
+      "command": "bash .github/ci/naming-gate.sh <scratch>/publication",
+      "exit_code": 0,
+      "coverage": "new document and evidence packet only"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "bound": "Tracked delta only; the custom artifact verifier separately checks untracked document whitespace and content."
+    }
+  ]
+}
