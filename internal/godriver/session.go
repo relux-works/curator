@@ -39,7 +39,7 @@ const (
 
 var (
 	goVersionPattern = regexp.MustCompile(`^go version go(1\.([0-9]+)(?:\.[0-9]+)?(?:rc[0-9]+|beta[0-9]+)?) ([a-z0-9]+)/([a-z0-9]+)$`)
-	allowedFamilies  = map[string]struct{}{"1.25": {}}
+	allowedFamilies  = map[string]struct{}{"1.25": {}, "1.26": {}, "1.27": {}}
 	probeEnvNames    = []string{
 		"GOROOT", "GOHOSTOS", "GOHOSTARCH", "GOOS", "GOARCH", "GO386", "GOAMD64", "GOARM", "GOARM64",
 		"GOMIPS", "GOMIPS64", "GOPPC64", "GORISCV64", "GOWASM", "GOTELEMETRY", "GOTELEMETRYDIR",

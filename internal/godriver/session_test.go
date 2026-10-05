@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 type recordingExecutor struct {
@@ -251,7 +253,7 @@ func TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics(t *testing.T) {
 		}},
 		{name: "future family", code: "unsupported_go_family", mutate: func(index int, _ Process, output Output) (Output, error) {
 			if index == 1 {
-				output.Stdout = []byte("go version go1.26.1 " + host.goos + "/" + host.goarch + "\n")
+				output.Stdout = []byte("go version go1.28.1 " + host.goos + "/" + host.goarch + "\n")
 			}
 			return output, nil
 		}},
@@ -409,6 +411,7 @@ func TestRealTrustedGoProbe(t *testing.T) {
 	if os.Getenv("CURATOR_REAL_GO_TEST") != "1" {
 		t.Skip("set CURATOR_REAL_GO_TEST=1 for the bounded native toolchain probe")
 	}
+	testtoolchain.LockHostGOROOT(t)
 	config := ConfigFromEnvironment(t.TempDir())
 	config.CuratorGo = filepath.Join(build.Default.GOROOT, "bin", platformGoName)
 	session, err := Establish(context.Background(), config)
@@ -418,6 +421,14 @@ func TestRealTrustedGoProbe(t *testing.T) {
 	if session.Target().GOOS != runtime.GOOS || session.Target().GOARCH != runtime.GOARCH {
 		t.Fatalf("target = %+v", session.Target())
 	}
+	wantVersion := "go version " + runtime.Version() + " " + runtime.GOOS + "/" + runtime.GOARCH
+	if identity := session.Toolchain(); identity.GoVersion != wantVersion || identity.Algorithm != buildmetaAlgorithm || !strings.HasPrefix(identity.ContentSHA256, "sha256:") {
+		t.Fatalf("real toolchain identity = %+v, want %s", identity, wantVersion)
+	}
+	if err := session.VerifyToolchain(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("qualified toolchain: %s, %s", session.Toolchain().GoVersion, session.Toolchain().ContentSHA256)
 	if err := session.Close(); err != nil {
 		t.Fatal(err)
 	}

@@ -71,6 +71,58 @@ env:
   PNPM_PIN: "10.33.0"
 
 jobs:
+  # Every admitted family gets its own real toolchain identity and driver
+  # qualification. Linux keeps the protocol's existing build refusal; native
+  # offline vendored builds replay twice with cold caches on macOS/Windows.
+  go-family-qualification:
+    name: Go ${{ matrix.go }} driver (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go: ['1.25.5', '1.26.0', '1.27.1']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout authoritative protocol suite
+        uses: actions/checkout@v4
+        with:
+          repository: relux-works/curator-spec
+          ref: ${{ env.SPEC_PIN }}
+          path: protocol-spec
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Verify family toolchain identity
+        shell: bash
+        env:
+          QUALIFIED_GO_VERSION: ${{ matrix.go }}
+        run: |
+          set -euo pipefail
+          actual="$(go version)"
+          echo "$actual"
+          [[ "$actual" == "go version go$QUALIFIED_GO_VERSION "* ]]
+          [[ "$(go env GOTOOLCHAIN)" == local ]]
+          [[ -z "$(go env GOENV)" || "$(go env GOENV)" == off ]]
+      - name: Driver qualification and reproducibility
+        shell: bash
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+          CURATOR_REAL_GO_TEST: '1'
+          CURATOR_REAL_GO_BUILD_TEST: ${{ runner.os != 'Linux' && '1' || '0' }}
+          GOFLAGS: '-work'
+        run: |
+          set -euo pipefail
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            go test -count=1 -timeout=10m -v ./internal/godriver -run 'Test(QualifiedGoFamilies|UnknownGoFamiliesRemainRefused|RealTrustedGoProbe|ProbeRejectsAnUncoveredPlatformBeforeTheWorker|ToolchainIdentityVectors)$'
+          else
+            go test -count=1 -timeout=10m -v ./internal/godriver
+          fi
+      - name: Driver vet
+        run: go vet ./internal/godriver
+      - name: Build manager
+        run: go build ./cmd/curator
+
   # ---------------------------------------------------------------------------
   # The default lane, against the committed conformance pin, on all three runners.
   #

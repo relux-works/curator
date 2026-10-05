@@ -16,6 +16,7 @@ import (
 
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/buildsource"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 func wantBuildArgv(artifact string) []string {
@@ -449,6 +450,22 @@ func TestRealGoV1VendoredBuildIsBoundedAndNotLaunched(t *testing.T) {
 	if os.Getenv("CURATOR_REAL_GO_BUILD_TEST") != "1" {
 		t.Skip("set CURATOR_REAL_GO_BUILD_TEST=1 for the bounded native go-v1 integration")
 	}
+	testtoolchain.LockHostGOROOT(t)
+	firstArtifact, firstToolchain := realVendoredBuild(t)
+	secondArtifact, secondToolchain := realVendoredBuild(t)
+	if firstArtifact != secondArtifact {
+		t.Fatalf("independent snapshots and cold caches produced different artifacts: %+v != %+v", firstArtifact, secondArtifact)
+	}
+	if firstToolchain != secondToolchain {
+		t.Fatalf("independent sessions produced different toolchain identities: %+v != %+v", firstToolchain, secondToolchain)
+	}
+	t.Logf("reproducible artifact: %s (%d bytes); toolchain: %s, %s", firstArtifact.SHA256, firstArtifact.Size, firstToolchain.GoVersion, firstToolchain.ContentSHA256)
+}
+
+// Each replay owns a separate source snapshot, session, and initially empty
+// module/build cache. Both drive the production Establish -> Build boundary.
+func realVendoredBuild(t *testing.T) (buildmeta.Artifact, buildmeta.Toolchain) {
+	t.Helper()
 	snapshot := filepath.Join(t.TempDir(), "snapshot")
 	fixtureRoot := "testdata/realbuild"
 	buildRootRel := "build"
@@ -492,7 +509,11 @@ func TestRealGoV1VendoredBuildIsBoundedAndNotLaunched(t *testing.T) {
 	if result.Evidence.ExecutionPolicy != ExecutionPolicy || len(result.Evidence.Controls) != len(nativeControlInventory) {
 		t.Fatalf("evidence = %+v", result.Evidence)
 	}
+	if err := session.VerifyToolchain(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	// Deliberately do not execute result.Artifact.StagedPath.
+	return result.Artifact.Metadata, session.Toolchain()
 }
 
 func assertFixedBuildEnvironment(t *testing.T, environment []string, session *Session) {
