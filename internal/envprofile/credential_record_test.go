@@ -18,6 +18,7 @@ import (
 // observes a sibling staged file while a second manager-home lock acquisition
 // is refused.
 func TestResolvePublishesCredentialMarkerThroughLockedJournal(t *testing.T) {
+	enableV1WritersForTest(t)
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
 	req := fx.request("codex_cli")
@@ -79,6 +80,7 @@ func TestResolvePublishesCredentialMarkerThroughLockedJournal(t *testing.T) {
 // journal and same-directory staging file at the exact before-rename boundary,
 // then drives Resolve again to recover and verify the complete v2 marker.
 func TestResolveRecoversCredentialMarkerAfterRenameCrash(t *testing.T) {
+	enableV1WritersForTest(t)
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
 	req := fx.request("codex_cli")

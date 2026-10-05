@@ -14,6 +14,13 @@ import (
 	"github.com/relux-works/curator/internal/hashing"
 )
 
+func enableV1Writers(t *testing.T) {
+	t.Helper()
+	prior := hashing.EnableV2Writers
+	hashing.EnableV2Writers = false
+	t.Cleanup(func() { hashing.EnableV2Writers = prior })
+}
+
 func enableV2Writers(t *testing.T) {
 	t.Helper()
 	prior := hashing.EnableV2Writers
@@ -21,7 +28,36 @@ func enableV2Writers(t *testing.T) {
 	t.Cleanup(func() { hashing.EnableV2Writers = prior })
 }
 
+// TestContentHashVersionFollowsTheMarkerNotTheWriter pins the reader rule
+// status depends on: a marker's content framing comes from its own shape,
+// never from the ambient writer switch. Frozen schemas and draft package
+// markers read v1 under either switch; only a core v5 marker reads v2.
+func TestContentHashVersionFollowsTheMarkerNotTheWriter(t *testing.T) {
+	prior := hashing.EnableV2Writers
+	t.Cleanup(func() { hashing.EnableV2Writers = prior })
+	for _, writerV2 := range []bool{false, true} {
+		hashing.EnableV2Writers = writerV2
+		for _, tc := range []struct {
+			name   string
+			marker *Marker
+			want   hashing.Version
+		}{
+			{"schema-1 reads v1", &Marker{SchemaVersion: LegacySchemaVersion}, hashing.VersionV1},
+			{"schema-2 reads v1", &Marker{SchemaVersion: SchemaVersion}, hashing.VersionV1},
+			{"schema-3 reads v1", &Marker{SchemaVersion: ExternalSchemaVersion}, hashing.VersionV1},
+			{"schema-4 reads v1", &Marker{SchemaVersion: PolicySchemaVersion}, hashing.VersionV1},
+			{"core v5 reads v2", &Marker{SchemaVersion: SchemaV5, HashVersion: hashing.VersionV2}, hashing.VersionV2},
+			{"draft v5 reads v1", &Marker{SchemaVersion: SchemaV5, Package: &Package{Kind: "local-snapshot", Snapshot: "sha256:" + strings.Repeat("a", 64)}}, hashing.VersionV1},
+		} {
+			if got := tc.marker.ContentHashVersion(); got != tc.want {
+				t.Fatalf("writer v2=%v: %s = %d, want %d", writerV2, tc.name, got, tc.want)
+			}
+		}
+	}
+}
+
 func TestWritePreservesContentHashInRC13Mode(t *testing.T) {
+	enableV1Writers(t)
 	for _, tc := range []struct {
 		skillSchema int
 		marker      int

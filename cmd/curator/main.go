@@ -1317,7 +1317,7 @@ func scopeStatusDrift(cfg *config.Config, manifestRoot, skillsDir string) map[st
 			drift[decl.Name] = state
 			continue
 		}
-		actualHash, err := hashing.ContentSHA256(installed, nil)
+		actualHash, err := hashing.ContentSHA256WithVersion(installed, nil, recorded.ContentHashVersion())
 		if err != nil || actualHash != recorded.ContentSHA256 {
 			drift[decl.Name] = stateContentDrift
 			continue
@@ -2091,7 +2091,7 @@ func (c cli) cmdHybrid(args []string) int {
 			if readErr != nil {
 				state, _ = markerReadFailure(installed, readErr)
 			} else if kind == stateread.KindPresent {
-				actual, hashErr := hashing.ContentSHA256(installed, nil)
+				actual, hashErr := hashing.ContentSHA256WithVersion(installed, nil, recorded.ContentHashVersion())
 				if hashErr != nil || actual != recorded.ContentSHA256 {
 					state = "content-drift"
 				} else {

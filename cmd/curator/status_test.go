@@ -24,6 +24,7 @@ import (
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/godriver"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/hookapproval"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
@@ -1970,8 +1971,17 @@ func TestStatusAcceptsAnUnchangedLegacyMarkerSchema(t *testing.T) {
 	}
 
 	installed := filepath.Join(project, ".agents", "skills", "skill-a")
+	// The rewrite must be a genuine v1 marker: no hash_version and a
+	// recomputed v1 identity. Relabelling the written v2 digest as schema 1
+	// would not be a legacy marker at all.
+	v1hash, err := hashing.ContentSHA256(installed, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	rewriteMarker(t, installed, func(object map[string]any) {
 		object["schema_version"] = marker.LegacySchemaVersion
+		object["content_sha256"] = v1hash
+		delete(object, "hash_version")
 		delete(object, "build_roots")
 		delete(object, "build_source")
 		delete(object, "builds")

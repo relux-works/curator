@@ -42,6 +42,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/stateread"
+	"github.com/relux-works/curator/internal/transaction"
 )
 
 // Migration render phases for MigrateReport.Text. Inspect prints the
@@ -106,17 +107,18 @@ const (
 // MigrateApplyResult.Report instead. InjectFault, symlink, and rename
 // are test seams: production never sets them.
 type MigrateRequest struct {
-	Home         string
-	Profile      string
-	EnvID        string
-	Machine      envregistry.MachineConfig
-	Detect       func(envregistry.Adapter) string
-	NativeHomeOf func(string) (string, error)
-	Expect       string
-	InjectFault  func(point string, applied int) error
-	Print        io.Writer
-	symlink      func(oldname, newpath string) error
-	rename       func(oldpath, newpath string) error
+	Home               string
+	Profile            string
+	EnvID              string
+	Machine            envregistry.MachineConfig
+	Detect             func(envregistry.Adapter) string
+	NativeHomeOf       func(string) (string, error)
+	Expect             string
+	InjectFault        func(point string, applied int) error
+	Print              io.Writer
+	symlink            func(oldname, newpath string) error
+	rename             func(oldpath, newpath string) error
+	transactionOptions []transaction.Option
 }
 
 // symlinkFn resolves the link-creation primitive: os.Symlink unless a
@@ -240,12 +242,13 @@ func (rec *MigrateRecovery) notice(home string) string {
 // inventoried home plus the plan hash over the canonical inventory,
 // operations, and conflicts.
 type MigrateReport struct {
-	Home      string
-	ScopeProf string
-	ScopeEnv  string
-	Homes     []MigrateHome
-	Recovery  *MigrateRecovery
-	Hash      string
+	Home           string
+	ScopeProf      string
+	ScopeEnv       string
+	Homes          []MigrateHome
+	Recovery       *MigrateRecovery
+	Hash           string
+	identityInputs map[string]string
 }
 
 // Ops flattens the report's operations in plan order.
@@ -284,6 +287,10 @@ func PlanMigration(req MigrateRequest) (*MigrateReport, error) {
 		for _, adapter := range adapters {
 			report.Homes = append(report.Homes, inventoryHome(&req, profile, adapter))
 		}
+	}
+	report.identityInputs, err = identityMigrationInputs(&req, profiles)
+	if err != nil {
+		return nil, err
 	}
 	report.Recovery = readRecoveryBestEffort(req.Home)
 	report.Hash = migrationHash(report)
@@ -728,7 +735,8 @@ func statRoot(path string) string {
 // re-hashes, so --expect refuses on plan drift.
 func migrationHash(report *MigrateReport) string {
 	var canonical strings.Builder
-	canonical.WriteString("migration-plan-v2\n")
+	canonical.WriteString("migration-plan-v3\n")
+	fmt.Fprintf(&canonical, "writer %d identity-inputs %s\n", hashing.WriteVersion(), identityInputHash(report.identityInputs))
 	for _, home := range report.Homes {
 		provisioned := "0"
 		if home.provisioned {
@@ -811,6 +819,9 @@ func (r *MigrateReport) Text(phase string) string {
 		if !shown {
 			out.WriteString("no operations, conflicts, or warnings\n")
 		}
+	}
+	if len(r.identityInputs) > 0 {
+		fmt.Fprintf(&out, "atomic v1-to-v2 profile identity migration: %d bound inputs; all provisioned environments of each selected legacy profile participate\n", len(r.identityInputs))
 	}
 	ops := len(r.Ops())
 	conflicts := len(r.Conflicts())
@@ -950,7 +961,7 @@ type MigrateApplyResult struct {
 // a mix; a kill between mutations leaves the journal for the next apply
 // carrying a plan hash to recover.
 func ApplyMigration(req MigrateRequest) (*MigrateApplyResult, error) {
-	op, err := beginOperation(req.Home)
+	op, err := beginOperation(req.Home, req.transactionOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -1001,6 +1012,35 @@ func ApplyMigration(req MigrateRequest) (*MigrateApplyResult, error) {
 			envregistry.DiagCredentialConflict, len(conflicts), where, first.Detail, first.Choice, extra)
 	}
 	ops := report.Ops()
+	if len(report.identityInputs) > 0 {
+		profiles, err := migrationProfiles(req.Home, req.Profile)
+		if err != nil {
+			return result, err
+		}
+		rr := req.resolveFor(req.Profile, req.EnvID)
+		migration, err := prepareIdentityMigration(rr, profiles, report)
+		if err != nil {
+			return result, err
+		}
+		defer migration.cleanup()
+		if req.InjectFault != nil {
+			if err := req.InjectFault(MigrateFaultPublishBegin, 0); err != nil {
+				return result, err
+			}
+		}
+		inputs, err := identityMigrationInputs(&req, profiles)
+		if err != nil {
+			return result, err
+		}
+		if identityInputHash(inputs) != identityInputHash(report.identityInputs) {
+			return result, fmt.Errorf("migration plan drift during identity staging; re-run --plan")
+		}
+		if err := migration.publish(op); err != nil {
+			return result, err
+		}
+		result.Applied = ops
+		return result, nil
+	}
 	if len(ops) == 0 {
 		return result, nil
 	}
@@ -1286,8 +1326,15 @@ func changedMarkers(report *MigrateReport) (map[string][]byte, map[string][]byte
 		if home.marker.Version == envmarker.VersionV1 && len(dropped) == 0 {
 			continue
 		}
+		_, lock, _, err := loadResolveInputs(report.Home, home.Profile)
+		if err != nil {
+			return nil, nil, err
+		}
+		if markerHashVersion(home.marker) != lock.ContentHashVersion() {
+			return nil, nil, fmt.Errorf("marker/lock hash version mismatch for %s/%s", home.Profile, home.EnvID)
+		}
 		updated := *home.marker
-		if hashing.WriteVersion() == hashing.VersionV2 {
+		if markerHashVersion(home.marker) == hashing.VersionV2 {
 			updated.Version = envmarker.VersionV3
 			updated.HashVersion = int(hashing.VersionV2)
 		} else {

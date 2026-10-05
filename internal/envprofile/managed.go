@@ -251,7 +251,7 @@ func skillsOf(home string, manager *gitManager, lock *contextlock.Lock) ([]skill
 		}
 		entry := manager.entryPath(home, resolvedOf(member))
 		root := packageRoot(entry, member.Directory)
-		hash, err := contextstore.ContentHash(root)
+		hash, err := hashing.ContentSHA256WithVersion(root, map[string]bool{}, lock.ContentHashVersion())
 		if err != nil {
 			return nil, fmt.Errorf("%s: member %s %v", DiagRepairFailed, member.Name, err)
 		}
@@ -271,18 +271,19 @@ func storeDocPath(home, profile, envID, rel string) string {
 // homePlan is the fully assembled managed home: every write, link, and
 // removal, with the marker recording them.
 type homePlan struct {
-	adapter    envregistry.Adapter
-	parent     string
-	homeDir    string
-	storeRoot  string
-	form       string
-	isolation  string
-	copies     map[string][]byte
-	links      map[string]string
-	docs       map[string][]byte
-	marker     *envmarker.Marker
-	fileHashes map[string][]byte
-	warnings   []string
+	adapter     envregistry.Adapter
+	hashVersion hashing.Version
+	parent      string
+	homeDir     string
+	storeRoot   string
+	form        string
+	isolation   string
+	copies      map[string][]byte
+	links       map[string]string
+	docs        map[string][]byte
+	marker      *envmarker.Marker
+	fileHashes  map[string][]byte
+	warnings    []string
 }
 
 // assembleHome builds the desired managed home purely from the lock, the
@@ -324,16 +325,17 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
 		return nil, err
 	}
 	plan := &homePlan{
-		adapter:    adapter,
-		parent:     ManagedParent(req.Home, req.Profile, adapter.ID),
-		homeDir:    ManagedHomeDir(req.Home, req.Profile, adapter.ID),
-		storeRoot:  ProfilesDir(req.Home),
-		form:       form,
-		isolation:  isolation,
-		copies:     map[string][]byte{},
-		links:      map[string]string{},
-		docs:       map[string][]byte{},
-		fileHashes: map[string][]byte{},
+		adapter:     adapter,
+		hashVersion: lock.ContentHashVersion(),
+		parent:      ManagedParent(req.Home, req.Profile, adapter.ID),
+		homeDir:     ManagedHomeDir(req.Home, req.Profile, adapter.ID),
+		storeRoot:   ProfilesDir(req.Home),
+		form:        form,
+		isolation:   isolation,
+		copies:      map[string][]byte{},
+		links:       map[string]string{},
+		docs:        map[string][]byte{},
+		fileHashes:  map[string][]byte{},
 	}
 	if form == envregistry.FormReferenced && adapter.ID == envregistry.OpenCode {
 		if blocked, err := referencedBlocked(plan.homeDir, prior); err != nil {
@@ -357,7 +359,7 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
 	}
 	markerVersion := envmarker.VersionV1
 	hashVersion := 0
-	if hashing.WriteVersion() == hashing.VersionV2 {
+	if lock.ContentHashVersion() == hashing.VersionV2 {
 		markerVersion = envmarker.VersionV3
 		hashVersion = int(hashing.VersionV2)
 	}
@@ -386,6 +388,11 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
 	}
 	plan.marker = marker
 	return plan, nil
+}
+
+func (p *homePlan) surfaceHash(files map[string][]byte) string {
+	digest, _ := contextmaterialize.SurfaceHashWithVersion(files, p.hashVersion)
+	return digest
 }
 
 // referencedBlocked reports whether an unmanaged opencode.json blocks the
@@ -469,7 +476,7 @@ func (p *homePlan) rootContext(req *ResolveRequest, lock *contextlock.Lock, hash
 		surfaces[envmarker.SurfaceRootContext] = envmarker.Surface{
 			Paths:         ordered,
 			Form:          p.form,
-			ContentSHA256: contextmaterialize.SurfaceHash(p.fileHashesFor(paths)),
+			ContentSHA256: p.surfaceHash(p.fileHashesFor(paths)),
 			Copies:        &copies,
 		}
 		return nil
@@ -498,7 +505,7 @@ func (p *homePlan) rootContext(req *ResolveRequest, lock *contextlock.Lock, hash
 	surfaces[envmarker.SurfaceRootContext] = envmarker.Surface{
 		Paths:         []string{target},
 		Form:          p.form,
-		ContentSHA256: contextmaterialize.SurfaceHash(map[string][]byte{target: document}),
+		ContentSHA256: p.surfaceHash(map[string][]byte{target: document}),
 		Copies:        &copies,
 	}
 	return nil
@@ -1326,7 +1333,7 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 		return nil, err
 	}
 	marker := plan.marker
-	if hashing.WriteVersion() == hashing.VersionV2 {
+	if plan.hashVersion == hashing.VersionV2 {
 		marker.Version = envmarker.VersionV3
 		marker.HashVersion = int(hashing.VersionV2)
 	} else {
@@ -1435,10 +1442,12 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 	return marker, nil
 }
 
-// legacyMarkerProjectionMatches checks whether publishing a schema-2 marker
+// legacyMarkerProjectionMatches checks whether publishing the candidate marker
 // would change any schema-1 state beyond adding credential metadata. A true
 // result keeps the original schema-1 bytes untouched; any unrelated marker
-// change is published as one complete schema-2 replacement.
+// change is published as one complete replacement. The projection is a
+// schema-1 document, so the candidate's hash_version is not schema-1 state
+// and is excluded along with the modern credential record shape.
 func legacyMarkerProjectionMatches(prior, candidate *envmarker.Marker) bool {
 	if prior == nil || prior.Version != envmarker.VersionV1 || candidate == nil {
 		return false
@@ -1458,6 +1467,7 @@ func legacyMarkerProjectionMatches(prior, candidate *envmarker.Marker) bool {
 	}
 	projected := *candidate
 	projected.Version = envmarker.VersionV1
+	projected.HashVersion = 0
 	projected.Passthrough = &legacyEntries
 	// codex_seed_record is valid in schema 1 as well as schema 2. Preserve it
 	// in the legacy projection so metadata-only repair does not rewrite a
@@ -2504,6 +2514,9 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 		}
 		return nil, failure
 	}
+	if req.Repair && !req.DryRun && hashing.WriteVersion() == hashing.VersionV2 && lock.ContentHashVersion() == hashing.VersionV1 {
+		return repairUnderLock(&req, adapter, source)
+	}
 	verdict := verifyHome(&req, adapter, source, lock, hash)
 	if verdict.markerReadFailed {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
@@ -2528,7 +2541,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 	if req.DryRun {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", DiagHomeStale, strings.Join(verdict.reasons, "; "))
 	}
-	return repairUnderLock(&req, adapter, source, lock, hash)
+	return repairUnderLock(&req, adapter, source)
 }
 
 // repairUnderLock takes the mutation lock with the bounded wait and a
@@ -2537,7 +2550,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 // the fragment (§10.1). A current home emits without touching any state;
 // repair restores managed bytes from the store and never adopts candidate
 // bytes found in the home.
-func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source Source, lock *contextlock.Lock, hash string) (*ResolveResult, error) {
+func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source Source) (*ResolveResult, error) {
 	op, err := beginOperation(req.Home, req.transactionOptions...)
 	if err != nil {
 		return nil, err
@@ -2545,6 +2558,24 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	defer func() { _ = op.close() }()
 	if err := validateProfilePathSources(req.Profile, source, req.Policy); err != nil {
 		return nil, err
+	}
+	source, lock, hash, err := loadResolveInputs(req.Home, req.Profile)
+	if err != nil {
+		return nil, err
+	}
+	if hashing.WriteVersion() == hashing.VersionV2 && lock.ContentHashVersion() == hashing.VersionV1 {
+		migration, err := prepareIdentityMigration(req, []string{req.Profile}, nil)
+		if err != nil {
+			return nil, err
+		}
+		defer migration.cleanup()
+		if err := migration.publish(op); err != nil {
+			return nil, err
+		}
+		source, lock, hash, err = loadResolveInputs(req.Home, req.Profile)
+		if err != nil {
+			return nil, err
+		}
 	}
 	verdict := verifyHome(req, adapter, source, lock, hash)
 	if verdict.markerReadFailed {
@@ -2845,7 +2876,7 @@ func (p *homePlan) systemPrompt(req *ResolveRequest, lock *contextlock.Lock, pre
 	copies := []envmarker.Copy{}
 	surfaces[envmarker.SurfaceSystemPrompt] = envmarker.Surface{
 		Paths:         paths,
-		ContentSHA256: contextmaterialize.SurfaceHash(p.fileHashesFor(paths)),
+		ContentSHA256: p.surfaceHash(p.fileHashesFor(paths)),
 		Copies:        &copies,
 	}
 	return nil
@@ -2873,7 +2904,7 @@ func (p *homePlan) skills(req *ResolveRequest, skills []skillOf, surfaces map[st
 	}
 	surfaces[envmarker.SurfaceSkills] = envmarker.Surface{
 		Paths:         paths,
-		ContentSHA256: contextmaterialize.SurfaceHash(hashes),
+		ContentSHA256: p.surfaceHash(hashes),
 		Copies:        &copies,
 	}
 }
@@ -2899,7 +2930,7 @@ func (p *homePlan) mcp(req *ResolveRequest, servers []contextmaterialize.MCPServ
 	copies := []envmarker.Copy{}
 	surfaces[envmarker.SurfaceMCP] = envmarker.Surface{
 		Paths:         []string{path},
-		ContentSHA256: contextmaterialize.SurfaceHash(map[string][]byte{path: document}),
+		ContentSHA256: p.surfaceHash(map[string][]byte{path: document}),
 		Copies:        &copies,
 	}
 	return nil

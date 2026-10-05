@@ -813,3 +813,14 @@ internal/buildcache	TestWindowsNativeExecutablePath	windows	-	-	queries the curr
 internal/buildcache	TestDarwinSavedExecutablePath	darwin	-	-	saved executable path is independent of argv zero
 internal/buildcache	TestLinuxExecutablePaths	linux	-	-	proc exe enumeration distinguishes absent and unreadable images
 cmd/curator	TestGCRetainsLiveProcessBuild	darwin,windows	linux	platform-control	GC entry point retains an old executable used by a live child; Linux compilation lacks a native-control inventory record
+
+# Atomic profile content-hash migration and v2 writer cutover.
+internal/envprofile	TestRC14MigrationRehashesLegacyIdentities	linux,darwin,windows	windows	host-capability	Resolve provisions genuine v1 identities; ApplyMigration rehashes lock, store and generated surfaces into v2
+internal/envprofile	TestRC14ResolveRepairMigratesSiblingHomes	linux,darwin,windows	windows	host-capability	Resolve --repair upgrades all managed sibling homes while retaining the legacy shared store
+internal/envprofile	TestRC14IdentityMigrationRollsBackEveryEntry	linux,darwin,windows	windows	host-capability	a transaction publication failure restores profile, managed surfaces and credential links exactly
+internal/envprofile	TestRC14IdentityMigrationRefusesSiblingPlanDrift	linux,darwin,windows	windows	host-capability	a changed sibling surface outside the credential environment filter refuses the planned apply
+internal/envprofile	TestRC14IdentityMigrationRefusesVersionAndPinMismatch	linux,darwin,windows	windows	host-capability	version relabelling and tampered store pins cannot authorize migration
+internal/envprofile	TestRC14IdentityMigrationRecoversInterruptedCommit	linux,darwin,windows	windows	host-capability	a process interruption resumes the joint identity and credential transaction on the next mutation
+internal/envprofile	TestRC14Schema1IdentityMigrationWithoutCredentialOperations	linux,darwin,windows	windows	host-capability	schema-1 metadata upgrades through both production migration entries when no credential link operation is needed
+internal/envprofile	TestRC14IdentityMigrationPreservesFallbackCopies	linux,darwin,windows	windows	host-capability	identity migration preserves directory copies and their symlink-fallback metadata
+internal/envprofile	TestRC14UseMigratesLegacyProfileBeforeNativePublication	linux,darwin,windows	windows	host-capability	Use rehashes the legacy profile before publishing v2 in-place markers and native generation headers

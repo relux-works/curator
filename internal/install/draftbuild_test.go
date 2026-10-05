@@ -20,6 +20,7 @@ import (
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/buildrepo"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/sourcelock"
@@ -432,7 +433,11 @@ func TestLegacyBuildsKeepReceipt1(t *testing.T) {
 		t.Fatalf("legacy receipt shape = %v", receipt)
 	}
 	recorded := marker.Read(filepath.Join(e.project, ".agents", "skills", "build-skill"))
-	if recorded == nil || recorded.SchemaVersion == marker.SchemaV5 || recorded.Builds["alpha"].ReceiptSchemaVersion == 3 {
+	// The v2 writer emits core marker v5 for every manifest band (Spec core
+	// §10), so the legacy install's marker is core v5 — but it must never
+	// be the draft package shape and never carry a receipt-3 record.
+	if recorded == nil || recorded.SchemaVersion != marker.SchemaV5 || recorded.Package != nil ||
+		recorded.HashVersion != hashing.VersionV2 || recorded.Builds["alpha"].ReceiptSchemaVersion != 1 {
 		t.Fatalf("legacy marker = %+v", recorded)
 	}
 }

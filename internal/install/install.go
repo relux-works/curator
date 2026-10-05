@@ -1217,11 +1217,19 @@ func buildMarker(
 	}
 	buildRoots := append([]string(nil), node.Spec.BuildRoots...)
 	sort.Strings(buildRoots)
+	refKind, ref := node.Resolved.Kind, node.Resolved.Ref
+	if hashing.WriteVersion() == hashing.VersionV2 && refKind == "revision" && ref != node.Resolved.Commit {
+		// Core marker v5 binds a revision marker immutably: ref carries the
+		// resolved commit, never a symbolic spelling. A development
+		// substitution resolves its checkout via HEAD; the substitution
+		// provenance stays in Substituted, so the ref records the commit.
+		ref = node.Resolved.Commit
+	}
 	expected := &marker.Marker{
 		Name:               node.Name,
 		Source:             node.Decl.Source,
-		RefKind:            node.Resolved.Kind,
-		Ref:                node.Resolved.Ref,
+		RefKind:            refKind,
+		Ref:                ref,
 		Commit:             node.Resolved.Commit,
 		Locale:             effectiveLocale,
 		Agents:             agents,

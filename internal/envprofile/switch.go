@@ -49,6 +49,7 @@ import (
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -251,6 +252,23 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 	if !clearScope {
 		if _, err := readSource(home, name); err != nil {
 			return nil, err
+		}
+	}
+	if hashing.WriteVersion() == hashing.VersionV2 {
+		lock, _, err := readLock(home, effective)
+		if err != nil {
+			return nil, err
+		}
+		if lock.ContentHashVersion() == hashing.VersionV1 {
+			req := &ResolveRequest{Home: home, Profile: effective, Machine: envregistry.DefaultMachineConfig(), Policy: policy}
+			migration, err := prepareIdentityMigration(req, []string{effective}, nil)
+			if err != nil {
+				return nil, err
+			}
+			defer migration.cleanup()
+			if err := migration.publish(op); err != nil {
+				return nil, err
+			}
 		}
 	}
 	results, err := materializeScope(home, effective, environment, policy)
@@ -814,7 +832,10 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 			}
 		}
 		surface.Paths = []string{adapter.Target}
-		surface.ContentSHA256 = contextmaterialize.SurfaceHash(map[string][]byte{adapter.Target: document})
+		surface.ContentSHA256 = func() string {
+			digest, _ := contextmaterialize.SurfaceHashWithVersion(map[string][]byte{adapter.Target: document}, lock.ContentHashVersion())
+			return digest
+		}()
 	}
 	surface.Copies = &copies
 	marker := &envmarker.Marker{
@@ -829,6 +850,10 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 		Precedence: envmarker.Precedence{Winner: precedence.Winner, Placement: precedence.Placement},
 		Mode:       envmarker.ModeLinked,
 		Surfaces:   map[string]envmarker.Surface{},
+	}
+	if lock.ContentHashVersion() == 2 {
+		marker.Version = envmarker.VersionV3
+		marker.HashVersion = 2
 	}
 	for _, member := range order {
 		entry := envmarker.Member{Name: member.Name, Version: member.Version, Weight: member.Weight, Overlay: member.Overlay}
@@ -874,7 +899,10 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	}
 	if len(skillPaths) > 0 {
 		marker.Surfaces[envmarker.SurfaceSkills] = envmarker.Surface{
-			Paths: skillPaths, ContentSHA256: contextmaterialize.SurfaceHash(skillHashes), Copies: &skillCopies,
+			Paths: skillPaths, ContentSHA256: func() string {
+				digest, _ := contextmaterialize.SurfaceHashWithVersion(skillHashes, lock.ContentHashVersion())
+				return digest
+			}(), Copies: &skillCopies,
 		}
 	}
 	payload, err := marker.Marshal()

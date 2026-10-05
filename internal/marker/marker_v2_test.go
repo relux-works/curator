@@ -31,6 +31,7 @@ func validMarkerV2() *Marker {
 }
 
 func TestWriteAlwaysProducesCanonicalMarkerV2(t *testing.T) {
+	enableV1Writers(t)
 	dir := t.TempDir()
 	m := validMarkerV2()
 	m.SchemaVersion = LegacySchemaVersion
@@ -70,6 +71,7 @@ func TestWriteAlwaysProducesCanonicalMarkerV2(t *testing.T) {
 }
 
 func TestAuthoritativeCompiledMarkerRoundTripsThroughWriter(t *testing.T) {
+	enableV1Writers(t)
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
 	if root == "" {
 		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
@@ -107,6 +109,7 @@ func TestAuthoritativeCompiledMarkerRoundTripsThroughWriter(t *testing.T) {
 }
 
 func TestWriteRejectsInvalidV2State(t *testing.T) {
+	enableV1Writers(t)
 	tests := map[string]func(*Marker){
 		"unsatisfied build source": func(m *Marker) {
 			m.Builds["tool"] = Build{Driver: buildmeta.DriverGoV1}
@@ -127,6 +130,7 @@ func TestWriteRejectsInvalidV2State(t *testing.T) {
 }
 
 func TestReadLegacyV1AndRewriteAsV2WithoutChangingContentHash(t *testing.T) {
+	enableV1Writers(t)
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("legacy"), 0o644); err != nil {
 		t.Fatal(err)
@@ -193,6 +197,7 @@ func TestReadLegacyV1AndRewriteAsV2WithoutChangingContentHash(t *testing.T) {
 }
 
 func TestReadLegacyV1AndRewriteV2PreservesEmptyRequirer(t *testing.T) {
+	enableV1Writers(t)
 	dir := t.TempDir()
 	legacy := validMarkerV2()
 	legacy.SchemaVersion = LegacySchemaVersion
@@ -222,6 +227,7 @@ func TestReadLegacyV1AndRewriteV2PreservesEmptyRequirer(t *testing.T) {
 }
 
 func TestCompiledCurrentnessRoundTripAndCallbackOrder(t *testing.T) {
+	enableV1Writers(t)
 	fixture := compiledFixture(t)
 	order := []string{}
 	options := fixture.options
@@ -245,6 +251,7 @@ func TestCompiledCurrentnessRoundTripAndCallbackOrder(t *testing.T) {
 }
 
 func TestCompiledCurrentnessFailureMatrix(t *testing.T) {
+	enableV1Writers(t)
 	tests := map[string]func(*compiledState){
 		"missing raw snapshot": func(state *compiledState) {
 			state.options.RawSnapshot = func() (*buildsource.Token, error) { return nil, nil }
@@ -295,6 +302,7 @@ func TestCompiledCurrentnessFailureMatrix(t *testing.T) {
 }
 
 func TestCompiledCurrentnessTreatsSnapshotIOAsUnknown(t *testing.T) {
+	enableV1Writers(t)
 	fixture := compiledFixture(t)
 	fixture.options.RawSnapshot = func() (*buildsource.Token, error) { return nil, errors.New("storage unavailable") }
 	if current, err := Current(fixture.installed, fixture.marker, fixture.options); err == nil || current {
@@ -303,6 +311,7 @@ func TestCompiledCurrentnessTreatsSnapshotIOAsUnknown(t *testing.T) {
 }
 
 func TestBuildCurrentnessResultPropagatesSnapshotCloseFailure(t *testing.T) {
+	enableV1Writers(t)
 	closeErr := errors.New("close snapshot")
 	current, err := buildCurrentnessResult(true, buildsource.ErrSnapshotMutated, closeErr)
 	if current || !errors.Is(err, closeErr) || !errors.Is(err, buildsource.ErrSnapshotMutated) {
@@ -311,6 +320,7 @@ func TestBuildCurrentnessResultPropagatesSnapshotCloseFailure(t *testing.T) {
 }
 
 func TestPackageRootMarkerBytesAffectBuildSourceButNotInstalledContentHash(t *testing.T) {
+	enableV1Writers(t)
 	fixture := compiledFixture(t)
 	before, err := hashing.ContentSHA256(fixture.installed, nil)
 	if err != nil {
@@ -333,6 +343,7 @@ func TestPackageRootMarkerBytesAffectBuildSourceButNotInstalledContentHash(t *te
 }
 
 func TestSnapshotMutationDuringCacheInspectionIsNonCurrent(t *testing.T) {
+	enableV1Writers(t)
 	fixture := compiledFixture(t)
 	inspect := fixture.options.InspectCache
 	fixture.options.InspectCache = func(command string, expectation buildcache.Expectation) buildcache.Result {
@@ -487,6 +498,7 @@ func marshalLegacy(marker *Marker) ([]byte, error) {
 }
 
 func TestV2WriterSortsEverySetLikeField(t *testing.T) {
+	enableV1Writers(t)
 	m := validMarkerV2()
 	m.Agents = []string{"zed", "alpha"}
 	m.Commands = []string{"zed", "alpha"}

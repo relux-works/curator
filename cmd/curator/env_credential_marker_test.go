@@ -38,8 +38,10 @@ func cliEnvMarker(t *testing.T, source stubConfigSource, env string) (string, []
 
 func requireCLICodexRecord(t *testing.T, marker *envmarker.Marker, provenance, backend string) {
 	t.Helper()
-	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
-		t.Fatalf("expected one schema-2 credential record, got %+v", marker)
+	// Current writers publish schema 3 with hash_version 2 (Spec
+	// environments §8.2); the record fields below are unchanged.
+	if marker.Version != envmarker.VersionV3 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
+		t.Fatalf("expected one schema-3 credential record, got %+v", marker)
 	}
 	record := (*marker.Passthrough)[0]
 	if record.Path != "auth.json" || record.Isolation != "shared" || record.Strategy != "keyring-preferred" ||
@@ -85,8 +87,8 @@ func TestEnvResolveCredentialRecordPathlessKeyring(t *testing.T) {
 		t.Fatalf("resolve --repair = %d\nstderr:\n%s", code, stderr)
 	}
 	_, payload, marker := cliEnvMarker(t, source, "codex_cli")
-	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
-		t.Fatalf("expected a schema-2 pathless record: %+v", marker)
+	if marker.Version != envmarker.VersionV3 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
+		t.Fatalf("expected a schema-3 pathless record: %+v", marker)
 	}
 	record := (*marker.Passthrough)[0]
 	if record.Path != "" || record.Isolation != "shared" || record.Strategy != "keyring-preferred" || record.SourceRole != "native" || record.Backend != "ambient" || record.BackendVersion != "0.153.2" || record.Provenance != "provisioned" {
@@ -118,8 +120,8 @@ func TestEnvResolveCredentialRecordIsolatedKeychain(t *testing.T) {
 		t.Fatalf("resolve --repair = %d\nstderr:\n%s", code, stderr)
 	}
 	_, payload, marker := cliEnvMarker(t, source, "claude_code")
-	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
-		t.Fatalf("expected one schema-2 credential record: %+v", marker)
+	if marker.Version != envmarker.VersionV3 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
+		t.Fatalf("expected one schema-3 credential record: %+v", marker)
 	}
 	record := (*marker.Passthrough)[0]
 	if record.Path != "" || record.Isolation != "isolated" || record.Strategy != "per-home-keychain" ||
@@ -140,6 +142,13 @@ func TestEnvResolveCredentialRecordIsolatedKeychain(t *testing.T) {
 // TestEnvResolveKeepsSchema1BytesForMetadataOnly proves an explicit repair
 // does not upgrade a schema-1 marker when its legacy state is unchanged.
 func TestEnvResolveKeepsSchema1BytesForMetadataOnly(t *testing.T) {
+	// The bytes-kept schema-1 repair is the frozen v1-lane behavior:
+	// current writers MUST publish schema 3 (environments §8.2), and a
+	// v1 marker over a v2 lock is a refused version mismatch. The
+	// legacy lane stays pinned for the whole test — install,
+	// provision, downgrade to genuine v1 bytes, repair — so the
+	// downgrade never relabels v2 digests under a v1 schema.
+	pinV1MarkerWriters(t)
 	source, _ := profileHome(t)
 	installCLIEnvProfile(t, source)
 	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
@@ -151,6 +160,9 @@ func TestEnvResolveKeepsSchema1BytesForMetadataOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	object["version"] = float64(envmarker.VersionV1)
+	// Schemas 1 and 2 carry no hash_version (environments §8.2); the
+	// published schema-3 value must not survive the downgrade.
+	delete(object, "hash_version")
 	modern, _ := object["passthrough"].([]any)
 	legacy := make([]any, 0, len(modern))
 	for _, value := range modern {
@@ -194,6 +206,11 @@ func TestEnvResolveKeepsSchema1BytesForMetadataOnly(t *testing.T) {
 }
 
 func TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome(t *testing.T) {
+	// Same frozen v1 lane as TestEnvResolveKeepsSchema1BytesForMetadataOnly:
+	// current writers MUST publish schema 3 (environments §8.2), so the
+	// pre-rule schema-1 home under test must be provisioned, downgraded,
+	// and repaired with the v1 writer to stay genuine.
+	pinV1MarkerWriters(t)
 	source, _ := profileHome(t)
 	installCLIEnvProfile(t, source)
 	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
@@ -205,6 +222,9 @@ func TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome(t *testing.
 		t.Fatal(err)
 	}
 	object["version"] = float64(envmarker.VersionV1)
+	// Schemas 1 and 2 carry no hash_version (environments §8.2); the
+	// published schema-3 value must not survive the downgrade.
+	delete(object, "hash_version")
 	delete(object, "codex_seed_record")
 	modern, _ := object["passthrough"].([]any)
 	legacy := make([]any, 0, len(modern))

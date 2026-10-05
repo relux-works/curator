@@ -292,6 +292,7 @@ func TestMigratePiWrongTargetToAgentRoot(t *testing.T) {
 // for an unlink; that replacement upgrades once and records the complete v2
 // credential set for the new isolated state.
 func TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker(t *testing.T) {
+	enableV1WritersForTest(t)
 	requireLinkCapability(t)
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
@@ -1985,7 +1986,7 @@ func TestMigrateRecoveryCleansOwnedTemp(t *testing.T) {
 // switch explicitly on, the required marker replacement upgrades a schema-1
 // marker straight to v3 carrying hash_version 2.
 func TestMigrateSchema1UnlinkPublishesCompleteSchema3MarkerV2WriterMode(t *testing.T) {
-	enableV2WritersForTest(t)
+	enableV1WritersForTest(t)
 	requireLinkCapability(t)
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
@@ -2015,6 +2016,7 @@ func TestMigrateSchema1UnlinkPublishesCompleteSchema3MarkerV2WriterMode(t *testi
 	if _, err := os.Lstat(link); err != nil {
 		t.Fatalf("schema-1 marker's recorded link is present: %v", err)
 	}
+	enableV2WritersForTest(t)
 	config := envregistry.DefaultMachineConfig()
 	config.Isolation = map[string]map[string]string{"acme": {"pi": envregistry.IsolationIsolated}}
 	req := fx.migrateRequest()

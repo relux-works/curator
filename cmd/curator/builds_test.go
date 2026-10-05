@@ -958,15 +958,16 @@ func writeCompiledMarkerForBand(t *testing.T, installed string, skillSchema int)
 }
 
 // recordedBuildForBand restates the recorded build of testRecordedBuild with
-// the per-schema fields marker v3 and v4 require of a local go-v1 command.
-// Nothing the currentness comparison reads changes, so a band difference can
-// only be observed through the schema banding under test.
+// the fields a core marker v5 requires of a local go-v1 command: v5 retains
+// the marker-v4 record rules for every manifest band (Spec core §10),
+// exactly as the install writer emits them. Nothing the currentness
+// comparison reads changes, so a band difference can only be observed
+// through the schema banding under test.
 func recordedBuildForBand(skillSchema int) marker.Build {
+	_ = skillSchema
 	build := testRecordedBuild()
-	if skillSchema >= 7 {
-		build.ExecutionPolicy = buildmeta.ExecutionPolicy
-		build.ReceiptSchemaVersion = 1
-	}
+	build.ExecutionPolicy = buildmeta.ExecutionPolicy
+	build.ReceiptSchemaVersion = 1
 	return build
 }
 
@@ -978,6 +979,9 @@ func markerAtSchema(schema int) *marker.Marker {
 	if schema != marker.SchemaVersion {
 		recorded.Builds["build-tool"] = recordedBuildForBand(8)
 	}
+	if schema == marker.SchemaV5 {
+		recorded.HashVersion = hashing.VersionV2
+	}
 	return recorded
 }
 
@@ -988,13 +992,14 @@ func markerAtSchema(schema int) *marker.Marker {
 // would record marker schema 2 -- a schema it would never write for that band.
 //
 // The band is pinned from both sides. Narrowing it back to the single written
-// schema fails the v3 and v4 cases; widening it to accept anything fails the
-// schema-1 and unknown-schema cases, which genuinely cannot describe a build.
+// schema fails the v2, v3 and v4 cases; widening it to accept anything fails
+// the schema-1 and unknown-schema cases, which genuinely cannot describe a
+// build. Schema 5 is the v2 writer's shape for every band (Spec core §10).
 func TestClassifySkillBuildsAcceptsEveryBuildBearingMarkerSchema(t *testing.T) {
 	t.Parallel()
 	facts := []buildFacts{testFacts(string(install.BuildCacheHit))}
 
-	for _, schema := range []int{marker.SchemaVersion, marker.ExternalSchemaVersion, marker.PolicySchemaVersion} {
+	for _, schema := range []int{marker.SchemaVersion, marker.ExternalSchemaVersion, marker.PolicySchemaVersion, marker.SchemaV5} {
 		state, rows := classifySkillBuilds(t.TempDir(), markerAtSchema(schema), facts)
 		if state != buildCurrent {
 			t.Fatalf("schema %d: state = %q, want %q (rows %+v)", schema, state, buildCurrent, rows)
@@ -1016,7 +1021,7 @@ func TestClassifySkillBuildsAcceptsEveryBuildBearingMarkerSchema(t *testing.T) {
 		// recorded: that self-contradiction is what made the escape unreadable
 		// to an operator holding a perfectly good marker.
 		for _, older := range []int{marker.LegacySchemaVersion, marker.SchemaVersion,
-			marker.ExternalSchemaVersion, marker.PolicySchemaVersion} {
+			marker.ExternalSchemaVersion, marker.PolicySchemaVersion, marker.SchemaV5} {
 			if older >= schema {
 				continue
 			}
@@ -1038,13 +1043,16 @@ func TestClassifySkillBuildsAcceptsEveryBuildBearingMarkerSchema(t *testing.T) {
 // agree rather than assumed to.
 func TestStatusReportFindsASchema8InstallationCurrent(t *testing.T) {
 	t.Parallel()
+	// The v2 writer emits core marker v5 for every manifest band (Spec core
+	// §10: current writers MUST use marker schema 5 for every installation
+	// mutation that writes a core marker).
 	for _, band := range []struct {
 		skillSchema  int
 		markerSchema int
 	}{
-		{skillSchema: 6, markerSchema: marker.SchemaVersion},
-		{skillSchema: 7, markerSchema: marker.ExternalSchemaVersion},
-		{skillSchema: 8, markerSchema: marker.PolicySchemaVersion},
+		{skillSchema: 6, markerSchema: marker.SchemaV5},
+		{skillSchema: 7, markerSchema: marker.SchemaV5},
+		{skillSchema: 8, markerSchema: marker.SchemaV5},
 	} {
 		t.Run(fmt.Sprintf("skill schema %d", band.skillSchema), func(t *testing.T) {
 			project := t.TempDir()

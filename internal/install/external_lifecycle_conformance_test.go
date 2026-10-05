@@ -19,6 +19,7 @@ import (
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/conformancecoverage"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/staging"
 	"github.com/relux-works/curator/internal/transaction"
@@ -136,7 +137,9 @@ func TestLegacyMixedBuildProjectInstallProducesMarkerV3(t *testing.T) {
 	}
 	installed := filepath.Join(e.project, ".agents", "skills", "golden-skill")
 	recorded := marker.Read(installed)
-	if recorded == nil || recorded.SchemaVersion != marker.ExternalSchemaVersion {
+	// The v2 writer emits core marker v5 for every manifest band (Spec core
+	// §10); the mixed local/external build-record rules are unchanged.
+	if recorded == nil || recorded.SchemaVersion != marker.SchemaV5 {
 		t.Fatalf("marker = %+v", recorded)
 	}
 	if len(recorded.Builds) != 2 {
@@ -197,7 +200,9 @@ func TestGlobalMixedBuildStagesExternalBeforeLocal(t *testing.T) {
 		t.Fatalf("global mixed stage order=%v", builder.calls)
 	}
 	recorded := marker.Read(filepath.Join(GlobalRoot(e.home), "skills", "golden-skill"))
-	if recorded == nil || recorded.SchemaVersion != marker.ExternalSchemaVersion || len(recorded.Builds) != 2 {
+	// The v2 writer emits core marker v5 for every manifest band (Spec core
+	// §10); the mixed local/external build-record rules are unchanged.
+	if recorded == nil || recorded.SchemaVersion != marker.SchemaV5 || len(recorded.Builds) != 2 {
 		t.Fatalf("global mixed marker=%+v", recorded)
 	}
 	if recorded.Builds["golden-tool"].ReceiptSchemaVersion != 2 || recorded.Builds["local-helper"].ReceiptSchemaVersion != 1 {
@@ -393,6 +398,15 @@ func compareMixedPlan(t *testing.T, path string, got *marker.Marker, stagedOrder
 }
 
 func TestAuthoritativeMixedBuildCasesUseProjectInstallEntry(t *testing.T) {
+	// The published vectors still describe the v1 writer's per-band markers
+	// (marker_version 2/3/4); the spec has not republished them for the v2
+	// writer's core marker v5. Drive them through the v1 lane so the
+	// conformance binding stays exact. This test selects the package writer
+	// switch and therefore runs serially; parallel install tests start
+	// after its writer selection has been restored.
+	priorWriter := hashing.EnableV2Writers
+	hashing.EnableV2Writers = false
+	t.Cleanup(func() { hashing.EnableV2Writers = priorWriter })
 	root, vectors := readExternalLifecycleVectors(t)
 	conformancecoverage.RunOutcomes(t, "external-repository-lifecycle/mixed_build_cases", vectors.MixedBuildCases,
 		func(testCase lifecycleMixedCase) string { return testCase.Name },

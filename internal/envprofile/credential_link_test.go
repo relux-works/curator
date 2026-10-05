@@ -408,6 +408,7 @@ func TestCodexUnknownStoreSharedRefuses(t *testing.T) {
 // refusal. A mutant that reports the pending link stale fails the bare
 // resolve; one that silences it fails the warning assertions.
 func TestPiProvisionTargetsAgentRoot(t *testing.T) {
+	enableV1WritersForTest(t)
 	requireLinkCapability(t)
 	fx := writeManagedFixture(t, "acme")
 	req := fx.request("pi")

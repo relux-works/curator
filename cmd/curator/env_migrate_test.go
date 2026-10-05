@@ -132,8 +132,8 @@ func TestEnvMigratePlanApplyPi(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if marker.Version != envmarker.VersionV2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
-		t.Fatalf("migration marker carries one schema-2 record: %+v", marker)
+	if marker.Version != envmarker.VersionV3 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
+		t.Fatalf("migration marker carries one schema-3 credential record: %+v", marker)
 	}
 	credential := (*marker.Passthrough)[0]
 	if credential.Path != "auth.json" || credential.Isolation != "shared" || credential.Strategy != "file-link" ||

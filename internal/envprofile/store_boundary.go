@@ -15,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/gitops"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/stateread"
@@ -159,7 +160,7 @@ func validateNamedStoreBoundaries(home string, lock *contextlock.Lock, owner pat
 func validateNamedStorePins(home string, lock *contextlock.Lock) *storeEntryFailure {
 	for _, member := range lock.Members {
 		entry := contextstore.EntryDir(home, member.Kind, member.Name, member.PinKey())
-		actual, expected, err := storeEntryPinHashes(home, member, entry)
+		actual, expected, err := storeEntryPinHashes(home, member, entry, lock.ContentHashVersion())
 		if err != nil {
 			return &storeEntryFailure{Member: member, Path: entry, Check: diagPinHash, Err: err}
 		}
@@ -201,7 +202,7 @@ func expectedStoreHash(home string, member contextlock.Member) (string, string, 
 	return "", "", fmt.Errorf("member %s/%s has no expected state or commit pin", member.Kind, member.Name)
 }
 
-func storeEntryPinHashes(home string, member contextlock.Member, entry string) (actual, expected string, err error) {
+func storeEntryPinHashes(home string, member contextlock.Member, entry string, version hashing.Version) (actual, expected string, err error) {
 	expected, format, err := expectedStoreHash(home, member)
 	if err != nil {
 		return "", "", err
@@ -213,7 +214,7 @@ func storeEntryPinHashes(home string, member contextlock.Member, entry string) (
 		}
 		return actual, expected, nil
 	}
-	actual, err = contextstore.ContentHash(entry)
+	actual, err = hashing.ContentSHA256WithVersion(entry, map[string]bool{}, version)
 	if err != nil {
 		return "", "", err
 	}

@@ -1373,6 +1373,17 @@ func markerHashVersion(m *Marker) hashing.Version {
 	return hashing.VersionV1
 }
 
+// ContentHashVersion reports the framing version of the marker's
+// content_sha256: v2 for core v5 markers, v1 for every frozen schema (1-4)
+// and for draft package markers, which retain their frozen v1 meaning.
+// Status and currentness readers must recompute with this version — the
+// marker's own — and never compare a marker against a recomputation in a
+// different framing (Spec §10: the installed content identity is both
+// hash_version and content_sha256, with frozen markers read as version 1).
+func (m *Marker) ContentHashVersion() hashing.Version {
+	return markerHashVersion(m)
+}
+
 func rawIntegerEquals(raw json.RawMessage, expected int64) bool {
 	var value json.Number
 	if err := json.Unmarshal(raw, &value); err != nil {

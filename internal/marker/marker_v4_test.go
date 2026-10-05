@@ -21,6 +21,7 @@ func v4Base() *Marker {
 }
 
 func TestMarkerV4IsWrittenForSchema8Installations(t *testing.T) {
+	enableV1Writers(t)
 	for _, testCase := range []struct {
 		name string
 		set  func(*Marker)
@@ -74,6 +75,7 @@ func TestMarkerV4IsWrittenForSchema8Installations(t *testing.T) {
 // manifest band it was defined for: v4 never represents schema 7, and v3 never
 // represents schema 8.
 func TestMarkerV4BandIsExact(t *testing.T) {
+	enableV1Writers(t)
 	for _, testCase := range []struct {
 		name          string
 		markerVersion int
@@ -108,6 +110,7 @@ func TestMarkerV4BandIsExact(t *testing.T) {
 // TestMarkerV4CurrentnessRequiresBuildProof proves a schema-8 marker fails
 // closed exactly as a schema-7 one does when the build evidence is missing.
 func TestMarkerV4CurrentnessRequiresBuildProof(t *testing.T) {
+	enableV1Writers(t)
 	dir := t.TempDir()
 	m := v4Base()
 	m.Commands, m.BuildRoots, m.BuildSource = []string{"external"}, []string{}, nil
@@ -146,6 +149,7 @@ func TestMarkerV4CurrentnessRequiresBuildProof(t *testing.T) {
 // marker v3 in force for v4: a recorded go-v1 build without a frozen source
 // identity is not a representable marker.
 func TestMarkerV4LocalBuildRequiresBuildSource(t *testing.T) {
+	enableV1Writers(t)
 	dir := t.TempDir()
 	m := v4Base()
 	m.Commands = []string{"local"}

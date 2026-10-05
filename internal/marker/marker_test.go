@@ -10,6 +10,7 @@ import (
 )
 
 func TestWriteUsesWireCompatibleEmptyValues(t *testing.T) {
+	enableV1Writers(t)
 	dir := t.TempDir()
 	m := validMarkerV2()
 	m.Locale = ""
@@ -63,6 +64,7 @@ func install(t *testing.T) (string, *Marker) {
 }
 
 func TestCurrentRoundTrip(t *testing.T) {
+	enableV1Writers(t)
 	dir, m := install(t)
 	current, err := Current(dir, m)
 	if err != nil || !current {
@@ -71,6 +73,7 @@ func TestCurrentRoundTrip(t *testing.T) {
 }
 
 func TestTamperDetectedByRehash(t *testing.T) {
+	enableV1Writers(t)
 	dir, m := install(t)
 	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("edited locally"), 0o644); err != nil {
 		t.Fatal(err)
@@ -85,6 +88,7 @@ func TestTamperDetectedByRehash(t *testing.T) {
 }
 
 func TestDriftFieldsInvalidate(t *testing.T) {
+	enableV1Writers(t)
 	dir, m := install(t)
 	cases := []func(x Marker) Marker{
 		func(x Marker) Marker { x.Commit = "def"; return x },
@@ -111,6 +115,7 @@ func TestDriftFieldsInvalidate(t *testing.T) {
 }
 
 func TestActivationOrderInsensitive(t *testing.T) {
+	enableV1Writers(t)
 	dir, m := install(t)
 	expected := *m
 	expected.Activation = &Activation{Context: true, Commands: []string{"x"}}
@@ -121,6 +126,7 @@ func TestActivationOrderInsensitive(t *testing.T) {
 }
 
 func TestUnsupportedSchemaErrors(t *testing.T) {
+	enableV1Writers(t)
 	dir, m := install(t)
 	m.SchemaVersion = 99
 	payload := `{"schema_version": 99, "name": "skill-a"}`
@@ -133,6 +139,7 @@ func TestUnsupportedSchemaErrors(t *testing.T) {
 }
 
 func TestReplaceDirSwapsAndCleans(t *testing.T) {
+	enableV1Writers(t)
 	parent := t.TempDir()
 	target := filepath.Join(parent, "skill-a")
 	if err := os.MkdirAll(target, 0o755); err != nil {
@@ -166,6 +173,7 @@ func TestReplaceDirSwapsAndCleans(t *testing.T) {
 }
 
 func TestReadAbsentAndCorrupt(t *testing.T) {
+	enableV1Writers(t)
 	if Read(t.TempDir()) != nil {
 		t.Fatal("absent marker must read nil")
 	}
@@ -179,6 +187,7 @@ func TestReadAbsentAndCorrupt(t *testing.T) {
 }
 
 func TestReadRejectsSchemaViolations(t *testing.T) {
+	enableV1Writers(t)
 	dir, _ := install(t)
 	payload, err := os.ReadFile(filepath.Join(dir, Name))
 	if err != nil {

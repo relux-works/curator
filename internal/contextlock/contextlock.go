@@ -375,6 +375,12 @@ func lockVersions(lock *Lock) (int, int) {
 	return schemaVersion, hashVersion
 }
 
+// ContentHashVersion returns the framing declared by this lock, including v1
+// for legacy carriers. It never infers a reader version from the writer switch.
+func (lock *Lock) ContentHashVersion() hashing.Version {
+	return hashing.Version(lockHashVersion(lock)) // #nosec G115 -- nonnegative int versions fit uint64; negative versions cannot alias v1 or v2
+}
+
 func lockHashVersion(lock *Lock) int {
 	_, hashVersion := lockVersions(lock)
 	return hashVersion

@@ -23,6 +23,7 @@ func v3Base() *Marker {
 }
 
 func TestMarkerV3ExternalCurrentnessIsReadOnlyAndFailsClosed(t *testing.T) {
+	enableV1Writers(t)
 	dir := t.TempDir()
 	m := v3Base()
 	m.Commands, m.BuildRoots, m.BuildSource = []string{"external"}, []string{}, nil
@@ -73,6 +74,7 @@ func externalV3Build() Build {
 }
 
 func TestMarkerV3StructurallyRepresentsLocalExternalAndMixed(t *testing.T) {
+	enableV1Writers(t)
 	for _, testCase := range []struct {
 		name string
 		set  func(*Marker)
@@ -118,6 +120,7 @@ func TestMarkerV3StructurallyRepresentsLocalExternalAndMixed(t *testing.T) {
 }
 
 func TestMarkerV3RejectsReceiptInterpretationAliasing(t *testing.T) {
+	enableV1Writers(t)
 	dir := t.TempDir()
 	m := v3Base()
 	aliased := externalV3Build()

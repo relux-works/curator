@@ -16,6 +16,7 @@ import (
 // contextresolve.Resolve -> auditAndStore -> auditMember. Both trees have the
 // same v1 hash, but each has a regular NUL-bearing file in a different path.
 func TestInstallBlocksBothV1CollidingSkillTrees(t *testing.T) {
+	enableV1WritersForTest(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	collision := []struct {
@@ -93,6 +94,7 @@ func TestInstallBlocksBothV1CollidingSkillTrees(t *testing.T) {
 }
 
 func TestInstallBlocksDeepNULFileInContextPathSnapshot(t *testing.T) {
+	enableV1WritersForTest(t)
 	home := t.TempDir()
 	pinHomes(t)
 	source := t.TempDir()
@@ -121,6 +123,7 @@ func TestInstallBlocksDeepNULFileInContextPathSnapshot(t *testing.T) {
 }
 
 func TestUpdateBlocksDeepNULFileInNewContextMember(t *testing.T) {
+	enableV1WritersForTest(t)
 	home, _, oldHash := installBlockingOverlayRoot(t)
 	overlay := filepath.Join(t.TempDir(), "overlay")
 	writeManifestPackage(t, overlay,

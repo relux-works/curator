@@ -111,7 +111,7 @@ func classifyDraftMember(skillsDir string, member sourcelock.Member, lockSHA256 
 		state, _ := markerRefusal(installed)
 		return state
 	}
-	actualHash, err := hashing.ContentSHA256(installed, nil)
+	actualHash, err := hashing.ContentSHA256WithVersion(installed, nil, recorded.ContentHashVersion())
 	if err != nil {
 		return stateUnresolvable
 	}

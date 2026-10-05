@@ -6,12 +6,12 @@ import (
 	"testing"
 )
 
-func TestManagedWriterVersionDefaultsToV1(t *testing.T) {
-	if EnableV2Writers {
-		t.Fatal("v2 writer switch is on before the atomic v1→v2 profile hash migration")
+func TestManagedWriterVersionDefaultsToV2(t *testing.T) {
+	if !EnableV2Writers {
+		t.Fatal("v2 writer switch is off after the atomic profile hash migration")
 	}
-	if got := WriteVersion(); got != VersionV1 {
-		t.Fatalf("default write version = %d, want v1", got)
+	if got := WriteVersion(); got != VersionV2 {
+		t.Fatalf("default write version = %d, want v2", got)
 	}
 }
 

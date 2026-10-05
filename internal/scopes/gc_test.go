@@ -78,32 +78,34 @@ func installBuildMarkerForBand(t *testing.T, skillsDir, name, commit, command st
 			Algorithm: buildsource.Algorithm, ContentSHA256: "sha256:" + strings.Repeat("b", 64),
 		},
 		InstalledAt: "2026-07-20T00:00:00Z",
-		Builds:      map[string]marker.Build{command: buildRecordForBand(key, artifactPath, skillSchema)},
+		Builds:      map[string]marker.Build{command: buildRecordForBand(key, artifactPath)},
 	}); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// buildRecordForBand carries the per-schema fields marker v3 and v4 require of
-// a local go-v1 command. Nothing the mark phase reads changes with the band, so
-// a band difference can only be observed through the schema banding under test.
-func buildRecordForBand(key buildmeta.CacheKey, artifactPath string, skillSchema int) marker.Build {
-	build := marker.Build{
-		Driver: buildmeta.DriverGoV1, CacheKey: key,
-		ReceiptSHA256:  buildmeta.ReceiptHash("sha256:" + strings.Repeat("d", 64)),
-		ArtifactSHA256: "sha256:" + strings.Repeat("e", 64),
-		ArtifactPath:   artifactPath,
+// buildRecordForBand carries the build-record fields a core marker v5 requires
+// of a local go-v1 command: v5 retains the marker-v4 record rules for every
+// manifest band (Spec core §10), exactly as the install writer emits them.
+// Nothing the mark phase reads changes with the band, so a band difference
+// can only be observed through the schema banding under test.
+func buildRecordForBand(key buildmeta.CacheKey, artifactPath string) marker.Build {
+	return marker.Build{
+		Driver:               buildmeta.DriverGoV1,
+		CacheKey:             key,
+		ReceiptSHA256:        buildmeta.ReceiptHash("sha256:" + strings.Repeat("d", 64)),
+		ArtifactSHA256:       "sha256:" + strings.Repeat("e", 64),
+		ArtifactPath:         artifactPath,
+		ExecutionPolicy:      buildmeta.ExecutionPolicy,
+		ReceiptSchemaVersion: 1,
 	}
-	if skillSchema >= 7 {
-		build.ExecutionPolicy = buildmeta.ExecutionPolicy
-		build.ReceiptSchemaVersion = 1
-	}
-	return build
 }
 
 // TestCollectMarksBuildKeysFromEveryBuildBearingMarkerSchema proves the mark
-// phase keeps a live build reference from every marker schema that can record
-// one, including the marker v4 a schema-8 installation writes.
+// phase keeps a live build reference from every manifest band the writer
+// serves. The v2 writer emits core marker v5 for every band (Spec core §10);
+// the historical v2/v3/v4-per-band shapes remain readable and are covered by
+// the schema-band unit test below.
 //
 // A schema missing from that band is not "this installation has no builds": its
 // recorded keys go unmarked, the sweep sees them as unreferenced, and the
@@ -121,9 +123,9 @@ func TestCollectMarksBuildKeysFromEveryBuildBearingMarkerSchema(t *testing.T) {
 		markerSchema int
 		key          buildmeta.CacheKey
 	}{
-		{skillSchema: 6, markerSchema: marker.SchemaVersion, key: buildKey("1")},
-		{skillSchema: 7, markerSchema: marker.ExternalSchemaVersion, key: buildKey("2")},
-		{skillSchema: 8, markerSchema: marker.PolicySchemaVersion, key: buildKey("3")},
+		{skillSchema: 6, markerSchema: marker.SchemaV5, key: buildKey("1")},
+		{skillSchema: 7, markerSchema: marker.SchemaV5, key: buildKey("2")},
+		{skillSchema: 8, markerSchema: marker.SchemaV5, key: buildKey("3")},
 	}
 	want := make([]string, 0, len(bands))
 	for index, band := range bands {
@@ -187,6 +189,7 @@ func TestAbsorbKeysBuildLivenessOnTheSchemaBandNotOnAPopulatedBuildsMap(t *testi
 		{name: "schema 2 records builds", schema: marker.SchemaVersion, want: 1},
 		{name: "schema 3 records builds", schema: marker.ExternalSchemaVersion, want: 1},
 		{name: "schema 4 records builds", schema: marker.PolicySchemaVersion, want: 1},
+		{name: "schema 5 records builds", schema: marker.SchemaV5, want: 1},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			marked := &marks{runtime: map[string]bool{}}
@@ -276,7 +279,7 @@ func TestCollectMarksRuntimeFromEverySupportedMarkerSchema(t *testing.T) {
 		t.Fatal("a valid marker-v1 installation lost its runtime entry")
 	}
 	if _, err := os.Stat(filepath.Join(home, "runtime", "skill-build", buildCommit)); err != nil {
-		t.Fatal("a valid marker-v2 installation lost its runtime entry")
+		t.Fatal("a valid build-bearing installation lost its runtime entry")
 	}
 	if len(result.RemovedRuntime) != 1 {
 		t.Fatalf("removed runtime = %v", result.RemovedRuntime)
@@ -497,8 +500,10 @@ func warned(result MaintenanceResult, needle string) bool {
 	return false
 }
 
-// downgradeToLegacyMarker rewrites a written marker as the schema-1 shape the
-// manager must still read: no build state, and the legacy schema version.
+// downgradeToLegacyMarker rewrites a written marker as the genuine schema-1
+// shape the manager must still read: no build state, the legacy schema
+// version, no hash_version, and a recomputed v1 content identity — a
+// relabelled v2 digest would not be a legacy marker at all.
 func downgradeToLegacyMarker(t *testing.T, installedDir string) {
 	t.Helper()
 	path := filepath.Join(installedDir, marker.Name)
@@ -510,10 +515,19 @@ func downgradeToLegacyMarker(t *testing.T, installedDir string) {
 	if err := json.Unmarshal(payload, &fields); err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range []string{"build_roots", "build_source", "builds"} {
+	for _, field := range []string{"build_roots", "build_source", "builds", "hash_version"} {
 		delete(fields, field)
 	}
 	fields["schema_version"] = json.RawMessage(fmt.Sprintf("%d", marker.LegacySchemaVersion))
+	v1hash, err := hashing.ContentSHA256(installedDir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := json.Marshal(v1hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fields["content_sha256"] = identity
 	legacy, err := json.Marshal(fields)
 	if err != nil {
 		t.Fatal(err)

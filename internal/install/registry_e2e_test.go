@@ -185,13 +185,13 @@ func registryEnvWithSigner(t *testing.T, status string, options ...registryOptio
 	return registryEnvWithVersions(t, status, hashing.VersionV1, hashing.VersionV1, options...)
 }
 
+// These fixtures select the package writer switch and therefore run serially;
+// parallel install tests start after their writer selection has been restored.
 func registryEnvWithVersions(t *testing.T, status string, artifactVersion, recordVersion hashing.Version, options ...registryOption) (*env, *httptest.Server, ed25519.PrivateKey, string) {
 	t.Helper()
-	if artifactVersion == hashing.VersionV2 {
-		prior := hashing.EnableV2Writers
-		hashing.EnableV2Writers = true
-		t.Cleanup(func() { hashing.EnableV2Writers = prior })
-	}
+	prior := hashing.EnableV2Writers
+	hashing.EnableV2Writers = artifactVersion == hashing.VersionV2
+	t.Cleanup(func() { hashing.EnableV2Writers = prior })
 	e := newEnv(t)
 	e.skill("skill-a")
 	e.declare("skill-a")
@@ -220,7 +220,6 @@ func registryEnvWithVersions(t *testing.T, status string, artifactVersion, recor
 }
 
 func TestRegistryRevocationDeniesInstall(t *testing.T) {
-	t.Parallel()
 	e, server := registryEnv(t, "revoked")
 	defer server.Close()
 	result := e.install(Options{})
@@ -230,7 +229,6 @@ func TestRegistryRevocationDeniesInstall(t *testing.T) {
 }
 
 func TestRegistryAttestationLandsInMarker(t *testing.T) {
-	t.Parallel()
 	e, server := registryEnv(t, "audited")
 	defer server.Close()
 	result := e.install(Options{})
@@ -571,7 +569,6 @@ func registryStateDigest(registryURL string) string {
 }
 
 func TestStrictRegistryPolicyFailsUnknown(t *testing.T) {
-	t.Parallel()
 	e, server := registryEnv(t, "pending") // pending resolves as unknown
 	defer server.Close()
 	e.cfg.Audit.RegistryPolicy = "strict"
@@ -791,7 +788,6 @@ func seedRegistryHighWater(t *testing.T, home string, urls, roots []string) {
 // any positive difference read as tampering. The hook makes that crossing
 // certain instead of leaving it to the runner's speed.
 func TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch(t *testing.T) {
-	t.Parallel()
 	e, server := registryEnv(t, "audited", beforeSnapshotResponse(crossSecondBoundary))
 	defer server.Close()
 	result := e.install(Options{})
@@ -817,7 +813,6 @@ func TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch(t *testing.T) {
 // shape the crossconformance harness uses, so it is also the legacy-lane
 // proof that the fix only removes the false "future" refusal.
 func TestRegistrySnapshotMintedDuringFetchIsNotFuture(t *testing.T) {
-	t.Parallel()
 	e, server := registryEnv(t, "audited", snapshotMintedAtServeTime(), beforeSnapshotResponse(crossSecondBoundary))
 	defer server.Close()
 	e.cfg.Audit.SnapshotClockSkewSeconds = 0
@@ -843,7 +838,14 @@ func TestRegistrySnapshotMintedDuringFetchIsNotFuture(t *testing.T) {
 // start accepts it. It runs through the frozen v1 lane with a literal zero
 // skew, like the row above.
 func TestRegistrySnapshotSlowSiblingDoesNotFlipInstantRegistry(t *testing.T) {
-	t.Parallel()
+	// Frozen v1 lane, like the rows above: the fixtures serve rc.13 audit
+	// records keyed by v1 content hashes, and versioned resolution refuses
+	// cross-version records. This test selects the package writer switch
+	// and therefore runs serially; parallel install tests start after its
+	// writer selection has been restored.
+	priorWriter := hashing.EnableV2Writers
+	hashing.EnableV2Writers = false
+	t.Cleanup(func() { hashing.EnableV2Writers = priorWriter })
 	e := newEnv(t)
 	e.skill("skill-a")
 	e.declare("skill-a")
@@ -892,7 +894,6 @@ func TestRegistrySnapshotSlowSiblingDoesNotFlipInstantRegistry(t *testing.T) {
 // into the past before `now` is sampled. Dropping the future check entirely
 // admits this row.
 func TestRegistrySnapshotTwoSecondsPastSkewStillRefuses(t *testing.T) {
-	t.Parallel()
 	e, server := registryEnv(t, "audited", snapshotFutureBy(2*time.Second))
 	defer server.Close()
 	e.cfg.Audit.SnapshotClockSkewSeconds = 0
@@ -914,7 +915,6 @@ func TestRegistrySnapshotTwoSecondsPastSkewStillRefuses(t *testing.T) {
 // deny the install, not warn: it names the call site the gate has to be
 // reachable from (install.resolveRegistries -> registry.CheckSnapshotsWithPolicy).
 func TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries(t *testing.T) {
-	t.Parallel()
 	e, server := registryEnv(t, "audited", snapshotCreatedAt(time.Now().Add(time.Hour)))
 	defer server.Close()
 	result := e.install(Options{})
@@ -935,7 +935,6 @@ func TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries(t *testing.
 // is pinned in internal/registry -- and its job here is to stop the refusal
 // above being satisfied by a gate that rejects every snapshot.
 func TestRegistrySnapshotWithinTheBoundIsAcceptedThroughInstall(t *testing.T) {
-	t.Parallel()
 	e, server := registryEnv(t, "audited", snapshotCreatedAt(time.Now().Add(-time.Minute)))
 	defer server.Close()
 	e.cfg.Audit.SnapshotClockSkewSeconds = 0

@@ -38,13 +38,12 @@ const (
 )
 
 // EnableV2Writers is the sole manager write cut-over for content-hash v2 and
-// its versioned carrier shapes. Production writes stay at v1 with the rc.14
-// conformance pin until the atomic v1→v2 profile hash migration ships in
-// TASK-261003-1uzji7.
+// its versioned carrier shapes. Legacy profile identities migrate through the
+// coordinated profile transaction before publishing a v2 carrier.
 //
 // Tests that exercise v2 writer shapes may set this explicitly and restore it
 // before returning.
-var EnableV2Writers = false
+var EnableV2Writers = true
 
 // WriteVersion returns the content-hash framing selected for new manager
 // state. Readers continue to accept explicitly versioned v2 state regardless

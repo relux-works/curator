@@ -24,6 +24,16 @@ import (
 
 const draftStatusPayload = `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
 
+// pinV1MarkerWriters restores the rc.13 writer for legacy-marker cases: the
+// marker under test must be a genuine v1 document, not a v5 document the
+// current writer happens to emit. Serial-only, like every test in this file.
+func pinV1MarkerWriters(t *testing.T) {
+	t.Helper()
+	prior := hashing.EnableV2Writers
+	hashing.EnableV2Writers = false
+	t.Cleanup(func() { hashing.EnableV2Writers = prior })
+}
+
 // setupDraftStatusProject resolves one local skill through the CLI and
 // returns the config path and project root.
 func setupDraftStatusProject(t *testing.T) (configPath, project string) {
@@ -207,6 +217,7 @@ func TestDraftStatusLockOnlyChangeNeedsInstall(t *testing.T) {
 // draft project is never current through the CLI: the installation
 // predates the lock and must be installed again.
 func TestDraftStatusLegacyMarkerNeedsInstall(t *testing.T) {
+	pinV1MarkerWriters(t)
 	configPath, project := setupDraftStatusProject(t)
 	dir := filepath.Join(project, ".agents", "skills", "review")
 	if err := os.MkdirAll(filepath.Join(dir, "references"), 0o755); err != nil {
@@ -626,6 +637,7 @@ func TestClassifyDraftMemberPresenceRows(t *testing.T) {
 	member := draftStatusMember(snapshot)
 
 	t.Run("legacy-marker", func(t *testing.T) {
+		pinV1MarkerWriters(t)
 		skillsDir := t.TempDir()
 		dir := filepath.Join(skillsDir, "review")
 		if err := os.MkdirAll(filepath.Join(dir, "references"), 0o755); err != nil {
