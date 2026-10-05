@@ -78,6 +78,9 @@ spawn selection rationale for gpt-6-astra/low: tb-R164 developer gpt-6-astra low
 spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [implementer] developer (codex) (run=RUN-261005-a5ff9f, max_parallel=8)
 spawn run started: [implementer] developer (codex) (run=RUN-261005-a5ff9f)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-261005-a5ff9f, pid=20274, exit=0)
+spawn run RUN-261005-a5ff9f failed; operator action required; failure: integration_binding_state_invalid: Change Request CR-TASK-261004-3pvg2k-1 revision 1 is integrated, want accepted or checkpointed
 
 ## Precondition Resources
 - [cip-process-brief.md](file://TASK-261004-3pvg2k/cip-process-brief.md)
@@ -102,12 +105,13 @@ spawn run started: [implementer] developer (codex) (run=RUN-261005-a5ff9f)
 - [TASK-261004-3pvg2k_spawn-log_-implementer--developer--codex-_RUN-261005-6a7ea0.log](file://TASK-261004-3pvg2k/TASK-261004-3pvg2k_spawn-log_-implementer--developer--codex-_RUN-261005-6a7ea0.log) — System spawn log captured by task-board
 - [TASK-261004-3pvg2k_RUN-261005-6a7ea0_integration-preconditions.md](file://TASK-261004-3pvg2k/TASK-261004-3pvg2k_RUN-261005-6a7ea0_integration-preconditions.md) — Fresh preconditions for runner-owned integration; no file changes
 - [TASK-261004-3pvg2k_spawn-log_-implementer--developer--codex-_RUN-261005-a5ff9f.log](file://TASK-261004-3pvg2k/TASK-261004-3pvg2k_spawn-log_-implementer--developer--codex-_RUN-261005-a5ff9f.log) — System spawn log captured by task-board
+- [TASK-261004-3pvg2k_complete2-output.log](file://TASK-261004-3pvg2k/TASK-261004-3pvg2k_complete2-output.log) — Bound worktree complete output; exit code 0; landing proven and board published; cleanup_pending.
 
 ## Created
 2026-10-04T02:05:39Z
 
 ## Last Update
-2026-10-05T12:24:08Z
+2026-10-05T12:28:11Z
 
 ## Assigned To
 [implementer] developer (codex)
