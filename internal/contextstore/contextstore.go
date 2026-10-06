@@ -20,6 +20,7 @@ import (
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/stateread"
@@ -56,9 +57,15 @@ func Exists(home, kind, name, pinKey string) (bool, error) {
 }
 
 // ContentHash is the core §8 content hash of a store entry (no exclusions:
-// a store entry carries no marker).
+// a store entry carries no marker). Under the v1 writer it refuses NUL
+// before hashing (Spec §8 interim rule for v1 readers); v2 hashes NUL
+// as ordinary data.
 func ContentHash(dir string) (string, error) {
-	return hashing.ContentSHA256WithVersion(dir, map[string]bool{}, hashing.WriteVersion())
+	version := hashing.WriteVersion()
+	if err := opaquescan.RefuseNULV1(dir, version); err != nil {
+		return "", err
+	}
+	return hashing.ContentSHA256WithVersion(dir, map[string]bool{}, version)
 }
 
 // EnsureGit installs the snapshot of commit from repo as the entry of

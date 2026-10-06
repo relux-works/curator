@@ -39,6 +39,7 @@ import (
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/rustsource"
 	"github.com/relux-works/curator/internal/scopes"
@@ -1317,6 +1318,15 @@ func scopeStatusDrift(cfg *config.Config, manifestRoot, skillsDir string) map[st
 			drift[decl.Name] = state
 			continue
 		}
+		// Spec §8 interim rule for v1 readers: a recorded v1 identity is
+		// never recomputed over NUL bytes. A v1-installed tree passed the
+		// install gate NUL-free, so NUL now means the tree drifted; the
+		// opaque refusal itself surfaces through the install-status error
+		// in this same invocation.
+		if err := opaquescan.RefuseNULV1(installed, recorded.ContentHashVersion()); err != nil {
+			drift[decl.Name] = stateContentDrift
+			continue
+		}
 		actualHash, err := hashing.ContentSHA256WithVersion(installed, nil, recorded.ContentHashVersion())
 		if err != nil || actualHash != recorded.ContentSHA256 {
 			drift[decl.Name] = stateContentDrift
@@ -1957,6 +1967,9 @@ func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDep
 			Git: subject.Declared.Identity, Commit: subject.Effective.Commit,
 			Snapshot: subject.SnapshotRoot, SchemaVersion: 7,
 			Capabilities: capabilities.ImplicitNone(),
+			// Live repository admission audits the writer-version
+			// identity; only frozen v1 carriers keep the NUL rule.
+			HashVersion: hashing.WriteVersion(),
 		}
 		var auditWarnings, auditErrs []string
 		if dryRun {
@@ -2091,8 +2104,11 @@ func (c cli) cmdHybrid(args []string) int {
 			if readErr != nil {
 				state, _ = markerReadFailure(installed, readErr)
 			} else if kind == stateread.KindPresent {
-				actual, hashErr := hashing.ContentSHA256WithVersion(installed, nil, recorded.ContentHashVersion())
-				if hashErr != nil || actual != recorded.ContentSHA256 {
+				// Spec §8 interim rule for v1 readers: refuse before
+				// recomputing a recorded v1 identity over NUL bytes.
+				if guardErr := opaquescan.RefuseNULV1(installed, recorded.ContentHashVersion()); guardErr != nil {
+					state = "content-drift"
+				} else if actual, hashErr := hashing.ContentSHA256WithVersion(installed, nil, recorded.ContentHashVersion()); hashErr != nil || actual != recorded.ContentSHA256 {
 					state = "content-drift"
 				} else {
 					state = "installed"
@@ -2131,7 +2147,10 @@ func (c cli) cmdAudit(args []string) int {
 			_, _ = fmt.Fprintln(c.stderr, "curator: --allow requires --reason")
 			return exitUsage
 		}
-		path, err := audit.Pin(cfg.Home(), *allow, *reason, os.Getenv("USER"))
+		// New pins record the writer framing explicitly (Spec §8): a pin
+		// authorizes only the (version, digest) identity it was issued
+		// for, so legacy v1 pins never approve v2 reads.
+		path, err := audit.PinAtVersion(cfg.Home(), *allow, hashing.WriteVersion(), *reason, os.Getenv("USER"))
 		if err != nil {
 			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
@@ -2260,6 +2279,9 @@ func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string, 
 			Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
 			SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
 			Commands: node.Spec.Commands,
+			// The audit CLI reports what an install would trust:
+			// the writer-version identity.
+			HashVersion: hashing.WriteVersion(),
 		})
 	}
 	warnings, errs := audit.Gate(cfg, subjects)

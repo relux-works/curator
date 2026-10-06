@@ -15,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/envfiles"
 	"github.com/relux-works/curator/internal/globalbins"
 	"github.com/relux-works/curator/internal/godriver"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/mcp"
@@ -191,6 +192,9 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
 					Commands: node.Spec.Commands,
+					// The global scope has no draft lane: the
+					// audited identity is the writer version.
+					HashVersion: hashing.WriteVersion(),
 				})
 			}
 			var warnings, errs []string
@@ -310,6 +314,19 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 	}
 	for _, build := range plan.builds {
 		observed.outcomes[build.skill+"."+build.command] = build.outcome
+	}
+
+	// A status plan reports on installed trees, so it verifies them: a
+	// recorded v1 identity over a NUL-bearing tree refuses here with the
+	// opaque finding instead of the plan silently reporting ready. This
+	// runs after build planning so the refusal still carries the complete
+	// per-command verdict a read-only reporting caller needs. The global
+	// scope has one store and no hybrid activation.
+	if opts.Operation == OperationStatus {
+		if err := refuseInstalledNULForStatus(nodes, func(string) string { return skillsDir }); err != nil {
+			result.failf("%v", err)
+			return result, nil
+		}
 	}
 
 	if opts.DryRun {

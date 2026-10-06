@@ -48,7 +48,9 @@ const (
 	RulesetVersion = "2"
 )
 
-const findingOpaqueNUL = "audit.opaque.nul-byte"
+// findingOpaqueNUL is the shared opaque-NUL finding id: every v1
+// pre-hash/pre-trust refusal in the tree carries this same id.
+const findingOpaqueNUL = opaquescan.FindingNUL
 
 // Finding is one audit finding.
 type Finding struct {
@@ -68,10 +70,29 @@ type Subject struct {
 	Snapshot      string
 	SchemaVersion int
 	Capabilities  capabilities.Manifest
+	// HashVersion is the content-hash framing the caller will compute
+	// or trust for this subject (Spec §8). The opaque-NUL interim rule
+	// applies exactly when it is v1: v2 hashes 0x00 as ordinary data.
+	// Zero means v1, like every other carrier reader's missing version.
+	HashVersion hashing.Version
 	// Commands carries the skill's parsed commands for the script audit
 	// warning classes (manager profile §7). A nil map labels nothing,
 	// so callers without a parsed manifest keep the previous output.
 	Commands map[string]skillspec.Command
+}
+
+// subjectVersion resolves the framing in force for one subject. A missing
+// version reads as v1 (fail-closed, matching the carrier readers); any
+// other unknown version refuses instead of guessing a rule.
+func subjectVersion(subject Subject) (hashing.Version, error) {
+	switch subject.HashVersion {
+	case 0, hashing.VersionV1:
+		return hashing.VersionV1, nil
+	case hashing.VersionV2:
+		return hashing.VersionV2, nil
+	default:
+		return 0, fmt.Errorf("unsupported content hash version %d", subject.HashVersion)
+	}
 }
 
 // Report is the audit outcome for one subject.
@@ -149,9 +170,10 @@ func Decide(findings []Finding, mode, failOn string) string {
 }
 
 // Gate audits every subject and returns warnings and blocking errors per the
-// gate behavior of Spec §12.2. Opaque NUL files block even when optional audit
-// is disabled, because the v1 content hash cannot distinguish their tree from
-// a colliding twin.
+// gate behavior of Spec §12.2. For v1 subjects, opaque NUL files block even
+// when optional audit is disabled, because the v1 content hash cannot
+// distinguish their tree from a colliding twin. V2 subjects hash NUL bytes
+// as ordinary data (Spec §8) and skip the opaque rule entirely.
 func Gate(cfg *config.Config, subjects []Subject) (warnings []string, errs []string) {
 	return gate(cfg, subjects, true)
 }
@@ -163,12 +185,23 @@ func GateReadOnly(cfg *config.Config, subjects []Subject) (warnings []string, er
 }
 
 func gate(cfg *config.Config, subjects []Subject, persist bool) (warnings []string, errs []string) {
-	// NUL-bearing files are opaque under the current v1 content framing, so
-	// this refusal is independent of the opt-in audit policy. Scan every
-	// admitted snapshot before the audit-enabled early return.
+	// NUL-bearing files are opaque under the v1 content framing only
+	// (Spec §8 interim rule for v1 readers), so this refusal is
+	// independent of the opt-in audit policy. Scan every v1 snapshot
+	// before the audit-enabled early return; v2 snapshots hash NUL
+	// bytes as ordinary data and skip the scan entirely.
 	opaquePaths := make([][]string, len(subjects))
 	skipAudit := make([]bool, len(subjects))
 	for index, subject := range subjects {
+		version, err := subjectVersion(subject)
+		if err != nil {
+			skipAudit[index] = true
+			errs = append(errs, fmt.Sprintf("audit blocked: %s: %v", subject.Name, err))
+			continue
+		}
+		if version != hashing.VersionV1 {
+			continue
+		}
 		paths, err := opaquescan.NULPaths(subject.Snapshot)
 		if err != nil {
 			skipAudit[index] = true
@@ -270,30 +303,50 @@ func scriptAuditWarnings(subject Subject) []string {
 
 // auditSubject runs the pipeline of Spec §12.1 for one subject.
 func auditSubject(cfg *config.Config, subject Subject, persist bool) (Report, error) {
-	opaquePaths, err := opaquescan.NULPaths(subject.Snapshot)
+	version, err := subjectVersion(subject)
 	if err != nil {
-		return Report{}, fmt.Errorf("opaque snapshot scan: %w", err)
+		return Report{}, err
+	}
+	var opaquePaths []string
+	if version == hashing.VersionV1 {
+		opaquePaths, err = opaquescan.NULPaths(subject.Snapshot)
+		if err != nil {
+			return Report{}, fmt.Errorf("opaque snapshot scan: %w", err)
+		}
 	}
 	return auditSubjectWithOpaquePaths(cfg, subject, persist, opaquePaths)
 }
 
 func auditSubjectWithOpaquePaths(cfg *config.Config, subject Subject, persist bool, opaquePaths []string) (Report, error) {
-	contentHash, err := hashing.ContentSHA256(subject.Snapshot, nil)
+	version, err := subjectVersion(subject)
+	if err != nil {
+		return Report{}, err
+	}
+	// The version rule is enforced here, not by caller convention: a v2
+	// subject never blocks on NUL paths, however they arrived.
+	if version != hashing.VersionV1 {
+		opaquePaths = nil
+	} else if len(opaquePaths) != 0 {
+		// Refuse BEFORE hashing: no v1 identity is ever computed over
+		// NUL bytes, so the refusal carries no digest. The v1 content
+		// hash can collide when file bytes contain NUL, so this result
+		// also stays outside the verdict cache: a NUL-free twin must
+		// never authorize a NUL-bearing tree with the same hash.
+		opaqueReport := opaqueNULReport(opaquePaths)
+		return Report{
+			Skill:          subject.Name,
+			Findings:       opaqueReport.Findings,
+			Decision:       opaqueReport.Decision,
+			ScriptPolicies: scriptpolicy.AuditPoliciesForCommands(subject.Commands),
+		}, nil
+	}
+	contentHash, err := hashing.ContentSHA256WithVersion(subject.Snapshot, nil, version)
 	if err != nil {
 		return Report{}, err
 	}
 	report := Report{
 		Skill: subject.Name, ContentSHA256: contentHash,
 		ScriptPolicies: scriptpolicy.AuditPoliciesForCommands(subject.Commands),
-	}
-	// The v1 content hash can collide when file bytes contain NUL. Keep this
-	// result outside the verdict cache so a NUL-free twin cannot authorize a
-	// NUL-bearing tree with the same hash.
-	opaqueReport := opaqueNULReport(opaquePaths)
-	if opaqueReport.Decision == DecisionBlock {
-		report.Findings = opaqueReport.Findings
-		report.Decision = opaqueReport.Decision
-		return report, nil
 	}
 
 	// Local revocations block unconditionally (Spec §12.2).
@@ -304,9 +357,10 @@ func auditSubjectWithOpaquePaths(cfg *config.Config, subject Subject, persist bo
 		return report, nil
 	}
 
-	// Verdict cache: findings cached by content hash, backend, model, and
-	// versions; the decision is recomputed under the current policy.
-	if findings, hit := loadCachedFindings(cfg, contentHash); hit {
+	// Verdict cache: findings cached by (framing version, content hash),
+	// backend, model, and versions; the decision is recomputed under the
+	// current policy.
+	if findings, hit := loadCachedFindings(cfg, contentHash, version); hit {
 		report.CacheHit = true
 		report.Findings = findings
 		report.Decision = decideWithPins(cfg, subject, contentHash, findings)
@@ -326,7 +380,8 @@ func auditSubjectWithOpaquePaths(cfg *config.Config, subject Subject, persist bo
 }
 
 func decideWithPins(cfg *config.Config, subject Subject, contentHash string, findings []Finding) string {
-	pinned := isPinned(cfg, contentHash)
+	version, err := subjectVersion(subject)
+	pinned := err == nil && isPinned(cfg, contentHash, version)
 	if cfg.Audit.Mode == "strict" && subject.SchemaVersion < 3 && !pinned {
 		return DecisionRequirePin
 	}
@@ -374,19 +429,47 @@ func RevocationFor(revocations []string, contentHash, source, git string) string
 // blocks profile installation (environments §9.1).
 func CanaryPasses() bool { return runStaticCanary() }
 
-// Pin records operator trust for a content hash with a reason (Spec §12.2).
+// Pin carriers mirror the verdict carriers: schema 1 is the frozen v1
+// shape (no hash_version member) and authorizes v1 reads only; schema 2
+// carries hash_version for v2 pins. Version and digest form one identity
+// (Spec §8), so equal digest text across framings never shares trust.
+const (
+	pinSchemaV1 = 1
+	pinSchemaV2 = 2
+)
+
+// Pin records operator trust for a v1 content hash with a reason (Spec
+// §12.2). It writes the frozen schema-1 shape, which authorizes v1 reads
+// only; v2 identities need PinAtVersion with the v2 framing.
 func Pin(home, contentHash, reason, pinnedBy string) (string, error) {
-	dir := trustDir(home, contentHash)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", err
-	}
-	payload, err := json.MarshalIndent(map[string]any{
-		"schema_version": 1,
+	return PinAtVersion(home, contentHash, hashing.VersionV1, reason, pinnedBy)
+}
+
+// PinAtVersion records operator trust for a content hash in the given
+// framing version with a reason (Spec §12.2). The version is explicit,
+// never inferred from digest bytes: v1 writes the frozen schema-1 shape
+// byte-identically, v2 writes schema 2 with hash_version 2.
+func PinAtVersion(home, contentHash string, version hashing.Version, reason, pinnedBy string) (string, error) {
+	record := map[string]any{
 		"content_sha256": strings.ToLower(contentHash),
 		"pinned":         true,
 		"pinned_by":      pinnedBy,
 		"reason":         reason,
-	}, "", "  ")
+	}
+	switch version {
+	case 0, hashing.VersionV1:
+		record["schema_version"] = pinSchemaV1
+	case hashing.VersionV2:
+		record["schema_version"] = pinSchemaV2
+		record["hash_version"] = int(version)
+	default:
+		return "", fmt.Errorf("unsupported content hash version %d", version)
+	}
+	dir := trustDir(home, contentHash)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	payload, err := json.MarshalIndent(record, "", "  ")
 	if err != nil {
 		return "", err
 	}
@@ -394,15 +477,36 @@ func Pin(home, contentHash, reason, pinnedBy string) (string, error) {
 	return path, os.WriteFile(path, append(payload, '\n'), 0o644)
 }
 
-func isPinned(cfg *config.Config, contentHash string) bool {
+func isPinned(cfg *config.Config, contentHash string, version hashing.Version) bool {
+	want := version
+	if want == 0 {
+		want = hashing.VersionV1
+	}
+	if want != hashing.VersionV1 && want != hashing.VersionV2 {
+		return false
+	}
 	payload, err := os.ReadFile(filepath.Join(trustDir(cfg.Home(), contentHash), "trust.json")) // #nosec G304
 	if err != nil {
 		return false
 	}
 	var data struct {
-		Pinned bool `json:"pinned"`
+		Pinned        bool            `json:"pinned"`
+		SchemaVersion int             `json:"schema_version"`
+		HashVersion   hashing.Version `json:"hash_version"`
 	}
-	return json.Unmarshal(payload, &data) == nil && data.Pinned
+	if json.Unmarshal(payload, &data) != nil || !data.Pinned {
+		return false
+	}
+	recordVersion := hashing.VersionV1
+	switch data.SchemaVersion {
+	case 0, pinSchemaV1:
+		// Legacy records without a version are v1.
+	case pinSchemaV2:
+		recordVersion = data.HashVersion
+	default:
+		return false
+	}
+	return recordVersion == want
 }
 
 func trustDir(home, contentHash string) string {
@@ -414,15 +518,40 @@ func verdictPath(cfg *config.Config, contentHash string) string {
 	return filepath.Join(trustDir(cfg.Home(), contentHash), "verdict-"+key+".json")
 }
 
-func loadCachedFindings(cfg *config.Config, contentHash string) ([]Finding, bool) {
+// Verdict carriers: schema 1 is the frozen v1 shape (no hash_version
+// member); schema 2 carries hash_version for v2 verdicts. A v2 digest is
+// never stored in the frozen v1 shape, and a record is honored only when
+// its version matches the subject's: version and digest form one
+// identity (Spec §8), so equal digest text across framings never shares
+// a verdict.
+const (
+	verdictSchemaV1 = 1
+	verdictSchemaV2 = 2
+)
+
+func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.Version) ([]Finding, bool) {
 	payload, err := os.ReadFile(verdictPath(cfg, contentHash)) // #nosec G304
 	if err != nil {
 		return nil, false
 	}
 	var data struct {
-		Findings []Finding `json:"findings"`
+		SchemaVersion int             `json:"schema_version"`
+		HashVersion   hashing.Version `json:"hash_version"`
+		Findings      []Finding       `json:"findings"`
 	}
 	if err := json.Unmarshal(payload, &data); err != nil {
+		return nil, false
+	}
+	recordVersion := hashing.VersionV1
+	switch data.SchemaVersion {
+	case 0, verdictSchemaV1:
+		// Legacy records without a version are v1.
+	case verdictSchemaV2:
+		recordVersion = data.HashVersion
+	default:
+		return nil, false
+	}
+	if recordVersion != version {
 		return nil, false
 	}
 	return data.Findings, true
@@ -462,12 +591,16 @@ func verdictHasScriptPolicies(cfg *config.Config, contentHash string) bool {
 }
 
 func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject, findings []Finding, policies []scriptpolicy.CommandAuditPolicy) {
+	version, err := subjectVersion(subject)
+	if err != nil {
+		return
+	}
 	dir := trustDir(cfg.Home(), contentHash)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return
 	}
-	payload, err := json.MarshalIndent(map[string]any{
-		"schema_version":  1,
+	record := map[string]any{
+		"schema_version":  verdictSchemaV1,
 		"content_sha256":  strings.ToLower(contentHash),
 		"skill":           subject.Name,
 		"commit":          subject.Commit,
@@ -477,7 +610,12 @@ func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject
 		"ruleset_version": RulesetVersion,
 		"findings":        findings,
 		"script_policies": policies,
-	}, "", "  ")
+	}
+	if version == hashing.VersionV2 {
+		record["schema_version"] = verdictSchemaV2
+		record["hash_version"] = int(version)
+	}
+	payload, err := json.MarshalIndent(record, "", "  ")
 	if err != nil {
 		return
 	}

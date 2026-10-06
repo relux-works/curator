@@ -49,6 +49,7 @@ import (
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -1698,7 +1699,16 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
 	if !canaryPasses() {
 		return nil, fmt.Errorf("audit blocked: audit canary failed: detectors are not producing expected findings")
 	}
-	contentHash, err := hashing.ContentSHA256(snapshot, nil)
+	// The audited identity follows the lock: the same version
+	// contextaudit.DetectAtVersion enforces above, so the NUL rule and
+	// the revocation/pin/cache identity agree on every member.
+	version := resolvedHashVersion(resolved)
+	// Spec §8 interim rule for v1 readers: refuse before hashing, so
+	// this revocation identity is never a v1 digest over NUL bytes.
+	if err := opaquescan.RefuseNULV1(snapshot, version); err != nil {
+		return nil, fmt.Errorf("audit blocked: %v", err)
+	}
+	contentHash, err := hashing.ContentSHA256WithVersion(snapshot, nil, version)
 	if err != nil {
 		return nil, fmt.Errorf("audit blocked: %v", err)
 	}
@@ -1728,6 +1738,7 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
 		Snapshot:      snapshot,
 		SchemaVersion: 3,
 		Capabilities:  capabilities.ImplicitNone(),
+		HashVersion:   version,
 	}
 	warnings, errs := audit.Gate(cfg, []audit.Subject{subject})
 	if len(errs) > 0 {

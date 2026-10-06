@@ -9,6 +9,7 @@ import (
 	"github.com/relux-works/curator/internal/contextaudit"
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/pathboundary"
 )
 
@@ -113,8 +114,12 @@ func TestInstallBlocksDeepNULFileInContextPathSnapshot(t *testing.T) {
 	}
 
 	_, _, _, err := Install(home, InstallOptions{Operand: source})
+	// The refusal fires at the store content hash, before any v1 identity
+	// is computed over these bytes (Spec §8 interim rule), so it carries
+	// the shared pre-hash opaque id rather than the detector class the
+	// later audit layers would have reported.
 	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) ||
-		!strings.Contains(err.Error(), contextaudit.ClassOpaqueFile) || !strings.Contains(err.Error(), "assets/deep/image.unsupported") {
+		!strings.Contains(err.Error(), opaquescan.FindingNUL) || !strings.Contains(err.Error(), "assets/deep/image.unsupported") {
 		t.Fatalf("Install error = %v, want a blocking opaque finding naming the deep file", err)
 	}
 	if _, err := readSource(home, "nul-context"); err == nil {
@@ -139,8 +144,13 @@ func TestUpdateBlocksDeepNULFileInNewContextMember(t *testing.T) {
 		Overlays:             map[string][]OverlaySpec{"acme": {{Source: overlay}}},
 	}
 	_, _, err := UpdateWithPolicy(home, "acme", policy)
-	if err == nil || !strings.Contains(err.Error(), DiagUpdateBlocked) ||
-		!strings.Contains(err.Error(), contextaudit.ClassOpaqueFile) || !strings.Contains(err.Error(), "docs/deep/opaque.unknown") {
+	// The store pre-hash guard refuses the overlay source at load, before
+	// any member audit exists — hence profile_source_invalid rather than
+	// the update-blocked member diagnostic — so the shared opaque id, not
+	// the detector class, names the deep file. The update is still
+	// refused and the old lock still stands, asserted below.
+	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) ||
+		!strings.Contains(err.Error(), opaquescan.FindingNUL) || !strings.Contains(err.Error(), "docs/deep/opaque.unknown") {
 		t.Fatalf("UpdateWithPolicy error = %v, want a blocking opaque finding naming the deep file", err)
 	}
 	_, afterHash, err := readLock(home, "acme")

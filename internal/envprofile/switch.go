@@ -51,6 +51,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -633,6 +634,16 @@ func loadMaterial(home string, manager *gitManager, lock *contextlock.Lock) (map
 			continue
 		}
 		entry := manager.entryPath(home, resolvedOf(member))
+		// Spec §8 interim rule for v1 readers: refuse before the
+		// lock-declared v1 materialized identities assembled from
+		// these bytes are computed or trusted downstream
+		// (surfaceHash, skill hashes, marker comparisons). The scan
+		// covers the full store entry — including files the module
+		// projection omits — for commit-pinned and state-pinned
+		// members alike.
+		if err := opaquescan.RefuseNULV1(entry, lock.ContentHashVersion()); err != nil {
+			return nil, fmt.Errorf("member %s: %v", member.Name, err)
+		}
 		root := packageRoot(entry, member.Directory)
 		manifest, err := contextpkg.LoadManifest(root)
 		if err != nil {

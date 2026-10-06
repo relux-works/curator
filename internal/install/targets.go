@@ -14,6 +14,7 @@ import (
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/locale"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/scriptpolicy"
 	"github.com/relux-works/curator/internal/scriptworker"
@@ -83,6 +84,11 @@ func stageNode(stageRoot string, install nodeInstall, clock Clock) (staging.Plan
 	if install.expected.Package != nil {
 		hashVersion = hashing.VersionV1
 	}
+	// Spec §8 interim rule for v1 readers: refuse before hashing a
+	// draft-lane v1 staged identity over NUL bytes.
+	if err := opaquescan.RefuseNULV1(staged, hashVersion); err != nil {
+		return staging.Plan{}, "", err
+	}
 	contentHash, err := hashing.ContentSHA256WithVersion(staged, nil, hashVersion)
 	if err != nil {
 		return staging.Plan{}, "", err
@@ -98,6 +104,30 @@ func stageNode(stageRoot string, install nodeInstall, clock Clock) (staging.Plan
 	}
 	plan.Replace(staging.ClassContext, install.kind+"/"+install.node.Name, live, staged)
 	return plan, "installed", nil
+}
+
+// refuseInstalledNULForStatus enforces the Spec §8 interim rule for v1
+// readers on the status surface: every installed tree backing a planned
+// node is refused before any currentness comparison when its recorded
+// identity is v1 and the tree contains NUL bytes. V2 trees hash NUL as
+// ordinary data and skip the scan. An absent, unreadable, or invalid
+// marker is not this gate's verdict — the drift classifiers report those
+// states — so only a present recorded marker is guarded.
+func refuseInstalledNULForStatus(nodes []*closure.Node, storeFor func(string) string) error {
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		installed := filepath.Join(storeFor(node.Name), node.Name)
+		recorded, _, err := marker.ReadState(installed)
+		if err != nil || recorded == nil {
+			continue
+		}
+		if err := opaquescan.RefuseNULV1(installed, recorded.ContentHashVersion()); err != nil {
+			return fmt.Errorf("installed skill %s: %w", node.Name, err)
+		}
+	}
+	return nil
 }
 
 // nodeSnapshots returns the resolved content snapshots of every closure

@@ -4,6 +4,41 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+### Changed
+
+- The opaque-NUL admission rule is scoped to v1 identities (curator-spec
+  §8 interim rule for v1 readers): NUL-bearing files block install, audit,
+  and status only when a v1 identity is computed or trusted (legacy
+  markers without `hash_version`, v1 readers, frozen v1 shapes including
+  the draft lane). Under v2, `0x00` is ordinary file data, so trees such
+  as vendored archives install and audit with a v2 identity. The v1
+  finding id, severity, and messages are unchanged, and blocked v1 NUL
+  results stay outside the verdict cache.
+- Operator action: bare content-hash `audit.revocations` entries minted
+  under v1 no longer match v2 identities, because matching them would
+  compute a v1 identity the v2 path must never touch. Re-issue such
+  revocations from the v2 digest; `source:` revocations are unaffected.
+  Operator pins are version-scoped as well: legacy unversioned pins keep
+  authorizing v1 reads only, and `audit --allow` now records the writer
+  framing (`hash_version: 2`), so v2 identities need a fresh pin after
+  the cutover instead of inheriting v1 trust.
+- The v1 NUL refusal now precedes any v1 identity computation: installed
+  currentness readers, status drift classifiers, the draft source audit,
+  the frozen package context hash, and the profile lock/store readers
+  scan for NUL bytes before hashing or comparing, so a NUL-bearing tree
+  — including a v1-collision twin of a recorded tree — can never read
+  as current or yield a v1 digest. The frozen v1 scan covers the full
+  skill snapshot, including declared runtime/build roots and
+  non-whitelisted paths the context projection omits. Read-only status
+  plans verify the installed trees they report on and refuse with the
+  opaque finding instead of reporting ready. Audit verdicts for v2
+  identities are stored in a versioned carrier (`hash_version: 2`);
+  legacy unversioned verdicts keep authorizing v1 reads only, and equal
+  digest text across framings never shares a verdict. Commit-pinned v1
+  profile contexts are refused the same way: the store pin check and the
+  profile materialization readers scan the full pinned snapshot for NUL
+  bytes before any v1 identity is recomputed or trusted.
+
 ## 0.15.0-rc.3 - 2026-10-04
 
 ### Added

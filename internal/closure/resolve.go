@@ -12,6 +12,7 @@ import (
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/snapshot"
 	"github.com/relux-works/curator/internal/sourcelock"
@@ -550,6 +551,15 @@ func recoverTransitiveIdentity(nodes []*Node, memberByName map[string]sourcelock
 func ContentHashFor(frozen string, spec *skillspec.Spec) (string, error) {
 	if spec == nil {
 		return "", fmt.Errorf("source_member_invalid: frozen package has no spec")
+	}
+	// Spec §8 interim rule for v1 readers: this frozen identity is v1,
+	// so refuse before filtering or hashing. V1 readers inspect every
+	// regular file in the snapshot — including declared runtime/build
+	// roots and non-whitelisted paths the projection below omits — so
+	// the full frozen tree is scanned, not the projection. No v1 digest
+	// is ever computed over NUL bytes.
+	if err := opaquescan.RefuseNULV1(frozen, hashing.VersionV1); err != nil {
+		return "", fmt.Errorf("source_member_invalid: frozen package context: %v", err)
 	}
 	includeScripts := len(spec.Commands) == 0
 	excludeRoots := whitelist.ContextExcludedRoots(spec.RuntimeRoots, spec.BuildRoots)

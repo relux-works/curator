@@ -36,6 +36,7 @@ import (
 
 	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
@@ -1088,6 +1089,9 @@ func CheckSourceAudit(cfg *config.Config, subject SourceSubject, persist bool, n
 		Name: subject.Name, Source: subject.Source, Git: subject.Git,
 		Commit: subject.Commit, Snapshot: subject.Snapshot,
 		SchemaVersion: subject.SchemaVersion, Capabilities: subject.Capabilities,
+		// The draft source-audit lane carries frozen v1 identities, so
+		// the opaque-NUL interim rule stays in force here.
+		HashVersion: hashing.VersionV1,
 	}, persist)
 	if err != nil {
 		return nil, fmt.Errorf("audit blocked: %s: %v", subject.Name, err)
@@ -1119,7 +1123,9 @@ func CheckSourceAudit(cfg *config.Config, subject SourceSubject, persist bool, n
 		Policy: policy, Evidence: storedEvidence, Decision: report.Decision,
 		Now: now, MaxAge: DefaultSourceAuditMaxAge,
 		Skill: subject.Name, Findings: report.Findings,
-		Pinned:  isPinned(cfg, report.ContentSHA256),
+		// The draft source-audit lane carries frozen v1 identities, so
+		// only v1 pins satisfy its require-pin check.
+		Pinned:  isPinned(cfg, report.ContentSHA256, hashing.VersionV1),
 		Revoked: report.Revoked, Revocation: report.Revocation,
 		ScriptLabels: subject.ScriptLabels, AssuranceLabels: subject.AssuranceLabels,
 	}
@@ -1141,7 +1147,7 @@ func establishSourceAudit(cfg *config.Config, subject SourceSubject, policy stri
 	if fail := enforceSourceDecision(subject.Name, report); fail != nil {
 		return nil, fail
 	}
-	pinned := isPinned(cfg, report.ContentSHA256)
+	pinned := isPinned(cfg, report.ContentSHA256, hashing.VersionV1)
 	evidence, err := MarshalEvidenceReport(EvidenceReport{
 		SchemaVersion: 1, Skill: subject.Name, Package: subject.Package,
 		ContentSHA256: subject.ContentSHA256, Findings: report.Findings,

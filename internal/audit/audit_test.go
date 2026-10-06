@@ -110,7 +110,7 @@ func TestOpaqueNULBlocksEvenWhenAV1TwinHasCachedAllow(t *testing.T) {
 	if warnings, errs := Gate(cfg, []Subject{clean}); len(errs) != 0 || len(warnings) != 0 {
 		t.Fatalf("NUL-free twin: warnings=%v errs=%v", warnings, errs)
 	}
-	if findings, hit := loadCachedFindings(cfg, leftHash); !hit || len(findings) != 0 {
+	if findings, hit := loadCachedFindings(cfg, leftHash, hashing.VersionV1); !hit || len(findings) != 0 {
 		t.Fatalf("clean twin cache = (%+v, hit=%v), want cached allow", findings, hit)
 	}
 
@@ -265,7 +265,7 @@ func TestGatePinPolicyFreshAndCached(t *testing.T) {
 							t.Fatalf("warm cache: %v", errs)
 						}
 					}
-					if _, hit := loadCachedFindings(cfg, contentHash); hit != cached {
+					if _, hit := loadCachedFindings(cfg, contentHash, hashing.VersionV1); hit != cached {
 						t.Fatalf("cache hit before gate = %v, want %v", hit, cached)
 					}
 					if tc.pinned {

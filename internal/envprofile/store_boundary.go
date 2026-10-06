@@ -16,6 +16,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/stateread"
@@ -203,8 +204,22 @@ func expectedStoreHash(home string, member contextlock.Member) (string, string, 
 }
 
 func storeEntryPinHashes(home string, member contextlock.Member, entry string, version hashing.Version) (actual, expected string, err error) {
+	// The expected pin lookup computes no v1 identity (a Git tree OID
+	// lookup for commit pins, a string format for state pins), so it
+	// stays first and a missing pinned-commit object keeps its
+	// repair-routing diagnosis.
 	expected, format, err := expectedStoreHash(home, member)
 	if err != nil {
+		return "", "", err
+	}
+	// Spec §8 interim rule for v1 readers: refuse before the recorded
+	// v1 state below is recomputed or trusted over NUL bytes. Commit
+	// pins verify through Git tree object IDs — a separate algorithm
+	// that itself computes no v1 identity — but the same snapshot
+	// feeds the lock-declared v1 materialized identities downstream
+	// (Resolve/loadMaterial/surfaceHash), so the full-snapshot scan
+	// runs for commit-pinned members too, before any trust.
+	if err := opaquescan.RefuseNULV1(entry, version); err != nil {
 		return "", "", err
 	}
 	if member.Commit != "" {

@@ -10,6 +10,12 @@ import (
 )
 
 func TestOpaqueNULIsBlockedAtProjectAndGlobalInstallWithAuditDisabled(t *testing.T) {
+	// The opaque-NUL interim rule (Spec §8) applies exactly to v1
+	// identities: pin the v1 writers so this matrix exercises the v1
+	// reader. The v2 production entry lives in nul_opaque_v2_test.go.
+	priorWriter := hashing.EnableV2Writers
+	hashing.EnableV2Writers = false
+	t.Cleanup(func() { hashing.EnableV2Writers = priorWriter })
 	type lane struct {
 		name    string
 		install func(*testing.T, *env) Result

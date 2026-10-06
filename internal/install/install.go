@@ -30,6 +30,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/mcp"
+	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/scopes"
@@ -569,13 +570,21 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	auditGate := opts.AuditGate
 	if auditGate == nil {
 		auditGate = func(nodes []*closure.Node) ([]string, []string) {
+			// The audit framing follows the identity this run will
+			// compute and trust downstream: frozen v1 on the draft
+			// lane (registry §13, marker Package), the writer
+			// version everywhere else.
+			auditVersion := hashing.WriteVersion()
+			if draftLock != nil {
+				auditVersion = hashing.VersionV1
+			}
 			subjects := make([]audit.Subject, 0, len(nodes))
 			for _, node := range nodes {
 				subjects = append(subjects, audit.Subject{
 					Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
 					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
-					Commands: node.Spec.Commands,
+					Commands: node.Spec.Commands, HashVersion: auditVersion,
 				})
 			}
 			var warnings, errs []string
@@ -720,6 +729,25 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	}
 	for _, build := range plan.builds {
 		observed.outcomes[build.skill+"."+build.command] = build.outcome
+	}
+
+	// A status plan reports on installed trees, so it verifies them: a
+	// recorded v1 identity over a NUL-bearing tree refuses here with the
+	// opaque finding instead of the plan silently reporting ready. This
+	// runs after build planning so the refusal still carries the complete
+	// per-command verdict a read-only reporting caller needs. Plain
+	// dry-run installs never consult installed state and keep that shape.
+	if opts.Operation == OperationStatus {
+		storeFor := func(name string) string {
+			if hybridNames[name] {
+				return hybridStore
+			}
+			return skillsDir
+		}
+		if err := refuseInstalledNULForStatus(nodes, storeFor); err != nil {
+			result.failf("%v", err)
+			return result, nil
+		}
 	}
 
 	// 18. Dry run stops before any file changes.
@@ -1529,6 +1557,13 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, 
 		hashVersion := hashing.WriteVersion()
 		if draft {
 			hashVersion = hashing.VersionV1
+		}
+		// Spec §8 interim rule for v1 readers: refuse before hashing a
+		// draft-lane v1 attestation identity over NUL bytes. The source
+		// audit above normally refuses first; this keeps the registry
+		// check compliant on its own.
+		if err := opaquescan.RefuseNULV1(node.Snapshot, hashVersion); err != nil {
+			return result, err
 		}
 		contentHash, err := hashing.ContentSHA256WithVersion(node.Snapshot, nil, hashVersion)
 		if err != nil {

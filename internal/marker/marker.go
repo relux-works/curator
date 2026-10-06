@@ -26,6 +26,7 @@ import (
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/identity"
+	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -1343,6 +1344,13 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 	recordedHashVersion := markerHashVersion(recorded)
 	if recordedHashVersion != markerHashVersion(expected) {
 		return false, nil
+	}
+	// Spec §8 interim rule for v1 readers: a recorded v1 identity is
+	// never recomputed or trusted over NUL bytes. Refuse before hashing
+	// so a NUL-bearing installed tree — including a v1-collision twin
+	// of the recorded tree — can never read as current.
+	if err := opaquescan.RefuseNULV1(installedDir, recordedHashVersion); err != nil {
+		return false, err
 	}
 	actual, err := hashing.ContentSHA256WithVersion(installedDir, nil, recordedHashVersion)
 	if err != nil {

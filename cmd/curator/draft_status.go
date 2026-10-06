@@ -25,6 +25,7 @@ import (
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/sourcelock"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -110,6 +111,12 @@ func classifyDraftMember(skillsDir string, member sourcelock.Member, lockSHA256 
 	if recorded == nil {
 		state, _ := markerRefusal(installed)
 		return state
+	}
+	// Spec §8 interim rule for v1 readers: refuse before recomputing
+	// a recorded v1 identity over NUL bytes. The opaque refusal itself
+	// surfaces through the install-status error in this same invocation.
+	if err := opaquescan.RefuseNULV1(installed, recorded.ContentHashVersion()); err != nil {
+		return stateUnresolvable
 	}
 	actualHash, err := hashing.ContentSHA256WithVersion(installed, nil, recorded.ContentHashVersion())
 	if err != nil {

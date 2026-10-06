@@ -694,7 +694,49 @@ func TestUpdateBlocksRevokedOverlayMember(t *testing.T) {
 		map[string]string{"a.md": "overlay\n"})
 	// A path member carries no network identity (its lock source is
 	// empty), so the revocation names the snapshot's content hash — the
-	// production mechanism for pinning local sources (§9.1).
+	// production mechanism for pinning local sources (§9.1). The strict
+	// member audit matches the framing the lock resolves (Spec §8), so
+	// the revocation is minted with the writer version in force.
+	contentHash, err := hashing.ContentSHA256WithVersion(overlay, nil, hashing.WriteVersion())
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy := Policy{
+		OverlaysAllowed:      true,
+		OverlayDefaultWeight: 1000,
+		Overlays:             map[string][]OverlaySpec{"acme": {{Source: overlay}}},
+		Revocations:          []string{contentHash},
+	}
+	_, _, err = UpdateWithPolicy(home, "acme", policy)
+	if err == nil || !strings.Contains(err.Error(), DiagUpdateBlocked) {
+		t.Fatalf("err = %v, want %s", err, DiagUpdateBlocked)
+	}
+	if !strings.Contains(err.Error(), "revoked") {
+		t.Fatalf("err = %v, want the revocation reason", err)
+	}
+	_, afterHash, err := readLock(home, "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterHash != oldHash {
+		t.Fatal("a blocked update moved the lock: the old lock must stand")
+	}
+}
+
+// TestUpdateBlocksV1RevokedOverlayMemberUnderV1Writers pins the v1 lane of
+// the versioned strict member audit: with v1 writers in force, a
+// revocation minted with the v1 framing still refuses the member. The v2
+// twin rows above mint with the writer version; bare-digest revocations
+// never match across framings, because matching would compute a v1
+// identity the v2 path must never touch (Spec §8).
+func TestUpdateBlocksV1RevokedOverlayMemberUnderV1Writers(t *testing.T) {
+	enableV1WritersForTest(t)
+	home, _, oldHash := installBlockingOverlayRoot(t)
+	overlay := filepath.Join(t.TempDir(), "overlay")
+	writeManifestPackage(t, overlay,
+		`{"schema_version": 1, "name": "personal", "version": "0.3.0",`+
+			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+		map[string]string{"a.md": "overlay\n"})
 	contentHash, err := hashing.ContentSHA256(overlay, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -735,8 +777,10 @@ func TestReinstallBlocksRevokedOverlayMember(t *testing.T) {
 		map[string]string{"a.md": "overlay\n"})
 	// A path member carries no network identity (its lock source is
 	// empty), so the revocation names the snapshot's content hash — the
-	// production mechanism for pinning local sources (§9.1).
-	contentHash, err := hashing.ContentSHA256(overlay, nil)
+	// production mechanism for pinning local sources (§9.1). The strict
+	// member audit matches the framing the lock resolves (Spec §8), so
+	// the revocation is minted with the writer version in force.
+	contentHash, err := hashing.ContentSHA256WithVersion(overlay, nil, hashing.WriteVersion())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	"github.com/relux-works/curator/internal/pathboundary"
 )
@@ -71,9 +72,40 @@ func (identity Identity) Equal(other Identity) bool {
 	return identity.HashVersion == other.HashVersion && Normalize(identity.SHA256) == Normalize(other.SHA256)
 }
 
+var (
+	observeV1Hashes atomic.Bool
+	v1HashCalls     atomic.Int64
+)
+
+// CountV1Hashes runs fn and reports how many v1 content-hash
+// computations it performed, over trees and in-memory file sets alike.
+// V2 computations are never counted, and failed version dispatches that
+// hash nothing are never counted either.
+//
+// It is a test seam for the Spec §8 no-v1-computation-over-NUL rule: a
+// guarded production entry driven over a NUL-bearing tree must report
+// zero, which a discarded hash-before-refuse mutant cannot satisfy.
+// Production code never calls it. It is not reentrant; tests must not
+// nest or overlap calls.
+func CountV1Hashes(fn func()) (calls int64) {
+	v1HashCalls.Store(0)
+	observeV1Hashes.Store(true)
+	defer func() { observeV1Hashes.Store(false) }()
+	fn()
+	calls = v1HashCalls.Load()
+	return calls
+}
+
+func noteV1Hash() {
+	if observeV1Hashes.Load() {
+		v1HashCalls.Add(1)
+	}
+}
+
 // ContentSHA256 hashes the tree rooted at root, excluding the given
 // root-relative POSIX paths (defaults to the install marker when nil).
 func ContentSHA256(root string, exclude map[string]bool) (string, error) {
+	noteV1Hash()
 	if exclude == nil {
 		exclude = map[string]bool{MarkerName: true}
 	}
@@ -153,6 +185,7 @@ func ContentSHA256Files(files map[string][]byte, version Version) (string, error
 	digest := sha256.New()
 	switch version {
 	case VersionV1:
+		noteV1Hash()
 		for index, path := range paths {
 			if index > 0 {
 				_, _ = digest.Write([]byte{0})

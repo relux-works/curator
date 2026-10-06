@@ -35,6 +35,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/protocoljson"
@@ -251,6 +252,11 @@ func skillsOf(home string, manager *gitManager, lock *contextlock.Lock) ([]skill
 		}
 		entry := manager.entryPath(home, resolvedOf(member))
 		root := packageRoot(entry, member.Directory)
+		// Spec §8 interim rule for v1 readers: refuse before
+		// recomputing a lock-declared v1 member identity over NUL bytes.
+		if err := opaquescan.RefuseNULV1(root, lock.ContentHashVersion()); err != nil {
+			return nil, fmt.Errorf("%s: member %s %v", DiagRepairFailed, member.Name, err)
+		}
 		hash, err := hashing.ContentSHA256WithVersion(root, map[string]bool{}, lock.ContentHashVersion())
 		if err != nil {
 			return nil, fmt.Errorf("%s: member %s %v", DiagRepairFailed, member.Name, err)
