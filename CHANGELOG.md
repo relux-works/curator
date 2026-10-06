@@ -4,8 +4,46 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+## v0.15.0-rc.4 — 2026-10-07
+
+### Added
+
+- The `go-v1` driver admits the Go 1.26 and 1.27 families with per-family
+  qualification (toolchain identity, driver tests, and a CI matrix job per
+  family). The 1.25 family is unchanged, and unknown future families are
+  still refused (curator#87).
+- Docs-only research records: CIP-0002 (project context in managed
+  launches), CIP-0003 (Claude managed-home credential modes), CIP-0004
+  (shell hook without sourced PATH append), CIP-0005 (audit backends and
+  CLI secret transport), and CIP-0006 (legacy provider settings and MCP
+  opt-outs), each with an evidence companion, plus a CSK gap-follow-ups
+  design note. All live under `.research/`; no product behavior changes.
+
 ### Changed
 
+- Content identities are now WRITTEN as v2: the `EnableV2Writers` cutover
+  is on, so new manager state carries `curator-content-v2` framing while
+  v1 stays readable (frozen marker schemas 1-4 and draft package markers
+  keep their frozen v1 meaning; core v5 markers are v2). Legacy profiles
+  migrate through an atomic v1→v2 identity transaction bound into the
+  `env migrate` plan/apply cycle (`migration-plan-v3`): lock, store, and
+  generated surfaces are rehashed together with rollback on failure,
+  plan-drift refusal (re-run `--plan`), and resume of an interrupted
+  commit on the next mutation; `resolve --repair` and profile `use` also
+  rehash legacy profiles on their normal paths. The rc.14
+  `byte-exact-snapshot` conformance gap is closed: the suite now expects
+  v2 writes.
+- Operator action for the cutover: run the normal `env migrate` plan/apply
+  (or `resolve --repair` / profile `use`) flow — the identity migration is
+  atomic within it, with no separate migration command. Bare content-hash
+  `audit.revocations` entries minted under v1 no longer match v2
+  identities, because matching them would compute a v1 identity the v2
+  path must never touch; re-issue such revocations from the v2 digest
+  (`source:` revocations are unaffected). Operator pins are
+  version-scoped as well: legacy unversioned pins keep authorizing v1
+  reads only, and `audit --allow` now records the writer framing
+  (`hash_version: 2`), so v2 identities need a fresh pin after the
+  cutover instead of inheriting v1 trust.
 - The opaque-NUL admission rule is scoped to v1 identities (curator-spec
   §8 interim rule for v1 readers): NUL-bearing files block install, audit,
   and status only when a v1 identity is computed or trusted (legacy
@@ -14,14 +52,6 @@ All notable implementation changes are recorded here.
   as vendored archives install and audit with a v2 identity. The v1
   finding id, severity, and messages are unchanged, and blocked v1 NUL
   results stay outside the verdict cache.
-- Operator action: bare content-hash `audit.revocations` entries minted
-  under v1 no longer match v2 identities, because matching them would
-  compute a v1 identity the v2 path must never touch. Re-issue such
-  revocations from the v2 digest; `source:` revocations are unaffected.
-  Operator pins are version-scoped as well: legacy unversioned pins keep
-  authorizing v1 reads only, and `audit --allow` now records the writer
-  framing (`hash_version: 2`), so v2 identities need a fresh pin after
-  the cutover instead of inheriting v1 trust.
 - The v1 NUL refusal now precedes any v1 identity computation: installed
   currentness readers, status drift classifiers, the draft source audit,
   the frozen package context hash, and the profile lock/store readers
@@ -38,6 +68,49 @@ All notable implementation changes are recorded here.
   profile contexts are refused the same way: the store pin check and the
   profile materialization readers scan the full pinned snapshot for NUL
   bytes before any v1 identity is recomputed or trusted.
+
+### Fixed
+
+- `env unmanage --restore-backups` no longer widens file modes (2026-10
+  inline audit N3): the restore plan carries each backup entry's type and
+  mode, and entries are written atomically with their original permissions
+  — a `0600` context file is no longer restored as `0644`. See
+  [issue #106](https://github.com/relux-works/curator/issues/106) and
+  [the audit report](docs/security-audit-2026-10-inline.md).
+- `env unmanage --restore-backups` restores a saved symlink entry as a
+  link, atomically and without following its target (2026-10 inline audit
+  N4, #106). Links in the parent route are still refused.
+
+### Security
+
+- Garbage collection no longer sweeps the runtime cache on an unprovable
+  live-reference set (2026-10 inline audit N1, #106): when a consumer
+  registry, skill scope, or marker leaves the reference set uncertain, the
+  runtime sweep is skipped — and the build-cache sweep with it — instead
+  of deleting entries a live process may still be running from.
+- Repository admission now budgets the expanded snapshot, not just unique
+  objects (2026-10 inline audit N2, #106): every emitted path is charged,
+  including aliases of the same blob or tree, under a new `MaxTreeEntries`
+  limit (400,000 default, independent of the 200,000-file default); file
+  content and canonical framing are reserved before copying, canonical
+  storage is allocated once at its reserved size, and both admission paths
+  refuse with `build_repository_incomplete_source` over budget. The limits
+  are documented in `docs/repository-admission-limits.md`.
+- In strict mode a trust pin no longer waives verifiable findings at or
+  above `fail_on` (2026-10 inline audit N5, #106): a pin only satisfies the
+  pre-capability `require_pin` rule, on both the cached and the fresh audit
+  path. Revocation still blocks first.
+
+### Known issues
+
+- Windows broker real-Git flake `TASK-260930-fp8vx7`: two historical failures
+  were not reproduced in approximately 21,000 hosted passes. No root cause is
+  established; rc.4 ships this as a documented risk.
+- The machine `security_posture` revision B (default-hardened) and Codex seed
+  revision B flips are NOT in rc.4; both are held for a later release.
+  Revision A behavior from rc.3 is unchanged.
+- The board-close gap on the Go qualification task is a tooling issue only
+  (spm#537); no product impact.
 
 ## 0.15.0-rc.3 - 2026-10-04
 
