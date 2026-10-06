@@ -1,0 +1,375 @@
+--- a/internal/hashing/hashing.go
++++ b/internal/hashing/hashing.go
+@@ -176,6 +176,8 @@
+ 
+ // ContentSHA256Files hashes an already materialized, path-keyed file set with
+ // the selected content framing. It is used for surfaces assembled in memory.
++var ReviewNULFileSetHashes int
++
+ func ContentSHA256Files(files map[string][]byte, version Version) (string, error) {
+ 	paths := make([]string, 0, len(files))
+ 	for path := range files {
+@@ -186,6 +188,7 @@
+ 	switch version {
+ 	case VersionV1:
+ 		noteV1Hash()
++		for _, payload := range files { if strings.IndexByte(string(payload), 0) >= 0 {ReviewNULFileSetHashes++; break} }
+ 		for index, path := range paths {
+ 			if index > 0 {
+ 				_, _ = digest.Write([]byte{0})
+--- /dev/null
++++ b/internal/audit/review_rev4_probe_test.go
+@@ -0,0 +1,178 @@
++package audit
++
++import (
++	"encoding/json"
++	"github.com/relux-works/curator/internal/capabilities"
++	"github.com/relux-works/curator/internal/closure"
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/manifest"
++	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/skillspec"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++func TestReviewFrozenV1RefusesExcludedNUL(t *testing.T) {
++	for _, shape := range []string{"runtime", "build", "unlisted"} {
++		t.Run(shape, func(t *testing.T) {
++			root := t.TempDir()
++			name := "assets/runtime/deep/a.bin"
++			if shape == "unlisted" {
++				name = "runtime/deep/a.bin"
++			}
++			writeFiles(t, root, map[string][]byte{"SKILL.md": []byte("# Test\n"), name: []byte("x\x00y")})
++			spec := &skillspec.Spec{}
++			if shape == "runtime" {
++				spec.RuntimeRoots = []string{"assets/runtime"}
++			}
++			if shape == "build" {
++				spec.BuildRoots = []string{"assets/runtime"}
++			}
++			var digest string
++			var err error
++			calls := hashing.CountV1Hashes(func() { digest, err = closure.ContentHashFor(root, spec) })
++			if calls != 0 {
++				t.Fatalf("frozen refusal computed %d v1 hashes", calls)
++			}
++			if err == nil || !strings.Contains(err.Error(), "audit.opaque.nul-byte") {
++				t.Fatalf("frozen v1 %s NUL = (%q,%v), want opaque refusal before projection/hash", shape, digest, err)
++			}
++		})
++	}
++}
++func TestReviewV2RejectsLegacyPin(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"assets/a.bin": []byte("x\x00y")})
++	digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	cfg := newCfg(t, "strict", "off")
++	// Synthetic equal-text identity pair: schema 1 has implicit v1.
++	if _, err := Pin(cfg.Home(), digest, "legacy v1 approval", "fixture"); err != nil {
++		t.Fatal(err)
++	}
++	_, errs := Gate(cfg, []Subject{{Name: "modern", Snapshot: root, HashVersion: hashing.VersionV2, SchemaVersion: 2, Capabilities: capabilities.ImplicitNone()}})
++	if len(errs) == 0 {
++		t.Fatal("v2 NUL subject authorized by an unversioned legacy v1 pin")
++	}
++	if !strings.Contains(strings.Join(errs, "\n"), "requires pin") {
++		t.Fatalf("errors %v, want version-specific require-pin", errs)
++	}
++}
++func TestReviewNewV2PinCarrierVersion(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"a.md": []byte("clean")})
++	digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	path, err := PinAtVersion(t.TempDir(), digest, hashing.VersionV2, "v2 approval", "fixture")
++	if err != nil {
++		t.Fatal(err)
++	}
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var record map[string]any
++	if err := json.Unmarshal(payload, &record); err != nil {
++		t.Fatal(err)
++	}
++	if record["hash_version"] != float64(2) {
++		t.Fatalf("new v2 pin hash_version=%v, want 2", record["hash_version"])
++	}
++}
++
++func TestReviewResolveDraftRefusesExcludedNUL(t *testing.T) {
++	project, home := t.TempDir(), t.TempDir()
++	skill := filepath.Join(project, "skills", "review")
++	writeFiles(t, skill, map[string][]byte{
++		"SKILL.md":                  []byte("---\nname: review\ndescription: Test review\n---\n# review\n"),
++		"agent-skill.json":          []byte(`{"schema_version":4,"capabilities":{},"commands":{},"dependencies":{"skills":{}},"runtime_roots":["assets/runtime"]}`),
++		"assets/runtime/deep/a.bin": []byte("x\x00y"),
++	})
++	payload := []byte(`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`)
++	m, err := manifest.ParseBytes(payload, filepath.Join(project, "Skillfile.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	result, err := closure.ResolveDraft(closure.DraftResolveConfig{ProjectRoot: project, Home: home, Manifest: m, ManifestPayload: payload})
++	if err == nil {
++		t.Fatalf("ResolveDraft accepted NUL-bearing frozen v1 skill: %+v", result.Lock)
++	}
++	if !strings.Contains(err.Error(), "audit.opaque.nul-byte") {
++		t.Fatalf("ResolveDraft refusal %v, want opaque finding", err)
++	}
++}
++func TestReviewLegacyMarkerCollisionAndDowngrade(t *testing.T) {
++	prior := hashing.EnableV2Writers
++	defer func() { hashing.EnableV2Writers = prior }()
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"assets/a.bin": []byte("x"), "docs/b.md": []byte("y")})
++	digest, err := hashing.ContentSHA256(root, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	m := &marker.Marker{Name: "review", Source: "review", RefKind: "tag", Ref: "v1", Commit: strings.Repeat("1", 40), ContentSHA256: digest, InstalledAt: "2026-10-06T00:00:00Z", SkillSchemaVersion: 3}
++	hashing.EnableV2Writers = false
++	if err := marker.Write(root, m); err != nil {
++		t.Fatal(err)
++	}
++	if m.HashVersion != 0 {
++		t.Fatal("legacy marker unexpectedly versioned")
++	}
++	if current, err := marker.Current(root, m); err != nil || !current {
++		t.Fatalf("clean control %v %v", current, err)
++	}
++	writeFiles(t, root, map[string][]byte{"assets/a.bin": []byte("x\x00docs/b.md\x00y")})
++	if err := os.Remove(filepath.Join(root, "docs", "b.md")); err != nil {
++		t.Fatal(err)
++	}
++	if current, err := marker.Current(root, m); current || err == nil || !strings.Contains(err.Error(), "audit.opaque.nul-byte") {
++		t.Fatalf("legacy collision current=%v err=%v", current, err)
++	}
++	hashing.EnableV2Writers = true
++	if err := marker.Write(root, m); err != nil {
++		t.Fatal(err)
++	}
++	if current, err := marker.Current(root, m); err != nil || !current {
++		t.Fatalf("v2 NUL control %v %v", current, err)
++	}
++	path := filepath.Join(root, marker.Name)
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var raw map[string]any
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	raw["hash_version"] = 1
++	payload, err = json.Marshal(raw)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, payload, 0644); err != nil {
++		t.Fatal(err)
++	}
++	if _, _, err := marker.ReadState(root); err == nil {
++		t.Fatal("v2-to-v1 downgrade admitted")
++	}
++}
++
++func TestReviewSourceAuditNeverHashesNULV1(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"assets/a.bin": []byte("x\x00y")})
++	cfg := newCfg(t, "advisory", "off")
++	calls := hashing.CountV1Hashes(func() {
++		if _, err := CheckSourceAudit(cfg, sourceTestSubject(root, 3), true, sourceAuditTestNow); err == nil || !strings.Contains(err.Error(), "audit.opaque.nul-byte") {
++			t.Fatalf("source audit refusal=%v", err)
++		}
++	})
++	if calls != 0 {
++		t.Fatalf("production source audit computed %d v1 identities over NUL before refusing", calls)
++	}
++}
+--- /dev/null
++++ b/internal/audit/review_profile_surface_test.go
+@@ -0,0 +1,172 @@
++package audit_test
++
++import (
++	"encoding/json"
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextmaterialize"
++	"github.com/relux-works/curator/internal/contextpkg"
++	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envprofile"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/privatedir"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++)
++
++// Real Git only, with an empty init template: no executable hook fixtures.
++func TestReviewV1CommitContextResolveRefusesNUL(t *testing.T) {
++	for _, shape := range []string{"module", "excluded", "clean", "v2-module", "v2-excluded"} {
++		t.Run(shape, func(t *testing.T) {
++			home := t.TempDir()
++			profile := "review"
++			source := "example.test/review"
++			repo := filepath.Join(home, "profile-repos", "example.test_review")
++			if err := os.MkdirAll(repo, 0700); err != nil {
++				t.Fatal(err)
++			}
++			git := func(args ...string) string {
++				c := exec.Command("git", args...)
++				c.Dir = repo
++				c.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+filepath.Join(home, "absent-config"), "GIT_AUTHOR_NAME=fixture", "GIT_AUTHOR_EMAIL=fixture@example.invalid", "GIT_COMMITTER_NAME=fixture", "GIT_COMMITTER_EMAIL=fixture@example.invalid")
++				out, err := c.CombinedOutput()
++				if err != nil {
++					t.Fatalf("git %v: %v %s", args, err, out)
++				}
++				return strings.TrimSpace(string(out))
++			}
++			git("init", "--quiet", "--template="+t.TempDir())
++			files := map[string]string{"agent-context.json": `{"schema_version":1,"name":"review","version":"1.0.0","context":{"modules":[{"path":"a.md"}]}}`, "context/a.md": "clean\n"}
++			if strings.HasSuffix(shape, "module") {
++				files["context/a.md"] = "x\x00y\n"
++			} else if strings.HasSuffix(shape, "excluded") {
++				files["assets/deep/a.bin"] = "x\x00y"
++			}
++			for rel, body := range files {
++				p := filepath.Join(repo, rel)
++				if err := os.MkdirAll(filepath.Dir(p), 0700); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(p, []byte(body), 0600); err != nil {
++					t.Fatal(err)
++				}
++			}
++			git("add", "--all")
++			git("commit", "--quiet", "-m", "fixture")
++			commit := git("rev-parse", "HEAD")
++			if _, err := contextstore.EnsureGit(home, "context", profile, repo, commit); err != nil {
++				t.Fatal(err)
++			}
++			lock := &contextlock.Lock{SchemaVersion: 1, Root: profile, Members: []contextlock.Member{{Kind: "context", Name: profile, Source: source, Version: "1.0.0", Commit: commit, Weight: 100}}}
++			version := hashing.VersionV1
++			if strings.HasPrefix(shape, "v2-") {
++				lock.SchemaVersion = 2
++				lock.HashVersion = 2
++				version = hashing.VersionV2
++			}
++			canonical, err := lock.Canonical()
++			if err != nil {
++				t.Fatal(err)
++			}
++			pd := envprofile.ProfileDir(home, profile)
++			if err := privatedir.MakeAll(pd); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(filepath.Join(pd, "lock.json"), canonical, 0600); err != nil {
++				t.Fatal(err)
++			}
++			raw, err := json.Marshal(envprofile.Source{Kind: envprofile.KindGit, Git: source, Req: envprofile.Requirement{Tag: "v1.0.0"}})
++			if err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(filepath.Join(pd, "source.json"), raw, 0600); err != nil {
++				t.Fatal(err)
++			}
++			pass := []envmarker.Passthrough{}
++			seeds := []string{}
++			mark := &envmarker.Marker{Version: 1, Profile: envmarker.Profile{Name: profile, Root: profile, Kind: "git", Source: source, Requirement: &envmarker.Requirement{Tag: "v1.0.0"}, LockSHA256: hashing.Normalize(contextlock.HashBytes(canonical))}, Members: []envmarker.Member{{Name: profile, Version: "1.0.0", Commit: commit, Weight: 100}}, Precedence: envmarker.Precedence{Winner: "higher-weight", Placement: "winner-last"}, Mode: envmarker.ModeManagedHome, Surfaces: map[string]envmarker.Surface{}, Passthrough: &pass, Seeds: &seeds}
++			if version == hashing.VersionV2 {
++				mark.Version = 3
++				mark.HashVersion = 2
++			}
++			entry := contextstore.EntryDir(home, "context", profile, commit)
++			manifest, err := contextpkg.LoadManifest(entry)
++			if err != nil {
++				t.Fatal(err)
++			}
++			pkg := contextmaterialize.Package{HasContext: manifest.HasContext}
++			for _, module := range manifest.Modules {
++				body, err := os.ReadFile(filepath.Join(entry, "context", module.Path))
++				if err != nil {
++					t.Fatal(err)
++				}
++				pkg.Modules = append(pkg.Modules, contextmaterialize.Module{Module: module, Bytes: body})
++			}
++			doc, written, err := contextmaterialize.Monolithic(lock, contextlock.HashBytes(canonical), contextmaterialize.Precedence{Winner: "higher-weight", Placement: "winner-last"}, "claude_code", map[string]contextmaterialize.Package{profile: pkg})
++			if err != nil || !written {
++				t.Fatalf("assemble fixture document: %v written=%v", err, written)
++			}
++			adapter, err := envregistry.ByID("claude_code")
++			if err != nil {
++				t.Fatal(err)
++			}
++			if version == hashing.VersionV2 && runtime.GOOS == "darwin" {
++				pass = []envmarker.Passthrough{{Isolation: envregistry.IsolationIsolated, Strategy: envregistry.StrategyPerHomeKeychain, SourceRole: "managed", Backend: "keychain", BackendVersion: adapter.VerifiedRelease, Provenance: "provisioned"}}
++			}
++			rootHash, err := contextmaterialize.SurfaceHashWithVersion(map[string][]byte{adapter.RootTarget: doc}, version)
++			if err != nil {
++				t.Fatal(err)
++			}
++			skillsHash, err := contextmaterialize.SurfaceHashWithVersion(map[string][]byte{}, version)
++			if err != nil {
++				t.Fatal(err)
++			}
++			copies := []envmarker.Copy{{Path: adapter.RootTarget, Reason: envmarker.ReasonClaudeCodeRootContext}}
++			emptyCopies := []envmarker.Copy{}
++			mark.Surfaces[envmarker.SurfaceRootContext] = envmarker.Surface{Paths: []string{adapter.RootTarget}, Form: "monolithic", ContentSHA256: rootHash, Copies: &copies}
++			mark.Surfaces[envmarker.SurfaceSkills] = envmarker.Surface{Paths: []string{}, ContentSHA256: skillsHash, Copies: &emptyCopies}
++			markerBytes, err := mark.Marshal()
++			if err != nil {
++				t.Fatal(err)
++			}
++			managed := envprofile.ManagedHomeDir(home, profile, "claude_code")
++			if err := privatedir.MakeAll(managed); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(filepath.Join(managed, envmarker.Name), markerBytes, 0600); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(filepath.Join(managed, adapter.RootTarget), doc, 0600); err != nil {
++				t.Fatal(err)
++			}
++			native := t.TempDir()
++			var resolveErr error
++			var result *envprofile.ResolveResult
++			hashing.ReviewNULFileSetHashes = 0
++			calls := hashing.CountV1Hashes(func() {
++				result, resolveErr = envprofile.Resolve(envprofile.ResolveRequest{Home: home, Profile: profile, EnvID: "claude_code", Machine: envregistry.DefaultMachineConfig(), LaunchDir: t.TempDir(), OperatorXDG: t.TempDir(), Detect: func(envregistry.Adapter) string { return "unknown" }, NativeHomeOf: func(string) (string, error) { return native, nil }})
++			})
++			t.Logf("shape=%s v1_hash_calls=%d v1_nul_fileset_hashes=%d fragment=%v resolve_error=%v", shape, calls, hashing.ReviewNULFileSetHashes, result != nil && len(result.Document) > 0, resolveErr)
++			if version == hashing.VersionV2 || shape == "clean" {
++				if resolveErr != nil || result == nil || len(result.Document) == 0 {
++					t.Fatalf("matching-version clean/v2 control refused: %v", resolveErr)
++				}
++				if version == hashing.VersionV2 && calls != 0 {
++					t.Errorf("v2 control computed %d v1 hashes", calls)
++				}
++				return
++			}
++			if calls != 0 {
++				t.Errorf("v1 context reader computed %d v1 identities before refusal", calls)
++			}
++			if resolveErr == nil || !strings.Contains(resolveErr.Error(), "audit.opaque.nul-byte") {
++				t.Errorf("v1 context reader did not report opaque refusal: %v", resolveErr)
++			}
++		})
++	}
++}

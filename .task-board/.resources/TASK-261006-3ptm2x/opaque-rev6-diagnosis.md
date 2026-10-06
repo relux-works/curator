@@ -1,0 +1,5 @@
+# Orchestrator diagnosis of the Linux-only failures (rev5 and rev6 gates, identical)
+Root cause, in the TEST fixture: `commitResolveRequest(t, …)` in `internal/envprofile/nul_opaque_v1_commit_test.go` (~line 66) creates a NEW `native := t.TempDir()` on every call, and returns `NativeHomeOf: func(string)(string,error){ return native, nil }`.
+- The tests call it twice: provision with `Repair=true`, then a bare re-resolve. On Linux, the claude_code `.credentials.json` passthrough is a file-link into the native home. Provisioning links it into native #1, and the bare re-check expects native #2. The result is `passthrough entry .credentials.json is detached`.
+- On macOS the credential lives in the Keychain, so there is no file link and the test passes there. That is why only ubuntu fails.
+FIX: create the native home (and OperatorXDG/LaunchDir, if they are compared) ONCE per test or subtest, and pass the same values to both Resolve calls. One option is a helper that returns a request factory bound to fixed temp dirs. Product code needs no change for this failure.

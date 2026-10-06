@@ -1,0 +1,41 @@
+{
+  "task_id": "TASK-261006-3ptm2x",
+  "revision": 3,
+  "verdict": "changes_requested",
+  "candidate_tree": "48cba51636dbd1adf22cdefb91ef2277f594f9db",
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "P2",
+      "class": "v1-opaque-snapshot-scope",
+      "mechanism": "Frozen v1 reader scans only the context projection after excluded NUL files have been omitted",
+      "repeat_of": null,
+      "evidence": "TestReviewResolveDraftRefusesExcludedNUL and TestReviewFrozenV1RefusesExcludedNUL fail on the candidate",
+      "location": "internal/closure/resolve.go:569",
+      "required_regression": "ResolveDraft and refresh refuse NUL under declared runtime/build roots and non-whitelisted roots before any frozen v1 identity is produced; clean control remains allowed",
+      "narrowing_mutant": "Scan only the context projection instead of the full frozen skill snapshot"
+    },
+    {
+      "id": "F2",
+      "severity": "P2",
+      "class": "unversioned-content-trust",
+      "mechanism": "Schema-1 trust pin stores or authorizes v2 digest text with no framing version comparison",
+      "repeat_of": "revision-1/finding-3",
+      "evidence": "TestReviewV2RejectsLegacyPin and TestReviewNewV2PinCarrierVersion fail on the candidate",
+      "location": "internal/audit/audit.go:432",
+      "required_regression": "CLI audit --allow produces an explicit v2 carrier; legacy v1 pins authorize only v1; synthetic equal digest text across versions never shares approval",
+      "narrowing_mutant": "Ignore pin hash_version when deciding a v2 subject"
+    },
+    {
+      "id": "F3",
+      "severity": "P2",
+      "class": "unobserved-prehash-refusal",
+      "mechanism": "Maintained tests observe empty returned digest or missing cache, so an unused v1 NUL hash before refusal is invisible",
+      "repeat_of": null,
+      "evidence": "M-order-existing-tests passes all three maintained tests; TestReviewSourceAuditNeverHashesNULV1 passes on candidate and fails mutant with one v1 NUL hash observed",
+      "location": "internal/audit/opaque_v1_rework_test.go:43",
+      "required_regression": "Observe v1 hash invocation at CheckSourceAudit and the other guarded production entries, separately from their returned digest and cache effects",
+      "narrowing_mutant": "Perform and discard ContentSHA256WithVersion(snapshot,nil,VersionV1) inside the NUL refusal branch before returning the unchanged refusal"
+    }
+  ]
+}

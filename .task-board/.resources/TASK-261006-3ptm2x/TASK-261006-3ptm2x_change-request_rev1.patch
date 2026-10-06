@@ -1,0 +1,1065 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 1c98b28f..bcf963c6 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,22 @@ All notable implementation changes are recorded here.
+ 
+ ## Unreleased
+ 
++### Changed
++
++- The opaque-NUL admission rule is scoped to v1 identities (curator-spec
++  §8 interim rule for v1 readers): NUL-bearing files block install, audit,
++  and status only when a v1 identity is computed or trusted (legacy
++  markers without `hash_version`, v1 readers, frozen v1 shapes including
++  the draft lane). Under v2, `0x00` is ordinary file data, so trees such
++  as vendored archives install and audit with a v2 identity. The v1
++  finding id, severity, and messages are unchanged, and blocked v1 NUL
++  results stay outside the verdict cache.
++- Operator action: bare content-hash `audit.revocations` entries minted
++  under v1 no longer match v2 identities, because matching them would
++  compute a v1 identity the v2 path must never touch. Re-issue such
++  revocations from the v2 digest; `source:` revocations are unaffected,
++  and operator pins re-prompt automatically through the require-pin flow.
++
+ ## 0.15.0-rc.3 - 2026-10-04
+ 
+ ### Added
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index caef93b3..0425f631 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -1957,6 +1957,9 @@ func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDep
+ 			Git: subject.Declared.Identity, Commit: subject.Effective.Commit,
+ 			Snapshot: subject.SnapshotRoot, SchemaVersion: 7,
+ 			Capabilities: capabilities.ImplicitNone(),
++			// Live repository admission audits the writer-version
++			// identity; only frozen v1 carriers keep the NUL rule.
++			HashVersion: hashing.WriteVersion(),
+ 		}
+ 		var auditWarnings, auditErrs []string
+ 		if dryRun {
+@@ -2260,6 +2263,9 @@ func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string,
+ 			Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+ 			SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
+ 			Commands: node.Spec.Commands,
++			// The audit CLI reports what an install would trust:
++			// the writer-version identity.
++			HashVersion: hashing.WriteVersion(),
+ 		})
+ 	}
+ 	warnings, errs := audit.Gate(cfg, subjects)
+diff --git a/cmd/curator/nul_opaque_test.go b/cmd/curator/nul_opaque_test.go
+index ba4ea0ad..538d30d9 100644
+--- a/cmd/curator/nul_opaque_test.go
++++ b/cmd/curator/nul_opaque_test.go
+@@ -9,9 +9,20 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/buildrepo"
+ 	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/hashing"
+ )
+ 
+-func TestProductionExternalAuditBlocksOpaqueNULWhenAuditIsDisabled(t *testing.T) {
++func pinAuditHashWriters(t *testing.T, v2 bool) {
++	t.Helper()
++	priorWriter := hashing.EnableV2Writers
++	hashing.EnableV2Writers = v2
++	t.Cleanup(func() { hashing.EnableV2Writers = priorWriter })
++}
++
++// The opaque-NUL interim rule (Spec §8) follows the audited identity: the
++// external-repository lane blocks a NUL-bearing snapshot under v1 and
++// admits it under v2, where NUL bytes are ordinary data.
++func TestProductionExternalAuditOpaqueNULFollowsHashVersion(t *testing.T) {
+ 	root := t.TempDir()
+ 	const rel = "assets/deep/opaque.unsupported"
+ 	path := filepath.Join(root, filepath.FromSlash(rel))
+@@ -25,47 +36,84 @@ func TestProductionExternalAuditBlocksOpaqueNULWhenAuditIsDisabled(t *testing.T)
+ 	if cfg.Audit.Enabled {
+ 		t.Fatal("test requires the default disabled audit configuration")
+ 	}
++	subject := buildrepo.AuditSubject{
++		Declared:     buildrepo.DeclaredState{Repository: "tools", Identity: "example.test/tools"},
++		Effective:    buildrepo.EffectiveState{Commit: strings.Repeat("1", 40)},
++		SnapshotRoot: root,
++	}
+ 
+-	for _, dryRun := range []bool{false, true} {
+-		t.Run(map[bool]string{false: "install", true: "dry-run"}[dryRun], func(t *testing.T) {
+-			deps := productionExternalDeps(cfg, dryRun)
+-			_, err := deps.AuditWarnings(context.Background(), buildrepo.AuditSubject{
+-				Declared:     buildrepo.DeclaredState{Repository: "tools", Identity: "example.test/tools"},
+-				Effective:    buildrepo.EffectiveState{Commit: strings.Repeat("1", 40)},
+-				SnapshotRoot: root,
++	t.Run("v1-blocks", func(t *testing.T) {
++		pinAuditHashWriters(t, false)
++		for _, dryRun := range []bool{false, true} {
++			t.Run(map[bool]string{false: "install", true: "dry-run"}[dryRun], func(t *testing.T) {
++				deps := productionExternalDeps(cfg, dryRun)
++				_, err := deps.AuditWarnings(context.Background(), subject)
++				if err == nil || !strings.Contains(err.Error(), "audit.opaque.nul-byte") || !strings.Contains(err.Error(), rel) {
++					t.Fatalf("production external audit error = %v, want blocking opaque finding naming %s", err, rel)
++				}
+ 			})
+-			if err == nil || !strings.Contains(err.Error(), "audit.opaque.nul-byte") || !strings.Contains(err.Error(), rel) {
+-				t.Fatalf("production external audit error = %v, want blocking opaque finding naming %s", err, rel)
+-			}
+-		})
+-	}
++		}
++	})
++
++	t.Run("v2-admits", func(t *testing.T) {
++		pinAuditHashWriters(t, true)
++		for _, dryRun := range []bool{false, true} {
++			t.Run(map[bool]string{false: "install", true: "dry-run"}[dryRun], func(t *testing.T) {
++				deps := productionExternalDeps(cfg, dryRun)
++				warnings, err := deps.AuditWarnings(context.Background(), subject)
++				if err != nil || len(warnings) != 0 {
++					t.Fatalf("v2 production external audit warnings=%v err=%v, want silent admission", warnings, err)
++				}
++			})
++		}
++	})
+ }
+ 
+-func TestCLIAuditBlocksOpaqueNULWhenAuditIsDisabled(t *testing.T) {
+-	configPath := auditLabelProject(t, 7, false, nil)
+-	cfg, err := config.Load(configPath, nil)
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	if cfg.Audit.Enabled {
+-		t.Fatal("test requires the default disabled audit configuration")
++// `curator audit` reports what an install would trust: the blocking opaque
++// finding under v1, a passing audit under v2.
++func TestCLIAuditOpaqueNULFollowsHashVersion(t *testing.T) {
++	build := func(t *testing.T) string {
++		t.Helper()
++		configPath := auditLabelProject(t, 7, false, nil)
++		cfg, err := config.Load(configPath, nil)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if cfg.Audit.Enabled {
++			t.Fatal("test requires the default disabled audit configuration")
++		}
++		repo := filepath.Join(cfg.SkillsRoot, "label-skill")
++		const rel = "docs/deep/opaque.unknown"
++		path := filepath.Join(repo, filepath.FromSlash(rel))
++		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(path, []byte("prefix\x00suffix"), 0o644); err != nil {
++			t.Fatal(err)
++		}
++		runGit(t, repo, "add", ".")
++		runGit(t, repo, "commit", "-qm", "add opaque audit file")
++		runGit(t, repo, "tag", "-f", "v1")
++		return configPath
+ 	}
+-	repo := filepath.Join(cfg.SkillsRoot, "label-skill")
+-	const rel = "docs/deep/opaque.unknown"
+-	path := filepath.Join(repo, filepath.FromSlash(rel))
+-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+-		t.Fatal(err)
+-	}
+-	if err := os.WriteFile(path, []byte("prefix\x00suffix"), 0o644); err != nil {
+-		t.Fatal(err)
+-	}
+-	runGit(t, repo, "add", ".")
+-	runGit(t, repo, "commit", "-qm", "add opaque audit file")
+-	runGit(t, repo, "tag", "-f", "v1")
+ 
+-	code, stdout, stderr := capture(t, configPath, "audit", "app")
+-	combined := stdout + "\n" + stderr
+-	if code == exitOK || !strings.Contains(combined, "audit.opaque.nul-byte") || !strings.Contains(combined, rel) {
+-		t.Fatalf("curator audit = %d\nstdout:\n%s\nstderr:\n%s; want blocking opaque finding naming %s", code, stdout, stderr, rel)
+-	}
++	t.Run("v1-blocks", func(t *testing.T) {
++		pinAuditHashWriters(t, false)
++		configPath := build(t)
++		code, stdout, stderr := capture(t, configPath, "audit", "app")
++		combined := stdout + "\n" + stderr
++		if code == exitOK || !strings.Contains(combined, "audit.opaque.nul-byte") || !strings.Contains(combined, "docs/deep/opaque.unknown") {
++			t.Fatalf("curator audit = %d\nstdout:\n%s\nstderr:\n%s; want blocking opaque finding naming %s", code, stdout, stderr, "docs/deep/opaque.unknown")
++		}
++	})
++
++	t.Run("v2-admits", func(t *testing.T) {
++		pinAuditHashWriters(t, true)
++		configPath := build(t)
++		code, stdout, stderr := capture(t, configPath, "audit", "app")
++		combined := stdout + "\n" + stderr
++		if code != exitOK || strings.Contains(combined, "audit.opaque.nul-byte") {
++			t.Fatalf("v2 curator audit = %d\nstdout:\n%s\nstderr:\n%s; want a passing audit", code, stdout, stderr)
++		}
++	})
+ }
+diff --git a/internal/audit/audit.go b/internal/audit/audit.go
+index 49e62130..77d7f60f 100644
+--- a/internal/audit/audit.go
++++ b/internal/audit/audit.go
+@@ -68,12 +68,31 @@ type Subject struct {
+ 	Snapshot      string
+ 	SchemaVersion int
+ 	Capabilities  capabilities.Manifest
++	// HashVersion is the content-hash framing the caller will compute
++	// or trust for this subject (Spec §8). The opaque-NUL interim rule
++	// applies exactly when it is v1: v2 hashes 0x00 as ordinary data.
++	// Zero means v1, like every other carrier reader's missing version.
++	HashVersion hashing.Version
+ 	// Commands carries the skill's parsed commands for the script audit
+ 	// warning classes (manager profile §7). A nil map labels nothing,
+ 	// so callers without a parsed manifest keep the previous output.
+ 	Commands map[string]skillspec.Command
+ }
+ 
++// subjectVersion resolves the framing in force for one subject. A missing
++// version reads as v1 (fail-closed, matching the carrier readers); any
++// other unknown version refuses instead of guessing a rule.
++func subjectVersion(subject Subject) (hashing.Version, error) {
++	switch subject.HashVersion {
++	case 0, hashing.VersionV1:
++		return hashing.VersionV1, nil
++	case hashing.VersionV2:
++		return hashing.VersionV2, nil
++	default:
++		return 0, fmt.Errorf("unsupported content hash version %d", subject.HashVersion)
++	}
++}
++
+ // Report is the audit outcome for one subject.
+ type Report struct {
+ 	Skill         string
+@@ -149,9 +168,10 @@ func Decide(findings []Finding, mode, failOn string) string {
+ }
+ 
+ // Gate audits every subject and returns warnings and blocking errors per the
+-// gate behavior of Spec §12.2. Opaque NUL files block even when optional audit
+-// is disabled, because the v1 content hash cannot distinguish their tree from
+-// a colliding twin.
++// gate behavior of Spec §12.2. For v1 subjects, opaque NUL files block even
++// when optional audit is disabled, because the v1 content hash cannot
++// distinguish their tree from a colliding twin. V2 subjects hash NUL bytes
++// as ordinary data (Spec §8) and skip the opaque rule entirely.
+ func Gate(cfg *config.Config, subjects []Subject) (warnings []string, errs []string) {
+ 	return gate(cfg, subjects, true)
+ }
+@@ -163,12 +183,23 @@ func GateReadOnly(cfg *config.Config, subjects []Subject) (warnings []string, er
+ }
+ 
+ func gate(cfg *config.Config, subjects []Subject, persist bool) (warnings []string, errs []string) {
+-	// NUL-bearing files are opaque under the current v1 content framing, so
+-	// this refusal is independent of the opt-in audit policy. Scan every
+-	// admitted snapshot before the audit-enabled early return.
++	// NUL-bearing files are opaque under the v1 content framing only
++	// (Spec §8 interim rule for v1 readers), so this refusal is
++	// independent of the opt-in audit policy. Scan every v1 snapshot
++	// before the audit-enabled early return; v2 snapshots hash NUL
++	// bytes as ordinary data and skip the scan entirely.
+ 	opaquePaths := make([][]string, len(subjects))
+ 	skipAudit := make([]bool, len(subjects))
+ 	for index, subject := range subjects {
++		version, err := subjectVersion(subject)
++		if err != nil {
++			skipAudit[index] = true
++			errs = append(errs, fmt.Sprintf("audit blocked: %s: %v", subject.Name, err))
++			continue
++		}
++		if version != hashing.VersionV1 {
++			continue
++		}
+ 		paths, err := opaquescan.NULPaths(subject.Snapshot)
+ 		if err != nil {
+ 			skipAudit[index] = true
+@@ -270,15 +301,31 @@ func scriptAuditWarnings(subject Subject) []string {
+ 
+ // auditSubject runs the pipeline of Spec §12.1 for one subject.
+ func auditSubject(cfg *config.Config, subject Subject, persist bool) (Report, error) {
+-	opaquePaths, err := opaquescan.NULPaths(subject.Snapshot)
++	version, err := subjectVersion(subject)
+ 	if err != nil {
+-		return Report{}, fmt.Errorf("opaque snapshot scan: %w", err)
++		return Report{}, err
++	}
++	var opaquePaths []string
++	if version == hashing.VersionV1 {
++		opaquePaths, err = opaquescan.NULPaths(subject.Snapshot)
++		if err != nil {
++			return Report{}, fmt.Errorf("opaque snapshot scan: %w", err)
++		}
+ 	}
+ 	return auditSubjectWithOpaquePaths(cfg, subject, persist, opaquePaths)
+ }
+ 
+ func auditSubjectWithOpaquePaths(cfg *config.Config, subject Subject, persist bool, opaquePaths []string) (Report, error) {
+-	contentHash, err := hashing.ContentSHA256(subject.Snapshot, nil)
++	version, err := subjectVersion(subject)
++	if err != nil {
++		return Report{}, err
++	}
++	// The version rule is enforced here, not by caller convention: a v2
++	// subject never blocks on NUL paths, however they arrived.
++	if version != hashing.VersionV1 {
++		opaquePaths = nil
++	}
++	contentHash, err := hashing.ContentSHA256WithVersion(subject.Snapshot, nil, version)
+ 	if err != nil {
+ 		return Report{}, err
+ 	}
+diff --git a/internal/audit/opaque_v1_test.go b/internal/audit/opaque_v1_test.go
+new file mode 100644
+index 00000000..c178fb23
+--- /dev/null
++++ b/internal/audit/opaque_v1_test.go
+@@ -0,0 +1,234 @@
++// Tests for the Spec §8 version rule of the opaque-NUL gate: the interim
++// NUL block applies exactly when a v1 identity is computed or trusted,
++// and never for a v2 computation or verification.
++package audit
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/capabilities"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++// writeNULCollisionPair builds the v1 framing collision: a NUL-bearing
++// single-record tree and a NUL-free twin with the same v1 digest but
++// different v2 digests.
++func writeNULCollisionPair(t *testing.T, nulTree, cleanTwin string) (v1, v2NUL, v2Twin string) {
++	t.Helper()
++	writeFiles(t, nulTree, map[string][]byte{
++		"assets/a.bin": []byte("x\x00docs/b.md\x00y"),
++	})
++	writeFiles(t, cleanTwin, map[string][]byte{
++		"assets/a.bin": []byte("x"),
++		"docs/b.md":    []byte("y"),
++	})
++	leftHash, err := hashing.ContentSHA256(nulTree, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	rightHash, err := hashing.ContentSHA256(cleanTwin, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if leftHash != rightHash {
++		t.Fatalf("v1 framing did not collide: %s != %s", leftHash, rightHash)
++	}
++	v2Left, err := hashing.ContentSHA256WithVersion(nulTree, nil, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	v2Right, err := hashing.ContentSHA256WithVersion(cleanTwin, nil, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if v2Left == v2Right {
++		t.Fatalf("v2 framing must distinguish the NUL tree from its twin: %s", v2Left)
++	}
++	return leftHash, v2Left, v2Right
++}
++
++// A v2 subject skips the opaque rule entirely, even when optional audit is
++// disabled: NUL bytes are ordinary v2 data, so there is nothing to refuse
++// and no scan failure to report.
++func TestGateV2AdmitsNULBearingTreeWhenAuditIsDisabled(t *testing.T) {
++	snapshot := t.TempDir()
++	writeFiles(t, snapshot, map[string][]byte{
++		"docs/deep/opaque.unsupported": []byte("prefix\x00suffix"),
++	})
++	cfg := &config.Config{Path: filepath.Join(t.TempDir(), "config.json")}
++	if cfg.Audit.Enabled {
++		t.Fatal("test requires the default disabled audit configuration")
++	}
++
++	for _, entry := range []struct {
++		name string
++		gate func(*config.Config, []Subject) ([]string, []string)
++	}{
++		{"Gate", Gate},
++		{"GateReadOnly", GateReadOnly},
++	} {
++		t.Run(entry.name, func(t *testing.T) {
++			warnings, errs := entry.gate(cfg, []Subject{{
++				Name: "opaque-skill", Snapshot: snapshot, SchemaVersion: 3,
++				Capabilities: capabilities.ImplicitNone(), HashVersion: hashing.VersionV2,
++			}})
++			if warnings != nil || errs != nil {
++				t.Fatalf("v2 gate over NUL tree = warnings %v, errors %v; want silent admission", warnings, errs)
++			}
++		})
++	}
++}
++
++// A v2 audit of the NUL tree reports the v2 identity, never consults the
++// v1 digest, and stores nothing under it: there is no path where a v1
++// identity is computed or trusted over NUL bytes.
++func TestGateV2ReportsV2IdentityAndStoresNothingUnderV1(t *testing.T) {
++	nulTree, cleanTwin := t.TempDir(), t.TempDir()
++	v1Hash, v2NUL, v2Twin := writeNULCollisionPair(t, nulTree, cleanTwin)
++	cfg := newCfg(t, "advisory", "off")
++
++	clean := Subject{Name: "clean-twin", Snapshot: cleanTwin, SchemaVersion: 3,
++		Capabilities: capabilities.ImplicitNone(), HashVersion: hashing.VersionV2}
++	if warnings, errs := Gate(cfg, []Subject{clean}); len(errs) != 0 || len(warnings) != 0 {
++		t.Fatalf("NUL-free v2 twin: warnings=%v errs=%v", warnings, errs)
++	}
++	if findings, hit := loadCachedFindings(cfg, v2Twin); !hit || len(findings) != 0 {
++		t.Fatalf("clean twin v2 cache = (%+v, hit=%v), want cached allow", findings, hit)
++	}
++
++	opaque := Subject{Name: "nul-tree", Snapshot: nulTree, SchemaVersion: 3,
++		Capabilities: capabilities.ImplicitNone(), HashVersion: hashing.VersionV2}
++	// The read-only audit runs before the persisting gate so the
++	// freshness assertion below is meaningful.
++	report, err := auditSubject(cfg, opaque, false)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if report.Decision != DecisionAllow || report.CacheHit || report.ContentSHA256 != v2NUL {
++		t.Fatalf("v2 opaque report %+v, want a fresh allow carrying the v2 identity %s", report, v2NUL)
++	}
++	if warnings, errs := Gate(cfg, []Subject{opaque}); len(errs) != 0 || len(warnings) != 0 {
++		t.Fatalf("NUL-bearing v2 tree: warnings=%v errs=%v, want admission", warnings, errs)
++	}
++	// The v1 digest of the NUL tree keys no trust state: no verdict was
++	// stored under it, so a v1 reader can never inherit this admission.
++	if _, err := os.Stat(filepath.Join(cfg.Home(), "audit", hashing.Normalize(v1Hash))); !os.IsNotExist(err) {
++		t.Fatalf("v2 audit left trust state under the v1 digest: %v", err)
++	}
++	if _, hit := loadCachedFindings(cfg, v1Hash); hit {
++		t.Fatal("v2 audit cached a verdict under the v1 digest")
++	}
++}
++
++// Every v1 identity path keeps the blocking opaque finding with the
++// unchanged id, severity, evidence, and message: explicit v1 subjects and
++// legacy subjects with no recorded version alike.
++func TestGateV1KeepsOpaqueBlockWithUnchangedFinding(t *testing.T) {
++	nulTree := t.TempDir()
++	writeFiles(t, nulTree, map[string][]byte{
++		"assets/a.bin": []byte("x\x00docs/b.md\x00y"),
++	})
++	v1Hash, err := hashing.ContentSHA256(nulTree, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++
++	for _, version := range []hashing.Version{0, hashing.VersionV1} {
++		t.Run(map[hashing.Version]string{0: "legacy-zero", hashing.VersionV1: "explicit-v1"}[version], func(t *testing.T) {
++			subject := Subject{Name: "nul-tree", Snapshot: nulTree, SchemaVersion: 3,
++				Capabilities: capabilities.ImplicitNone(), HashVersion: version}
++
++			disabled := &config.Config{Path: filepath.Join(t.TempDir(), "config.json")}
++			_, errs := Gate(disabled, []Subject{subject})
++			want := "audit blocked: nul-tree: critical audit.opaque.nul-byte - " +
++				"regular file contains a NUL byte and is treated as opaque (file: assets/a.bin)"
++			if len(errs) != 1 || errs[0] != want {
++				t.Fatalf("disabled-audit v1 gate errors = %v, want exactly %q", errs, want)
++			}
++
++			cfg := newCfg(t, "advisory", "off")
++			if _, errs := Gate(cfg, []Subject{subject}); len(errs) != 1 || !strings.Contains(errs[0], findingOpaqueNUL) {
++				t.Fatalf("enabled-audit v1 gate errors = %v, want the blocking opaque finding", errs)
++			}
++			report, err := auditSubject(cfg, subject, true)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if report.Decision != DecisionBlock || report.CacheHit || len(report.Findings) != 1 {
++				t.Fatalf("v1 opaque report %+v, want an uncached block with one finding", report)
++			}
++			finding := report.Findings[0]
++			if finding.ID != findingOpaqueNUL || finding.Severity != SeverityCritical ||
++				finding.File != "assets/a.bin" ||
++				finding.Evidence != "regular file contains a NUL byte and is treated as opaque" ||
++				!finding.Verifiable {
++				t.Fatalf("v1 opaque finding %+v, want the unchanged critical file-naming finding", finding)
++			}
++			// The blocked v1 result stays outside the verdict cache.
++			if _, hit := loadCachedFindings(cfg, v1Hash); hit {
++				t.Fatal("blocked v1 NUL result was stored in the verdict cache")
++			}
++		})
++	}
++}
++
++// An unknown framing version refuses instead of guessing a rule: it must
++// neither scan-and-block as v1 nor admit as v2, on clean trees either.
++func TestGateRejectsUnknownHashVersion(t *testing.T) {
++	nulTree := t.TempDir()
++	writeFiles(t, nulTree, map[string][]byte{
++		"assets/a.bin": []byte("x\x00y"),
++	})
++	cleanTree := t.TempDir()
++	writeFiles(t, cleanTree, map[string][]byte{
++		"assets/a.bin": []byte("x"),
++	})
++	cfg := newCfg(t, "advisory", "off")
++
++	for _, root := range []string{nulTree, cleanTree} {
++		subject := Subject{Name: "skill-a", Snapshot: root, SchemaVersion: 3,
++			Capabilities: capabilities.ImplicitNone(), HashVersion: hashing.Version(3)}
++		if _, errs := Gate(cfg, []Subject{subject}); len(errs) != 1 ||
++			!strings.Contains(errs[0], "unsupported content hash version 3") {
++			t.Fatalf("unknown-version gate over %s = %v, want an unsupported-version refusal", root, errs)
++		}
++		if _, errs := GateReadOnly(cfg, []Subject{subject}); len(errs) != 1 ||
++			!strings.Contains(errs[0], "unsupported content hash version 3") {
++			t.Fatalf("unknown-version read-only gate over %s = %v, want an unsupported-version refusal", root, errs)
++		}
++		if _, err := auditSubject(cfg, subject, false); err == nil ||
++			!strings.Contains(err.Error(), "unsupported content hash version 3") {
++			t.Fatalf("unknown-version auditSubject over %s = %v, want an unsupported-version error", root, err)
++		}
++	}
++}
++
++// The v2 rule is enforced at the decision point, not by caller convention:
++// even handed NUL paths, a v2 subject never blocks on them.
++func TestAuditSubjectWithOpaquePathsIgnoresNULPathsForV2(t *testing.T) {
++	snapshot := t.TempDir()
++	writeFiles(t, snapshot, map[string][]byte{
++		"assets/a.bin": []byte("prefix\x00suffix"),
++	})
++	cfg := newCfg(t, "advisory", "off")
++	subject := Subject{Name: "nul-tree", Snapshot: snapshot, SchemaVersion: 3,
++		Capabilities: capabilities.ImplicitNone(), HashVersion: hashing.VersionV2}
++	report, err := auditSubjectWithOpaquePaths(cfg, subject, false, []string{"assets/a.bin"})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if report.Decision != DecisionAllow || len(report.Findings) != 0 {
++		t.Fatalf("v2 report with handed NUL paths %+v, want an allow with no findings", report)
++	}
++	wantV2, err := hashing.ContentSHA256WithVersion(snapshot, nil, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if report.ContentSHA256 != wantV2 {
++		t.Fatalf("v2 report identity = %s, want %s", report.ContentSHA256, wantV2)
++	}
++}
+diff --git a/internal/audit/sourceaudit.go b/internal/audit/sourceaudit.go
+index b3a1aa81..a647e4d6 100644
+--- a/internal/audit/sourceaudit.go
++++ b/internal/audit/sourceaudit.go
+@@ -36,6 +36,7 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/capabilities"
+ 	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+ )
+ 
+@@ -1088,6 +1089,9 @@ func CheckSourceAudit(cfg *config.Config, subject SourceSubject, persist bool, n
+ 		Name: subject.Name, Source: subject.Source, Git: subject.Git,
+ 		Commit: subject.Commit, Snapshot: subject.Snapshot,
+ 		SchemaVersion: subject.SchemaVersion, Capabilities: subject.Capabilities,
++		// The draft source-audit lane carries frozen v1 identities, so
++		// the opaque-NUL interim rule stays in force here.
++		HashVersion: hashing.VersionV1,
+ 	}, persist)
+ 	if err != nil {
+ 		return nil, fmt.Errorf("audit blocked: %s: %v", subject.Name, err)
+diff --git a/internal/envprofile/envprofile.go b/internal/envprofile/envprofile.go
+index 0a027512..b9d3626b 100644
+--- a/internal/envprofile/envprofile.go
++++ b/internal/envprofile/envprofile.go
+@@ -1698,7 +1698,11 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
+ 	if !canaryPasses() {
+ 		return nil, fmt.Errorf("audit blocked: audit canary failed: detectors are not producing expected findings")
+ 	}
+-	contentHash, err := hashing.ContentSHA256(snapshot, nil)
++	// The audited identity follows the lock: the same version
++	// contextaudit.DetectAtVersion enforces above, so the NUL rule and
++	// the revocation/pin/cache identity agree on every member.
++	version := resolvedHashVersion(resolved)
++	contentHash, err := hashing.ContentSHA256WithVersion(snapshot, nil, version)
+ 	if err != nil {
+ 		return nil, fmt.Errorf("audit blocked: %v", err)
+ 	}
+@@ -1728,6 +1732,7 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
+ 		Snapshot:      snapshot,
+ 		SchemaVersion: 3,
+ 		Capabilities:  capabilities.ImplicitNone(),
++		HashVersion:   version,
+ 	}
+ 	warnings, errs := audit.Gate(cfg, []audit.Subject{subject})
+ 	if len(errs) > 0 {
+diff --git a/internal/envprofile/nul_opaque_v2_test.go b/internal/envprofile/nul_opaque_v2_test.go
+new file mode 100644
+index 00000000..d64aa18a
+--- /dev/null
++++ b/internal/envprofile/nul_opaque_v2_test.go
+@@ -0,0 +1,112 @@
++package envprofile
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/pathboundary"
++)
++
++// TestInstallAdmitsV1CollidingSkillTreesUnderV2 drives Install through
++// contextresolve.Resolve -> auditAndStore -> auditMember with the v1
++// framing collision pair. Under v2 the NUL bytes are ordinary data
++// (Spec §8): both members install under a v2 lock. Git skill members are
++// commit-pinned, so the twin-distinguishing proof for the shared audit
++// gate lives in the audit and install packages; here the v1 collision
++// preamble ties the admitted fixtures to the pair the v1 lane refuses.
++// The v1 refusal of the same pair lives in nul_opaque_test.go.
++func TestInstallAdmitsV1CollidingSkillTreesUnderV2(t *testing.T) {
++	enableV2WritersForTest(t)
++	pinHomes(t)
++	ids := newGitIdentities(t)
++	single := map[string]string{
++		"assets/a.bin": "x\x00docs/b.md\x00y\x00z",
++	}
++	split := map[string]string{
++		"assets/a.bin": "x",
++		"docs/b.md":    "y\x00z",
++	}
++	left, right := t.TempDir(), t.TempDir()
++	writeV1Files(t, left, single)
++	writeV1Files(t, right, split)
++	leftHash, err := hashing.ContentSHA256(left, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	rightHash, err := hashing.ContentSHA256(right, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if leftHash != rightHash {
++		t.Fatalf("v1 framing did not collide: %s != %s", leftHash, rightHash)
++	}
++
++	home := t.TempDir()
++	skillARepo := gitRepo(t, single, "v1.0.0")
++	skillAOperand := ids.serve(skillARepo, "https://example.com/v2-single-skill")
++	skillBRepo := gitRepo(t, split, "v1.0.0")
++	skillBOperand := ids.serve(skillBRepo, "https://example.com/v2-split-skill")
++	rootRepo := gitRepo(t, twinDependencyRootFiles(skillAOperand, skillBOperand), "v1.0.0")
++	rootOperand := ids.serve(rootRepo, "https://example.com/v2-twin-root")
++
++	info, _, _, err := Install(home, InstallOptions{Operand: rootOperand})
++	if err != nil {
++		t.Fatalf("v2 Install of NUL-bearing twins: %v", err)
++	}
++	if info.Lock.ContentHashVersion() != hashing.VersionV2 {
++		t.Fatalf("lock content hash version = %d, want v2", info.Lock.ContentHashVersion())
++	}
++	if memberA, ok := lockMember(info.Lock, "ska"); !ok || memberA.Kind != contextlock.KindSkill {
++		t.Fatalf("installed lock lacks skill member ska: %+v", info.Lock.Members)
++	}
++	if memberB, ok := lockMember(info.Lock, "skb"); !ok || memberB.Kind != contextlock.KindSkill {
++		t.Fatalf("installed lock lacks skill member skb: %+v", info.Lock.Members)
++	}
++}
++
++// TestInstallAdmitsDeepNULFileInContextPathSnapshotUnderV2 mirrors the v1
++// refusal of a deep NUL file with the v2 admission: the context member
++// installs and publishes its profile source.
++func TestInstallAdmitsDeepNULFileInContextPathSnapshotUnderV2(t *testing.T) {
++	enableV2WritersForTest(t)
++	home := t.TempDir()
++	pinHomes(t)
++	source := t.TempDir()
++	writeGitFile(t, source, "agent-context.json", `{"schema_version": 1, "name": "nul-context", "version": "1.0.0",`+
++		`"context": {"modules": [{"path": "a.md"}]}}`+"\n")
++	writeGitFile(t, source, "context/a.md", "clean\n")
++	deep := filepath.Join(source, "assets", "deep", "image.unsupported")
++	if err := os.MkdirAll(filepath.Dir(deep), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(deep, []byte{1, 0, 2}, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := pathboundary.ProtectTree(source); err != nil {
++		t.Fatal(err)
++	}
++
++	info, _, _, err := Install(home, InstallOptions{Operand: source})
++	if err != nil {
++		t.Fatalf("v2 Install of deep-NUL context: %v", err)
++	}
++	if info.Lock.ContentHashVersion() != hashing.VersionV2 {
++		t.Fatalf("lock content hash version = %d, want v2", info.Lock.ContentHashVersion())
++	}
++	if _, err := readSource(home, "nul-context"); err != nil {
++		t.Fatalf("admitted context install published no profile source: %v", err)
++	}
++}
++
++func twinDependencyRootFiles(skillAOperand, skillBOperand string) map[string]string {
++	return map[string]string{
++		"agent-context.json": `{"schema_version": 1, "name": "twin-root", "version": "1.0.0",` +
++			`"context": {"modules": [{"path": "a.md"}]},` +
++			`"requires": {"skills": {"ska": {"git": "` + skillAOperand + `", "range": "*"},` +
++			`"skb": {"git": "` + skillBOperand + `", "range": "*"}}}}` + "\n",
++		"context/a.md": "clean\n",
++	}
++}
+diff --git a/internal/envprofile/pathkind_test.go b/internal/envprofile/pathkind_test.go
+index 7d4b41ea..9bad7fc8 100644
+--- a/internal/envprofile/pathkind_test.go
++++ b/internal/envprofile/pathkind_test.go
+@@ -694,7 +694,49 @@ func TestUpdateBlocksRevokedOverlayMember(t *testing.T) {
+ 		map[string]string{"a.md": "overlay\n"})
+ 	// A path member carries no network identity (its lock source is
+ 	// empty), so the revocation names the snapshot's content hash — the
+-	// production mechanism for pinning local sources (§9.1).
++	// production mechanism for pinning local sources (§9.1). The strict
++	// member audit matches the framing the lock resolves (Spec §8), so
++	// the revocation is minted with the writer version in force.
++	contentHash, err := hashing.ContentSHA256WithVersion(overlay, nil, hashing.WriteVersion())
++	if err != nil {
++		t.Fatal(err)
++	}
++	policy := Policy{
++		OverlaysAllowed:      true,
++		OverlayDefaultWeight: 1000,
++		Overlays:             map[string][]OverlaySpec{"acme": {{Source: overlay}}},
++		Revocations:          []string{contentHash},
++	}
++	_, _, err = UpdateWithPolicy(home, "acme", policy)
++	if err == nil || !strings.Contains(err.Error(), DiagUpdateBlocked) {
++		t.Fatalf("err = %v, want %s", err, DiagUpdateBlocked)
++	}
++	if !strings.Contains(err.Error(), "revoked") {
++		t.Fatalf("err = %v, want the revocation reason", err)
++	}
++	_, afterHash, err := readLock(home, "acme")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if afterHash != oldHash {
++		t.Fatal("a blocked update moved the lock: the old lock must stand")
++	}
++}
++
++// TestUpdateBlocksV1RevokedOverlayMemberUnderV1Writers pins the v1 lane of
++// the versioned strict member audit: with v1 writers in force, a
++// revocation minted with the v1 framing still refuses the member. The v2
++// twin rows above mint with the writer version; bare-digest revocations
++// never match across framings, because matching would compute a v1
++// identity the v2 path must never touch (Spec §8).
++func TestUpdateBlocksV1RevokedOverlayMemberUnderV1Writers(t *testing.T) {
++	enableV1WritersForTest(t)
++	home, _, oldHash := installBlockingOverlayRoot(t)
++	overlay := filepath.Join(t.TempDir(), "overlay")
++	writeManifestPackage(t, overlay,
++		`{"schema_version": 1, "name": "personal", "version": "0.3.0",`+
++			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
++		map[string]string{"a.md": "overlay\n"})
+ 	contentHash, err := hashing.ContentSHA256(overlay, nil)
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -735,8 +777,10 @@ func TestReinstallBlocksRevokedOverlayMember(t *testing.T) {
+ 		map[string]string{"a.md": "overlay\n"})
+ 	// A path member carries no network identity (its lock source is
+ 	// empty), so the revocation names the snapshot's content hash — the
+-	// production mechanism for pinning local sources (§9.1).
+-	contentHash, err := hashing.ContentSHA256(overlay, nil)
++	// production mechanism for pinning local sources (§9.1). The strict
++	// member audit matches the framing the lock resolves (Spec §8), so
++	// the revocation is minted with the writer version in force.
++	contentHash, err := hashing.ContentSHA256WithVersion(overlay, nil, hashing.WriteVersion())
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/internal/install/global.go b/internal/install/global.go
+index 8be36ae2..429ba147 100644
+--- a/internal/install/global.go
++++ b/internal/install/global.go
+@@ -15,6 +15,7 @@ import (
+ 	"github.com/relux-works/curator/internal/envfiles"
+ 	"github.com/relux-works/curator/internal/globalbins"
+ 	"github.com/relux-works/curator/internal/godriver"
++	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/marker"
+ 	"github.com/relux-works/curator/internal/mcp"
+@@ -191,6 +192,9 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
+ 					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+ 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
+ 					Commands: node.Spec.Commands,
++					// The global scope has no draft lane: the
++					// audited identity is the writer version.
++					HashVersion: hashing.WriteVersion(),
+ 				})
+ 			}
+ 			var warnings, errs []string
+diff --git a/internal/install/install.go b/internal/install/install.go
+index 60f3520f..12f78a88 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -569,13 +569,21 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 	auditGate := opts.AuditGate
+ 	if auditGate == nil {
+ 		auditGate = func(nodes []*closure.Node) ([]string, []string) {
++			// The audit framing follows the identity this run will
++			// compute and trust downstream: frozen v1 on the draft
++			// lane (registry §13, marker Package), the writer
++			// version everywhere else.
++			auditVersion := hashing.WriteVersion()
++			if draftLock != nil {
++				auditVersion = hashing.VersionV1
++			}
+ 			subjects := make([]audit.Subject, 0, len(nodes))
+ 			for _, node := range nodes {
+ 				subjects = append(subjects, audit.Subject{
+ 					Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
+ 					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+ 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
+-					Commands: node.Spec.Commands,
++					Commands: node.Spec.Commands, HashVersion: auditVersion,
+ 				})
+ 			}
+ 			var warnings, errs []string
+diff --git a/internal/install/nul_opaque_test.go b/internal/install/nul_opaque_test.go
+index c9778956..23c4b423 100644
+--- a/internal/install/nul_opaque_test.go
++++ b/internal/install/nul_opaque_test.go
+@@ -10,6 +10,12 @@ import (
+ )
+ 
+ func TestOpaqueNULIsBlockedAtProjectAndGlobalInstallWithAuditDisabled(t *testing.T) {
++	// The opaque-NUL interim rule (Spec §8) applies exactly to v1
++	// identities: pin the v1 writers so this matrix exercises the v1
++	// reader. The v2 production entry lives in nul_opaque_v2_test.go.
++	priorWriter := hashing.EnableV2Writers
++	hashing.EnableV2Writers = false
++	t.Cleanup(func() { hashing.EnableV2Writers = priorWriter })
+ 	type lane struct {
+ 		name    string
+ 		install func(*testing.T, *env) Result
+diff --git a/internal/install/nul_opaque_v2_test.go b/internal/install/nul_opaque_v2_test.go
+new file mode 100644
+index 00000000..db362e87
+--- /dev/null
++++ b/internal/install/nul_opaque_v2_test.go
+@@ -0,0 +1,209 @@
++package install
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/hashing"
++	markerpkg "github.com/relux-works/curator/internal/marker"
++)
++
++// NUL fixture bytes shared with nul_opaque_test.go: the single-record tree
++// collides under v1 with the split-records twin. The collision itself is
++// asserted there and in the audit package; these tests prove the v2
++// production entry distinguishes the twins and never computes v1 over them.
++var (
++	nulSingleRecordFiles = map[string]string{
++		"assets/a.bin": "x\x00docs/b.md\x00y\x00z",
++	}
++	nulSplitRecordsFiles = map[string]string{
++		"assets/a.bin": "x",
++		"docs/b.md":    "y\x00z",
++	}
++	nulDeepFile = map[string]string{
++		"docs/deep/opaque.unsupported": "prefix\x00suffix",
++	}
++)
++
++func pinV2Writers(t *testing.T) {
++	t.Helper()
++	priorWriter := hashing.EnableV2Writers
++	hashing.EnableV2Writers = true
++	t.Cleanup(func() { hashing.EnableV2Writers = priorWriter })
++}
++
++// A NUL-bearing skill installs, audits, and reports current under v2 with
++// a v2 identity on both the project and global lanes: NUL bytes are
++// ordinary v2 data (Spec §8), so the interim v1 rule stays silent.
++func TestV2InstallAdmitsNULBearingSkillAtProjectAndGlobal(t *testing.T) {
++	pinV2Writers(t)
++	type lane struct {
++		name    string
++		install func(*testing.T, *env) Result
++		target  func(*env) string
++	}
++	lanes := []lane{
++		{
++			name: "project",
++			install: func(_ *testing.T, e *env) Result {
++				e.declare("skill-a")
++				return e.install(Options{})
++			},
++			target: func(e *env) string { return filepath.Join(e.project, ".agents", "skills", "skill-a") },
++		},
++		{
++			name: "global",
++			install: func(t *testing.T, e *env) Result {
++				t.Helper()
++				if _, err := GlobalInit(e.home); err != nil {
++					t.Fatal(err)
++				}
++				if err := manifestAddGlobal(e, "skill-a"); err != nil {
++					t.Fatal(err)
++				}
++				return Global(e.cfg, t.TempDir(), Options{Platform: installPlatform()})
++			},
++			target: func(e *env) string { return filepath.Join(GlobalRoot(e.home), "skills", "skill-a") },
++		},
++	}
++
++	for _, installLane := range lanes {
++		t.Run(installLane.name, func(t *testing.T) {
++			e := newEnv(t)
++			e.skill("skill-a")
++			addSkillFilesAndRetag(t, e, "skill-a", nulSingleRecordFiles)
++			addSkillFilesAndRetag(t, e, "skill-a", nulDeepFile)
++			if e.cfg.Audit.Enabled {
++				t.Fatal("test requires the default disabled audit configuration")
++			}
++
++			result := installLane.install(t, e)
++			if result.Status != "ok" {
++				t.Fatalf("v2 NUL install status %q: %s", result.Status,
++					strings.Join(append(result.Errors, result.Messages...), "\n"))
++			}
++			installed := installLane.target(e)
++			recorded := markerpkg.Read(installed)
++			if recorded == nil {
++				t.Fatalf("no marker recorded at %s", installed)
++			}
++			if recorded.SchemaVersion != markerpkg.SchemaV5 || recorded.HashVersion != hashing.VersionV2 {
++				t.Fatalf("marker versions = schema:%d hash:%d, want schema:%d hash:2",
++					recorded.SchemaVersion, recorded.HashVersion, markerpkg.SchemaV5)
++			}
++			wantV2, err := hashing.ContentSHA256WithVersion(installed, nil, hashing.VersionV2)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if recorded.ContentSHA256 != wantV2 {
++				t.Fatalf("installed identity = %s, want the v2 recomputation %s", recorded.ContentSHA256, wantV2)
++			}
++			// No v1 identity was computed or trusted for this tree: the
++			// v1 digest keys no audit trust state.
++			v1Installed, err := hashing.ContentSHA256(installed, nil)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if _, err := os.Stat(filepath.Join(e.home, "audit", hashing.Normalize(v1Installed))); !os.IsNotExist(err) {
++				t.Fatalf("v2 install left trust state under the v1 digest: %v", err)
++			}
++
++			again := installLane.install(t, e)
++			if again.Status != "ok" {
++				t.Fatalf("v2 NUL reinstall status %q: %+v", again.Status, again)
++			}
++			if !strings.Contains(strings.Join(again.Messages, "\n"), "up-to-date") {
++				t.Fatalf("v2 NUL reinstall did not report up-to-date installations: %q", again.Messages)
++			}
++		})
++	}
++}
++
++// The v1-colliding twins install under v2 with distinct v2 identities: the
++// install never confuses the NUL tree with its clean twin.
++func TestV2InstallDistinguishesNULCollisionTwins(t *testing.T) {
++	pinV2Writers(t)
++	first, second := t.TempDir(), t.TempDir()
++	writeNULTree(t, first, nulSingleRecordFiles)
++	writeNULTree(t, second, nulSplitRecordsFiles)
++	firstHash, err := hashing.ContentSHA256(first, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	secondHash, err := hashing.ContentSHA256(second, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if firstHash != secondHash {
++		t.Fatalf("v1 framing did not collide: %s != %s", firstHash, secondHash)
++	}
++
++	e := newEnv(t)
++	e.skill("skill-a")
++	addSkillFilesAndRetag(t, e, "skill-a", nulSingleRecordFiles)
++	e.skill("skill-b")
++	addSkillFilesAndRetag(t, e, "skill-b", nulSplitRecordsFiles)
++	e.declare("skill-a", "skill-b")
++
++	result := e.install(Options{})
++	if result.Status != "ok" {
++		t.Fatalf("v2 twin install status %q: %+v", result.Status, result)
++	}
++	markerA := markerpkg.Read(filepath.Join(e.project, ".agents", "skills", "skill-a"))
++	markerB := markerpkg.Read(filepath.Join(e.project, ".agents", "skills", "skill-b"))
++	if markerA == nil || markerB == nil {
++		t.Fatalf("missing markers: skill-a=%+v skill-b=%+v", markerA, markerB)
++	}
++	if markerA.HashVersion != hashing.VersionV2 || markerB.HashVersion != hashing.VersionV2 {
++		t.Fatalf("twin marker hash versions = %d/%d, want v2/v2", markerA.HashVersion, markerB.HashVersion)
++	}
++	if markerA.ContentSHA256 == markerB.ContentSHA256 {
++		t.Fatalf("twin v2 identities collide: %s", markerA.ContentSHA256)
++	}
++}
++
++// The draft lane carries frozen v1 identities, so a NUL-bearing draft
++// member is still refused with the blocking opaque finding: through the
++// source-audit binding gate when audit is enabled, and through the shared
++// gate when it is disabled.
++func TestDraftLaneStillBlocksNULBearingMember(t *testing.T) {
++	pinV2Writers(t)
++	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
++	build := func(t *testing.T) (string, string) {
++		t.Helper()
++		project, home, _ := draftProject(t, payload, map[string]string{"skills/review": "review"})
++		nulPath := filepath.Join(project, "skills", "review", "assets", "a.bin")
++		if err := os.MkdirAll(filepath.Dir(nulPath), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(nulPath, []byte("x\x00docs/b.md\x00y"), 0o644); err != nil {
++			t.Fatal(err)
++		}
++		resolveDraftForInstall(t, project, home, payload)
++		return project, home
++	}
++
++	t.Run("audit-enabled", func(t *testing.T) {
++		project, home := build(t)
++		result := draftProjectResult(draftAuditConfig(home), project, home, false)
++		joined := strings.Join(append(result.Errors, result.Messages...), "\n")
++		if result.Status != "failed" || !strings.Contains(joined, "critical audit.opaque.nul-byte") {
++			t.Fatalf("enabled-audit draft result %+v, want a blocking opaque finding", result)
++		}
++	})
++
++	t.Run("audit-disabled", func(t *testing.T) {
++		project, home := build(t)
++		cfg := draftTestConfig(home, t.TempDir())
++		if cfg.Audit.Enabled {
++			t.Fatal("test requires the default disabled audit configuration")
++		}
++		result := draftProjectResult(cfg, project, home, false)
++		joined := strings.Join(append(result.Errors, result.Messages...), "\n")
++		if result.Status != "failed" || !strings.Contains(joined, "critical audit.opaque.nul-byte") {
++			t.Fatalf("disabled-audit draft result %+v, want a blocking opaque finding", result)
++		}
++	})
++}

@@ -1,0 +1,184 @@
+diff --git a/internal/audit/review_rev4_probe_test.go b/internal/audit/review_rev4_probe_test.go
+new file mode 100644
+index 00000000..554f0a68
+--- /dev/null
++++ b/internal/audit/review_rev4_probe_test.go
+@@ -0,0 +1,178 @@
++package audit
++
++import (
++	"encoding/json"
++	"github.com/relux-works/curator/internal/capabilities"
++	"github.com/relux-works/curator/internal/closure"
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/manifest"
++	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/skillspec"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++func TestReviewFrozenV1RefusesExcludedNUL(t *testing.T) {
++	for _, shape := range []string{"runtime", "build", "unlisted"} {
++		t.Run(shape, func(t *testing.T) {
++			root := t.TempDir()
++			name := "assets/runtime/deep/a.bin"
++			if shape == "unlisted" {
++				name = "runtime/deep/a.bin"
++			}
++			writeFiles(t, root, map[string][]byte{"SKILL.md": []byte("# Test\n"), name: []byte("x\x00y")})
++			spec := &skillspec.Spec{}
++			if shape == "runtime" {
++				spec.RuntimeRoots = []string{"assets/runtime"}
++			}
++			if shape == "build" {
++				spec.BuildRoots = []string{"assets/runtime"}
++			}
++			var digest string
++			var err error
++			calls := hashing.CountV1Hashes(func() { digest, err = closure.ContentHashFor(root, spec) })
++			if calls != 0 {
++				t.Fatalf("frozen refusal computed %d v1 hashes", calls)
++			}
++			if err == nil || !strings.Contains(err.Error(), "audit.opaque.nul-byte") {
++				t.Fatalf("frozen v1 %s NUL = (%q,%v), want opaque refusal before projection/hash", shape, digest, err)
++			}
++		})
++	}
++}
++func TestReviewV2RejectsLegacyPin(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"assets/a.bin": []byte("x\x00y")})
++	digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	cfg := newCfg(t, "strict", "off")
++	// Synthetic equal-text identity pair: schema 1 has implicit v1.
++	if _, err := Pin(cfg.Home(), digest, "legacy v1 approval", "fixture"); err != nil {
++		t.Fatal(err)
++	}
++	_, errs := Gate(cfg, []Subject{{Name: "modern", Snapshot: root, HashVersion: hashing.VersionV2, SchemaVersion: 2, Capabilities: capabilities.ImplicitNone()}})
++	if len(errs) == 0 {
++		t.Fatal("v2 NUL subject authorized by an unversioned legacy v1 pin")
++	}
++	if !strings.Contains(strings.Join(errs, "\n"), "requires pin") {
++		t.Fatalf("errors %v, want version-specific require-pin", errs)
++	}
++}
++func TestReviewNewV2PinCarrierVersion(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"a.md": []byte("clean")})
++	digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	path, err := PinAtVersion(t.TempDir(), digest, hashing.VersionV2, "v2 approval", "fixture")
++	if err != nil {
++		t.Fatal(err)
++	}
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var record map[string]any
++	if err := json.Unmarshal(payload, &record); err != nil {
++		t.Fatal(err)
++	}
++	if record["hash_version"] != float64(2) {
++		t.Fatalf("new v2 pin hash_version=%v, want 2", record["hash_version"])
++	}
++}
++
++func TestReviewResolveDraftRefusesExcludedNUL(t *testing.T) {
++	project, home := t.TempDir(), t.TempDir()
++	skill := filepath.Join(project, "skills", "review")
++	writeFiles(t, skill, map[string][]byte{
++		"SKILL.md":                  []byte("---\nname: review\ndescription: Test review\n---\n# review\n"),
++		"agent-skill.json":          []byte(`{"schema_version":4,"capabilities":{},"commands":{},"dependencies":{"skills":{}},"runtime_roots":["assets/runtime"]}`),
++		"assets/runtime/deep/a.bin": []byte("x\x00y"),
++	})
++	payload := []byte(`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`)
++	m, err := manifest.ParseBytes(payload, filepath.Join(project, "Skillfile.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	result, err := closure.ResolveDraft(closure.DraftResolveConfig{ProjectRoot: project, Home: home, Manifest: m, ManifestPayload: payload})
++	if err == nil {
++		t.Fatalf("ResolveDraft accepted NUL-bearing frozen v1 skill: %+v", result.Lock)
++	}
++	if !strings.Contains(err.Error(), "audit.opaque.nul-byte") {
++		t.Fatalf("ResolveDraft refusal %v, want opaque finding", err)
++	}
++}
++func TestReviewLegacyMarkerCollisionAndDowngrade(t *testing.T) {
++	prior := hashing.EnableV2Writers
++	defer func() { hashing.EnableV2Writers = prior }()
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"assets/a.bin": []byte("x"), "docs/b.md": []byte("y")})
++	digest, err := hashing.ContentSHA256(root, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	m := &marker.Marker{Name: "review", Source: "review", RefKind: "tag", Ref: "v1", Commit: strings.Repeat("1", 40), ContentSHA256: digest, InstalledAt: "2026-10-06T00:00:00Z", SkillSchemaVersion: 3}
++	hashing.EnableV2Writers = false
++	if err := marker.Write(root, m); err != nil {
++		t.Fatal(err)
++	}
++	if m.HashVersion != 0 {
++		t.Fatal("legacy marker unexpectedly versioned")
++	}
++	if current, err := marker.Current(root, m); err != nil || !current {
++		t.Fatalf("clean control %v %v", current, err)
++	}
++	writeFiles(t, root, map[string][]byte{"assets/a.bin": []byte("x\x00docs/b.md\x00y")})
++	if err := os.Remove(filepath.Join(root, "docs", "b.md")); err != nil {
++		t.Fatal(err)
++	}
++	if current, err := marker.Current(root, m); current || err == nil || !strings.Contains(err.Error(), "audit.opaque.nul-byte") {
++		t.Fatalf("legacy collision current=%v err=%v", current, err)
++	}
++	hashing.EnableV2Writers = true
++	if err := marker.Write(root, m); err != nil {
++		t.Fatal(err)
++	}
++	if current, err := marker.Current(root, m); err != nil || !current {
++		t.Fatalf("v2 NUL control %v %v", current, err)
++	}
++	path := filepath.Join(root, marker.Name)
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var raw map[string]any
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	raw["hash_version"] = 1
++	payload, err = json.Marshal(raw)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, payload, 0644); err != nil {
++		t.Fatal(err)
++	}
++	if _, _, err := marker.ReadState(root); err == nil {
++		t.Fatal("v2-to-v1 downgrade admitted")
++	}
++}
++
++func TestReviewSourceAuditNeverHashesNULV1(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"assets/a.bin": []byte("x\x00y")})
++	cfg := newCfg(t, "advisory", "off")
++	calls := hashing.CountV1Hashes(func() {
++		if _, err := CheckSourceAudit(cfg, sourceTestSubject(root, 3), true, sourceAuditTestNow); err == nil || !strings.Contains(err.Error(), "audit.opaque.nul-byte") {
++			t.Fatalf("source audit refusal=%v", err)
++		}
++	})
++	if calls != 0 {
++		t.Fatalf("production source audit computed %d v1 identities over NUL before refusing", calls)
++	}
++}

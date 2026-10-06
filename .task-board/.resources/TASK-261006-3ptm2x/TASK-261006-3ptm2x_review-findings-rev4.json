@@ -1,0 +1,135 @@
+{
+  "findings": [
+    {
+      "id": "v1-commit-context-bypass",
+      "row": "Profile store commit-pin verification and v1 context reads",
+      "invariant": "Before computing or trusting any v1 content identity, inspect every regular file of the full context snapshot for NUL and refuse before hashing; v2 accepts NUL as data.",
+      "mechanism": "storeEntryPinHashes returns from its member.Commit branch before RefuseNULV1; loadMaterial has no version guard, so Resolve -> verifyHome -> assembleHome -> rootContext -> surfaceHash computes and trusts a v1 identity from NUL-bearing commit-pinned context bytes.",
+      "reproductions": [
+        {
+          "test_file": "internal/audit/review_profile_surface_test.go (attached reviewer patch)",
+          "command": "mini-build-lock run opaque -- env GOFLAGS=-work go test ./internal/audit -run '^TestReviewV1CommitContextResolveRefusesNUL$' -count=1 -timeout=6m -v",
+          "expected_failure": "module and excluded subtests return a launch fragment with nil error instead of the opaque refusal; module observes one v1 file-set hash containing NUL. Clean v1 and both NUL-bearing v2 controls pass.",
+          "pinned_blobs": [
+            "sha256:a2c8f671101bd866d7cffbc3cd6192121a169a7c13521df8f4e99679b4c8497b",
+            "sha256:abc0c24bd9d84aca0a6b0523342ce99792074ca1a7a0821b91e5185e459df08f",
+            "sha256:fdc32b638d18b35d19ae9d1a49d90ab8a4653ab95da57db36238ba0dd743c844",
+            "sha256:d430dd3c0550e6bb92968a06d3da41a1f79f35d1acacaac1c15b5b2ba670a53e"
+          ]
+        }
+      ],
+      "severity": "bypass",
+      "repeat-of": "none"
+    }
+  ],
+  "notes": [
+    "Revision-3 F1/F2/F3 are fixed. The new finding skips the scan by pin algorithm, whereas rev3/F1 scanned a filtered frozen projection; same general invariant, different bypass mechanism.",
+    "Exhaustive rendered-surface and concurrent scan/hash mutation coverage remain unestablished."
+  ],
+  "surface_results": [
+    {
+      "row": "Audit gate and pipeline",
+      "result": "held"
+    },
+    {
+      "row": "Legacy detect/canary",
+      "result": "held"
+    },
+    {
+      "row": "Shared RefuseNULV1",
+      "result": "held"
+    },
+    {
+      "row": "Contextaudit version dispatch",
+      "result": "held"
+    },
+    {
+      "row": "Project/global/CLI/external admission",
+      "result": "held"
+    },
+    {
+      "row": "Draft source audit",
+      "result": "held"
+    },
+    {
+      "row": "Frozen resolve/refresh/projection",
+      "result": "held"
+    },
+    {
+      "row": "Install registry and staged hashing",
+      "result": "held"
+    },
+    {
+      "row": "Recorded marker currentness",
+      "result": "held"
+    },
+    {
+      "row": "CLI drift/hybrid/draft status",
+      "result": "held"
+    },
+    {
+      "row": "Project/global status plans",
+      "result": "held"
+    },
+    {
+      "row": "Marker writer versions",
+      "result": "held"
+    },
+    {
+      "row": "Context store writer hashing",
+      "result": "held"
+    },
+    {
+      "row": "Strict profile audit/update",
+      "result": "held"
+    },
+    {
+      "row": "Profile store state-pin verification",
+      "result": "held"
+    },
+    {
+      "row": "Profile store commit-pin verification and v1 context reads",
+      "result": "broken"
+    },
+    {
+      "row": "Managed skill loader",
+      "result": "held"
+    },
+    {
+      "row": "Profile identity migration",
+      "result": "not-attacked",
+      "detail": "Old-lock state boundary inspected; separate migration transaction not dynamically attacked this round."
+    },
+    {
+      "row": "Global skill migration",
+      "result": "held"
+    },
+    {
+      "row": "Registry/source-audit comparisons",
+      "result": "held"
+    },
+    {
+      "row": "Verdict cache carrier/version/exclusion",
+      "result": "held"
+    },
+    {
+      "row": "Trust pin carrier/version comparison",
+      "result": "held"
+    },
+    {
+      "row": "Revocations",
+      "result": "held"
+    },
+    {
+      "row": "Materialized context surface hashes",
+      "result": "broken"
+    },
+    {
+      "row": "Other identity schemes",
+      "result": "held"
+    }
+  ],
+  "free_hunt": [
+    "Commit-pinned v1 context re-check bypass demonstrated through envprofile.Resolve."
+  ]
+}

@@ -1,0 +1,168 @@
+# Reviewer probes for revision 1
+
+These synthetic tests ran only in a disposable clone under internal/audit.
+No code in the Story workspace was changed.
+
+The temporary hashing instrumentation adds a zeroed exported counter
+ReviewObservedNULV1Hashes, incremented immediately before digest.Write(content)
+in ContentSHA256 when strings.ContainsRune(string(content), 0). It observes
+existing behavior without changing hashing or admission.
+
+The cache fixture with equal digest text and a legacy carrier tests the §8
+version-pair requirement; it does not claim an actual cross-version SHA-256
+collision. Marker collision fixtures are actual equal-v1-digest trees.
+
+The final seven-probe run had two passes and five failures. Earlier prototypes
+with a missing SKILL.md or excluded docs root were discarded; final frozen
+context fixture contains SKILL.md and an included assets/a.bin. Two initial
+mutants that failed to compile were discarded and rerun as valid mutations.
+
+## Probe source
+
+```go
+package audit
+import (
+ "os"
+ "path/filepath"
+ "testing"
+ "strings"
+ "encoding/json"
+ "github.com/relux-works/curator/internal/hashing"
+ "github.com/relux-works/curator/internal/marker"
+ "github.com/relux-works/curator/internal/capabilities"
+ "github.com/relux-works/curator/internal/config"
+ "github.com/relux-works/curator/internal/closure"
+ "github.com/relux-works/curator/internal/skillspec"
+)
+func TestReviewMixedVersionGate(t *testing.T) {
+ root:=t.TempDir(); writeFiles(t,root,map[string][]byte{"deep/a.bin":[]byte("x\x00y")})
+ cfg:=&config.Config{Path:filepath.Join(t.TempDir(),"config.json")}
+ _,errs:=Gate(cfg,[]Subject{{Name:"legacy",Snapshot:root},{Name:"modern",Snapshot:root,HashVersion:hashing.VersionV2}})
+ if len(errs)!=1 || !strings.Contains(errs[0],"audit blocked: legacy: critical audit.opaque.nul-byte") { t.Fatalf("mixed result %v",errs) }
+}
+func TestReviewLegacyMarkerNULCollisionCurrentness(t *testing.T) {
+ prior:=hashing.EnableV2Writers; hashing.EnableV2Writers=false; defer func(){hashing.EnableV2Writers=prior}()
+ root:=t.TempDir(); writeFiles(t,root,map[string][]byte{"assets/a.bin":[]byte("x"),"docs/b.md":[]byte("y")})
+ digest,err:=hashing.ContentSHA256(root,nil); if err!=nil {t.Fatal(err)}
+ m:=&marker.Marker{Name:"test-skill",Source:"test-skill",RefKind:"tag",Ref:"v1",Commit:strings.Repeat("1",40),ContentSHA256:digest,InstalledAt:"2026-10-06T00:00:00Z",SkillSchemaVersion:3}
+ if err:=marker.Write(root,m); err!=nil {t.Fatal(err)}
+ if current,err:=marker.Current(root,m); err!=nil || !current {t.Fatalf("clean control %v %v",current,err)}
+ writeFiles(t,root,map[string][]byte{"assets/a.bin":[]byte("x\x00docs/b.md\x00y")}); if err:=os.Remove(filepath.Join(root,"docs/b.md"));err!=nil{t.Fatal(err)}
+ current,err:=marker.Current(root,m)
+ t.Logf("legacy marker schema=%d hash_version=%d current=%v error=%v",m.SchemaVersion,m.HashVersion,current,err)
+ if current || err==nil || !strings.Contains(err.Error(),"audit.opaque.nul-byte") {t.Fatalf("v1 installed NUL tree must block before rehash: current=%v err=%v",current,err)}
+}
+func TestReviewExplicitV2ToV1DowngradeRejected(t *testing.T) {
+ prior:=hashing.EnableV2Writers; hashing.EnableV2Writers=true; defer func(){hashing.EnableV2Writers=prior}()
+ root:=t.TempDir();writeFiles(t,root,map[string][]byte{"assets/a.bin":[]byte("x\x00y")})
+ m:=&marker.Marker{Name:"test-skill",Source:"test-skill",RefKind:"tag",Ref:"v1",Commit:strings.Repeat("1",40),InstalledAt:"2026-10-06T00:00:00Z",SkillSchemaVersion:3}
+ if err:=marker.Write(root,m);err!=nil{t.Fatal(err)}
+ payload,err:=os.ReadFile(filepath.Join(root,marker.Name));if err!=nil{t.Fatal(err)}
+ var raw map[string]any;if err:=json.Unmarshal(payload,&raw);err!=nil{t.Fatal(err)};raw["hash_version"]=1
+ payload,err=json.Marshal(raw);if err!=nil{t.Fatal(err)};if err:=os.WriteFile(filepath.Join(root,marker.Name),payload,0644);err!=nil{t.Fatal(err)}
+ if _,_,err:=marker.ReadState(root);err==nil{t.Fatal("core v5 admitted hash_version 1 downgrade")}
+}
+func TestReviewDraftAuditNeverComputesV1OverNUL(t *testing.T) {
+ root:=t.TempDir();writeFiles(t,root,map[string][]byte{"assets/a.bin":[]byte("x\x00y")})
+ cfg:=newCfg(t,"advisory","off")
+ hashing.ReviewObservedNULV1Hashes=0
+ _,err:=CheckSourceAudit(cfg,sourceTestSubject(root,3),true,sourceAuditTestNow)
+ t.Logf("draft error=%v v1 NUL hashes=%d",err,hashing.ReviewObservedNULV1Hashes)
+ if err==nil || !strings.Contains(err.Error(),"audit.opaque.nul-byte"){t.Fatalf("wrong draft refusal %v",err)}
+ if hashing.ReviewObservedNULV1Hashes!=0{t.Fatalf("draft audit computed v1 identity over NUL %d times",hashing.ReviewObservedNULV1Hashes)}
+ report,err:=auditSubject(cfg,Subject{Name:"nul",Snapshot:root,HashVersion:hashing.VersionV1,SchemaVersion:3,Capabilities:capabilities.ImplicitNone()},false)
+ if err!=nil{t.Fatal(err)};if report.ContentSHA256!=""{t.Fatalf("opaque block carries computed v1 identity %s",report.ContentSHA256)}
+}
+
+func TestReviewFrozenContextHashNeverHashesNUL(t *testing.T) {
+ root:=t.TempDir();writeFiles(t,root,map[string][]byte{"SKILL.md":[]byte("# Test\n"),"assets/a.bin":[]byte("x\x00y")})
+ hashing.ReviewObservedNULV1Hashes=0
+ digest,err:=closure.ContentHashFor(root,&skillspec.Spec{})
+ if err!=nil && !strings.Contains(err.Error(),"audit.opaque.nul-byte") { t.Fatalf("unexpected fixture error %v",err) }
+ t.Logf("frozen digest=%s error=%v v1 NUL hashes=%d",digest,err,hashing.ReviewObservedNULV1Hashes)
+ if hashing.ReviewObservedNULV1Hashes!=0 { t.Fatalf("frozen context identity computed before opaque refusal") }
+}
+func TestReviewV2VerdictRecordsHashVersion(t *testing.T) {
+ root:=t.TempDir();writeFiles(t,root,map[string][]byte{"assets/a.bin":[]byte("x\x00y")})
+ cfg:=newCfg(t,"advisory","off")
+ subject:=Subject{Name:"nul",Snapshot:root,HashVersion:hashing.VersionV2,SchemaVersion:3,Capabilities:capabilities.ImplicitNone()}
+ report,err:=auditSubject(cfg,subject,true);if err!=nil{t.Fatal(err)}
+ payload,err:=os.ReadFile(verdictPath(cfg,report.ContentSHA256));if err!=nil{t.Fatal(err)}
+ var raw map[string]any;if err:=json.Unmarshal(payload,&raw);err!=nil{t.Fatal(err)}
+ t.Logf("cache schema_version=%v hash_version=%v",raw["schema_version"],raw["hash_version"])
+ if raw["hash_version"]!=float64(2){t.Fatalf("v2 NUL verdict stored in unversioned carrier: hash_version=%v",raw["hash_version"])}
+}
+func TestReviewV2RejectsUnversionedLegacyVerdict(t *testing.T) {
+ root:=t.TempDir();writeFiles(t,root,map[string][]byte{"scripts/tool":[]byte("contact https://unlisted.example/")})
+ digest,err:=hashing.ContentSHA256WithVersion(root,nil,hashing.VersionV2);if err!=nil{t.Fatal(err)}
+ cfg:=newCfg(t,"advisory","off")
+ // Equal digest text must not erase differing recorded identity versions (§8).
+ legacy:=Subject{Name:"legacy",Snapshot:root,HashVersion:hashing.VersionV1,SchemaVersion:3}
+ storeCachedFindings(cfg,digest,legacy,nil,nil)
+ modern:=Subject{Name:"modern",Snapshot:root,HashVersion:hashing.VersionV2,SchemaVersion:3,Capabilities:capabilities.ImplicitNone()}
+ report,err:=auditSubject(cfg,modern,false);if err!=nil{t.Fatal(err)}
+ t.Logf("v2 consumed legacy-shaped cache: hit=%v findings=%v",report.CacheHit,report.Findings)
+ if report.CacheHit || len(report.Findings)==0 { t.Fatalf("v2 accepted unversioned/v1 cache identity at matching digest text") }
+}
+
+```
+
+## Disposable mutation runner
+
+```python
+import sys,subprocess
+from pathlib import Path
+root=Path(__file__).parent;clone=root/'candidate'
+audit=root/'audit-original.go';context=root/'contextaudit-original.go';hashing=root/'hashing-original.go'
+name=sys.argv[1];pkg='audit';regex='NUL|Opaque|HashVersion'
+a=audit.read_text();c=context.read_text();h=hashing.read_text()
+if name=='M1-unconditional-scan':a=a.replace('if version != hashing.VersionV1 {\n\t\t\tcontinue','if version != version {\n\t\t\tcontinue',1)
+elif name=='M2-delete-v1-gate':a=a.replace('if version != hashing.VersionV1 {\n\t\t\tcontinue','if version == version {\n\t\t\tcontinue',1)
+elif name=='M3-legacy-zero-as-v2':a=a.replace('case 0, hashing.VersionV1:\n\t\treturn hashing.VersionV1, nil','case 0:\n\t\treturn hashing.VersionV2, nil\n\tcase hashing.VersionV1:\n\t\treturn hashing.VersionV1, nil',1)
+elif name=='M4-unknown-as-v2':a=a.replace('return 0, fmt.Errorf("unsupported content hash version %d", subject.HashVersion)','return hashing.VersionV2, nil',1)
+elif name=='M5-audit-hashes-v1':a=a.replace('hashing.ContentSHA256WithVersion(subject.Snapshot, nil, version)','hashing.ContentSHA256WithVersion(subject.Snapshot, nil, hashing.VersionV1)',1)
+elif name=='M6-v2-keeps-opaque-paths':a=a.replace('if version != hashing.VersionV1 {\n\t\topaquePaths = nil\n\t}', '',1)
+elif name=='M7-cache-v1-nul-block':a=a.replace('if opaqueReport.Decision == DecisionBlock {','if opaqueReport.Decision == DecisionBlock {\n\t\tif persist { storeCachedFindings(cfg, contentHash, subject, opaqueReport.Findings, report.ScriptPolicies) }',1)
+elif name=='M8-narrow-scan-assets-only':a=a.replace('opaquePaths[index] = paths','var narrowed []string\n\t\tfor _, p := range paths { if strings.HasPrefix(p,"assets/") { narrowed=append(narrowed,p) } }\n\t\tpaths=narrowed\n\t\topaquePaths[index] = paths',1)
+elif name=='M9-context-v2-scans':
+ pkg='contextaudit';c=c.replace('if hashVersion == hashing.VersionV1 {\n\t\treturn Detect(root, pin, waivers)','if hashVersion == hashing.VersionV1 || hashVersion == hashing.VersionV2 {\n\t\treturn Detect(root, pin, waivers)',1)
+elif name=='attacks':
+ regex=sys.argv[2] if len(sys.argv)>2 else 'TestReview';h=h.replace('func ContentSHA256(root string, exclude map[string]bool)', 'var ReviewObservedNULV1Hashes int\n\nfunc ContentSHA256(root string, exclude map[string]bool)',1)
+ h=h.replace('\t\tdigest.Write(content)','\t\tif strings.ContainsRune(string(content), 0) { ReviewObservedNULV1Hashes++ }\n\t\tdigest.Write(content)',1)
+ (clone/'internal/audit/review_probe_test.go').write_bytes((root/'probes.go').read_bytes())
+else:raise SystemExit('unknown mutation')
+try:
+ (clone/'internal/audit/audit.go').write_text(a);(clone/'internal/contextaudit/contextaudit.go').write_text(c);(clone/'internal/hashing/hashing.go').write_text(h)
+ subprocess.run([sys.executable,str(root/'check.py'),name,pkg,regex],check=True)
+finally:
+ (clone/'internal/audit/audit.go').write_bytes(audit.read_bytes());(clone/'internal/contextaudit/contextaudit.go').write_bytes(context.read_bytes());(clone/'internal/hashing/hashing.go').write_bytes(hashing.read_bytes())
+ (clone/'internal/audit/review_probe_test.go').unlink(missing_ok=True)
+
+```
+
+## Bounded test runner
+
+```python
+import sys,subprocess,time,json,re
+from pathlib import Path
+root=Path(__file__).parent
+clone=root/'candidate'
+label,pkg,regex=sys.argv[1:]
+def health():
+ p=subprocess.run(['launchctl','print','system/com.apple.security.syspolicy'],capture_output=True,text=True)
+ out=p.stdout
+ count=re.search(r'successive crashes = (\d+)',out)
+ return {'running':'state = running' in out,'successive_crashes':int(count.group(1)) if count else None}
+before=health()
+if not before['running']: raise SystemExit('syspolicyd not running; defer build')
+start=time.monotonic()
+cmd=[str(Path.home()/'.local/bin/mini-build-lock'),'run','opaque','--','env','GOFLAGS=-work','go','test','./internal/'+pkg,'-run',regex,'-count=1','-timeout=6m']
+if label=='attacks': cmd.append('-v')
+p=subprocess.run(cmd,cwd=clone,capture_output=True,text=True)
+after=health()
+output=re.sub(r'WORK=.*','WORK=<retained>',p.stdout+p.stderr)
+record={'case':label,'package':pkg,'regex':regex,'exit':p.returncode,'duration_seconds':round(time.monotonic()-start,3),'before':before,'after':after,'output':output}
+with (root/'review-checks.jsonl').open('a') as f: f.write(json.dumps(record)+'\n')
+print(json.dumps(record))
+
+```

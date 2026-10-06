@@ -1,0 +1,3701 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 1c98b28f..e331cb3f 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,38 @@ All notable implementation changes are recorded here.
+ 
+ ## Unreleased
+ 
++### Changed
++
++- The opaque-NUL admission rule is scoped to v1 identities (curator-spec
++  §8 interim rule for v1 readers): NUL-bearing files block install, audit,
++  and status only when a v1 identity is computed or trusted (legacy
++  markers without `hash_version`, v1 readers, frozen v1 shapes including
++  the draft lane). Under v2, `0x00` is ordinary file data, so trees such
++  as vendored archives install and audit with a v2 identity. The v1
++  finding id, severity, and messages are unchanged, and blocked v1 NUL
++  results stay outside the verdict cache.
++- Operator action: bare content-hash `audit.revocations` entries minted
++  under v1 no longer match v2 identities, because matching them would
++  compute a v1 identity the v2 path must never touch. Re-issue such
++  revocations from the v2 digest; `source:` revocations are unaffected.
++  Operator pins are version-scoped as well: legacy unversioned pins keep
++  authorizing v1 reads only, and `audit --allow` now records the writer
++  framing (`hash_version: 2`), so v2 identities need a fresh pin after
++  the cutover instead of inheriting v1 trust.
++- The v1 NUL refusal now precedes any v1 identity computation: installed
++  currentness readers, status drift classifiers, the draft source audit,
++  the frozen package context hash, and the profile lock/store readers
++  scan for NUL bytes before hashing or comparing, so a NUL-bearing tree
++  — including a v1-collision twin of a recorded tree — can never read
++  as current or yield a v1 digest. The frozen v1 scan covers the full
++  skill snapshot, including declared runtime/build roots and
++  non-whitelisted paths the context projection omits. Read-only status
++  plans verify the installed trees they report on and refuse with the
++  opaque finding instead of reporting ready. Audit verdicts for v2
++  identities are stored in a versioned carrier (`hash_version: 2`);
++  legacy unversioned verdicts keep authorizing v1 reads only, and equal
++  digest text across framings never shares a verdict.
++
+ ## 0.15.0-rc.3 - 2026-10-04
+ 
+ ### Added
+diff --git a/cmd/curator/draft_status.go b/cmd/curator/draft_status.go
+index 956f5ff8..47227f1b 100644
+--- a/cmd/curator/draft_status.go
++++ b/cmd/curator/draft_status.go
+@@ -25,6 +25,7 @@ import (
+ 	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/opaquescan"
+ 	"github.com/relux-works/curator/internal/sourcelock"
+ 	"github.com/relux-works/curator/internal/stateread"
+ )
+@@ -111,6 +112,12 @@ func classifyDraftMember(skillsDir string, member sourcelock.Member, lockSHA256
+ 		state, _ := markerRefusal(installed)
+ 		return state
+ 	}
++	// Spec §8 interim rule for v1 readers: refuse before recomputing
++	// a recorded v1 identity over NUL bytes. The opaque refusal itself
++	// surfaces through the install-status error in this same invocation.
++	if err := opaquescan.RefuseNULV1(installed, recorded.ContentHashVersion()); err != nil {
++		return stateUnresolvable
++	}
+ 	actualHash, err := hashing.ContentSHA256WithVersion(installed, nil, recorded.ContentHashVersion())
+ 	if err != nil {
+ 		return stateUnresolvable
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index caef93b3..f3e52dcc 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -39,6 +39,7 @@ import (
+ 	"github.com/relux-works/curator/internal/managerlock"
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/opaquescan"
+ 	"github.com/relux-works/curator/internal/registry"
+ 	"github.com/relux-works/curator/internal/rustsource"
+ 	"github.com/relux-works/curator/internal/scopes"
+@@ -1317,6 +1318,15 @@ func scopeStatusDrift(cfg *config.Config, manifestRoot, skillsDir string) map[st
+ 			drift[decl.Name] = state
+ 			continue
+ 		}
++		// Spec §8 interim rule for v1 readers: a recorded v1 identity is
++		// never recomputed over NUL bytes. A v1-installed tree passed the
++		// install gate NUL-free, so NUL now means the tree drifted; the
++		// opaque refusal itself surfaces through the install-status error
++		// in this same invocation.
++		if err := opaquescan.RefuseNULV1(installed, recorded.ContentHashVersion()); err != nil {
++			drift[decl.Name] = stateContentDrift
++			continue
++		}
+ 		actualHash, err := hashing.ContentSHA256WithVersion(installed, nil, recorded.ContentHashVersion())
+ 		if err != nil || actualHash != recorded.ContentSHA256 {
+ 			drift[decl.Name] = stateContentDrift
+@@ -1957,6 +1967,9 @@ func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDep
+ 			Git: subject.Declared.Identity, Commit: subject.Effective.Commit,
+ 			Snapshot: subject.SnapshotRoot, SchemaVersion: 7,
+ 			Capabilities: capabilities.ImplicitNone(),
++			// Live repository admission audits the writer-version
++			// identity; only frozen v1 carriers keep the NUL rule.
++			HashVersion: hashing.WriteVersion(),
+ 		}
+ 		var auditWarnings, auditErrs []string
+ 		if dryRun {
+@@ -2091,8 +2104,11 @@ func (c cli) cmdHybrid(args []string) int {
+ 			if readErr != nil {
+ 				state, _ = markerReadFailure(installed, readErr)
+ 			} else if kind == stateread.KindPresent {
+-				actual, hashErr := hashing.ContentSHA256WithVersion(installed, nil, recorded.ContentHashVersion())
+-				if hashErr != nil || actual != recorded.ContentSHA256 {
++				// Spec §8 interim rule for v1 readers: refuse before
++				// recomputing a recorded v1 identity over NUL bytes.
++				if guardErr := opaquescan.RefuseNULV1(installed, recorded.ContentHashVersion()); guardErr != nil {
++					state = "content-drift"
++				} else if actual, hashErr := hashing.ContentSHA256WithVersion(installed, nil, recorded.ContentHashVersion()); hashErr != nil || actual != recorded.ContentSHA256 {
+ 					state = "content-drift"
+ 				} else {
+ 					state = "installed"
+@@ -2131,7 +2147,10 @@ func (c cli) cmdAudit(args []string) int {
+ 			_, _ = fmt.Fprintln(c.stderr, "curator: --allow requires --reason")
+ 			return exitUsage
+ 		}
+-		path, err := audit.Pin(cfg.Home(), *allow, *reason, os.Getenv("USER"))
++		// New pins record the writer framing explicitly (Spec §8): a pin
++		// authorizes only the (version, digest) identity it was issued
++		// for, so legacy v1 pins never approve v2 reads.
++		path, err := audit.PinAtVersion(cfg.Home(), *allow, hashing.WriteVersion(), *reason, os.Getenv("USER"))
+ 		if err != nil {
+ 			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitFail
+@@ -2260,6 +2279,9 @@ func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string,
+ 			Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+ 			SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
+ 			Commands: node.Spec.Commands,
++			// The audit CLI reports what an install would trust:
++			// the writer-version identity.
++			HashVersion: hashing.WriteVersion(),
+ 		})
+ 	}
+ 	warnings, errs := audit.Gate(cfg, subjects)
+diff --git a/cmd/curator/nul_opaque_test.go b/cmd/curator/nul_opaque_test.go
+index ba4ea0ad..538d30d9 100644
+--- a/cmd/curator/nul_opaque_test.go
++++ b/cmd/curator/nul_opaque_test.go
+@@ -9,9 +9,20 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/buildrepo"
+ 	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/hashing"
+ )
+ 
+-func TestProductionExternalAuditBlocksOpaqueNULWhenAuditIsDisabled(t *testing.T) {
++func pinAuditHashWriters(t *testing.T, v2 bool) {
++	t.Helper()
++	priorWriter := hashing.EnableV2Writers
++	hashing.EnableV2Writers = v2
++	t.Cleanup(func() { hashing.EnableV2Writers = priorWriter })
++}
++
++// The opaque-NUL interim rule (Spec §8) follows the audited identity: the
++// external-repository lane blocks a NUL-bearing snapshot under v1 and
++// admits it under v2, where NUL bytes are ordinary data.
++func TestProductionExternalAuditOpaqueNULFollowsHashVersion(t *testing.T) {
+ 	root := t.TempDir()
+ 	const rel = "assets/deep/opaque.unsupported"
+ 	path := filepath.Join(root, filepath.FromSlash(rel))
+@@ -25,47 +36,84 @@ func TestProductionExternalAuditBlocksOpaqueNULWhenAuditIsDisabled(t *testing.T)
+ 	if cfg.Audit.Enabled {
+ 		t.Fatal("test requires the default disabled audit configuration")
+ 	}
++	subject := buildrepo.AuditSubject{
++		Declared:     buildrepo.DeclaredState{Repository: "tools", Identity: "example.test/tools"},
++		Effective:    buildrepo.EffectiveState{Commit: strings.Repeat("1", 40)},
++		SnapshotRoot: root,
++	}
+ 
+-	for _, dryRun := range []bool{false, true} {
+-		t.Run(map[bool]string{false: "install", true: "dry-run"}[dryRun], func(t *testing.T) {
+-			deps := productionExternalDeps(cfg, dryRun)
+-			_, err := deps.AuditWarnings(context.Background(), buildrepo.AuditSubject{
+-				Declared:     buildrepo.DeclaredState{Repository: "tools", Identity: "example.test/tools"},
+-				Effective:    buildrepo.EffectiveState{Commit: strings.Repeat("1", 40)},
+-				SnapshotRoot: root,
++	t.Run("v1-blocks", func(t *testing.T) {
++		pinAuditHashWriters(t, false)
++		for _, dryRun := range []bool{false, true} {
++			t.Run(map[bool]string{false: "install", true: "dry-run"}[dryRun], func(t *testing.T) {
++				deps := productionExternalDeps(cfg, dryRun)
++				_, err := deps.AuditWarnings(context.Background(), subject)
++				if err == nil || !strings.Contains(err.Error(), "audit.opaque.nul-byte") || !strings.Contains(err.Error(), rel) {
++					t.Fatalf("production external audit error = %v, want blocking opaque finding naming %s", err, rel)
++				}
+ 			})
+-			if err == nil || !strings.Contains(err.Error(), "audit.opaque.nul-byte") || !strings.Contains(err.Error(), rel) {
+-				t.Fatalf("production external audit error = %v, want blocking opaque finding naming %s", err, rel)
+-			}
+-		})
+-	}
++		}
++	})
++
++	t.Run("v2-admits", func(t *testing.T) {
++		pinAuditHashWriters(t, true)
++		for _, dryRun := range []bool{false, true} {
++			t.Run(map[bool]string{false: "install", true: "dry-run"}[dryRun], func(t *testing.T) {
++				deps := productionExternalDeps(cfg, dryRun)
++				warnings, err := deps.AuditWarnings(context.Background(), subject)
++				if err != nil || len(warnings) != 0 {
++					t.Fatalf("v2 production external audit warnings=%v err=%v, want silent admission", warnings, err)
++				}
++			})
++		}
++	})
+ }
+ 
+-func TestCLIAuditBlocksOpaqueNULWhenAuditIsDisabled(t *testing.T) {
+-	configPath := auditLabelProject(t, 7, false, nil)
+-	cfg, err := config.Load(configPath, nil)
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	if cfg.Audit.Enabled {
+-		t.Fatal("test requires the default disabled audit configuration")
++// `curator audit` reports what an install would trust: the blocking opaque
++// finding under v1, a passing audit under v2.
++func TestCLIAuditOpaqueNULFollowsHashVersion(t *testing.T) {
++	build := func(t *testing.T) string {
++		t.Helper()
++		configPath := auditLabelProject(t, 7, false, nil)
++		cfg, err := config.Load(configPath, nil)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if cfg.Audit.Enabled {
++			t.Fatal("test requires the default disabled audit configuration")
++		}
++		repo := filepath.Join(cfg.SkillsRoot, "label-skill")
++		const rel = "docs/deep/opaque.unknown"
++		path := filepath.Join(repo, filepath.FromSlash(rel))
++		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(path, []byte("prefix\x00suffix"), 0o644); err != nil {
++			t.Fatal(err)
++		}
++		runGit(t, repo, "add", ".")
++		runGit(t, repo, "commit", "-qm", "add opaque audit file")
++		runGit(t, repo, "tag", "-f", "v1")
++		return configPath
+ 	}
+-	repo := filepath.Join(cfg.SkillsRoot, "label-skill")
+-	const rel = "docs/deep/opaque.unknown"
+-	path := filepath.Join(repo, filepath.FromSlash(rel))
+-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+-		t.Fatal(err)
+-	}
+-	if err := os.WriteFile(path, []byte("prefix\x00suffix"), 0o644); err != nil {
+-		t.Fatal(err)
+-	}
+-	runGit(t, repo, "add", ".")
+-	runGit(t, repo, "commit", "-qm", "add opaque audit file")
+-	runGit(t, repo, "tag", "-f", "v1")
+ 
+-	code, stdout, stderr := capture(t, configPath, "audit", "app")
+-	combined := stdout + "\n" + stderr
+-	if code == exitOK || !strings.Contains(combined, "audit.opaque.nul-byte") || !strings.Contains(combined, rel) {
+-		t.Fatalf("curator audit = %d\nstdout:\n%s\nstderr:\n%s; want blocking opaque finding naming %s", code, stdout, stderr, rel)
+-	}
++	t.Run("v1-blocks", func(t *testing.T) {
++		pinAuditHashWriters(t, false)
++		configPath := build(t)
++		code, stdout, stderr := capture(t, configPath, "audit", "app")
++		combined := stdout + "\n" + stderr
++		if code == exitOK || !strings.Contains(combined, "audit.opaque.nul-byte") || !strings.Contains(combined, "docs/deep/opaque.unknown") {
++			t.Fatalf("curator audit = %d\nstdout:\n%s\nstderr:\n%s; want blocking opaque finding naming %s", code, stdout, stderr, "docs/deep/opaque.unknown")
++		}
++	})
++
++	t.Run("v2-admits", func(t *testing.T) {
++		pinAuditHashWriters(t, true)
++		configPath := build(t)
++		code, stdout, stderr := capture(t, configPath, "audit", "app")
++		combined := stdout + "\n" + stderr
++		if code != exitOK || strings.Contains(combined, "audit.opaque.nul-byte") {
++			t.Fatalf("v2 curator audit = %d\nstdout:\n%s\nstderr:\n%s; want a passing audit", code, stdout, stderr)
++		}
++	})
+ }
+diff --git a/cmd/curator/nul_opaque_v1_pins_test.go b/cmd/curator/nul_opaque_v1_pins_test.go
+new file mode 100644
+index 00000000..7b1a8393
+--- /dev/null
++++ b/cmd/curator/nul_opaque_v1_pins_test.go
+@@ -0,0 +1,67 @@
++package main
++
++// Rework-2 regression for revision-3 finding F2 at the CLI production
++// entry: `audit --allow` records the writer framing explicitly, so a new
++// pin carries hash_version 2 under the v2 writer and the frozen v1 shape
++// under the v1 writer. Legacy v1 pins keep authorizing v1 reads only.
++// This test runs on the hosted gate (R194), like every cmd/curator suite.
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++// The CLI pin writer records the framing in force: a v2-writer pin is a
++// schema-2 carrier with hash_version 2, while a v1-writer pin keeps the
++// frozen schema-1 shape with no hash_version member.
++func TestAuditAllowWritesWriterVersionPinCarrier(t *testing.T) {
++	digest := "sha256:" + strings.Repeat("b", 64)
++
++	t.Run("v2-writer", func(t *testing.T) {
++		pinAuditHashWriters(t, true)
++		_, home := legacyProject(t)
++		configPath := filepath.Join(home, "config.json")
++		if code, stdout, stderr := capture(t, configPath, "audit", "--allow", digest, "--reason", "regression"); code != exitOK {
++			t.Fatalf("audit --allow = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++		}
++		raw := readCLIPinCarrier(t, home, digest)
++		if raw["schema_version"] != float64(2) || raw["hash_version"] != float64(2) {
++			t.Fatalf("CLI v2 pin carrier = schema_version %v hash_version %v, want 2/2",
++				raw["schema_version"], raw["hash_version"])
++		}
++	})
++
++	t.Run("v1-writer", func(t *testing.T) {
++		pinAuditHashWriters(t, false)
++		_, home := legacyProject(t)
++		configPath := filepath.Join(home, "config.json")
++		if code, stdout, stderr := capture(t, configPath, "audit", "--allow", digest, "--reason", "regression"); code != exitOK {
++			t.Fatalf("audit --allow = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++		}
++		raw := readCLIPinCarrier(t, home, digest)
++		if raw["schema_version"] != float64(1) {
++			t.Fatalf("CLI v1 pin carrier schema_version = %v, want 1", raw["schema_version"])
++		}
++		if _, present := raw["hash_version"]; present {
++			t.Fatalf("CLI v1 pin carrier gained hash_version %v, want the frozen shape", raw["hash_version"])
++		}
++	})
++}
++
++func readCLIPinCarrier(t *testing.T, home, digest string) map[string]any {
++	t.Helper()
++	payload, err := os.ReadFile(filepath.Join(home, "audit", hashing.Normalize(digest), "trust.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var raw map[string]any
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	return raw
++}
+diff --git a/cmd/curator/nul_opaque_v1_rework_test.go b/cmd/curator/nul_opaque_v1_rework_test.go
+new file mode 100644
+index 00000000..eb2f16b1
+--- /dev/null
++++ b/cmd/curator/nul_opaque_v1_rework_test.go
+@@ -0,0 +1,141 @@
++package main
++
++// Rework-1 regressions for finding 1 at the CLI production entry: `status
++// --check` and reinstall over a v1 installation after NUL bytes appear —
++// including a v1-collision-preserving edit — refuse with the opaque
++// finding instead of reporting up-to-date. The v2 lane admits the same
++// bytes with a v2 identity. These tests run on the hosted gate (R194),
++// like every cmd/curator suite.
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/sourcelock"
++)
++
++// addCLISkillFilesAndRetag appends files to a CLI skill repository fixture
++// and moves its v1 tag onto the new commit.
++func addCLISkillFilesAndRetag(t *testing.T, skill string, files map[string]string) {
++	t.Helper()
++	for name, content := range files {
++		writeFile(t, filepath.Join(skill, filepath.FromSlash(name)), content)
++	}
++	runGit(t, skill, "add", ".")
++	runGit(t, skill, "commit", "-qm", "add opaque snapshot files")
++	runGit(t, skill, "tag", "-f", "v1")
++}
++
++func cliSkillsRoot(home string) string {
++	return filepath.Join(filepath.Dir(home), "skills")
++}
++
++// A v1 installation that gains NUL bytes afterwards refuses at every
++// status surface: `status --check` exits nonzero with the opaque finding,
++// reinstall fails the same way, and the drift classifiers report
++// non-current without hashing. The collision-preserving edit proves the
++// pre-hash guard specifically, because the v1 digests match by
++// construction and only the scan-before-hash can refuse.
++func TestStatusCheckRefusesV1NULAppearingAfterInstall(t *testing.T) {
++	pinV1MarkerWriters(t)
++	project, home := legacyProject(t)
++	configPath := filepath.Join(home, "config.json")
++	skill := filepath.Join(cliSkillsRoot(home), "skill-a")
++	addCLISkillFilesAndRetag(t, skill, map[string]string{
++		"assets/a.bin": "x",
++		"assets/b.md":  "y",
++	})
++	if code, stdout, stderr := capture(t, configPath, "install", "app"); code != exitOK {
++		t.Fatalf("clean v1 install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	installed := filepath.Join(project, ".agents", "skills", "skill-a")
++	skillsDir := filepath.Join(project, ".agents", "skills")
++	recorded := marker.Read(installed)
++	if recorded == nil || recorded.ContentHashVersion() != hashing.VersionV1 {
++		t.Fatalf("installed marker = %+v, want a recorded v1 identity", recorded)
++	}
++
++	code, stdout, stderr := capture(t, configPath, "status", "app", "--json", "--check")
++	if code != exitOK {
++		t.Fatalf("clean v1 status --check = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if report := decodeStatus(t, stdout); report.Skills["skill-a"] != stateUpToDate {
++		t.Fatalf("clean v1 skills = %v, want skill-a up-to-date", report.Skills)
++	}
++	cfg := &config.Config{SkillsRoot: cliSkillsRoot(home)}
++	if drift := scopeStatusDrift(cfg, project, skillsDir); drift["skill-a"] != stateUpToDate {
++		t.Fatalf("clean v1 drift = %v, want skill-a up-to-date", drift)
++	}
++	if state := classifyDraftMember(skillsDir, sourcelock.Member{Name: "skill-a"}, "", nil); state != stateNeedsInstall {
++		t.Fatalf("clean legacy member draft classification = %q, want needs-install", state)
++	}
++
++	before, err := hashing.ContentSHA256(installed, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	writeFile(t, filepath.Join(installed, "assets", "a.bin"), "x\x00assets/b.md\x00y")
++	if err := os.Remove(filepath.Join(installed, "assets", "b.md")); err != nil {
++		t.Fatal(err)
++	}
++	after, err := hashing.ContentSHA256(installed, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if before != after {
++		t.Fatalf("fixture is not a v1 collision: %s != %s", before, after)
++	}
++
++	code, _, stderr = capture(t, configPath, "status", "app", "--check")
++	if code != exitFail {
++		t.Fatalf("status --check after v1-collision edit = %d, want %d\nstderr:\n%s", code, exitFail, stderr)
++	}
++	if !strings.Contains(stderr, "audit.opaque.nul-byte") {
++		t.Fatalf("status --check stderr lacks the opaque finding:\n%s", stderr)
++	}
++	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitFail ||
++		!strings.Contains(stderr, "audit.opaque.nul-byte") {
++		t.Fatalf("reinstall after v1-collision edit = %d, want a failing opaque refusal\nstderr:\n%s", code, stderr)
++	}
++	if drift := scopeStatusDrift(cfg, project, skillsDir); drift["skill-a"] != stateContentDrift {
++		t.Fatalf("drift after v1-collision edit = %v, want skill-a content-drift", drift)
++	}
++	if state := classifyDraftMember(skillsDir, sourcelock.Member{Name: "skill-a"}, "", nil); state != stateUnresolvable {
++		t.Fatalf("draft classification after v1-collision edit = %q, want unresolvable", state)
++	}
++}
++
++// The same NUL bytes under v2 install, report current, and re-check
++// clean: NUL is ordinary v2 data, and the recorded identity is v2.
++func TestStatusCheckAdmitsV2NULBearingInstall(t *testing.T) {
++	pinAuditHashWriters(t, true)
++	project, home := legacyProject(t)
++	configPath := filepath.Join(home, "config.json")
++	skill := filepath.Join(cliSkillsRoot(home), "skill-a")
++	addCLISkillFilesAndRetag(t, skill, map[string]string{
++		"assets/a.bin": "x\x00assets/b.md\x00y",
++	})
++	if code, stdout, stderr := capture(t, configPath, "install", "app"); code != exitOK {
++		t.Fatalf("v2 NUL install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	installed := filepath.Join(project, ".agents", "skills", "skill-a")
++	recorded := marker.Read(installed)
++	if recorded == nil || recorded.SchemaVersion != marker.SchemaV5 || recorded.HashVersion != hashing.VersionV2 {
++		t.Fatalf("installed marker = %+v, want a recorded v2 identity", recorded)
++	}
++	code, stdout, stderr := capture(t, configPath, "status", "app", "--json", "--check")
++	if code != exitOK {
++		t.Fatalf("v2 NUL status --check = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	if report := decodeStatus(t, stdout); report.Skills["skill-a"] != stateUpToDate {
++		t.Fatalf("v2 NUL skills = %v, want skill-a up-to-date", report.Skills)
++	}
++	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitOK {
++		t.Fatalf("v2 NUL reinstall = %d, want %d\nstderr:\n%s", code, exitOK, stderr)
++	}
++}
+diff --git a/internal/audit/audit.go b/internal/audit/audit.go
+index 49e62130..f75aa0c7 100644
+--- a/internal/audit/audit.go
++++ b/internal/audit/audit.go
+@@ -48,7 +48,9 @@ const (
+ 	RulesetVersion = "2"
+ )
+ 
+-const findingOpaqueNUL = "audit.opaque.nul-byte"
++// findingOpaqueNUL is the shared opaque-NUL finding id: every v1
++// pre-hash/pre-trust refusal in the tree carries this same id.
++const findingOpaqueNUL = opaquescan.FindingNUL
+ 
+ // Finding is one audit finding.
+ type Finding struct {
+@@ -68,12 +70,31 @@ type Subject struct {
+ 	Snapshot      string
+ 	SchemaVersion int
+ 	Capabilities  capabilities.Manifest
++	// HashVersion is the content-hash framing the caller will compute
++	// or trust for this subject (Spec §8). The opaque-NUL interim rule
++	// applies exactly when it is v1: v2 hashes 0x00 as ordinary data.
++	// Zero means v1, like every other carrier reader's missing version.
++	HashVersion hashing.Version
+ 	// Commands carries the skill's parsed commands for the script audit
+ 	// warning classes (manager profile §7). A nil map labels nothing,
+ 	// so callers without a parsed manifest keep the previous output.
+ 	Commands map[string]skillspec.Command
+ }
+ 
++// subjectVersion resolves the framing in force for one subject. A missing
++// version reads as v1 (fail-closed, matching the carrier readers); any
++// other unknown version refuses instead of guessing a rule.
++func subjectVersion(subject Subject) (hashing.Version, error) {
++	switch subject.HashVersion {
++	case 0, hashing.VersionV1:
++		return hashing.VersionV1, nil
++	case hashing.VersionV2:
++		return hashing.VersionV2, nil
++	default:
++		return 0, fmt.Errorf("unsupported content hash version %d", subject.HashVersion)
++	}
++}
++
+ // Report is the audit outcome for one subject.
+ type Report struct {
+ 	Skill         string
+@@ -149,9 +170,10 @@ func Decide(findings []Finding, mode, failOn string) string {
+ }
+ 
+ // Gate audits every subject and returns warnings and blocking errors per the
+-// gate behavior of Spec §12.2. Opaque NUL files block even when optional audit
+-// is disabled, because the v1 content hash cannot distinguish their tree from
+-// a colliding twin.
++// gate behavior of Spec §12.2. For v1 subjects, opaque NUL files block even
++// when optional audit is disabled, because the v1 content hash cannot
++// distinguish their tree from a colliding twin. V2 subjects hash NUL bytes
++// as ordinary data (Spec §8) and skip the opaque rule entirely.
+ func Gate(cfg *config.Config, subjects []Subject) (warnings []string, errs []string) {
+ 	return gate(cfg, subjects, true)
+ }
+@@ -163,12 +185,23 @@ func GateReadOnly(cfg *config.Config, subjects []Subject) (warnings []string, er
+ }
+ 
+ func gate(cfg *config.Config, subjects []Subject, persist bool) (warnings []string, errs []string) {
+-	// NUL-bearing files are opaque under the current v1 content framing, so
+-	// this refusal is independent of the opt-in audit policy. Scan every
+-	// admitted snapshot before the audit-enabled early return.
++	// NUL-bearing files are opaque under the v1 content framing only
++	// (Spec §8 interim rule for v1 readers), so this refusal is
++	// independent of the opt-in audit policy. Scan every v1 snapshot
++	// before the audit-enabled early return; v2 snapshots hash NUL
++	// bytes as ordinary data and skip the scan entirely.
+ 	opaquePaths := make([][]string, len(subjects))
+ 	skipAudit := make([]bool, len(subjects))
+ 	for index, subject := range subjects {
++		version, err := subjectVersion(subject)
++		if err != nil {
++			skipAudit[index] = true
++			errs = append(errs, fmt.Sprintf("audit blocked: %s: %v", subject.Name, err))
++			continue
++		}
++		if version != hashing.VersionV1 {
++			continue
++		}
+ 		paths, err := opaquescan.NULPaths(subject.Snapshot)
+ 		if err != nil {
+ 			skipAudit[index] = true
+@@ -270,15 +303,44 @@ func scriptAuditWarnings(subject Subject) []string {
+ 
+ // auditSubject runs the pipeline of Spec §12.1 for one subject.
+ func auditSubject(cfg *config.Config, subject Subject, persist bool) (Report, error) {
+-	opaquePaths, err := opaquescan.NULPaths(subject.Snapshot)
++	version, err := subjectVersion(subject)
+ 	if err != nil {
+-		return Report{}, fmt.Errorf("opaque snapshot scan: %w", err)
++		return Report{}, err
++	}
++	var opaquePaths []string
++	if version == hashing.VersionV1 {
++		opaquePaths, err = opaquescan.NULPaths(subject.Snapshot)
++		if err != nil {
++			return Report{}, fmt.Errorf("opaque snapshot scan: %w", err)
++		}
+ 	}
+ 	return auditSubjectWithOpaquePaths(cfg, subject, persist, opaquePaths)
+ }
+ 
+ func auditSubjectWithOpaquePaths(cfg *config.Config, subject Subject, persist bool, opaquePaths []string) (Report, error) {
+-	contentHash, err := hashing.ContentSHA256(subject.Snapshot, nil)
++	version, err := subjectVersion(subject)
++	if err != nil {
++		return Report{}, err
++	}
++	// The version rule is enforced here, not by caller convention: a v2
++	// subject never blocks on NUL paths, however they arrived.
++	if version != hashing.VersionV1 {
++		opaquePaths = nil
++	} else if len(opaquePaths) != 0 {
++		// Refuse BEFORE hashing: no v1 identity is ever computed over
++		// NUL bytes, so the refusal carries no digest. The v1 content
++		// hash can collide when file bytes contain NUL, so this result
++		// also stays outside the verdict cache: a NUL-free twin must
++		// never authorize a NUL-bearing tree with the same hash.
++		opaqueReport := opaqueNULReport(opaquePaths)
++		return Report{
++			Skill:          subject.Name,
++			Findings:       opaqueReport.Findings,
++			Decision:       opaqueReport.Decision,
++			ScriptPolicies: scriptpolicy.AuditPoliciesForCommands(subject.Commands),
++		}, nil
++	}
++	contentHash, err := hashing.ContentSHA256WithVersion(subject.Snapshot, nil, version)
+ 	if err != nil {
+ 		return Report{}, err
+ 	}
+@@ -286,15 +348,6 @@ func auditSubjectWithOpaquePaths(cfg *config.Config, subject Subject, persist bo
+ 		Skill: subject.Name, ContentSHA256: contentHash,
+ 		ScriptPolicies: scriptpolicy.AuditPoliciesForCommands(subject.Commands),
+ 	}
+-	// The v1 content hash can collide when file bytes contain NUL. Keep this
+-	// result outside the verdict cache so a NUL-free twin cannot authorize a
+-	// NUL-bearing tree with the same hash.
+-	opaqueReport := opaqueNULReport(opaquePaths)
+-	if opaqueReport.Decision == DecisionBlock {
+-		report.Findings = opaqueReport.Findings
+-		report.Decision = opaqueReport.Decision
+-		return report, nil
+-	}
+ 
+ 	// Local revocations block unconditionally (Spec §12.2).
+ 	if reason := revocationReason(cfg, contentHash, subject.Source, subject.Git); reason != "" {
+@@ -304,9 +357,10 @@ func auditSubjectWithOpaquePaths(cfg *config.Config, subject Subject, persist bo
+ 		return report, nil
+ 	}
+ 
+-	// Verdict cache: findings cached by content hash, backend, model, and
+-	// versions; the decision is recomputed under the current policy.
+-	if findings, hit := loadCachedFindings(cfg, contentHash); hit {
++	// Verdict cache: findings cached by (framing version, content hash),
++	// backend, model, and versions; the decision is recomputed under the
++	// current policy.
++	if findings, hit := loadCachedFindings(cfg, contentHash, version); hit {
+ 		report.CacheHit = true
+ 		report.Findings = findings
+ 		report.Decision = decideWithPins(cfg, subject, contentHash, findings)
+@@ -326,7 +380,8 @@ func auditSubjectWithOpaquePaths(cfg *config.Config, subject Subject, persist bo
+ }
+ 
+ func decideWithPins(cfg *config.Config, subject Subject, contentHash string, findings []Finding) string {
+-	pinned := isPinned(cfg, contentHash)
++	version, err := subjectVersion(subject)
++	pinned := err == nil && isPinned(cfg, contentHash, version)
+ 	if cfg.Audit.Mode == "strict" && subject.SchemaVersion < 3 && !pinned {
+ 		return DecisionRequirePin
+ 	}
+@@ -374,19 +429,47 @@ func RevocationFor(revocations []string, contentHash, source, git string) string
+ // blocks profile installation (environments §9.1).
+ func CanaryPasses() bool { return runStaticCanary() }
+ 
+-// Pin records operator trust for a content hash with a reason (Spec §12.2).
++// Pin carriers mirror the verdict carriers: schema 1 is the frozen v1
++// shape (no hash_version member) and authorizes v1 reads only; schema 2
++// carries hash_version for v2 pins. Version and digest form one identity
++// (Spec §8), so equal digest text across framings never shares trust.
++const (
++	pinSchemaV1 = 1
++	pinSchemaV2 = 2
++)
++
++// Pin records operator trust for a v1 content hash with a reason (Spec
++// §12.2). It writes the frozen schema-1 shape, which authorizes v1 reads
++// only; v2 identities need PinAtVersion with the v2 framing.
+ func Pin(home, contentHash, reason, pinnedBy string) (string, error) {
+-	dir := trustDir(home, contentHash)
+-	if err := os.MkdirAll(dir, 0o755); err != nil {
+-		return "", err
+-	}
+-	payload, err := json.MarshalIndent(map[string]any{
+-		"schema_version": 1,
++	return PinAtVersion(home, contentHash, hashing.VersionV1, reason, pinnedBy)
++}
++
++// PinAtVersion records operator trust for a content hash in the given
++// framing version with a reason (Spec §12.2). The version is explicit,
++// never inferred from digest bytes: v1 writes the frozen schema-1 shape
++// byte-identically, v2 writes schema 2 with hash_version 2.
++func PinAtVersion(home, contentHash string, version hashing.Version, reason, pinnedBy string) (string, error) {
++	record := map[string]any{
+ 		"content_sha256": strings.ToLower(contentHash),
+ 		"pinned":         true,
+ 		"pinned_by":      pinnedBy,
+ 		"reason":         reason,
+-	}, "", "  ")
++	}
++	switch version {
++	case 0, hashing.VersionV1:
++		record["schema_version"] = pinSchemaV1
++	case hashing.VersionV2:
++		record["schema_version"] = pinSchemaV2
++		record["hash_version"] = int(version)
++	default:
++		return "", fmt.Errorf("unsupported content hash version %d", version)
++	}
++	dir := trustDir(home, contentHash)
++	if err := os.MkdirAll(dir, 0o755); err != nil {
++		return "", err
++	}
++	payload, err := json.MarshalIndent(record, "", "  ")
+ 	if err != nil {
+ 		return "", err
+ 	}
+@@ -394,15 +477,36 @@ func Pin(home, contentHash, reason, pinnedBy string) (string, error) {
+ 	return path, os.WriteFile(path, append(payload, '\n'), 0o644)
+ }
+ 
+-func isPinned(cfg *config.Config, contentHash string) bool {
++func isPinned(cfg *config.Config, contentHash string, version hashing.Version) bool {
++	want := version
++	if want == 0 {
++		want = hashing.VersionV1
++	}
++	if want != hashing.VersionV1 && want != hashing.VersionV2 {
++		return false
++	}
+ 	payload, err := os.ReadFile(filepath.Join(trustDir(cfg.Home(), contentHash), "trust.json")) // #nosec G304
+ 	if err != nil {
+ 		return false
+ 	}
+ 	var data struct {
+-		Pinned bool `json:"pinned"`
++		Pinned        bool            `json:"pinned"`
++		SchemaVersion int             `json:"schema_version"`
++		HashVersion   hashing.Version `json:"hash_version"`
++	}
++	if json.Unmarshal(payload, &data) != nil || !data.Pinned {
++		return false
++	}
++	recordVersion := hashing.VersionV1
++	switch data.SchemaVersion {
++	case 0, pinSchemaV1:
++		// Legacy records without a version are v1.
++	case pinSchemaV2:
++		recordVersion = data.HashVersion
++	default:
++		return false
+ 	}
+-	return json.Unmarshal(payload, &data) == nil && data.Pinned
++	return recordVersion == want
+ }
+ 
+ func trustDir(home, contentHash string) string {
+@@ -414,17 +518,42 @@ func verdictPath(cfg *config.Config, contentHash string) string {
+ 	return filepath.Join(trustDir(cfg.Home(), contentHash), "verdict-"+key+".json")
+ }
+ 
+-func loadCachedFindings(cfg *config.Config, contentHash string) ([]Finding, bool) {
++// Verdict carriers: schema 1 is the frozen v1 shape (no hash_version
++// member); schema 2 carries hash_version for v2 verdicts. A v2 digest is
++// never stored in the frozen v1 shape, and a record is honored only when
++// its version matches the subject's: version and digest form one
++// identity (Spec §8), so equal digest text across framings never shares
++// a verdict.
++const (
++	verdictSchemaV1 = 1
++	verdictSchemaV2 = 2
++)
++
++func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.Version) ([]Finding, bool) {
+ 	payload, err := os.ReadFile(verdictPath(cfg, contentHash)) // #nosec G304
+ 	if err != nil {
+ 		return nil, false
+ 	}
+ 	var data struct {
+-		Findings []Finding `json:"findings"`
++		SchemaVersion int             `json:"schema_version"`
++		HashVersion   hashing.Version `json:"hash_version"`
++		Findings      []Finding       `json:"findings"`
+ 	}
+ 	if err := json.Unmarshal(payload, &data); err != nil {
+ 		return nil, false
+ 	}
++	recordVersion := hashing.VersionV1
++	switch data.SchemaVersion {
++	case 0, verdictSchemaV1:
++		// Legacy records without a version are v1.
++	case verdictSchemaV2:
++		recordVersion = data.HashVersion
++	default:
++		return nil, false
++	}
++	if recordVersion != version {
++		return nil, false
++	}
+ 	return data.Findings, true
+ }
+ 
+@@ -462,12 +591,16 @@ func verdictHasScriptPolicies(cfg *config.Config, contentHash string) bool {
+ }
+ 
+ func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject, findings []Finding, policies []scriptpolicy.CommandAuditPolicy) {
++	version, err := subjectVersion(subject)
++	if err != nil {
++		return
++	}
+ 	dir := trustDir(cfg.Home(), contentHash)
+ 	if err := os.MkdirAll(dir, 0o755); err != nil {
+ 		return
+ 	}
+-	payload, err := json.MarshalIndent(map[string]any{
+-		"schema_version":  1,
++	record := map[string]any{
++		"schema_version":  verdictSchemaV1,
+ 		"content_sha256":  strings.ToLower(contentHash),
+ 		"skill":           subject.Name,
+ 		"commit":          subject.Commit,
+@@ -477,7 +610,12 @@ func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject
+ 		"ruleset_version": RulesetVersion,
+ 		"findings":        findings,
+ 		"script_policies": policies,
+-	}, "", "  ")
++	}
++	if version == hashing.VersionV2 {
++		record["schema_version"] = verdictSchemaV2
++		record["hash_version"] = int(version)
++	}
++	payload, err := json.MarshalIndent(record, "", "  ")
+ 	if err != nil {
+ 		return
+ 	}
+diff --git a/internal/audit/audit_test.go b/internal/audit/audit_test.go
+index 28224b61..642b3ab3 100644
+--- a/internal/audit/audit_test.go
++++ b/internal/audit/audit_test.go
+@@ -110,7 +110,7 @@ func TestOpaqueNULBlocksEvenWhenAV1TwinHasCachedAllow(t *testing.T) {
+ 	if warnings, errs := Gate(cfg, []Subject{clean}); len(errs) != 0 || len(warnings) != 0 {
+ 		t.Fatalf("NUL-free twin: warnings=%v errs=%v", warnings, errs)
+ 	}
+-	if findings, hit := loadCachedFindings(cfg, leftHash); !hit || len(findings) != 0 {
++	if findings, hit := loadCachedFindings(cfg, leftHash, hashing.VersionV1); !hit || len(findings) != 0 {
+ 		t.Fatalf("clean twin cache = (%+v, hit=%v), want cached allow", findings, hit)
+ 	}
+ 
+@@ -265,7 +265,7 @@ func TestGatePinPolicyFreshAndCached(t *testing.T) {
+ 							t.Fatalf("warm cache: %v", errs)
+ 						}
+ 					}
+-					if _, hit := loadCachedFindings(cfg, contentHash); hit != cached {
++					if _, hit := loadCachedFindings(cfg, contentHash, hashing.VersionV1); hit != cached {
+ 						t.Fatalf("cache hit before gate = %v, want %v", hit, cached)
+ 					}
+ 					if tc.pinned {
+diff --git a/internal/audit/opaque_v1_nohash_test.go b/internal/audit/opaque_v1_nohash_test.go
+new file mode 100644
+index 00000000..0fb50350
+--- /dev/null
++++ b/internal/audit/opaque_v1_nohash_test.go
+@@ -0,0 +1,130 @@
++// Rework-2 regressions for revision-3 finding F3: the v1 opaque
++// refusal is observed to precede hashing, not merely to return an empty
++// digest. Each test below drives a guarded production entry over a
++// NUL-bearing tree inside hashing.CountV1Hashes and requires zero v1
++// computations; the clean control in the same test requires at least
++// one, proving the seam is wired. The narrowing mutant — a discarded
++// ContentSHA256WithVersion(snapshot, nil, VersionV1) inside the refusal
++// branch, or the live hash moved above the guard — computes one v1
++// identity and fails every zero assertion here.
++package audit
++
++import (
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/capabilities"
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++// The gate refuses a v1 NUL tree with the opaque finding whether audit
++// is enabled or not, and neither path computes a v1 identity. The
++// enabled clean control hashes, proving the observation is live.
++func TestGateV1NULRefusalComputesNoV1Identity(t *testing.T) {
++	nulTree := t.TempDir()
++	writeFiles(t, nulTree, map[string][]byte{
++		"scripts/tool": []byte("echo ok\n"),
++		"assets/a.bin": []byte("x\x00y"),
++	})
++	subject := Subject{Name: "nul-tree", Snapshot: nulTree, SchemaVersion: 3,
++		Capabilities: capabilities.ImplicitNone()}
++
++	disabled := newCfg(t, "advisory", "off")
++	disabled.Audit.Enabled = false
++	var disabledErrs []string
++	if calls := hashing.CountV1Hashes(func() {
++		_, disabledErrs = Gate(disabled, []Subject{subject})
++	}); calls != 0 {
++		t.Fatalf("disabled-audit v1 NUL gate computed %d v1 identities, want 0", calls)
++	}
++	if len(disabledErrs) != 1 || !strings.Contains(disabledErrs[0], "audit.opaque.nul-byte") {
++		t.Fatalf("disabled-audit v1 NUL gate errs = %v, want the opaque refusal", disabledErrs)
++	}
++
++	enabled := newCfg(t, "advisory", "off")
++	var enabledErrs []string
++	if calls := hashing.CountV1Hashes(func() {
++		_, enabledErrs = Gate(enabled, []Subject{subject})
++	}); calls != 0 {
++		t.Fatalf("enabled-audit v1 NUL gate computed %d v1 identities, want 0", calls)
++	}
++	if len(enabledErrs) != 1 || !strings.Contains(enabledErrs[0], "audit.opaque.nul-byte") {
++		t.Fatalf("enabled-audit v1 NUL gate errs = %v, want the opaque refusal", enabledErrs)
++	}
++
++	cleanTree := t.TempDir()
++	writeFiles(t, cleanTree, map[string][]byte{"scripts/tool": []byte("echo ok\n")})
++	clean := Subject{Name: "clean-tree", Snapshot: cleanTree, SchemaVersion: 3,
++		Capabilities: capabilities.ImplicitNone()}
++	if calls := hashing.CountV1Hashes(func() {
++		if _, errs := Gate(enabled, []Subject{clean}); len(errs) != 0 {
++			t.Fatalf("clean v1 gate errs = %v, want admission", errs)
++		}
++	}); calls == 0 {
++		t.Fatal("clean v1 gate observed no v1 hash; the seam is not wired")
++	}
++}
++
++// The audit pipeline refuses a v1 NUL tree before hashing for both the
++// legacy zero version and the explicit v1 version; the refusal carries
++// no digest because none was computed. The clean control hashes.
++func TestAuditSubjectV1NULRefusalComputesNoV1Identity(t *testing.T) {
++	nulTree := t.TempDir()
++	writeFiles(t, nulTree, map[string][]byte{"assets/a.bin": []byte("x\x00y")})
++	cfg := newCfg(t, "advisory", "off")
++	for _, version := range []hashing.Version{0, hashing.VersionV1} {
++		subject := Subject{Name: "nul-tree", Snapshot: nulTree, SchemaVersion: 3,
++			Capabilities: capabilities.ImplicitNone(), HashVersion: version}
++		var report Report
++		var err error
++		if calls := hashing.CountV1Hashes(func() {
++			report, err = auditSubject(cfg, subject, true)
++		}); calls != 0 {
++			t.Fatalf("version %d: v1 NUL audit computed %d v1 identities, want 0", version, calls)
++		}
++		if err != nil {
++			t.Fatal(err)
++		}
++		if report.Decision != DecisionBlock || report.ContentSHA256 != "" {
++			t.Fatalf("version %d: report %+v, want a digest-free block", version, report)
++		}
++	}
++
++	cleanTree := t.TempDir()
++	writeFiles(t, cleanTree, map[string][]byte{"scripts/tool": []byte("echo ok\n")})
++	clean := Subject{Name: "clean-tree", Snapshot: cleanTree, SchemaVersion: 3,
++		Capabilities: capabilities.ImplicitNone()}
++	if calls := hashing.CountV1Hashes(func() {
++		if _, err := auditSubject(cfg, clean, false); err != nil {
++			t.Fatal(err)
++		}
++	}); calls == 0 {
++		t.Fatal("clean v1 audit observed no v1 hash; the seam is not wired")
++	}
++}
++
++// The draft source-audit lane refuses a NUL tree with the opaque finding
++// before its live v1 pipeline hashes anything. The clean control
++// establishes a binding and hashes.
++func TestCheckSourceAuditV1NULRefusalComputesNoV1Identity(t *testing.T) {
++	nulTree := t.TempDir()
++	writeFiles(t, nulTree, map[string][]byte{"assets/a.bin": []byte("x\x00y")})
++	cfg := newCfg(t, "advisory", "off")
++	var auditErr error
++	if calls := hashing.CountV1Hashes(func() {
++		_, auditErr = CheckSourceAudit(cfg, sourceTestSubject(nulTree, 3), true, sourceAuditTestNow)
++	}); calls != 0 {
++		t.Fatalf("v1 NUL source audit computed %d v1 identities, want 0", calls)
++	}
++	if auditErr == nil || !strings.Contains(auditErr.Error(), "audit.opaque.nul-byte") {
++		t.Fatalf("v1 NUL source audit err = %v, want the opaque refusal", auditErr)
++	}
++
++	if calls := hashing.CountV1Hashes(func() {
++		if _, err := CheckSourceAudit(cfg, sourceTestSubject(cleanSnapshot(t, "echo ok\n"), 3), true, sourceAuditTestNow); err != nil {
++			t.Fatal(err)
++		}
++	}); calls == 0 {
++		t.Fatal("clean v1 source audit observed no v1 hash; the seam is not wired")
++	}
++}
+diff --git a/internal/audit/opaque_v1_pins_test.go b/internal/audit/opaque_v1_pins_test.go
+new file mode 100644
+index 00000000..f2d31721
+--- /dev/null
++++ b/internal/audit/opaque_v1_pins_test.go
+@@ -0,0 +1,204 @@
++// Rework-2 regressions for revision-3 finding F2: trust pins are a
++// versioned carrier. A pin authorizes only the (version, digest)
++// identity it was issued for (Spec §8): legacy unversioned pins keep
++// authorizing v1 reads only, and equal digest text across framings
++// never shares trust. A mutant that ignores the recorded pin version
++// authorizes the mismatched subjects below instead of requiring a pin.
++package audit
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/capabilities"
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++// A new v2 pin records schema 2 with hash_version 2; v1 pins keep the
++// byte-identical frozen schema-1 shape with no hash_version member,
++// whether written by the legacy writer or the versioned writer.
++func TestPinAtVersionWritesVersionedCarrier(t *testing.T) {
++	digest := "sha256:" + strings.Repeat("a", 64)
++
++	homeV2 := t.TempDir()
++	path, err := PinAtVersion(homeV2, digest, hashing.VersionV2, "v2 approval", "fixture")
++	if err != nil {
++		t.Fatal(err)
++	}
++	raw := readPinCarrier(t, path)
++	if raw["schema_version"] != float64(2) || raw["hash_version"] != float64(2) {
++		t.Fatalf("v2 pin carrier = schema_version %v hash_version %v, want 2/2",
++			raw["schema_version"], raw["hash_version"])
++	}
++
++	homeV1 := t.TempDir()
++	legacyPath, err := Pin(homeV1, digest, "legacy v1 approval", "fixture")
++	if err != nil {
++		t.Fatal(err)
++	}
++	assertFrozenV1PinCarrier(t, legacyPath)
++
++	explicitPath, err := PinAtVersion(t.TempDir(), digest, hashing.VersionV1, "explicit v1 approval", "fixture")
++	if err != nil {
++		t.Fatal(err)
++	}
++	assertFrozenV1PinCarrier(t, explicitPath)
++
++	if _, err := PinAtVersion(t.TempDir(), digest, hashing.Version(9), "bad", "fixture"); err == nil ||
++		!strings.Contains(err.Error(), "unsupported content hash version") {
++		t.Fatalf("unknown-version pin = %v, want an unsupported-version refusal", err)
++	}
++}
++
++func readPinCarrier(t *testing.T, path string) map[string]any {
++	t.Helper()
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var raw map[string]any
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	return raw
++}
++
++func assertFrozenV1PinCarrier(t *testing.T, path string) {
++	t.Helper()
++	raw := readPinCarrier(t, path)
++	if raw["schema_version"] != float64(1) {
++		t.Fatalf("v1 pin carrier schema_version = %v, want 1", raw["schema_version"])
++	}
++	if _, present := raw["hash_version"]; present {
++		t.Fatalf("v1 pin carrier gained hash_version %v, want the frozen shape", raw["hash_version"])
++	}
++}
++
++// A legacy v1 pin never authorizes a v2 subject, even at equal digest
++// text: the strict schema-2 v2 subject over a NUL tree still requires
++// a v2 pin. The equal digest text is a synthetic version-pair fixture,
++// not a hash collision.
++func TestV2RejectsLegacyV1Pin(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{
++		"scripts/tool": []byte("echo ok\n"),
++		"assets/a.bin": []byte("x\x00y"),
++	})
++	digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	cfg := newCfg(t, "strict", "high")
++	if _, err := Pin(cfg.Home(), digest, "legacy v1 approval", "fixture"); err != nil {
++		t.Fatal(err)
++	}
++	_, errs := Gate(cfg, []Subject{{
++		Name: "modern", Snapshot: root, HashVersion: hashing.VersionV2,
++		SchemaVersion: 2, Capabilities: capabilities.ImplicitNone(),
++	}})
++	if len(errs) != 1 || !strings.Contains(errs[0], "requires pin") {
++		t.Fatalf("v2 subject with a legacy v1 pin: errs = %v, want exactly the require-pin refusal", errs)
++	}
++}
++
++// Symmetrically, a v2 pin never authorizes a v1 subject: the strict
++// schema-2 v1 subject over a clean tree still requires a v1 pin. The
++// tree is clean so the v1 opaque refusal cannot mask the pin decision.
++func TestV1RejectsV2Pin(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("echo ok\n")})
++	digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV1)
++	if err != nil {
++		t.Fatal(err)
++	}
++	cfg := newCfg(t, "strict", "high")
++	if _, err := PinAtVersion(cfg.Home(), digest, hashing.VersionV2, "v2 approval", "fixture"); err != nil {
++		t.Fatal(err)
++	}
++	_, errs := Gate(cfg, []Subject{{
++		Name: "legacy", Snapshot: root, HashVersion: hashing.VersionV1,
++		SchemaVersion: 2, Capabilities: capabilities.ImplicitNone(),
++	}})
++	if len(errs) != 1 || !strings.Contains(errs[0], "requires pin") {
++		t.Fatalf("v1 subject with a v2 pin: errs = %v, want exactly the require-pin refusal", errs)
++	}
++}
++
++// Matching versions authorize: a v2 pin admits the v2 subject and a v1
++// pin admits the v1 subject, both silently under strict audit.
++func TestPinVersionMatchAuthorizes(t *testing.T) {
++	for _, version := range []hashing.Version{hashing.VersionV1, hashing.VersionV2} {
++		root := t.TempDir()
++		writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("echo ok\n")})
++		digest, err := hashing.ContentSHA256WithVersion(root, nil, version)
++		if err != nil {
++			t.Fatal(err)
++		}
++		cfg := newCfg(t, "strict", "high")
++		var path string
++		if version == hashing.VersionV1 {
++			path, err = Pin(cfg.Home(), digest, "v1 approval", "fixture")
++		} else {
++			path, err = PinAtVersion(cfg.Home(), digest, version, "v2 approval", "fixture")
++		}
++		if err != nil {
++			t.Fatal(err)
++		}
++		if version == hashing.VersionV1 {
++			assertFrozenV1PinCarrier(t, path)
++		} else if raw := readPinCarrier(t, path); raw["hash_version"] != float64(2) {
++			t.Fatalf("v2 pin carrier hash_version = %v, want 2", raw["hash_version"])
++		}
++		warnings, errs := Gate(cfg, []Subject{{
++			Name: "skill", Snapshot: root, HashVersion: version,
++			SchemaVersion: 2, Capabilities: capabilities.ImplicitNone(),
++		}})
++		if len(warnings) != 0 || len(errs) != 0 {
++			t.Fatalf("version %d: warnings=%v errs=%v, want silent admission", version, warnings, errs)
++		}
++	}
++}
++
++// A schemaless legacy record (pinned with no version at all) reads as
++// v1 only: it authorizes the v1 subject and never the v2 subject.
++func TestLegacySchemalessPinReadsAsV1(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("echo ok\n")})
++	v1Digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV1)
++	if err != nil {
++		t.Fatal(err)
++	}
++	v2Digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	cfg := newCfg(t, "strict", "high")
++	for _, digest := range []string{v1Digest, v2Digest} {
++		dir := filepath.Join(cfg.Home(), "audit", hashing.Normalize(digest))
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		payload, err := json.Marshal(map[string]any{
++			"content_sha256": strings.ToLower(digest),
++			"pinned":         true,
++		})
++		if err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(dir, "trust.json"), append(payload, '\n'), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if !isPinned(cfg, v1Digest, hashing.VersionV1) || !isPinned(cfg, v1Digest, 0) {
++		t.Fatal("schemaless pin must authorize v1 reads, including the zero-version reader")
++	}
++	if isPinned(cfg, v2Digest, hashing.VersionV2) {
++		t.Fatal("schemaless pin must never authorize a v2 read")
++	}
++	if isPinned(cfg, v1Digest, hashing.Version(9)) {
++		t.Fatal("unknown-version read must never report pinned")
++	}
++}
+diff --git a/internal/audit/opaque_v1_rework_test.go b/internal/audit/opaque_v1_rework_test.go
+new file mode 100644
+index 00000000..99ab75e8
+--- /dev/null
++++ b/internal/audit/opaque_v1_rework_test.go
+@@ -0,0 +1,194 @@
++// Rework-1 regressions for the Spec §8 version rule of the opaque-NUL
++// gate: refusal happens before any v1 identity is computed, and v2 audit
++// verdicts live in a versioned carrier that legacy v1 records never
++// satisfy. These tests adapt the revision-1 reviewer's attack probes
++// into maintained production-entry coverage.
++package audit
++
++import (
++	"encoding/json"
++	"os"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/capabilities"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++// A mixed gate over one NUL tree refuses exactly the v1 subject; the v2
++// subject over the same bytes is admitted silently.
++func TestGateMixedVersionsRefuseOnlyTheV1Subject(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"deep/a.bin": []byte("x\x00y")})
++	cfg := newCfg(t, "advisory", "off")
++	_, errs := Gate(cfg, []Subject{
++		{Name: "legacy", Snapshot: root},
++		{Name: "modern", Snapshot: root, HashVersion: hashing.VersionV2},
++	})
++	if len(errs) != 1 || !strings.Contains(errs[0], "audit blocked: legacy: critical audit.opaque.nul-byte") {
++		t.Fatalf("mixed gate errors = %v, want exactly the legacy opaque refusal", errs)
++	}
++}
++
++// The v1 opaque refusal precedes hashing: a blocked v1 report carries no
++// computed ContentSHA256 at all. A hashing-behind-refusal regression
++// would populate this field.
++func TestAuditSubjectV1NULBlockCarriesNoComputedIdentity(t *testing.T) {
++	nulTree := t.TempDir()
++	writeFiles(t, nulTree, map[string][]byte{
++		"assets/a.bin": []byte("x\x00docs/b.md\x00y"),
++	})
++	cfg := newCfg(t, "advisory", "off")
++	for _, version := range []hashing.Version{0, hashing.VersionV1} {
++		subject := Subject{Name: "nul-tree", Snapshot: nulTree, SchemaVersion: 3,
++			Capabilities: capabilities.ImplicitNone(), HashVersion: version}
++		report, err := auditSubject(cfg, subject, true)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if report.Decision != DecisionBlock || len(report.Findings) != 1 {
++			t.Fatalf("version %d: report %+v, want a block with one finding", version, report)
++		}
++		if report.ContentSHA256 != "" {
++			t.Fatalf("version %d: refusal carries computed v1 identity %s, want none", version, report.ContentSHA256)
++		}
++	}
++}
++
++// The draft source-audit lane refuses a NUL tree with the opaque finding
++// and stores no verdict: the frozen v1 binding is never computed over
++// those bytes and never cached.
++func TestCheckSourceAuditV1NULRefusesWithoutVerdict(t *testing.T) {
++	nulTree := t.TempDir()
++	writeFiles(t, nulTree, map[string][]byte{
++		"assets/a.bin": []byte("x\x00y"),
++	})
++	v1Hash, err := hashing.ContentSHA256(nulTree, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	cfg := newCfg(t, "advisory", "off")
++	if _, err := CheckSourceAudit(cfg, sourceTestSubject(nulTree, 3), true, sourceAuditTestNow); err == nil ||
++		!strings.Contains(err.Error(), "audit.opaque.nul-byte") {
++		t.Fatalf("draft source audit over NUL = %v, want the opaque refusal", err)
++	}
++	if _, hit := loadCachedFindings(cfg, v1Hash, hashing.VersionV1); hit {
++		t.Fatal("draft source audit cached a verdict for a NUL tree")
++	}
++}
++
++// A v2 verdict is stored in the versioned carrier: schema 2 with an
++// explicit hash_version 2, never the frozen v1 shape.
++func TestV2VerdictCarrierRecordsHashVersion(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"assets/a.bin": []byte("x\x00y")})
++	cfg := newCfg(t, "advisory", "off")
++	subject := Subject{Name: "nul", Snapshot: root, HashVersion: hashing.VersionV2,
++		SchemaVersion: 3, Capabilities: capabilities.ImplicitNone()}
++	report, err := auditSubject(cfg, subject, true)
++	if err != nil {
++		t.Fatal(err)
++	}
++	payload, err := os.ReadFile(verdictPath(cfg, report.ContentSHA256))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var raw map[string]any
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	if raw["schema_version"] != float64(2) || raw["hash_version"] != float64(2) {
++		t.Fatalf("v2 verdict carrier = schema_version %v hash_version %v, want 2/2",
++			raw["schema_version"], raw["hash_version"])
++	}
++}
++
++// A v2 subject never consumes a legacy unversioned record, even at equal
++// digest text: version and digest form one identity (Spec §8). The equal
++// digest text is a synthetic version-pair fixture, not a hash collision.
++func TestV2RejectsLegacyUnversionedVerdict(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
++	digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	cfg := newCfg(t, "advisory", "off")
++	legacy := Subject{Name: "legacy", Snapshot: root, HashVersion: hashing.VersionV1, SchemaVersion: 3}
++	storeCachedFindings(cfg, digest, legacy, nil, nil)
++	modern := Subject{Name: "modern", Snapshot: root, HashVersion: hashing.VersionV2,
++		SchemaVersion: 3, Capabilities: capabilities.ImplicitNone()}
++	report, err := auditSubject(cfg, modern, false)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if report.CacheHit || len(report.Findings) == 0 {
++		t.Fatalf("v2 report %+v, want a fresh detection, not the legacy-shaped cache entry", report)
++	}
++}
++
++// Symmetrically, a v1 subject never consumes a v2 record: the seeded v2
++// allow at the v1 digest must not authorize the v1 read.
++func TestV1IgnoresV2VerdictCarrier(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
++	digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV1)
++	if err != nil {
++		t.Fatal(err)
++	}
++	cfg := newCfg(t, "advisory", "off")
++	modern := Subject{Name: "modern", Snapshot: root, HashVersion: hashing.VersionV2, SchemaVersion: 3}
++	storeCachedFindings(cfg, digest, modern, nil, nil)
++	legacy := Subject{Name: "legacy", Snapshot: root, HashVersion: hashing.VersionV1,
++		SchemaVersion: 3, Capabilities: capabilities.ImplicitNone()}
++	report, err := auditSubject(cfg, legacy, false)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if report.CacheHit || len(report.Findings) == 0 {
++		t.Fatalf("v1 report %+v, want a fresh detection, not the v2 cache entry", report)
++	}
++}
++
++// Legacy schema-1 records without hash_version keep authorizing v1
++// reads, and the script-policy backfill preserves their frozen shape.
++func TestV1HonorsLegacySchema1Verdict(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
++	digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV1)
++	if err != nil {
++		t.Fatal(err)
++	}
++	cfg := newCfg(t, "advisory", "off")
++	legacy := Subject{Name: "legacy", Snapshot: root, HashVersion: hashing.VersionV1,
++		SchemaVersion: 3, Capabilities: capabilities.ImplicitNone()}
++	storeCachedFindings(cfg, digest, legacy, nil, nil)
++	assertFrozenV1Carrier(t, cfg, digest)
++	report, err := auditSubject(cfg, legacy, true)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !report.CacheHit || len(report.Findings) != 0 {
++		t.Fatalf("v1 report %+v, want the cached legacy allow", report)
++	}
++	assertFrozenV1Carrier(t, cfg, digest)
++}
++
++func assertFrozenV1Carrier(t *testing.T, cfg *config.Config, digest string) {
++	t.Helper()
++	payload, err := os.ReadFile(verdictPath(cfg, digest))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var raw map[string]any
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	if raw["schema_version"] != float64(1) {
++		t.Fatalf("v1 verdict carrier schema_version = %v, want 1", raw["schema_version"])
++	}
++	if _, present := raw["hash_version"]; present {
++		t.Fatalf("v1 verdict carrier gained hash_version %v, want the frozen shape", raw["hash_version"])
++	}
++}
+diff --git a/internal/audit/opaque_v1_test.go b/internal/audit/opaque_v1_test.go
+new file mode 100644
+index 00000000..a2222110
+--- /dev/null
++++ b/internal/audit/opaque_v1_test.go
+@@ -0,0 +1,234 @@
++// Tests for the Spec §8 version rule of the opaque-NUL gate: the interim
++// NUL block applies exactly when a v1 identity is computed or trusted,
++// and never for a v2 computation or verification.
++package audit
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/capabilities"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++// writeNULCollisionPair builds the v1 framing collision: a NUL-bearing
++// single-record tree and a NUL-free twin with the same v1 digest but
++// different v2 digests.
++func writeNULCollisionPair(t *testing.T, nulTree, cleanTwin string) (v1, v2NUL, v2Twin string) {
++	t.Helper()
++	writeFiles(t, nulTree, map[string][]byte{
++		"assets/a.bin": []byte("x\x00docs/b.md\x00y"),
++	})
++	writeFiles(t, cleanTwin, map[string][]byte{
++		"assets/a.bin": []byte("x"),
++		"docs/b.md":    []byte("y"),
++	})
++	leftHash, err := hashing.ContentSHA256(nulTree, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	rightHash, err := hashing.ContentSHA256(cleanTwin, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if leftHash != rightHash {
++		t.Fatalf("v1 framing did not collide: %s != %s", leftHash, rightHash)
++	}
++	v2Left, err := hashing.ContentSHA256WithVersion(nulTree, nil, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	v2Right, err := hashing.ContentSHA256WithVersion(cleanTwin, nil, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if v2Left == v2Right {
++		t.Fatalf("v2 framing must distinguish the NUL tree from its twin: %s", v2Left)
++	}
++	return leftHash, v2Left, v2Right
++}
++
++// A v2 subject skips the opaque rule entirely, even when optional audit is
++// disabled: NUL bytes are ordinary v2 data, so there is nothing to refuse
++// and no scan failure to report.
++func TestGateV2AdmitsNULBearingTreeWhenAuditIsDisabled(t *testing.T) {
++	snapshot := t.TempDir()
++	writeFiles(t, snapshot, map[string][]byte{
++		"docs/deep/opaque.unsupported": []byte("prefix\x00suffix"),
++	})
++	cfg := &config.Config{Path: filepath.Join(t.TempDir(), "config.json")}
++	if cfg.Audit.Enabled {
++		t.Fatal("test requires the default disabled audit configuration")
++	}
++
++	for _, entry := range []struct {
++		name string
++		gate func(*config.Config, []Subject) ([]string, []string)
++	}{
++		{"Gate", Gate},
++		{"GateReadOnly", GateReadOnly},
++	} {
++		t.Run(entry.name, func(t *testing.T) {
++			warnings, errs := entry.gate(cfg, []Subject{{
++				Name: "opaque-skill", Snapshot: snapshot, SchemaVersion: 3,
++				Capabilities: capabilities.ImplicitNone(), HashVersion: hashing.VersionV2,
++			}})
++			if warnings != nil || errs != nil {
++				t.Fatalf("v2 gate over NUL tree = warnings %v, errors %v; want silent admission", warnings, errs)
++			}
++		})
++	}
++}
++
++// A v2 audit of the NUL tree reports the v2 identity, never consults the
++// v1 digest, and stores nothing under it: there is no path where a v1
++// identity is computed or trusted over NUL bytes.
++func TestGateV2ReportsV2IdentityAndStoresNothingUnderV1(t *testing.T) {
++	nulTree, cleanTwin := t.TempDir(), t.TempDir()
++	v1Hash, v2NUL, v2Twin := writeNULCollisionPair(t, nulTree, cleanTwin)
++	cfg := newCfg(t, "advisory", "off")
++
++	clean := Subject{Name: "clean-twin", Snapshot: cleanTwin, SchemaVersion: 3,
++		Capabilities: capabilities.ImplicitNone(), HashVersion: hashing.VersionV2}
++	if warnings, errs := Gate(cfg, []Subject{clean}); len(errs) != 0 || len(warnings) != 0 {
++		t.Fatalf("NUL-free v2 twin: warnings=%v errs=%v", warnings, errs)
++	}
++	if findings, hit := loadCachedFindings(cfg, v2Twin, hashing.VersionV2); !hit || len(findings) != 0 {
++		t.Fatalf("clean twin v2 cache = (%+v, hit=%v), want cached allow", findings, hit)
++	}
++
++	opaque := Subject{Name: "nul-tree", Snapshot: nulTree, SchemaVersion: 3,
++		Capabilities: capabilities.ImplicitNone(), HashVersion: hashing.VersionV2}
++	// The read-only audit runs before the persisting gate so the
++	// freshness assertion below is meaningful.
++	report, err := auditSubject(cfg, opaque, false)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if report.Decision != DecisionAllow || report.CacheHit || report.ContentSHA256 != v2NUL {
++		t.Fatalf("v2 opaque report %+v, want a fresh allow carrying the v2 identity %s", report, v2NUL)
++	}
++	if warnings, errs := Gate(cfg, []Subject{opaque}); len(errs) != 0 || len(warnings) != 0 {
++		t.Fatalf("NUL-bearing v2 tree: warnings=%v errs=%v, want admission", warnings, errs)
++	}
++	// The v1 digest of the NUL tree keys no trust state: no verdict was
++	// stored under it, so a v1 reader can never inherit this admission.
++	if _, err := os.Stat(filepath.Join(cfg.Home(), "audit", hashing.Normalize(v1Hash))); !os.IsNotExist(err) {
++		t.Fatalf("v2 audit left trust state under the v1 digest: %v", err)
++	}
++	if _, hit := loadCachedFindings(cfg, v1Hash, hashing.VersionV1); hit {
++		t.Fatal("v2 audit cached a verdict under the v1 digest")
++	}
++}
++
++// Every v1 identity path keeps the blocking opaque finding with the
++// unchanged id, severity, evidence, and message: explicit v1 subjects and
++// legacy subjects with no recorded version alike.
++func TestGateV1KeepsOpaqueBlockWithUnchangedFinding(t *testing.T) {
++	nulTree := t.TempDir()
++	writeFiles(t, nulTree, map[string][]byte{
++		"assets/a.bin": []byte("x\x00docs/b.md\x00y"),
++	})
++	v1Hash, err := hashing.ContentSHA256(nulTree, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++
++	for _, version := range []hashing.Version{0, hashing.VersionV1} {
++		t.Run(map[hashing.Version]string{0: "legacy-zero", hashing.VersionV1: "explicit-v1"}[version], func(t *testing.T) {
++			subject := Subject{Name: "nul-tree", Snapshot: nulTree, SchemaVersion: 3,
++				Capabilities: capabilities.ImplicitNone(), HashVersion: version}
++
++			disabled := &config.Config{Path: filepath.Join(t.TempDir(), "config.json")}
++			_, errs := Gate(disabled, []Subject{subject})
++			want := "audit blocked: nul-tree: critical audit.opaque.nul-byte - " +
++				"regular file contains a NUL byte and is treated as opaque (file: assets/a.bin)"
++			if len(errs) != 1 || errs[0] != want {
++				t.Fatalf("disabled-audit v1 gate errors = %v, want exactly %q", errs, want)
++			}
++
++			cfg := newCfg(t, "advisory", "off")
++			if _, errs := Gate(cfg, []Subject{subject}); len(errs) != 1 || !strings.Contains(errs[0], findingOpaqueNUL) {
++				t.Fatalf("enabled-audit v1 gate errors = %v, want the blocking opaque finding", errs)
++			}
++			report, err := auditSubject(cfg, subject, true)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if report.Decision != DecisionBlock || report.CacheHit || len(report.Findings) != 1 {
++				t.Fatalf("v1 opaque report %+v, want an uncached block with one finding", report)
++			}
++			finding := report.Findings[0]
++			if finding.ID != findingOpaqueNUL || finding.Severity != SeverityCritical ||
++				finding.File != "assets/a.bin" ||
++				finding.Evidence != "regular file contains a NUL byte and is treated as opaque" ||
++				!finding.Verifiable {
++				t.Fatalf("v1 opaque finding %+v, want the unchanged critical file-naming finding", finding)
++			}
++			// The blocked v1 result stays outside the verdict cache.
++			if _, hit := loadCachedFindings(cfg, v1Hash, hashing.VersionV1); hit {
++				t.Fatal("blocked v1 NUL result was stored in the verdict cache")
++			}
++		})
++	}
++}
++
++// An unknown framing version refuses instead of guessing a rule: it must
++// neither scan-and-block as v1 nor admit as v2, on clean trees either.
++func TestGateRejectsUnknownHashVersion(t *testing.T) {
++	nulTree := t.TempDir()
++	writeFiles(t, nulTree, map[string][]byte{
++		"assets/a.bin": []byte("x\x00y"),
++	})
++	cleanTree := t.TempDir()
++	writeFiles(t, cleanTree, map[string][]byte{
++		"assets/a.bin": []byte("x"),
++	})
++	cfg := newCfg(t, "advisory", "off")
++
++	for _, root := range []string{nulTree, cleanTree} {
++		subject := Subject{Name: "skill-a", Snapshot: root, SchemaVersion: 3,
++			Capabilities: capabilities.ImplicitNone(), HashVersion: hashing.Version(3)}
++		if _, errs := Gate(cfg, []Subject{subject}); len(errs) != 1 ||
++			!strings.Contains(errs[0], "unsupported content hash version 3") {
++			t.Fatalf("unknown-version gate over %s = %v, want an unsupported-version refusal", root, errs)
++		}
++		if _, errs := GateReadOnly(cfg, []Subject{subject}); len(errs) != 1 ||
++			!strings.Contains(errs[0], "unsupported content hash version 3") {
++			t.Fatalf("unknown-version read-only gate over %s = %v, want an unsupported-version refusal", root, errs)
++		}
++		if _, err := auditSubject(cfg, subject, false); err == nil ||
++			!strings.Contains(err.Error(), "unsupported content hash version 3") {
++			t.Fatalf("unknown-version auditSubject over %s = %v, want an unsupported-version error", root, err)
++		}
++	}
++}
++
++// The v2 rule is enforced at the decision point, not by caller convention:
++// even handed NUL paths, a v2 subject never blocks on them.
++func TestAuditSubjectWithOpaquePathsIgnoresNULPathsForV2(t *testing.T) {
++	snapshot := t.TempDir()
++	writeFiles(t, snapshot, map[string][]byte{
++		"assets/a.bin": []byte("prefix\x00suffix"),
++	})
++	cfg := newCfg(t, "advisory", "off")
++	subject := Subject{Name: "nul-tree", Snapshot: snapshot, SchemaVersion: 3,
++		Capabilities: capabilities.ImplicitNone(), HashVersion: hashing.VersionV2}
++	report, err := auditSubjectWithOpaquePaths(cfg, subject, false, []string{"assets/a.bin"})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if report.Decision != DecisionAllow || len(report.Findings) != 0 {
++		t.Fatalf("v2 report with handed NUL paths %+v, want an allow with no findings", report)
++	}
++	wantV2, err := hashing.ContentSHA256WithVersion(snapshot, nil, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if report.ContentSHA256 != wantV2 {
++		t.Fatalf("v2 report identity = %s, want %s", report.ContentSHA256, wantV2)
++	}
++}
+diff --git a/internal/audit/sourceaudit.go b/internal/audit/sourceaudit.go
+index b3a1aa81..5e0e3ffc 100644
+--- a/internal/audit/sourceaudit.go
++++ b/internal/audit/sourceaudit.go
+@@ -36,6 +36,7 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/capabilities"
+ 	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+ )
+ 
+@@ -1088,6 +1089,9 @@ func CheckSourceAudit(cfg *config.Config, subject SourceSubject, persist bool, n
+ 		Name: subject.Name, Source: subject.Source, Git: subject.Git,
+ 		Commit: subject.Commit, Snapshot: subject.Snapshot,
+ 		SchemaVersion: subject.SchemaVersion, Capabilities: subject.Capabilities,
++		// The draft source-audit lane carries frozen v1 identities, so
++		// the opaque-NUL interim rule stays in force here.
++		HashVersion: hashing.VersionV1,
+ 	}, persist)
+ 	if err != nil {
+ 		return nil, fmt.Errorf("audit blocked: %s: %v", subject.Name, err)
+@@ -1119,7 +1123,9 @@ func CheckSourceAudit(cfg *config.Config, subject SourceSubject, persist bool, n
+ 		Policy: policy, Evidence: storedEvidence, Decision: report.Decision,
+ 		Now: now, MaxAge: DefaultSourceAuditMaxAge,
+ 		Skill: subject.Name, Findings: report.Findings,
+-		Pinned:  isPinned(cfg, report.ContentSHA256),
++		// The draft source-audit lane carries frozen v1 identities, so
++		// only v1 pins satisfy its require-pin check.
++		Pinned:  isPinned(cfg, report.ContentSHA256, hashing.VersionV1),
+ 		Revoked: report.Revoked, Revocation: report.Revocation,
+ 		ScriptLabels: subject.ScriptLabels, AssuranceLabels: subject.AssuranceLabels,
+ 	}
+@@ -1141,7 +1147,7 @@ func establishSourceAudit(cfg *config.Config, subject SourceSubject, policy stri
+ 	if fail := enforceSourceDecision(subject.Name, report); fail != nil {
+ 		return nil, fail
+ 	}
+-	pinned := isPinned(cfg, report.ContentSHA256)
++	pinned := isPinned(cfg, report.ContentSHA256, hashing.VersionV1)
+ 	evidence, err := MarshalEvidenceReport(EvidenceReport{
+ 		SchemaVersion: 1, Skill: subject.Name, Package: subject.Package,
+ 		ContentSHA256: subject.ContentSHA256, Findings: report.Findings,
+diff --git a/internal/closure/nul_opaque_v1_scope_test.go b/internal/closure/nul_opaque_v1_scope_test.go
+new file mode 100644
+index 00000000..6c200866
+--- /dev/null
++++ b/internal/closure/nul_opaque_v1_scope_test.go
+@@ -0,0 +1,203 @@
++// Rework-2 regressions for revision-3 finding F1: the frozen v1 guard
++// scans the full skill snapshot before filtering or hashing, including
++// declared runtime/build roots and non-whitelisted paths the context
++// projection omits. A mutant that moves the scan back to the projection
++// returns a digest for every shape below instead of refusing.
++package closure
++
++import (
++	"bytes"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/opaquescan"
++	"github.com/relux-works/curator/internal/skillspec"
++)
++
++// The frozen helper refuses NUL under an excluded runtime root, an
++// excluded build root, and a non-whitelisted root alike: the projection
++// would omit every one of these files, so only the full-snapshot scan
++// can refuse. Clean twins in the same shapes still hash, and the
++// refusal computes no v1 identity at all.
++func TestContentHashForRefusesExcludedNUL(t *testing.T) {
++	shapes := []struct {
++		name  string
++		rel   string
++		roots func(*skillspec.Spec)
++	}{
++		{"runtime", "assets/runtime/deep/a.bin", func(spec *skillspec.Spec) {
++			spec.RuntimeRoots = []string{"assets/runtime"}
++		}},
++		{"build", "assets/runtime/deep/a.bin", func(spec *skillspec.Spec) {
++			spec.BuildRoots = []string{"assets/runtime"}
++		}},
++		{"unlisted", "runtime/deep/a.bin", func(*skillspec.Spec) {}},
++	}
++	for _, shape := range shapes {
++		t.Run(shape.name, func(t *testing.T) {
++			nulTree := t.TempDir()
++			writeFrozenTestFiles(t, nulTree, map[string][]byte{
++				"SKILL.md": []byte("# Test\n"),
++				shape.rel:  []byte("x\x00y"),
++			})
++			spec := &skillspec.Spec{}
++			shape.roots(spec)
++			var digest string
++			var err error
++			calls := hashing.CountV1Hashes(func() {
++				digest, err = ContentHashFor(nulTree, spec)
++			})
++			if err == nil || !strings.Contains(err.Error(), opaquescan.FindingNUL) {
++				t.Fatalf("frozen v1 %s NUL = (%q, %v), want the opaque refusal before projection/hash", shape.name, digest, err)
++			}
++			if digest != "" {
++				t.Fatalf("frozen v1 %s NUL returned digest %s alongside the refusal", shape.name, digest)
++			}
++			if calls != 0 {
++				t.Fatalf("frozen v1 %s NUL computed %d v1 identities before refusing, want 0", shape.name, calls)
++			}
++
++			cleanTree := t.TempDir()
++			writeFrozenTestFiles(t, cleanTree, map[string][]byte{
++				"SKILL.md": []byte("# Test\n"),
++				shape.rel:  []byte("x"),
++			})
++			cleanSpec := &skillspec.Spec{}
++			shape.roots(cleanSpec)
++			var cleanDigest string
++			cleanCalls := hashing.CountV1Hashes(func() {
++				var cleanErr error
++				cleanDigest, cleanErr = ContentHashFor(cleanTree, cleanSpec)
++				if cleanErr != nil {
++					t.Fatal(cleanErr)
++				}
++			})
++			if cleanDigest == "" {
++				t.Fatalf("clean frozen %s context produced no digest", shape.name)
++			}
++			if cleanCalls == 0 {
++				t.Fatalf("clean frozen %s context observed no v1 hash; the seam is not wired", shape.name)
++			}
++		})
++	}
++}
++
++const excludedNULPayload = `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
++
++func writeExcludedNULSkill(t *testing.T, dir, shape, content string) {
++	t.Helper()
++	switch shape {
++	case "runtime":
++		writeDraftSkill(t, dir, "review", false, map[string]string{"runtime/deep/a.bin": content}, nil)
++	case "build":
++		writeDraftSkill(t, dir, "review", false, nil, map[string]string{"build/blob.bin": content})
++	case "unlisted":
++		writeDraftSkill(t, dir, "review", false, nil, nil)
++		full := filepath.Join(dir, "tooling", "cache.bin")
++		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	default:
++		t.Fatalf("unknown excluded shape %q", shape)
++	}
++}
++
++// The production resolve entry refuses a NUL file the frozen context
++// projection would omit, in every excluded shape, before any frozen v1
++// identity is produced. Clean twins resolve, proving the refusal is
++// NUL-specific rather than shape-specific.
++func TestResolveDraftRefusesExcludedNUL(t *testing.T) {
++	for _, shape := range []string{"runtime", "build", "unlisted"} {
++		t.Run(shape, func(t *testing.T) {
++			project, home := t.TempDir(), t.TempDir()
++			writeExcludedNULSkill(t, filepath.Join(project, "skills", "review"), shape, "x\x00y")
++			m, raw := parseDraftManifest(t, project, excludedNULPayload)
++			var resolveErr error
++			calls := hashing.CountV1Hashes(func() {
++				_, resolveErr = ResolveDraft(DraftResolveConfig{ProjectRoot: project, Home: home, Manifest: m, ManifestPayload: raw})
++			})
++			if resolveErr == nil || !strings.Contains(resolveErr.Error(), opaquescan.FindingNUL) {
++				t.Fatalf("ResolveDraft accepted NUL under excluded %s root: %v", shape, resolveErr)
++			}
++			if calls != 0 {
++				t.Fatalf("refused ResolveDraft computed %d v1 identities, want 0", calls)
++			}
++
++			cleanProject, cleanHome := t.TempDir(), t.TempDir()
++			writeExcludedNULSkill(t, filepath.Join(cleanProject, "skills", "review"), shape, "clean-bytes")
++			cleanManifest, cleanRaw := parseDraftManifest(t, cleanProject, excludedNULPayload)
++			var plan *DraftPlan
++			cleanCalls := hashing.CountV1Hashes(func() {
++				var err error
++				plan, err = ResolveDraft(DraftResolveConfig{ProjectRoot: cleanProject, Home: cleanHome, Manifest: cleanManifest, ManifestPayload: cleanRaw})
++				if err != nil {
++					t.Fatal(err)
++				}
++			})
++			if plan.Lock == nil || len(plan.Lock.Members) != 1 {
++				t.Fatalf("clean resolve locked %+v, want one member", plan.Lock)
++			}
++			if cleanCalls == 0 {
++				t.Fatalf("clean resolve observed no v1 hash; the seam is not wired")
++			}
++		})
++	}
++}
++
++// A refresh that meets NUL under an excluded root fails with the opaque
++// finding and preserves the prior lock and bindings byte-identically:
++// the refused generation never publishes.
++func TestRefreshDraftExcludedNULPreservesPriorLock(t *testing.T) {
++	project, home := t.TempDir(), t.TempDir()
++	skill := filepath.Join(project, "skills", "review")
++	writeDraftSkill(t, skill, "review", false, map[string]string{"runtime/deep/a.bin": "clean-bytes"}, nil)
++	m, raw := parseDraftManifest(t, project, excludedNULPayload)
++	cfg := DraftResolveConfig{ProjectRoot: project, Home: home, Manifest: m, ManifestPayload: raw}
++	lockPath := filepath.Join(project, "Skillfile.lock.json")
++	bindingsPath := filepath.Join(home, "bindings.json")
++	if _, err := RefreshDraft(cfg, lockPath, bindingsPath); err != nil {
++		t.Fatal(err)
++	}
++	priorLock, err := os.ReadFile(lockPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	priorBindings, err := os.ReadFile(bindingsPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++
++	if err := os.WriteFile(filepath.Join(skill, "runtime", "deep", "a.bin"), []byte("x\x00y"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	var refreshErr error
++	calls := hashing.CountV1Hashes(func() {
++		_, refreshErr = RefreshDraft(cfg, lockPath, bindingsPath)
++	})
++	if refreshErr == nil || !strings.Contains(refreshErr.Error(), opaquescan.FindingNUL) {
++		t.Fatalf("refresh over excluded NUL = %v, want the opaque refusal", refreshErr)
++	}
++	if calls != 0 {
++		t.Fatalf("refused refresh computed %d v1 identities, want 0", calls)
++	}
++	keptLock, err := os.ReadFile(lockPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !bytes.Equal(keptLock, priorLock) {
++		t.Fatal("refused refresh rewrote the prior lock")
++	}
++	keptBindings, err := os.ReadFile(bindingsPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !bytes.Equal(keptBindings, priorBindings) {
++		t.Fatal("refused refresh rewrote the prior bindings")
++	}
++}
+diff --git a/internal/closure/nul_opaque_v1_test.go b/internal/closure/nul_opaque_v1_test.go
+new file mode 100644
+index 00000000..fe5a5b9c
+--- /dev/null
++++ b/internal/closure/nul_opaque_v1_test.go
+@@ -0,0 +1,54 @@
++// Rework-1 regression for the Spec §8 version rule at the frozen package
++// context hash: the frozen v1 identity is never computed over NUL bytes.
++// Adapts the revision-1 reviewer's attack probe into maintained coverage.
++package closure
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/opaquescan"
++	"github.com/relux-works/curator/internal/skillspec"
++)
++
++func writeFrozenTestFiles(t *testing.T, root string, files map[string][]byte) {
++	t.Helper()
++	for rel, payload := range files {
++		path := filepath.Join(root, filepath.FromSlash(rel))
++		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(path, payload, 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++}
++
++// A frozen tree whose projected context carries NUL bytes is refused with
++// the opaque finding before any v1 digest is computed: no digest is
++// returned. The NUL-free control still hashes.
++func TestContentHashForRefusesNULBeforeHashing(t *testing.T) {
++	nulTree := t.TempDir()
++	writeFrozenTestFiles(t, nulTree, map[string][]byte{
++		"SKILL.md":     []byte("# Test\n"),
++		"assets/a.bin": []byte("x\x00y"),
++	})
++	digest, err := ContentHashFor(nulTree, &skillspec.Spec{})
++	if err == nil || !strings.Contains(err.Error(), opaquescan.FindingNUL) {
++		t.Fatalf("frozen NUL context = (%q, %v), want the opaque refusal", digest, err)
++	}
++	if digest != "" {
++		t.Fatalf("frozen NUL context returned digest %s alongside the refusal", digest)
++	}
++
++	cleanTree := t.TempDir()
++	writeFrozenTestFiles(t, cleanTree, map[string][]byte{
++		"SKILL.md":     []byte("# Test\n"),
++		"assets/a.bin": []byte("x"),
++	})
++	if digest, err := ContentHashFor(cleanTree, &skillspec.Spec{}); err != nil || digest == "" {
++		t.Fatalf("clean frozen context = (%q, %v), want a digest", digest, err)
++	}
++}
+diff --git a/internal/closure/resolve.go b/internal/closure/resolve.go
+index 1c123f91..78fedaeb 100644
+--- a/internal/closure/resolve.go
++++ b/internal/closure/resolve.go
+@@ -12,6 +12,7 @@ import (
+ 	"github.com/relux-works/curator/internal/gitops"
+ 	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/manifest"
++	"github.com/relux-works/curator/internal/opaquescan"
+ 	"github.com/relux-works/curator/internal/skillspec"
+ 	"github.com/relux-works/curator/internal/snapshot"
+ 	"github.com/relux-works/curator/internal/sourcelock"
+@@ -551,6 +552,15 @@ func ContentHashFor(frozen string, spec *skillspec.Spec) (string, error) {
+ 	if spec == nil {
+ 		return "", fmt.Errorf("source_member_invalid: frozen package has no spec")
+ 	}
++	// Spec §8 interim rule for v1 readers: this frozen identity is v1,
++	// so refuse before filtering or hashing. V1 readers inspect every
++	// regular file in the snapshot — including declared runtime/build
++	// roots and non-whitelisted paths the projection below omits — so
++	// the full frozen tree is scanned, not the projection. No v1 digest
++	// is ever computed over NUL bytes.
++	if err := opaquescan.RefuseNULV1(frozen, hashing.VersionV1); err != nil {
++		return "", fmt.Errorf("source_member_invalid: frozen package context: %v", err)
++	}
+ 	includeScripts := len(spec.Commands) == 0
+ 	excludeRoots := whitelist.ContextExcludedRoots(spec.RuntimeRoots, spec.BuildRoots)
+ 	staging, err := os.MkdirTemp("", "curator-context-*")
+diff --git a/internal/contextstore/contextstore.go b/internal/contextstore/contextstore.go
+index 6bff3e22..52cc6c19 100644
+--- a/internal/contextstore/contextstore.go
++++ b/internal/contextstore/contextstore.go
+@@ -20,6 +20,7 @@ import (
+ 	"github.com/relux-works/curator/internal/gitops"
+ 	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/identifiers"
++	"github.com/relux-works/curator/internal/opaquescan"
+ 	"github.com/relux-works/curator/internal/pathboundary"
+ 	"github.com/relux-works/curator/internal/privatedir"
+ 	"github.com/relux-works/curator/internal/stateread"
+@@ -56,9 +57,15 @@ func Exists(home, kind, name, pinKey string) (bool, error) {
+ }
+ 
+ // ContentHash is the core §8 content hash of a store entry (no exclusions:
+-// a store entry carries no marker).
++// a store entry carries no marker). Under the v1 writer it refuses NUL
++// before hashing (Spec §8 interim rule for v1 readers); v2 hashes NUL
++// as ordinary data.
+ func ContentHash(dir string) (string, error) {
+-	return hashing.ContentSHA256WithVersion(dir, map[string]bool{}, hashing.WriteVersion())
++	version := hashing.WriteVersion()
++	if err := opaquescan.RefuseNULV1(dir, version); err != nil {
++		return "", err
++	}
++	return hashing.ContentSHA256WithVersion(dir, map[string]bool{}, version)
+ }
+ 
+ // EnsureGit installs the snapshot of commit from repo as the entry of
+diff --git a/internal/contextstore/nul_opaque_v1_test.go b/internal/contextstore/nul_opaque_v1_test.go
+new file mode 100644
+index 00000000..5d28f4c6
+--- /dev/null
++++ b/internal/contextstore/nul_opaque_v1_test.go
+@@ -0,0 +1,86 @@
++// Rework-1 regression for the Spec §8 version rule at the store content
++// hash: under the v1 writer a NUL-bearing entry is refused before any v1
++// identity is computed; under v2, NUL is ordinary data.
++package contextstore
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/opaquescan"
++)
++
++func TestContentHashFollowsWriterVersionNULRule(t *testing.T) {
++	nulTree := t.TempDir()
++	path := filepath.Join(nulTree, "assets", "a.bin")
++	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, []byte("x\x00y"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++
++	prior := hashing.EnableV2Writers
++	t.Cleanup(func() { hashing.EnableV2Writers = prior })
++
++	hashing.EnableV2Writers = false
++	if digest, err := ContentHash(nulTree); err == nil || !strings.Contains(err.Error(), opaquescan.FindingNUL) {
++		t.Fatalf("v1 store hash over NUL = (%q, %v), want the opaque refusal", digest, err)
++	}
++
++	hashing.EnableV2Writers = true
++	want, err := hashing.ContentSHA256WithVersion(nulTree, map[string]bool{}, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if digest, err := ContentHash(nulTree); err != nil || digest != want {
++		t.Fatalf("v2 store hash over NUL = (%q, %v), want %s", digest, err, want)
++	}
++}
++
++// Rework-2 regression for revision-3 finding F3 at the store content
++// hash: under the v1 writer the opaque refusal is observed to precede
++// hashing. The clean control hashes, proving the seam is wired.
++func TestContentHashV1NULRefusalComputesNoV1Identity(t *testing.T) {
++	nulTree := t.TempDir()
++	nulPath := filepath.Join(nulTree, "assets", "a.bin")
++	if err := os.MkdirAll(filepath.Dir(nulPath), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(nulPath, []byte("x\x00y"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	cleanTree := t.TempDir()
++	cleanPath := filepath.Join(cleanTree, "assets", "a.bin")
++	if err := os.MkdirAll(filepath.Dir(cleanPath), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(cleanPath, []byte("x"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++
++	prior := hashing.EnableV2Writers
++	t.Cleanup(func() { hashing.EnableV2Writers = prior })
++	hashing.EnableV2Writers = false
++
++	var digest string
++	var err error
++	if calls := hashing.CountV1Hashes(func() {
++		digest, err = ContentHash(nulTree)
++	}); calls != 0 {
++		t.Fatalf("v1 store hash over NUL computed %d v1 identities, want 0", calls)
++	}
++	if err == nil || !strings.Contains(err.Error(), opaquescan.FindingNUL) {
++		t.Fatalf("v1 store hash over NUL = (%q, %v), want the opaque refusal", digest, err)
++	}
++	if calls := hashing.CountV1Hashes(func() {
++		if _, err := ContentHash(cleanTree); err != nil {
++			t.Fatal(err)
++		}
++	}); calls == 0 {
++		t.Fatal("clean v1 store hash observed no v1 hash; the seam is not wired")
++	}
++}
+diff --git a/internal/envprofile/envprofile.go b/internal/envprofile/envprofile.go
+index 0a027512..a72cf011 100644
+--- a/internal/envprofile/envprofile.go
++++ b/internal/envprofile/envprofile.go
+@@ -49,6 +49,7 @@ import (
+ 	"github.com/relux-works/curator/internal/identifiers"
+ 	"github.com/relux-works/curator/internal/identity"
+ 	"github.com/relux-works/curator/internal/manifest"
++	"github.com/relux-works/curator/internal/opaquescan"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+ 	"github.com/relux-works/curator/internal/stateread"
+ )
+@@ -1698,7 +1699,16 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
+ 	if !canaryPasses() {
+ 		return nil, fmt.Errorf("audit blocked: audit canary failed: detectors are not producing expected findings")
+ 	}
+-	contentHash, err := hashing.ContentSHA256(snapshot, nil)
++	// The audited identity follows the lock: the same version
++	// contextaudit.DetectAtVersion enforces above, so the NUL rule and
++	// the revocation/pin/cache identity agree on every member.
++	version := resolvedHashVersion(resolved)
++	// Spec §8 interim rule for v1 readers: refuse before hashing, so
++	// this revocation identity is never a v1 digest over NUL bytes.
++	if err := opaquescan.RefuseNULV1(snapshot, version); err != nil {
++		return nil, fmt.Errorf("audit blocked: %v", err)
++	}
++	contentHash, err := hashing.ContentSHA256WithVersion(snapshot, nil, version)
+ 	if err != nil {
+ 		return nil, fmt.Errorf("audit blocked: %v", err)
+ 	}
+@@ -1728,6 +1738,7 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
+ 		Snapshot:      snapshot,
+ 		SchemaVersion: 3,
+ 		Capabilities:  capabilities.ImplicitNone(),
++		HashVersion:   version,
+ 	}
+ 	warnings, errs := audit.Gate(cfg, []audit.Subject{subject})
+ 	if len(errs) > 0 {
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index d64c66ee..5bf77038 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -35,6 +35,7 @@ import (
+ 	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/identifiers"
++	"github.com/relux-works/curator/internal/opaquescan"
+ 	"github.com/relux-works/curator/internal/pathboundary"
+ 	"github.com/relux-works/curator/internal/privatedir"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+@@ -251,6 +252,11 @@ func skillsOf(home string, manager *gitManager, lock *contextlock.Lock) ([]skill
+ 		}
+ 		entry := manager.entryPath(home, resolvedOf(member))
+ 		root := packageRoot(entry, member.Directory)
++		// Spec §8 interim rule for v1 readers: refuse before
++		// recomputing a lock-declared v1 member identity over NUL bytes.
++		if err := opaquescan.RefuseNULV1(root, lock.ContentHashVersion()); err != nil {
++			return nil, fmt.Errorf("%s: member %s %v", DiagRepairFailed, member.Name, err)
++		}
+ 		hash, err := hashing.ContentSHA256WithVersion(root, map[string]bool{}, lock.ContentHashVersion())
+ 		if err != nil {
+ 			return nil, fmt.Errorf("%s: member %s %v", DiagRepairFailed, member.Name, err)
+diff --git a/internal/envprofile/nul_opaque_test.go b/internal/envprofile/nul_opaque_test.go
+index 02005458..9866b020 100644
+--- a/internal/envprofile/nul_opaque_test.go
++++ b/internal/envprofile/nul_opaque_test.go
+@@ -9,6 +9,7 @@ import (
+ 	"github.com/relux-works/curator/internal/contextaudit"
+ 	"github.com/relux-works/curator/internal/contextlock"
+ 	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/opaquescan"
+ 	"github.com/relux-works/curator/internal/pathboundary"
+ )
+ 
+@@ -113,8 +114,12 @@ func TestInstallBlocksDeepNULFileInContextPathSnapshot(t *testing.T) {
+ 	}
+ 
+ 	_, _, _, err := Install(home, InstallOptions{Operand: source})
++	// The refusal fires at the store content hash, before any v1 identity
++	// is computed over these bytes (Spec §8 interim rule), so it carries
++	// the shared pre-hash opaque id rather than the detector class the
++	// later audit layers would have reported.
+ 	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) ||
+-		!strings.Contains(err.Error(), contextaudit.ClassOpaqueFile) || !strings.Contains(err.Error(), "assets/deep/image.unsupported") {
++		!strings.Contains(err.Error(), opaquescan.FindingNUL) || !strings.Contains(err.Error(), "assets/deep/image.unsupported") {
+ 		t.Fatalf("Install error = %v, want a blocking opaque finding naming the deep file", err)
+ 	}
+ 	if _, err := readSource(home, "nul-context"); err == nil {
+@@ -139,8 +144,13 @@ func TestUpdateBlocksDeepNULFileInNewContextMember(t *testing.T) {
+ 		Overlays:             map[string][]OverlaySpec{"acme": {{Source: overlay}}},
+ 	}
+ 	_, _, err := UpdateWithPolicy(home, "acme", policy)
+-	if err == nil || !strings.Contains(err.Error(), DiagUpdateBlocked) ||
+-		!strings.Contains(err.Error(), contextaudit.ClassOpaqueFile) || !strings.Contains(err.Error(), "docs/deep/opaque.unknown") {
++	// The store pre-hash guard refuses the overlay source at load, before
++	// any member audit exists — hence profile_source_invalid rather than
++	// the update-blocked member diagnostic — so the shared opaque id, not
++	// the detector class, names the deep file. The update is still
++	// refused and the old lock still stands, asserted below.
++	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) ||
++		!strings.Contains(err.Error(), opaquescan.FindingNUL) || !strings.Contains(err.Error(), "docs/deep/opaque.unknown") {
+ 		t.Fatalf("UpdateWithPolicy error = %v, want a blocking opaque finding naming the deep file", err)
+ 	}
+ 	_, afterHash, err := readLock(home, "acme")
+diff --git a/internal/envprofile/nul_opaque_v1_guard_test.go b/internal/envprofile/nul_opaque_v1_guard_test.go
+new file mode 100644
+index 00000000..82264a09
+--- /dev/null
++++ b/internal/envprofile/nul_opaque_v1_guard_test.go
+@@ -0,0 +1,275 @@
++// Rework-1 regressions for the Spec §8 version rule at the profile
++// lock/store readers: a lock-declared v1 member identity is never
++// computed or trusted over NUL bytes, while v2 treats NUL as data.
++package envprofile
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextresolve"
++	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/opaquescan"
++)
++
++func writeStoreTestFiles(t *testing.T, root string, files map[string][]byte) {
++	t.Helper()
++	for rel, payload := range files {
++		path := filepath.Join(root, filepath.FromSlash(rel))
++		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(path, payload, 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++}
++
++func pinHex(t *testing.T, entry string, version hashing.Version) string {
++	t.Helper()
++	digest, err := hashing.ContentSHA256WithVersion(entry, map[string]bool{}, version)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return strings.TrimPrefix(digest, "sha256:")
++}
++
++// The strict member audit refuses a v1 NUL snapshot before hashing its
++// revocation identity; the same snapshot under v2 audits clean.
++func TestStrictAuditMemberRefusesV1NULBeforeHashing(t *testing.T) {
++	home := t.TempDir()
++	entry := filepath.Join(t.TempDir(), "entry")
++	writeStoreTestFiles(t, entry, map[string][]byte{
++		"assets/a.bin": []byte("x\x00y"),
++	})
++	manager := &gitManager{}
++	v1 := contextresolve.Resolved{Kind: contextlock.KindSkill, Name: "skill-a", HashVersion: hashing.VersionV1}
++	if _, err := strictAuditMember(home, manager, v1, entry, Policy{}); err == nil ||
++		!strings.Contains(err.Error(), opaquescan.FindingNUL) {
++		t.Fatalf("v1 strict member audit over NUL = %v, want the opaque refusal", err)
++	}
++	v2 := contextresolve.Resolved{Kind: contextlock.KindSkill, Name: "skill-a", HashVersion: hashing.VersionV2}
++	if _, err := strictAuditMember(home, manager, v2, entry, Policy{}); err != nil {
++		t.Fatalf("v2 strict member audit over NUL = %v, want admission", err)
++	}
++}
++
++// The store pin check refuses a v1 NUL entry before recomputing its
++// state pin; a matching v1 pin over clean bytes still verifies, and a
++// v2 NUL entry with a matching v2 pin verifies as data.
++func TestValidateNamedStorePinsRefusesV1NULBeforeHashing(t *testing.T) {
++	home := t.TempDir()
++
++	nulEntry := contextstore.EntryDir(home, contextlock.KindSkill, "nul-skill", "pending")
++	writeStoreTestFiles(t, nulEntry, map[string][]byte{
++		"assets/a.bin": []byte("x\x00y"),
++	})
++	v1Lock := &contextlock.Lock{HashVersion: 1, Members: []contextlock.Member{{
++		Kind: contextlock.KindSkill, Name: "nul-skill", StateHash: pinHex(t, nulEntry, hashing.VersionV1),
++	}}}
++	// Rekey the entry under its true pin: the bytes match the recorded
++	// v1 pin exactly, so only the pre-hash guard can refuse.
++	pinned := contextstore.EntryDir(home, contextlock.KindSkill, "nul-skill", v1Lock.Members[0].StateHash)
++	if err := os.MkdirAll(filepath.Dir(pinned), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Rename(nulEntry, pinned); err != nil {
++		t.Fatal(err)
++	}
++	failure := validateNamedStorePins(home, v1Lock)
++	if failure == nil || failure.Check != diagPinHash || !strings.Contains(failure.Err.Error(), opaquescan.FindingNUL) {
++		t.Fatalf("v1 pin check over NUL = %+v, want a pin_hash failure carrying the opaque refusal", failure)
++	}
++
++	cleanEntry := contextstore.EntryDir(home, contextlock.KindSkill, "clean-skill", "pending")
++	writeStoreTestFiles(t, cleanEntry, map[string][]byte{
++		"assets/a.bin": []byte("x"),
++	})
++	cleanLock := &contextlock.Lock{HashVersion: 1, Members: []contextlock.Member{{
++		Kind: contextlock.KindSkill, Name: "clean-skill", StateHash: pinHex(t, cleanEntry, hashing.VersionV1),
++	}}}
++	pinnedClean := contextstore.EntryDir(home, contextlock.KindSkill, "clean-skill", cleanLock.Members[0].StateHash)
++	if err := os.MkdirAll(filepath.Dir(pinnedClean), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Rename(cleanEntry, pinnedClean); err != nil {
++		t.Fatal(err)
++	}
++	if failure := validateNamedStorePins(home, cleanLock); failure != nil {
++		t.Fatalf("v1 pin check over clean matching bytes = %+v, want nil", failure)
++	}
++
++	v2Lock := &contextlock.Lock{HashVersion: 2, Members: []contextlock.Member{{
++		Kind: contextlock.KindSkill, Name: "nul-v2-skill", StateHash: pinHex(t, pinned, hashing.VersionV2),
++	}}}
++	v2Entry := contextstore.EntryDir(home, contextlock.KindSkill, "nul-v2-skill", v2Lock.Members[0].StateHash)
++	if err := os.MkdirAll(filepath.Dir(v2Entry), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	writeStoreTestFiles(t, v2Entry, map[string][]byte{
++		"assets/a.bin": []byte("x\x00y"),
++	})
++	if failure := validateNamedStorePins(home, v2Lock); failure != nil {
++		t.Fatalf("v2 pin check over NUL = %+v, want nil (NUL is ordinary v2 data)", failure)
++	}
++}
++
++// The managed skill loader refuses a lock-declared v1 member identity
++// over NUL bytes; the v2 member loads with its v2 hash.
++func TestSkillsOfRefusesV1NULBeforeHashing(t *testing.T) {
++	home := t.TempDir()
++	manager := &gitManager{}
++
++	nulEntry := contextstore.EntryDir(home, contextlock.KindSkill, "nul-skill", "pending")
++	writeStoreTestFiles(t, nulEntry, map[string][]byte{
++		"assets/a.bin": []byte("x\x00y"),
++	})
++	v1Lock := &contextlock.Lock{HashVersion: 1, Members: []contextlock.Member{{
++		Kind: contextlock.KindSkill, Name: "nul-skill", StateHash: pinHex(t, nulEntry, hashing.VersionV1),
++	}}}
++	pinned := contextstore.EntryDir(home, contextlock.KindSkill, "nul-skill", v1Lock.Members[0].StateHash)
++	if err := os.MkdirAll(filepath.Dir(pinned), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Rename(nulEntry, pinned); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := skillsOf(home, manager, v1Lock); err == nil ||
++		!strings.Contains(err.Error(), DiagRepairFailed) ||
++		!strings.Contains(err.Error(), opaquescan.FindingNUL) {
++		t.Fatalf("v1 skillsOf over NUL = %v, want a repair failure carrying the opaque refusal", err)
++	}
++
++	v2Lock := &contextlock.Lock{HashVersion: 2, Members: []contextlock.Member{{
++		Kind: contextlock.KindSkill, Name: "nul-v2-skill", StateHash: pinHex(t, pinned, hashing.VersionV2),
++	}}}
++	v2Entry := contextstore.EntryDir(home, contextlock.KindSkill, "nul-v2-skill", v2Lock.Members[0].StateHash)
++	if err := os.MkdirAll(filepath.Dir(v2Entry), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	writeStoreTestFiles(t, v2Entry, map[string][]byte{
++		"assets/a.bin": []byte("x\x00y"),
++	})
++	skills, err := skillsOf(home, manager, v2Lock)
++	if err != nil {
++		t.Fatalf("v2 skillsOf over NUL = %v, want loaded skills", err)
++	}
++	if len(skills) != 1 || skills[0].name != "nul-v2-skill" {
++		t.Fatalf("v2 skills = %+v, want the one loaded member", skills)
++	}
++	wantV2, err := hashing.ContentSHA256WithVersion(v2Entry, map[string]bool{}, hashing.VersionV2)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if skills[0].hash != wantV2 {
++		t.Fatalf("v2 skill hash = %s, want %s", skills[0].hash, wantV2)
++	}
++}
++
++// Rework-2 regression for revision-3 finding F3 at the profile
++// lock/store readers: each v1 opaque refusal is observed to precede
++// hashing. Every clean control hashes, proving the seam is wired.
++func TestGuardedReadersV1NULRefusalComputesNoV1Identity(t *testing.T) {
++	t.Run("strictAuditMember", func(t *testing.T) {
++		home := t.TempDir()
++		nulEntry := filepath.Join(t.TempDir(), "entry")
++		writeStoreTestFiles(t, nulEntry, map[string][]byte{"assets/a.bin": []byte("x\x00y")})
++		cleanEntry := filepath.Join(t.TempDir(), "entry")
++		writeStoreTestFiles(t, cleanEntry, map[string][]byte{"assets/a.bin": []byte("x")})
++		manager := &gitManager{}
++		v1 := contextresolve.Resolved{Kind: contextlock.KindSkill, Name: "skill-a", HashVersion: hashing.VersionV1}
++		var auditErr error
++		if calls := hashing.CountV1Hashes(func() {
++			_, auditErr = strictAuditMember(home, manager, v1, nulEntry, Policy{})
++		}); calls != 0 {
++			t.Fatalf("v1 strict member audit over NUL computed %d v1 identities, want 0", calls)
++		}
++		if auditErr == nil || !strings.Contains(auditErr.Error(), opaquescan.FindingNUL) {
++			t.Fatalf("v1 strict member audit over NUL = %v, want the opaque refusal", auditErr)
++		}
++		if calls := hashing.CountV1Hashes(func() {
++			if _, err := strictAuditMember(home, manager, v1, cleanEntry, Policy{}); err != nil {
++				t.Fatal(err)
++			}
++		}); calls == 0 {
++			t.Fatal("clean v1 strict member audit observed no v1 hash; the seam is not wired")
++		}
++	})
++
++	rekeyed := func(t *testing.T, home, name string, files map[string][]byte, version hashing.Version) *contextlock.Lock {
++		t.Helper()
++		staging := contextstore.EntryDir(home, contextlock.KindSkill, name, "pending")
++		writeStoreTestFiles(t, staging, files)
++		pin := pinHex(t, staging, version)
++		lock := &contextlock.Lock{Members: []contextlock.Member{{
++			Kind: contextlock.KindSkill, Name: name, StateHash: pin,
++		}}}
++		lock.HashVersion = int(version)
++		pinned := contextstore.EntryDir(home, contextlock.KindSkill, name, pin)
++		if err := os.MkdirAll(filepath.Dir(pinned), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Rename(staging, pinned); err != nil {
++			t.Fatal(err)
++		}
++		return lock
++	}
++
++	t.Run("validateNamedStorePins", func(t *testing.T) {
++		home := t.TempDir()
++		nulLock := rekeyed(t, home, "nul-skill",
++			map[string][]byte{"assets/a.bin": []byte("x\x00y")}, hashing.VersionV1)
++		var failure *storeEntryFailure
++		if calls := hashing.CountV1Hashes(func() {
++			failure = validateNamedStorePins(home, nulLock)
++		}); calls != 0 {
++			t.Fatalf("v1 pin check over NUL computed %d v1 identities, want 0", calls)
++		}
++		if failure == nil || failure.Check != diagPinHash ||
++			!strings.Contains(failure.Err.Error(), opaquescan.FindingNUL) {
++			t.Fatalf("v1 pin check over NUL = %+v, want a pin_hash opaque failure", failure)
++		}
++		cleanLock := rekeyed(t, home, "clean-skill",
++			map[string][]byte{"assets/a.bin": []byte("x")}, hashing.VersionV1)
++		if calls := hashing.CountV1Hashes(func() {
++			if failure := validateNamedStorePins(home, cleanLock); failure != nil {
++				t.Fatalf("clean v1 pin check = %+v, want nil", failure)
++			}
++		}); calls == 0 {
++			t.Fatal("clean v1 pin check observed no v1 hash; the seam is not wired")
++		}
++	})
++
++	t.Run("skillsOf", func(t *testing.T) {
++		home := t.TempDir()
++		manager := &gitManager{}
++		nulLock := rekeyed(t, home, "nul-skill",
++			map[string][]byte{"assets/a.bin": []byte("x\x00y")}, hashing.VersionV1)
++		var skillsErr error
++		if calls := hashing.CountV1Hashes(func() {
++			_, skillsErr = skillsOf(home, manager, nulLock)
++		}); calls != 0 {
++			t.Fatalf("v1 skillsOf over NUL computed %d v1 identities, want 0", calls)
++		}
++		if skillsErr == nil || !strings.Contains(skillsErr.Error(), opaquescan.FindingNUL) {
++			t.Fatalf("v1 skillsOf over NUL = %v, want the opaque refusal", skillsErr)
++		}
++		cleanLock := rekeyed(t, home, "clean-skill",
++			map[string][]byte{"assets/a.bin": []byte("x")}, hashing.VersionV1)
++		if calls := hashing.CountV1Hashes(func() {
++			skills, err := skillsOf(home, manager, cleanLock)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if len(skills) != 1 {
++				t.Fatalf("clean v1 skills = %+v, want one member", skills)
++			}
++		}); calls == 0 {
++			t.Fatal("clean v1 skillsOf observed no v1 hash; the seam is not wired")
++		}
++	})
++}
+diff --git a/internal/envprofile/nul_opaque_v2_test.go b/internal/envprofile/nul_opaque_v2_test.go
+new file mode 100644
+index 00000000..d64aa18a
+--- /dev/null
++++ b/internal/envprofile/nul_opaque_v2_test.go
+@@ -0,0 +1,112 @@
++package envprofile
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/pathboundary"
++)
++
++// TestInstallAdmitsV1CollidingSkillTreesUnderV2 drives Install through
++// contextresolve.Resolve -> auditAndStore -> auditMember with the v1
++// framing collision pair. Under v2 the NUL bytes are ordinary data
++// (Spec §8): both members install under a v2 lock. Git skill members are
++// commit-pinned, so the twin-distinguishing proof for the shared audit
++// gate lives in the audit and install packages; here the v1 collision
++// preamble ties the admitted fixtures to the pair the v1 lane refuses.
++// The v1 refusal of the same pair lives in nul_opaque_test.go.
++func TestInstallAdmitsV1CollidingSkillTreesUnderV2(t *testing.T) {
++	enableV2WritersForTest(t)
++	pinHomes(t)
++	ids := newGitIdentities(t)
++	single := map[string]string{
++		"assets/a.bin": "x\x00docs/b.md\x00y\x00z",
++	}
++	split := map[string]string{
++		"assets/a.bin": "x",
++		"docs/b.md":    "y\x00z",
++	}
++	left, right := t.TempDir(), t.TempDir()
++	writeV1Files(t, left, single)
++	writeV1Files(t, right, split)
++	leftHash, err := hashing.ContentSHA256(left, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	rightHash, err := hashing.ContentSHA256(right, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if leftHash != rightHash {
++		t.Fatalf("v1 framing did not collide: %s != %s", leftHash, rightHash)
++	}
++
++	home := t.TempDir()
++	skillARepo := gitRepo(t, single, "v1.0.0")
++	skillAOperand := ids.serve(skillARepo, "https://example.com/v2-single-skill")
++	skillBRepo := gitRepo(t, split, "v1.0.0")
++	skillBOperand := ids.serve(skillBRepo, "https://example.com/v2-split-skill")
++	rootRepo := gitRepo(t, twinDependencyRootFiles(skillAOperand, skillBOperand), "v1.0.0")
++	rootOperand := ids.serve(rootRepo, "https://example.com/v2-twin-root")
++
++	info, _, _, err := Install(home, InstallOptions{Operand: rootOperand})
++	if err != nil {
++		t.Fatalf("v2 Install of NUL-bearing twins: %v", err)
++	}
++	if info.Lock.ContentHashVersion() != hashing.VersionV2 {
++		t.Fatalf("lock content hash version = %d, want v2", info.Lock.ContentHashVersion())
++	}
++	if memberA, ok := lockMember(info.Lock, "ska"); !ok || memberA.Kind != contextlock.KindSkill {
++		t.Fatalf("installed lock lacks skill member ska: %+v", info.Lock.Members)
++	}
++	if memberB, ok := lockMember(info.Lock, "skb"); !ok || memberB.Kind != contextlock.KindSkill {
++		t.Fatalf("installed lock lacks skill member skb: %+v", info.Lock.Members)
++	}
++}
++
++// TestInstallAdmitsDeepNULFileInContextPathSnapshotUnderV2 mirrors the v1
++// refusal of a deep NUL file with the v2 admission: the context member
++// installs and publishes its profile source.
++func TestInstallAdmitsDeepNULFileInContextPathSnapshotUnderV2(t *testing.T) {
++	enableV2WritersForTest(t)
++	home := t.TempDir()
++	pinHomes(t)
++	source := t.TempDir()
++	writeGitFile(t, source, "agent-context.json", `{"schema_version": 1, "name": "nul-context", "version": "1.0.0",`+
++		`"context": {"modules": [{"path": "a.md"}]}}`+"\n")
++	writeGitFile(t, source, "context/a.md", "clean\n")
++	deep := filepath.Join(source, "assets", "deep", "image.unsupported")
++	if err := os.MkdirAll(filepath.Dir(deep), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(deep, []byte{1, 0, 2}, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := pathboundary.ProtectTree(source); err != nil {
++		t.Fatal(err)
++	}
++
++	info, _, _, err := Install(home, InstallOptions{Operand: source})
++	if err != nil {
++		t.Fatalf("v2 Install of deep-NUL context: %v", err)
++	}
++	if info.Lock.ContentHashVersion() != hashing.VersionV2 {
++		t.Fatalf("lock content hash version = %d, want v2", info.Lock.ContentHashVersion())
++	}
++	if _, err := readSource(home, "nul-context"); err != nil {
++		t.Fatalf("admitted context install published no profile source: %v", err)
++	}
++}
++
++func twinDependencyRootFiles(skillAOperand, skillBOperand string) map[string]string {
++	return map[string]string{
++		"agent-context.json": `{"schema_version": 1, "name": "twin-root", "version": "1.0.0",` +
++			`"context": {"modules": [{"path": "a.md"}]},` +
++			`"requires": {"skills": {"ska": {"git": "` + skillAOperand + `", "range": "*"},` +
++			`"skb": {"git": "` + skillBOperand + `", "range": "*"}}}}` + "\n",
++		"context/a.md": "clean\n",
++	}
++}
+diff --git a/internal/envprofile/pathkind_test.go b/internal/envprofile/pathkind_test.go
+index 7d4b41ea..9bad7fc8 100644
+--- a/internal/envprofile/pathkind_test.go
++++ b/internal/envprofile/pathkind_test.go
+@@ -694,7 +694,49 @@ func TestUpdateBlocksRevokedOverlayMember(t *testing.T) {
+ 		map[string]string{"a.md": "overlay\n"})
+ 	// A path member carries no network identity (its lock source is
+ 	// empty), so the revocation names the snapshot's content hash — the
+-	// production mechanism for pinning local sources (§9.1).
++	// production mechanism for pinning local sources (§9.1). The strict
++	// member audit matches the framing the lock resolves (Spec §8), so
++	// the revocation is minted with the writer version in force.
++	contentHash, err := hashing.ContentSHA256WithVersion(overlay, nil, hashing.WriteVersion())
++	if err != nil {
++		t.Fatal(err)
++	}
++	policy := Policy{
++		OverlaysAllowed:      true,
++		OverlayDefaultWeight: 1000,
++		Overlays:             map[string][]OverlaySpec{"acme": {{Source: overlay}}},
++		Revocations:          []string{contentHash},
++	}
++	_, _, err = UpdateWithPolicy(home, "acme", policy)
++	if err == nil || !strings.Contains(err.Error(), DiagUpdateBlocked) {
++		t.Fatalf("err = %v, want %s", err, DiagUpdateBlocked)
++	}
++	if !strings.Contains(err.Error(), "revoked") {
++		t.Fatalf("err = %v, want the revocation reason", err)
++	}
++	_, afterHash, err := readLock(home, "acme")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if afterHash != oldHash {
++		t.Fatal("a blocked update moved the lock: the old lock must stand")
++	}
++}
++
++// TestUpdateBlocksV1RevokedOverlayMemberUnderV1Writers pins the v1 lane of
++// the versioned strict member audit: with v1 writers in force, a
++// revocation minted with the v1 framing still refuses the member. The v2
++// twin rows above mint with the writer version; bare-digest revocations
++// never match across framings, because matching would compute a v1
++// identity the v2 path must never touch (Spec §8).
++func TestUpdateBlocksV1RevokedOverlayMemberUnderV1Writers(t *testing.T) {
++	enableV1WritersForTest(t)
++	home, _, oldHash := installBlockingOverlayRoot(t)
++	overlay := filepath.Join(t.TempDir(), "overlay")
++	writeManifestPackage(t, overlay,
++		`{"schema_version": 1, "name": "personal", "version": "0.3.0",`+
++			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
++		map[string]string{"a.md": "overlay\n"})
+ 	contentHash, err := hashing.ContentSHA256(overlay, nil)
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -735,8 +777,10 @@ func TestReinstallBlocksRevokedOverlayMember(t *testing.T) {
+ 		map[string]string{"a.md": "overlay\n"})
+ 	// A path member carries no network identity (its lock source is
+ 	// empty), so the revocation names the snapshot's content hash — the
+-	// production mechanism for pinning local sources (§9.1).
+-	contentHash, err := hashing.ContentSHA256(overlay, nil)
++	// production mechanism for pinning local sources (§9.1). The strict
++	// member audit matches the framing the lock resolves (Spec §8), so
++	// the revocation is minted with the writer version in force.
++	contentHash, err := hashing.ContentSHA256WithVersion(overlay, nil, hashing.WriteVersion())
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/internal/envprofile/store_boundary.go b/internal/envprofile/store_boundary.go
+index 108fc7d4..3da10e48 100644
+--- a/internal/envprofile/store_boundary.go
++++ b/internal/envprofile/store_boundary.go
+@@ -16,6 +16,7 @@ import (
+ 	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/gitops"
+ 	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/opaquescan"
+ 	"github.com/relux-works/curator/internal/pathboundary"
+ 	"github.com/relux-works/curator/internal/privatedir"
+ 	"github.com/relux-works/curator/internal/stateread"
+@@ -214,6 +215,12 @@ func storeEntryPinHashes(home string, member contextlock.Member, entry string, v
+ 		}
+ 		return actual, expected, nil
+ 	}
++	// Spec §8 interim rule for v1 readers: refuse before recomputing a
++	// recorded v1 state pin over NUL bytes. Commit pins above use Git
++	// tree object IDs, a different identity scheme outside this rule.
++	if err := opaquescan.RefuseNULV1(entry, version); err != nil {
++		return "", "", err
++	}
+ 	actual, err = hashing.ContentSHA256WithVersion(entry, map[string]bool{}, version)
+ 	if err != nil {
+ 		return "", "", err
+diff --git a/internal/hashing/hashing.go b/internal/hashing/hashing.go
+index 4cf518fd..63283375 100644
+--- a/internal/hashing/hashing.go
++++ b/internal/hashing/hashing.go
+@@ -19,6 +19,7 @@ import (
+ 	"path/filepath"
+ 	"sort"
+ 	"strings"
++	"sync/atomic"
+ 
+ 	"github.com/relux-works/curator/internal/pathboundary"
+ )
+@@ -71,9 +72,40 @@ func (identity Identity) Equal(other Identity) bool {
+ 	return identity.HashVersion == other.HashVersion && Normalize(identity.SHA256) == Normalize(other.SHA256)
+ }
+ 
++var (
++	observeV1Hashes atomic.Bool
++	v1HashCalls     atomic.Int64
++)
++
++// CountV1Hashes runs fn and reports how many v1 content-hash
++// computations it performed, over trees and in-memory file sets alike.
++// V2 computations are never counted, and failed version dispatches that
++// hash nothing are never counted either.
++//
++// It is a test seam for the Spec §8 no-v1-computation-over-NUL rule: a
++// guarded production entry driven over a NUL-bearing tree must report
++// zero, which a discarded hash-before-refuse mutant cannot satisfy.
++// Production code never calls it. It is not reentrant; tests must not
++// nest or overlap calls.
++func CountV1Hashes(fn func()) (calls int64) {
++	v1HashCalls.Store(0)
++	observeV1Hashes.Store(true)
++	defer func() { observeV1Hashes.Store(false) }()
++	fn()
++	calls = v1HashCalls.Load()
++	return calls
++}
++
++func noteV1Hash() {
++	if observeV1Hashes.Load() {
++		v1HashCalls.Add(1)
++	}
++}
++
+ // ContentSHA256 hashes the tree rooted at root, excluding the given
+ // root-relative POSIX paths (defaults to the install marker when nil).
+ func ContentSHA256(root string, exclude map[string]bool) (string, error) {
++	noteV1Hash()
+ 	if exclude == nil {
+ 		exclude = map[string]bool{MarkerName: true}
+ 	}
+@@ -153,6 +185,7 @@ func ContentSHA256Files(files map[string][]byte, version Version) (string, error
+ 	digest := sha256.New()
+ 	switch version {
+ 	case VersionV1:
++		noteV1Hash()
+ 		for index, path := range paths {
+ 			if index > 0 {
+ 				_, _ = digest.Write([]byte{0})
+diff --git a/internal/hashing/v1observe_test.go b/internal/hashing/v1observe_test.go
+new file mode 100644
+index 00000000..0eacc549
+--- /dev/null
++++ b/internal/hashing/v1observe_test.go
+@@ -0,0 +1,75 @@
++// Tests for the v1 hash-observation seam: CountV1Hashes reports every v1
++// content-hash computation and no v2 computation, so guarded production
++// entries can prove refusal-before-hashing by observation rather than by
++// the shape of their returned digest.
++package hashing
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++func TestCountV1HashesObservesOnlyV1Computations(t *testing.T) {
++	root := t.TempDir()
++	if err := os.MkdirAll(filepath.Join(root, "assets"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(root, "assets", "a.bin"), []byte("x"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	files := map[string][]byte{"assets/a.bin": []byte("x")}
++
++	if calls := CountV1Hashes(func() {
++		if _, err := ContentSHA256(root, nil); err != nil {
++			t.Fatal(err)
++		}
++	}); calls != 1 {
++		t.Fatalf("v1 tree hash observations = %d, want 1", calls)
++	}
++	if calls := CountV1Hashes(func() {
++		if _, err := ContentSHA256WithVersion(root, nil, VersionV1); err != nil {
++			t.Fatal(err)
++		}
++	}); calls != 1 {
++		t.Fatalf("dispatched v1 tree hash observations = %d, want exactly 1 (no double count)", calls)
++	}
++	if calls := CountV1Hashes(func() {
++		if _, err := ContentIdentity(root, nil, VersionV1); err != nil {
++			t.Fatal(err)
++		}
++	}); calls != 1 {
++		t.Fatalf("v1 identity observations = %d, want exactly 1 (no double count)", calls)
++	}
++	if calls := CountV1Hashes(func() {
++		if _, err := ContentSHA256Files(files, VersionV1); err != nil {
++			t.Fatal(err)
++		}
++	}); calls != 1 {
++		t.Fatalf("v1 file-set hash observations = %d, want 1", calls)
++	}
++	if calls := CountV1Hashes(func() {
++		if _, err := ContentSHA256WithVersion(root, nil, VersionV2); err != nil {
++			t.Fatal(err)
++		}
++		if _, err := ContentSHA256Files(files, VersionV2); err != nil {
++			t.Fatal(err)
++		}
++	}); calls != 0 {
++		t.Fatalf("v2 hash observations = %d, want 0 (v2 hashes NUL as ordinary data)", calls)
++	}
++	if calls := CountV1Hashes(func() {
++		if _, err := ContentSHA256WithVersion(root, nil, Version(9)); err == nil {
++			t.Fatal("unknown version must fail without hashing")
++		}
++	}); calls != 0 {
++		t.Fatalf("failed-dispatch observations = %d, want 0", calls)
++	}
++	// Observation stops when the call returns: later hashes are silent.
++	if _, err := ContentSHA256(root, nil); err != nil {
++		t.Fatal(err)
++	}
++	if calls := CountV1Hashes(func() {}); calls != 0 {
++		t.Fatalf("empty observation = %d, want 0", calls)
++	}
++}
+diff --git a/internal/install/global.go b/internal/install/global.go
+index 8be36ae2..c0d9ff76 100644
+--- a/internal/install/global.go
++++ b/internal/install/global.go
+@@ -15,6 +15,7 @@ import (
+ 	"github.com/relux-works/curator/internal/envfiles"
+ 	"github.com/relux-works/curator/internal/globalbins"
+ 	"github.com/relux-works/curator/internal/godriver"
++	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/marker"
+ 	"github.com/relux-works/curator/internal/mcp"
+@@ -191,6 +192,9 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
+ 					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+ 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
+ 					Commands: node.Spec.Commands,
++					// The global scope has no draft lane: the
++					// audited identity is the writer version.
++					HashVersion: hashing.WriteVersion(),
+ 				})
+ 			}
+ 			var warnings, errs []string
+@@ -312,6 +316,19 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
+ 		observed.outcomes[build.skill+"."+build.command] = build.outcome
+ 	}
+ 
++	// A status plan reports on installed trees, so it verifies them: a
++	// recorded v1 identity over a NUL-bearing tree refuses here with the
++	// opaque finding instead of the plan silently reporting ready. This
++	// runs after build planning so the refusal still carries the complete
++	// per-command verdict a read-only reporting caller needs. The global
++	// scope has one store and no hybrid activation.
++	if opts.Operation == OperationStatus {
++		if err := refuseInstalledNULForStatus(nodes, func(string) string { return skillsDir }); err != nil {
++			result.failf("%v", err)
++			return result, nil
++		}
++	}
++
+ 	if opts.DryRun {
+ 		for _, node := range nodes {
+ 			result.Messages = append(result.Messages, fmt.Sprintf("global: %s (planned)", nodeSummary(node)))
+diff --git a/internal/install/install.go b/internal/install/install.go
+index 60f3520f..1a3971e1 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -30,6 +30,7 @@ import (
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/marker"
+ 	"github.com/relux-works/curator/internal/mcp"
++	"github.com/relux-works/curator/internal/opaquescan"
+ 	"github.com/relux-works/curator/internal/registry"
+ 	"github.com/relux-works/curator/internal/runtimestore"
+ 	"github.com/relux-works/curator/internal/scopes"
+@@ -569,13 +570,21 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 	auditGate := opts.AuditGate
+ 	if auditGate == nil {
+ 		auditGate = func(nodes []*closure.Node) ([]string, []string) {
++			// The audit framing follows the identity this run will
++			// compute and trust downstream: frozen v1 on the draft
++			// lane (registry §13, marker Package), the writer
++			// version everywhere else.
++			auditVersion := hashing.WriteVersion()
++			if draftLock != nil {
++				auditVersion = hashing.VersionV1
++			}
+ 			subjects := make([]audit.Subject, 0, len(nodes))
+ 			for _, node := range nodes {
+ 				subjects = append(subjects, audit.Subject{
+ 					Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
+ 					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+ 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
+-					Commands: node.Spec.Commands,
++					Commands: node.Spec.Commands, HashVersion: auditVersion,
+ 				})
+ 			}
+ 			var warnings, errs []string
+@@ -722,6 +731,25 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 		observed.outcomes[build.skill+"."+build.command] = build.outcome
+ 	}
+ 
++	// A status plan reports on installed trees, so it verifies them: a
++	// recorded v1 identity over a NUL-bearing tree refuses here with the
++	// opaque finding instead of the plan silently reporting ready. This
++	// runs after build planning so the refusal still carries the complete
++	// per-command verdict a read-only reporting caller needs. Plain
++	// dry-run installs never consult installed state and keep that shape.
++	if opts.Operation == OperationStatus {
++		storeFor := func(name string) string {
++			if hybridNames[name] {
++				return hybridStore
++			}
++			return skillsDir
++		}
++		if err := refuseInstalledNULForStatus(nodes, storeFor); err != nil {
++			result.failf("%v", err)
++			return result, nil
++		}
++	}
++
+ 	// 18. Dry run stops before any file changes.
+ 	if opts.DryRun {
+ 		for _, node := range nodes {
+@@ -1530,6 +1558,13 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string,
+ 		if draft {
+ 			hashVersion = hashing.VersionV1
+ 		}
++		// Spec §8 interim rule for v1 readers: refuse before hashing a
++		// draft-lane v1 attestation identity over NUL bytes. The source
++		// audit above normally refuses first; this keeps the registry
++		// check compliant on its own.
++		if err := opaquescan.RefuseNULV1(node.Snapshot, hashVersion); err != nil {
++			return result, err
++		}
+ 		contentHash, err := hashing.ContentSHA256WithVersion(node.Snapshot, nil, hashVersion)
+ 		if err != nil {
+ 			return result, err
+diff --git a/internal/install/nul_opaque_test.go b/internal/install/nul_opaque_test.go
+index c9778956..23c4b423 100644
+--- a/internal/install/nul_opaque_test.go
++++ b/internal/install/nul_opaque_test.go
+@@ -10,6 +10,12 @@ import (
+ )
+ 
+ func TestOpaqueNULIsBlockedAtProjectAndGlobalInstallWithAuditDisabled(t *testing.T) {
++	// The opaque-NUL interim rule (Spec §8) applies exactly to v1
++	// identities: pin the v1 writers so this matrix exercises the v1
++	// reader. The v2 production entry lives in nul_opaque_v2_test.go.
++	priorWriter := hashing.EnableV2Writers
++	hashing.EnableV2Writers = false
++	t.Cleanup(func() { hashing.EnableV2Writers = priorWriter })
+ 	type lane struct {
+ 		name    string
+ 		install func(*testing.T, *env) Result
+diff --git a/internal/install/nul_opaque_v1_rework_test.go b/internal/install/nul_opaque_v1_rework_test.go
+new file mode 100644
+index 00000000..2db98d1a
+--- /dev/null
++++ b/internal/install/nul_opaque_v1_rework_test.go
+@@ -0,0 +1,76 @@
++package install
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++// Rework-1 regressions for finding 1 at the install production entry: a
++// v1-installed tree that gains NUL bytes afterwards — including a
++// v1-collision-preserving edit — is refused with the opaque finding on
++// reinstall and on the read-only status plan. Only the pre-hash guard can
++// refuse the collision edit, because the v1 digests match by construction.
++func TestV1ReinstallRefusesNULAppearingAfterInstall(t *testing.T) {
++	priorWriter := hashing.EnableV2Writers
++	hashing.EnableV2Writers = false
++	t.Cleanup(func() { hashing.EnableV2Writers = priorWriter })
++
++	setup := func(t *testing.T) (*env, string) {
++		t.Helper()
++		e := newEnv(t)
++		e.skill("skill-a")
++		addSkillFilesAndRetag(t, e, "skill-a", map[string]string{
++			"assets/a.bin": "x",
++			"assets/b.md":  "y",
++		})
++		e.declare("skill-a")
++		if result := e.install(Options{}); result.Status != "ok" {
++			t.Fatalf("clean v1 install status %q: %+v", result.Status, result)
++		}
++		return e, filepath.Join(e.project, ".agents", "skills", "skill-a")
++	}
++	assertOpaqueRefusal := func(t *testing.T, result Result, what string) {
++		t.Helper()
++		joined := strings.Join(append(result.Errors, result.Messages...), "\n")
++		if result.Status != "failed" || !strings.Contains(joined, "audit.opaque.nul-byte") {
++			t.Fatalf("%s: status %q: %s, want a failed opaque refusal", what, result.Status, joined)
++		}
++		if strings.Contains(strings.Join(result.Messages, "\n"), "up-to-date") {
++			t.Fatalf("%s reported up-to-date over a NUL-bearing v1 tree: %+v", what, result)
++		}
++	}
++
++	t.Run("collision-preserving-edit", func(t *testing.T) {
++		e, installed := setup(t)
++		before, err := hashing.ContentSHA256(installed, nil)
++		if err != nil {
++			t.Fatal(err)
++		}
++		// Splice the two installed records into one NUL-bearing record
++		// with identical v1 stream bytes.
++		e.write(installed, "assets/a.bin", "x\x00assets/b.md\x00y")
++		if err := os.Remove(filepath.Join(installed, "assets", "b.md")); err != nil {
++			t.Fatal(err)
++		}
++		after, err := hashing.ContentSHA256(installed, nil)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if before != after {
++			t.Fatalf("fixture is not a v1 collision: %s != %s", before, after)
++		}
++		assertOpaqueRefusal(t, e.install(Options{}), "reinstall after v1-collision edit")
++		assertOpaqueRefusal(t, e.install(Options{Operation: OperationStatus, DryRun: true}), "status plan after v1-collision edit")
++	})
++
++	t.Run("fresh-nul-file", func(t *testing.T) {
++		e, installed := setup(t)
++		e.write(installed, "assets/c.bin", "prefix\x00suffix")
++		assertOpaqueRefusal(t, e.install(Options{}), "reinstall after NUL appears")
++		assertOpaqueRefusal(t, e.install(Options{Operation: OperationStatus, DryRun: true}), "status plan after NUL appears")
++	})
++}
+diff --git a/internal/install/nul_opaque_v2_test.go b/internal/install/nul_opaque_v2_test.go
+new file mode 100644
+index 00000000..f804f06c
+--- /dev/null
++++ b/internal/install/nul_opaque_v2_test.go
+@@ -0,0 +1,241 @@
++package install
++
++import (
++	"bytes"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/closure"
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/manifest"
++	markerpkg "github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/sourcelock"
++)
++
++// NUL fixture bytes shared with nul_opaque_test.go: the single-record tree
++// collides under v1 with the split-records twin. The collision itself is
++// asserted there and in the audit package; these tests prove the v2
++// production entry distinguishes the twins and never computes v1 over them.
++var (
++	nulSingleRecordFiles = map[string]string{
++		"assets/a.bin": "x\x00docs/b.md\x00y\x00z",
++	}
++	nulSplitRecordsFiles = map[string]string{
++		"assets/a.bin": "x",
++		"docs/b.md":    "y\x00z",
++	}
++	nulDeepFile = map[string]string{
++		"docs/deep/opaque.unsupported": "prefix\x00suffix",
++	}
++)
++
++func pinV2Writers(t *testing.T) {
++	t.Helper()
++	priorWriter := hashing.EnableV2Writers
++	hashing.EnableV2Writers = true
++	t.Cleanup(func() { hashing.EnableV2Writers = priorWriter })
++}
++
++// A NUL-bearing skill installs, audits, and reports current under v2 with
++// a v2 identity on both the project and global lanes: NUL bytes are
++// ordinary v2 data (Spec §8), so the interim v1 rule stays silent.
++func TestV2InstallAdmitsNULBearingSkillAtProjectAndGlobal(t *testing.T) {
++	pinV2Writers(t)
++	type lane struct {
++		name    string
++		install func(*testing.T, *env) Result
++		target  func(*env) string
++	}
++	lanes := []lane{
++		{
++			name: "project",
++			install: func(_ *testing.T, e *env) Result {
++				e.declare("skill-a")
++				return e.install(Options{})
++			},
++			target: func(e *env) string { return filepath.Join(e.project, ".agents", "skills", "skill-a") },
++		},
++		{
++			name: "global",
++			install: func(t *testing.T, e *env) Result {
++				t.Helper()
++				if _, err := GlobalInit(e.home); err != nil {
++					t.Fatal(err)
++				}
++				if err := manifestAddGlobal(e, "skill-a"); err != nil {
++					t.Fatal(err)
++				}
++				return Global(e.cfg, t.TempDir(), Options{Platform: installPlatform()})
++			},
++			target: func(e *env) string { return filepath.Join(GlobalRoot(e.home), "skills", "skill-a") },
++		},
++	}
++
++	for _, installLane := range lanes {
++		t.Run(installLane.name, func(t *testing.T) {
++			e := newEnv(t)
++			e.skill("skill-a")
++			addSkillFilesAndRetag(t, e, "skill-a", nulSingleRecordFiles)
++			addSkillFilesAndRetag(t, e, "skill-a", nulDeepFile)
++			if e.cfg.Audit.Enabled {
++				t.Fatal("test requires the default disabled audit configuration")
++			}
++
++			result := installLane.install(t, e)
++			if result.Status != "ok" {
++				t.Fatalf("v2 NUL install status %q: %s", result.Status,
++					strings.Join(append(result.Errors, result.Messages...), "\n"))
++			}
++			installed := installLane.target(e)
++			recorded := markerpkg.Read(installed)
++			if recorded == nil {
++				t.Fatalf("no marker recorded at %s", installed)
++			}
++			if recorded.SchemaVersion != markerpkg.SchemaV5 || recorded.HashVersion != hashing.VersionV2 {
++				t.Fatalf("marker versions = schema:%d hash:%d, want schema:%d hash:2",
++					recorded.SchemaVersion, recorded.HashVersion, markerpkg.SchemaV5)
++			}
++			wantV2, err := hashing.ContentSHA256WithVersion(installed, nil, hashing.VersionV2)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if recorded.ContentSHA256 != wantV2 {
++				t.Fatalf("installed identity = %s, want the v2 recomputation %s", recorded.ContentSHA256, wantV2)
++			}
++			// No v1 identity was computed or trusted for this tree: the
++			// v1 digest keys no audit trust state.
++			v1Installed, err := hashing.ContentSHA256(installed, nil)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if _, err := os.Stat(filepath.Join(e.home, "audit", hashing.Normalize(v1Installed))); !os.IsNotExist(err) {
++				t.Fatalf("v2 install left trust state under the v1 digest: %v", err)
++			}
++
++			again := installLane.install(t, e)
++			if again.Status != "ok" {
++				t.Fatalf("v2 NUL reinstall status %q: %+v", again.Status, again)
++			}
++			if !strings.Contains(strings.Join(again.Messages, "\n"), "up-to-date") {
++				t.Fatalf("v2 NUL reinstall did not report up-to-date installations: %q", again.Messages)
++			}
++		})
++	}
++}
++
++// The v1-colliding twins install under v2 with distinct v2 identities: the
++// install never confuses the NUL tree with its clean twin.
++func TestV2InstallDistinguishesNULCollisionTwins(t *testing.T) {
++	pinV2Writers(t)
++	first, second := t.TempDir(), t.TempDir()
++	writeNULTree(t, first, nulSingleRecordFiles)
++	writeNULTree(t, second, nulSplitRecordsFiles)
++	firstHash, err := hashing.ContentSHA256(first, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	secondHash, err := hashing.ContentSHA256(second, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if firstHash != secondHash {
++		t.Fatalf("v1 framing did not collide: %s != %s", firstHash, secondHash)
++	}
++
++	e := newEnv(t)
++	e.skill("skill-a")
++	addSkillFilesAndRetag(t, e, "skill-a", nulSingleRecordFiles)
++	e.skill("skill-b")
++	addSkillFilesAndRetag(t, e, "skill-b", nulSplitRecordsFiles)
++	e.declare("skill-a", "skill-b")
++
++	result := e.install(Options{})
++	if result.Status != "ok" {
++		t.Fatalf("v2 twin install status %q: %+v", result.Status, result)
++	}
++	markerA := markerpkg.Read(filepath.Join(e.project, ".agents", "skills", "skill-a"))
++	markerB := markerpkg.Read(filepath.Join(e.project, ".agents", "skills", "skill-b"))
++	if markerA == nil || markerB == nil {
++		t.Fatalf("missing markers: skill-a=%+v skill-b=%+v", markerA, markerB)
++	}
++	if markerA.HashVersion != hashing.VersionV2 || markerB.HashVersion != hashing.VersionV2 {
++		t.Fatalf("twin marker hash versions = %d/%d, want v2/v2", markerA.HashVersion, markerB.HashVersion)
++	}
++	if markerA.ContentSHA256 == markerB.ContentSHA256 {
++		t.Fatalf("twin v2 identities collide: %s", markerA.ContentSHA256)
++	}
++}
++
++// The draft lane carries frozen v1 identities, so a NUL-bearing draft
++// member is refused with the opaque finding at the explicit
++// resolve/refresh entry: the frozen package context hash is never
++// computed over NUL bytes, so no lock can bind such a tree and no v1
++// digest of it ever exists. Refresh additionally preserves the prior
++// lock on refusal.
++func TestDraftLaneStillBlocksNULBearingMember(t *testing.T) {
++	pinV2Writers(t)
++	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
++	writeNULMember := func(t *testing.T, project string) {
++		t.Helper()
++		nulPath := filepath.Join(project, "skills", "review", "assets", "a.bin")
++		if err := os.MkdirAll(filepath.Dir(nulPath), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(nulPath, []byte("x\x00docs/b.md\x00y"), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++	resolveErr := func(t *testing.T, project, home string) error {
++		t.Helper()
++		m, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, "Skillfile.json"))
++		if err != nil {
++			t.Fatal(err)
++		}
++		_, err = closure.ResolveDraft(closure.DraftResolveConfig{ProjectRoot: project, Home: home, Manifest: m, ManifestPayload: []byte(payload)})
++		return err
++	}
++	assertOpaqueRefusal := func(t *testing.T, err error, what string) {
++		t.Helper()
++		if err == nil || !strings.Contains(err.Error(), "audit.opaque.nul-byte") {
++			t.Fatalf("%s: err = %v, want the opaque refusal", what, err)
++		}
++		// The refusal fires at the frozen-context load, before any v1
++		// digest exists: without the pre-hash guard this same tree
++		// would hash and fail later at the audit gate instead.
++		if !strings.Contains(err.Error(), "source_member_invalid") {
++			t.Fatalf("%s: err = %v, want the pre-hash frozen-context refusal", what, err)
++		}
++	}
++
++	t.Run("explicit-resolve-refuses", func(t *testing.T) {
++		project, home, _ := draftProject(t, payload, map[string]string{"skills/review": "review"})
++		writeNULMember(t, project)
++		assertOpaqueRefusal(t, resolveErr(t, project, home), "explicit resolve over a NUL member")
++	})
++
++	t.Run("refresh-refuses-and-keeps-prior-lock", func(t *testing.T) {
++		project, home, _ := draftProject(t, payload, map[string]string{"skills/review": "review"})
++		resolveDraftForInstall(t, project, home, payload)
++		lockPath := sourcelock.PathIn(project)
++		before, err := os.ReadFile(lockPath)
++		if err != nil {
++			t.Fatal(err)
++		}
++		writeNULMember(t, project)
++		m, err := manifest.ParseBytes([]byte(payload), filepath.Join(project, "Skillfile.json"))
++		if err != nil {
++			t.Fatal(err)
++		}
++		_, err = closure.RefreshDraft(closure.DraftResolveConfig{ProjectRoot: project, Home: home, Manifest: m, ManifestPayload: []byte(payload)}, lockPath, "")
++		assertOpaqueRefusal(t, err, "refresh after NUL appears")
++		after, readErr := os.ReadFile(lockPath)
++		if readErr != nil {
++			t.Fatal(readErr)
++		}
++		if !bytes.Equal(before, after) {
++			t.Fatal("refused refresh rewrote the prior lock")
++		}
++	})
++}
+diff --git a/internal/install/targets.go b/internal/install/targets.go
+index 4b0bf688..874b2c51 100644
+--- a/internal/install/targets.go
++++ b/internal/install/targets.go
+@@ -14,6 +14,7 @@ import (
+ 	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/locale"
+ 	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/opaquescan"
+ 	"github.com/relux-works/curator/internal/runtimestore"
+ 	"github.com/relux-works/curator/internal/scriptpolicy"
+ 	"github.com/relux-works/curator/internal/scriptworker"
+@@ -83,6 +84,11 @@ func stageNode(stageRoot string, install nodeInstall, clock Clock) (staging.Plan
+ 	if install.expected.Package != nil {
+ 		hashVersion = hashing.VersionV1
+ 	}
++	// Spec §8 interim rule for v1 readers: refuse before hashing a
++	// draft-lane v1 staged identity over NUL bytes.
++	if err := opaquescan.RefuseNULV1(staged, hashVersion); err != nil {
++		return staging.Plan{}, "", err
++	}
+ 	contentHash, err := hashing.ContentSHA256WithVersion(staged, nil, hashVersion)
+ 	if err != nil {
+ 		return staging.Plan{}, "", err
+@@ -100,6 +106,30 @@ func stageNode(stageRoot string, install nodeInstall, clock Clock) (staging.Plan
+ 	return plan, "installed", nil
+ }
+ 
++// refuseInstalledNULForStatus enforces the Spec §8 interim rule for v1
++// readers on the status surface: every installed tree backing a planned
++// node is refused before any currentness comparison when its recorded
++// identity is v1 and the tree contains NUL bytes. V2 trees hash NUL as
++// ordinary data and skip the scan. An absent, unreadable, or invalid
++// marker is not this gate's verdict — the drift classifiers report those
++// states — so only a present recorded marker is guarded.
++func refuseInstalledNULForStatus(nodes []*closure.Node, storeFor func(string) string) error {
++	for _, node := range nodes {
++		if node == nil {
++			continue
++		}
++		installed := filepath.Join(storeFor(node.Name), node.Name)
++		recorded, _, err := marker.ReadState(installed)
++		if err != nil || recorded == nil {
++			continue
++		}
++		if err := opaquescan.RefuseNULV1(installed, recorded.ContentHashVersion()); err != nil {
++			return fmt.Errorf("installed skill %s: %w", node.Name, err)
++		}
++	}
++	return nil
++}
++
+ // nodeSnapshots returns the resolved content snapshots of every closure
+ // node: the admitted inputs the publication boundary guard must protect.
+ // Staging already reads these directories (context projection and runtime
+diff --git a/internal/marker/marker.go b/internal/marker/marker.go
+index bb7acf84..c7c997da 100644
+--- a/internal/marker/marker.go
++++ b/internal/marker/marker.go
+@@ -26,6 +26,7 @@ import (
+ 	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/identifiers"
+ 	"github.com/relux-works/curator/internal/identity"
++	"github.com/relux-works/curator/internal/opaquescan"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+ 	"github.com/relux-works/curator/internal/stateread"
+ )
+@@ -1344,6 +1345,13 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
+ 	if recordedHashVersion != markerHashVersion(expected) {
+ 		return false, nil
+ 	}
++	// Spec §8 interim rule for v1 readers: a recorded v1 identity is
++	// never recomputed or trusted over NUL bytes. Refuse before hashing
++	// so a NUL-bearing installed tree — including a v1-collision twin
++	// of the recorded tree — can never read as current.
++	if err := opaquescan.RefuseNULV1(installedDir, recordedHashVersion); err != nil {
++		return false, err
++	}
+ 	actual, err := hashing.ContentSHA256WithVersion(installedDir, nil, recordedHashVersion)
+ 	if err != nil {
+ 		return false, err
+diff --git a/internal/marker/nul_opaque_v1_test.go b/internal/marker/nul_opaque_v1_test.go
+new file mode 100644
+index 00000000..58db2062
+--- /dev/null
++++ b/internal/marker/nul_opaque_v1_test.go
+@@ -0,0 +1,169 @@
++// Rework-1 regressions for the Spec §8 version rule at the installed-tree
++// currentness reader: a recorded v1 identity is never recomputed or
++// trusted over NUL bytes, while a recorded v2 identity treats NUL as
++// ordinary data. The collision case adapts the revision-1 reviewer's
++// attack probe into maintained coverage.
++package marker
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/opaquescan"
++)
++
++func writeMarkerTestFiles(t *testing.T, root string, files map[string][]byte) {
++	t.Helper()
++	for rel, payload := range files {
++		path := filepath.Join(root, filepath.FromSlash(rel))
++		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(path, payload, 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++}
++
++// A legacy marker with no hash_version over a clean two-record tree reads
++// current; after the files are replaced with their NUL-bearing one-record
++// v1 collision, Current refuses with the opaque finding instead of
++// trusting the colliding v1 digest. These are real equal-v1-digest trees,
++// not assumed collisions.
++func TestCurrentLegacyMarkerNULCollisionRefuses(t *testing.T) {
++	enableV1Writers(t)
++	root := t.TempDir()
++	writeMarkerTestFiles(t, root, map[string][]byte{
++		"assets/a.bin": []byte("x"),
++		"docs/b.md":    []byte("y"),
++	})
++	digest, err := hashing.ContentSHA256(root, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	m := &Marker{Name: "test-skill", Source: "test-skill", RefKind: "tag", Ref: "v1",
++		Commit: strings.Repeat("1", 40), ContentSHA256: digest,
++		InstalledAt: "2026-10-06T00:00:00Z", SkillSchemaVersion: 3}
++	if err := Write(root, m); err != nil {
++		t.Fatal(err)
++	}
++	if current, err := Current(root, m); err != nil || !current {
++		t.Fatalf("clean control current=%v err=%v, want true/nil", current, err)
++	}
++	writeMarkerTestFiles(t, root, map[string][]byte{
++		"assets/a.bin": []byte("x\x00docs/b.md\x00y"),
++	})
++	if err := os.Remove(filepath.Join(root, "docs", "b.md")); err != nil {
++		t.Fatal(err)
++	}
++	current, err := Current(root, m)
++	if current || err == nil || !strings.Contains(err.Error(), opaquescan.FindingNUL) {
++		t.Fatalf("v1 installed NUL collision: current=%v err=%v, want a pre-hash opaque refusal", current, err)
++	}
++}
++
++// A recorded v2 identity over a NUL-bearing tree stays verifiable: the
++// currentness reader recomputes in v2 and reports current.
++func TestCurrentV2MarkerAdmitsNULBearingTree(t *testing.T) {
++	enableV2Writers(t)
++	root := t.TempDir()
++	writeMarkerTestFiles(t, root, map[string][]byte{
++		"assets/a.bin": []byte("x\x00y"),
++	})
++	m := validMarkerV2()
++	m.SkillSchemaVersion = 6
++	if err := Write(root, m); err != nil {
++		t.Fatal(err)
++	}
++	if m.SchemaVersion != SchemaV5 || m.HashVersion != hashing.VersionV2 {
++		t.Fatalf("marker = schema:%d hash_version:%d, want a recorded v2 identity", m.SchemaVersion, m.HashVersion)
++	}
++	if current, err := Current(root, m); err != nil || !current {
++		t.Fatalf("v2 NUL current=%v err=%v, want true/nil", current, err)
++	}
++}
++
++// A v2 marker file edited down to hash_version 1 is refused by the state
++// reader: a v2-to-v1 downgrade never becomes a trusted v1 identity.
++func TestReadStateRefusesV2ToV1Downgrade(t *testing.T) {
++	enableV2Writers(t)
++	root := t.TempDir()
++	writeMarkerTestFiles(t, root, map[string][]byte{
++		"assets/a.bin": []byte("x\x00y"),
++	})
++	m := validMarkerV2()
++	m.SkillSchemaVersion = 6
++	if err := Write(root, m); err != nil {
++		t.Fatal(err)
++	}
++	payload, err := os.ReadFile(filepath.Join(root, Name))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var raw map[string]any
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	raw["hash_version"] = 1
++	payload, err = json.Marshal(raw)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(root, Name), payload, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if _, _, err := ReadState(root); err == nil {
++		t.Fatal("state reader admitted a hash_version 1 downgrade of a v2 marker")
++	}
++}
++
++// Rework-2 regression for revision-3 finding F3 at the installed-tree
++// currentness reader: the v1 opaque refusal is observed to precede
++// hashing. The clean control hashes, proving the seam is wired; a
++// discarded hash-before-refuse mutant computes one v1 identity and
++// fails the zero assertion.
++func TestCurrentV1NULRefusalComputesNoV1Identity(t *testing.T) {
++	enableV1Writers(t)
++	root := t.TempDir()
++	writeMarkerTestFiles(t, root, map[string][]byte{
++		"assets/a.bin": []byte("x"),
++		"docs/b.md":    []byte("y"),
++	})
++	digest, err := hashing.ContentSHA256(root, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	m := &Marker{Name: "test-skill", Source: "test-skill", RefKind: "tag", Ref: "v1",
++		Commit: strings.Repeat("1", 40), ContentSHA256: digest,
++		InstalledAt: "2026-10-06T00:00:00Z", SkillSchemaVersion: 3}
++	if err := Write(root, m); err != nil {
++		t.Fatal(err)
++	}
++	if calls := hashing.CountV1Hashes(func() {
++		if current, err := Current(root, m); err != nil || !current {
++			t.Fatalf("clean control current=%v err=%v, want true/nil", current, err)
++		}
++	}); calls == 0 {
++		t.Fatal("clean v1 currentness observed no v1 hash; the seam is not wired")
++	}
++	writeMarkerTestFiles(t, root, map[string][]byte{
++		"assets/a.bin": []byte("x\x00docs/b.md\x00y"),
++	})
++	if err := os.Remove(filepath.Join(root, "docs", "b.md")); err != nil {
++		t.Fatal(err)
++	}
++	var current bool
++	var currentErr error
++	if calls := hashing.CountV1Hashes(func() {
++		current, currentErr = Current(root, m)
++	}); calls != 0 {
++		t.Fatalf("v1 NUL currentness computed %d v1 identities, want 0", calls)
++	}
++	if current || currentErr == nil || !strings.Contains(currentErr.Error(), opaquescan.FindingNUL) {
++		t.Fatalf("v1 installed NUL collision: current=%v err=%v, want a pre-hash opaque refusal", current, currentErr)
++	}
++}
+diff --git a/internal/opaquescan/v1guard.go b/internal/opaquescan/v1guard.go
+new file mode 100644
+index 00000000..4b19ec95
+--- /dev/null
++++ b/internal/opaquescan/v1guard.go
+@@ -0,0 +1,41 @@
++package opaquescan
++
++import (
++	"fmt"
++	"strings"
++
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++// FindingNUL is the stable opaque-NUL finding id shared by every v1
++// pre-hash and pre-trust refusal (Spec §8 interim rule for v1 readers).
++// Audit findings render this id; entry points without a finding channel
++// (currentness readers, frozen hashes, store pin checks) carry it in
++// their refusal error so operators and tests see one vocabulary.
++const FindingNUL = "audit.opaque.nul-byte"
++
++// RefuseNULV1 enforces the Spec §8 interim rule before a v1 identity is
++// computed or trusted over root: when version selects the v1 framing it
++// scans every regular file below root and refuses with an error carrying
++// FindingNUL if any file contains a NUL byte, so no v1 digest is ever
++// computed over those bytes. A v2 root hashes NUL as ordinary data and
++// skips the scan entirely. An unknown version refuses without scanning
++// rather than guessing a rule.
++func RefuseNULV1(root string, version hashing.Version) error {
++	switch version {
++	case hashing.VersionV1:
++		paths, err := NULPaths(root)
++		if err != nil {
++			return err
++		}
++		if len(paths) == 0 {
++			return nil
++		}
++		return fmt.Errorf("%s: regular file contains a NUL byte and is treated as opaque (files: %s)",
++			FindingNUL, strings.Join(paths, ", "))
++	case hashing.VersionV2:
++		return nil
++	default:
++		return fmt.Errorf("unsupported content hash version %d", version)
++	}
++}
+diff --git a/internal/opaquescan/v1guard_test.go b/internal/opaquescan/v1guard_test.go
+new file mode 100644
+index 00000000..0935ca77
+--- /dev/null
++++ b/internal/opaquescan/v1guard_test.go
+@@ -0,0 +1,62 @@
++package opaquescan
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++func writeTestFile(t *testing.T, root, rel string, payload []byte) {
++	t.Helper()
++	path := filepath.Join(root, filepath.FromSlash(rel))
++	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, payload, 0o644); err != nil {
++		t.Fatal(err)
++	}
++}
++
++// The pre-hash guard refuses v1 roots with NUL bytes, carrying the shared
++// finding id and the offending file; v2 roots skip the scan entirely and
++// unknown versions refuse without scanning.
++func TestRefuseNULV1(t *testing.T) {
++	nulTree := t.TempDir()
++	writeTestFile(t, nulTree, "assets/a.bin", []byte("x\x00y"))
++	cleanTree := t.TempDir()
++	writeTestFile(t, cleanTree, "assets/a.bin", []byte("x"))
++
++	if err := RefuseNULV1(nulTree, hashing.VersionV1); err == nil ||
++		!strings.Contains(err.Error(), FindingNUL) ||
++		!strings.Contains(err.Error(), "assets/a.bin") {
++		t.Fatalf("v1 NUL refusal = %v, want the finding id naming assets/a.bin", err)
++	}
++	if err := RefuseNULV1(nulTree, 0); err == nil ||
++		!strings.Contains(err.Error(), "unsupported content hash version") {
++		t.Fatalf("zero-version guard = %v, want an unsupported-version refusal", err)
++	}
++	if err := RefuseNULV1(nulTree, hashing.Version(3)); err == nil ||
++		!strings.Contains(err.Error(), "unsupported content hash version 3") {
++		t.Fatalf("unknown-version guard = %v, want an unsupported-version refusal", err)
++	}
++	if err := RefuseNULV1(cleanTree, hashing.VersionV1); err != nil {
++		t.Fatalf("v1 clean guard = %v, want nil", err)
++	}
++	if err := RefuseNULV1(nulTree, hashing.VersionV2); err != nil {
++		t.Fatalf("v2 NUL guard = %v, want nil (NUL is ordinary v2 data)", err)
++	}
++}
++
++// The v1 guard scans nested files, not just the snapshot root: a mutant
++// that narrows the scan to top-level entries must still trip on this tree.
++func TestRefuseNULV1ScansNestedFiles(t *testing.T) {
++	root := t.TempDir()
++	writeTestFile(t, root, "docs/deep/opaque.unsupported", []byte("prefix\x00suffix"))
++	if err := RefuseNULV1(root, hashing.VersionV1); err == nil ||
++		!strings.Contains(err.Error(), "docs/deep/opaque.unsupported") {
++		t.Fatalf("v1 deep-NUL refusal = %v, want the finding id naming the nested file", err)
++	}
++}

@@ -1,0 +1,7 @@
+# THE ONLY CURRENT INSTRUCTION — TASK-261006-3ptm2x rework 2 (developer, code)
+Progress: the reviewer (sol high, RUN-261006-a39bf8) confirmed that both P1 findings from rev1 are fixed and that the audit ordering is now correct. Three P2 findings remain. Read the attached `TASK-261006-3ptm2x_review-verdict-rev3.md` IN FULL, including its mutants and probes:
+- **F1.** The frozen-v1 guard scans an already filtered projection. `closure.ContentHashFor` (`internal/closure/resolve.go:569`) copies the whitelist and subtracts runtime and build roots before scanning, so a NUL file in an excluded root escapes. Scan the full snapshot that the v1 identity covers, before any filtering.
+- **F2.** Trust pins use the unversioned v1 carrier for v2 approval: `audit.Pin` (:432), `isPinned` (:451), `decideWithPins` (:383). Version the pin carrier per core.md §8, as you did for the verdict cache in rev2. Compare (version, digest). Read legacy pins as v1 only. Never let a v1 pin approve a v2 identity, or the reverse.
+- **F3.** The tests do not prove refusal before hashing. Add a negative test that fails if ANY v1 digest is computed over a NUL tree: for example, a hashing hook or counter seam at the production entry. Name the mutant it kills, such as moving the hash above the guard.
+Host rules (attached): targeted tests only through `mini-build-lock`; no cmd/curator or install suites run locally. Keep the CHANGELOG entry current. No LOGBOOK or remote-gate.sh edits.
+Then `task-board handoff TASK-261006-3ptm2x --role developer` and END YOUR TURN.
