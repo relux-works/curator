@@ -41,6 +41,29 @@ spawn run completed: codex (run=RUN-261008-6f691e, pid=99528, exit=0)
 spawn autonomous recovery: run RUN-261008-6f691e queued successor RUN-261008-41c4b0 (attempt 1/3, model=gpt-6-astra): producer run RUN-261008-6f691e remains unsatisfied: producer run RUN-261008-6f691e published no Change Request and reached no handoff branch while TASK-261008-1c6bvv is done: the board is not at to-review
 spawn run started: [analyst] researcher (codex) (run=RUN-261008-41c4b0)
 Successor recovery: existing research preserved; updated the same architecture-review outcome with direct verification and a Stop-The-Line lifecycle packet. Activity proves predecessor researcher handoff to to-review succeeded, followed by another session setting done before ready Change Request creation. Required start command exited 1 (terminal_status). Structure/privacy check and git diff --check rerun directly, each exit 0; original harness/source evidence accepted from predecessor, not rerun. All 25 findings and A-G answers retained. Operator/runtime reconciliation of terminal task, ready Change Request and stale recovery is required. No code/spec changes or commits; final required handoff command follows.
+agent completed: [analyst] researcher (codex) (exit=0)
+spawn run completed: codex (run=RUN-261008-41c4b0, pid=27226, exit=0)
+\## Stop-The-Line
+
+### Blocker
+
+The research deliverable is present, but the successor cannot perform the requested lifecycle transition because the task is already terminal `done` while its recorded Change Request was created as `ready`. This is a board/runtime reconciliation issue, not missing research or an architecture decision needed to write the findings.
+
+### Evidence
+
+- `task-board m 'set_status(TASK-261008-1c6bvv, status=analysis)'` exited 1 with `terminal_status`; the CLI identified the existing state as `done`.
+- The scoped task query exited 0 and showed all 11 checklist items checked, the architecture-review outcome attached and the status `done`.
+- The bounded activity query exited 0. Event 26 records the predecessor's researcher handoff from `analysis` to `to-review` at 02:33:55 UTC. Event 28 records another session's transition from `to-review` to `done` at 03:15:19 UTC. Event 29 records creation of Change Request revision 1 as `ready` at 03:20:11 UTC. These events contradict the recovery premise that the predecessor never handed off.
+- The resource retrievals, direct report checks and byte-for-byte comparison exited 0. The successor performed no authentication, Go build/test, code/specification edits, commit or branch operation.
+
+### Options
+
+Recommended: preserve the report and reconcile the terminal task, ready Change Request and stale recovery run through the supported operator/runtime workflow. Confirm whether the earlier closure was intentional; retain it and retire the stale recovery if valid, or restore the proper review route through an authorized repair if it was premature. Repeating the research, inventing reviewer acceptance or editing board storage directly would not resolve this state mismatch.
+
+### EXACT INPUT NEEDED
+
+The board/runtime operator must determine the intended disposition of the existing `done` transition and reconcile it with the ready Change Request and successor run. No new product decision, credential access or source research is required. The researcher cannot override the terminal-state guard through the prescribed status/handoff commands.
+spawn run RUN-261008-41c4b0 failed because its runner heartbeat expired; operator action required; failure: spawn runner heartbeat expired
 
 ## Precondition Resources
 - [rw-arch-review-brief.md](file://TASK-261008-1c6bvv/rw-arch-review-brief.md)
@@ -56,7 +79,7 @@ Successor recovery: existing research preserved; updated the same architecture-r
 2026-10-08T01:07:21Z
 
 ## Last Update
-2026-10-08T03:26:35Z
+2026-10-08T03:31:14Z
 
 ## Assigned To
 [analyst] researcher (codex)
