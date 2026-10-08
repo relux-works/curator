@@ -1,0 +1,2 @@
+# THE ONLY CURRENT INSTRUCTION — review TASK-261004-3s6ymq rev1 (reviewer)
+The launcher v0.2.0 / curator rc.3 compatibility smoke: the CR adds one file (the smoke record). The launcher was tagged v0.2.0 on 2026-10-04 on the strength of this smoke. Review the record for: every row maps to an executed command with its exit, no secrets or personal paths, no claims beyond the rows. If fine: accept_cr with the live checklist. No builds (R193/R194). Then END YOUR TURN.

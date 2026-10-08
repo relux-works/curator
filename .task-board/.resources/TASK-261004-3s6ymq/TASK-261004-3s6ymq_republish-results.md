@@ -1,0 +1,1 @@
+Re-applied revision 1 unchanged to .research/261004_launcher_rc3_compat_smoke.md (git apply exit 0); byte-identical to TASK-261004-3s6ymq_smoke.md (cmp exit 0); no tests or builds run, LOGBOOK.md untouched.
