@@ -1,0 +1,139 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 6c8c0e421f7a2047043fc411c4a20cae57ed5c33..2293473c2f97ae7b58e2160e7e35a13889128c45 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,12 @@ All notable implementation changes are recorded here.
+ 
+ ## Unreleased
+ 
++### Fixed
++
++- A credential helper answer larger than the 64-KiB bound is now refused
++  outright instead of being silently truncated and accepted as a different
++  credential; the affected host simply reports no credential.
++
+ ## v0.15.0-rc.5 — 2026-10-08
+ 
+ ### Added
+diff --git a/internal/gitcred/credential_bound_test.go b/internal/gitcred/credential_bound_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..fa2cdfee498c1e958c4adeae4a1efa7e3f59f7f1
+--- /dev/null
++++ b/internal/gitcred/credential_bound_test.go
+@@ -0,0 +1,80 @@
++package gitcred
++
++import (
++	"context"
++	"fmt"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++)
++
++// Uses the real Git executable with only a synthetic helper in a temporary home.
++func TestCredentialAnswerBoundRefusesOversized(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("fixture helper is a POSIX shell script")
++	}
++	for _, n := range []int{32, maxAnswerBytes - 80, maxAnswerBytes + 128} {
++		t.Run(fmt.Sprint(n), func(t *testing.T) {
++			access, home := realGitAccess(t, "[credential]\n\thelper =\n")
++			helper := filepath.Join(home, "helper")
++			reply := filepath.Join(home, "reply")
++			secret := strings.Repeat("x", n)
++			if err := os.WriteFile(reply, []byte("username=synthetic\npassword="+secret+"\n\n"), 0600); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(helper, []byte("#!/bin/sh\n/bin/cat '"+reply+"'\n"), 0700); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(filepath.Join(home, ".gitconfig"), []byte("[credential]\n\thelper =\n\thelper = "+helper+"\n"), 0600); err != nil {
++				t.Fatal(err)
++			}
++			got, ok := access.ReadHost(context.Background(), "fixture.invalid")
++			t.Logf("ReadHost requested_secret_bytes=%d returned_secret_bytes=%d present=%v", n, len(got.Secret), ok)
++			if n > maxAnswerBytes {
++				if ok {
++					t.Fatalf("oversized helper answer accepted as credential (truncated=%v)", got.Secret != secret)
++				}
++				return
++			}
++			if !ok || got.Secret != secret {
++				t.Fatal("bounded answer did not survive unchanged")
++			}
++		})
++	}
++}
++
++// Access.ReadHost is the production entry. This controlled Git executable tests
++// the exact cap including format bytes, without relying on Git output ordering.
++func TestCredentialExactFrameBound(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("POSIX fixture")
++	}
++	for _, delta := range []int{-1, 0, 1} {
++		t.Run(fmt.Sprint(delta), func(t *testing.T) {
++			root := t.TempDir()
++			output := filepath.Join(root, "answer")
++			git := filepath.Join(root, "git")
++			prefix := "username=synthetic\npassword="
++			n := maxAnswerBytes + delta - len(prefix) - 2
++			if err := os.WriteFile(output, []byte(prefix+strings.Repeat("x", n)+"\n\n"), 0600); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(git, []byte("#!/bin/sh\n/bin/cat '"+output+"'\n"), 0700); err != nil {
++				t.Fatal(err)
++			}
++			got, ok := (Access{Git: git, Home: root, Environ: []string{}}).ReadHost(context.Background(), "fixture.invalid")
++			t.Logf("answer_bytes=%d present=%v secret_bytes=%d", maxAnswerBytes+delta, ok, len(got.Secret))
++			if delta > 0 {
++				if ok {
++					t.Fatal("cap+1 frame was accepted")
++				}
++				return
++			}
++			if !ok || len(got.Secret) != n {
++				t.Fatal("at/below-cap answer failed")
++			}
++		})
++	}
++}
+diff --git a/internal/gitcred/gitcred.go b/internal/gitcred/gitcred.go
+index 7e3cdf966e6645ac1f888a7b6c20075cd67e222e..0fb4e005f75b81b3a939187157fe7cbc74cf2ff7 100644
+--- a/internal/gitcred/gitcred.go
++++ b/internal/gitcred/gitcred.go
+@@ -289,6 +289,9 @@ func (a Access) call(ctx context.Context, action string, request ...field) (map[
+ 	if err := cmd.Run(); err != nil {
+ 		return nil, false
+ 	}
++	if answer.overflow {
++		return nil, false
++	}
+ 	return parseAnswer(answer.Bytes()), true
+ }
+ 
+@@ -393,15 +396,20 @@ func notPersistedError(lead string) error {
+ 
+ // boundedBuffer collects a helper answer up to a fixed size. A helper is an
+ // operator-configured program, and a manager must not grow without bound on
+-// whatever it decides to print.
++// whatever it decides to print. Anything past the bound is discarded and the
++// overflow flag is set, so the caller refuses the whole answer rather than
++// parsing a truncated prefix as a credential. An answer of exactly the bound
++// is kept unchanged with the flag clear.
+ type boundedBuffer struct {
+ 	buffer    bytes.Buffer
+ 	remaining int
++	overflow  bool
+ }
+ 
+ func (b *boundedBuffer) Write(payload []byte) (int, error) {
+ 	accepted := payload
+ 	if len(accepted) > b.remaining {
++		b.overflow = true
+ 		accepted = accepted[:b.remaining]
+ 	}
+ 	if len(accepted) > 0 {

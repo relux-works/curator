@@ -1,0 +1,8 @@
+Integration precondition evidence for N6 credential answer frame bound.
+Run: RUN-261008-8a0451; role developer / implementer.
+Read-only board query exited 0: status integrating, all 14 checklist items checked; change-request history records revision 3 accepted by RUN-261008-f8eb78.
+worktree status exited 0: CR-TASK-261008-2uq6jo-3 accepted, kind story_final, candidate tree 794492d4b7ac5cff6acdfb5304cb3f13808fe26f; branch tip and checkpoint both 3b6481c15d61b08d3f0fae7c3269329555336709; workspace present and registered, current run holds lease.
+Fresh file verification exited 0: git hash-object matches accepted candidate blobs for CHANGELOG.md, internal/gitcred/credential_bound_test.go, internal/gitcred/gitcred.go, and internal/gitcred/gitcred_test.go. git status --short exited 0 and shows exactly these four candidate paths. git diff --check exited 0. Directives query exited 0: none recorded.
+No source files changed, no local tests or builds rerun in this integration-only run. Existing accepted validation evidence and checked checklist are relied upon, not represented as newly executed tests.
+Discovery calls schema(operation=change_request), task-board cr --help, and task-board change-request --help each exited 1 because those operations are unsupported; supported board query and worktree status provided the evidence above.
+Per the superseding Integration Assignment, no status mutation, generic handoff, checkpoint, or integrate command was invoked. The bound runner owns fresh authority validation and synchronous landing after producer exit; this evidence does not claim landing has occurred.
