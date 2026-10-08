@@ -1,0 +1,2 @@
+# Review note for TASK-260918-bi6ouz (reviewer)
+Revision 7 was ACCEPTED on 2026-09-26; this revision is a re-application after main moved (v2 writer flip, Codex seed revision B, rc.4/rc.5). Review the current revision against the accepted intent (the manager-side dotfile-manager table per the landed spec table TASK-260918-24eazm): the re-applied managed.go changes, the tests, the docs and the platform-cases rows. Hosted gate is the arbiter for the suites; locally only targeted packages (R193/R194). Verdict per the usual rules; accept_cr with the live checklist if it holds.

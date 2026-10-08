@@ -1,0 +1,1064 @@
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index b0d83572..1fb17e8f 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -422,6 +422,12 @@ internal/envprofile	TestPathUpdateAllSucceedsWithImportedProfile	linux,darwin,wi
+ internal/envprofile	TestUseWithoutTakeoverRefusesUnmanaged	linux,darwin,windows	-	-	a switch over unmanaged files fails with environment_surface_unmanaged_conflict and writes nothing
+ internal/envprofile	TestUseTakeoverBacksUpAndNotifies	linux,darwin,windows	-	-	takeover backs every replaced file up before the first write and reports the notice
+ internal/envprofile	TestForeignSymlinkStopsSwitch	linux,darwin	windows	host-capability	a foreign-manager symlink stops with environment_foreign_manager_detected and the take-over choice
++internal/envprofile	TestDotfileManagerTableMatchesSpecFixture	linux,darwin,windows	-	-	the ordered manager table matches the byte-for-byte curator-spec 802caee fixture
++internal/envprofile	TestDotfileStatePathResolution	linux,darwin,windows	-	-	home and XDG path resolution uses injected values on each native platform, including Windows
++internal/envprofile	TestForeignManagerHintLstatDiscipline	linux,darwin,windows	-	-	lstat distinguishes absence, symlinks, regular files, and failed inspection while continuing the ordered scan
++internal/envprofile	TestTakeoverSymlinkedDotfileManagerStateDoesNotWarn	linux,darwin,windows	windows	host-capability	a directory symlink at the resolved chezmoi state path does not trigger the production takeover warning; Windows may lack unprivileged symlink creation
++internal/envprofile	TestDotfileManagerVectors	linux,darwin,windows	linux,darwin,windows	root-content	the supplied rc.12 conformance root predates the dotfile-manager vector; each native platform case runs when the vector is present
++internal/envprofile	TestDotfileManagerStateAloneDoesNotWarn	linux,darwin,windows	-	-	manager state alone does not emit the warning when inventory finds no unmanaged surface
+ internal/envprofile	TestTakeoverWarnsDotfileHeuristic	linux,darwin,windows	-	-	takeover warns the dotfile-manager heuristic without blocking the switch
+ internal/envprofile	TestMachineClearReachesSeamGate	linux,darwin,windows	-	-	the machine-clear combination reaches the single structural require_current_profile gate while a scoped clear is unaffected
+ internal/envprofile	TestReadOnlyCommandsNeverOnboard	linux,darwin,windows	-	-	read-only commands never write a backup, a marker, or a prompt
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 17773d62..173ec674 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,18 @@ All notable implementation changes are recorded here.
+ 
+ ## Unreleased
+ 
++### Changed
++
++- The takeover warning environment_foreign_manager_suspected now follows
++  the closed environments §9.5 dotfile-manager table in spec order:
++  chezmoi, home-manager, yadm, stow, dotbot across macOS, Linux, and
++  Windows, including explicit none cells. State paths resolve through
++  absolute XDG overrides or the specified home defaults, and presence
++  requires a non-symlink directory found with lstat; failed inspection
++  leaves that row unknown while scanning later rows and does not become
++  absence (§8.4.1). The warning names the first present manager and remains
++  best-effort.
++
+ ### Added
+ 
+ - E4: umbrella provider lookup from trust roots (warning release,
+diff --git a/docs/troubleshooting.md b/docs/troubleshooting.md
+index 86b4a98c..ad431ed9 100644
+--- a/docs/troubleshooting.md
++++ b/docs/troubleshooting.md
+@@ -1,5 +1,33 @@
+ # Curator Troubleshooting Guide
+ 
++## Dotfile-manager onboarding warning
++
++### environment_foreign_manager_suspected
++
++Symptom: a mutating profile operation with the takeover option emits
++environment_foreign_manager_suspected and names a dotfile manager.
++
++Cause: Curator found plain unmanaged files and a state directory from the
++closed environments §9.5 table. It checks managers in this order:
++chezmoi, home-manager, yadm, stow, dotbot. The first matching row is named.
++On macOS and Linux, non-empty absolute XDG_DATA_HOME and XDG_CONFIG_HOME
++values override their home-relative defaults; empty, unset, or relative
++values use ~/.local/share and ~/.config. On Windows, Curator uses
++USERPROFILE for the home and applies the same absolute-path rule to
++XDG_DATA_HOME; the other table cells are explicitly none.
++
++Curator checks only the resolved table path with lstat semantics. A symlink
++to a directory and a regular file do not count as a present state directory.
++An inspection failure does not match that row; Curator continues through the
++table, so a later present manager can still be named. If no later row matches,
++the failed location remains unknown and is never treated as proof of absence
++(§8.4.1). Custom manager locations and sibling paths are outside this
++heuristic.
++
++Remedy: review the named manager and the takeover notice, then keep or
++remove the takeover option based on whether replacing the listed unmanaged
++files is intended. This warning is best-effort and never blocks the operation.
++
+ This guide provides symptom, cause, and remedy entries for common Curator diagnostic codes and failures. Every error string and code is verified against `internal/` and `cmd/curator/` source files.
+ 
+ ## Compiled-command diagnostics and status codes
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index 37db00ae..e12246be 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -720,35 +720,161 @@ func claudeProjects(homeDir string) (map[string]bool, error) {
+ 	return entries, nil
+ }
+ 
+-// dotfileStateDirs is the closed heuristic list for the §9.5 inventory: a
+-// well-known dotfile-manager state location elevates the notice for plain
+-// unmanaged files to environment_foreign_manager_suspected. The heuristic
+-// never blocks.
+-//
+-// Stated bound (TASK-260906-vlrjo1): the entries are POSIX-portable
+-// relative paths resolved under os.UserHomeDir, matching the §9.5
+-// spellings verbatim. Whether the closed list is platform-specific —
+-// chezmoi keeps state under %LOCALAPPDATA% on Windows, home-manager is
+-// Nix-only — is a spec question §9.5 does not decide, so no Windows
+-// location is invented here and the heuristic stays inert for those
+-// layouts on that platform.
+-var dotfileStateDirs = [][2]string{
+-	{".local/share/chezmoi", "chezmoi"},
+-	{".config/home-manager", "home-manager"},
+-}
+-
+-// foreignManagerHint scans the operator home for dotfile-manager state.
++// dotfileStateCell is one §9.5 table cell. The text preserves the spec's
++// literal cell; the resolution fields are empty for an explicit none cell.
++type dotfileStateCell struct {
++	specText    string
++	baseEnv     string
++	defaultBase string
++	leaf        string
++}
++
++type dotfileStateRow struct {
++	manager string
++	macOS   dotfileStateCell
++	linux   dotfileStateCell
++	windows dotfileStateCell
++	source  string
++}
++
++func dotfilePathCell(specText, baseEnv, defaultBase, leaf string) dotfileStateCell {
++	return dotfileStateCell{specText: specText, baseEnv: baseEnv, defaultBase: defaultBase, leaf: leaf}
++}
++
++func dotfileNoneCell(specText string) dotfileStateCell {
++	return dotfileStateCell{specText: specText}
++}
++
++// dotfileStateTable is the closed environments §9.5 table, in spec row
++// order. TestDotfileManagerTableMatchesSpecFixture pins every cell and the
++// source column byte-for-byte to
++// testdata/dotfile-manager-table-802caee.md, copied from
++// curator-spec protocol/environments.md at 802caee548ddc8b19408746d26c7972d39b39cc2
++// (fixture SHA-256 6575912115cf5b87facc0a6981e2d17bbcc1716f6ca7db3e0da5ddbf98853670).
++var dotfileStateTable = [...]dotfileStateRow{
++	{
++		manager: "chezmoi",
++		macOS: dotfilePathCell("`$XDG_DATA_HOME/chezmoi` (default `~/.local/share/chezmoi`) — verified",
++			"XDG_DATA_HOME", ".local/share", "chezmoi"),
++		linux: dotfilePathCell("`$XDG_DATA_HOME/chezmoi` (default `~/.local/share/chezmoi`) — verified",
++			"XDG_DATA_HOME", ".local/share", "chezmoi"),
++		windows: dotfilePathCell("`%XDG_DATA_HOME%\\chezmoi` (default `%USERPROFILE%\\.local\\share\\chezmoi`) — verified",
++			"XDG_DATA_HOME", ".local/share", "chezmoi"),
++		source: "`defaultSourceDir` over `go-xdg`: the XDG data home on every platform, no platform switch",
++	},
++	{
++		manager: "home-manager",
++		macOS: dotfilePathCell("`$XDG_CONFIG_HOME/home-manager` (default `~/.config/home-manager`) — verified",
++			"XDG_CONFIG_HOME", ".config", "home-manager"),
++		linux: dotfilePathCell("`$XDG_CONFIG_HOME/home-manager` (default `~/.config/home-manager`) — verified",
++			"XDG_CONFIG_HOME", ".config", "home-manager"),
++		windows: dotfileNoneCell("`none` — verified: Nix-only, no native Windows location"),
++		source:  "launcher `setConfigFile`/`setFlakeAttribute`; install docs name only Nix platforms",
++	},
++	{
++		manager: "yadm",
++		macOS: dotfilePathCell("`$XDG_DATA_HOME/yadm` (default `~/.local/share/yadm`) — verified",
++			"XDG_DATA_HOME", ".local/share", "yadm"),
++		linux: dotfilePathCell("`$XDG_DATA_HOME/yadm` (default `~/.local/share/yadm`) — verified",
++			"XDG_DATA_HOME", ".local/share", "yadm"),
++		windows: dotfileNoneCell("`none` — verified: a bash script with no native Windows home to anchor to"),
++		source:  "`set_yadm_dirs` plus FILES section; every path `$HOME`-relative",
++	},
++	{
++		manager: "stow",
++		macOS:   dotfileNoneCell("`none` — verified: keeps no state of its own"),
++		linux:   dotfileNoneCell("`none` — verified: keeps no state of its own"),
++		windows: dotfileNoneCell("`none` — verified: keeps no state of its own"),
++		source:  "manual: \"stores no extra state between runs\"",
++	},
++	{
++		manager: "dotbot",
++		macOS:   dotfileNoneCell("`none` — verified: its config lives in the operator's own repo at any path"),
++		linux:   dotfileNoneCell("`none` — verified: its config lives in the operator's own repo at any path"),
++		windows: dotfileNoneCell("`none` — verified: its config lives in the operator's own repo at any path"),
++		source:  "README: the dotfiles path is the operator's (\"replace with the path to your dotfiles\")",
++	},
++}
++
++func (row dotfileStateRow) cell(platform string) dotfileStateCell {
++	switch platform {
++	case "darwin", "macos":
++		return row.macOS
++	case "linux":
++		return row.linux
++	case "windows":
++		return row.windows
++	default:
++		return dotfileStateCell{}
++	}
++}
++
++func dotfilePlatformForGOOS(goos string) (string, bool) {
++	switch goos {
++	case "darwin":
++		return "macos", true
++	case "linux", "windows":
++		return goos, true
++	default:
++		return "", false
++	}
++}
++
++// resolveDotfileStatePath applies the §9.5 XDG resolution rule. Empty,
++// unset, and non-absolute XDG values use the home-relative default.
++func resolveDotfileStatePath(cell dotfileStateCell, home string, getenv func(string) string) (string, bool) {
++	if cell.baseEnv == "" || cell.defaultBase == "" || cell.leaf == "" || home == "" {
++		return "", false
++	}
++	base := getenv(cell.baseEnv)
++	if base == "" || !filepath.IsAbs(base) {
++		base = filepath.Join(home, filepath.FromSlash(cell.defaultBase))
++	}
++	return filepath.Join(base, cell.leaf), true
++}
++
++// foreignManagerHintAt scans resolved §9.5 state paths in table order. The
++// lstat probe distinguishes absence from an inspection failure (§8.4.1).
++// Failed rows do not match, but the scan continues; the returned error keeps
++// those locations unknown rather than claiming they were absent.
++func foreignManagerHintAt(home, goos string, getenv func(string) string, lstat func(string) (os.FileInfo, error)) (string, error) {
++	platform, ok := dotfilePlatformForGOOS(goos)
++	if !ok || home == "" {
++		return "", nil
++	}
++	var inspectionErr error
++	for _, row := range dotfileStateTable {
++		path, ok := resolveDotfileStatePath(row.cell(platform), home, getenv)
++		if !ok {
++			continue
++		}
++		info, err := lstat(path)
++		if err != nil {
++			if os.IsNotExist(err) {
++				continue
++			}
++			if inspectionErr == nil {
++				inspectionErr = fmt.Errorf("lstat dotfile-manager state %s: %w", path, err)
++			}
++			continue
++		}
++		if info.Mode()&os.ModeSymlink == 0 && info.IsDir() {
++			return row.manager, inspectionErr
++		}
++	}
++	return "", inspectionErr
++}
++
++// foreignManagerHint is best-effort: it can name a later known-present row
++// after an earlier inspection failure, while suppressing the error from this
++// warning-only path. It never treats a failed inspection as an absent record.
+ func foreignManagerHint() string {
+ 	home, err := os.UserHomeDir()
+ 	if err != nil {
+ 		return ""
+ 	}
+-	for _, candidate := range dotfileStateDirs {
+-		if info, err := os.Stat(filepath.Join(home, filepath.FromSlash(candidate[0]))); err == nil && info.IsDir() {
+-			return candidate[1]
+-		}
+-	}
+-	return ""
++	hint, _ := foreignManagerHintAt(home, runtime.GOOS, os.Getenv, os.Lstat)
++	return hint
+ }
+ 
+ // inventoryUnmanaged walks the desired home paths before the first write:
+@@ -756,7 +882,7 @@ func foreignManagerHint() string {
+ // manager's store is evidence of another manager and stops the operation
+ // with environment_foreign_manager_detected; any other unmanaged file
+ // fails with environment_surface_unmanaged_conflict (§8.3, §9.5).
+-func inventoryUnmanaged(homeDir string, want map[string]bool, storeRoot string) error {
++func inventoryUnmanaged(homeDir string, want map[string]bool, storeRoot string) (bool, error) {
+ 	paths := make([]string, 0, len(want))
+ 	for path := range want {
+ 		paths = append(paths, path)
+@@ -769,17 +895,17 @@ func inventoryUnmanaged(homeDir string, want map[string]bool, storeRoot string)
+ 			if os.IsNotExist(err) {
+ 				continue
+ 			}
+-			return fmt.Errorf("%s: inventory of %s: %v", DiagUnmanagedConflict, path, err)
++			return false, fmt.Errorf("%s: inventory of %s: %v", DiagUnmanagedConflict, path, err)
+ 		}
+ 		if info.Mode()&os.ModeSymlink != 0 {
+ 			target, err := os.Readlink(full)
+ 			if err == nil && !sameStoreTree(target, storeRoot) {
+-				return fmt.Errorf("%s: %s is a symlink outside the manager store; abort, or take over with backup", DiagForeignManager, path)
++				return false, fmt.Errorf("%s: %s is a symlink outside the manager store; abort, or take over with backup", DiagForeignManager, path)
+ 			}
+ 		}
+-		return fmt.Errorf("%s: %s exists and no marker records it", DiagUnmanagedConflict, path)
++		return true, fmt.Errorf("%s: %s exists and no marker records it", DiagUnmanagedConflict, path)
+ 	}
+-	return nil
++	return false, nil
+ }
+ 
+ // sameStoreTree reports whether the link target lives below the store.
+@@ -1666,16 +1792,19 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 		// backs every replaced file up before the first write (applyPlan
+ 		// below, subject to environment_backup_exists) and reports the
+ 		// replace notice.
+-		if err := inventoryUnmanaged(plan.homeDir, want, contextstore.Root(req.Home)); err != nil {
++		plainUnmanaged, inventoryErr := inventoryUnmanaged(plan.homeDir, want, contextstore.Root(req.Home))
++		if inventoryErr != nil {
+ 			if !req.Policy.Takeover {
+-				return nil, err
++				return nil, inventoryErr
+ 			}
+ 			plan.warnings = append(plan.warnings, "taking over unmanaged files for "+adapter.ID+
+ 				": native global context files are being replaced by managed ones; backups land in "+
+ 				filepath.Join(plan.homeDir, ".agent-environment-backup")+"/")
+ 		}
+-		if hint := foreignManagerHint(); hint != "" {
+-			plan.warnings = append(plan.warnings, fmt.Sprintf("%s: %s appears to manage this machine and will overwrite managed surfaces on its next apply", DiagForeignSuspect, hint))
++		if plainUnmanaged {
++			if hint := foreignManagerHint(); hint != "" {
++				plan.warnings = append(plan.warnings, fmt.Sprintf("%s: %s appears to manage this machine and will overwrite managed surfaces on its next apply", DiagForeignSuspect, hint))
++			}
+ 		}
+ 	}
+ 	recorded := map[string]bool{}
+diff --git a/internal/envprofile/managed_dotfile_conformance_test.go b/internal/envprofile/managed_dotfile_conformance_test.go
+new file mode 100644
+index 00000000..a195294c
+--- /dev/null
++++ b/internal/envprofile/managed_dotfile_conformance_test.go
+@@ -0,0 +1,331 @@
++package envprofile
++
++import (
++	"encoding/json"
++	"errors"
++	"os"
++	"path/filepath"
++	"reflect"
++	"runtime"
++	"strings"
++	"testing"
++)
++
++type dotfileManagerVector struct {
++	ProtocolVersion    string                     `json:"protocol_version"`
++	SchemaVersion      int                        `json:"schema_version"`
++	Capability         string                     `json:"capability"`
++	CapabilityRevision int                        `json:"capability_revision"`
++	Rule               string                     `json:"rule"`
++	Diagnostic         string                     `json:"diagnostic"`
++	Managers           []string                   `json:"managers"`
++	Platforms          []string                   `json:"platforms"`
++	Table              []dotfileManagerVectorRow  `json:"table"`
++	Cases              []dotfileManagerVectorCase `json:"cases"`
++}
++
++type dotfileManagerVectorRow struct {
++	Manager string                    `json:"manager"`
++	MacOS   *dotfileManagerVectorCell `json:"macos"`
++	Linux   *dotfileManagerVectorCell `json:"linux"`
++	Windows *dotfileManagerVectorCell `json:"windows"`
++}
++
++type dotfileManagerVectorCell struct {
++	Base string `json:"base"`
++	Leaf string `json:"leaf"`
++}
++
++type dotfileManagerVectorCase struct {
++	Name     string             `json:"name"`
++	Platform string             `json:"platform"`
++	Home     string             `json:"home"`
++	Env      map[string]string  `json:"env"`
++	States   map[string]*string `json:"states"`
++	Expected struct {
++		Blocks       bool    `json:"blocks"`
++		NamesManager *string `json:"names_manager"`
++		Notice       *string `json:"notice"`
++		ResolvedPath *string `json:"resolved_path"`
++	} `json:"expected"`
++}
++
++func TestDotfileManagerVectors(t *testing.T) {
++	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
++	if root == "" {
++		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
++	}
++	vectorPath := filepath.Join(root, "vectors", "environments-dotfile-managers.json")
++	payload, err := os.ReadFile(vectorPath) // #nosec G304 -- explicit conformance input
++	if errors.Is(err, os.ErrNotExist) {
++		t.Skip("the supplied conformance root is a pre-revision root")
++	}
++	if err != nil {
++		t.Fatal(err)
++	}
++
++	var vectors dotfileManagerVector
++	if err := json.Unmarshal(payload, &vectors); err != nil {
++		t.Fatalf("decode %s: %v", vectorPath, err)
++	}
++	if vectors.SchemaVersion != 1 ||
++		vectors.Capability != "agent-environments" ||
++		vectors.CapabilityRevision != 1 ||
++		vectors.Diagnostic != DiagForeignSuspect {
++		t.Fatalf("unexpected vector identity: schema=%d capability=%q revision=%d diagnostic=%q",
++			vectors.SchemaVersion, vectors.Capability, vectors.CapabilityRevision, vectors.Diagnostic)
++	}
++	if vectors.Rule != "environments section 9.5 dotfile-manager state table" {
++		t.Fatalf("unexpected vector rule %q", vectors.Rule)
++	}
++	assertDotfileManagerVectorTable(t, vectors)
++	if len(vectors.Cases) == 0 {
++		t.Fatal("vectors/environments-dotfile-managers.json publishes no cases")
++	}
++
++	platform, ok := dotfilePlatformForGOOS(runtime.GOOS)
++	if !ok {
++		t.Fatalf("unsupported test platform %q", runtime.GOOS)
++	}
++	ran := 0
++	for _, tc := range vectors.Cases {
++		if tc.Platform != platform {
++			continue
++		}
++		tc := tc
++		ran++
++		t.Run(tc.Name, func(t *testing.T) {
++			runDotfileManagerVectorCase(t, platform, tc)
++		})
++	}
++	if ran == 0 {
++		t.Fatalf("the vector publishes no cases for native platform %s", platform)
++	}
++	t.Logf("executed %d of %d vector cases on %s; other platform cases run on their native CI lanes", ran, len(vectors.Cases), platform)
++}
++
++func assertDotfileManagerVectorTable(t *testing.T, vectors dotfileManagerVector) {
++	t.Helper()
++	wantManagers := make([]string, 0, len(dotfileStateTable))
++	wantTable := make([]dotfileManagerVectorRow, 0, len(dotfileStateTable))
++	for _, row := range dotfileStateTable {
++		wantManagers = append(wantManagers, row.manager)
++		wantTable = append(wantTable, dotfileManagerVectorRow{
++			Manager: row.manager,
++			MacOS:   vectorCell(row.macOS),
++			Linux:   vectorCell(row.linux),
++			Windows: vectorCell(row.windows),
++		})
++	}
++	if !equalStringSlices(vectors.Managers, wantManagers) {
++		t.Fatalf("vector managers %v, want spec order %v", vectors.Managers, wantManagers)
++	}
++	if !equalStringSlices(vectors.Platforms, []string{"macos", "linux", "windows"}) {
++		t.Fatalf("vector platforms %v, want [macos linux windows]", vectors.Platforms)
++	}
++	if len(vectors.Table) != len(wantTable) {
++		t.Fatalf("vector table has %d rows, want %d", len(vectors.Table), len(wantTable))
++	}
++	for index := range wantTable {
++		if !reflect.DeepEqual(vectors.Table[index], wantTable[index]) {
++			t.Fatalf("vector table row %d = %+v, want %+v", index+1, vectors.Table[index], wantTable[index])
++		}
++	}
++}
++
++func vectorCell(cell dotfileStateCell) *dotfileManagerVectorCell {
++	if cell.baseEnv == "" {
++		return nil
++	}
++	return &dotfileManagerVectorCell{Base: cell.baseEnv, Leaf: cell.leaf}
++}
++
++func equalStringSlices(left, right []string) bool {
++	if len(left) != len(right) {
++		return false
++	}
++	for index := range left {
++		if left[index] != right[index] {
++			return false
++		}
++	}
++	return true
++}
++
++func runDotfileManagerVectorCase(t *testing.T, platform string, tc dotfileManagerVectorCase) {
++	t.Helper()
++	if tc.Home == "" {
++		t.Fatal("vector home is empty")
++	}
++	if tc.Expected.Blocks {
++		t.Fatal("current dotfile-manager vectors must remain warning-only")
++	}
++
++	home := t.TempDir()
++	pinHomes(t)
++	installIdleProfile(t, home, "dotfile-manager-vector")
++	native := claudeHome(t)
++	if err := os.MkdirAll(native, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(native, "CLAUDE.md"), []byte("operator-owned\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++
++	operatorHome := t.TempDir()
++	pinOperatorHome(t, operatorHome)
++	runtimeEnv := setDotfileVectorEnvironment(t, tc.Env, operatorHome)
++	for _, row := range dotfileStateTable {
++		state, exists := tc.States[row.manager]
++		if !exists {
++			t.Fatalf("vector case omits state for %s", row.manager)
++		}
++		prepareDotfileVectorState(t, platform, operatorHome, runtimeEnv, row, state)
++	}
++
++	assertDotfileVectorResolvedPath(t, platform, operatorHome, runtimeEnv, tc)
++	results, err := UseWithPolicy(home, "dotfile-manager-vector", "", "", false, Policy{Takeover: true})
++	if err != nil {
++		t.Fatalf("takeover blocked: %v", err)
++	}
++	var warningForManager bool
++	var anyWarning bool
++	for _, result := range results {
++		if !result.OK {
++			t.Fatalf("%s: %s", result.Adapter, result.Detail)
++		}
++		for _, warning := range result.Warnings {
++			if strings.HasPrefix(warning, DiagForeignSuspect+":") {
++				anyWarning = true
++				if tc.Expected.NamesManager != nil &&
++					strings.HasPrefix(warning, DiagForeignSuspect+": "+*tc.Expected.NamesManager+" ") {
++					warningForManager = true
++				}
++			}
++		}
++	}
++	if tc.Expected.Notice == nil {
++		if anyWarning {
++			t.Fatalf("unexpected dotfile-manager warning in %s: %+v", tc.Name, results)
++		}
++	} else {
++		if *tc.Expected.Notice != DiagForeignSuspect {
++			t.Fatalf("notice %q, want %q", *tc.Expected.Notice, DiagForeignSuspect)
++		}
++		if tc.Expected.NamesManager == nil || !warningForManager {
++			t.Fatalf("warning did not name expected manager %v: %+v", tc.Expected.NamesManager, results)
++		}
++	}
++}
++
++func setDotfileVectorEnvironment(t *testing.T, vectorEnv map[string]string, operatorHome string) map[string]string {
++	t.Helper()
++	values := make(map[string]string, 2)
++	for _, name := range []string{"XDG_DATA_HOME", "XDG_CONFIG_HOME"} {
++		value := vectorEnv[name]
++		if value != "" && filepath.IsAbs(value) {
++			value = filepath.Join(operatorHome, strings.ToLower(name)+"-override")
++		}
++		t.Setenv(name, value)
++		values[name] = value
++	}
++	return values
++}
++
++func prepareDotfileVectorState(t *testing.T, platform, home string, env map[string]string, row dotfileStateRow, state *string) {
++	t.Helper()
++	path, resolved := resolveDotfileStatePath(row.cell(platform), home, func(name string) string { return env[name] })
++	if !resolved {
++		if state != nil {
++			t.Fatalf("none cell for %s has vector state %q", row.manager, *state)
++		}
++		return
++	}
++	if state == nil {
++		t.Fatalf("path cell for %s has no vector state", row.manager)
++	}
++	if *state == "absent" {
++		return
++	}
++	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	switch *state {
++	case "directory":
++		if err := os.MkdirAll(path, 0o755); err != nil {
++			t.Fatal(err)
++		}
++	case "symlink":
++		target := path + "-target"
++		if err := os.MkdirAll(target, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Symlink(target, path); err != nil {
++			t.Skip("symlink unavailable")
++		}
++	case "file":
++		if err := os.WriteFile(path, []byte("state"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++	case "unreadable":
++		parent := filepath.Dir(path)
++		if err := os.Chmod(parent, 0); err != nil {
++			t.Skip("this host cannot create an unreadable dotfile state path")
++		}
++		t.Cleanup(func() { _ = os.Chmod(parent, 0o700) })
++		_, err := os.Lstat(path)
++		if err == nil {
++			t.Skip("root ignores directory permissions")
++		}
++		if !os.IsPermission(err) {
++			t.Fatalf("unreadable fixture inspection error %v, want permission denied", err)
++		}
++	default:
++		t.Fatalf("unknown vector location state %q for %s", *state, row.manager)
++	}
++}
++
++func assertDotfileVectorResolvedPath(t *testing.T, platform, home string, env map[string]string, tc dotfileManagerVectorCase) {
++	t.Helper()
++	if tc.Expected.NamesManager == nil {
++		if tc.Expected.ResolvedPath != nil {
++			t.Fatalf("quiet case unexpectedly declares resolved path %q", *tc.Expected.ResolvedPath)
++		}
++		return
++	}
++	if tc.Expected.ResolvedPath == nil {
++		t.Fatal("present manager case has no resolved_path")
++	}
++	var row *dotfileStateRow
++	for index := range dotfileStateTable {
++		if dotfileStateTable[index].manager == *tc.Expected.NamesManager {
++			row = &dotfileStateTable[index]
++			break
++		}
++	}
++	if row == nil {
++		t.Fatalf("expected unknown manager %q", *tc.Expected.NamesManager)
++	}
++	cell := row.cell(platform)
++	path, resolved := resolveDotfileStatePath(cell, home, func(name string) string { return env[name] })
++	if !resolved {
++		t.Fatalf("%s has no resolved path on %s", row.manager, platform)
++	}
++
++	vectorBase := filepath.Join(tc.Home, filepath.FromSlash(cell.defaultBase))
++	if value := tc.Env[cell.baseEnv]; value != "" && filepath.IsAbs(value) {
++		vectorBase = value
++	}
++	relative, err := filepath.Rel(vectorBase, *tc.Expected.ResolvedPath)
++	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
++		t.Fatalf("vector resolved path %q is outside base %q: %v", *tc.Expected.ResolvedPath, vectorBase, err)
++	}
++	localBase := env[cell.baseEnv]
++	if localBase == "" || !filepath.IsAbs(localBase) {
++		localBase = filepath.Join(home, filepath.FromSlash(cell.defaultBase))
++	}
++	want := filepath.Join(localBase, relative)
++	if path != want {
++		t.Fatalf("resolved path %q, want remapped vector path %q", path, want)
++	}
++}
+diff --git a/internal/envprofile/managed_dotfile_test.go b/internal/envprofile/managed_dotfile_test.go
+new file mode 100644
+index 00000000..e032e089
+--- /dev/null
++++ b/internal/envprofile/managed_dotfile_test.go
+@@ -0,0 +1,289 @@
++package envprofile
++
++import (
++	"bytes"
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++	"time"
++)
++
++func TestDotfileManagerTableMatchesSpecFixture(t *testing.T) {
++	fixture, err := os.ReadFile("testdata/dotfile-manager-table-802caee.md")
++	if err != nil {
++		t.Fatal(err)
++	}
++
++	lines := []string{
++		"| # | Manager | macOS | Linux | Windows | Source |",
++		"|---|---|---|---|---|---|",
++	}
++	tick := string(rune(96))
++	for index, row := range dotfileStateTable {
++		lines = append(lines, fmt.Sprintf("| %d | %s%s%s | %s | %s | %s | %s |",
++			index+1,
++			tick, row.manager, tick,
++			row.macOS.specText, row.linux.specText, row.windows.specText, row.source))
++	}
++	got := []byte(strings.Join(lines, "\n") + "\n")
++	if !bytes.Equal(got, fixture) {
++		limit := len(got)
++		if len(fixture) < limit {
++			limit = len(fixture)
++		}
++		for index := 0; index < limit; index++ {
++			if got[index] != fixture[index] {
++				t.Fatalf("dotfileStateTable differs from curator-spec 802caee fixture at byte %d: got %q, want %q", index, got[index:index+1], fixture[index:index+1])
++			}
++		}
++		t.Fatalf("dotfileStateTable length %d differs from curator-spec 802caee fixture length %d", len(got), len(fixture))
++	}
++}
++
++func TestDotfileStatePathResolution(t *testing.T) {
++	platform, ok := dotfilePlatformForGOOS(runtime.GOOS)
++	if !ok {
++		t.Fatalf("unsupported test platform %q", runtime.GOOS)
++	}
++	home := t.TempDir()
++	absoluteBase := filepath.Join(t.TempDir(), "xdg")
++	for _, row := range dotfileStateTable {
++		cell := row.cell(platform)
++		if cell.baseEnv == "" {
++			if _, resolved := resolveDotfileStatePath(cell, home, func(string) string { return "" }); resolved {
++				t.Fatalf("%s unexpectedly resolved a none cell on %s", row.manager, platform)
++			}
++			continue
++		}
++
++		for _, envValue := range []string{"", "relative/xdg", absoluteBase} {
++			t.Run(row.manager+"/"+valueName(envValue), func(t *testing.T) {
++				path, resolved := resolveDotfileStatePath(cell, home, func(name string) string {
++					if name != cell.baseEnv {
++						t.Fatalf("looked up %q for %s", name, row.manager)
++					}
++					return envValue
++				})
++				if !resolved {
++					t.Fatalf("%s on %s did not resolve", row.manager, platform)
++				}
++				base := filepath.Join(home, filepath.FromSlash(cell.defaultBase))
++				if envValue != "" && filepath.IsAbs(envValue) {
++					base = envValue
++				}
++				want := filepath.Join(base, cell.leaf)
++				if path != want {
++					t.Fatalf("resolved path %q, want %q", path, want)
++				}
++			})
++		}
++	}
++	t.Logf("path resolution exercised on native platform %s with injected home and XDG values", platform)
++}
++
++func valueName(value string) string {
++	switch {
++	case value == "":
++		return "empty"
++	case filepath.IsAbs(value):
++		return "absolute"
++	default:
++		return "relative"
++	}
++}
++
++type dotfileTestFileInfo struct {
++	name  string
++	mode  os.FileMode
++	isDir bool
++}
++
++func (info dotfileTestFileInfo) Name() string       { return info.name }
++func (info dotfileTestFileInfo) Size() int64        { return 0 }
++func (info dotfileTestFileInfo) Mode() os.FileMode  { return info.mode }
++func (info dotfileTestFileInfo) ModTime() time.Time { return time.Time{} }
++func (info dotfileTestFileInfo) IsDir() bool        { return info.isDir }
++func (info dotfileTestFileInfo) Sys() any           { return nil }
++
++func TestForeignManagerHintLstatDiscipline(t *testing.T) {
++	platform, ok := dotfilePlatformForGOOS(runtime.GOOS)
++	if !ok {
++		t.Fatalf("unsupported test platform %q", runtime.GOOS)
++	}
++	home := t.TempDir()
++	var paths []string
++	var managers []string
++	for _, row := range dotfileStateTable {
++		path, resolved := resolveDotfileStatePath(row.cell(platform), home, func(string) string { return "" })
++		if resolved {
++			paths = append(paths, path)
++			managers = append(managers, row.manager)
++		}
++	}
++	if len(paths) == 0 {
++		t.Fatalf("no state paths for %s", platform)
++	}
++	emptyEnv := func(string) string { return "" }
++
++	t.Run("absence advances in table order", func(t *testing.T) {
++		hint, err := foreignManagerHintAt(home, runtime.GOOS, emptyEnv, func(path string) (os.FileInfo, error) {
++			if path == paths[0] {
++				return nil, os.ErrNotExist
++			}
++			if len(paths) > 1 && path == paths[1] {
++				return dotfileTestFileInfo{name: path, mode: os.ModeDir, isDir: true}, nil
++			}
++			return nil, os.ErrNotExist
++		})
++		if err != nil {
++			t.Fatal(err)
++		}
++		if len(paths) > 1 && hint != managers[1] {
++			t.Fatalf("hint %q, want next present manager %q", hint, managers[1])
++		}
++		if len(paths) == 1 && hint != "" {
++			t.Fatalf("hint %q with no later present manager, want none", hint)
++		}
++	})
++
++	t.Run("symlink to directory is not present", func(t *testing.T) {
++		hint, err := foreignManagerHintAt(home, runtime.GOOS, emptyEnv, func(path string) (os.FileInfo, error) {
++			if path == paths[0] {
++				// Lstat returns the link's mode even when its target is a directory.
++				return dotfileTestFileInfo{name: path, mode: os.ModeSymlink, isDir: true}, nil
++			}
++			if len(paths) > 1 && path == paths[1] {
++				return dotfileTestFileInfo{name: path, mode: os.ModeDir, isDir: true}, nil
++			}
++			return nil, os.ErrNotExist
++		})
++		if err != nil {
++			t.Fatal(err)
++		}
++		if len(paths) > 1 && hint != managers[1] {
++			t.Fatalf("symlink counted as %q; want the next present manager %q", hint, managers[1])
++		}
++		if len(paths) == 1 && hint != "" {
++			t.Fatalf("symlink counted as %q on %s", hint, platform)
++		}
++	})
++
++	t.Run("failed inspection continues to later yadm directory", func(t *testing.T) {
++		sentinel := os.ErrPermission
++		var yadmPath string
++		for _, row := range dotfileStateTable {
++			if row.manager != "yadm" {
++				continue
++			}
++			var resolved bool
++			yadmPath, resolved = resolveDotfileStatePath(row.cell(platform), home, emptyEnv)
++			if !resolved {
++				yadmPath = ""
++			}
++		}
++		if yadmPath != "" {
++			if err := os.MkdirAll(yadmPath, 0o755); err != nil {
++				t.Fatal(err)
++			}
++		}
++		calls := make(map[string]int)
++		hint, err := foreignManagerHintAt(home, runtime.GOOS, emptyEnv, func(path string) (os.FileInfo, error) {
++			calls[path]++
++			if path == paths[0] {
++				return nil, sentinel
++			}
++			return os.Lstat(path)
++		})
++		if yadmPath == "" {
++			if hint != "" {
++				t.Fatalf("hint %q on %s, whose yadm cell is none", hint, platform)
++			}
++		} else if hint != "yadm" {
++			t.Fatalf("later present yadm row returned hint %q, want yadm", hint)
++		}
++		if err == nil || !errors.Is(err, sentinel) {
++			t.Fatalf("inspection error %v, want wrapped permission error", err)
++		}
++		if calls[paths[0]] != 1 {
++			t.Fatalf("first candidate lstat calls %d, want 1", calls[paths[0]])
++		}
++		if yadmPath != "" && calls[yadmPath] != 1 {
++			t.Fatalf("yadm row lstat calls %d, want 1 after earlier permission error", calls[yadmPath])
++		}
++	})
++
++	t.Run("unreadable only candidate yields unknown without a hint", func(t *testing.T) {
++		sentinel := os.ErrPermission
++		calls := make(map[string]int)
++		hint, err := foreignManagerHintAt(home, runtime.GOOS, emptyEnv, func(path string) (os.FileInfo, error) {
++			calls[path]++
++			if path == paths[0] {
++				return nil, sentinel
++			}
++			return nil, os.ErrNotExist
++		})
++		if hint != "" {
++			t.Fatalf("unreadable candidate produced manager hint %q", hint)
++		}
++		if err == nil || !errors.Is(err, sentinel) {
++			t.Fatalf("inspection error %v, want wrapped permission error", err)
++		}
++		for _, path := range paths {
++			if calls[path] != 1 {
++				t.Fatalf("candidate %q lstat calls %d, want 1 (continue after unreadable row)", path, calls[path])
++			}
++		}
++	})
++
++	t.Run("regular file is not present", func(t *testing.T) {
++		hint, err := foreignManagerHintAt(home, runtime.GOOS, emptyEnv, func(path string) (os.FileInfo, error) {
++			if path == paths[0] {
++				return dotfileTestFileInfo{name: path, mode: 0, isDir: false}, nil
++			}
++			if len(paths) > 1 && path == paths[1] {
++				return dotfileTestFileInfo{name: path, mode: os.ModeDir, isDir: true}, nil
++			}
++			return nil, os.ErrNotExist
++		})
++		if err != nil {
++			t.Fatal(err)
++		}
++		if len(paths) > 1 && hint != managers[1] {
++			t.Fatalf("regular file counted as %q; want %q", hint, managers[1])
++		}
++		if len(paths) == 1 && hint != "" {
++			t.Fatalf("regular file counted as %q on %s", hint, platform)
++		}
++	})
++}
++
++func TestDotfileManagerStateAloneDoesNotWarn(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	installIdleProfile(t, home, "dotfile-state-without-unmanaged-surface")
++	claudeHome(t)
++
++	operatorHome := t.TempDir()
++	pinOperatorHome(t, operatorHome)
++	dataHome := filepath.Join(operatorHome, "xdg-data")
++	t.Setenv("XDG_DATA_HOME", dataHome)
++	if err := os.MkdirAll(filepath.Join(dataHome, "chezmoi"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++
++	results, err := UseWithPolicy(home, "dotfile-state-without-unmanaged-surface", "", "", false, Policy{Takeover: true})
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, result := range results {
++		for _, warning := range result.Warnings {
++			if strings.HasPrefix(warning, DiagForeignSuspect+":") {
++				t.Fatalf("manager state without unmanaged surfaces produced warning: %+v", result)
++			}
++		}
++	}
++}
+diff --git a/internal/envprofile/takeover_test.go b/internal/envprofile/takeover_test.go
+index 7f9eecba..cea9d119 100644
+--- a/internal/envprofile/takeover_test.go
++++ b/internal/envprofile/takeover_test.go
+@@ -3,6 +3,7 @@ package envprofile
+ import (
+ 	"os"
+ 	"path/filepath"
++	"runtime"
+ 	"strings"
+ 	"testing"
+ 
+@@ -228,6 +229,83 @@ func TestTakeoverWarnsDotfileHeuristic(t *testing.T) {
+ 	}
+ }
+ 
++// TestTakeoverSymlinkedDotfileManagerStateDoesNotWarn drives the production
++// takeover path with a symlink at the resolved chezmoi table location. The
++// target is a directory, so this catches replacing the production Lstat with
++// Stat, which would incorrectly report chezmoi as present.
++func TestTakeoverSymlinkedDotfileManagerStateDoesNotWarn(t *testing.T) {
++	home := t.TempDir()
++	pinHomes(t)
++	installIdleProfile(t, home, "acme")
++	native := claudeHome(t)
++	if err := os.MkdirAll(native, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(native, "CLAUDE.md"), []byte("mine\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++
++	operator := t.TempDir()
++	pinOperatorHome(t, operator)
++	dataHome := filepath.Join(operator, "xdg-data")
++	t.Setenv("XDG_DATA_HOME", dataHome)
++	t.Setenv("XDG_CONFIG_HOME", "")
++	platform, ok := dotfilePlatformForGOOS(runtime.GOOS)
++	if !ok {
++		t.Fatalf("unsupported test platform %q", runtime.GOOS)
++	}
++	var chezmoi dotfileStateRow
++	for _, row := range dotfileStateTable {
++		if row.manager == "chezmoi" {
++			chezmoi = row
++			break
++		}
++	}
++	statePath, resolved := resolveDotfileStatePath(chezmoi.cell(platform), operator, os.Getenv)
++	if !resolved {
++		t.Fatalf("chezmoi has no resolved state path on %s", platform)
++	}
++	if err := os.MkdirAll(filepath.Dir(statePath), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	target := filepath.Join(t.TempDir(), "chezmoi-state-target")
++	if err := os.MkdirAll(target, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink(target, statePath); err != nil {
++		if runtime.GOOS == "windows" {
++			t.Skipf("creating Windows symlink requires host support: %v", err)
++		}
++		t.Fatalf("create directory symlink at resolved state path: %v", err)
++	}
++	linkInfo, err := os.Lstat(statePath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if linkInfo.Mode()&os.ModeSymlink == 0 {
++		t.Fatalf("resolved state path %q is not represented as a symlink: mode %v", statePath, linkInfo.Mode())
++	}
++	targetInfo, err := os.Stat(statePath)
++	if err != nil || !targetInfo.IsDir() {
++		t.Fatalf("symlink target stat = %+v, err = %v; want directory", targetInfo, err)
++	}
++
++	results, err := UseWithPolicy(home, "acme", "", "", false, Policy{Takeover: true})
++	if err != nil {
++		t.Fatalf("takeover failed: %v", err)
++	}
++	for _, result := range results {
++		if !result.OK {
++			t.Fatalf("%s: %s", result.Adapter, result.Detail)
++		}
++		for _, warning := range result.Warnings {
++			if strings.HasPrefix(warning, DiagForeignSuspect+":") {
++				t.Fatalf("symlinked directory produced a foreign-manager warning: %+v", result)
++			}
++		}
++	}
++}
++
+ // TestReadOnlyCommandsNeverOnboard drives the read-only surface over
+ // unmanaged state: list, status, and bare resolve report without writing
+ // a backup, a marker, or a prompt.
+diff --git a/internal/envprofile/testdata/dotfile-manager-table-802caee.md b/internal/envprofile/testdata/dotfile-manager-table-802caee.md
+new file mode 100644
+index 00000000..4555d097
+--- /dev/null
++++ b/internal/envprofile/testdata/dotfile-manager-table-802caee.md
+@@ -0,0 +1,7 @@
++| # | Manager | macOS | Linux | Windows | Source |
++|---|---|---|---|---|---|
++| 1 | `chezmoi` | `$XDG_DATA_HOME/chezmoi` (default `~/.local/share/chezmoi`) — verified | `$XDG_DATA_HOME/chezmoi` (default `~/.local/share/chezmoi`) — verified | `%XDG_DATA_HOME%\chezmoi` (default `%USERPROFILE%\.local\share\chezmoi`) — verified | `defaultSourceDir` over `go-xdg`: the XDG data home on every platform, no platform switch |
++| 2 | `home-manager` | `$XDG_CONFIG_HOME/home-manager` (default `~/.config/home-manager`) — verified | `$XDG_CONFIG_HOME/home-manager` (default `~/.config/home-manager`) — verified | `none` — verified: Nix-only, no native Windows location | launcher `setConfigFile`/`setFlakeAttribute`; install docs name only Nix platforms |
++| 3 | `yadm` | `$XDG_DATA_HOME/yadm` (default `~/.local/share/yadm`) — verified | `$XDG_DATA_HOME/yadm` (default `~/.local/share/yadm`) — verified | `none` — verified: a bash script with no native Windows home to anchor to | `set_yadm_dirs` plus FILES section; every path `$HOME`-relative |
++| 4 | `stow` | `none` — verified: keeps no state of its own | `none` — verified: keeps no state of its own | `none` — verified: keeps no state of its own | manual: "stores no extra state between runs" |
++| 5 | `dotbot` | `none` — verified: its config lives in the operator's own repo at any path | `none` — verified: its config lives in the operator's own repo at any path | `none` — verified: its config lives in the operator's own repo at any path | README: the dotfiles path is the operator's ("replace with the path to your dotfiles") |
