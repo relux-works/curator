@@ -1,5 +1,33 @@
 # Curator Troubleshooting Guide
 
+## Dotfile-manager onboarding warning
+
+### environment_foreign_manager_suspected
+
+Symptom: a mutating profile operation with the takeover option emits
+environment_foreign_manager_suspected and names a dotfile manager.
+
+Cause: Curator found plain unmanaged files and a state directory from the
+closed environments §9.5 table. It checks managers in this order:
+chezmoi, home-manager, yadm, stow, dotbot. The first matching row is named.
+On macOS and Linux, non-empty absolute XDG_DATA_HOME and XDG_CONFIG_HOME
+values override their home-relative defaults; empty, unset, or relative
+values use ~/.local/share and ~/.config. On Windows, Curator uses
+USERPROFILE for the home and applies the same absolute-path rule to
+XDG_DATA_HOME; the other table cells are explicitly none.
+
+Curator checks only the resolved table path with lstat semantics. A symlink
+to a directory and a regular file do not count as a present state directory.
+An inspection failure does not match that row; Curator continues through the
+table, so a later present manager can still be named. If no later row matches,
+the failed location remains unknown and is never treated as proof of absence
+(§8.4.1). Custom manager locations and sibling paths are outside this
+heuristic.
+
+Remedy: review the named manager and the takeover notice, then keep or
+remove the takeover option based on whether replacing the listed unmanaged
+files is intended. This warning is best-effort and never blocks the operation.
+
 This guide provides symptom, cause, and remedy entries for common Curator diagnostic codes and failures. Every error string and code is verified against `internal/` and `cmd/curator/` source files.
 
 ## Compiled-command diagnostics and status codes

@@ -1065,43 +1065,173 @@ func claudeProjects(homeDir string) (map[string]bool, error) {
 	return entries, nil
 }
 
-// dotfileStateDirs is the closed heuristic list for the §9.5 inventory: a
-// well-known dotfile-manager state location elevates the notice for plain
-// unmanaged files to environment_foreign_manager_suspected. The heuristic
-// never blocks.
-//
-// Stated bound (TASK-260906-vlrjo1): the entries are POSIX-portable
-// relative paths resolved under os.UserHomeDir, matching the §9.5
-// spellings verbatim. Whether the closed list is platform-specific —
-// chezmoi keeps state under %LOCALAPPDATA% on Windows, home-manager is
-// Nix-only — is a spec question §9.5 does not decide, so no Windows
-// location is invented here and the heuristic stays inert for those
-// layouts on that platform.
-var dotfileStateDirs = [][2]string{
-	{".local/share/chezmoi", "chezmoi"},
-	{".config/home-manager", "home-manager"},
+// dotfileStateCell is one §9.5 table cell. The text preserves the spec's
+// literal cell; the resolution fields are empty for an explicit none cell.
+type dotfileStateCell struct {
+	specText    string
+	baseEnv     string
+	defaultBase string
+	leaf        string
 }
 
-// foreignManagerHint scans the operator home for dotfile-manager state.
+type dotfileStateRow struct {
+	manager string
+	macOS   dotfileStateCell
+	linux   dotfileStateCell
+	windows dotfileStateCell
+	source  string
+}
+
+func dotfilePathCell(specText, baseEnv, defaultBase, leaf string) dotfileStateCell {
+	return dotfileStateCell{specText: specText, baseEnv: baseEnv, defaultBase: defaultBase, leaf: leaf}
+}
+
+func dotfileNoneCell(specText string) dotfileStateCell {
+	return dotfileStateCell{specText: specText}
+}
+
+// dotfileStateTable is the closed environments §9.5 table, in spec row
+// order. TestDotfileManagerTableMatchesSpecFixture pins every cell and the
+// source column byte-for-byte to
+// testdata/dotfile-manager-table-802caee.md, copied from
+// curator-spec protocol/environments.md at 802caee548ddc8b19408746d26c7972d39b39cc2
+// (fixture SHA-256 6575912115cf5b87facc0a6981e2d17bbcc1716f6ca7db3e0da5ddbf98853670).
+var dotfileStateTable = [...]dotfileStateRow{
+	{
+		manager: "chezmoi",
+		macOS: dotfilePathCell("`$XDG_DATA_HOME/chezmoi` (default `~/.local/share/chezmoi`) — verified",
+			"XDG_DATA_HOME", ".local/share", "chezmoi"),
+		linux: dotfilePathCell("`$XDG_DATA_HOME/chezmoi` (default `~/.local/share/chezmoi`) — verified",
+			"XDG_DATA_HOME", ".local/share", "chezmoi"),
+		windows: dotfilePathCell("`%XDG_DATA_HOME%\\chezmoi` (default `%USERPROFILE%\\.local\\share\\chezmoi`) — verified",
+			"XDG_DATA_HOME", ".local/share", "chezmoi"),
+		source: "`defaultSourceDir` over `go-xdg`: the XDG data home on every platform, no platform switch",
+	},
+	{
+		manager: "home-manager",
+		macOS: dotfilePathCell("`$XDG_CONFIG_HOME/home-manager` (default `~/.config/home-manager`) — verified",
+			"XDG_CONFIG_HOME", ".config", "home-manager"),
+		linux: dotfilePathCell("`$XDG_CONFIG_HOME/home-manager` (default `~/.config/home-manager`) — verified",
+			"XDG_CONFIG_HOME", ".config", "home-manager"),
+		windows: dotfileNoneCell("`none` — verified: Nix-only, no native Windows location"),
+		source:  "launcher `setConfigFile`/`setFlakeAttribute`; install docs name only Nix platforms",
+	},
+	{
+		manager: "yadm",
+		macOS: dotfilePathCell("`$XDG_DATA_HOME/yadm` (default `~/.local/share/yadm`) — verified",
+			"XDG_DATA_HOME", ".local/share", "yadm"),
+		linux: dotfilePathCell("`$XDG_DATA_HOME/yadm` (default `~/.local/share/yadm`) — verified",
+			"XDG_DATA_HOME", ".local/share", "yadm"),
+		windows: dotfileNoneCell("`none` — verified: a bash script with no native Windows home to anchor to"),
+		source:  "`set_yadm_dirs` plus FILES section; every path `$HOME`-relative",
+	},
+	{
+		manager: "stow",
+		macOS:   dotfileNoneCell("`none` — verified: keeps no state of its own"),
+		linux:   dotfileNoneCell("`none` — verified: keeps no state of its own"),
+		windows: dotfileNoneCell("`none` — verified: keeps no state of its own"),
+		source:  "manual: \"stores no extra state between runs\"",
+	},
+	{
+		manager: "dotbot",
+		macOS:   dotfileNoneCell("`none` — verified: its config lives in the operator's own repo at any path"),
+		linux:   dotfileNoneCell("`none` — verified: its config lives in the operator's own repo at any path"),
+		windows: dotfileNoneCell("`none` — verified: its config lives in the operator's own repo at any path"),
+		source:  "README: the dotfiles path is the operator's (\"replace with the path to your dotfiles\")",
+	},
+}
+
+func (row dotfileStateRow) cell(platform string) dotfileStateCell {
+	switch platform {
+	case "darwin", "macos":
+		return row.macOS
+	case "linux":
+		return row.linux
+	case "windows":
+		return row.windows
+	default:
+		return dotfileStateCell{}
+	}
+}
+
+func dotfilePlatformForGOOS(goos string) (string, bool) {
+	switch goos {
+	case "darwin":
+		return "macos", true
+	case "linux", "windows":
+		return goos, true
+	default:
+		return "", false
+	}
+}
+
+// resolveDotfileStatePath applies the §9.5 XDG resolution rule. Empty,
+// unset, and non-absolute XDG values use the home-relative default.
+func resolveDotfileStatePath(cell dotfileStateCell, home string, getenv func(string) string) (string, bool) {
+	if cell.baseEnv == "" || cell.defaultBase == "" || cell.leaf == "" || home == "" {
+		return "", false
+	}
+	base := getenv(cell.baseEnv)
+	if base == "" || !filepath.IsAbs(base) {
+		base = filepath.Join(home, filepath.FromSlash(cell.defaultBase))
+	}
+	return filepath.Join(base, cell.leaf), true
+}
+
+// foreignManagerHintAt scans resolved §9.5 state paths in table order. The
+// stateread probe distinguishes absence from an inspection failure (§8.4.1).
+// Failed rows do not match, but the scan continues; the returned error keeps
+// those locations unknown rather than claiming they were absent.
+func foreignManagerHintAt(home, goos string, getenv func(string) string, statState func(string) (stateread.Metadata, error)) (string, error) {
+	platform, ok := dotfilePlatformForGOOS(goos)
+	if !ok || home == "" {
+		return "", nil
+	}
+	var inspectionErr error
+	for _, row := range dotfileStateTable {
+		path, ok := resolveDotfileStatePath(row.cell(platform), home, getenv)
+		if !ok {
+			continue
+		}
+		metadata, err := statState(path)
+		if err != nil {
+			if inspectionErr == nil {
+				inspectionErr = fmt.Errorf("lstat dotfile-manager state %s: %w", path, err)
+			}
+			continue
+		}
+		if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+			continue
+		}
+		info := metadata.Info
+		if info.Mode()&os.ModeSymlink == 0 && info.IsDir() {
+			return row.manager, inspectionErr
+		}
+	}
+	return "", inspectionErr
+}
+
+// foreignManagerHint is best-effort: it can name a later known-present row
+// after an earlier inspection failure, while suppressing the error from this
+// warning-only path. It never treats a failed inspection as an absent record.
 func foreignManagerHint() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
-	for _, candidate := range dotfileStateDirs {
-		if info, err := os.Stat(filepath.Join(home, filepath.FromSlash(candidate[0]))); err == nil && info.IsDir() {
-			return candidate[1]
-		}
-	}
-	return ""
+	hint, _ := foreignManagerHintAt(home, runtime.GOOS, os.Getenv, stateread.Lstat)
+	return hint
 }
 
 // inventoryUnmanaged walks the desired home paths before the first write:
 // a managed-surface path that is already a symlink pointing outside the
 // manager's store is evidence of another manager and stops the operation
 // with environment_foreign_manager_detected; any other unmanaged file
-// fails with environment_surface_unmanaged_conflict (§8.3, §9.5).
-func inventoryUnmanaged(homeDir string, want map[string]bool, storeRoot string) error {
+// fails with environment_surface_unmanaged_conflict (§8.3, §9.5). The
+// boolean reports a plain unmanaged file, which is the only case that
+// elevates the dotfile-manager notice to
+// environment_foreign_manager_suspected.
+func inventoryUnmanaged(homeDir string, want map[string]bool, storeRoot string) (bool, error) {
 	paths := make([]string, 0, len(want))
 	for path := range want {
 		paths = append(paths, path)
@@ -1111,27 +1241,27 @@ func inventoryUnmanaged(homeDir string, want map[string]bool, storeRoot string) 
 		full := filepath.Join(homeDir, filepath.FromSlash(path))
 		metadata, err := stateread.Lstat(full)
 		if err != nil {
-			return fmt.Errorf("%s: inventory of %s: %v", DiagUnmanagedConflict, path, err)
+			return false, fmt.Errorf("%s: inventory of %s: %v", DiagUnmanagedConflict, path, err)
 		}
 		if metadata.Kind == stateread.KindAbsent {
 			continue
 		}
 		if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
-			return fmt.Errorf("%s: inventory of %s: path metadata is unreadable", DiagUnmanagedConflict, path)
+			return false, fmt.Errorf("%s: inventory of %s: path metadata is unreadable", DiagUnmanagedConflict, path)
 		}
 		info := metadata.Info
 		if info.Mode()&os.ModeSymlink != 0 {
 			link, err := stateread.Readlink(full)
 			if err != nil || link.Kind != stateread.KindPresent {
-				return fmt.Errorf("%s: inventory of %s: symbolic link target is unreadable: %v", DiagUnmanagedConflict, path, err)
+				return false, fmt.Errorf("%s: inventory of %s: symbolic link target is unreadable: %v", DiagUnmanagedConflict, path, err)
 			}
 			if !sameStoreTree(link.Target, storeRoot) {
-				return fmt.Errorf("%s: %s is a symlink outside the manager store; abort, or take over with backup", DiagForeignManager, path)
+				return false, fmt.Errorf("%s: %s is a symlink outside the manager store; abort, or take over with backup", DiagForeignManager, path)
 			}
 		}
-		return fmt.Errorf("%s: %s exists and no marker records it", DiagUnmanagedConflict, path)
+		return true, fmt.Errorf("%s: %s exists and no marker records it", DiagUnmanagedConflict, path)
 	}
-	return nil
+	return false, nil
 }
 
 // preflightManagedWriteTargets checks every managed-surface parent and the
@@ -1189,7 +1319,7 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	// during a repair of an otherwise managed home.
 	unmanaged := unmanagedPlanTargets(plan, recorded)
 	if len(unmanaged) > 0 {
-		if err := inventoryUnmanaged(plan.homeDir, unmanaged, contextstore.Root(req.Home)); err != nil {
+		if _, err := inventoryUnmanaged(plan.homeDir, unmanaged, contextstore.Root(req.Home)); err != nil {
 			if !req.Policy.Takeover {
 				return err
 			}
@@ -2692,16 +2822,19 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		// backs every replaced file up before the first write (applyPlan
 		// below, subject to environment_backup_exists) and reports the
 		// replace notice.
-		if err := inventoryUnmanaged(plan.homeDir, want, contextstore.Root(req.Home)); err != nil {
+		plainUnmanaged, inventoryErr := inventoryUnmanaged(plan.homeDir, want, contextstore.Root(req.Home))
+		if inventoryErr != nil {
 			if !req.Policy.Takeover {
-				return nil, err
+				return nil, inventoryErr
 			}
 			plan.warnings = append(plan.warnings, "taking over unmanaged files for "+adapter.ID+
 				": native global context files are being replaced by managed ones; backups land in "+
 				filepath.Join(plan.homeDir, ".agent-environment-backup")+"/")
 		}
-		if hint := foreignManagerHint(); hint != "" {
-			plan.warnings = append(plan.warnings, fmt.Sprintf("%s: %s appears to manage this machine and will overwrite managed surfaces on its next apply", DiagForeignSuspect, hint))
+		if plainUnmanaged {
+			if hint := foreignManagerHint(); hint != "" {
+				plan.warnings = append(plan.warnings, fmt.Sprintf("%s: %s appears to manage this machine and will overwrite managed surfaces on its next apply", DiagForeignSuspect, hint))
+			}
 		}
 	}
 	recorded := map[string]bool{}

@@ -1,0 +1,7 @@
+| # | Manager | macOS | Linux | Windows | Source |
+|---|---|---|---|---|---|
+| 1 | `chezmoi` | `$XDG_DATA_HOME/chezmoi` (default `~/.local/share/chezmoi`) — verified | `$XDG_DATA_HOME/chezmoi` (default `~/.local/share/chezmoi`) — verified | `%XDG_DATA_HOME%\chezmoi` (default `%USERPROFILE%\.local\share\chezmoi`) — verified | `defaultSourceDir` over `go-xdg`: the XDG data home on every platform, no platform switch |
+| 2 | `home-manager` | `$XDG_CONFIG_HOME/home-manager` (default `~/.config/home-manager`) — verified | `$XDG_CONFIG_HOME/home-manager` (default `~/.config/home-manager`) — verified | `none` — verified: Nix-only, no native Windows location | launcher `setConfigFile`/`setFlakeAttribute`; install docs name only Nix platforms |
+| 3 | `yadm` | `$XDG_DATA_HOME/yadm` (default `~/.local/share/yadm`) — verified | `$XDG_DATA_HOME/yadm` (default `~/.local/share/yadm`) — verified | `none` — verified: a bash script with no native Windows home to anchor to | `set_yadm_dirs` plus FILES section; every path `$HOME`-relative |
+| 4 | `stow` | `none` — verified: keeps no state of its own | `none` — verified: keeps no state of its own | `none` — verified: keeps no state of its own | manual: "stores no extra state between runs" |
+| 5 | `dotbot` | `none` — verified: its config lives in the operator's own repo at any path | `none` — verified: its config lives in the operator's own repo at any path | `none` — verified: its config lives in the operator's own repo at any path | README: the dotfiles path is the operator's ("replace with the path to your dotfiles") |

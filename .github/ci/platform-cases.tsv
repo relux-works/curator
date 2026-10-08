@@ -574,6 +574,13 @@ internal/envprofile	TestPathUpdateAllSucceedsWithImportedProfile	linux,darwin,wi
 internal/envprofile	TestUseWithoutTakeoverRefusesUnmanaged	linux,darwin,windows	-	-	a switch over unmanaged files fails with environment_surface_unmanaged_conflict and writes nothing
 internal/envprofile	TestUseTakeoverBacksUpAndNotifies	linux,darwin,windows	-	-	takeover backs every replaced file up before the first write and reports the notice
 internal/envprofile	TestForeignSymlinkStopsSwitch	linux,darwin	windows	host-capability	a foreign-manager symlink stops with environment_foreign_manager_detected and the take-over choice
+internal/envprofile	TestDotfileManagerTableMatchesSpecFixture	linux,darwin,windows	-	-	the ordered manager table matches the byte-for-byte curator-spec 802caee fixture
+internal/envprofile	TestDotfileStatePathResolution	linux,darwin,windows	-	-	home and XDG path resolution uses injected values on each native platform, including Windows
+internal/envprofile	TestForeignManagerHintLstatDiscipline	linux,darwin,windows	-	-	lstat distinguishes absence, symlinks, regular files, and failed inspection while continuing the ordered scan
+internal/envprofile	TestTakeoverSymlinkedDotfileManagerStateDoesNotWarn	linux,darwin,windows	windows	host-capability	a directory symlink at the resolved chezmoi state path does not trigger the production takeover warning; Windows may lack unprivileged symlink creation
+internal/envprofile	TestDotfileManagerVectors	linux,darwin,windows	linux,darwin,windows	root-content	the supplied rc.12 conformance root predates the dotfile-manager vector; each native platform case runs when the vector is present
+internal/envprofile	TestDotfileManagerStateAloneDoesNotWarn	linux,darwin,windows	-	-	manager state alone does not emit the warning when inventory finds no unmanaged surface
+internal/envprofile	TestUnreadableDotfileStateKeepsTakeoverQuiet	linux,darwin	windows	host-capability	an unreadable home-manager state keeps the machine takeover quiet; Windows has no home-manager cell and cannot build the mode-000 fixture
 internal/envprofile	TestTakeoverWarnsDotfileHeuristic	linux,darwin,windows	-	-	takeover warns the dotfile-manager heuristic without blocking the switch
 internal/envprofile	TestMachineClearReachesSeamGate	linux,darwin,windows	-	-	the machine-clear combination reaches the single structural require_current_profile gate while a scoped clear is unaffected
 internal/envprofile	TestReadOnlyCommandsNeverOnboard	linux,darwin,windows	-	-	read-only commands never write a backup, a marker, or a prompt

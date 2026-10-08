@@ -288,7 +288,7 @@ func preflightManagedProfile(home, profile string, policy Policy, machine envreg
 		}
 		want := unmanagedPlanTargets(plan, recorded)
 		if len(want) > 0 && !policy.Takeover {
-			if err := inventoryUnmanaged(plan.homeDir, want, contextstore.Root(home)); err != nil {
+			if _, err := inventoryUnmanaged(plan.homeDir, want, contextstore.Root(home)); err != nil {
 				return err
 			}
 		}

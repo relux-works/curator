@@ -3,6 +3,7 @@ package envprofile
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -226,6 +227,83 @@ func TestTakeoverWarnsDotfileHeuristic(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("results %+v carry no %s naming chezmoi", results, DiagForeignSuspect)
+	}
+}
+
+// TestTakeoverSymlinkedDotfileManagerStateDoesNotWarn drives the production
+// takeover path with a symlink at the resolved chezmoi table location. The
+// target is a directory, so this catches replacing the production Lstat with
+// Stat, which would incorrectly report chezmoi as present.
+func TestTakeoverSymlinkedDotfileManagerStateDoesNotWarn(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	installIdleProfile(t, home, "acme")
+	native := claudeHome(t)
+	if err := os.MkdirAll(native, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(native, "CLAUDE.md"), []byte("mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	operator := t.TempDir()
+	pinOperatorHome(t, operator)
+	dataHome := filepath.Join(operator, "xdg-data")
+	t.Setenv("XDG_DATA_HOME", dataHome)
+	t.Setenv("XDG_CONFIG_HOME", "")
+	platform, ok := dotfilePlatformForGOOS(runtime.GOOS)
+	if !ok {
+		t.Fatalf("unsupported test platform %q", runtime.GOOS)
+	}
+	var chezmoi dotfileStateRow
+	for _, row := range dotfileStateTable {
+		if row.manager == "chezmoi" {
+			chezmoi = row
+			break
+		}
+	}
+	statePath, resolved := resolveDotfileStatePath(chezmoi.cell(platform), operator, os.Getenv)
+	if !resolved {
+		t.Fatalf("chezmoi has no resolved state path on %s", platform)
+	}
+	if err := os.MkdirAll(filepath.Dir(statePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(t.TempDir(), "chezmoi-state-target")
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, statePath); err != nil {
+		if runtime.GOOS == "windows" {
+			t.Skipf("creating Windows symlink requires host support: %v", err)
+		}
+		t.Fatalf("create directory symlink at resolved state path: %v", err)
+	}
+	linkInfo, err := os.Lstat(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if linkInfo.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("resolved state path %q is not represented as a symlink: mode %v", statePath, linkInfo.Mode())
+	}
+	targetInfo, err := os.Stat(statePath)
+	if err != nil || !targetInfo.IsDir() {
+		t.Fatalf("symlink target stat = %+v, err = %v; want directory", targetInfo, err)
+	}
+
+	results, err := UseWithPolicy(home, "acme", "", "", false, Policy{Takeover: true})
+	if err != nil {
+		t.Fatalf("takeover failed: %v", err)
+	}
+	for _, result := range results {
+		if !result.OK {
+			t.Fatalf("%s: %s", result.Adapter, result.Detail)
+		}
+		for _, warning := range result.Warnings {
+			if strings.HasPrefix(warning, DiagForeignSuspect+":") {
+				t.Fatalf("symlinked directory produced a foreign-manager warning: %+v", result)
+			}
+		}
 	}
 }
 
