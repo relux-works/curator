@@ -54,9 +54,9 @@ type codexSeedVectorSet struct {
 	Posture      []codexSeedPostureVector      `json:"posture_cases"`
 }
 
-// TestCodexSeedProvisioningAndStatus exercises the shipped revision-A rule
-// through Resolve and StatusOf, including the whole-file copy and migration
-// warning.
+// TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression retains the
+// historical warning-release behavior through the revision-A test seam, then
+// checks that shipped revision B preserves the existing home through repair.
 func TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
@@ -67,6 +67,7 @@ func TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression(t *testing.T) {
 
 	req := fx.request(envregistry.CodexCLI)
 	req.Repair = true
+	req.codexSeedRevisionForTest = envregistry.CodexSeedRevisionA
 	result, err := Resolve(req)
 	if err != nil {
 		t.Fatalf("Resolve provisioning: %v", err)
@@ -112,7 +113,9 @@ func TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression(t *testing.T) {
 		t.Fatalf("codex_seed_record = %+v, want %+v", marker.CodexSeedRecord, wantRecord)
 	}
 
-	status, err := StatusOf(statusRequest(fx))
+	statusReq := statusRequest(fx)
+	statusReq.codexSeedRevisionForTest = envregistry.CodexSeedRevisionA
+	status, err := StatusOf(statusReq)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,6 +135,41 @@ func TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression(t *testing.T) {
 	if got := countWarnings(home.Warnings, envregistry.DiagMCPNativeServersUngoverned); got != 1 {
 		t.Fatalf("env status warnings = %v; ungoverned count = %d, want 1", home.Warnings, got)
 	}
+
+	// StatusOf and Resolve use the shipped registry from here on. The flip
+	// warns about the old seed but must not silently strip or refresh it.
+	status, err = StatusOf(statusRequest(fx))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.CodexSeedRule.Revision != envregistry.CodexSeedRevisionB || status.CodexSeedRule.Provenance != "shipped" {
+		t.Fatalf("shipped codex-seed status row = %+v", status.CodexSeedRule)
+	}
+	home = findHome(status, fx.profile, envregistry.CodexCLI)
+	if home == nil || !home.Current || home.NativeMCPServersDisposition != "ungoverned" {
+		t.Fatalf("revision-A home under shipped B = %+v", home)
+	}
+	if got := countWarnings(home.Warnings, envregistry.DiagMCPSeedUnstripped); got != 1 || !strings.Contains(warningWithPrefix(home.Warnings, envregistry.DiagMCPSeedUnstripped), "re-provision") {
+		t.Fatalf("revision-A home lacks the B re-provision warning: %v", home.Warnings)
+	}
+	if err := os.Remove(filepath.Join(managedHome, "AGENTS.md")); err != nil {
+		t.Fatal(err)
+	}
+	req.codexSeedRevisionForTest = ""
+	result, err = Resolve(req)
+	if err != nil {
+		t.Fatalf("repair revision-A home under shipped B: %v", err)
+	}
+	if result.Provisioned || countWarnings(result.Warnings, envregistry.DiagMCPNativeServersNotInherited) != 0 {
+		t.Fatalf("repair must not provision a B seed: %+v", result)
+	}
+	after, err := os.ReadFile(filepath.Join(managedHome, "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(after, []byte(native)) || !reflect.DeepEqual(readManagedMarker(t, fx, envregistry.CodexCLI).CodexSeedRecord, wantRecord) {
+		t.Fatal("repair under shipped B changed the revision-A seed bytes or record")
+	}
 }
 
 func TestCodexSeedStripsInlineMCPTable(t *testing.T) {
@@ -143,7 +181,6 @@ func TestCodexSeedStripsInlineMCPTable(t *testing.T) {
 	}
 	req := fx.request(envregistry.CodexCLI)
 	req.Repair = true
-	req.codexSeedRevisionForTest = envregistry.CodexSeedRevisionB
 	result, err := Resolve(req)
 	if err != nil {
 		t.Fatalf("Resolve provisioning: %v", err)
@@ -177,7 +214,6 @@ func TestCodexSeedRejectsInvalidTOMLBeforePublishingHome(t *testing.T) {
 	}
 	req := fx.request(envregistry.CodexCLI)
 	req.Repair = true
-	req.codexSeedRevisionForTest = envregistry.CodexSeedRevisionB
 	if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), envregistry.DiagSeedUnreadable) {
 		t.Fatalf("Resolve error = %v, want %s refusal", err, envregistry.DiagSeedUnreadable)
 	}
@@ -195,7 +231,6 @@ func TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair(t *testing.T) {
 	}
 	req := fx.request(envregistry.CodexCLI)
 	req.Repair = true
-	req.codexSeedRevisionForTest = envregistry.CodexSeedRevisionB
 	if _, err := Resolve(req); err != nil {
 		t.Fatal(err)
 	}
@@ -231,13 +266,12 @@ func TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair(t *testing.T) {
 	}
 }
 
-// TestEnvironmentsCodexSeedVectors drives the shipped revision-A rc.13
-// vectors through Resolve and StatusOf. Revision-B cases remain exercised
-// through the internal revision seam, while the gap ledger assigns their
-// shipped-production coverage to the revision flip leaf.
+// TestEnvironmentsCodexSeedVectors drives every published case through Resolve
+// and StatusOf. B uses the shipped registry without an override; A remains a
+// historical regression through the retained revision seam.
 func TestEnvironmentsCodexSeedVectors(t *testing.T) {
-	if envregistry.CodexSeedRevision != envregistry.CodexSeedRevisionA {
-		t.Fatalf("trunk must ship Codex seed revision A, got %q", envregistry.CodexSeedRevision)
+	if envregistry.CodexSeedRevision != envregistry.CodexSeedRevisionB {
+		t.Fatalf("registry must ship Codex seed revision B, got %q", envregistry.CodexSeedRevision)
 	}
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
 	if root == "" {
@@ -252,34 +286,27 @@ func TestEnvironmentsCodexSeedVectors(t *testing.T) {
 	if err := json.Unmarshal(payload, &vectors); err != nil {
 		t.Fatal(err)
 	}
-	if len(vectors.Provisioning) == 0 || len(vectors.Posture) == 0 {
-		t.Fatalf("%s is missing provisioning or posture cases", codexSeedVectorFile)
+	conformancecoverage.Run(t, "environments-codex-seed/provisioning-cases", vectors.Provisioning,
+		func(tc codexSeedProvisioningVector) string { return tc.Name }, func(t *testing.T, tc codexSeedProvisioningVector) {
+			runCodexSeedProvisioningVector(t, tc, codexSeedHistoricalOverride(t, tc.Revision))
+		})
+	conformancecoverage.Run(t, "environments-codex-seed/posture-cases", vectors.Posture,
+		func(tc codexSeedPostureVector) string { return tc.Name }, func(t *testing.T, tc codexSeedPostureVector) {
+			runCodexSeedPostureVector(t, tc, codexSeedHistoricalOverride(t, tc.RevisionShipped))
+		})
+}
+
+func codexSeedHistoricalOverride(t *testing.T, revision string) string {
+	t.Helper()
+	switch revision {
+	case envregistry.CodexSeedRevisionA:
+		return envregistry.CodexSeedRevisionA
+	case envregistry.CodexSeedRevisionB:
+		return ""
+	default:
+		t.Fatalf("unknown Codex seed vector revision %q", revision)
+		return ""
 	}
-	const revisionBGap = "revision B remains behind the test seam until TASK-260927-1e5qqm ships it through the registry"
-	conformancecoverage.RunOutcomes(t, "environments-codex-seed/provisioning-cases", vectors.Provisioning,
-		func(tc codexSeedProvisioningVector) string { return tc.Name }, func(t *testing.T, tc codexSeedProvisioningVector) conformancecoverage.Observation {
-			if tc.Revision == envregistry.CodexSeedRevisionA {
-				runCodexSeedProvisioningVector(t, tc, "")
-				return conformancecoverage.Observation{}
-			}
-			if tc.Revision != envregistry.CodexSeedRevisionB {
-				t.Fatalf("unknown Codex seed vector revision %q", tc.Revision)
-			}
-			runCodexSeedProvisioningVector(t, tc, envregistry.CodexSeedRevisionB)
-			return conformancecoverage.Observation{FailureReason: revisionBGap}
-		})
-	conformancecoverage.RunOutcomes(t, "environments-codex-seed/posture-cases", vectors.Posture,
-		func(tc codexSeedPostureVector) string { return tc.Name }, func(t *testing.T, tc codexSeedPostureVector) conformancecoverage.Observation {
-			if tc.RevisionShipped == envregistry.CodexSeedRevisionA {
-				runCodexSeedPostureVector(t, tc, "")
-				return conformancecoverage.Observation{}
-			}
-			if tc.RevisionShipped != envregistry.CodexSeedRevisionB {
-				t.Fatalf("unknown Codex seed posture revision %q", tc.RevisionShipped)
-			}
-			runCodexSeedPostureVector(t, tc, envregistry.CodexSeedRevisionB)
-			return conformancecoverage.Observation{FailureReason: revisionBGap}
-		})
 }
 
 func runCodexSeedProvisioningVector(t *testing.T, tc codexSeedProvisioningVector, revisionOverride string) {

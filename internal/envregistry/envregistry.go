@@ -32,9 +32,9 @@ const (
 	CodexSeedRevisionA = "A"
 	CodexSeedRevisionB = "B"
 
-	// CodexSeedRevision selects the manager behavior shipped on trunk. Move
-	// this single registry switch to B only after revision A has shipped.
-	CodexSeedRevision = CodexSeedRevisionA
+	// CodexSeedRevision selects the manager behavior shipped on trunk.
+	// Revision A shipped in v0.15.0-rc.3 before this revision-B switch.
+	CodexSeedRevision = CodexSeedRevisionB
 )
 
 // EnvAliases maps the CLI-only short spellings to their canonical

@@ -163,6 +163,8 @@ func TestEnvResolveKeepsSchema1BytesForMetadataOnly(t *testing.T) {
 	// Schemas 1 and 2 carry no hash_version (environments §8.2); the
 	// published schema-3 value must not survive the downgrade.
 	delete(object, "hash_version")
+	// Preserve the historical A marker independently of the shipped seed rule.
+	object["codex_seed_record"] = map[string]any{"revision": "A", "native_mcp_servers": []string{}}
 	modern, _ := object["passthrough"].([]any)
 	legacy := make([]any, 0, len(modern))
 	for _, value := range modern {
@@ -282,7 +284,7 @@ func TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome(t *testing.
 	if code != exitOK {
 		t.Fatalf("env status = %d\nstderr:\n%s", code, stderr)
 	}
-	if !strings.Contains(stdout, "mcp_seed_unstripped: this managed Codex home predates the seed record; re-provision it to apply seed revision A") {
+	if !strings.Contains(stdout, "mcp_seed_unstripped: this managed Codex home predates the seed record; re-provision it to apply seed revision B") {
 		t.Fatalf("env status did not report the pre-rule Codex home:\n%s", stdout)
 	}
 }
