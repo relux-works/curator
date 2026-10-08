@@ -289,6 +289,9 @@ func (a Access) call(ctx context.Context, action string, request ...field) (map[
 	if err := cmd.Run(); err != nil {
 		return nil, false
 	}
+	if answer.overflow {
+		return nil, false
+	}
 	return parseAnswer(answer.Bytes()), true
 }
 
@@ -393,15 +396,20 @@ func notPersistedError(lead string) error {
 
 // boundedBuffer collects a helper answer up to a fixed size. A helper is an
 // operator-configured program, and a manager must not grow without bound on
-// whatever it decides to print.
+// whatever it decides to print. Anything past the bound is discarded and the
+// overflow flag is set, so the caller refuses the whole answer rather than
+// parsing a truncated prefix as a credential. An answer of exactly the bound
+// is kept unchanged with the flag clear.
 type boundedBuffer struct {
 	buffer    bytes.Buffer
 	remaining int
+	overflow  bool
 }
 
 func (b *boundedBuffer) Write(payload []byte) (int, error) {
 	accepted := payload
 	if len(accepted) > b.remaining {
+		b.overflow = true
 		accepted = accepted[:b.remaining]
 	}
 	if len(accepted) > 0 {

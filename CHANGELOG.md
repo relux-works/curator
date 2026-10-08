@@ -4,6 +4,12 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- A credential helper answer larger than the 64-KiB bound is now refused
+  outright instead of being silently truncated and accepted as a different
+  credential; the affected host simply reports no credential.
+
 ## v0.15.0-rc.5 — 2026-10-08
 
 ### Added

@@ -48,6 +48,11 @@ const (
 	// modeSleeper is that helper. It answers nothing and records nothing; it
 	// exists only to still be there after Git is gone.
 	modeSleeper = "sleeper"
+	// modeFixedAnswer is a Git that answers every credential call with the
+	// exact bytes held in answer.bin, whatever the request. It emulates a
+	// helper answer of a precise total size without depending on any
+	// helper's output formatting.
+	modeFixedAnswer = "fixed-answer"
 )
 
 func TestMain(m *testing.M) {
@@ -547,6 +552,16 @@ func fakeGitMain(dir string) int {
 	}
 	input, _ := io.ReadAll(os.Stdin)
 	recordCall(dir, fakeCall{Args: os.Args[1:], Env: os.Environ(), Stdin: string(input)})
+	if mode == modeFixedAnswer {
+		answer, err := os.ReadFile(filepath.Join(dir, "answer.bin")) // #nosec G304 -- test-owned path.
+		if err != nil {
+			return 1
+		}
+		if _, err := os.Stdout.Write(answer); err != nil {
+			return 1
+		}
+		return 0
+	}
 	if mode == modeFail {
 		return 1
 	}
