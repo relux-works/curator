@@ -66,10 +66,8 @@ spawn run completed: codex (run=RUN-261002-97f2a7, pid=39084, exit=0)
 ## Outcome Resources
 - [TASK-261002-3so4n6_spawn-log_-implementer--developer--codex-_RUN-261002-9ed321.log](file://TASK-261002-3so4n6/TASK-261002-3so4n6_spawn-log_-implementer--developer--codex-_RUN-261002-9ed321.log) — System spawn log captured by task-board
 - [TASK-261002-3so4n6_results.md](file://TASK-261002-3so4n6/TASK-261002-3so4n6_results.md) — Release preparation, real local gates, binding hosted review gate, and checklist alignment
-- [TASK-261002-3so4n6_validation.zip](file://TASK-261002-3so4n6/TASK-261002-3so4n6_validation.zip) — Real validation exits, baseline Windows vet, passing subsets, and startup-stall evidence
 - [TASK-261002-3so4n6_candidate.patch](file://TASK-261002-3so4n6/TASK-261002-3so4n6_candidate.patch) — Uncommitted v0.2.0 release preparation patch
 - [TASK-261002-3so4n6_spawn-log_-implementer--developer--codex-_RUN-261002-1eb7fb.log](file://TASK-261002-3so4n6/TASK-261002-3so4n6_spawn-log_-implementer--developer--codex-_RUN-261002-1eb7fb.log) — System spawn log captured by task-board
-- [TASK-261002-3so4n6_handoff-validation.zip](file://TASK-261002-3so4n6/TASK-261002-3so4n6_handoff-validation.zip) — Fresh real gate exits and logs plus approved hosted-gate checklist alignment
 - [TASK-261002-3so4n6_change-request_rev1.patch](file://TASK-261002-3so4n6/TASK-261002-3so4n6_change-request_rev1.patch) — Change Request CR-TASK-261002-3so4n6-1 revision 1 candidate patch (repository_delta=present, 5 changed paths)
 - [TASK-261002-3so4n6_change-request_rev1-validation.log](file://TASK-261002-3so4n6/TASK-261002-3so4n6_change-request_rev1-validation.log) — Change Request CR-TASK-261002-3so4n6-1 revision 1 bounded validation log
 - [TASK-261002-3so4n6_spawn-log_-reviewer--reviewer--codex-_RUN-261002-97f2a7.log](file://TASK-261002-3so4n6/TASK-261002-3so4n6_spawn-log_-reviewer--reviewer--codex-_RUN-261002-97f2a7.log) — System spawn log captured by task-board
@@ -79,7 +77,7 @@ spawn run completed: codex (run=RUN-261002-97f2a7, pid=39084, exit=0)
 2026-10-02T05:06:53Z
 
 ## Last Update
-2026-10-02T06:15:40Z
+2026-10-08T17:04:17Z
 
 ## Assigned To
 [reviewer] reviewer (codex)

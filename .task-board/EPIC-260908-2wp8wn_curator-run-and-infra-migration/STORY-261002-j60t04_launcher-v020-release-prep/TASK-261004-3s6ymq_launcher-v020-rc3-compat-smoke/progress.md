@@ -114,7 +114,6 @@ spawn run completed: codex (run=RUN-261008-5f5a4f, pid=53920, exit=0)
 - [TASK-261004-3s6ymq_spawn-log_-analyst--researcher--codex-_RUN-261004-2c8c22.log](file://TASK-261004-3s6ymq/TASK-261004-3s6ymq_spawn-log_-analyst--researcher--codex-_RUN-261004-2c8c22.log) — System spawn log captured by task-board
 - [TASK-261004-3s6ymq_smoke.md](file://TASK-261004-3s6ymq/TASK-261004-3s6ymq_smoke.md) — GO within bounded rc.3 x launcher 0.2.0 smoke; 45 real exit-code rows and explicit native/MCP limits
 - [TASK-261004-3s6ymq_rows.jsonl](file://TASK-261004-3s6ymq/TASK-261004-3s6ymq_rows.jsonl) — All 45 standalone smoke command exit codes and full stdout/stderr
-- [TASK-261004-3s6ymq_harness.tgz](file://TASK-261004-3s6ymq/TASK-261004-3s6ymq_harness.tgz) — Scratch harness, mutation wrapper, capture-only providers, fragments, release metadata and checksums
 - [TASK-261004-3s6ymq_change-request_rev1.patch](file://TASK-261004-3s6ymq/TASK-261004-3s6ymq_change-request_rev1.patch) — Change Request CR-TASK-261004-3s6ymq-1 revision 1 candidate patch (repository_delta=present, 1 changed paths)
 - [TASK-261004-3s6ymq_change-request_rev1-validation.log](file://TASK-261004-3s6ymq/TASK-261004-3s6ymq_change-request_rev1-validation.log) — Change Request CR-TASK-261004-3s6ymq-1 revision 1 bounded validation log
 - [TASK-261004-3s6ymq_spawn-log_-reviewer--reviewer--claude-_RUN-261008-380a60.log](file://TASK-261004-3s6ymq/TASK-261004-3s6ymq_spawn-log_-reviewer--reviewer--claude-_RUN-261008-380a60.log) — System spawn log captured by task-board
@@ -135,7 +134,7 @@ spawn run completed: codex (run=RUN-261008-5f5a4f, pid=53920, exit=0)
 2026-10-04T03:07:54Z
 
 ## Last Update
-2026-10-08T16:06:38Z
+2026-10-08T17:03:16Z
 
 ## Assigned To
 [analyst] researcher (codex)
