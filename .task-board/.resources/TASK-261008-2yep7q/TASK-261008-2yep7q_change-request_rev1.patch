@@ -1,0 +1,2698 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index ea3f8e8902317050c0cd04acf78923145b1da6cc..14f4950a259ab5abf75f748f091f14c7584e56ad 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -5,6 +5,20 @@ Versioning for the complete specification set.
+ 
+ ## Unreleased
+ 
++### Added
++
++- Unreleased, opt-in core manifest schema 9 adds optional
++  `dependencies.skills.*.directory` selection at the dependency's pinned
++  repository ref. It reuses the Skillfile schema-2 directory grammar,
++  normalizes omitted directory to `.`, and binds package, closure, lock,
++  local audit and install-marker-v6 identity to that directory. Schemas 1
++  through 8 and the rc.14 suite remain unchanged; the source-extension
++  vectors cover path rejection, missing package folders and manifests, root
++  compatibility, and same-repository diamond unification. Released schemas
++  stay byte-frozen: schema-9 recording mints `install-marker-v6` (marker v5
++  shape with manifest versions through 9) because the frozen marker v5 band
++  cannot record version 9.
++
+ ## 1.0.0-rc.14 - 2026-10-02
+ 
+ ### Changed
+diff --git a/conformance/candidate.json b/conformance/candidate.json
+index 0aed0caa29eef52d7d8d187b8555b2d1128696eb..fa67e57bd9adb97aa46570fa33df4db0175adaec 100644
+--- a/conformance/candidate.json
++++ b/conformance/candidate.json
+@@ -5,7 +5,7 @@
+   },
+   "skillfile_sources_v1": {
+     "manifest_path": "conformance/skillfile-sources-v1/manifest.json",
+-    "manifest_sha256": "sha256:061ec05ddb1746b72168d157f81d2930047cd62371ffa46cf585844da61ee6be"
++    "manifest_sha256": "sha256:c72f021289be19b3a610974ebab282dcd98eca661351224c2d8fc245a3a4d65f"
+   },
+   "status": "candidate"
+ }
+diff --git a/conformance/skillfile-sources-v1/README.md b/conformance/skillfile-sources-v1/README.md
+index cf932bf08ceae3b57c5d7b7315dea1d301b26bae..5be484a2647e6fd7ee455173f314b314f2e0d308 100644
+--- a/conformance/skillfile-sources-v1/README.md
++++ b/conformance/skillfile-sources-v1/README.md
+@@ -12,8 +12,11 @@ required outcomes. `index.json` lists structural positives and negatives;
+ outcomes (`v2-*` cases cover transport revision 2: port, mirror and alias
+ positives plus undeclared-mirror, unknown-alias and policy-misuse refusals). It
+ also records moved-tag lock replay and machine-global/project-scope schema-2
+-requirements from the source protocol. These hand-authored vectors remain in
+-this namespace rather than the generated `conformance/v1` corpus.
++requirements from the source protocol. `manifest-dependency-directories.json`
++covers schema-9 subfolder selection, root-default identity, missing package
++paths, audit/lock identity and same-repository diamond unification. These
++hand-authored vectors remain in this namespace rather than the generated
++`conformance/v1` corpus.
+ 
+ ## Specification checks
+ 
+@@ -63,6 +66,14 @@ for old_name, arm in zip(['buildRecordV1WithReceiptVersion', 'buildRecordV2'],
+     expected['properties']['receipt_schema_version'] = {'const': 3}
+     expected = json.loads(json.dumps(expected).replace('"#/$defs/', '"../v1/common.schema.json#/$defs/'))
+     assert arm == expected, old_name
++# Marker v6 is v5 with schema_version 6 and skill_schema_version through 9.
++v6 = schemas['install-marker-v6.schema.json']
++assert v6['properties']['schema_version'] == {'const': 6}
++assert v6['properties']['skill_schema_version'] == {'type': 'integer', 'minimum': 1, 'maximum': 9}
++v6_as_v5 = copy.deepcopy(v6)
++v6_as_v5['properties']['schema_version'] = {'const': 5}
++v6_as_v5['properties']['skill_schema_version'] = {'type': 'integer', 'minimum': 1, 'maximum': 8}
++assert {k: v for k, v in v6_as_v5.items() if k != '$id'} == {k: v for k, v in v5.items() if k != '$id'}
+ # Narrow the actual schema refusal to local markers with BOTH forbidden fields.
+ # Each single-field negative must expose this weakening at the same validator entry.
+ mutant = copy.deepcopy(v5)
+diff --git a/conformance/skillfile-sources-v1/index.json b/conformance/skillfile-sources-v1/index.json
+index 98a37aa6d05f98821fe1b7cbb1b96bee1ad347bd..6f2fee9cc2b3886e5e4c90dd2067ab02acb18068 100644
+--- a/conformance/skillfile-sources-v1/index.json
++++ b/conformance/skillfile-sources-v1/index.json
+@@ -610,5 +610,130 @@
+     "schema": "source-policy-v2.schema.json",
+     "instance": "schema-cases/source-policy-v2/invalid-port-range-ssh.json",
+     "valid": false
++  },
++  {
++    "schema": "agent-skill-v9.schema.json",
++    "instance": "schema-cases/agent-skill-v9/invalid-directory-absolute.json",
++    "valid": false
++  },
++  {
++    "schema": "agent-skill-v9.schema.json",
++    "instance": "schema-cases/agent-skill-v9/invalid-directory-backslash.json",
++    "valid": false
++  },
++  {
++    "schema": "agent-skill-v9.schema.json",
++    "instance": "schema-cases/agent-skill-v9/invalid-directory-empty.json",
++    "valid": false
++  },
++  {
++    "schema": "agent-skill-v9.schema.json",
++    "instance": "schema-cases/agent-skill-v9/invalid-directory-escape.json",
++    "valid": false
++  },
++  {
++    "schema": "agent-skill-v9.schema.json",
++    "instance": "schema-cases/agent-skill-v9/invalid-directory-glob.json",
++    "valid": false
++  },
++  {
++    "schema": "agent-skill-v9.schema.json",
++    "instance": "schema-cases/agent-skill-v9/invalid-directory-parent-component.json",
++    "valid": false
++  },
++  {
++    "schema": "agent-skill-v9.schema.json",
++    "instance": "schema-cases/agent-skill-v9/invalid.json",
++    "valid": false
++  },
++  {
++    "schema": "agent-skill-v9.schema.json",
++    "instance": "schema-cases/agent-skill-v9/valid-directory-absent.json",
++    "valid": true
++  },
++  {
++    "schema": "agent-skill-v9.schema.json",
++    "instance": "schema-cases/agent-skill-v9/valid-directory-root.json",
++    "valid": true
++  },
++  {
++    "schema": "agent-skill-v9.schema.json",
++    "instance": "schema-cases/agent-skill-v9/valid-directory-subfolder.json",
++    "valid": true
++  },
++  {
++    "schema": "agent-skill-v9.schema.json",
++    "instance": "schema-cases/agent-skill-v9/valid.json",
++    "valid": true
++  },
++  {
++    "schema": "csk-skill-v9.schema.json",
++    "instance": "schema-cases/csk-skill-v9/invalid-directory-absolute.json",
++    "valid": false
++  },
++  {
++    "schema": "csk-skill-v9.schema.json",
++    "instance": "schema-cases/csk-skill-v9/invalid-directory-backslash.json",
++    "valid": false
++  },
++  {
++    "schema": "csk-skill-v9.schema.json",
++    "instance": "schema-cases/csk-skill-v9/invalid-directory-empty.json",
++    "valid": false
++  },
++  {
++    "schema": "csk-skill-v9.schema.json",
++    "instance": "schema-cases/csk-skill-v9/invalid-directory-escape.json",
++    "valid": false
++  },
++  {
++    "schema": "csk-skill-v9.schema.json",
++    "instance": "schema-cases/csk-skill-v9/invalid-directory-glob.json",
++    "valid": false
++  },
++  {
++    "schema": "csk-skill-v9.schema.json",
++    "instance": "schema-cases/csk-skill-v9/invalid-directory-parent-component.json",
++    "valid": false
++  },
++  {
++    "schema": "csk-skill-v9.schema.json",
++    "instance": "schema-cases/csk-skill-v9/invalid.json",
++    "valid": false
++  },
++  {
++    "schema": "csk-skill-v9.schema.json",
++    "instance": "schema-cases/csk-skill-v9/valid-directory-absent.json",
++    "valid": true
++  },
++  {
++    "schema": "csk-skill-v9.schema.json",
++    "instance": "schema-cases/csk-skill-v9/valid-directory-root.json",
++    "valid": true
++  },
++  {
++    "schema": "csk-skill-v9.schema.json",
++    "instance": "schema-cases/csk-skill-v9/valid-directory-subfolder.json",
++    "valid": true
++  },
++  {
++    "schema": "csk-skill-v9.schema.json",
++    "instance": "schema-cases/csk-skill-v9/valid.json",
++    "valid": true
++  },
++  {
++    "schema": "install-marker-v6.schema.json",
++    "instance": "schema-cases/install-marker-v6/valid.json",
++    "valid": true
++  },
++  {
++    "schema": "install-marker-v6.schema.json",
++    "instance": "schema-cases/install-marker-v6/invalid.json",
++    "valid": false
++  },
++  {
++    "schema": "install-marker-v5.schema.json",
++    "instance": "schema-cases/install-marker-v5/invalid-skill-schema-version-9.json",
++    "valid": false
+   }
+ ]
+diff --git a/conformance/skillfile-sources-v1/manifest-dependency-directories.json b/conformance/skillfile-sources-v1/manifest-dependency-directories.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..fbcc3b2e284582ea3ae0d44eb66e22f6512ad3c0
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/manifest-dependency-directories.json
+@@ -0,0 +1,367 @@
++{
++  "schema_version": 1,
++  "directory_grammar_cases": [
++    {
++      "name": "root-selector",
++      "input": ".",
++      "valid": true
++    },
++    {
++      "name": "portable-subfolder",
++      "input": "skills/developer",
++      "valid": true
++    },
++    {
++      "name": "empty",
++      "input": "",
++      "valid": false
++    },
++    {
++      "name": "absolute",
++      "input": "/skills/developer",
++      "valid": false
++    },
++    {
++      "name": "parent-escape",
++      "input": "../developer",
++      "valid": false
++    },
++    {
++      "name": "parent-component",
++      "input": "skills/../developer",
++      "valid": false
++    },
++    {
++      "name": "backslash",
++      "input": "skills\\developer",
++      "valid": false
++    },
++    {
++      "name": "drive-prefix",
++      "input": "C:/skills/developer",
++      "valid": false
++    },
++    {
++      "name": "glob",
++      "input": "skills/*",
++      "valid": false
++    }
++  ],
++  "resolution_cases": [
++    {
++      "name": "valid-subfolder-dependency",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/developer"
++      },
++      "snapshot": {
++        "directories": [
++          "skills",
++          "skills/developer"
++        ],
++        "files": [
++          "skills/developer/SKILL.md"
++        ],
++        "frontmatter_names": {
++          "skills/developer/SKILL.md": "developer"
++        }
++      },
++      "expected": {
++        "status": "accepted",
++        "normalized_directory": "skills/developer",
++        "identity": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "skills/developer"
++        },
++        "lock_directory": "skills/developer",
++        "audit_package": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "skills/developer"
++        },
++        "marker_schema_version": 6,
++        "marker_skill_schema_version": 9
++      }
++    },
++    {
++      "name": "absent-directory-selects-root",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        }
++      },
++      "snapshot": {
++        "directories": [],
++        "files": [
++          "SKILL.md"
++        ],
++        "frontmatter_names": {
++          "SKILL.md": "developer"
++        }
++      },
++      "expected": {
++        "status": "accepted",
++        "normalized_directory": ".",
++        "identity": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "."
++        },
++        "lock_directory": ".",
++        "audit_package": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "."
++        },
++        "marker_schema_version": 6,
++        "marker_skill_schema_version": 9
++      }
++    },
++    {
++      "name": "explicit-root-selects-root",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "."
++      },
++      "snapshot": {
++        "directories": [],
++        "files": [
++          "SKILL.md"
++        ],
++        "frontmatter_names": {
++          "SKILL.md": "developer"
++        }
++      },
++      "expected": {
++        "status": "accepted",
++        "normalized_directory": ".",
++        "identity": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "."
++        },
++        "lock_directory": ".",
++        "audit_package": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "."
++        },
++        "marker_schema_version": 6,
++        "marker_skill_schema_version": 9
++      }
++    },
++    {
++      "name": "missing-folder",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/missing"
++      },
++      "snapshot": {
++        "directories": [
++          "skills"
++        ],
++        "files": [],
++        "frontmatter_names": {}
++      },
++      "expected": {
++        "status": "rejected",
++        "reason": "directory-missing"
++      }
++    },
++    {
++      "name": "folder-without-skill-md",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/no-manifest"
++      },
++      "snapshot": {
++        "directories": [
++          "skills",
++          "skills/no-manifest"
++        ],
++        "files": [],
++        "frontmatter_names": {}
++      },
++      "expected": {
++        "status": "rejected",
++        "reason": "skill-md-missing"
++      }
++    },
++    {
++      "name": "symlinked-directory-escape",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/escape"
++      },
++      "snapshot": {
++        "directories": [
++          "skills",
++          "skills/escape"
++        ],
++        "files": [],
++        "frontmatter_names": {},
++        "symlinks": {
++          "skills/escape": "../outside"
++        }
++      },
++      "expected": {
++        "status": "rejected",
++        "reason": "directory-escapes-repository"
++      }
++    },
++    {
++      "name": "diamond-different-directories-same-repository",
++      "repository": "github.com/example/role-skills",
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "requirements": [
++        {
++          "requirer": "app",
++          "name": "frontend",
++          "directory": "skills/frontend"
++        },
++        {
++          "requirer": "app",
++          "name": "backend",
++          "directory": "skills/backend"
++        },
++        {
++          "requirer": "frontend",
++          "name": "shared",
++          "directory": "skills/shared"
++        },
++        {
++          "requirer": "backend",
++          "name": "shared",
++          "directory": "skills/shared"
++        }
++      ],
++      "snapshot": {
++        "directories": [
++          "skills",
++          "skills/backend",
++          "skills/frontend",
++          "skills/shared"
++        ],
++        "skill_names": {
++          "skills/backend": "backend",
++          "skills/frontend": "frontend",
++          "skills/shared": "shared"
++        }
++      },
++      "expected": {
++        "status": "accepted",
++        "provider_order": [
++          "shared",
++          "backend",
++          "frontend",
++          "app"
++        ],
++        "repository_acquisitions": 1,
++        "package_identities": [
++          {
++            "kind": "network-git",
++            "repository": "github.com/example/role-skills",
++            "commit": {
++              "object_format": "sha1",
++              "hex": "0123456789abcdef0123456789abcdef01234567"
++            },
++            "directory": "skills/backend"
++          },
++          {
++            "kind": "network-git",
++            "repository": "github.com/example/role-skills",
++            "commit": {
++              "object_format": "sha1",
++              "hex": "0123456789abcdef0123456789abcdef01234567"
++            },
++            "directory": "skills/frontend"
++          },
++          {
++            "kind": "network-git",
++            "repository": "github.com/example/role-skills",
++            "commit": {
++              "object_format": "sha1",
++              "hex": "0123456789abcdef0123456789abcdef01234567"
++            },
++            "directory": "skills/shared"
++          }
++        ],
++        "shared_package_nodes": 1
++      }
++    },
++    {
++      "name": "same-name-different-directory-conflicts",
++      "repository": "github.com/example/role-skills",
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "requirements": [
++        {
++          "requirer": "app",
++          "name": "shared",
++          "directory": "skills/shared-a"
++        },
++        {
++          "requirer": "app",
++          "name": "shared",
++          "directory": "skills/shared-b"
++        }
++      ],
++      "expected": {
++        "status": "rejected",
++        "reason": "package-identity-conflict"
++      }
++    }
++  ]
++}
+diff --git a/conformance/skillfile-sources-v1/manifest.json b/conformance/skillfile-sources-v1/manifest.json
+index 8aece184c8b6c8b18b9ccb1857b3f619b9e0f7f6..50239c4e02b746dc58bee1c66cfdc993aab27a1a 100644
+--- a/conformance/skillfile-sources-v1/manifest.json
++++ b/conformance/skillfile-sources-v1/manifest.json
+@@ -2,11 +2,59 @@
+   "files": [
+     {
+       "path": "conformance/skillfile-sources-v1/README.md",
+-      "sha256": "sha256:dd3621a7c57d43cf54ce04dd52e0f7b596661455b9ef8ce35440f8b2bc1cef9b"
++      "sha256": "sha256:39c4d0e0b52cf02b5493cbb9fffabde32fb1bcc8eec3eee88a07dc572bf0712a"
+     },
+     {
+       "path": "conformance/skillfile-sources-v1/index.json",
+-      "sha256": "sha256:654707af529bffc5104e92e98d4ab6fb910163b187861152bfd7fa769d852575"
++      "sha256": "sha256:2d10b89f00812455ff0bbb2a3c2b1f645ef8d6b571f2acd8a41bb61e0ab1a799"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/manifest-dependency-directories.json",
++      "sha256": "sha256:cfc37ce63c8322e386cce8460ea866020d5017b11e2a06c95454e484ff54b24e"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-absolute.json",
++      "sha256": "sha256:35a7543cb9c6c3309daa3f61997500e6ff161e03b2041360e9e4cba454947b7e"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-backslash.json",
++      "sha256": "sha256:4bd973a4ff6a91fb08e5a9fb9d5e565bea0334c7c5c7b1276e9755221755658d"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-empty.json",
++      "sha256": "sha256:f4fa3de75ef27017713d63dc432da6ddf2976de279dcc2851056c18113efb5a4"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-escape.json",
++      "sha256": "sha256:aa6977b72c228e5e0f1175b8e7a268e2421a0cb0cbd1b67b460200e4332a0f5c"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-glob.json",
++      "sha256": "sha256:51e26dbf8003a5730819f34269a1278b6ef7b5cdb49aab57ae5695ab5fe7073c"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-parent-component.json",
++      "sha256": "sha256:35d4498e73d1d058263ecdc48ceae140bc42b860a1a898416244edb6eaa76361"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid.json",
++      "sha256": "sha256:0282ff1290b90081925f8a18be4a3c1dd86c51df883508e0f74e2285533f0ebe"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid-directory-absent.json",
++      "sha256": "sha256:b046676baef4a667571ee9c60eb77781a76e7eedd3b5ccbe5d6a6e6dd56d87a5"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid-directory-root.json",
++      "sha256": "sha256:f0b2a09a02f3e431e46737135b7d7282b56ce9dcd8f834c2ba963f4e7cf1567a"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid-directory-subfolder.json",
++      "sha256": "sha256:96525b88d0f2d92b4ba0036ff9b60a94cfe14bc07af9caad096487d9466b4b16"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid.json",
++      "sha256": "sha256:b08b365927d1e036a5e0254c8a8af5bea3758379f345a1b4e2963c12d9bf7784"
+     },
+     {
+       "path": "conformance/skillfile-sources-v1/schema-cases/build-receipt-v3/invalid-kind.json",
+@@ -24,6 +72,50 @@
+       "path": "conformance/skillfile-sources-v1/schema-cases/build-receipt-v3/valid.json",
+       "sha256": "sha256:4249b5735724a5166e526089077ea62728a6f3c96b263ad73c5a70f48c50e411"
+     },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-absolute.json",
++      "sha256": "sha256:35a7543cb9c6c3309daa3f61997500e6ff161e03b2041360e9e4cba454947b7e"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-backslash.json",
++      "sha256": "sha256:4bd973a4ff6a91fb08e5a9fb9d5e565bea0334c7c5c7b1276e9755221755658d"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-empty.json",
++      "sha256": "sha256:f4fa3de75ef27017713d63dc432da6ddf2976de279dcc2851056c18113efb5a4"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-escape.json",
++      "sha256": "sha256:aa6977b72c228e5e0f1175b8e7a268e2421a0cb0cbd1b67b460200e4332a0f5c"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-glob.json",
++      "sha256": "sha256:51e26dbf8003a5730819f34269a1278b6ef7b5cdb49aab57ae5695ab5fe7073c"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-parent-component.json",
++      "sha256": "sha256:35d4498e73d1d058263ecdc48ceae140bc42b860a1a898416244edb6eaa76361"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid.json",
++      "sha256": "sha256:0282ff1290b90081925f8a18be4a3c1dd86c51df883508e0f74e2285533f0ebe"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid-directory-absent.json",
++      "sha256": "sha256:b046676baef4a667571ee9c60eb77781a76e7eedd3b5ccbe5d6a6e6dd56d87a5"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid-directory-root.json",
++      "sha256": "sha256:f0b2a09a02f3e431e46737135b7d7282b56ce9dcd8f834c2ba963f4e7cf1567a"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid-directory-subfolder.json",
++      "sha256": "sha256:96525b88d0f2d92b4ba0036ff9b60a94cfe14bc07af9caad096487d9466b4b16"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid.json",
++      "sha256": "sha256:b08b365927d1e036a5e0254c8a8af5bea3758379f345a1b4e2963c12d9bf7784"
++    },
+     {
+       "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-attestation-empty-registry.json",
+       "sha256": "sha256:f80e420ad30a28a4baef5293d961834099e47503a3686bccb689011957ab6276"
+@@ -156,6 +248,10 @@
+       "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-local-substitution-null.json",
+       "sha256": "sha256:3516ae179ec8644ce9644e407a3bb7c843c026eabf50ef9798e06e5aa138f8fa"
+     },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-skill-schema-version-9.json",
++      "sha256": "sha256:d928486860e238484c431a0d6e3fa3f2d309d514c44142d059938e0c82f9dcdc"
++    },
+     {
+       "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-substitution-boolean.json",
+       "sha256": "sha256:990b509bdcb2e1eb252733572a5f0c2f2fe256e7b7c927bbe55be197c521a99d"
+@@ -200,6 +296,14 @@
+       "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v5/valid.json",
+       "sha256": "sha256:0d26f65031caf466217d192303c0196982aeede9faaf4440cff699cc05d9333a"
+     },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v6/invalid.json",
++      "sha256": "sha256:575d77d1235dc85c4c82ccabedff5fd995f6f86b08aedc40c8209a8cfbf78333"
++    },
++    {
++      "path": "conformance/skillfile-sources-v1/schema-cases/install-marker-v6/valid.json",
++      "sha256": "sha256:f9a0cc9caffca4b33a54337bb897b7e959a4ea0d5d097961d41dffec6a30f330"
++    },
+     {
+       "path": "conformance/skillfile-sources-v1/schema-cases/local-snapshot-v1/invalid-algorithm.json",
+       "sha256": "sha256:4e927ab70268d9fc0a4db30529f6339814a8d411df1cb2fb41c8b65a6ff6b549"
+@@ -510,20 +614,32 @@
+     },
+     {
+       "path": "protocol/skillfile-sources.md",
+-      "sha256": "sha256:f31eb9178edc877d8ec8c3456dbd77fb999bd0af77fb0108a209d0e805d21483"
++      "sha256": "sha256:429f7ed762f93afe713f6d427bb65dce4660b68a9ee10fb1d2b646186deefde1"
+     },
+     {
+       "path": "schemas/skillfile-sources-v1/README.md",
+-      "sha256": "sha256:33f1192658d3f0e93a414de8c5c0efff0e66920a5cfc24bff4a5a3b20af4a601"
++      "sha256": "sha256:55fdb3df4f23f1a1b804e92583f25e596fc22ea5536b8fe14df212ca51c41e71"
++    },
++    {
++      "path": "schemas/skillfile-sources-v1/agent-skill-v9.schema.json",
++      "sha256": "sha256:a68e72d70f52e9c139d0480a0f3b73abcd284544719a59f903e2d767ae1bdcbe"
+     },
+     {
+       "path": "schemas/skillfile-sources-v1/build-receipt-v3.schema.json",
+       "sha256": "sha256:92821ea9901ea1cd8d7f2c448fbfa5b71d70ee408c717ef34d5f9ab2e8d3dfb3"
+     },
++    {
++      "path": "schemas/skillfile-sources-v1/csk-skill-v9.schema.json",
++      "sha256": "sha256:4eff1c716a511ada77b7b6333e8b47201a73c83bf672bde6f093a472f3b0e854"
++    },
+     {
+       "path": "schemas/skillfile-sources-v1/install-marker-v5.schema.json",
+       "sha256": "sha256:8510cf629b510bc7216cd9e88055d3d253511c1339e823e51b1e6edb60e31fd2"
+     },
++    {
++      "path": "schemas/skillfile-sources-v1/install-marker-v6.schema.json",
++      "sha256": "sha256:ad12df0615e8259578f5e947637ec466c9be04c91930724747f99ec493851f9c"
++    },
+     {
+       "path": "schemas/skillfile-sources-v1/local-snapshot-v1.schema.json",
+       "sha256": "sha256:2ab2e2783ad86bcc7891166b6d492ac93f73d3ad36513ae86a62d4db2e79cff4"
+diff --git a/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-absolute.json b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-absolute.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..363d02853ce94600867f9ef11d8886f6f2214d58
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-absolute.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "/skills/developer"
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-backslash.json b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-backslash.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..f191cafb9979a54c62bc42c01c224ee43ddae384
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-backslash.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills\\developer"
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-empty.json b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-empty.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..5e168a2f8e210cfa56e294ceb5cd17ec56f8ef43
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-empty.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": ""
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-escape.json b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-escape.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..73cc93990e98a9798b1b977367ffd40c1f3db013
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-escape.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "../developer"
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-glob.json b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-glob.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..94645d7f00239eb5c07bf8f9654ad49984d5bce6
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-glob.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/*"
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-parent-component.json b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-parent-component.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..3db678f8f4b16cfdf5753d200ded64a41ce0c1e6
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid-directory-parent-component.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/../developer"
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid.json b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..4cc3b536014c6927c1e52981b82ebfc2a4ea9185
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/invalid.json
+@@ -0,0 +1,4 @@
++{
++  "schema_version": 8,
++  "capabilities": {}
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid-directory-absent.json b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid-directory-absent.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..1dcaf3dfe2c7208837c6c43c46b05e80681fbb94
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid-directory-absent.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        }
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid-directory-root.json b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid-directory-root.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..3a2ac5397df12a6815f4f21aaa5296900587606c
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid-directory-root.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "."
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid-directory-subfolder.json b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid-directory-subfolder.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..63c6c2a6a7ee1d614cce5521d63712de3844f0e5
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid-directory-subfolder.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/developer"
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid.json b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..16ad2cff4d7fa53a905d7f97ab2fd4b753b685c9
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/agent-skill-v9/valid.json
+@@ -0,0 +1,4 @@
++{
++  "schema_version": 9,
++  "capabilities": {}
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-absolute.json b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-absolute.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..363d02853ce94600867f9ef11d8886f6f2214d58
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-absolute.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "/skills/developer"
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-backslash.json b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-backslash.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..f191cafb9979a54c62bc42c01c224ee43ddae384
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-backslash.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills\\developer"
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-empty.json b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-empty.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..5e168a2f8e210cfa56e294ceb5cd17ec56f8ef43
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-empty.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": ""
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-escape.json b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-escape.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..73cc93990e98a9798b1b977367ffd40c1f3db013
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-escape.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "../developer"
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-glob.json b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-glob.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..94645d7f00239eb5c07bf8f9654ad49984d5bce6
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-glob.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/*"
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-parent-component.json b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-parent-component.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..3db678f8f4b16cfdf5753d200ded64a41ce0c1e6
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid-directory-parent-component.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/../developer"
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid.json b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..4cc3b536014c6927c1e52981b82ebfc2a4ea9185
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/invalid.json
+@@ -0,0 +1,4 @@
++{
++  "schema_version": 8,
++  "capabilities": {}
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid-directory-absent.json b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid-directory-absent.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..1dcaf3dfe2c7208837c6c43c46b05e80681fbb94
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid-directory-absent.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        }
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid-directory-root.json b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid-directory-root.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..3a2ac5397df12a6815f4f21aaa5296900587606c
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid-directory-root.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "."
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid-directory-subfolder.json b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid-directory-subfolder.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..63c6c2a6a7ee1d614cce5521d63712de3844f0e5
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid-directory-subfolder.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/developer"
++      }
++    }
++  }
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid.json b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..16ad2cff4d7fa53a905d7f97ab2fd4b753b685c9
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/csk-skill-v9/valid.json
+@@ -0,0 +1,4 @@
++{
++  "schema_version": 9,
++  "capabilities": {}
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-skill-schema-version-9.json b/conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-skill-schema-version-9.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..cce768afcc80247264dcbc4e60b61117bb56e0f3
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/install-marker-v5/invalid-skill-schema-version-9.json
+@@ -0,0 +1,40 @@
++{
++  "activation": {
++    "commands": [
++      "golden-tool"
++    ],
++    "context": true
++  },
++  "agents": [
++    "codex_cli"
++  ],
++  "build_roots": [
++    "build"
++  ],
++  "builds": {},
++  "commands": [
++    "golden-tool",
++    "local-helper"
++  ],
++  "content_sha256": "sha256:e2bd2941476b164099dc773d7448c638ff99849f8dce76e7b105f215fcdf31be",
++  "dependencies": [],
++  "files": [
++    ".skill_triggers/en.md",
++    "SKILL.md",
++    "references/notes.md"
++  ],
++  "installed_at": "2000-01-01T00:00:00Z",
++  "locale": null,
++  "name": "golden-skill",
++  "requirers": [
++    "<project>"
++  ],
++  "runtime_roots": [],
++  "schema_version": 5,
++  "skill_schema_version": 9,
++  "package": {
++    "kind": "local-snapshot",
++    "snapshot": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++  },
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81"
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/install-marker-v6/invalid.json b/conformance/skillfile-sources-v1/schema-cases/install-marker-v6/invalid.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..adc72a0b79b0e5482d1b996b681f6f51e8ca4a39
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/install-marker-v6/invalid.json
+@@ -0,0 +1,45 @@
++{
++  "activation": {
++    "commands": [
++      "golden-tool"
++    ],
++    "context": true
++  },
++  "agents": [
++    "codex_cli"
++  ],
++  "build_roots": [
++    "build"
++  ],
++  "builds": {},
++  "commands": [
++    "golden-tool",
++    "local-helper"
++  ],
++  "content_sha256": "sha256:e2bd2941476b164099dc773d7448c638ff99849f8dce76e7b105f215fcdf31be",
++  "dependencies": [],
++  "files": [
++    ".skill_triggers/en.md",
++    "SKILL.md",
++    "references/notes.md"
++  ],
++  "installed_at": "2000-01-01T00:00:00Z",
++  "locale": null,
++  "name": "golden-skill",
++  "requirers": [
++    "<project>"
++  ],
++  "runtime_roots": [],
++  "schema_version": 6,
++  "skill_schema_version": 10,
++  "package": {
++    "kind": "network-git",
++    "repository": "github.com/example/golden-skills",
++    "commit": {
++      "object_format": "sha1",
++      "hex": "0123456789abcdef0123456789abcdef01234567"
++    },
++    "directory": "skills/developer"
++  },
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81"
++}
+diff --git a/conformance/skillfile-sources-v1/schema-cases/install-marker-v6/valid.json b/conformance/skillfile-sources-v1/schema-cases/install-marker-v6/valid.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..6234ee81b1642bd076e35d563b05b071d3fae646
+--- /dev/null
++++ b/conformance/skillfile-sources-v1/schema-cases/install-marker-v6/valid.json
+@@ -0,0 +1,45 @@
++{
++  "activation": {
++    "commands": [
++      "golden-tool"
++    ],
++    "context": true
++  },
++  "agents": [
++    "codex_cli"
++  ],
++  "build_roots": [
++    "build"
++  ],
++  "builds": {},
++  "commands": [
++    "golden-tool",
++    "local-helper"
++  ],
++  "content_sha256": "sha256:e2bd2941476b164099dc773d7448c638ff99849f8dce76e7b105f215fcdf31be",
++  "dependencies": [],
++  "files": [
++    ".skill_triggers/en.md",
++    "SKILL.md",
++    "references/notes.md"
++  ],
++  "installed_at": "2000-01-01T00:00:00Z",
++  "locale": null,
++  "name": "golden-skill",
++  "requirers": [
++    "<project>"
++  ],
++  "runtime_roots": [],
++  "schema_version": 6,
++  "skill_schema_version": 9,
++  "package": {
++    "kind": "network-git",
++    "repository": "github.com/example/golden-skills",
++    "commit": {
++      "object_format": "sha1",
++      "hex": "0123456789abcdef0123456789abcdef01234567"
++    },
++    "directory": "skills/developer"
++  },
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81"
++}
+diff --git a/profiles/manager.md b/profiles/manager.md
+index c2dc27f5a92dd776557fcfd57deefb71c7b26615..3efe1d66cd9a3d1b8c41e7052e980c647e36932f 100644
+--- a/profiles/manager.md
++++ b/profiles/manager.md
+@@ -152,7 +152,9 @@ For each operation the manager performs these phases in order:
+    tree before reading a build-cache entry or starting any Go process;
+ 4. parse and validate both manifest names according to Protocol Core section
+    4, validate link-free disjoint runtime roots, build roots, and source
+-   directories, and derive every artifact-relative path from its command name;
++   directories, resolve schema-9 dependency directories under the core §4.4
++   rules and the shared Skillfile selector grammar, and derive every
++   artifact-relative path from its command name;
+ 5. exclude every build root as a whole subtree from agent context before
+    locale rendering and from commit-keyed runtime copying, identically for a
+    real build, cache hit, and dry run;
+@@ -160,8 +162,10 @@ For each operation the manager performs these phases in order:
+    validated raw snapshot, including a package-provided root
+    `.csk-install.json`, and freeze that snapshot instance until its last build
+    child exits;
+-7. build the provider-first dependency closure, apply source allowlists and
+-   snapshot checks, validate every skill package, reject command, shim,
++7. build the provider-first dependency closure using the full package identity
++   (canonical source, commit, and normalized selected directory), apply source
++   allowlists and snapshot checks, validate every selected skill package,
++   reject command, shim,
+    portable-path, case-folding, and platform-path collisions, and verify system,
+    legacy command, and MCP requirements;
+ 8. run source-audit policy, resolve trusted registries and attestations, reject
+@@ -188,6 +192,12 @@ compilation. Neither a cache hit nor a dry run may bypass source validation,
+ static context exclusion, build-source hashing, closure construction, collision
+ checks, audit, attestation, revocation, or moved-tag evaluation.
+ 
++For a schema-9 dependency, the normalized selected directory is part of the
++local audit subject and audit-cache key. A shared repository snapshot does not
++permit reuse of package validation or audit decisions between directories.
++The lock and marker package identity MUST carry the same directory; see core
++§§4.4, 7, and 10 and the source extension's shared package identity rules.
++
+ ### 2.2 Closed `go-v1` toolchain and process graph
+ 
+ A conforming manager MUST support an operator-trusted Go 1.23 release family
+@@ -1128,6 +1138,13 @@ snapshot. Pins do not override local or registry revocation.
+ Persisted state-hash waivers use `manager-config-v3.schema.json`, which admits
+ `hash_version: 2`; `manager-config-v2` remains frozen without that member.
+ 
++For schema-9 skill dependencies, each local audit record binds the package
++identity including normalized directory, and audit-cache reuse requires exact
++package identity equality. The same repository commit selected at two paths
++therefore receives separate package audit decisions. Registry records retain
++their source/content matching rules and do not substitute for the local
++package-specific audit record.
++
+ Script execution policy is part of the audit record. For every script command
+ the record carries the effective execution-policy identity or its absence, so a
+ reviewer can separate enforced commands from declared-only ones and a registry
+@@ -1440,6 +1457,13 @@ Read-only status validates marker schema, recomputes content hashes, reports
+ manifest and activation drift, and MAY re-resolve registry attestations. A
+ check mode returns non-zero for drift without mutating state.
+ 
++A schema-9 dependency installation uses source-extension marker v6, with the
++marker's `package.directory` and lock binding equal to the normalized core
++§4.4 selection. Status compares that package identity exactly; neither a core
++marker nor source-extension marker v5 can establish currentness for a schema-9
++installation. Source-audit records and their cache keys retain the same
++directory as required by sections 2.1 and 7.
++
+ `curator status` and, where the environments capability is implemented,
+ `curator env status` list, per configured registry, the persisted
+ high-water (`version`, `log_size`), its bootstrap source — `checkpoint`
+diff --git a/protocol/core.md b/protocol/core.md
+index 8957f02e1e45589ec1a2ac47cda98b88efeab2ee..8ebdd90e0773238ce17ec41c349b620d588dcf0e 100644
+--- a/protocol/core.md
++++ b/protocol/core.md
+@@ -161,7 +161,10 @@ current installation.
+ to exactly one of `agent-skill-v1.schema.json` through
+ `agent-skill-v8.schema.json`. The legacy filename `csk-skill.json` has exactly
+ the same object shape and schema-version semantics through
+-`csk-skill-v8.schema.json`.
++`csk-skill-v8.schema.json`. The unreleased, opt-in schema 9 is defined by
++[`agent-skill-v9.schema.json`](../schemas/skillfile-sources-v1/agent-skill-v9.schema.json)
++and its legacy-name equivalent in the source-extension namespace; it is not
++part of rc.14.
+ 
+ Readers resolve manifests in this order:
+ 
+@@ -185,10 +188,14 @@ Readers resolve manifests in this order:
+ | 6 | declarative compiled commands and context-excluded `build_roots` |
+ | 7 | first-class external build repositories and `go-repository-v1` |
+ | 8 | opt-in `script-worker-v1` script execution policy and declared first-party module roots |
++| 9 (draft, opt-in) | optional subdirectory selection for transitive skill dependencies |
+ 
+ Version gates are downward: a field introduced by a later version MUST be
+ rejected in an earlier one. Schema 1 preserves its deployed extension behavior;
+-schemas 2 through 8 reject unknown fields. Schema 1 through 5 MUST reject
++schemas 2 through 8 reject unknown fields. Draft schema 9 rejects unknown fields
++and adds only the `directory` skill-dependency member. Schemas 4 through 8 MUST
++reject that member, and earlier schemas keep their existing dependency meaning.
++Schema 1 through 5 MUST reject
+ `build_roots`, a command with `type: "build"`, and every build-only field.
+ Schema 1 through 6 MUST reject `build_repositories`, `repository`, `target`,
+ and `go-repository-v1`. Schema 1 through 7 MUST reject `modules` at the top
+@@ -1129,11 +1136,40 @@ the schema defaults above remain the declared-only reading.
+ migration warning.
+ 
+ Each `dependencies.skills` entry contains `git`, exact `ref`, activation
+-`mode`, and OPTIONAL command narrowing. `ref.kind` is `tag` or `revision`;
++`mode`, and OPTIONAL command narrowing. Schema 9 additionally permits OPTIONAL
++`directory`, selecting the skill package below the dependency repository at
++the pinned ref. This member is accepted only by an implementation that opts
++into draft manifest schema 9. Its grammar and containment rules are exactly the Skillfile
++schema-2 individual selector rules in
++[`skillfile-sources.md` section 1](skillfile-sources.md#1-acquisition-and-selection);
++schema 9 reuses the shared `directory` definition for it. The selected directory MUST resolve to a
++real, link-free directory containing that package's `SKILL.md`, whose
++frontmatter name matches the dependency key. An absent `directory` means
++`.`, the repository root, preserving every earlier schema's meaning.
++
++The selected package identity is the canonical repository identity, resolved
++full commit, and normalized selected directory (`.` for an absent or explicit
++root selector). The directory is part of closure unification: repeated
++requirements for the same name, repository, commit, and directory unify;
++different refs resolving to that same tuple also unify. A requirement for the
++same skill name and commit from another repository or another directory
++conflicts. Distinct skill names selected from different directories of one
++repository at one commit are distinct closure nodes; managers MAY share the
++repository snapshot but MUST validate, install, lock, and audit each selected
++package independently.
++
++Any dependency lock or install identity MUST record the normalized directory.
++The package identity and lock member directory MUST agree. A local source-audit
++record MUST bind that same package identity, so an audit result for one
++directory cannot be reused for another directory merely because repository and
++commit match. Registry attestations retain their existing repository/content
++matching rules and do not replace the per-package audit decision.
++
++`ref.kind` is `tag` or `revision`;
+ branch and range syntax is forbidden. `mode` is `full` (default), `runtime`, or
+ `context`. `commands` is valid only in runtime mode, is non-empty when present,
+ and names exported script or build commands of the provider. Build commands are
+-available only from schema 6 or 7 providers; schemas 1 through 5 retain
++available only from schemas 6 through 8 providers and draft schema 9; schemas 1 through 5 retain
+ script-only command narrowing. Duplicates are rejected.
+ 
+ Each `dependencies.mcp_servers` entry requires a non-empty `hint`, MAY document
+@@ -1436,9 +1472,10 @@ cannot be obtained and audited.
+ Direct declarations enter as `full` requirements from synthetic consumer
+ `<project>`. Processing a provider adds its skill requirements.
+ 
+-Within one closure, one skill name MUST resolve to exactly one commit and one
+-canonical source identity. Different identities or commits fail with every
+-relevant requirement chain. Different refs resolving to one commit unify.
++Within one closure, one skill name MUST resolve to exactly one commit, one
++canonical source identity, and one normalized selected directory. Different
++repositories, commits, or directories fail with every relevant requirement
++chain. Different refs resolving to the same complete package identity unify.
+ Cycles fail and name the cycle.
+ 
+ Activation is edge-based. Context is active when any incoming edge is `full`
+@@ -1763,11 +1800,17 @@ garbage-collection paths remain implementation-specific.
+ 
+ The following writer-version rules describe legacy installations. The
+ [source extension](skillfile-sources.md) requires marker schema 5 for every
+-Skillfile schema-2 installation and preserves these legacy read meanings.
++Skillfile schema-2 installation. A manager that accepts manifest schema 9
++MUST also support source-extension marker schema 6 and use it for every
++schema-9 installation mutation, because neither a core marker nor
++source-extension marker v5 can represent the dependency package directory.
++The source extension preserves these legacy read meanings.
+ 
+ Every installed closure node has `.csk-install.json`. Managers supporting
+ schema 7 MUST read marker schemas 1, 2, 3, and 5, and managers supporting
+-schema 8 MUST read marker schemas 1, 2, 3, 4, and 5. Markers 2, 3, and 4 retain their
++schema 8 MUST read marker schemas 1, 2, 3, 4, and 5. A manager supporting
++schema 9 MUST read core marker schemas 1 through 5 and source-extension
++marker schemas 5 and 6. Markers 2, 3, and 4 retain their
+ historical writer bands and meanings; markers 1 through 4 carry framing
+ version 1, and their frozen schemas do not acquire a `hash_version` member.
+ Current writers MUST use marker schema 5 with framing version 2 for every
+@@ -1819,7 +1862,9 @@ rules. An enforced `script-worker-v1` script command produces no build entry
+ and adds no marker member: schema 8 changes which manifests a marker may
+ describe, not what a marker records. Markers v1, v2, and v3 keep their frozen
+ shapes and their existing manifest-version bands, so a schema-8 installation
+-was recorded by marker v4 alone under framing version 1.
++was recorded by marker v4 alone under framing version 1. Schema 9 is recorded
++only by source-extension marker v6, whose `package.directory` and lock binding
++preserve the selected dependency package identity.
+ 
+ Marker v5 is the current core marker for content-hash framing version 2. It
+ retains marker-v4 fields and build-record rules, changes `schema_version` to
+@@ -1829,8 +1874,8 @@ top-level member `hash_version: 2`. That member versions the marker's
+ hashes, which keep their separately specified identities. A writer using
+ framing version 2 MUST write marker v5. A marker v5 MUST NOT omit
+ `hash_version` or use another value. The skillfile-sources carriers
+-`skillfile-lock-v2`, `install-marker-v6`, and `source-audit-v2` adopt
+-`hash_version` in follow-up TASK-260930-3ny11n.
++`skillfile-lock-v2` and `source-audit-v2` adopt `hash_version`, and the
++schema-9 `install-marker-v6` gains it, in follow-up TASK-260930-3ny11n.
+ 
+ `locale` is always present and is a string or `null`. Required set-like arrays
+ are always arrays, including when empty.
+diff --git a/protocol/skillfile-sources.md b/protocol/skillfile-sources.md
+index eaa99a550c60a02ae2a3b08f75679ca826c5cc43..43a154f3149a83bb07ae2cb89cd4d26cc179228f 100644
+--- a/protocol/skillfile-sources.md
++++ b/protocol/skillfile-sources.md
+@@ -27,6 +27,9 @@ name; it is not a path relative to the project. Schema 2 preserves `project`,
+ `agents`, `locale` and legacy skill entries by reference to schema 1. No
+ on-disk migration is implicit. Unsupported versions fail with an upgrade error.
+ Skill manifest versions remain independent and need no collection-specific edit.
++The shared package identity and audit rules in this document also govern
++manifest schema 9 dependency directories under core section 4.4; accepting that
++manifest field does not make Skillfile schema 2 mandatory.
+ 
+ `sources` is an optional map of case-sensitive aliases to acquisition objects:
+ 
+@@ -58,6 +61,13 @@ Explicit source paths may point outside the project; selectors may not escape
+ that chosen source. An individual name MUST equal validated SKILL.md metadata
+ and the resolved skill manifest identity, where that manifest declares one.
+ 
++These are the canonical directory grammar and containment rules for selected
++skill packages. A manifest schema-9 `dependencies.skills` entry reuses them
++for its repository-relative `directory`; see [core section 4.4](core.md#44-dependencies).
++In both forms the selected path is relative to the acquired repository or
++source root, and the resolved package directory must contain its own
++`SKILL.md`.
++
+ Collections enumerate immediate child directories only. `include` is a
+ non-empty unique list of literal portable folder identifiers or `*`; `exclude`
+ is a unique list of literals only. `*` selects all immediate directories after
+@@ -149,6 +159,12 @@ A package identity is the disjoint union in source-types schema 1:
+   name exactly as in schema 1. This is a scoped configured-root identity, not
+   a network trust identity; existing Git commit semantics remain unchanged.
+ 
++For a schema-9 transitive dependency, the package's directory is the manifest
++selection normalized to `.` when absent. Distinct directories of one Git
++repository at one commit are distinct package identities; the same directory
++selected repeatedly for one skill name is one identity and unifies under core
++section 7.
++
+ Git snapshots retain existing raw-object and integrity requirements. Every
+ member from one Git alias uses the same resolved commit. A local collection
+ freezes each package and the expanded membership together in one transaction.
+@@ -216,8 +232,10 @@ bootstrap or prebuilt binary-distribution route is added. External repositories
+ of a local package still obey manager section 11; local skill acquisition does
+ not turn their committed-HEAD substitutions into dirty-byte snapshots.
+ 
+-For schema-2 installations write marker schema 5, regardless of skill manifest
+-version. Its `package` replaces legacy `source/git/ref_kind/ref/commit` fields;
++For schema-2 installations write marker schema 5, except that a core schema-9
++installation writes marker schema 6, including when its root project still
++uses Skillfile schema 1; marker v5 cannot record manifest version 9. Its
++`package` replaces legacy `source/git/ref_kind/ref/commit` fields;
+ its `lock_sha256` binds the installed selection and declared ref through the
+ validated lock and matching manifest. The following migration is exhaustive;
+ fields not replaced here retain core section 10 meaning, including applicability,
+@@ -235,6 +253,10 @@ requiredness and canonical set ordering.
+ | `builds` | Retained driver-specific records below, with receipt version 3 |
+ | No predecessor | Required `package` and `lock_sha256` |
+ 
++Marker v6 is marker v5 with `schema_version` 6 and `skill_schema_version`
++through 9; every other field, requiredness rule, and currentness comparison is
++unchanged. Writers use marker v6 exactly for core schema-9 installations.
++
+ `attestation` MUST be present exactly when the effective plan selects existing
+ registry evidence and MUST equal its registry, status and key ID (including key
+ absence). Both `network-git` and legacy `configured-git` packages may record it
+@@ -338,6 +360,13 @@ Network-Git members may use existing registry evidence only with exact name,
+ canonical repository, commit and context hash matching. No registry redesign
+ or new signed record format is implied.
+ 
++For a schema-9 dependency, the source-audit record's package identity carries
++the normalized selected directory. Audit-cache equality includes the complete
++package identity, so a decision for another directory in the same repository
++and commit is not reusable. Registry records keep their existing repository
++and content matching rules; they do not replace this package-specific audit
++record.
++
+ Assurance permits, execution receipts and checkpoints retain their versioned
+ shapes: bind the exact receipt-3 build input digest in `build_input_sha256`.
+ This adds no verified-provider script operation; script-worker rules retain
+diff --git a/schemas/skillfile-sources-v1/README.md b/schemas/skillfile-sources-v1/README.md
+index 06244ecccb44dc3cfb5e8e2b8f9155a79d8e9a62..9b867110eaafb3eba5d133dc006358d771f2687f 100644
+--- a/schemas/skillfile-sources-v1/README.md
++++ b/schemas/skillfile-sources-v1/README.md
+@@ -17,8 +17,10 @@ references and remain unchanged.
+ | `source-policy-v1` | Operator endpoint/auth policy and explicit root inputs |
+ | `source-policy-v2` | Revision 2 policy: explicit ports, `mirror_of` mirrors, operator host aliases |
+ | `install-marker-v5` | Installed package/lock identity and runtime/build references |
++| `install-marker-v6` | Marker v5 shape recording manifest schema 9 for subfolder installs |
+ | `build-receipt-v3` | Package-bound wrapper around existing closed build inputs |
+ | `source-audit-v1` | Machine audit report binding, not a registry attestation |
++| `agent-skill-v9` / `csk-skill-v9` | Opt-in manifest directory selection for transitive skill dependencies |
+ 
+ The [source contract](../../protocol/skillfile-sources.md) defines semantic
+ requirements beyond schema checks: normalized repository identity, alias
+@@ -35,3 +37,5 @@ Marker v5 retains v4 attestation and legacy substitution evidence with explicit
+ local/Git applicability. Its build records retain the complete local/external
+ field sets with receipt version 3. The exhaustive migration and currentness,
+ strict-audit, repair and refresh rules are in source contract section 4.
++Marker v6 is marker v5 with `schema_version` 6 and `skill_schema_version`
++through 9; it records schema-9 installations and changes nothing else.
+diff --git a/schemas/skillfile-sources-v1/agent-skill-v9.schema.json b/schemas/skillfile-sources-v1/agent-skill-v9.schema.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..062f0aecea757390b79e41ee5ee33f07fe447c95
+--- /dev/null
++++ b/schemas/skillfile-sources-v1/agent-skill-v9.schema.json
+@@ -0,0 +1,121 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/skillfile-sources-v1/agent-skill-v9.schema.json",
++  "title": "agent-skill.json schema 9 (draft)",
++  "$defs": {
++    "skillRequirementV9": {
++      "type": "object",
++      "required": [
++        "git",
++        "ref"
++      ],
++      "properties": {
++        "git": {
++          "$ref": "../v1/../v1/common.schema.json#/$defs/nonEmptyString"
++        },
++        "ref": {
++          "$ref": "../v1/../v1/common.schema.json#/$defs/ref"
++        },
++        "mode": {
++          "enum": [
++            "full",
++            "runtime",
++            "context"
++          ],
++          "default": "full"
++        },
++        "commands": {
++          "type": "array",
++          "minItems": 1,
++          "items": {
++            "$ref": "../v1/../v1/common.schema.json#/$defs/identifier"
++          },
++          "uniqueItems": true
++        },
++        "directory": {
++          "$ref": "source-types-v1.schema.json#/$defs/directory"
++        }
++      },
++      "allOf": [
++        {
++          "if": {
++            "required": [
++              "commands"
++            ]
++          },
++          "then": {
++            "properties": {
++              "mode": {
++                "const": "runtime"
++              }
++            },
++            "required": [
++              "mode"
++            ]
++          }
++        }
++      ],
++      "additionalProperties": false
++    },
++    "dependenciesV6": {
++      "type": "object",
++      "properties": {
++        "commands": {
++          "$ref": "../v1/../v1/common.schema.json#/$defs/dependenciesV5/properties/commands"
++        },
++        "skills": {
++          "type": "object",
++          "additionalProperties": {
++            "$ref": "#/$defs/skillRequirementV9"
++          }
++        },
++        "mcp_servers": {
++          "$ref": "../v1/../v1/common.schema.json#/$defs/dependenciesV5/properties/mcp_servers"
++        }
++      },
++      "additionalProperties": false
++    }
++  },
++  "type": "object",
++  "required": [
++    "schema_version",
++    "capabilities"
++  ],
++  "properties": {
++    "schema_version": {
++      "const": 9
++    },
++    "runtime_roots": {
++      "$ref": "../v1/common.schema.json#/$defs/pathSet"
++    },
++    "build_roots": {
++      "$ref": "../v1/common.schema.json#/$defs/pathSet"
++    },
++    "build_repositories": {
++      "type": "object",
++      "minProperties": 1,
++      "propertyNames": {
++        "$ref": "../v1/common.schema.json#/$defs/identifier"
++      },
++      "additionalProperties": {
++        "$ref": "../v1/common.schema.json#/$defs/buildRepositoryV1"
++      }
++    },
++    "commands": {
++      "type": "object",
++      "propertyNames": {
++        "$ref": "../v1/common.schema.json#/$defs/identifier"
++      },
++      "additionalProperties": {
++        "$ref": "../v1/common.schema.json#/$defs/commandV8"
++      }
++    },
++    "capabilities": {
++      "$ref": "../v1/common.schema.json#/$defs/capabilities"
++    },
++    "dependencies": {
++      "$ref": "#/$defs/dependenciesV6"
++    }
++  },
++  "additionalProperties": false
++}
+diff --git a/schemas/skillfile-sources-v1/csk-skill-v9.schema.json b/schemas/skillfile-sources-v1/csk-skill-v9.schema.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..007c433af0c6d7fd8d3f50978a5ce4411318f3b2
+--- /dev/null
++++ b/schemas/skillfile-sources-v1/csk-skill-v9.schema.json
+@@ -0,0 +1,121 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/skillfile-sources-v1/csk-skill-v9.schema.json",
++  "title": "csk-skill.json schema 9 (draft)",
++  "$defs": {
++    "skillRequirementV9": {
++      "type": "object",
++      "required": [
++        "git",
++        "ref"
++      ],
++      "properties": {
++        "git": {
++          "$ref": "../v1/../v1/common.schema.json#/$defs/nonEmptyString"
++        },
++        "ref": {
++          "$ref": "../v1/../v1/common.schema.json#/$defs/ref"
++        },
++        "mode": {
++          "enum": [
++            "full",
++            "runtime",
++            "context"
++          ],
++          "default": "full"
++        },
++        "commands": {
++          "type": "array",
++          "minItems": 1,
++          "items": {
++            "$ref": "../v1/../v1/common.schema.json#/$defs/identifier"
++          },
++          "uniqueItems": true
++        },
++        "directory": {
++          "$ref": "source-types-v1.schema.json#/$defs/directory"
++        }
++      },
++      "allOf": [
++        {
++          "if": {
++            "required": [
++              "commands"
++            ]
++          },
++          "then": {
++            "properties": {
++              "mode": {
++                "const": "runtime"
++              }
++            },
++            "required": [
++              "mode"
++            ]
++          }
++        }
++      ],
++      "additionalProperties": false
++    },
++    "dependenciesV6": {
++      "type": "object",
++      "properties": {
++        "commands": {
++          "$ref": "../v1/../v1/common.schema.json#/$defs/dependenciesV5/properties/commands"
++        },
++        "skills": {
++          "type": "object",
++          "additionalProperties": {
++            "$ref": "#/$defs/skillRequirementV9"
++          }
++        },
++        "mcp_servers": {
++          "$ref": "../v1/../v1/common.schema.json#/$defs/dependenciesV5/properties/mcp_servers"
++        }
++      },
++      "additionalProperties": false
++    }
++  },
++  "type": "object",
++  "required": [
++    "schema_version",
++    "capabilities"
++  ],
++  "properties": {
++    "schema_version": {
++      "const": 9
++    },
++    "runtime_roots": {
++      "$ref": "../v1/common.schema.json#/$defs/pathSet"
++    },
++    "build_roots": {
++      "$ref": "../v1/common.schema.json#/$defs/pathSet"
++    },
++    "build_repositories": {
++      "type": "object",
++      "minProperties": 1,
++      "propertyNames": {
++        "$ref": "../v1/common.schema.json#/$defs/identifier"
++      },
++      "additionalProperties": {
++        "$ref": "../v1/common.schema.json#/$defs/buildRepositoryV1"
++      }
++    },
++    "commands": {
++      "type": "object",
++      "propertyNames": {
++        "$ref": "../v1/common.schema.json#/$defs/identifier"
++      },
++      "additionalProperties": {
++        "$ref": "../v1/common.schema.json#/$defs/commandV8"
++      }
++    },
++    "capabilities": {
++      "$ref": "../v1/common.schema.json#/$defs/capabilities"
++    },
++    "dependencies": {
++      "$ref": "#/$defs/dependenciesV6"
++    }
++  },
++  "additionalProperties": false
++}
+diff --git a/schemas/skillfile-sources-v1/install-marker-v6.schema.json b/schemas/skillfile-sources-v1/install-marker-v6.schema.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..b195a0172d0a8355aac0c2784790a3d26aa05258
+--- /dev/null
++++ b/schemas/skillfile-sources-v1/install-marker-v6.schema.json
+@@ -0,0 +1,344 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/skillfile-sources-v1/install-marker-v6.schema.json",
++  "type": "object",
++  "properties": {
++    "name": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/name"
++    },
++    "content_sha256": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/content_sha256"
++    },
++    "build_source": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/build_source"
++    },
++    "locale": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/locale"
++    },
++    "agents": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/agents"
++    },
++    "commands": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/commands"
++    },
++    "dependencies": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/dependencies"
++    },
++    "runtime_roots": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/runtime_roots"
++    },
++    "build_roots": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/build_roots"
++    },
++    "installed_at": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/installed_at"
++    },
++    "files": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/files"
++    },
++    "requirements": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/requirements"
++    },
++    "mcp_servers": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/mcp_servers"
++    },
++    "activation": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/activation"
++    },
++    "requirers": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/requirers"
++    },
++    "schema_version": {
++      "const": 6
++    },
++    "skill_schema_version": {
++      "type": "integer",
++      "minimum": 1,
++      "maximum": 9
++    },
++    "package": {
++      "$ref": "source-types-v1.schema.json#/$defs/package"
++    },
++    "lock_sha256": {
++      "$ref": "../v1/common.schema.json#/$defs/sha256"
++    },
++    "builds": {
++      "type": "object",
++      "propertyNames": {
++        "$ref": "../v1/common.schema.json#/$defs/identifier"
++      },
++      "additionalProperties": {
++        "oneOf": [
++          {
++            "type": "object",
++            "required": [
++              "driver",
++              "receipt_schema_version",
++              "execution_policy",
++              "cache_key",
++              "receipt_sha256",
++              "artifact_sha256",
++              "artifact_path"
++            ],
++            "properties": {
++              "driver": {
++                "const": "go-v1"
++              },
++              "receipt_schema_version": {
++                "const": 3
++              },
++              "execution_policy": {
++                "$ref": "../v1/common.schema.json#/$defs/goExecutionPolicyV1"
++              },
++              "cache_key": {
++                "$ref": "../v1/common.schema.json#/$defs/sha256"
++              },
++              "receipt_sha256": {
++                "$ref": "../v1/common.schema.json#/$defs/sha256"
++              },
++              "artifact_sha256": {
++                "$ref": "../v1/common.schema.json#/$defs/sha256"
++              },
++              "artifact_path": {
++                "$ref": "../v1/common.schema.json#/$defs/portablePath"
++              }
++            },
++            "additionalProperties": false
++          },
++          {
++            "type": "object",
++            "required": [
++              "driver",
++              "receipt_schema_version",
++              "execution_policy",
++              "repository",
++              "declared_identity",
++              "declared_locked_commit",
++              "effective_identity",
++              "object_format",
++              "commit",
++              "substituted",
++              "build_source",
++              "descriptor_target",
++              "cache_key",
++              "receipt_sha256",
++              "artifact_sha256",
++              "artifact_path"
++            ],
++            "properties": {
++              "driver": {
++                "const": "go-repository-v1"
++              },
++              "receipt_schema_version": {
++                "const": 3
++              },
++              "execution_policy": {
++                "$ref": "../v1/common.schema.json#/$defs/goExecutionPolicyV1"
++              },
++              "repository": {
++                "$ref": "../v1/common.schema.json#/$defs/identifier"
++              },
++              "declared_identity": {
++                "$ref": "../v1/common.schema.json#/$defs/networkSourceIdentity"
++              },
++              "declared_locked_commit": {
++                "$ref": "../v1/common.schema.json#/$defs/lockedCommit"
++              },
++              "declared_tag": {
++                "$ref": "../v1/common.schema.json#/$defs/gitRefName"
++              },
++              "effective_identity": {
++                "oneOf": [
++                  {
++                    "$ref": "../v1/common.schema.json#/$defs/networkSourceIdentity"
++                  },
++                  {
++                    "$ref": "../v1/common.schema.json#/$defs/localSourceIdentity"
++                  }
++                ]
++              },
++              "object_format": {
++                "enum": [
++                  "sha1",
++                  "sha256"
++                ]
++              },
++              "commit": {
++                "$ref": "../v1/common.schema.json#/$defs/commit"
++              },
++              "substituted": {
++                "type": "boolean"
++              },
++              "substitution": {
++                "oneOf": [
++                  {
++                    "type": "object",
++                    "required": [
++                      "type"
++                    ],
++                    "properties": {
++                      "type": {
++                        "const": "local-path"
++                      }
++                    },
++                    "additionalProperties": false
++                  },
++                  {
++                    "type": "object",
++                    "required": [
++                      "type",
++                      "ref"
++                    ],
++                    "properties": {
++                      "type": {
++                        "const": "network-git"
++                      },
++                      "ref": {
++                        "$ref": "../v1/common.schema.json#/$defs/repositoryStructuredRef"
++                      }
++                    },
++                    "additionalProperties": false
++                  }
++                ]
++              },
++              "build_source": {
++                "$ref": "../v1/common.schema.json#/$defs/buildSourceIdentity"
++              },
++              "descriptor_target": {
++                "$ref": "../v1/common.schema.json#/$defs/identifier"
++              },
++              "cache_key": {
++                "$ref": "../v1/common.schema.json#/$defs/sha256"
++              },
++              "receipt_sha256": {
++                "$ref": "../v1/common.schema.json#/$defs/sha256"
++              },
++              "artifact_sha256": {
++                "$ref": "../v1/common.schema.json#/$defs/sha256"
++              },
++              "artifact_path": {
++                "$ref": "../v1/common.schema.json#/$defs/portablePath"
++              }
++            },
++            "allOf": [
++              {
++                "if": {
++                  "properties": {
++                    "object_format": {
++                      "const": "sha1"
++                    }
++                  },
++                  "required": [
++                    "object_format"
++                  ]
++                },
++                "then": {
++                  "properties": {
++                    "commit": {
++                      "type": "string",
++                      "pattern": "^[0-9a-f]{40}$"
++                    }
++                  }
++                },
++                "else": {
++                  "properties": {
++                    "commit": {
++                      "type": "string",
++                      "pattern": "^[0-9a-f]{64}$"
++                    }
++                  }
++                }
++              },
++              {
++                "if": {
++                  "properties": {
++                    "substituted": {
++                      "const": true
++                    }
++                  },
++                  "required": [
++                    "substituted"
++                  ]
++                },
++                "then": {
++                  "required": [
++                    "substitution"
++                  ]
++                },
++                "else": {
++                  "not": {
++                    "required": [
++                      "substitution"
++                    ]
++                  }
++                }
++              }
++            ],
++            "additionalProperties": false
++          }
++        ]
++      }
++    },
++    "attestation": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/attestation"
++    },
++    "substituted": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/substituted"
++    }
++  },
++  "required": [
++    "name",
++    "content_sha256",
++    "locale",
++    "agents",
++    "commands",
++    "dependencies",
++    "runtime_roots",
++    "build_roots",
++    "installed_at",
++    "files",
++    "schema_version",
++    "skill_schema_version",
++    "package",
++    "lock_sha256",
++    "builds"
++  ],
++  "additionalProperties": false,
++  "allOf": [
++    {
++      "if": {
++        "properties": {
++          "package": {
++            "properties": {
++              "kind": {
++                "const": "local-snapshot"
++              }
++            },
++            "required": [
++              "kind"
++            ]
++          }
++        },
++        "required": [
++          "package"
++        ]
++      },
++      "then": {
++        "not": {
++          "anyOf": [
++            {
++              "required": [
++                "attestation"
++              ]
++            },
++            {
++              "required": [
++                "substituted"
++              ]
++            }
++          ]
++        }
++      }
++    }
++  ]
++}
+diff --git a/schemas/v1/README.md b/schemas/v1/README.md
+index 00a367c5a7af1dd94a0a08fc7ef3f7fce5df4396..de1a013f804ab1a75ac43cffa49023dee43fb1df 100644
+--- a/schemas/v1/README.md
++++ b/schemas/v1/README.md
+@@ -21,8 +21,9 @@ and `registry-bundle-v2`. `manager-config-v3` carries `hash_version: 2` on a
+ state-hash waiver; `manager-config-v2` remains byte-frozen without it. The
+ `log-response-v3` envelope references `registry-log-entry-v2` and the frozen
+ `log-response-v2` continues to reference v1 entries. The skillfile-sources
+-carriers `skillfile-lock-v2`, `install-marker-v6`, and `source-audit-v2` adopt
+-`hash_version` in follow-up TASK-260930-3ny11n. In legacy frozen shapes, an absent version
++carriers `skillfile-lock-v2` and `source-audit-v2` adopt `hash_version`, and
++the schema-9 `install-marker-v6` gains it, in follow-up TASK-260930-3ny11n.
++In legacy frozen shapes, an absent version
+ means 1; no reader may compare identities across versions. The
+ `content-hashes-v2.json` vector pins the v1 collision, its v2 split, the empty
+ tree, an ordinary exact digest, a NUL byte at nested depth, and a registry
+@@ -35,6 +36,10 @@ conformance claim v5. Rc.8 carries `assurance-policy-v1`,
+ conformance claim v4. These are new closed objects; no prior schema is widened
+ or reinterpreted.
+ 
++The unreleased manifest schema-9 directory amendment is isolated in the
++[source-extension namespace](../skillfile-sources-v1/README.md). Schemas 1 through 8
++and the rc.14 conformance corpus remain unchanged.
++
+ The R1/P1 page-boundary revision carries `records-response-v2` and
+ `log-response-v2`: each v1 envelope plus one REQUIRED `boundary` member whose
+ value is a `registry-snapshot-v1` object, `additionalProperties: false`
+@@ -102,7 +107,8 @@ canonical skill-manifest schemas. The corresponding `csk-skill-*` schemas are
+ the legacy filenames with byte-equivalent versioned meaning.
+ 
+ Manifest schema selection is exact: the integer `schema_version` selects the
+-same-numbered schema. Schemas 1 through 6 do not acquire schema-7
++same-numbered schema. Draft schema 9 lives only in `schemas/skillfile-sources-v1`
++and is accepted only by explicit opt-in. Schemas 1 through 6 do not acquire schema-7
+ `build_repositories` or `go-repository-v1` meaning. Schema 7 adds those fields
+ without changing the earlier schemas or their generated fixtures. Schemas 1
+ through 7 do not acquire schema-8 `execution_policy`, `interpreter`, or
+@@ -184,6 +190,9 @@ is active — applies unchanged. Markers v1 through v4 keep their frozen
+ framing-version-1 shapes. Current writers use marker v5 with
+ `hash_version: 2` for core installations.
+ 
++The unreleased source-extension marker v6 records schema-9 package directories
++and the lock binding; it does not change any released marker.
++
+ ## Manifest schema 8: declared first-party module roots
+ 
+ Schema 8 also admits the declared module roots of decision 0009. A local
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index 2afcc68fd5fe24630532b25bdee5b3d0060542b7..3438fe5a01e1fe1a156ed33566781dd8c07ebf52 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -251,6 +251,59 @@ class CandidateMetadataTests(unittest.TestCase):
+             path.write_bytes(original)
+ 
+ 
++class ManifestDependencyDirectoryTests(unittest.TestCase):
++    def setUp(self) -> None:
++        self.vector = validate.load_json(
++            validate.SOURCES_SUITE / "manifest-dependency-directories.json"
++        )
++
++    def test_draft_schema_cases_and_directory_vectors_are_valid(self) -> None:
++        validate.validate_skillfile_sources_schemas()
++        validate.validate_manifest_dependency_directory_vectors(self.vector)
++
++    def test_audit_identity_cannot_drop_selected_directory(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = next(
++            item for item in changed["resolution_cases"]
++            if item["name"] == "valid-subfolder-dependency"
++        )
++        case["expected"]["audit_package"]["directory"] = "skills/another"
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_manifest_dependency_directory_vectors(changed)
++
++    def test_parent_escape_mutant_is_not_admitted(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = next(
++            item for item in changed["directory_grammar_cases"]
++            if item["name"] == "parent-escape"
++        )
++        case["valid"] = True
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_manifest_dependency_directory_vectors(changed)
++
++    def test_diamond_narrowing_mutant_is_rejected(self) -> None:
++        changed = copy.deepcopy(self.vector)
++        case = next(
++            item for item in changed["resolution_cases"]
++            if item["name"] == "diamond-different-directories-same-repository"
++        )
++        case["expected"]["provider_order"] = ["shared", "frontend", "backend", "app"]
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_manifest_dependency_directory_vectors(changed)
++
++    def test_marker_v6_max_narrowing_mutant_is_rejected(self) -> None:
++        path = validate.SOURCES_SCHEMAS / "install-marker-v6.schema.json"
++        original = path.read_bytes()
++        try:
++            narrowed = json.loads(original)
++            narrowed["properties"]["skill_schema_version"]["maximum"] = 8
++            path.write_text(json.dumps(narrowed, indent=2) + "\n", encoding="utf-8")
++            with self.assertRaises(validate.ValidationFailure):
++                validate.validate_skillfile_sources_schemas()
++        finally:
++            path.write_bytes(original)
++
++
+ class WireSemanticValidationTests(unittest.TestCase):
+     def test_manifest_requires_exact_declared_repository_selection(self) -> None:
+         valid = {
+diff --git a/tools/validate.py b/tools/validate.py
+index cf0adaf46f9b97ecbd8a0f5a13bf6f2e4092e501..dce8974c1ffb621c1bb0b11250514cf9605130c5 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -22,7 +22,9 @@ from referencing import Registry, Resource
+ 
+ ROOT = Path(__file__).resolve().parents[1]
+ SCHEMAS = ROOT / "schemas" / "v1"
++SOURCES_SCHEMAS = ROOT / "schemas" / "skillfile-sources-v1"
+ SUITE = ROOT / "conformance" / "v1"
++SOURCES_SUITE = ROOT / "conformance" / "skillfile-sources-v1"
+ REVIEWS = ROOT / "reviews"
+ _VALID_SCHEMA_DOCUMENTS: set[bytes] = set()
+ SAFE_INTEGER = 9_007_199_254_740_991
+@@ -3523,6 +3525,312 @@ def validate_registry_bootstrap_vectors(client: Any = None, behavior: Any = None
+             )
+ 
+ 
++def skillfile_sources_schema_registry() -> tuple[Registry, dict[str, Path]]:
++    documents: dict[str, Any] = {}
++    paths: dict[str, Path] = {}
++    for schema_dir in (SCHEMAS, SOURCES_SCHEMAS):
++        for path in sorted(schema_dir.glob("*.json")):
++            document = load_json(path)
++            try:
++                Draft202012Validator.check_schema(document)
++            except SchemaError as exc:
++                raise ValidationFailure(
++                    f"{path}: invalid Draft 2020-12 schema: {exc.message}"
++                ) from exc
++            schema_id = document.get("$id")
++            if not isinstance(schema_id, str) or not schema_id or schema_id in documents:
++                raise ValidationFailure(f"{path}: missing or duplicate schema $id")
++            documents[schema_id] = document
++            if schema_dir == SOURCES_SCHEMAS:
++                paths[path.name] = path
++    registry = Registry().with_resources(
++        (schema_id, Resource.from_contents(document))
++        for schema_id, document in documents.items()
++    )
++    return registry, paths
++
++
++def validate_skillfile_sources_schemas() -> None:
++    registry, paths = skillfile_sources_schema_registry()
++    suite_names = {path.name for path in SOURCES_SCHEMAS.glob("*.json")}
++    index = load_json(SOURCES_SUITE / "index.json")
++    coverage: dict[str, set[bool]] = {}
++    for case in index:
++        schema_name = case.get("schema")
++        if schema_name not in suite_names:
++            raise ValidationFailure(
++                f"source-extension schema case names unknown schema {schema_name!r}"
++            )
++        instance_path = SOURCES_SUITE / case["instance"]
++        instance = load_json(instance_path)
++        valid = not list(
++            Draft202012Validator(
++                load_json(paths[schema_name]), registry=registry
++            ).iter_errors(instance)
++        )
++        if valid is not case.get("valid"):
++            raise ValidationFailure(
++                f"{instance_path}: expected valid={case.get('valid')}, got {valid}"
++            )
++        coverage.setdefault(schema_name, set()).add(valid)
++    required = suite_names - {"source-types-v1.schema.json"}
++    if set(coverage) != required or any(value != {True, False} for value in coverage.values()):
++        raise ValidationFailure("source-extension schemas require both indexed positive and negative cases")
++
++    source_types = load_json(SOURCES_SCHEMAS / "source-types-v1.schema.json")
++    shared_directory_ref = "source-types-v1.schema.json#/$defs/directory"
++    source_directory = source_types["$defs"]["directory"]
++    if not source_directory:
++        raise ValidationFailure("shared selected-directory definition is empty")
++    manifest = load_json(SOURCES_SCHEMAS / "agent-skill-v9.schema.json")
++    legacy_manifest = load_json(SOURCES_SCHEMAS / "csk-skill-v9.schema.json")
++    requirement_directory_ref = manifest["$defs"]["skillRequirementV9"]["properties"]["directory"]
++    if requirement_directory_ref != {"$ref": shared_directory_ref}:
++        raise ValidationFailure("manifest schema 9 does not reuse the Skillfile directory grammar")
++    for member in ("$id", "title"):
++        manifest.pop(member, None)
++        legacy_manifest.pop(member, None)
++    if manifest != legacy_manifest:
++        raise ValidationFailure("canonical and legacy schema-9 manifests differ beyond identity metadata")
++
++    marker_v5 = load_json(SOURCES_SCHEMAS / "install-marker-v5.schema.json")
++    marker_v6 = load_json(SOURCES_SCHEMAS / "install-marker-v6.schema.json")
++    if marker_v6["properties"]["schema_version"] != {"const": 6}:
++        raise ValidationFailure("source-extension marker v6 does not select schema version 6")
++    if marker_v6["properties"]["skill_schema_version"] != {"type": "integer", "minimum": 1, "maximum": 9}:
++        raise ValidationFailure("source-extension marker v6 does not record manifest versions through 9")
++    marker_v5.pop("$id", None)
++    marker_v6.pop("$id", None)
++    marker_v6["properties"]["schema_version"] = {"const": 5}
++    marker_v6["properties"]["skill_schema_version"] = {"type": "integer", "minimum": 1, "maximum": 8}
++    if marker_v5 != marker_v6:
++        raise ValidationFailure("source-extension marker v6 differs from marker v5 beyond schema and manifest versions")
++
++    previous, previous_paths = schema_registry()
++    old_manifest = load_json(previous_paths["agent-skill-v8.schema.json"])
++    old_dependency = {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {"kind": "revision", "value": "0123456789abcdef0123456789abcdef01234567"},
++    }
++    old_valid = {
++        "schema_version": 8,
++        "capabilities": {},
++        "dependencies": {"skills": {"developer": old_dependency}},
++    }
++    old_with_directory = {
++        **old_valid,
++        "dependencies": {
++            "skills": {
++                "developer": {**old_dependency, "directory": "skills/developer"}
++            }
++        },
++    }
++    if list(Draft202012Validator(old_manifest, registry=previous).iter_errors(old_valid)):
++        raise ValidationFailure("schema 8 no longer accepts an existing root dependency")
++    if not list(
++        Draft202012Validator(old_manifest, registry=previous).iter_errors(old_with_directory)
++    ):
++        raise ValidationFailure("schema 8 acquired the schema-9 directory member")
++
++
++def validate_manifest_dependency_directory_vectors(vector: Any = None) -> None:
++    if vector is None:
++        vector = load_json(SOURCES_SUITE / "manifest-dependency-directories.json")
++    if not isinstance(vector, dict) or vector.get("schema_version") != 1:
++        raise ValidationFailure("manifest dependency directory vectors require schema version 1")
++
++    registry, paths = skillfile_sources_schema_registry()
++    source_types = load_json(paths["source-types-v1.schema.json"])
++    directory_schema = source_types["$defs"]["directory"]
++    directory_validator = Draft202012Validator(
++        {"$ref": f"{source_types['$id']}#/$defs/directory"}, registry=registry
++    )
++    grammar_cases = named_cases(
++        vector.get("directory_grammar_cases"), "manifest dependency directory grammar"
++    )
++    required_grammar = {
++        "root-selector", "portable-subfolder", "empty", "absolute",
++        "parent-escape", "parent-component", "backslash", "drive-prefix", "glob",
++    }
++    if set(grammar_cases) != required_grammar:
++        raise ValidationFailure("manifest dependency directory grammar cases are not the closed required set")
++    for name, case in grammar_cases.items():
++        actual = not list(directory_validator.iter_errors(case.get("input")))
++        if actual is not case.get("valid"):
++            raise ValidationFailure(
++                f"manifest dependency directory grammar case {name} has the wrong result"
++            )
++
++    cases = named_cases(
++        vector.get("resolution_cases"), "manifest dependency directory resolution"
++    )
++    required_cases = {
++        "valid-subfolder-dependency",
++        "absent-directory-selects-root",
++        "explicit-root-selects-root",
++        "missing-folder",
++        "folder-without-skill-md",
++        "symlinked-directory-escape",
++        "diamond-different-directories-same-repository",
++        "same-name-different-directory-conflicts",
++    }
++    if set(cases) != required_cases:
++        raise ValidationFailure("manifest dependency directory resolution cases are not the closed required set")
++
++    expected_repository = "github.com/example/role-skills"
++    expected_commit = "0123456789abcdef0123456789abcdef01234567"
++    for name in (
++        "valid-subfolder-dependency",
++        "absent-directory-selects-root",
++        "explicit-root-selects-root",
++    ):
++        case = cases[name]
++        dependency = case.get("dependency")
++        snapshot = case.get("snapshot")
++        expected = case.get("expected")
++        if not isinstance(dependency, dict) or not isinstance(snapshot, dict) or not isinstance(expected, dict):
++            raise ValidationFailure(f"manifest dependency directory case {name} is incomplete")
++        selected_name = dependency.get("name")
++        declared = dependency.get("directory", ".")
++        normalized = "." if declared == "." else declared
++        if name == "valid-subfolder-dependency" and normalized != "skills/developer":
++            raise ValidationFailure("valid subfolder dependency does not select its declared package folder")
++        if name != "valid-subfolder-dependency" and normalized != ".":
++            raise ValidationFailure(f"manifest dependency directory case {name} does not select the repository root")
++        selected_dir = normalized
++        manifest_path = "SKILL.md" if selected_dir == "." else f"{selected_dir}/SKILL.md"
++        files = snapshot.get("files")
++        names = snapshot.get("frontmatter_names")
++        directories = snapshot.get("directories")
++        if (
++            not isinstance(files, list)
++            or manifest_path not in files
++            or not isinstance(names, dict)
++            or names.get(manifest_path) != selected_name
++            or not isinstance(directories, list)
++            or (selected_dir != "." and selected_dir not in directories)
++        ):
++            raise ValidationFailure(f"manifest dependency directory case {name} has no matching selected SKILL.md")
++        expected_identity = {
++            "kind": "network-git",
++            "repository": expected_repository,
++            "commit": {"object_format": "sha1", "hex": expected_commit},
++            "directory": normalized,
++        }
++        if (
++            expected.get("status") != "accepted"
++            or expected.get("normalized_directory") != normalized
++            or expected.get("identity") != expected_identity
++            or expected.get("lock_directory") != normalized
++            or expected.get("audit_package") != expected_identity
++            or expected.get("marker_schema_version") != 6
++            or expected.get("marker_skill_schema_version") != 9
++        ):
++            raise ValidationFailure(f"manifest dependency directory case {name} loses directory identity")
++    if cases["absent-directory-selects-root"]["expected"] != cases["explicit-root-selects-root"]["expected"]:
++        raise ValidationFailure("absent and explicit root dependency directories do not have equal identity")
++
++    for name, reason in (
++        ("missing-folder", "directory-missing"),
++        ("folder-without-skill-md", "skill-md-missing"),
++        ("symlinked-directory-escape", "directory-escapes-repository"),
++    ):
++        case = cases[name]
++        dependency = case.get("dependency")
++        snapshot = case.get("snapshot")
++        expected = case.get("expected")
++        if not isinstance(dependency, dict) or not isinstance(snapshot, dict) or not isinstance(expected, dict):
++            raise ValidationFailure(f"manifest dependency directory rejection {name} is incomplete")
++        directory = dependency.get("directory")
++        if expected.get("status") != "rejected" or expected.get("reason") != reason:
++            raise ValidationFailure(f"manifest dependency directory rejection {name} has the wrong outcome")
++        directories = snapshot.get("directories", [])
++        files = snapshot.get("files", [])
++        if name == "missing-folder" and directory in directories:
++            raise ValidationFailure("missing-folder vector includes the selected directory")
++        if name == "folder-without-skill-md" and (
++            directory not in directories or f"{directory}/SKILL.md" in files
++        ):
++            raise ValidationFailure("folder-without-skill-md vector does not isolate the missing manifest")
++        if name == "symlinked-directory-escape":
++            links = snapshot.get("symlinks", {})
++            if directory not in directories or links.get(directory) != "../outside":
++                raise ValidationFailure("symlinked-directory-escape vector does not contain an escaping link")
++
++    diamond = cases["diamond-different-directories-same-repository"]
++    requirements = diamond.get("requirements")
++    expected = diamond.get("expected")
++    if (
++        diamond.get("repository") != expected_repository
++        or diamond.get("commit") != expected_commit
++        or not isinstance(requirements, list)
++        or not isinstance(expected, dict)
++    ):
++        raise ValidationFailure("directory dependency diamond identity is incomplete")
++    package_requirements: dict[str, set[str]] = {}
++    prerequisites: dict[str, set[str]] = {}
++    for requirement in requirements:
++        if not isinstance(requirement, dict):
++            raise ValidationFailure("directory dependency diamond has a malformed requirement")
++        name, directory, requirer = (
++            requirement.get("name"), requirement.get("directory"), requirement.get("requirer")
++        )
++        if not isinstance(name, str) or not isinstance(directory, str) or not isinstance(requirer, str):
++            raise ValidationFailure("directory dependency diamond requirement lacks name, directory, or requirer")
++        package_requirements.setdefault(name, set()).add(directory)
++        if requirer != "app":
++            prerequisites.setdefault(requirer, set()).add(name)
++    package_nodes = set(package_requirements)
++    completed: set[str] = set()
++    order: list[str] = []
++    while package_nodes - completed:
++        ready = sorted(
++            node for node in package_nodes - completed
++            if prerequisites.get(node, set()) <= completed
++        )
++        if not ready:
++            raise ValidationFailure("directory dependency diamond is cyclic")
++        selected = ready[0]
++        order.append(selected)
++        completed.add(selected)
++    order.append("app")
++    wanted_identities = [
++        {
++            "kind": "network-git",
++            "repository": expected_repository,
++            "commit": {"object_format": "sha1", "hex": expected_commit},
++            "directory": directory,
++        }
++        for directory in ("skills/backend", "skills/frontend", "skills/shared")
++    ]
++    if (
++        expected.get("status") != "accepted"
++        or expected.get("provider_order") != order
++        or expected.get("provider_order") != ["shared", "backend", "frontend", "app"]
++        or expected.get("repository_acquisitions") != 1
++        or expected.get("package_identities") != wanted_identities
++        or expected.get("shared_package_nodes") != 1
++        or package_requirements.get("frontend") != {"skills/frontend"}
++        or package_requirements.get("backend") != {"skills/backend"}
++        or package_requirements.get("shared") != {"skills/shared"}
++    ):
++        raise ValidationFailure("directory dependency diamond does not unify by full package identity")
++
++    conflict = cases["same-name-different-directory-conflicts"]
++    conflict_requirements = conflict.get("requirements")
++    conflict_expected = conflict.get("expected")
++    if (
++        not isinstance(conflict_requirements, list)
++        or len(conflict_requirements) != 2
++        or {item.get("name") for item in conflict_requirements if isinstance(item, dict)} != {"shared"}
++        or len({item.get("directory") for item in conflict_requirements if isinstance(item, dict)}) != 2
++        or not isinstance(conflict_expected, dict)
++        or conflict_expected.get("status") != "rejected"
++        or conflict_expected.get("reason") != "package-identity-conflict"
++    ):
++        raise ValidationFailure("same-name different-directory conflict is not rejected")
++
++
+ def validate_vector_semantics() -> None:
+     ledger = load_json(SUITE / "expected" / "adapter-ledger.json")
+     require_sorted_unique(ledger["entries"], "adapter ledger entries")
+@@ -3553,6 +3861,8 @@ def validate_vector_semantics() -> None:
+         ):
+             raise ValidationFailure("skill-manifest resolution files must map paths to text")
+ 
++    validate_manifest_dependency_directory_vectors()
++
+     valid_ccj = load_json(SUITE / "vectors" / "canonical-valid.json")
+     if not valid_ccj or any(not item.get("canonical_utf8") for item in valid_ccj):
+         raise ValidationFailure("canonical-valid vectors are empty")
+@@ -11521,6 +11831,7 @@ def main(*, release_history_only: bool = False) -> int:
+         validate_released_record_immutability,
+         validate_released_schema_immutability,
+         validate_schemas,
++        validate_skillfile_sources_schemas,
+         validate_repository_descriptor_identity,
+         validate_manifest,
+         validate_review_evidence,
