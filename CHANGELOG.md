@@ -4,6 +4,70 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+## v0.15.0-rc.5 — 2026-10-08
+
+### Added
+
+- No additions in this release; rc.5 flips two revision defaults to their
+  hardened forms (see Changed and Security).
+
+### Changed
+
+- Codex seed revision B is now the shipped default (TASK-260927-1e5qqm):
+  managed Codex homes no longer inherit native MCP servers. Provisioning
+  strips the `mcp_servers` table — both the inline-table and the
+  subtable-only form — from the seeded `config.toml` and keeps every other
+  member, so the profile MCP table is the only source of MCP servers. The
+  provisioning warning is now `mcp_native_servers_not_inherited` ("native
+  Codex MCP servers … were stripped from config.toml and are not
+  inherited"), replacing the revision-A `mcp_native_servers_ungoverned`
+  warning and its "accept the loss" migration hint; `env status` reports
+  `codex-seed: revision B (shipped)` with seed-record rows marked
+  `(not-inherited)`. Existing revision-A homes are preserved as-is —
+  repair neither strips nor refreshes their seed — and carry the
+  `mcp_seed_unstripped` warning to re-provision to apply seed revision B.
+  The 36 `environments-codex-seed` conformance-gap rows (9 cases across 4
+  manifest digests) are removed: the seed families account for 7/7
+  provisioning and 8/8 posture cases with no gaps, bounds, or skips.
+
+### Fixed
+
+- No fixes in this release.
+
+### Security
+
+- The machine `security_posture` revision B flip: schema-2 machines now
+  default to `security_posture: hardened` (TASK-260927-25hk87). Hardened
+  defaults select strict audit and registry policy, reject unwaived
+  transitive system modules, and require source signers: an empty source
+  allowlist refuses install/update (`source_allowlist_empty`), an empty
+  MCP allowlist refuses profile composition when MCP declarations are
+  present (`mcp_package_allowlist_empty`), an explicit
+  `passable_env_names: null` is refused
+  (`passable_env_names_unbounded_refused`), and
+  `transitive_system_modules` defaults to `error` instead of `drop`.
+  Operator action: configure the required allowlists and signer keys
+  before those operations (see the new "Security posture" section in
+  `docs/environment-config.md`). To keep the old behaviour, set an
+  explicit `security_posture: permissive`, which retains the former
+  per-knob defaults and emits `security_posture_permissive` once per
+  manager operation; explicit knobs and locked system values still
+  override posture defaults, and schema-1 machines retain their frozen
+  permissive behavior. The permissive migration hint drops the "before
+  revision B flips the default" suffix now that the flip has landed.
+  The posture conformance family accounts for 17/17 published vectors
+  with 0 known gaps (12 driven and 5 bound at the config entry point, 13
+  driven and 4 bound at the CLI entry point); all six revision-B vectors
+  are driven.
+
+### Known issues
+
+- Windows broker real-Git flake `TASK-260930-fp8vx7`: two historical failures
+  were not reproduced in approximately 21,000 hosted passes. No root cause is
+  established; rc.5 ships this as a documented risk.
+- The board-close gap on the Go qualification task is a tooling issue only
+  (spm#537); no product impact.
+
 ## v0.15.0-rc.4 — 2026-10-07
 
 ### Added
