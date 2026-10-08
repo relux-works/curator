@@ -1,0 +1,2 @@
+# THE ONLY CURRENT INSTRUCTION — review TASK-261001-183vis rev1 (reviewer)
+A diagnosis research task (validation-suite drift behind the 2026-10-01 landing refusals). Its Change Request carries no file changes; the outcome is the results resource. Review the results resource for: a clear root cause with evidence, no secrets or personal paths, no employer names. The drift was later fixed on main (landings work since 2026-10-02). If the diagnosis is coherent: accept_cr with the live checklist (the empty CR is expected). Then END YOUR TURN.
