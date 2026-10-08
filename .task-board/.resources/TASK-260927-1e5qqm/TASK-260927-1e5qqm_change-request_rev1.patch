@@ -1,0 +1,400 @@
+diff --git a/.github/ci/conformance-gaps.tsv b/.github/ci/conformance-gaps.tsv
+index a54453b6..81136a48 100644
+--- a/.github/ci/conformance-gaps.tsv
++++ b/.github/ci/conformance-gaps.tsv
+@@ -2,24 +2,6 @@
+ # Rows are scoped to the SHA-256 identity of conformance/v1/manifest.json; candidate-only gaps are absent under rc.13.
+ # Remove a row only after its named published case passes its production-entry consumer.
+ suite_manifest_sha256	family	case_id	owner	reason
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/posture-cases	a-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/posture-cases	b-home-empty-snapshot-no-rows	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/posture-cases	b-home-lists-not-inherited	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/posture-cases	non-codex-home-without-record-no-rows	TASK-260927-1e5qqm	The manager posture row is revision B in this vector; it remains pending the registry flip owned by this leaf.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/posture-cases	pre-rule-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/provisioning-cases	b-empty-mcp-servers-table-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/provisioning-cases	b-strips-servers-keeps-rest	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/provisioning-cases	b-subtable-only-form-stripped	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-950ee74ad148615c273fe95bbb93f1bc0f9bdf2ea2bd9395f1dc8e3601419e60	environments-codex-seed/provisioning-cases	b-without-servers-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	a-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	b-home-empty-snapshot-no-rows	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	b-home-lists-not-inherited	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	non-codex-home-without-record-no-rows	TASK-260927-1e5qqm	The manager posture row is revision B in this vector; it remains pending the registry flip owned by this leaf.
+-be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/posture-cases	pre-rule-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/provisioning-cases	b-empty-mcp-servers-table-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/provisioning-cases	b-strips-servers-keeps-rest	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/provisioning-cases	b-subtable-only-form-stripped	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-be11bb1e4c46f21fb5684d586f9c2a8b0d59f3b437bc7ea7aa5aa530fe4d47ca	environments-codex-seed/provisioning-cases	b-without-servers-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ 
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-empty-backend-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	invalid-missing-backend-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+@@ -61,15 +43,6 @@ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-lock-v2
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-lock-v2/schema-cases	invalid-wrong-hash-version.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-lock-v2/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	context-lock-v2/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+-bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/posture-cases	a-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/posture-cases	b-home-empty-snapshot-no-rows	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/posture-cases	b-home-lists-not-inherited	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/posture-cases	non-codex-home-without-record-no-rows	TASK-260927-1e5qqm	The manager posture row is revision B in this vector; it remains pending the registry flip owned by this leaf.
+-bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/posture-cases	pre-rule-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/provisioning-cases	b-empty-mcp-servers-table-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/provisioning-cases	b-strips-servers-keeps-rest	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/provisioning-cases	b-subtable-only-form-stripped	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	environments-codex-seed/provisioning-cases	b-without-servers-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	log-response-v3/schema-cases	invalid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	log-response-v3/schema-cases	valid.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	manager-config-v3/schema-cases	invalid-v3-state-waiver-commit-length.json	TASK-260917-2tx81l	v2 content-hash reader support is owned by TASK-260917-2tx81l; this family is not implemented in this task.
+@@ -113,13 +86,4 @@ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	registry-log-en
+ bd03456b92a7368d90ea74fe6953db10bc188588020683024a6a6b8735a40783	agent-environment-marker-v3/schema-cases	valid-muse-shared.json	TASK-260917-2tx81l	v3 marker emission requires the separately owned content-hash-v2 implementation; Muse emits the current v2 marker without claiming v3 support.
+ 
+ # rc.14 retains current implementation gaps; historical Muse hash-v2 gaps do not apply.
+-6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/posture-cases	a-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/posture-cases	b-home-empty-snapshot-no-rows	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/posture-cases	b-home-lists-not-inherited	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/posture-cases	non-codex-home-without-record-no-rows	TASK-260927-1e5qqm	The manager posture row is revision B in this vector; it remains pending the registry flip owned by this leaf.
+-6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/posture-cases	pre-rule-home-unstripped-under-b	TASK-260927-1e5qqm	Revision B posture is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/provisioning-cases	b-empty-mcp-servers-table-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/provisioning-cases	b-strips-servers-keeps-rest	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/provisioning-cases	b-subtable-only-form-stripped	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+-6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	environments-codex-seed/provisioning-cases	b-without-servers-no-warning	TASK-260927-1e5qqm	Revision B is exercised through the retained test seam; the default registry ships revision A until this flip leaf ships B.
+ 6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5	snapshot-acquisition/cases	byte-exact-snapshot	TASK-261003-1uzji7	rc.14 expects curator-content-v2 writes; writer enabled after the atomic v1→v2 profile hash migration
+diff --git a/cmd/curator/env_credential_marker_test.go b/cmd/curator/env_credential_marker_test.go
+index 2abcc6f3..2a1749d7 100644
+--- a/cmd/curator/env_credential_marker_test.go
++++ b/cmd/curator/env_credential_marker_test.go
+@@ -151,6 +151,8 @@ func TestEnvResolveKeepsSchema1BytesForMetadataOnly(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 	object["version"] = float64(envmarker.VersionV1)
++	// Preserve the historical A marker independently of the shipped seed rule.
++	object["codex_seed_record"] = map[string]any{"revision": "A", "native_mcp_servers": []string{}}
+ 	modern, _ := object["passthrough"].([]any)
+ 	legacy := make([]any, 0, len(modern))
+ 	for _, value := range modern {
+@@ -262,7 +264,7 @@ func TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome(t *testing.
+ 	if code != exitOK {
+ 		t.Fatalf("env status = %d\nstderr:\n%s", code, stderr)
+ 	}
+-	if !strings.Contains(stdout, "mcp_seed_unstripped: this managed Codex home predates the seed record; re-provision it to apply seed revision A") {
++	if !strings.Contains(stdout, "mcp_seed_unstripped: this managed Codex home predates the seed record; re-provision it to apply seed revision B") {
+ 		t.Fatalf("env status did not report the pre-rule Codex home:\n%s", stdout)
+ 	}
+ }
+diff --git a/cmd/curator/envstatus_test.go b/cmd/curator/envstatus_test.go
+index b9f63b5d..2919fb6d 100644
+--- a/cmd/curator/envstatus_test.go
++++ b/cmd/curator/envstatus_test.go
+@@ -7,6 +7,8 @@ import (
+ 	"strings"
+ 	"testing"
+ 
++	"github.com/BurntSushi/toml"
++
+ 	"github.com/relux-works/curator/internal/envmarker"
+ 	"github.com/relux-works/curator/internal/envprofile"
+ 	"github.com/relux-works/curator/internal/envregistry"
+@@ -39,7 +41,7 @@ func TestPrintEnvStatusShowsCodexSeedPostureAndNames(t *testing.T) {
+ 	}
+ }
+ 
+-func TestEnvStatusReportsUngovernedNativeCodexServers(t *testing.T) {
++func TestEnvStatusReportsNotInheritedNativeCodexServers(t *testing.T) {
+ 	source, _ := profileHome(t)
+ 	installCLIEnvProfile(t, source)
+ 	configPath := filepath.Join(os.Getenv("CODEX_HOME"), "config.toml")
+@@ -49,25 +51,27 @@ func TestEnvStatusReportsUngovernedNativeCodexServers(t *testing.T) {
+ 	}
+ 	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
+ 		t.Fatalf("env resolve codex_cli --repair = %d\nstderr:\n%s", code, stderr)
+-	} else if !strings.Contains(stderr, "mcp_native_servers_ungoverned: native Codex MCP servers figma") || !strings.Contains(strings.ToLower(stderr), "declare each server in the profile's mcp set, or accept the loss") {
+-		t.Fatalf("env resolve omitted the revision-A warning or migration hint:\n%s", stderr)
++	} else if !strings.Contains(stderr, "mcp_native_servers_not_inherited: native Codex MCP servers figma") || strings.Contains(strings.ToLower(stderr), "accept the loss") {
++		t.Fatalf("env resolve omitted the revision-B not-inherited warning, or retained a migration hint:\n%s", stderr)
+ 	}
+ 	managedConfig := filepath.Join(envprofile.ManagedHomeDir(source.cfg.Home(), "acme", envregistry.CodexCLI), "config.toml")
+ 	seeded, err := os.ReadFile(managedConfig)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if string(seeded) != nativeConfig {
+-		t.Fatalf("revision-A CLI seed changed config.toml:\n got %q\nwant %q", seeded, nativeConfig)
++	assertCLISeedStripped(t, seeded)
++	_, _, marker := cliEnvMarker(t, source, envregistry.CodexCLI)
++	if record := marker.CodexSeedRecord; record == nil || record.Revision != envregistry.CodexSeedRevisionB || len(record.NativeMCPServers) != 1 || record.NativeMCPServers[0] != "figma" {
++		t.Fatalf("CLI provisioning seed record = %+v, want B with figma", record)
+ 	}
+ 	code, stdout, stderr := runProfile(t, source, "env", "status")
+ 	if code != exitOK {
+ 		t.Fatalf("env status = %d\nstderr:\n%s", code, stderr)
+ 	}
+ 	for _, want := range []string{
+-		"codex-seed: revision A (shipped)",
+-		"codex-seed-record: revision A; native MCP servers figma (ungoverned)",
+-		"warning: mcp_native_servers_ungoverned: native Codex MCP servers figma remain in this managed home outside the profile lock and MCP allowlist",
++		"codex-seed: revision B (shipped)",
++		"codex-seed-record: revision B; native MCP servers figma (not-inherited)",
++		"warning: mcp_native_servers_not_inherited: native Codex MCP servers figma were stripped from config.toml and are not inherited",
+ 	} {
+ 		if !strings.Contains(stdout, want) {
+ 			t.Errorf("env status omitted %q:\n%s", want, stdout)
+@@ -75,7 +79,7 @@ func TestEnvStatusReportsUngovernedNativeCodexServers(t *testing.T) {
+ 	}
+ }
+ 
+-func TestEnvResolveCopiesAndReportsInlineNativeCodexMCPTable(t *testing.T) {
++func TestEnvResolveStripsAndReportsInlineNativeCodexMCPTable(t *testing.T) {
+ 	source, _ := profileHome(t)
+ 	installCLIEnvProfile(t, source)
+ 	configPath := filepath.Join(os.Getenv("CODEX_HOME"), "config.toml")
+@@ -87,8 +91,8 @@ mcp_servers = { local = { command = "server", args = [] } }
+ 	}
+ 	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
+ 		t.Fatalf("env resolve codex_cli --repair = %d\nstderr:\n%s", code, stderr)
+-	} else if !strings.Contains(stderr, "mcp_native_servers_ungoverned: native Codex MCP servers local") || !strings.Contains(strings.ToLower(stderr), "accept the loss") {
+-		t.Fatalf("env resolve omitted the inline-table warning or migration hint:\n%s", stderr)
++	} else if !strings.Contains(stderr, "mcp_native_servers_not_inherited: native Codex MCP servers local") || strings.Contains(strings.ToLower(stderr), "accept the loss") {
++		t.Fatalf("env resolve omitted the revision-B inline-table warning, or retained a migration hint:\n%s", stderr)
+ 	}
+ 
+ 	seededPath := filepath.Join(envprofile.ManagedHomeDir(source.cfg.Home(), "acme", envregistry.CodexCLI), "config.toml")
+@@ -96,18 +100,30 @@ mcp_servers = { local = { command = "server", args = [] } }
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if string(seeded) != nativeConfig {
+-		t.Fatalf("revision-A seed changed inline native Codex config:\n got %q\nwant %q", seeded, nativeConfig)
+-	}
++	assertCLISeedStripped(t, seeded)
+ 
+ 	code, stdout, stderr := runProfile(t, source, "env", "status")
+ 	if code != exitOK {
+ 		t.Fatalf("env status = %d\nstderr:\n%s", code, stderr)
+ 	}
+-	if !strings.Contains(stdout, "native MCP servers local (ungoverned)") {
++	if !strings.Contains(stdout, "native MCP servers local (not-inherited)") {
+ 		t.Fatalf("env status omitted inline-table server name:\n%s", stdout)
+ 	}
+ 	if strings.Contains(stdout, `command = "server"`) {
+ 		t.Fatalf("env status exposed the native MCP server command:\n%s", stdout)
+ 	}
+ }
++
++func assertCLISeedStripped(t *testing.T, payload []byte) {
++	t.Helper()
++	var seeded map[string]any
++	if err := toml.Unmarshal(payload, &seeded); err != nil {
++		t.Fatalf("CLI seed is invalid TOML: %v", err)
++	}
++	if _, exists := seeded["mcp_servers"]; exists {
++		t.Fatalf("revision-B CLI seed inherited native MCP servers: %s", payload)
++	}
++	if len(seeded) != 1 || seeded["model"] != "gpt-5-codex" {
++		t.Fatalf("revision-B CLI seed failed to preserve non-MCP members: %#v", seeded)
++	}
++}
+diff --git a/docs/ci-gates.md b/docs/ci-gates.md
+index c9c555d0..1e776dbf 100644
+--- a/docs/ci-gates.md
++++ b/docs/ci-gates.md
+@@ -69,7 +69,7 @@ The committed protocol-suite pin is declared as `SPEC_PIN` in the workflow `env:
+ 
+ Consumers that iterate a complete published case family use the shared case-coverage harness. [`conformance-case-counts.tsv`](../.github/ci/conformance-case-counts.tsv) pins the expected case count for each family at its selected corpus revision; each run classifies every published case as driven, known-gap, bound, or skipped and requires the tally to equal that count. [`conformance-gaps.tsv`](../.github/ci/conformance-gaps.tsv) is the only place a known gap may be declared. A row is an owed implementation, never an accepted deviation: an unlisted failure fails the test, a listed case that starts passing fails until its row is removed, and a row whose case disappears fails the count or row-presence check.
+ 
+-The released v1.0.0-rc.14 root adds the content-hash-v2 vectors and versioned carriers to the rc.13 families. Manager writes remain `curator-content-v1` until the atomic v1→v2 profile hash migration in TASK-261003-1uzji7; readers retain frozen v1 compatibility and accept versioned v2 artifacts. Exact family counts are keyed by the released manifest digest in `.github/ci/conformance-case-counts.tsv`. The `snapshot-acquisition/cases` family accounts for 1/1 published cases: 0 driven, 1 known-gap (`byte-exact-snapshot`, owned by TASK-261003-1uzji7), 0 bound, 0 skipped. The production extraction path preserves exact bytes under both autocrlf settings; the expected rc.14 v2 hash remains a gap while v1 writers are selected. The nine rc.14 seed/posture B gaps remain owned by their separate flip task: `CodexSeedRevision` and `SecurityPostureRevision` remain A. Tests that select one named case from a broader published vector set remain targeted checks; they do not claim to account for the complete family.
++The released v1.0.0-rc.14 root adds the content-hash-v2 vectors and versioned carriers to the rc.13 families. Manager writes remain `curator-content-v1` until the atomic v1→v2 profile hash migration in TASK-261003-1uzji7; readers retain frozen v1 compatibility and accept versioned v2 artifacts. Exact family counts are keyed by the released manifest digest in `.github/ci/conformance-case-counts.tsv`. The `snapshot-acquisition/cases` family accounts for 1/1 published cases: 0 driven, 1 known-gap (`byte-exact-snapshot`, owned by TASK-261003-1uzji7), 0 bound, 0 skipped. The production extraction path preserves exact bytes under both autocrlf settings; the expected rc.14 v2 hash remains a gap while v1 writers are selected. `CodexSeedRevision` selects B after the A warning release in v0.15.0-rc.3. The seed families account for 7/7 provisioning and 8/8 posture cases with no gaps, bounds, or skips: all four B provisioning and five B posture cases use the shipped registry through `Resolve` and `StatusOf`; the three A cases in each family retain historical coverage through the A test seam. `SecurityPostureRevision` remains A, owned by its separate flip task. Tests that select one named case from a broader published vector set remain targeted checks; they do not claim to account for the complete family.
+ 
+ The 28 manager-config overlay gaps are attributed to the unsupported `permissions`, `source_signers`, and `require_source_signers` members added by 0017/0018 and E1. Those members are present in the updated overlay cases, so `Load` can report either new blocker first; it does not indicate an overlay path-kind failure. The config regression test checks all 14 schema inputs and 14 vectors against their production results and checks both owners in each ledger row. The rc.13 script-worker root also publishes eight Windows executable-identity cases: the manager resolver drives all eight, with all eight counted as driven; the System32 exception proves owner SID, matching file IDs, and complete component-store link enumeration.
+ 
+diff --git a/internal/envprofile/codex_seed_test.go b/internal/envprofile/codex_seed_test.go
+index d971c642..cf6195ee 100644
+--- a/internal/envprofile/codex_seed_test.go
++++ b/internal/envprofile/codex_seed_test.go
+@@ -54,9 +54,9 @@ type codexSeedVectorSet struct {
+ 	Posture      []codexSeedPostureVector      `json:"posture_cases"`
+ }
+ 
+-// TestCodexSeedProvisioningAndStatus exercises the shipped revision-A rule
+-// through Resolve and StatusOf, including the whole-file copy and migration
+-// warning.
++// TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression retains the
++// historical warning-release behavior through the revision-A test seam, then
++// checks that shipped revision B preserves the existing home through repair.
+ func TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression(t *testing.T) {
+ 	fx := writeManagedFixture(t, "acme")
+ 	seedLiveNativeCredentials(t, fx)
+@@ -67,6 +67,7 @@ func TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression(t *testing.T) {
+ 
+ 	req := fx.request(envregistry.CodexCLI)
+ 	req.Repair = true
++	req.codexSeedRevisionForTest = envregistry.CodexSeedRevisionA
+ 	result, err := Resolve(req)
+ 	if err != nil {
+ 		t.Fatalf("Resolve provisioning: %v", err)
+@@ -112,7 +113,9 @@ func TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression(t *testing.T) {
+ 		t.Fatalf("codex_seed_record = %+v, want %+v", marker.CodexSeedRecord, wantRecord)
+ 	}
+ 
+-	status, err := StatusOf(statusRequest(fx))
++	statusReq := statusRequest(fx)
++	statusReq.codexSeedRevisionForTest = envregistry.CodexSeedRevisionA
++	status, err := StatusOf(statusReq)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -132,6 +135,41 @@ func TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression(t *testing.T) {
+ 	if got := countWarnings(home.Warnings, envregistry.DiagMCPNativeServersUngoverned); got != 1 {
+ 		t.Fatalf("env status warnings = %v; ungoverned count = %d, want 1", home.Warnings, got)
+ 	}
++
++	// StatusOf and Resolve use the shipped registry from here on. The flip
++	// warns about the old seed but must not silently strip or refresh it.
++	status, err = StatusOf(statusRequest(fx))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if status.CodexSeedRule.Revision != envregistry.CodexSeedRevisionB || status.CodexSeedRule.Provenance != "shipped" {
++		t.Fatalf("shipped codex-seed status row = %+v", status.CodexSeedRule)
++	}
++	home = findHome(status, fx.profile, envregistry.CodexCLI)
++	if home == nil || !home.Current || home.NativeMCPServersDisposition != "ungoverned" {
++		t.Fatalf("revision-A home under shipped B = %+v", home)
++	}
++	if got := countWarnings(home.Warnings, envregistry.DiagMCPSeedUnstripped); got != 1 || !strings.Contains(warningWithPrefix(home.Warnings, envregistry.DiagMCPSeedUnstripped), "re-provision") {
++		t.Fatalf("revision-A home lacks the B re-provision warning: %v", home.Warnings)
++	}
++	if err := os.Remove(filepath.Join(managedHome, "AGENTS.md")); err != nil {
++		t.Fatal(err)
++	}
++	req.codexSeedRevisionForTest = ""
++	result, err = Resolve(req)
++	if err != nil {
++		t.Fatalf("repair revision-A home under shipped B: %v", err)
++	}
++	if result.Provisioned || countWarnings(result.Warnings, envregistry.DiagMCPNativeServersNotInherited) != 0 {
++		t.Fatalf("repair must not provision a B seed: %+v", result)
++	}
++	after, err := os.ReadFile(filepath.Join(managedHome, "config.toml"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !bytes.Equal(after, []byte(native)) || !reflect.DeepEqual(readManagedMarker(t, fx, envregistry.CodexCLI).CodexSeedRecord, wantRecord) {
++		t.Fatal("repair under shipped B changed the revision-A seed bytes or record")
++	}
+ }
+ 
+ func TestCodexSeedStripsInlineMCPTable(t *testing.T) {
+@@ -143,7 +181,6 @@ func TestCodexSeedStripsInlineMCPTable(t *testing.T) {
+ 	}
+ 	req := fx.request(envregistry.CodexCLI)
+ 	req.Repair = true
+-	req.codexSeedRevisionForTest = envregistry.CodexSeedRevisionB
+ 	result, err := Resolve(req)
+ 	if err != nil {
+ 		t.Fatalf("Resolve provisioning: %v", err)
+@@ -177,7 +214,6 @@ func TestCodexSeedRejectsInvalidTOMLBeforePublishingHome(t *testing.T) {
+ 	}
+ 	req := fx.request(envregistry.CodexCLI)
+ 	req.Repair = true
+-	req.codexSeedRevisionForTest = envregistry.CodexSeedRevisionB
+ 	if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), envregistry.DiagSeedUnreadable) {
+ 		t.Fatalf("Resolve error = %v, want %s refusal", err, envregistry.DiagSeedUnreadable)
+ 	}
+@@ -195,7 +231,6 @@ func TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair(t *testing.T) {
+ 	}
+ 	req := fx.request(envregistry.CodexCLI)
+ 	req.Repair = true
+-	req.codexSeedRevisionForTest = envregistry.CodexSeedRevisionB
+ 	if _, err := Resolve(req); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -231,13 +266,12 @@ func TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair(t *testing.T) {
+ 	}
+ }
+ 
+-// TestEnvironmentsCodexSeedVectors drives the shipped revision-A rc.13
+-// vectors through Resolve and StatusOf. Revision-B cases remain exercised
+-// through the internal revision seam, while the gap ledger assigns their
+-// shipped-production coverage to the revision flip leaf.
++// TestEnvironmentsCodexSeedVectors drives every published case through Resolve
++// and StatusOf. B uses the shipped registry without an override; A remains a
++// historical regression through the retained revision seam.
+ func TestEnvironmentsCodexSeedVectors(t *testing.T) {
+-	if envregistry.CodexSeedRevision != envregistry.CodexSeedRevisionA {
+-		t.Fatalf("trunk must ship Codex seed revision A, got %q", envregistry.CodexSeedRevision)
++	if envregistry.CodexSeedRevision != envregistry.CodexSeedRevisionB {
++		t.Fatalf("registry must ship Codex seed revision B, got %q", envregistry.CodexSeedRevision)
+ 	}
+ 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+ 	if root == "" {
+@@ -252,36 +286,29 @@ func TestEnvironmentsCodexSeedVectors(t *testing.T) {
+ 	if err := json.Unmarshal(payload, &vectors); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if len(vectors.Provisioning) == 0 || len(vectors.Posture) == 0 {
+-		t.Fatalf("%s is missing provisioning or posture cases", codexSeedVectorFile)
+-	}
+-	const revisionBGap = "revision B remains behind the test seam until TASK-260927-1e5qqm ships it through the registry"
+-	conformancecoverage.RunOutcomes(t, "environments-codex-seed/provisioning-cases", vectors.Provisioning,
+-		func(tc codexSeedProvisioningVector) string { return tc.Name }, func(t *testing.T, tc codexSeedProvisioningVector) conformancecoverage.Observation {
+-			if tc.Revision == envregistry.CodexSeedRevisionA {
+-				runCodexSeedProvisioningVector(t, tc, "")
+-				return conformancecoverage.Observation{}
+-			}
+-			if tc.Revision != envregistry.CodexSeedRevisionB {
+-				t.Fatalf("unknown Codex seed vector revision %q", tc.Revision)
+-			}
+-			runCodexSeedProvisioningVector(t, tc, envregistry.CodexSeedRevisionB)
+-			return conformancecoverage.Observation{FailureReason: revisionBGap}
++	conformancecoverage.Run(t, "environments-codex-seed/provisioning-cases", vectors.Provisioning,
++		func(tc codexSeedProvisioningVector) string { return tc.Name }, func(t *testing.T, tc codexSeedProvisioningVector) {
++			runCodexSeedProvisioningVector(t, tc, codexSeedHistoricalOverride(t, tc.Revision))
+ 		})
+-	conformancecoverage.RunOutcomes(t, "environments-codex-seed/posture-cases", vectors.Posture,
+-		func(tc codexSeedPostureVector) string { return tc.Name }, func(t *testing.T, tc codexSeedPostureVector) conformancecoverage.Observation {
+-			if tc.RevisionShipped == envregistry.CodexSeedRevisionA {
+-				runCodexSeedPostureVector(t, tc, "")
+-				return conformancecoverage.Observation{}
+-			}
+-			if tc.RevisionShipped != envregistry.CodexSeedRevisionB {
+-				t.Fatalf("unknown Codex seed posture revision %q", tc.RevisionShipped)
+-			}
+-			runCodexSeedPostureVector(t, tc, envregistry.CodexSeedRevisionB)
+-			return conformancecoverage.Observation{FailureReason: revisionBGap}
++	conformancecoverage.Run(t, "environments-codex-seed/posture-cases", vectors.Posture,
++		func(tc codexSeedPostureVector) string { return tc.Name }, func(t *testing.T, tc codexSeedPostureVector) {
++			runCodexSeedPostureVector(t, tc, codexSeedHistoricalOverride(t, tc.RevisionShipped))
+ 		})
+ }
+ 
++func codexSeedHistoricalOverride(t *testing.T, revision string) string {
++	t.Helper()
++	switch revision {
++	case envregistry.CodexSeedRevisionA:
++		return envregistry.CodexSeedRevisionA
++	case envregistry.CodexSeedRevisionB:
++		return ""
++	default:
++		t.Fatalf("unknown Codex seed vector revision %q", revision)
++		return ""
++	}
++}
++
+ func runCodexSeedProvisioningVector(t *testing.T, tc codexSeedProvisioningVector, revisionOverride string) {
+ 	t.Helper()
+ 	fx := writeManagedFixture(t, "acme")
+diff --git a/internal/envregistry/envregistry.go b/internal/envregistry/envregistry.go
+index 89097c82..c882df3b 100644
+--- a/internal/envregistry/envregistry.go
++++ b/internal/envregistry/envregistry.go
+@@ -32,9 +32,9 @@ const (
+ 	CodexSeedRevisionA = "A"
+ 	CodexSeedRevisionB = "B"
+ 
+-	// CodexSeedRevision selects the manager behavior shipped on trunk. Move
+-	// this single registry switch to B only after revision A has shipped.
+-	CodexSeedRevision = CodexSeedRevisionA
++	// CodexSeedRevision selects the manager behavior shipped on trunk.
++	// Revision A shipped in v0.15.0-rc.3 before this revision-B switch.
++	CodexSeedRevision = CodexSeedRevisionB
+ )
+ 
+ // EnvAliases maps the CLI-only short spellings to their canonical
