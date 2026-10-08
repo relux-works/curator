@@ -205,6 +205,15 @@ spawn queued: [implementer] developer (codex) (run=RUN-261008-31de5d, max_parall
 spawn run started: [implementer] developer (codex) (run=RUN-261008-31de5d)
 agent completed: [implementer] developer (codex) (exit=0)
 spawn run completed: codex (run=RUN-261008-31de5d, pid=81460, exit=0)
+spawn run RUN-261008-31de5d failed; operator action required; failure: integration_blocked: runner integrate refused: board_publication_pending: STORY-260916-12lbww is landed and its board state is committed as bd035b305541c11ff92691a35aeffcfd91d78c41 on the local trunk, but the publication push did not land (integration_blocked); the landing stands — run `task-board board publish` to publish it
+  board_commit_oid: bd035b305541c11ff92691a35aeffcfd91d78c41
+  cause_code: integration_blocked
+  post_landing_steps: ["publish the landed commits as a non-default branch and open a pull request against the protected default branch","review on the hosting platform, wait for the required checks, and merge the exact reviewed head","in the control root, after the hosted merge, prove the landed commits delivered under their rewritten identities and move local trunk (a unique local commit refuses): task-board worktree reconcile-trunk"]
+  remedy: task-board board publish
+  story_commit_oid: 1ec3dc3781b776ea40b08cfd38be31661affcd64
+  story_id: STORY-260916-12lbww
+  cause: integration_blocked: the repository integration lock /Users/administrator/Developer/ReluxWorks/curator/curator/.temp/integration/repository.lock is held by another board operation; board publish serializes against every trunk-moving board run and refuses rather than queuing behind one
+  lock: /Users/administrator/Developer/ReluxWorks/curator/curator/.temp/integration/repository.lock
 
 ## Precondition Resources
 - [carry-delta-review-note-2.md](file://TASK-260918-bi6ouz/carry-delta-review-note-2.md)
@@ -276,7 +285,7 @@ spawn run completed: codex (run=RUN-261008-31de5d, pid=81460, exit=0)
 2026-09-18T19:02:32Z
 
 ## Last Update
-2026-10-08T11:09:52Z
+2026-10-08T12:09:35Z
 
 ## Assigned To
 [implementer] developer (codex)
