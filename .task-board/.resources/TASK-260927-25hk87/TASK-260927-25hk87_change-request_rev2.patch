@@ -1,0 +1,1030 @@
+diff --git a/cmd/curator/env_credential_marker_test.go b/cmd/curator/env_credential_marker_test.go
+index 2abcc6f3..2ea5447f 100644
+--- a/cmd/curator/env_credential_marker_test.go
++++ b/cmd/curator/env_credential_marker_test.go
+@@ -109,7 +109,7 @@ func TestEnvResolveCredentialRecordIsolatedKeychain(t *testing.T) {
+ 	if runtime.GOOS != "darwin" {
+ 		t.Skip("Claude's per-home Keychain strategy is supported on macOS")
+ 	}
+-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
+ 	installCLIEnvProfile(t, source)
+ 	if code, _, stderr := runProfile(t, source, "env", "config", "set", "isolation", `{"acme": {"claude_code": "isolated"}}`); code != exitOK {
+ 		t.Fatalf("set isolated mode = %d\nstderr:\n%s", code, stderr)
+diff --git a/cmd/curator/env_permissions_test.go b/cmd/curator/env_permissions_test.go
+index bd4d84e3..9c2d9644 100644
+--- a/cmd/curator/env_permissions_test.go
++++ b/cmd/curator/env_permissions_test.go
+@@ -191,9 +191,10 @@ func TestEnvResolveEmitsPermissionsV2AtProductionEntry(t *testing.T) {
+ 		t.Run(tc.name, func(t *testing.T) {
+ 			source, home := profileHome(t)
+ 			machine := map[string]any{
+-				"schema_version": 2,
+-				"skills_root":    filepath.Join(home, "skills"),
+-				"projects":       map[string]any{},
++				"schema_version":   2,
++				"security_posture": "permissive",
++				"skills_root":      filepath.Join(home, "skills"),
++				"projects":         map[string]any{},
+ 			}
+ 			if tc.machinePermission != "" {
+ 				machine["environments"] = map[string]any{
+diff --git a/cmd/curator/env_test.go b/cmd/curator/env_test.go
+index a089b01e..25739c06 100644
+--- a/cmd/curator/env_test.go
++++ b/cmd/curator/env_test.go
+@@ -186,7 +186,7 @@ func installEnvTestProfile(t *testing.T, source stubConfigSource) {
+ func TestEnvResolveIsolatedSystemLockUsesDirection(t *testing.T) {
+ 	source, _ := profileHome(t)
+ 	writeNativeCredentials(t)
+-	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
++	user := `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`
+ 	system := `{"schema_version": 2, "locked": ["environments.isolation"], "environments": {"isolation": {"acme": {"codex_cli": "isolated"}}}}`
+ 	source = loadEnvironmentIsolationConfig(t, source, user, system)
+ 	if !source.cfg.Locked["environments.isolation"] || source.cfg.Env.Isolation["acme"]["codex_cli"] != "isolated" {
+@@ -209,10 +209,10 @@ func TestEnvResolveIsolatedSystemLockUsesDirection(t *testing.T) {
+ func TestEnvResolveExplicitSharedConflictsWithIsolatedSystemLock(t *testing.T) {
+ 	source, _ := profileHome(t)
+ 	writeNativeCredentials(t)
+-	base := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
++	base := `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`
+ 	source = loadEnvironmentIsolationConfig(t, source, base, "")
+ 	installEnvTestProfile(t, source)
+-	user := `{"schema_version": 2, "skills_root": "x", "projects": {}, "environments": {"isolation": {"acme": {"codex_cli": "shared"}}}}`
++	user := `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}, "environments": {"isolation": {"acme": {"codex_cli": "shared"}}}}`
+ 	system := `{"schema_version": 2, "locked": ["environments.isolation"], "environments": {"isolation": {"acme": {"codex_cli": "isolated"}}}}`
+ 	source = loadEnvironmentIsolationConfig(t, source, user, system)
+ 	code, stdout, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair")
+@@ -237,7 +237,7 @@ func TestEnvResolveLockedIsolationRequiresMigration(t *testing.T) {
+ 	requireLinkCapability(t)
+ 	source, _ := profileHome(t)
+ 	writeNativeCredentials(t)
+-	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
++	user := `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`
+ 	source = loadEnvironmentIsolationConfig(t, source, user, "")
+ 	installEnvTestProfile(t, source)
+ 	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
+@@ -715,7 +715,7 @@ func TestEnvStatusS4Posture(t *testing.T) {
+ func TestEnvStatusEffectivePassableList(t *testing.T) {
+ 	source, home := profileHome(t)
+ 	userPath := filepath.Join(home, "machine.json")
+-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {},`+
++	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {},`+
+ 		`"environments": {"passable_env_names": ["A_B"]}}`), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/cmd/curator/envalias_test.go b/cmd/curator/envalias_test.go
+index 2fca77f7..cd555722 100644
+--- a/cmd/curator/envalias_test.go
++++ b/cmd/curator/envalias_test.go
+@@ -190,7 +190,7 @@ func TestEnvStatusPrintsCanonicalAfterAliasUse(t *testing.T) {
+ // config set: the machine file persists the canonical id, show reads it
+ // back through either spelling, and unset accepts the alias too.
+ func TestEnvConfigSetNormalizesEnvKnobs(t *testing.T) {
+-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
+ 	type knobCase struct {
+ 		aliasKnob, canonicalKnob, value, want string
+ 	}
+@@ -235,7 +235,7 @@ func TestEnvConfigSetNormalizesEnvKnobs(t *testing.T) {
+ // name environments: env-keyed map keys and shadow_acknowledged env
+ // members normalize, and an explicit canonical key wins over its alias.
+ func TestEnvConfigSetNormalizesWholesaleValues(t *testing.T) {
+-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
+ 	if code, _, stderr := runProfile(t, source, "env", "config", "set", "forms", `{"codex": "monolithic"}`); code != exitOK {
+ 		t.Fatalf("set forms = %d\nstderr:\n%s", code, stderr)
+ 	}
+@@ -287,7 +287,7 @@ func TestEnvConfigAliasOutputPrintsCanonicalKnob(t *testing.T) {
+ 		// The quoted alias ("forms.claude") is not a substring of the
+ 		// quoted canonical ("forms.claude_code"), so the negative
+ 		// assertion is exact, not a prefix accident.
+-		refusal := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++		refusal := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
+ 		code, _, stderr := runProfile(t, refusal, "env", "config", "unset", tc.aliasKnob)
+ 		if code != exitFail {
+ 			t.Fatalf("unset %s = %d, want the not-set refusal", tc.aliasKnob, code)
+@@ -303,7 +303,7 @@ func TestEnvConfigAliasOutputPrintsCanonicalKnob(t *testing.T) {
+ 			t.Fatalf("unset %s = %d, refusal bytes identical to the alias: %v", tc.canonicalKnob, code, controlStderr == stderr)
+ 		}
+ 		// Set success through the alias prints the value only.
+-		source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++		source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
+ 		code, stdout, stderr := runProfile(t, source, "env", "config", "set", tc.aliasKnob, tc.value)
+ 		if code != exitOK {
+ 			t.Fatalf("set %s = %d\nstderr:\n%s", tc.aliasKnob, code, stderr)
+@@ -327,7 +327,7 @@ func TestEnvConfigAliasOutputPrintsCanonicalKnob(t *testing.T) {
+ 		}
+ 		// Canonical control: the same set/unset pair via the canonical
+ 		// spelling prints the identical bytes.
+-		control := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++		control := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
+ 		code, controlOut, stderr := runProfile(t, control, "env", "config", "set", tc.canonicalKnob, tc.value)
+ 		if code != exitOK || controlOut != strings.TrimSpace(tc.wantJSON)+"\n" {
+ 			t.Fatalf("set %s = %d %q, want the alias-identical value line\nstderr:\n%s", tc.canonicalKnob, code, controlOut, stderr)
+@@ -351,7 +351,7 @@ func TestEnvConfigAliasLockRefusalPrintsCanonicalKnob(t *testing.T) {
+ 		source, _ := profileHome(t)
+ 		home := t.TempDir()
+ 		userPath := filepath.Join(home, "config.json")
+-		if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
++		if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+ 			t.Fatal(err)
+ 		}
+ 		systemPath := filepath.Join(home, "system.json")
+diff --git a/cmd/curator/envconfig_test.go b/cmd/curator/envconfig_test.go
+index b74e3592..2c8ac7e2 100644
+--- a/cmd/curator/envconfig_test.go
++++ b/cmd/curator/envconfig_test.go
+@@ -43,7 +43,7 @@ func reloadSource(t *testing.T, source stubConfigSource) stubConfigSource {
+ }
+ 
+ func TestEnvConfigShowDefaults(t *testing.T) {
+-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
+ 	code, stdout, _ := runProfile(t, source, "env", "config", "show", "overlay_default_weight")
+ 	if code != exitOK || strings.TrimSpace(stdout) != "1000" {
+ 		t.Fatalf("code = %d, stdout = %q, want 1000", code, stdout)
+@@ -83,7 +83,7 @@ func TestEnvConfigSetUnsetRoundTrip(t *testing.T) {
+ }
+ 
+ func TestEnvConfigSetListKnob(t *testing.T) {
+-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
+ 	code, _, stderr := runProfile(t, source, "env", "config", "set", "xdg_seed_allowlist", `["git"]`)
+ 	if code != exitOK {
+ 		t.Fatalf("set = %d\nstderr:\n%s", code, stderr)
+@@ -95,7 +95,7 @@ func TestEnvConfigSetListKnob(t *testing.T) {
+ }
+ 
+ func TestEnvConfigRefusals(t *testing.T) {
+-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
+ 	for _, args := range [][]string{
+ 		{"env", "config", "set", "nope", "1"},
+ 		{"env", "config", "set", "precedence.winner"},
+@@ -121,7 +121,7 @@ func TestEnvConfigRefusals(t *testing.T) {
+ // default, set stores the list, show reads it back, an invalid
+ // spelling is refused without writing, and unset restores the default.
+ func TestEnvConfigProviderDirectoriesRoundTrip(t *testing.T) {
+-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
+ 	code, stdout, _ := runProfile(t, source, "env", "config", "show", "provider_directories")
+ 	if code != exitOK || strings.TrimSpace(stdout) != "[]" {
+ 		t.Fatalf("show default = %d %q, want []", code, stdout)
+@@ -164,7 +164,7 @@ func TestEnvConfigProviderDirectoriesLockedRefuses(t *testing.T) {
+ 	source, _ := profileHome(t)
+ 	home := t.TempDir()
+ 	userPath := filepath.Join(home, "config.json")
+-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
++	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	systemPath := filepath.Join(home, "system.json")
+@@ -196,7 +196,7 @@ func TestEnvConfigLockedKnobRefuses(t *testing.T) {
+ 	source, _ := profileHome(t)
+ 	home := t.TempDir()
+ 	userPath := filepath.Join(home, "config.json")
+-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
++	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	systemPath := filepath.Join(home, "system.json")
+@@ -266,7 +266,7 @@ func TestProfileComposeAddListRemove(t *testing.T) {
+ func TestProfileComposeAddWarnsWhenOverlaysForbidden(t *testing.T) {
+ 	source, home := profileHome(t)
+ 	userPath := filepath.Join(home, "machine.json")
+-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
++	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	systemPath := filepath.Join(home, "system.json")
+@@ -300,7 +300,7 @@ func TestProfileComposeAddWarnsWhenOverlaysForbidden(t *testing.T) {
+ }
+ 
+ func TestProfileComposeRefusals(t *testing.T) {
+-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
+ 	if code, _, _ := runProfile(t, source, "profile", "compose", "a", "add", "s", "--range", "^1", "--tag", "v1"); code != exitUsage {
+ 		t.Fatalf("two requirement forms = %d, want usage", code)
+ 	}
+@@ -321,7 +321,7 @@ func TestProfileComposeRefusals(t *testing.T) {
+ func TestProfileUseLockedRequireRefuses(t *testing.T) {
+ 	source, home := profileHome(t)
+ 	userPath := filepath.Join(home, "machine.json")
+-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
++	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	systemPath := filepath.Join(home, "system.json")
+@@ -364,7 +364,7 @@ func TestProfileUseLockedRequireRefuses(t *testing.T) {
+ func TestProfileInstallUseLockedRequireRefuses(t *testing.T) {
+ 	source, home := profileHome(t)
+ 	userPath := filepath.Join(home, "machine.json")
+-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
++	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	systemPath := filepath.Join(home, "system.json")
+@@ -401,7 +401,7 @@ func TestProfileInstallUseLockedRequireRefuses(t *testing.T) {
+ func TestProfileInstallFirstActivationLockedRequireRefuses(t *testing.T) {
+ 	source, home := profileHome(t)
+ 	userPath := filepath.Join(home, "machine.json")
+-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
++	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	systemPath := filepath.Join(home, "system.json")
+@@ -432,7 +432,7 @@ func TestProfileInstallFirstActivationLockedRequireRefuses(t *testing.T) {
+ func TestProfileUseClearOperandIsUsage(t *testing.T) {
+ 	source, home := profileHome(t)
+ 	userPath := filepath.Join(home, "machine.json")
+-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
++	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	systemPath := filepath.Join(home, "system.json")
+@@ -479,7 +479,7 @@ func TestProfileUseClearOperandIsUsage(t *testing.T) {
+ func TestProfileScopedUseUnaffectedByLockedRequire(t *testing.T) {
+ 	source, home := profileHome(t)
+ 	userPath := filepath.Join(home, "machine.json")
+-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
++	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	systemPath := filepath.Join(home, "system.json")
+@@ -526,7 +526,7 @@ func TestProfileImportUseLockedRequireRefuses(t *testing.T) {
+ 	source, home := profileHome(t)
+ 	pinOperatorHome(t)
+ 	userPath := filepath.Join(home, "machine.json")
+-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
++	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	systemPath := filepath.Join(home, "system.json")
+@@ -570,7 +570,7 @@ func TestProfileUpdateResyncPassesLockedRequire(t *testing.T) {
+ 	}
+ 	source, home := profileHome(t)
+ 	userPath := filepath.Join(home, "machine.json")
+-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
++	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	systemPath := filepath.Join(home, "system.json")
+@@ -631,7 +631,7 @@ func TestProfileUpdateResyncPassesLockedRequire(t *testing.T) {
+ func TestEnvStatusReportsLockedRequire(t *testing.T) {
+ 	source, home := profileHome(t)
+ 	userPath := filepath.Join(home, "machine.json")
+-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
++	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	systemPath := filepath.Join(home, "system.json")
+diff --git a/cmd/curator/firstrun_ux_test.go b/cmd/curator/firstrun_ux_test.go
+index c99027a2..f86a0a02 100644
+--- a/cmd/curator/firstrun_ux_test.go
++++ b/cmd/curator/firstrun_ux_test.go
+@@ -92,7 +92,7 @@ func TestGlobalInitSubcommandHelpWithoutConfigRefuses(t *testing.T) {
+ 	}
+ }
+ 
+-const wantPostureWarning = "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\n"
++const wantPostureWarning = "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults\n"
+ 
+ func TestGlobalInitEnvResolveSubcommandHelpPreservesFlagSet(t *testing.T) {
+ 	home := t.TempDir()
+diff --git a/cmd/curator/import_cli_test.go b/cmd/curator/import_cli_test.go
+index 6d7b5820..2bdda14c 100644
+--- a/cmd/curator/import_cli_test.go
++++ b/cmd/curator/import_cli_test.go
+@@ -95,7 +95,7 @@ func TestProfileImportNameTakenRow(t *testing.T) {
+ // declaration, and the list reports it in the `path` form column — the
+ // branch that was dead while every overlay needed a form.
+ func TestProfileComposeAddPathRow(t *testing.T) {
+-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
+ 	overlay := t.TempDir()
+ 	if code, stdout, stderr := runProfile(t, source, "profile", "compose", "acme", "add", overlay); code != exitOK {
+ 		t.Fatalf("bare compose add = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
+@@ -148,7 +148,7 @@ func TestProfileComposeAddRefusesAFormOnAPathSource(t *testing.T) {
+ 	}
+ 	for _, tc := range cases {
+ 		t.Run(tc.name, func(t *testing.T) {
+-			source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++			source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
+ 			args := append([]string{"profile", "compose", "acme", "add"}, tc.args...)
+ 			code, stdout, stderr := runProfile(t, source, args...)
+ 			if code != tc.want {
+@@ -180,7 +180,7 @@ func TestPathOverlayFromMachineConfigJoinsTheClosure(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {},
++	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {},
+ 		"environments": {"overlays": {"acme": [{"source": `+string(encoded)+`, "weight": 250}]}}}`)
+ 	if code, stdout, stderr := runProfile(t, source, "profile", "install", root, "--use"); code != exitOK {
+ 		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+@@ -245,7 +245,7 @@ func TestOverlayFromMachineConfigIsRefusedByKind(t *testing.T) {
+ 		t.Run(tc.name, func(t *testing.T) {
+ 			source, _ := profileHome(t)
+ 			path := filepath.Join(t.TempDir(), "config.json")
+-			text := `{"schema_version": 2, "skills_root": "x", "projects": {},
++			text := `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {},
+ 				"environments": {"overlays": {"acme": [` + tc.row + `]}}}`
+ 			if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+ 				t.Fatal(err)
+diff --git a/cmd/curator/muse_test.go b/cmd/curator/muse_test.go
+index 95412d34..d34b1a3e 100644
+--- a/cmd/curator/muse_test.go
++++ b/cmd/curator/muse_test.go
+@@ -383,7 +383,7 @@ func driveMuseFragmentPolicy(t *testing.T, schema *jsonschema.Schema, source stu
+ 	t.Helper()
+ 	permission := fixture["permissions"].(map[string]any)
+ 	machine := envregistry.DefaultMachineConfig()
+-	configObject := map[string]any{"schema_version": 2, "skills_root": filepath.Join(source.cfg.Home(), "skills"), "projects": map[string]any{}}
++	configObject := map[string]any{"schema_version": 2, "security_posture": "permissive", "skills_root": filepath.Join(source.cfg.Home(), "skills"), "projects": map[string]any{}}
+ 	if permission["source"] == "profile" {
+ 		machine.Permissions["acme"] = permission["mode"].(string)
+ 		configObject["environments"] = map[string]any{"permissions": machine.Permissions}
+diff --git a/cmd/curator/security_posture_conformance_test.go b/cmd/curator/security_posture_conformance_test.go
+index 672c75f5..dac2291b 100644
+--- a/cmd/curator/security_posture_conformance_test.go
++++ b/cmd/curator/security_posture_conformance_test.go
+@@ -53,11 +53,10 @@ type cliSecurityPostureDiagnostic struct {
+ 	MigrationHint bool   `json:"migration_hint,omitempty"`
+ }
+ 
+-// TestSecurityPostureVectorsThroughCLI drives every revision-A-owned vector
+-// through run(), then checks the status commands and operation result that a
+-// caller sees. The config package vector test separately pins the resolved
+-// effective values and provenance. The two unreachable-registry vectors are
+-// owned by 1sapuy; revision-B cases are owned by the posture flip leaf.
++// TestSecurityPostureVectorsThroughCLI drives the current posture vectors
++// through run(), then checks production status and operation results. Only
++// historical revision-A implicit defaults are bounded; they are not counted
++// as driven by substituting explicit permissive configurations.
+ func TestSecurityPostureVectorsThroughCLI(t *testing.T) {
+ 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+ 	if root == "" {
+@@ -73,7 +72,7 @@ func TestSecurityPostureVectorsThroughCLI(t *testing.T) {
+ 	if err := json.Unmarshal(payload, &corpus); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	conformancecoverage.RunOutcomes(t, "security-posture/vectors", corpus.Cases,
++	tally := conformancecoverage.RunOutcomes(t, "security-posture/vectors", corpus.Cases,
+ 		func(tc cliSecurityPostureVector) string { return tc.Name },
+ 		func(caseT *testing.T, tc cliSecurityPostureVector) conformancecoverage.Observation {
+ 			if reason := cliSecurityPostureVectorBound(tc.Name); reason != "" {
+@@ -124,13 +123,36 @@ func TestSecurityPostureVectorsThroughCLI(t *testing.T) {
+ 			}
+ 
+ 			operationCode, operationOut, operationErr := runSecurityPostureVectorOperation(caseT, source, tc)
+-			if tc.Expected.Outcome == "refused" && operationCode != exitFail {
++			if (tc.Expected.Outcome == "refused" || tc.Expected.Outcome == "non-current") && operationCode != exitFail {
+ 				caseT.Fatalf("operation exit = %d, want refusal (%d)\nstdout:\n%s\nstderr:\n%s", operationCode, exitFail, operationOut, operationErr)
+ 			}
+-			if tc.Expected.Outcome != "refused" && operationCode != exitOK {
++			if tc.Expected.Outcome != "refused" && tc.Expected.Outcome != "non-current" && operationCode != exitOK {
+ 				caseT.Fatalf("operation exit = %d, want %q (%d)\nstdout:\n%s\nstderr:\n%s", operationCode, tc.Expected.Outcome, exitOK, operationOut, operationErr)
+ 			}
+ 			diagnosticOutput := operationOut + operationErr
++			if source.cfg.SecurityPostureHardened() && strings.Contains(diagnosticOutput, config.DiagSecurityPosturePermissive) {
++				caseT.Fatalf("hardened operation emitted a permissive warning:\n%s", diagnosticOutput)
++			}
++			if tc.Expected.Outcome == "non-current" {
++				var status struct {
++					NonCurrent      bool `json:"non_current"`
++					MCPDeclarations []struct {
++						Rows []json.RawMessage `json:"rows"`
++					} `json:"mcp_declarations"`
++				}
++				if err := json.Unmarshal([]byte(operationOut), &status); err != nil || !status.NonCurrent {
++					caseT.Fatalf("status-check did not report non-current: %v\n%s", err, operationOut)
++				}
++				if tc.Operation.MCPDeclarationsPresent {
++					rows := 0
++					for _, scope := range status.MCPDeclarations {
++						rows += len(scope.Rows)
++					}
++					if rows == 0 {
++						caseT.Fatal("status-check vector did not reproduce its MCP declarations")
++					}
++				}
++			}
+ 			for _, diagnostic := range tc.Expected.Diagnostics {
+ 				if got := strings.Count(diagnosticOutput, diagnostic.Code); got != 1 {
+ 					caseT.Fatalf("diagnostic %q occurred %d times, want once in production output:\n%s", diagnostic.Code, got, diagnosticOutput)
+@@ -158,6 +180,9 @@ func TestSecurityPostureVectorsThroughCLI(t *testing.T) {
+ 			}
+ 			return conformancecoverage.Observation{}
+ 		})
++	if tally.Driven != 13 || tally.Bound != 4 || tally.KnownGap != 0 || tally.Skipped != 0 || tally.Total() != 17 {
++		t.Fatalf("unexpected posture coverage: %+v", tally)
++	}
+ }
+ 
+ // The hardened outage refusal is independent of the per-artifact registry
+@@ -280,8 +305,8 @@ func decodeCLISecurityPostureRows(t testing.TB, rows []any) []config.SecurityPos
+ 
+ func cliSecurityPostureVectorBound(name string) string {
+ 	switch name {
+-	case "revision-B-default-hardened-flip-install", "refusal-mcp-allowlist-empty-with-declarations", "hardened-contradiction-status-check-non-current", "posture-rows-flipped-revisions":
+-		return "revision-B default or shipped-row flip is owned by TASK-260927-25hk87 (flip-security-posture-default-hardened)"
++	case "revision-A-default-permissive-status", "revision-A-permissive-warning-once-install", "locked-value-beats-explicit", "unreachable-registry-permissive-warns":
++		return "historical revision-A implicit permissive default; this manager ships revision B (explicit permissive compatibility is tested separately)"
+ 	default:
+ 		return ""
+ 	}
+@@ -309,7 +334,7 @@ func securityPostureCLIFixture(t *testing.T, tc cliSecurityPostureVector) stubCo
+ 		}
+ 		machine["environments"] = environments
+ 	}
+-	if tc.Operation.Kind == "profile-install" && tc.Operation.MCPDeclarationsPresent && tc.Expected.Outcome == "proceeds" {
++	if tc.Operation.Kind == "profile-install" && tc.Operation.MCPDeclarationsPresent {
+ 		// The production resolver applies the broad source allowlist to every
+ 		// git member in the closure, then applies the MCP allowlist as an
+ 		// additional bound. Make this CLI fixture valid for both checks.
+@@ -319,6 +344,9 @@ func securityPostureCLIFixture(t *testing.T, tc cliSecurityPostureVector) stubCo
+ 			seen[source] = true
+ 		}
+ 		environments, _ := machine["environments"].(map[string]any)
++		if environments == nil {
++			environments = map[string]any{}
++		}
+ 		for _, source := range postureVectorStrings(environments["mcp_package_allowlist"]) {
+ 			if !seen[source] {
+ 				allowed = append(allowed, source)
+@@ -335,6 +363,11 @@ func securityPostureCLIFixture(t *testing.T, tc cliSecurityPostureVector) stubCo
+ 					"type": "ssh", "key": publicKey + " operator@example",
+ 				}}
+ 			}
++			// Empty MCP policy still needs a real signed dependency so the
++			// resolver reaches the posture gate after signature verification.
++			if len(postureVectorStrings(environments["mcp_package_allowlist"])) == 0 && len(allowed) > 0 {
++				sourceSigners[allowed[0]+"/mcp"] = sourceSigners[allowed[0]]
++			}
+ 			environments["source_signers"] = sourceSigners
+ 			machine["environments"] = environments
+ 		}
+@@ -459,6 +492,11 @@ func runSecurityPostureVectorOperation(t *testing.T, source stubConfigSource, tc
+ 	switch tc.Operation.Kind {
+ 	case "status":
+ 		return runProfile(t, source, "status", "app", "--json")
++	case "status-check":
++		if tc.Operation.MCPDeclarationsPresent {
++			preparePostureStatusMCPProfile(t, source)
++		}
++		return runProfile(t, source, "env", "status", "--check", "--json")
+ 	case "install":
+ 		if len(tc.Operation.ArtifactsWithoutEvidence) > 0 {
+ 			source.cfg.AuditRegistries = postureVectorUnreachableRegistries(tc.Operation.UnreachableTrustedRegistries)
+@@ -480,6 +518,40 @@ func runSecurityPostureVectorOperation(t *testing.T, source stubConfigSource, tc
+ 	}
+ }
+ 
++// Install an MCP-bearing profile through the production CLI under explicit
++// permissive policy, then restore the vector's B configuration. This models
++// an existing profile encountering hardened contradictions after the flip.
++func preparePostureStatusMCPProfile(t *testing.T, source stubConfigSource) {
++	t.Helper()
++	original, err := os.ReadFile(source.path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer func() {
++		if err := os.WriteFile(source.path, original, 0o600); err != nil {
++			t.Error(err)
++		}
++	}()
++	fixture := cliSecurityPostureVector{Machine: map[string]any{
++		"allowed_sources": []any{"https://example.com/posture-root", "https://example.com/posture-mcp"},
++		"environments":    map[string]any{"mcp_package_allowlist": []any{"https://example.com/posture-mcp"}},
++	}}
++	fixture.Operation.MCPDeclarationsPresent = true
++	setup := map[string]any{
++		"schema_version": 2, "security_posture": "permissive",
++		"skills_root": source.cfg.SkillsRoot, "projects": map[string]any{},
++		"allowed_sources": []string{"example.com/posture-root", "example.com/posture-mcp"},
++		"environments":    map[string]any{"mcp_package_allowlist": []string{"example.com/posture-mcp"}},
++	}
++	writePostureVectorFile(t, filepath.Dir(source.path), filepath.Base(source.path), setup)
++	setupSource := reloadSource(t, source)
++	pkg := securityPostureVectorPackage(t, setupSource, fixture)
++	code, stdout, stderr := runProfile(t, setupSource, "profile", "install", pkg)
++	if code != exitOK {
++		t.Fatalf("seed MCP profile = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++}
++
+ func securityPostureVectorPackage(t *testing.T, source stubConfigSource, tc cliSecurityPostureVector) string {
+ 	t.Helper()
+ 	if !tc.Operation.MCPDeclarationsPresent {
+@@ -491,10 +563,13 @@ func securityPostureVectorPackage(t *testing.T, source stubConfigSource, tc cliS
+ 	allowed := postureVectorStrings(tc.Machine["allowed_sources"])
+ 	environment, _ := tc.Machine["environments"].(map[string]any)
+ 	mcpAllowed := postureVectorStrings(environment["mcp_package_allowlist"])
+-	if len(allowed) == 0 || len(mcpAllowed) == 0 {
++	if len(allowed) == 0 {
+ 		t.Fatalf("MCP vector fixture needs source and MCP allowlists: sources=%v mcp=%v", allowed, mcpAllowed)
+ 	}
+-	rootIdentity, mcpIdentity := allowed[0], mcpAllowed[0]
++	rootIdentity, mcpIdentity := allowed[0], allowed[0]+"/mcp"
++	if len(mcpAllowed) > 0 {
++		mcpIdentity = mcpAllowed[0]
++	}
+ 	tool := t.TempDir()
+ 	writeGitRepoFile(t, tool, "agent-mcp.json", surfacingToolManifest)
+ 	runGitRepo(t, tool, "init", "-q", "-b", "main")
+diff --git a/cmd/curator/security_posture_test.go b/cmd/curator/security_posture_test.go
+index f299af1d..2adc3792 100644
+--- a/cmd/curator/security_posture_test.go
++++ b/cmd/curator/security_posture_test.go
+@@ -42,7 +42,7 @@ func requirePermissivePostureWarning(t testing.TB, stderr string) {
+ 
+ func TestSecurityPostureWarningAndEnvStatusRows(t *testing.T) {
+ 	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
+-	source := writeMachineConfig(t, `{"schema_version":2,"skills_root":"x","projects":{}}`)
++	source := writeMachineConfig(t, `{"schema_version":2,"security_posture":"permissive","skills_root":"x","projects":{}}`)
+ 	code, stdout, stderr := runProfile(t, source, "env", "status", "--json")
+ 	if code != exitOK {
+ 		t.Fatalf("env status = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+@@ -55,14 +55,14 @@ func TestSecurityPostureWarningAndEnvStatusRows(t *testing.T) {
+ 	}
+ 	rows := decodeSecurityPostureRows(t, stdout)
+ 	if len(rows) != 14 || rows[0]["gate"] != "security_posture" ||
+-		rows[0]["value"] != config.SecurityPosturePermissive || rows[0]["source"] != "profile" {
++		rows[0]["value"] != config.SecurityPosturePermissive || rows[0]["source"] != "explicit" {
+ 		t.Fatalf("env status posture rows = %#v", rows)
+ 	}
+ }
+ 
+ func TestSecurityPostureWarningIsNotEmittedByEnforcedShim(t *testing.T) {
+ 	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
+-	source := writeMachineConfig(t, `{"schema_version":2,"skills_root":"x","projects":{}}`)
++	source := writeMachineConfig(t, `{"schema_version":2,"security_posture":"permissive","skills_root":"x","projects":{}}`)
+ 	t.Setenv("CURATOR_CONFIG", source.path)
+ 	reader, writer, err := os.Pipe()
+ 	if err != nil {
+@@ -132,8 +132,9 @@ func TestSecurityPostureCuratorStatusRows(t *testing.T) {
+ 	project, home := legacyProject(t)
+ 	configPath := filepath.Join(home, "config.json")
+ 	data := map[string]any{
+-		"schema_version": 2,
+-		"skills_root":    filepath.Join(filepath.Dir(home), "skills"),
++		"schema_version":   2,
++		"security_posture": "permissive",
++		"skills_root":      filepath.Join(filepath.Dir(home), "skills"),
+ 		"projects": map[string]any{
+ 			"app": map[string]any{"path": project, "agents": []any{"codex_cli"}},
+ 		},
+@@ -214,7 +215,7 @@ func TestSecurityPostureHardenedMCPContradictionFailsEnvStatusCheck(t *testing.T
+ 	}
+ 	vector.Operation.MCPDeclarationsPresent = true
+ 	root := securityPostureVectorPackage(t, stubConfigSource{}, vector)
+-	source := writeMachineConfig(t, `{"schema_version":2,"allowed_sources":["example.com/skills","example.com/mcp"],`+
++	source := writeMachineConfig(t, `{"schema_version":2,"security_posture":"permissive","allowed_sources":["example.com/skills","example.com/mcp"],`+
+ 		`"skills_root":"x","projects":{},"environments":{"mcp_package_allowlist":["example.com/mcp"]}}`)
+ 	if code, stdout, stderr := runProfile(t, source, "profile", "install", root); code != exitOK {
+ 		t.Fatalf("permissive MCP profile install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+@@ -306,3 +307,73 @@ func TestSecurityPostureResolveRefusesExplicitUnboundedPassthrough(t *testing.T)
+ 		t.Fatalf("hardened explicit unbounded passthrough reports current: %s", stdout)
+ 	}
+ }
++
++// Drive run() -> config.Load -> the production operation gates with an
++// omitted posture. No test helper supplies a hardened posture on their behalf.
++func TestSecurityPostureRevisionBDefaultRefusesEmptySources(t *testing.T) {
++	for _, allowlist := range []struct{ name, member string }{
++		{"absent", ""}, {"explicit-empty", `,"allowed_sources":[]`},
++	} {
++		for _, command := range []string{"install", "update", "upgrade", "profile-install"} {
++			t.Run(allowlist.name+"/"+command, func(t *testing.T) {
++				t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++				source := writeMachineConfig(t, `{"schema_version":2,"skills_root":"x","projects":{}`+allowlist.member+`}`)
++				args := []string{command, "app"}
++				if command == "profile-install" {
++					pkg := t.TempDir()
++					writeContextPackage(t, pkg, "posture", "1.0.0", "posture test\n")
++					args = []string{"profile", "install", pkg}
++				}
++				code, stdout, stderr := runProfile(t, source, args...)
++				if code != exitFail || !strings.Contains(stderr, config.DiagSourceAllowlistEmpty) {
++					t.Fatalf("%s = %d, want source refusal\nstdout:\n%s\nstderr:\n%s", command, code, stdout, stderr)
++				}
++				if strings.Contains(stderr, config.DiagSecurityPosturePermissive) {
++					t.Fatalf("default hardened operation emitted permissive warning: %s", stderr)
++				}
++				if _, err := os.Lstat(filepath.Join(source.cfg.Home(), "profiles")); !os.IsNotExist(err) {
++					t.Fatalf("refusal published profile state: %v", err)
++				}
++			})
++		}
++	}
++}
++
++func TestSecurityPostureExplicitPermissiveInstallsWithoutSourceAllowlist(t *testing.T) {
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	source := writeMachineConfig(t, `{"schema_version":2,"security_posture":"permissive","skills_root":"x","projects":{},"allowed_sources":[]}`)
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "posture", "1.0.0", "permissive profile\n")
++	code, stdout, stderr := runProfile(t, source, "profile", "install", pkg)
++	if code != exitOK {
++		t.Fatalf("explicit permissive install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++	}
++	requirePermissivePostureWarning(t, stderr)
++	if _, err := os.Lstat(envprofile.ProfileDir(source.cfg.Home(), "posture")); err != nil {
++		t.Fatalf("permissive install did not publish profile: %v", err)
++	}
++}
++
++func TestSecurityPostureRevisionBDefaultEnvStatus(t *testing.T) {
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	source := writeMachineConfig(t, `{"schema_version":2,"skills_root":"x","projects":{}}`)
++	for _, check := range []bool{false, true} {
++		args := []string{"env", "status", "--json"}
++		wantCode := exitOK
++		if check {
++			args = append(args, "--check")
++			wantCode = exitFail
++		}
++		code, stdout, stderr := runProfile(t, source, args...)
++		if code != wantCode {
++			t.Fatalf("env status check=%t = %d, want %d: %s", check, code, wantCode, stderr)
++		}
++		rows := decodeSecurityPostureRows(t, stdout)
++		if len(rows) != 14 || rows[0]["value"] != "hardened" || rows[0]["source"] != "profile" {
++			t.Fatalf("default posture rows = %#v", rows)
++		}
++		if strings.Contains(stderr, config.DiagSecurityPosturePermissive) {
++			t.Fatalf("hardened status warned permissive: %s", stderr)
++		}
++	}
++}
+diff --git a/cmd/curator/testdata/profile-update-mcp-delta.golden b/cmd/curator/testdata/profile-update-mcp-delta.golden
+index 7ee47a95..740bfc4b 100644
+--- a/cmd/curator/testdata/profile-update-mcp-delta.golden
++++ b/cmd/curator/testdata/profile-update-mcp-delta.golden
+@@ -4,7 +4,7 @@ lock-delta moved context mcp-root 1.0.0 → 1.1.0 commit:<old-root-commit> → c
+ lock-delta added mcp tool 1.0.0 commit:<tool-commit>
+ mcp-declaration tool 1.0.0 stdio command=npx args=["tool"] env_names=[]
+ stderr:
+-warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default
++warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+ mcp-root: warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
+ mcp-root: profile_update_confirmation_required: members tool require --confirm-system-delta; revision B refuses with profile_update_confirmation_required unless --confirm-system-delta is given
+ confirmed: exit=0
+@@ -14,5 +14,5 @@ lock-delta added mcp tool 1.0.0 commit:<tool-commit>
+ mcp-declaration tool 1.0.0 stdio command=npx args=["tool"] env_names=[]
+ mcp-root: updated (lock sha256:<lock-hash>)
+ stderr:
+-warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default
++warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+ mcp-root: warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
+diff --git a/cmd/curator/testdata/profile-update-system-delta.golden b/cmd/curator/testdata/profile-update-system-delta.golden
+index 1e4d1ebd..49abff6e 100644
+--- a/cmd/curator/testdata/profile-update-system-delta.golden
++++ b/cmd/curator/testdata/profile-update-system-delta.golden
+@@ -2,7 +2,7 @@ refused: exit=1
+ stdout:
+ lock-delta moved context delta 1.0.0 → 1.0.1 commit:<old-commit> → commit:<new-commit>
+ stderr:
+-warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default
++warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+ delta: warning: context-system-module-present: delta/system.md
+ delta: warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
+ delta: profile_update_confirmation_required: members delta require --confirm-system-delta; revision B refuses with profile_update_confirmation_required unless --confirm-system-delta is given
+@@ -11,6 +11,6 @@ stdout:
+ lock-delta moved context delta 1.0.0 → 1.0.1 commit:<old-commit> → commit:<new-commit>
+ delta: updated (lock sha256:<lock-hash>)
+ stderr:
+-warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default
++warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+ delta: warning: context-system-module-present: delta/system.md
+ delta: warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
+diff --git a/docs/ci-gates.md b/docs/ci-gates.md
+index c9c555d0..32bf08b0 100644
+--- a/docs/ci-gates.md
++++ b/docs/ci-gates.md
+@@ -69,7 +69,7 @@ The committed protocol-suite pin is declared as `SPEC_PIN` in the workflow `env:
+ 
+ Consumers that iterate a complete published case family use the shared case-coverage harness. [`conformance-case-counts.tsv`](../.github/ci/conformance-case-counts.tsv) pins the expected case count for each family at its selected corpus revision; each run classifies every published case as driven, known-gap, bound, or skipped and requires the tally to equal that count. [`conformance-gaps.tsv`](../.github/ci/conformance-gaps.tsv) is the only place a known gap may be declared. A row is an owed implementation, never an accepted deviation: an unlisted failure fails the test, a listed case that starts passing fails until its row is removed, and a row whose case disappears fails the count or row-presence check.
+ 
+-The released v1.0.0-rc.14 root adds the content-hash-v2 vectors and versioned carriers to the rc.13 families. Manager writes remain `curator-content-v1` until the atomic v1→v2 profile hash migration in TASK-261003-1uzji7; readers retain frozen v1 compatibility and accept versioned v2 artifacts. Exact family counts are keyed by the released manifest digest in `.github/ci/conformance-case-counts.tsv`. The `snapshot-acquisition/cases` family accounts for 1/1 published cases: 0 driven, 1 known-gap (`byte-exact-snapshot`, owned by TASK-261003-1uzji7), 0 bound, 0 skipped. The production extraction path preserves exact bytes under both autocrlf settings; the expected rc.14 v2 hash remains a gap while v1 writers are selected. The nine rc.14 seed/posture B gaps remain owned by their separate flip task: `CodexSeedRevision` and `SecurityPostureRevision` remain A. Tests that select one named case from a broader published vector set remain targeted checks; they do not claim to account for the complete family.
++The released v1.0.0-rc.14 root adds the content-hash-v2 vectors and versioned carriers to the rc.13 families. Manager writes remain `curator-content-v1` until the atomic v1→v2 profile hash migration in TASK-261003-1uzji7; readers retain frozen v1 compatibility and accept versioned v2 artifacts. Exact family counts are keyed by the released manifest digest in `.github/ci/conformance-case-counts.tsv`. The `snapshot-acquisition/cases` family accounts for 1/1 published cases: 0 driven, 1 known-gap (`byte-exact-snapshot`, owned by TASK-261003-1uzji7), 0 bound, 0 skipped. The production extraction path preserves exact bytes under both autocrlf settings; the expected rc.14 v2 hash remains a gap while v1 writers are selected. The nine rc.14 Codex seed gaps remain owned by their separate flip task. `SecurityPostureRevision` ships B: the posture family accounts for 17/17 published vectors with 12 driven and 5 bound at the config entry point, and 13 driven and 4 bound at the CLI entry point (0 known-gap and 0 skipped in either consumer). All six revision-B vectors are driven. Bounds name historical revision-A implicit permissive defaults; the config consumer additionally bounds registry I/O, which the CLI tests exercise. Explicit permissive compatibility is tested through production loading and commands. Tests that select one named case from a broader published vector set remain targeted checks; they do not claim to account for the complete family.
+ 
+ The 28 manager-config overlay gaps are attributed to the unsupported `permissions`, `source_signers`, and `require_source_signers` members added by 0017/0018 and E1. Those members are present in the updated overlay cases, so `Load` can report either new blocker first; it does not indicate an overlay path-kind failure. The config regression test checks all 14 schema inputs and 14 vectors against their production results and checks both owners in each ledger row. The rc.13 script-worker root also publishes eight Windows executable-identity cases: the manager resolver drives all eight, with all eight counted as driven; the System32 exception proves owner SID, matching file IDs, and complete component-store link enumeration.
+ 
+diff --git a/docs/environment-config.md b/docs/environment-config.md
+index b64e2e0e..2f384da2 100644
+--- a/docs/environment-config.md
++++ b/docs/environment-config.md
+@@ -28,6 +28,21 @@ All three knobs sit under one `environments` object:
+ 
+ `env status` reports the effective state of every knob below.
+ 
++## Security posture
++
++Schema-2 machine configurations default to `security_posture: hardened`
++(revision B). Revision A shipped its migration warning in v0.15.0-rc.3.
++Hardened defaults select strict audit and registry policy, reject unwaived
++transitive system modules, and require source signers. An empty source
++allowlist refuses install/update; an empty MCP allowlist refuses profile
++composition when MCP declarations are present. Configure the required
++allowlists and signer keys before those operations.
++
++An explicit `security_posture: permissive` retains the former per-knob
++defaults and emits `security_posture_permissive` once per manager operation.
++Explicit knobs and locked system values still override posture defaults.
++Schema-1 machines retain their frozen permissive behavior.
++
+ ## Permission mode
+ 
+ `permissions` maps profile names to `native` or `yolo`. An absent profile
+@@ -83,7 +98,8 @@ operation.
+ 
+ ## Transitive system modules (E2)
+ 
+-`transitive_system_modules` is exactly `drop` (default) or `error`.
++`transitive_system_modules` is exactly `drop` or `error`. Its default is
++`error` under hardened posture and `drop` under permissive posture.
+ A package is **direct** when it is the root, an active overlay, or named
+ by the root's or an active overlay's `requires.contexts`; every other
+ `context` member is **transitive**. Only the `class: system` modules of
+@@ -209,10 +225,10 @@ knob of the three with a `null` meaning:
+ 
+ | Knob | Absent | Empty list | Explicit `null` |
+ |---|---|---|---|
+-| `transitive_system_modules` | `drop` | n/a (string knob) | rejected: must be `drop` or `error` |
++| `transitive_system_modules` | hardened: `error`; permissive: `drop` | n/a (string knob) | rejected: must be `drop` or `error` |
+ | `system_module_waivers` | `[]` | `[]` | rejected: must be a list |
+ | `provider_directories` | `[]` | `[]` | rejected: must be a list of strings |
+-| `passable_env_names` | s4-warn: unbounded + warning; s4-enforce: `[]` | `[]` (nothing passes) | unbounded, silent |
++| `passable_env_names` | s4-warn: unbounded + warning; s4-enforce: `[]` | `[]` (nothing passes) | hardened: refused; permissive: unbounded, silent |
+ 
+ Lockable subset (§12.2): `transitive_system_modules` (only toward
+ `error`), `provider_directories`, and `passable_env_names`.
+diff --git a/internal/config/environments_conformance_test.go b/internal/config/environments_conformance_test.go
+index 1668897b..ebd1cda7 100644
+--- a/internal/config/environments_conformance_test.go
++++ b/internal/config/environments_conformance_test.go
+@@ -434,17 +434,72 @@ func TestManagerConfigV2Vectors(t *testing.T) {
+ 			if err := json.Unmarshal(rendered, &got); err != nil {
+ 				t.Fatal(err)
+ 			}
+-			wantJSON, err := json.Marshal(tc.Expected)
++			want := managerVectorExpectedForShippedPosture(tc.Input, tc.Expected)
++			wantJSON, err := json.Marshal(want)
+ 			if err != nil {
+ 				t.Fatal(err)
+ 			}
+-			if !managerEffectiveJSONMatchesVector(got, tc.Expected) {
++			if !managerEffectiveJSONMatchesVector(got, want) {
+ 				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("effective config got %s, want %s", rendered, wantJSON)}
+ 			}
+ 			return conformancecoverage.Observation{}
+ 		})
+ }
+ 
++// Manager-config vectors predate the B posture default. Keep their inputs
++// and all explicit-knob expectations intact; select only the absent-knob
++// defaults that manager §7.1 assigns to the shipped posture revision.
++func managerVectorExpectedForShippedPosture(input, expected map[string]any) map[string]any {
++	if SecurityPostureRevision != "B" || input["schema_version"] != float64(SchemaVersion2) {
++		return expected
++	}
++	if posture, present := input["security_posture"]; present && posture != SecurityPostureHardened {
++		return expected
++	}
++	expectedEnv, ok := expected["environments"].(map[string]any)
++	if !ok {
++		return expected
++	}
++	result := cloneStringAnyMap(expected)
++	env := cloneStringAnyMap(expectedEnv)
++	inputEnv, _ := input["environments"].(map[string]any)
++	for knob, value := range map[string]any{"transitive_system_modules": "error", "require_source_signers": true} {
++		if _, explicit := inputEnv[knob]; !explicit {
++			if _, compared := expectedEnv[knob]; compared {
++				env[knob] = value
++			}
++		}
++	}
++	result["environments"] = env
++	return result
++}
++
++func TestManagerVectorPostureDefaultsPreserveExplicitKnobs(t *testing.T) {
++	expected := map[string]any{"environments": map[string]any{"transitive_system_modules": "drop", "require_source_signers": false, "other_knob": "unchanged"}}
++	for _, tc := range []struct {
++		name       string
++		input      map[string]any
++		transitive string
++		signers    bool
++	}{
++		{"schema2-default", map[string]any{"schema_version": float64(2)}, "error", true},
++		{"schema1", map[string]any{"schema_version": float64(1)}, "drop", false},
++		{"permissive", map[string]any{"schema_version": float64(2), "security_posture": "permissive"}, "drop", false},
++		{"explicit-knobs", map[string]any{"schema_version": float64(2), "environments": map[string]any{"transitive_system_modules": "drop", "require_source_signers": false}}, "drop", false},
++		{"one-explicit-knob", map[string]any{"schema_version": float64(2), "environments": map[string]any{"require_source_signers": false}}, "error", false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			got := managerVectorExpectedForShippedPosture(tc.input, expected)["environments"].(map[string]any)
++			if got["transitive_system_modules"] != tc.transitive || got["require_source_signers"] != tc.signers || got["other_knob"] != "unchanged" || len(got) != 3 {
++				t.Fatalf("adjusted vector = %#v", got)
++			}
++		})
++	}
++	if original := expected["environments"].(map[string]any); original["transitive_system_modules"] != "drop" || original["require_source_signers"] != false {
++		t.Fatal("posture expectation selection mutated the published vector")
++	}
++}
++
+ // exactManagerEffectiveJSON compares canonical JSON bytes for the full
+ // normalized object. In particular, extra actual keys are a mismatch too.
+ func exactManagerEffectiveJSON(actual, expected map[string]any) bool {
+@@ -630,7 +685,8 @@ func TestOverlayConformancePassesWithPermissionsAndSourceSigners(t *testing.T) {
+ 			t.Fatal(err)
+ 		}
+ 		gotEnv, gotOK := got["environments"].(map[string]any)
+-		wantEnv, wantOK := tc.Expected["environments"].(map[string]any)
++		want := managerVectorExpectedForShippedPosture(tc.Input, tc.Expected)
++		wantEnv, wantOK := want["environments"].(map[string]any)
+ 		if !gotOK || !wantOK {
+ 			t.Errorf("%s lacks the environments EffectiveJSON object", tc.Name)
+ 			continue
+diff --git a/internal/config/environments_test.go b/internal/config/environments_test.go
+index 78f1ad3b..9e29e7be 100644
+--- a/internal/config/environments_test.go
++++ b/internal/config/environments_test.go
+@@ -676,12 +676,12 @@ func TestEffectiveJSONShape(t *testing.T) {
+ 	}
+ }
+ 
+-// TestTransitiveSystemModulesDefaults proves the §12.1 defaults: drop for
+-// the policy, empty for the waiver list.
++// TestTransitiveSystemModulesDefaults proves hardened revision-B defaults:
++// error for the policy, empty for the waiver list.
+ func TestTransitiveSystemModulesDefaults(t *testing.T) {
+ 	cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+-	if cfg.Env.TransitiveSystemModules != "drop" {
+-		t.Fatalf("transitive_system_modules = %q, want drop", cfg.Env.TransitiveSystemModules)
++	if cfg.Env.TransitiveSystemModules != "error" {
++		t.Fatalf("transitive_system_modules = %q, want error", cfg.Env.TransitiveSystemModules)
+ 	}
+ 	if len(cfg.Env.SystemModuleWaivers) != 0 {
+ 		t.Fatalf("system_module_waivers = %+v, want empty", cfg.Env.SystemModuleWaivers)
+diff --git a/internal/config/security_posture.go b/internal/config/security_posture.go
+index f0af5fa7..6af5cf51 100644
+--- a/internal/config/security_posture.go
++++ b/internal/config/security_posture.go
+@@ -3,16 +3,16 @@ package config
+ import "fmt"
+ 
+ // SecurityPostureRevision is the one release switch for the machine posture
+-// default. Revision A ships first with the permissive warning; Revision B is
+-// the later default flip owned by its bounded rollout task.
+-const SecurityPostureRevision = "A"
++// default. Revision A shipped the permissive warning before revision B
++// selected hardened defaults for schema-2 machines.
++const SecurityPostureRevision = "B"
+ 
+ const (
+ 	// SecurityPosturePermissive selects today's default-open gate values.
+ 	SecurityPosturePermissive = "permissive"
+ 	// SecurityPostureHardened selects the strict end of each posture gate.
+ 	SecurityPostureHardened = "hardened"
+-	// DiagSecurityPosturePermissive identifies the revision-A migration warning.
++	// DiagSecurityPosturePermissive identifies the permissive migration warning.
+ 	DiagSecurityPosturePermissive = "security_posture_permissive"
+ 	// DiagSourceAllowlistEmpty identifies the hardened install/update refusal.
+ 	DiagSourceAllowlistEmpty = "source_allowlist_empty"
+@@ -20,8 +20,8 @@ const (
+ 	DiagMCPAllowlistEmpty = "mcp_package_allowlist_empty"
+ 	// DiagPassableEnvUnbounded identifies explicit-null passthrough refusal.
+ 	DiagPassableEnvUnbounded = "passable_env_names_unbounded_refused" // #nosec G101 -- diagnostic identifier, not a credential.
+-	// SecurityPostureMigrationHint is shown while revision A defaults permissive.
+-	SecurityPostureMigrationHint = "set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default"
++	// SecurityPostureMigrationHint is shown for explicit permissive configurations.
++	SecurityPostureMigrationHint = "set security_posture: hardened in the machine configuration to adopt the hardened defaults"
+ )
+ 
+ // SecurityPostureDiagnostic is a posture operation finding. Optional fields
+@@ -82,7 +82,7 @@ func (c *Config) SecurityPostureHardened() bool {
+ 	return c != nil && c.EffectiveSecurityPosture() == SecurityPostureHardened
+ }
+ 
+-// SecurityPostureWarning returns the revision-A migration warning once per
++// SecurityPostureWarning returns the permissive migration warning once per
+ // loaded manager operation when the effective posture is permissive.
+ func (c *Config) SecurityPostureWarning() string {
+ 	if c == nil || c.SecurityPostureHardened() {
+diff --git a/internal/config/security_posture_conformance_test.go b/internal/config/security_posture_conformance_test.go
+index 175cb096..9319619b 100644
+--- a/internal/config/security_posture_conformance_test.go
++++ b/internal/config/security_posture_conformance_test.go
+@@ -41,10 +41,9 @@ type securityPostureExpectation struct {
+ 	EnvStatusRows           json.RawMessage             `json:"env_status_rows"`
+ }
+ 
+-// TestSecurityPostureVectors drives every revision-A-owned vector through
+-// config.Load and the same diagnostics, outcome, and status-row APIs consumed
+-// by the manager. Registry reachability belongs to 1sapuy; revision-B default
+-// and flipped shipped-row cases belong to the flip leaf.
++// TestSecurityPostureVectors drives the current posture vectors through
++// config.Load and the diagnostics, outcome, and status-row APIs consumed by
++// the manager. Historical revision-A defaults and registry I/O are bounded.
+ func TestSecurityPostureVectors(t *testing.T) {
+ 	root := conformanceRoot(t)
+ 	payload, err := os.ReadFile(filepath.Join(root, "vectors", "security-posture.json")) // #nosec G304 -- pinned conformance input
+@@ -61,13 +60,13 @@ func TestSecurityPostureVectors(t *testing.T) {
+ 	if len(cases) == 0 {
+ 		t.Fatal("security-posture vectors publish no cases")
+ 	}
+-	conformancecoverage.RunOutcomes(t, "security-posture/vectors", cases,
++	tally := conformancecoverage.RunOutcomes(t, "security-posture/vectors", cases,
+ 		func(tc securityPostureVector) string { return tc.Name }, func(caseT *testing.T, tc securityPostureVector) conformancecoverage.Observation {
+ 			if reason := securityPostureBound(tc.Name); reason != "" {
+ 				return conformancecoverage.Observation{BoundReason: reason}
+ 			}
+-			cfg := loadSecurityPostureVector(t, tc)
+-			checkJSONEqual(t, "effective posture", tc.Expected.Effective, securityPostureEffective(cfg, tc.ShippedRevisions.EnvPassthrough))
++			cfg := loadSecurityPostureVector(caseT, tc)
++			checkJSONEqual(caseT, "effective posture", tc.Expected.Effective, securityPostureEffective(cfg, tc.ShippedRevisions.EnvPassthrough))
+ 			if got := cfg.EffectiveSecurityPosture(); got != tc.Expected.Profile {
+ 				caseT.Fatalf("profile = %q, want %q", got, tc.Expected.Profile)
+ 			}
+@@ -95,6 +94,9 @@ func TestSecurityPostureVectors(t *testing.T) {
+ 			checkJSONEqual(caseT, "env status rows", wantEnvRows, gotEnvRows)
+ 			return conformancecoverage.Observation{}
+ 		})
++	if tally.Driven != 12 || tally.Bound != 5 || tally.KnownGap != 0 || tally.Skipped != 0 || tally.Total() != 17 {
++		t.Fatalf("unexpected posture coverage: %+v", tally)
++	}
+ }
+ 
+ func TestSecurityPostureSchema1MachineRemainsPermissiveWithSystemPosture(t *testing.T) {
+@@ -145,8 +147,8 @@ func securityPostureBound(name string) string {
+ 	switch name {
+ 	case "unreachable-registry-permissive-warns", "unreachable-registry-hardened-refuses":
+ 		return "install-time unreachable-registry behavior is owned by TASK-260910-1sapuy"
+-	case "revision-B-default-hardened-flip-install", "refusal-mcp-allowlist-empty-with-declarations", "hardened-contradiction-status-check-non-current", "posture-rows-flipped-revisions":
+-		return "revision-B posture default or shipped-row flip is owned by TASK-260927-25hk87"
++	case "revision-A-default-permissive-status", "revision-A-permissive-warning-once-install", "locked-value-beats-explicit":
++		return "historical revision-A implicit permissive default; this manager ships revision B (explicit permissive compatibility is tested separately)"
+ 	default:
+ 		return ""
+ 	}
+diff --git a/internal/config/security_posture_test.go b/internal/config/security_posture_test.go
+new file mode 100644
+index 00000000..9e5ac4a3
+--- /dev/null
++++ b/internal/config/security_posture_test.go
+@@ -0,0 +1,49 @@
++package config
++
++import (
++	"strings"
++	"testing"
++)
++
++func TestSecurityPostureRevisionBDefaultsAndPermissiveCompatibility(t *testing.T) {
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	for _, tc := range []struct {
++		name, text, posture, source, auditMode, registryPolicy, transitive string
++		requireSigners                                                     bool
++	}{
++		{"schema2-default", `{"schema_version":2,"skills_root":"x","projects":{}}`, "hardened", "profile", "strict", "strict", "error", true},
++		{"schema2-empty-environments", `{"schema_version":2,"skills_root":"x","projects":{},"environments":{}}`, "hardened", "profile", "strict", "strict", "error", true},
++		{"explicit-permissive", `{"schema_version":2,"security_posture":"permissive","skills_root":"x","projects":{}}`, "permissive", "explicit", "advisory", "advisory", "drop", false},
++		{"schema1-frozen", `{"schema_version":1,"skills_root":"x","projects":{}}`, "permissive", "profile", "advisory", "advisory", "drop", false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			cfg := loadText(t, tc.text)
++			if cfg.EffectiveSecurityPosture() != tc.posture || cfg.SecurityPostureSource != tc.source {
++				t.Fatalf("posture = %s/%s, want %s/%s", cfg.EffectiveSecurityPosture(), cfg.SecurityPostureSource, tc.posture, tc.source)
++			}
++			if cfg.Audit.Mode != tc.auditMode || cfg.Audit.RegistryPolicy != tc.registryPolicy || cfg.Env.TransitiveSystemModules != tc.transitive || cfg.Env.RequireSourceSigners != tc.requireSigners {
++				t.Fatalf("defaults = %s/%s/%s/%t, want %s/%s/%s/%t", cfg.Audit.Mode, cfg.Audit.RegistryPolicy, cfg.Env.TransitiveSystemModules, cfg.Env.RequireSourceSigners, tc.auditMode, tc.registryPolicy, tc.transitive, tc.requireSigners)
++			}
++			if len(cfg.AllowedSources) != 0 || len(cfg.Env.MCPPackageAllowlist) != 0 || cfg.Env.PassableEnvNamesSet || cfg.Env.PassableEnvNames != nil {
++				t.Fatalf("allowlist or passthrough defaults changed: %+v", cfg.Env)
++			}
++			warning := cfg.SecurityPostureWarning()
++			if (tc.posture == "permissive") != strings.Contains(warning, DiagSecurityPosturePermissive) {
++				t.Fatalf("warning = %q for %s", warning, tc.posture)
++			}
++		})
++	}
++}
++
++func TestSecurityPostureRevisionBExplicitKnobsStillWin(t *testing.T) {
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	cfg := loadText(t, `{"schema_version":2,"skills_root":"x","projects":{},"audit":{"mode":"advisory","registry_policy":"advisory"},"environments":{"transitive_system_modules":"drop","require_source_signers":false}}`)
++	if !cfg.SecurityPostureHardened() || cfg.Audit.Mode != "advisory" || cfg.Audit.RegistryPolicy != "advisory" || cfg.Env.TransitiveSystemModules != "drop" || cfg.Env.RequireSourceSigners {
++		t.Fatalf("explicit knobs lost to hardened defaults: %+v", cfg)
++	}
++	for _, knob := range []string{"audit.mode", "audit.registry_policy", "environments.transitive_system_modules", "environments.require_source_signers"} {
++		if cfg.PostureSourceFor(knob) != "explicit" {
++			t.Errorf("%s source = %s", knob, cfg.PostureSourceFor(knob))
++		}
++	}
++}

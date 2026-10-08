@@ -1,0 +1,7 @@
+# THE ONLY CURRENT INSTRUCTION — TASK-260927-25hk87: re-apply the posture-B delta on fresh main and republish (developer)
+**What happened.** Your accepted revision 2 went stale at landing: main advanced (the v1-only NUL gate, 7d809c5f) on `cmd/curator/env_credential_marker_test.go`, which your delta also changes. The orchestrator converged your Story workspace onto fresh main. Every other file of your delta was carried unchanged. The conflicting file was reverted to the fresh main; its original delta is attached as `postureB-conflict-delta.patch` (full snapshot: refs/campaign/STORY-260928-oflbe1-snapshot-20261008).
+**Do, in the workspace as it is now (do NOT checkout, reset or converge):**
+1. `cmd/curator/env_credential_marker_test.go`: re-apply your intent from the patch onto the NEW file. Main rewrote this file for the NUL gate; apply the intent, not the hunk, and keep every new v1/v2 assertion intact.
+2. Sanity-check that the rest of the delta still compiles against the new base: `~/.local/bin/mini-build-lock run postureB -- env GOFLAGS=-work go vet ./cmd/curator ./internal/envprofile`. Do NOT run cmd/curator tests locally (R194); the hosted gate is the arbiter.
+3. In your results resource: a short "re-applied after converge" note naming the file and what changed versus revision 2 (expected: nothing semantically).
+Then `task-board handoff TASK-260927-25hk87 --role developer` and END YOUR TURN. No LOGBOOK, CHANGELOG or scripts/remote-gate.sh edits.

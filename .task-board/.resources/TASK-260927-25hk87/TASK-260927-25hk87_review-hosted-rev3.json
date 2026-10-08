@@ -1,0 +1,830 @@
+{
+  "conclusion": "success",
+  "headSha": "5e23dbe77f9a68ef35e8e06a0e171bc0f78959ae",
+  "jobs": [
+    {
+      "name": "Race (macos-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Gate self-test (ubuntu-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Interop conformance gate",
+      "conclusion": "success"
+    },
+    {
+      "name": "Lint",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test (windows-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Naming gate",
+      "conclusion": "success"
+    },
+    {
+      "name": "Gate self-test (windows-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Go 1.25.5 driver (ubuntu-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test (ubuntu-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test (macos-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Race (ubuntu-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Gate self-test (macos-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Go 1.25.5 driver (macos-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Go 1.27.1 driver (ubuntu-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Go 1.27.1 driver (macos-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Go 1.27.1 driver (windows-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Go 1.26.0 driver (ubuntu-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Go 1.26.0 driver (macos-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Go 1.26.0 driver (windows-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Go 1.25.5 driver (windows-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Candidate suite (${{ matrix.os }})",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Test (rose-air)",
+      "conclusion": "skipped"
+    }
+  ],
+  "status": "completed",
+  "url": "https://github.com/relux-works/curator/actions/runs/37710630256",
+  "candidate_tree": "922cb84700584e5e448aa18f9fb8f40896c1523f",
+  "green_jobs": 20,
+  "declared_skipped_jobs": 2,
+  "review_checks": {
+    "normalized_rev2_rev3_patches_identical": true,
+    "changed_paths": 19,
+    "working_files_match_candidate": true,
+    "fresh_advertised_and_fetched_main_equals_base": true,
+    "diff_check_exit": 0,
+    "protected_files_changed": [],
+    "local_cmd_curator_tests_rerun": false
+  },
+  "test_artifacts": [
+    {
+      "platform": "macos",
+      "artifact_id": 11522580382,
+      "artifact_name": "test-evidence-macos-latest",
+      "member": "test/go-test.json",
+      "sha256": "b97c4a896dfdf18a068a699756c46b38f01c21563b5e0577ee85f43dab55234c",
+      "bytes": 10796308,
+      "posture_coverage": [
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "output": "security-posture/vectors: 12 driven, 0 known-gap, 5 bound, 0 skipped, 17 total"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "output": "security-posture/vectors: 13 driven, 0 known-gap, 4 bound, 0 skipped, 17 total"
+        }
+      ],
+      "outcomes": [
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/revision-A-default-permissive-status",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/revision-B-default-hardened-flip-install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/explicit-hardened-effective-defaults",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/explicit-knob-beats-profile-default",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/locked-value-beats-explicit",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/locked-posture-beats-explicit-permissive",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/refusal-source-allowlist-empty-explicit",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/refusal-mcp-allowlist-empty-with-declarations",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/hardened-empty-mcp-allowlist-without-declarations-warns",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/refusal-passable-env-null",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/revision-A-permissive-warning-once-install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/unreachable-registry-permissive-warns",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/unreachable-registry-hardened-refuses",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/schema1-machine-is-permissive",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/hardened-contradiction-status-check-non-current",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/hardened-absent-passthrough-follows-s4-warn",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/posture-rows-flipped-revisions",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureSchema1MachineRemainsPermissiveWithSystemPosture",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureSystemValueMustBeLocked",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureRevisionBDefaultsAndPermissiveCompatibility/schema2-default",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureRevisionBDefaultsAndPermissiveCompatibility/schema2-empty-environments",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureRevisionBDefaultsAndPermissiveCompatibility/explicit-permissive",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureRevisionBDefaultsAndPermissiveCompatibility/schema1-frozen",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureRevisionBDefaultsAndPermissiveCompatibility",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureRevisionBExplicitKnobsStillWin",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestEnvResolveCredentialRecordIsolatedKeychain",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestEnvResolveKeepsSchema1BytesForMetadataOnly",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/revision-A-default-permissive-status",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/revision-B-default-hardened-flip-install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/explicit-hardened-effective-defaults",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/explicit-knob-beats-profile-default",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/locked-value-beats-explicit",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/locked-posture-beats-explicit-permissive",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/refusal-source-allowlist-empty-explicit",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/refusal-mcp-allowlist-empty-with-declarations",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/hardened-empty-mcp-allowlist-without-declarations-warns",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/refusal-passable-env-null",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/revision-A-permissive-warning-once-install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/unreachable-registry-permissive-warns",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/unreachable-registry-hardened-refuses",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/schema1-machine-is-permissive",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/hardened-contradiction-status-check-non-current",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/hardened-absent-passthrough-follows-s4-warn",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/posture-rows-flipped-revisions",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureWarningAndEnvStatusRows",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureWarningIsNotEmittedByEnforcedShim",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureHardenedContradictionFailsEnvStatusCheck",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureSchema1EnvStatusHasNoPostureInventory",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureCuratorStatusRows",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureProfileInstallRefusesEmptySourceAllowlistBeforeWriting",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureProfileInstallRefusesMCPDeclarations",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureHardenedMCPContradictionFailsEnvStatusCheck",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureHardenedEmptyMCPWithoutDeclarationsWarnsAndInstalls",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureResolveRefusesExplicitUnboundedPassthrough",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/absent/install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/absent/update",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/absent/upgrade",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/absent/profile-install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/explicit-empty/install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/explicit-empty/update",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/explicit-empty/upgrade",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/explicit-empty/profile-install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureExplicitPermissiveInstallsWithoutSourceAllowlist",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultEnvStatus",
+          "action": "pass"
+        }
+      ]
+    },
+    {
+      "platform": "ubuntu",
+      "artifact_id": 11522064332,
+      "artifact_name": "test-evidence-ubuntu-latest",
+      "member": "test/go-test.json",
+      "sha256": "c1643be061d1a1ab172c8fa8ce87cd9bd681b1f9379f63ee7ff29f2614bd87fb",
+      "bytes": 10322021,
+      "posture_coverage": [
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "output": "security-posture/vectors: 12 driven, 0 known-gap, 5 bound, 0 skipped, 17 total"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "output": "security-posture/vectors: 13 driven, 0 known-gap, 4 bound, 0 skipped, 17 total"
+        }
+      ],
+      "outcomes": [
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/revision-A-default-permissive-status",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/revision-B-default-hardened-flip-install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/explicit-hardened-effective-defaults",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/explicit-knob-beats-profile-default",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/locked-value-beats-explicit",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/locked-posture-beats-explicit-permissive",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/refusal-source-allowlist-empty-explicit",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/refusal-mcp-allowlist-empty-with-declarations",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/hardened-empty-mcp-allowlist-without-declarations-warns",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/refusal-passable-env-null",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/revision-A-permissive-warning-once-install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/unreachable-registry-permissive-warns",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/unreachable-registry-hardened-refuses",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/schema1-machine-is-permissive",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/hardened-contradiction-status-check-non-current",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/hardened-absent-passthrough-follows-s4-warn",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors/posture-rows-flipped-revisions",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureVectors",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureSchema1MachineRemainsPermissiveWithSystemPosture",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureSystemValueMustBeLocked",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureRevisionBDefaultsAndPermissiveCompatibility/schema2-default",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureRevisionBDefaultsAndPermissiveCompatibility/schema2-empty-environments",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureRevisionBDefaultsAndPermissiveCompatibility/explicit-permissive",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureRevisionBDefaultsAndPermissiveCompatibility/schema1-frozen",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureRevisionBDefaultsAndPermissiveCompatibility",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/config",
+          "test": "TestSecurityPostureRevisionBExplicitKnobsStillWin",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestEnvResolveCredentialRecordIsolatedKeychain",
+          "action": "skip"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestEnvResolveKeepsSchema1BytesForMetadataOnly",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/revision-A-default-permissive-status",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/revision-B-default-hardened-flip-install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/explicit-hardened-effective-defaults",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/explicit-knob-beats-profile-default",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/locked-value-beats-explicit",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/locked-posture-beats-explicit-permissive",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/refusal-source-allowlist-empty-explicit",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/refusal-mcp-allowlist-empty-with-declarations",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/hardened-empty-mcp-allowlist-without-declarations-warns",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/refusal-passable-env-null",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/revision-A-permissive-warning-once-install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/unreachable-registry-permissive-warns",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/unreachable-registry-hardened-refuses",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/schema1-machine-is-permissive",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/hardened-contradiction-status-check-non-current",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/hardened-absent-passthrough-follows-s4-warn",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI/posture-rows-flipped-revisions",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureVectorsThroughCLI",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureWarningAndEnvStatusRows",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureWarningIsNotEmittedByEnforcedShim",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureHardenedContradictionFailsEnvStatusCheck",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureSchema1EnvStatusHasNoPostureInventory",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureCuratorStatusRows",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureProfileInstallRefusesEmptySourceAllowlistBeforeWriting",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureProfileInstallRefusesMCPDeclarations",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureHardenedMCPContradictionFailsEnvStatusCheck",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureHardenedEmptyMCPWithoutDeclarationsWarnsAndInstalls",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureResolveRefusesExplicitUnboundedPassthrough",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/absent/install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/absent/update",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/absent/upgrade",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/absent/profile-install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/explicit-empty/install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/explicit-empty/update",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/explicit-empty/upgrade",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources/explicit-empty/profile-install",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultRefusesEmptySources",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureExplicitPermissiveInstallsWithoutSourceAllowlist",
+          "action": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestSecurityPostureRevisionBDefaultEnvStatus",
+          "action": "pass"
+        }
+      ]
+    }
+  ]
+}

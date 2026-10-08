@@ -1,0 +1,5 @@
+# TASK-260927-25hk87 — flip-security-posture-default-hardened: revision-3 acceptance receipt
+
+accept_cr revision=3 exited 0 with ok=true. CR-TASK-260927-25hk87-3 is accepted; the task is integrating. Verdict evidence is TASK-260927-25hk87_review-verdict-rev3.md; hosted verification is TASK-260927-25hk87_review-hosted-rev3.json. The recorded reviewer is RUN-261008-d739b2; the bound producer is developer/implementer. No code edits, commit_ack, checkpoint, integration or release performed. LANDING HELD pending the operator schedule.
+
+Board-runtime anomaly: the successful acceptance reports write_boundary policy=warn, status=violated, code=run_wrote_outside_worktree. Five reported paths belong to an unrelated task/Story: four unattributed and one attributed to another run. This reviewer only mutated its assigned task through the board CLI; it made no direct board-file edits or unrelated task mutations. Provenance of the unattributed changes is unknown. The runtime returned acceptance successfully; no cleanup or rollback attempted. This outcome records the anomaly without editing LOGBOOK.md.

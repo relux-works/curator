@@ -1,0 +1,11 @@
+# Revision-3 integration preconditions
+
+Bound run RUN-261008-9bbd16; role developer, archetype implementer. Integration assignment supersedes prior landing-hold and generic handoff instructions. No source changes made in this run.
+
+Board worktree status exited 0: CR-TASK-260927-25hk87-3 accepted, revision 3, kind story_final. Candidate tree 922cb84700584e5e448aa18f9fb8f40896c1523f. Base and checkpoint 75ab9a71a9b9049ec4242b4acdb60c3fead6aff1. Active workspace lease belongs to this run. Fresh git ls-remote origin refs/heads/main exited 0 and advertised that same base. Runner remains responsible for authoritative fetch, freshness and transaction gates at landing.
+
+Fresh standalone git diff against candidate excluding the untracked new test exited 0. The excluded internal/config/security_posture_test.go hashes to 9e5ac4a33cbad47f7e20239f57e5240be38a67c0, identical to its candidate blob; both hash queries exited 0. git status shows exactly the accepted 19 changed paths, including that new test. Fresh standalone git diff --check exited 0. No LOGBOOK.md, CHANGELOG.md or scripts/remote-gate.sh changes.
+
+Accepted evidence reused, not rerun: TASK-260927-25hk87_review-acceptance-rev3.md records successful acceptance; TASK-260927-25hk87_review-hosted-rev3.json records https://github.com/relux-works/curator/actions/runs/37710630256 for the exact candidate tree: 20 successful jobs, 2 declared skips. Config posture coverage 12 driven + 5 bound / 17 total; CLI posture coverage 13 driven + 4 bound / 17 total; both zero known gaps and zero skipped vectors. No local tests or builds rerun in this integration-only run; no code changed and local cmd/curator tests are prohibited by the task. Resource reads exited 0.
+
+No run directives recorded. Prior acceptance receipt records an unrelated board write-boundary warning; no cleanup attempted. Fresh outcome attached before exit. Board remains integrating. No generic handoff, checkpoint, integrate, commit or release invoked; bound runner owns synchronous landing and its result.
