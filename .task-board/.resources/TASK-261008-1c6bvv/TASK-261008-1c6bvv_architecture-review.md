@@ -362,3 +362,30 @@ The minimum useful milestones are:
 - **Reuse measured RWH guards with their actual dependencies.** Keep allow-from, rate/token/lifetime controls, tool-surface observation and audit, while naming their transport, log and single-auth-owner assumptions. [C9 D1; RWH docs/worker-mode.md; docs/session-mode.md; docs/muse-mode.md.]
 
 The report is ready for review. Proposed fixes are recommendations; no policy amendment, live-security qualification or product acceptance is implied.
+
+## Recovery verification — 2026-10-08
+
+The successor resumed the existing report and its attached evidence; it did not repeat the source research or the five harness help probes. Those remain predecessor evidence with the limits stated above. Before this recovery note was added, the attached outcome matched this worktree report byte-for-byte (SHA-256 `4c50cc8a53a5adfad9bfbf6995d3aa98b0822556963d6145944f38e938a8a242`).
+
+The successor directly reran a standalone structure/privacy check and `git diff --check`; both exited 0. The structure check found 25/25 numbered findings (18 P1, 7 P2), 7/7 A–G sections and 25/25 required finding-field sets. Six privacy-pattern classes were clear; this is a bounded heuristic, not proof against arbitrary secrets. The previously attached Change Request validation log records exit 0 for its one required command shard; the successor read that log but did not rerun its command or claim its coverage.
+
+## Stop-The-Line
+
+### Blocker
+
+The research deliverable is present, but the successor cannot perform the requested lifecycle transition because the task is already terminal `done` while its recorded Change Request was created as `ready`. This is a board/runtime reconciliation issue, not missing research or an architecture decision needed to write the findings.
+
+### Evidence
+
+- `task-board m 'set_status(TASK-261008-1c6bvv, status=analysis)'` exited 1 with `terminal_status`; the CLI identified the existing state as `done`.
+- The scoped task query exited 0 and showed all 11 checklist items checked, the architecture-review outcome attached and the status `done`.
+- The bounded activity query exited 0. Event 26 records the predecessor's researcher handoff from `analysis` to `to-review` at 02:33:55 UTC. Event 28 records another session's transition from `to-review` to `done` at 03:15:19 UTC. Event 29 records creation of Change Request revision 1 as `ready` at 03:20:11 UTC. These events contradict the recovery premise that the predecessor never handed off.
+- The resource retrievals, direct report checks and byte-for-byte comparison exited 0. The successor performed no authentication, Go build/test, code/specification edits, commit or branch operation.
+
+### Options
+
+Recommended: preserve the report and reconcile the terminal task, ready Change Request and stale recovery run through the supported operator/runtime workflow. Confirm whether the earlier closure was intentional; retain it and retire the stale recovery if valid, or restore the proper review route through an authorized repair if it was premature. Repeating the research, inventing reviewer acceptance or editing board storage directly would not resolve this state mismatch.
+
+### EXACT INPUT NEEDED
+
+The board/runtime operator must determine the intended disposition of the existing `done` transition and reconcile it with the ready Change Request and successor run. No new product decision, credential access or source research is required. The researcher cannot override the terminal-state guard through the prescribed status/handoff commands.
