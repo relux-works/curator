@@ -111,7 +111,7 @@ func TestEnvResolveCredentialRecordIsolatedKeychain(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("Claude's per-home Keychain strategy is supported on macOS")
 	}
-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
 	installCLIEnvProfile(t, source)
 	if code, _, stderr := runProfile(t, source, "env", "config", "set", "isolation", `{"acme": {"claude_code": "isolated"}}`); code != exitOK {
 		t.Fatalf("set isolated mode = %d\nstderr:\n%s", code, stderr)

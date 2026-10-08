@@ -42,7 +42,7 @@ func requirePermissivePostureWarning(t testing.TB, stderr string) {
 
 func TestSecurityPostureWarningAndEnvStatusRows(t *testing.T) {
 	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
-	source := writeMachineConfig(t, `{"schema_version":2,"skills_root":"x","projects":{}}`)
+	source := writeMachineConfig(t, `{"schema_version":2,"security_posture":"permissive","skills_root":"x","projects":{}}`)
 	code, stdout, stderr := runProfile(t, source, "env", "status", "--json")
 	if code != exitOK {
 		t.Fatalf("env status = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
@@ -55,14 +55,14 @@ func TestSecurityPostureWarningAndEnvStatusRows(t *testing.T) {
 	}
 	rows := decodeSecurityPostureRows(t, stdout)
 	if len(rows) != 14 || rows[0]["gate"] != "security_posture" ||
-		rows[0]["value"] != config.SecurityPosturePermissive || rows[0]["source"] != "profile" {
+		rows[0]["value"] != config.SecurityPosturePermissive || rows[0]["source"] != "explicit" {
 		t.Fatalf("env status posture rows = %#v", rows)
 	}
 }
 
 func TestSecurityPostureWarningIsNotEmittedByEnforcedShim(t *testing.T) {
 	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
-	source := writeMachineConfig(t, `{"schema_version":2,"skills_root":"x","projects":{}}`)
+	source := writeMachineConfig(t, `{"schema_version":2,"security_posture":"permissive","skills_root":"x","projects":{}}`)
 	t.Setenv("CURATOR_CONFIG", source.path)
 	reader, writer, err := os.Pipe()
 	if err != nil {
@@ -132,8 +132,9 @@ func TestSecurityPostureCuratorStatusRows(t *testing.T) {
 	project, home := legacyProject(t)
 	configPath := filepath.Join(home, "config.json")
 	data := map[string]any{
-		"schema_version": 2,
-		"skills_root":    filepath.Join(filepath.Dir(home), "skills"),
+		"schema_version":   2,
+		"security_posture": "permissive",
+		"skills_root":      filepath.Join(filepath.Dir(home), "skills"),
 		"projects": map[string]any{
 			"app": map[string]any{"path": project, "agents": []any{"codex_cli"}},
 		},
@@ -214,7 +215,7 @@ func TestSecurityPostureHardenedMCPContradictionFailsEnvStatusCheck(t *testing.T
 	}
 	vector.Operation.MCPDeclarationsPresent = true
 	root := securityPostureVectorPackage(t, stubConfigSource{}, vector)
-	source := writeMachineConfig(t, `{"schema_version":2,"allowed_sources":["example.com/skills","example.com/mcp"],`+
+	source := writeMachineConfig(t, `{"schema_version":2,"security_posture":"permissive","allowed_sources":["example.com/skills","example.com/mcp"],`+
 		`"skills_root":"x","projects":{},"environments":{"mcp_package_allowlist":["example.com/mcp"]}}`)
 	if code, stdout, stderr := runProfile(t, source, "profile", "install", root); code != exitOK {
 		t.Fatalf("permissive MCP profile install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
@@ -304,5 +305,75 @@ func TestSecurityPostureResolveRefusesExplicitUnboundedPassthrough(t *testing.T)
 	}
 	if !status.NonCurrent {
 		t.Fatalf("hardened explicit unbounded passthrough reports current: %s", stdout)
+	}
+}
+
+// Drive run() -> config.Load -> the production operation gates with an
+// omitted posture. No test helper supplies a hardened posture on their behalf.
+func TestSecurityPostureRevisionBDefaultRefusesEmptySources(t *testing.T) {
+	for _, allowlist := range []struct{ name, member string }{
+		{"absent", ""}, {"explicit-empty", `,"allowed_sources":[]`},
+	} {
+		for _, command := range []string{"install", "update", "upgrade", "profile-install"} {
+			t.Run(allowlist.name+"/"+command, func(t *testing.T) {
+				t.Setenv("CURATOR_SYSTEM_CONFIG", "")
+				source := writeMachineConfig(t, `{"schema_version":2,"skills_root":"x","projects":{}`+allowlist.member+`}`)
+				args := []string{command, "app"}
+				if command == "profile-install" {
+					pkg := t.TempDir()
+					writeContextPackage(t, pkg, "posture", "1.0.0", "posture test\n")
+					args = []string{"profile", "install", pkg}
+				}
+				code, stdout, stderr := runProfile(t, source, args...)
+				if code != exitFail || !strings.Contains(stderr, config.DiagSourceAllowlistEmpty) {
+					t.Fatalf("%s = %d, want source refusal\nstdout:\n%s\nstderr:\n%s", command, code, stdout, stderr)
+				}
+				if strings.Contains(stderr, config.DiagSecurityPosturePermissive) {
+					t.Fatalf("default hardened operation emitted permissive warning: %s", stderr)
+				}
+				if _, err := os.Lstat(filepath.Join(source.cfg.Home(), "profiles")); !os.IsNotExist(err) {
+					t.Fatalf("refusal published profile state: %v", err)
+				}
+			})
+		}
+	}
+}
+
+func TestSecurityPostureExplicitPermissiveInstallsWithoutSourceAllowlist(t *testing.T) {
+	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
+	source := writeMachineConfig(t, `{"schema_version":2,"security_posture":"permissive","skills_root":"x","projects":{},"allowed_sources":[]}`)
+	pkg := t.TempDir()
+	writeContextPackage(t, pkg, "posture", "1.0.0", "permissive profile\n")
+	code, stdout, stderr := runProfile(t, source, "profile", "install", pkg)
+	if code != exitOK {
+		t.Fatalf("explicit permissive install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	requirePermissivePostureWarning(t, stderr)
+	if _, err := os.Lstat(envprofile.ProfileDir(source.cfg.Home(), "posture")); err != nil {
+		t.Fatalf("permissive install did not publish profile: %v", err)
+	}
+}
+
+func TestSecurityPostureRevisionBDefaultEnvStatus(t *testing.T) {
+	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
+	source := writeMachineConfig(t, `{"schema_version":2,"skills_root":"x","projects":{}}`)
+	for _, check := range []bool{false, true} {
+		args := []string{"env", "status", "--json"}
+		wantCode := exitOK
+		if check {
+			args = append(args, "--check")
+			wantCode = exitFail
+		}
+		code, stdout, stderr := runProfile(t, source, args...)
+		if code != wantCode {
+			t.Fatalf("env status check=%t = %d, want %d: %s", check, code, wantCode, stderr)
+		}
+		rows := decodeSecurityPostureRows(t, stdout)
+		if len(rows) != 14 || rows[0]["value"] != "hardened" || rows[0]["source"] != "profile" {
+			t.Fatalf("default posture rows = %#v", rows)
+		}
+		if strings.Contains(stderr, config.DiagSecurityPosturePermissive) {
+			t.Fatalf("hardened status warned permissive: %s", stderr)
+		}
 	}
 }

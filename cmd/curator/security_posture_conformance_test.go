@@ -53,11 +53,10 @@ type cliSecurityPostureDiagnostic struct {
 	MigrationHint bool   `json:"migration_hint,omitempty"`
 }
 
-// TestSecurityPostureVectorsThroughCLI drives every revision-A-owned vector
-// through run(), then checks the status commands and operation result that a
-// caller sees. The config package vector test separately pins the resolved
-// effective values and provenance. The two unreachable-registry vectors are
-// owned by 1sapuy; revision-B cases are owned by the posture flip leaf.
+// TestSecurityPostureVectorsThroughCLI drives the current posture vectors
+// through run(), then checks production status and operation results. Only
+// historical revision-A implicit defaults are bounded; they are not counted
+// as driven by substituting explicit permissive configurations.
 func TestSecurityPostureVectorsThroughCLI(t *testing.T) {
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
 	if root == "" {
@@ -73,7 +72,7 @@ func TestSecurityPostureVectorsThroughCLI(t *testing.T) {
 	if err := json.Unmarshal(payload, &corpus); err != nil {
 		t.Fatal(err)
 	}
-	conformancecoverage.RunOutcomes(t, "security-posture/vectors", corpus.Cases,
+	tally := conformancecoverage.RunOutcomes(t, "security-posture/vectors", corpus.Cases,
 		func(tc cliSecurityPostureVector) string { return tc.Name },
 		func(caseT *testing.T, tc cliSecurityPostureVector) conformancecoverage.Observation {
 			if reason := cliSecurityPostureVectorBound(tc.Name); reason != "" {
@@ -124,13 +123,36 @@ func TestSecurityPostureVectorsThroughCLI(t *testing.T) {
 			}
 
 			operationCode, operationOut, operationErr := runSecurityPostureVectorOperation(caseT, source, tc)
-			if tc.Expected.Outcome == "refused" && operationCode != exitFail {
+			if (tc.Expected.Outcome == "refused" || tc.Expected.Outcome == "non-current") && operationCode != exitFail {
 				caseT.Fatalf("operation exit = %d, want refusal (%d)\nstdout:\n%s\nstderr:\n%s", operationCode, exitFail, operationOut, operationErr)
 			}
-			if tc.Expected.Outcome != "refused" && operationCode != exitOK {
+			if tc.Expected.Outcome != "refused" && tc.Expected.Outcome != "non-current" && operationCode != exitOK {
 				caseT.Fatalf("operation exit = %d, want %q (%d)\nstdout:\n%s\nstderr:\n%s", operationCode, tc.Expected.Outcome, exitOK, operationOut, operationErr)
 			}
 			diagnosticOutput := operationOut + operationErr
+			if source.cfg.SecurityPostureHardened() && strings.Contains(diagnosticOutput, config.DiagSecurityPosturePermissive) {
+				caseT.Fatalf("hardened operation emitted a permissive warning:\n%s", diagnosticOutput)
+			}
+			if tc.Expected.Outcome == "non-current" {
+				var status struct {
+					NonCurrent      bool `json:"non_current"`
+					MCPDeclarations []struct {
+						Rows []json.RawMessage `json:"rows"`
+					} `json:"mcp_declarations"`
+				}
+				if err := json.Unmarshal([]byte(operationOut), &status); err != nil || !status.NonCurrent {
+					caseT.Fatalf("status-check did not report non-current: %v\n%s", err, operationOut)
+				}
+				if tc.Operation.MCPDeclarationsPresent {
+					rows := 0
+					for _, scope := range status.MCPDeclarations {
+						rows += len(scope.Rows)
+					}
+					if rows == 0 {
+						caseT.Fatal("status-check vector did not reproduce its MCP declarations")
+					}
+				}
+			}
 			for _, diagnostic := range tc.Expected.Diagnostics {
 				if got := strings.Count(diagnosticOutput, diagnostic.Code); got != 1 {
 					caseT.Fatalf("diagnostic %q occurred %d times, want once in production output:\n%s", diagnostic.Code, got, diagnosticOutput)
@@ -158,6 +180,9 @@ func TestSecurityPostureVectorsThroughCLI(t *testing.T) {
 			}
 			return conformancecoverage.Observation{}
 		})
+	if tally.Driven != 13 || tally.Bound != 4 || tally.KnownGap != 0 || tally.Skipped != 0 || tally.Total() != 17 {
+		t.Fatalf("unexpected posture coverage: %+v", tally)
+	}
 }
 
 // The hardened outage refusal is independent of the per-artifact registry
@@ -280,8 +305,8 @@ func decodeCLISecurityPostureRows(t testing.TB, rows []any) []config.SecurityPos
 
 func cliSecurityPostureVectorBound(name string) string {
 	switch name {
-	case "revision-B-default-hardened-flip-install", "refusal-mcp-allowlist-empty-with-declarations", "hardened-contradiction-status-check-non-current", "posture-rows-flipped-revisions":
-		return "revision-B default or shipped-row flip is owned by TASK-260927-25hk87 (flip-security-posture-default-hardened)"
+	case "revision-A-default-permissive-status", "revision-A-permissive-warning-once-install", "locked-value-beats-explicit", "unreachable-registry-permissive-warns":
+		return "historical revision-A implicit permissive default; this manager ships revision B (explicit permissive compatibility is tested separately)"
 	default:
 		return ""
 	}
@@ -309,7 +334,7 @@ func securityPostureCLIFixture(t *testing.T, tc cliSecurityPostureVector) stubCo
 		}
 		machine["environments"] = environments
 	}
-	if tc.Operation.Kind == "profile-install" && tc.Operation.MCPDeclarationsPresent && tc.Expected.Outcome == "proceeds" {
+	if tc.Operation.Kind == "profile-install" && tc.Operation.MCPDeclarationsPresent {
 		// The production resolver applies the broad source allowlist to every
 		// git member in the closure, then applies the MCP allowlist as an
 		// additional bound. Make this CLI fixture valid for both checks.
@@ -319,6 +344,9 @@ func securityPostureCLIFixture(t *testing.T, tc cliSecurityPostureVector) stubCo
 			seen[source] = true
 		}
 		environments, _ := machine["environments"].(map[string]any)
+		if environments == nil {
+			environments = map[string]any{}
+		}
 		for _, source := range postureVectorStrings(environments["mcp_package_allowlist"]) {
 			if !seen[source] {
 				allowed = append(allowed, source)
@@ -334,6 +362,11 @@ func securityPostureCLIFixture(t *testing.T, tc cliSecurityPostureVector) stubCo
 				sourceSigners[source] = []any{map[string]any{
 					"type": "ssh", "key": publicKey + " operator@example",
 				}}
+			}
+			// Empty MCP policy still needs a real signed dependency so the
+			// resolver reaches the posture gate after signature verification.
+			if len(postureVectorStrings(environments["mcp_package_allowlist"])) == 0 && len(allowed) > 0 {
+				sourceSigners[allowed[0]+"/mcp"] = sourceSigners[allowed[0]]
 			}
 			environments["source_signers"] = sourceSigners
 			machine["environments"] = environments
@@ -459,6 +492,11 @@ func runSecurityPostureVectorOperation(t *testing.T, source stubConfigSource, tc
 	switch tc.Operation.Kind {
 	case "status":
 		return runProfile(t, source, "status", "app", "--json")
+	case "status-check":
+		if tc.Operation.MCPDeclarationsPresent {
+			preparePostureStatusMCPProfile(t, source)
+		}
+		return runProfile(t, source, "env", "status", "--check", "--json")
 	case "install":
 		if len(tc.Operation.ArtifactsWithoutEvidence) > 0 {
 			source.cfg.AuditRegistries = postureVectorUnreachableRegistries(tc.Operation.UnreachableTrustedRegistries)
@@ -480,6 +518,40 @@ func runSecurityPostureVectorOperation(t *testing.T, source stubConfigSource, tc
 	}
 }
 
+// Install an MCP-bearing profile through the production CLI under explicit
+// permissive policy, then restore the vector's B configuration. This models
+// an existing profile encountering hardened contradictions after the flip.
+func preparePostureStatusMCPProfile(t *testing.T, source stubConfigSource) {
+	t.Helper()
+	original, err := os.ReadFile(source.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.WriteFile(source.path, original, 0o600); err != nil {
+			t.Error(err)
+		}
+	}()
+	fixture := cliSecurityPostureVector{Machine: map[string]any{
+		"allowed_sources": []any{"https://example.com/posture-root", "https://example.com/posture-mcp"},
+		"environments":    map[string]any{"mcp_package_allowlist": []any{"https://example.com/posture-mcp"}},
+	}}
+	fixture.Operation.MCPDeclarationsPresent = true
+	setup := map[string]any{
+		"schema_version": 2, "security_posture": "permissive",
+		"skills_root": source.cfg.SkillsRoot, "projects": map[string]any{},
+		"allowed_sources": []string{"example.com/posture-root", "example.com/posture-mcp"},
+		"environments":    map[string]any{"mcp_package_allowlist": []string{"example.com/posture-mcp"}},
+	}
+	writePostureVectorFile(t, filepath.Dir(source.path), filepath.Base(source.path), setup)
+	setupSource := reloadSource(t, source)
+	pkg := securityPostureVectorPackage(t, setupSource, fixture)
+	code, stdout, stderr := runProfile(t, setupSource, "profile", "install", pkg)
+	if code != exitOK {
+		t.Fatalf("seed MCP profile = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+}
+
 func securityPostureVectorPackage(t *testing.T, source stubConfigSource, tc cliSecurityPostureVector) string {
 	t.Helper()
 	if !tc.Operation.MCPDeclarationsPresent {
@@ -491,10 +563,13 @@ func securityPostureVectorPackage(t *testing.T, source stubConfigSource, tc cliS
 	allowed := postureVectorStrings(tc.Machine["allowed_sources"])
 	environment, _ := tc.Machine["environments"].(map[string]any)
 	mcpAllowed := postureVectorStrings(environment["mcp_package_allowlist"])
-	if len(allowed) == 0 || len(mcpAllowed) == 0 {
+	if len(allowed) == 0 {
 		t.Fatalf("MCP vector fixture needs source and MCP allowlists: sources=%v mcp=%v", allowed, mcpAllowed)
 	}
-	rootIdentity, mcpIdentity := allowed[0], mcpAllowed[0]
+	rootIdentity, mcpIdentity := allowed[0], allowed[0]+"/mcp"
+	if len(mcpAllowed) > 0 {
+		mcpIdentity = mcpAllowed[0]
+	}
 	tool := t.TempDir()
 	writeGitRepoFile(t, tool, "agent-mcp.json", surfacingToolManifest)
 	runGitRepo(t, tool, "init", "-q", "-b", "main")

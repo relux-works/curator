@@ -92,7 +92,7 @@ func TestGlobalInitSubcommandHelpWithoutConfigRefuses(t *testing.T) {
 	}
 }
 
-const wantPostureWarning = "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default\n"
+const wantPostureWarning = "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults\n"
 
 func TestGlobalInitEnvResolveSubcommandHelpPreservesFlagSet(t *testing.T) {
 	home := t.TempDir()

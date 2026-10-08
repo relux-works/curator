@@ -383,7 +383,7 @@ func driveMuseFragmentPolicy(t *testing.T, schema *jsonschema.Schema, source stu
 	t.Helper()
 	permission := fixture["permissions"].(map[string]any)
 	machine := envregistry.DefaultMachineConfig()
-	configObject := map[string]any{"schema_version": 2, "skills_root": filepath.Join(source.cfg.Home(), "skills"), "projects": map[string]any{}}
+	configObject := map[string]any{"schema_version": 2, "security_posture": "permissive", "skills_root": filepath.Join(source.cfg.Home(), "skills"), "projects": map[string]any{}}
 	if permission["source"] == "profile" {
 		machine.Permissions["acme"] = permission["mode"].(string)
 		configObject["environments"] = map[string]any{"permissions": machine.Permissions}

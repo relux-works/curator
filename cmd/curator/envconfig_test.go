@@ -43,7 +43,7 @@ func reloadSource(t *testing.T, source stubConfigSource) stubConfigSource {
 }
 
 func TestEnvConfigShowDefaults(t *testing.T) {
-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
 	code, stdout, _ := runProfile(t, source, "env", "config", "show", "overlay_default_weight")
 	if code != exitOK || strings.TrimSpace(stdout) != "1000" {
 		t.Fatalf("code = %d, stdout = %q, want 1000", code, stdout)
@@ -83,7 +83,7 @@ func TestEnvConfigSetUnsetRoundTrip(t *testing.T) {
 }
 
 func TestEnvConfigSetListKnob(t *testing.T) {
-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
 	code, _, stderr := runProfile(t, source, "env", "config", "set", "xdg_seed_allowlist", `["git"]`)
 	if code != exitOK {
 		t.Fatalf("set = %d\nstderr:\n%s", code, stderr)
@@ -95,7 +95,7 @@ func TestEnvConfigSetListKnob(t *testing.T) {
 }
 
 func TestEnvConfigRefusals(t *testing.T) {
-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
 	for _, args := range [][]string{
 		{"env", "config", "set", "nope", "1"},
 		{"env", "config", "set", "precedence.winner"},
@@ -121,7 +121,7 @@ func TestEnvConfigRefusals(t *testing.T) {
 // default, set stores the list, show reads it back, an invalid
 // spelling is refused without writing, and unset restores the default.
 func TestEnvConfigProviderDirectoriesRoundTrip(t *testing.T) {
-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
 	code, stdout, _ := runProfile(t, source, "env", "config", "show", "provider_directories")
 	if code != exitOK || strings.TrimSpace(stdout) != "[]" {
 		t.Fatalf("show default = %d %q, want []", code, stdout)
@@ -164,7 +164,7 @@ func TestEnvConfigProviderDirectoriesLockedRefuses(t *testing.T) {
 	source, _ := profileHome(t)
 	home := t.TempDir()
 	userPath := filepath.Join(home, "config.json")
-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	systemPath := filepath.Join(home, "system.json")
@@ -196,7 +196,7 @@ func TestEnvConfigLockedKnobRefuses(t *testing.T) {
 	source, _ := profileHome(t)
 	home := t.TempDir()
 	userPath := filepath.Join(home, "config.json")
-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	systemPath := filepath.Join(home, "system.json")
@@ -266,7 +266,7 @@ func TestProfileComposeAddListRemove(t *testing.T) {
 func TestProfileComposeAddWarnsWhenOverlaysForbidden(t *testing.T) {
 	source, home := profileHome(t)
 	userPath := filepath.Join(home, "machine.json")
-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	systemPath := filepath.Join(home, "system.json")
@@ -300,7 +300,7 @@ func TestProfileComposeAddWarnsWhenOverlaysForbidden(t *testing.T) {
 }
 
 func TestProfileComposeRefusals(t *testing.T) {
-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
 	if code, _, _ := runProfile(t, source, "profile", "compose", "a", "add", "s", "--range", "^1", "--tag", "v1"); code != exitUsage {
 		t.Fatalf("two requirement forms = %d, want usage", code)
 	}
@@ -321,7 +321,7 @@ func TestProfileComposeRefusals(t *testing.T) {
 func TestProfileUseLockedRequireRefuses(t *testing.T) {
 	source, home := profileHome(t)
 	userPath := filepath.Join(home, "machine.json")
-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	systemPath := filepath.Join(home, "system.json")
@@ -364,7 +364,7 @@ func TestProfileUseLockedRequireRefuses(t *testing.T) {
 func TestProfileInstallUseLockedRequireRefuses(t *testing.T) {
 	source, home := profileHome(t)
 	userPath := filepath.Join(home, "machine.json")
-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	systemPath := filepath.Join(home, "system.json")
@@ -401,7 +401,7 @@ func TestProfileInstallUseLockedRequireRefuses(t *testing.T) {
 func TestProfileInstallFirstActivationLockedRequireRefuses(t *testing.T) {
 	source, home := profileHome(t)
 	userPath := filepath.Join(home, "machine.json")
-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	systemPath := filepath.Join(home, "system.json")
@@ -432,7 +432,7 @@ func TestProfileInstallFirstActivationLockedRequireRefuses(t *testing.T) {
 func TestProfileUseClearOperandIsUsage(t *testing.T) {
 	source, home := profileHome(t)
 	userPath := filepath.Join(home, "machine.json")
-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	systemPath := filepath.Join(home, "system.json")
@@ -479,7 +479,7 @@ func TestProfileUseClearOperandIsUsage(t *testing.T) {
 func TestProfileScopedUseUnaffectedByLockedRequire(t *testing.T) {
 	source, home := profileHome(t)
 	userPath := filepath.Join(home, "machine.json")
-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	systemPath := filepath.Join(home, "system.json")
@@ -526,7 +526,7 @@ func TestProfileImportUseLockedRequireRefuses(t *testing.T) {
 	source, home := profileHome(t)
 	pinOperatorHome(t)
 	userPath := filepath.Join(home, "machine.json")
-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	systemPath := filepath.Join(home, "system.json")
@@ -570,7 +570,7 @@ func TestProfileUpdateResyncPassesLockedRequire(t *testing.T) {
 	}
 	source, home := profileHome(t)
 	userPath := filepath.Join(home, "machine.json")
-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	systemPath := filepath.Join(home, "system.json")
@@ -631,7 +631,7 @@ func TestProfileUpdateResyncPassesLockedRequire(t *testing.T) {
 func TestEnvStatusReportsLockedRequire(t *testing.T) {
 	source, home := profileHome(t)
 	userPath := filepath.Join(home, "machine.json")
-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	systemPath := filepath.Join(home, "system.json")

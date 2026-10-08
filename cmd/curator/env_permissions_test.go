@@ -191,9 +191,10 @@ func TestEnvResolveEmitsPermissionsV2AtProductionEntry(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			source, home := profileHome(t)
 			machine := map[string]any{
-				"schema_version": 2,
-				"skills_root":    filepath.Join(home, "skills"),
-				"projects":       map[string]any{},
+				"schema_version":   2,
+				"security_posture": "permissive",
+				"skills_root":      filepath.Join(home, "skills"),
+				"projects":         map[string]any{},
 			}
 			if tc.machinePermission != "" {
 				machine["environments"] = map[string]any{

@@ -28,6 +28,21 @@ All three knobs sit under one `environments` object:
 
 `env status` reports the effective state of every knob below.
 
+## Security posture
+
+Schema-2 machine configurations default to `security_posture: hardened`
+(revision B). Revision A shipped its migration warning in v0.15.0-rc.3.
+Hardened defaults select strict audit and registry policy, reject unwaived
+transitive system modules, and require source signers. An empty source
+allowlist refuses install/update; an empty MCP allowlist refuses profile
+composition when MCP declarations are present. Configure the required
+allowlists and signer keys before those operations.
+
+An explicit `security_posture: permissive` retains the former per-knob
+defaults and emits `security_posture_permissive` once per manager operation.
+Explicit knobs and locked system values still override posture defaults.
+Schema-1 machines retain their frozen permissive behavior.
+
 ## Permission mode
 
 `permissions` maps profile names to `native` or `yolo`. An absent profile
@@ -83,7 +98,8 @@ operation.
 
 ## Transitive system modules (E2)
 
-`transitive_system_modules` is exactly `drop` (default) or `error`.
+`transitive_system_modules` is exactly `drop` or `error`. Its default is
+`error` under hardened posture and `drop` under permissive posture.
 A package is **direct** when it is the root, an active overlay, or named
 by the root's or an active overlay's `requires.contexts`; every other
 `context` member is **transitive**. Only the `class: system` modules of
@@ -209,10 +225,10 @@ knob of the three with a `null` meaning:
 
 | Knob | Absent | Empty list | Explicit `null` |
 |---|---|---|---|
-| `transitive_system_modules` | `drop` | n/a (string knob) | rejected: must be `drop` or `error` |
+| `transitive_system_modules` | hardened: `error`; permissive: `drop` | n/a (string knob) | rejected: must be `drop` or `error` |
 | `system_module_waivers` | `[]` | `[]` | rejected: must be a list |
 | `provider_directories` | `[]` | `[]` | rejected: must be a list of strings |
-| `passable_env_names` | s4-warn: unbounded + warning; s4-enforce: `[]` | `[]` (nothing passes) | unbounded, silent |
+| `passable_env_names` | s4-warn: unbounded + warning; s4-enforce: `[]` | `[]` (nothing passes) | hardened: refused; permissive: unbounded, silent |
 
 Lockable subset (§12.2): `transitive_system_modules` (only toward
 `error`), `provider_directories`, and `passable_env_names`.

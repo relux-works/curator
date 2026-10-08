@@ -190,7 +190,7 @@ func TestEnvStatusPrintsCanonicalAfterAliasUse(t *testing.T) {
 // config set: the machine file persists the canonical id, show reads it
 // back through either spelling, and unset accepts the alias too.
 func TestEnvConfigSetNormalizesEnvKnobs(t *testing.T) {
-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
 	type knobCase struct {
 		aliasKnob, canonicalKnob, value, want string
 	}
@@ -235,7 +235,7 @@ func TestEnvConfigSetNormalizesEnvKnobs(t *testing.T) {
 // name environments: env-keyed map keys and shadow_acknowledged env
 // members normalize, and an explicit canonical key wins over its alias.
 func TestEnvConfigSetNormalizesWholesaleValues(t *testing.T) {
-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
 	if code, _, stderr := runProfile(t, source, "env", "config", "set", "forms", `{"codex": "monolithic"}`); code != exitOK {
 		t.Fatalf("set forms = %d\nstderr:\n%s", code, stderr)
 	}
@@ -287,7 +287,7 @@ func TestEnvConfigAliasOutputPrintsCanonicalKnob(t *testing.T) {
 		// The quoted alias ("forms.claude") is not a substring of the
 		// quoted canonical ("forms.claude_code"), so the negative
 		// assertion is exact, not a prefix accident.
-		refusal := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+		refusal := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
 		code, _, stderr := runProfile(t, refusal, "env", "config", "unset", tc.aliasKnob)
 		if code != exitFail {
 			t.Fatalf("unset %s = %d, want the not-set refusal", tc.aliasKnob, code)
@@ -303,7 +303,7 @@ func TestEnvConfigAliasOutputPrintsCanonicalKnob(t *testing.T) {
 			t.Fatalf("unset %s = %d, refusal bytes identical to the alias: %v", tc.canonicalKnob, code, controlStderr == stderr)
 		}
 		// Set success through the alias prints the value only.
-		source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+		source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
 		code, stdout, stderr := runProfile(t, source, "env", "config", "set", tc.aliasKnob, tc.value)
 		if code != exitOK {
 			t.Fatalf("set %s = %d\nstderr:\n%s", tc.aliasKnob, code, stderr)
@@ -327,7 +327,7 @@ func TestEnvConfigAliasOutputPrintsCanonicalKnob(t *testing.T) {
 		}
 		// Canonical control: the same set/unset pair via the canonical
 		// spelling prints the identical bytes.
-		control := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+		control := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
 		code, controlOut, stderr := runProfile(t, control, "env", "config", "set", tc.canonicalKnob, tc.value)
 		if code != exitOK || controlOut != strings.TrimSpace(tc.wantJSON)+"\n" {
 			t.Fatalf("set %s = %d %q, want the alias-identical value line\nstderr:\n%s", tc.canonicalKnob, code, controlOut, stderr)
@@ -351,7 +351,7 @@ func TestEnvConfigAliasLockRefusalPrintsCanonicalKnob(t *testing.T) {
 		source, _ := profileHome(t)
 		home := t.TempDir()
 		userPath := filepath.Join(home, "config.json")
-		if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+		if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		systemPath := filepath.Join(home, "system.json")

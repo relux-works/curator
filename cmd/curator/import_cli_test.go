@@ -95,7 +95,7 @@ func TestProfileImportNameTakenRow(t *testing.T) {
 // declaration, and the list reports it in the `path` form column — the
 // branch that was dead while every overlay needed a form.
 func TestProfileComposeAddPathRow(t *testing.T) {
-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
 	overlay := t.TempDir()
 	if code, stdout, stderr := runProfile(t, source, "profile", "compose", "acme", "add", overlay); code != exitOK {
 		t.Fatalf("bare compose add = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
@@ -148,7 +148,7 @@ func TestProfileComposeAddRefusesAFormOnAPathSource(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+			source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`)
 			args := append([]string{"profile", "compose", "acme", "add"}, tc.args...)
 			code, stdout, stderr := runProfile(t, source, args...)
 			if code != tc.want {
@@ -180,7 +180,7 @@ func TestPathOverlayFromMachineConfigJoinsTheClosure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {},
+	source := writeMachineConfig(t, `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {},
 		"environments": {"overlays": {"acme": [{"source": `+string(encoded)+`, "weight": 250}]}}}`)
 	if code, stdout, stderr := runProfile(t, source, "profile", "install", root, "--use"); code != exitOK {
 		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
@@ -245,7 +245,7 @@ func TestOverlayFromMachineConfigIsRefusedByKind(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			source, _ := profileHome(t)
 			path := filepath.Join(t.TempDir(), "config.json")
-			text := `{"schema_version": 2, "skills_root": "x", "projects": {},
+			text := `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {},
 				"environments": {"overlays": {"acme": [` + tc.row + `]}}}`
 			if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
 				t.Fatal(err)

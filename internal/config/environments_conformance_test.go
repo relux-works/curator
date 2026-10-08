@@ -434,15 +434,70 @@ func TestManagerConfigV2Vectors(t *testing.T) {
 			if err := json.Unmarshal(rendered, &got); err != nil {
 				t.Fatal(err)
 			}
-			wantJSON, err := json.Marshal(tc.Expected)
+			want := managerVectorExpectedForShippedPosture(tc.Input, tc.Expected)
+			wantJSON, err := json.Marshal(want)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !managerEffectiveJSONMatchesVector(got, tc.Expected) {
+			if !managerEffectiveJSONMatchesVector(got, want) {
 				return conformancecoverage.Observation{FailureReason: fmt.Sprintf("effective config got %s, want %s", rendered, wantJSON)}
 			}
 			return conformancecoverage.Observation{}
 		})
+}
+
+// Manager-config vectors predate the B posture default. Keep their inputs
+// and all explicit-knob expectations intact; select only the absent-knob
+// defaults that manager §7.1 assigns to the shipped posture revision.
+func managerVectorExpectedForShippedPosture(input, expected map[string]any) map[string]any {
+	if SecurityPostureRevision != "B" || input["schema_version"] != float64(SchemaVersion2) {
+		return expected
+	}
+	if posture, present := input["security_posture"]; present && posture != SecurityPostureHardened {
+		return expected
+	}
+	expectedEnv, ok := expected["environments"].(map[string]any)
+	if !ok {
+		return expected
+	}
+	result := cloneStringAnyMap(expected)
+	env := cloneStringAnyMap(expectedEnv)
+	inputEnv, _ := input["environments"].(map[string]any)
+	for knob, value := range map[string]any{"transitive_system_modules": "error", "require_source_signers": true} {
+		if _, explicit := inputEnv[knob]; !explicit {
+			if _, compared := expectedEnv[knob]; compared {
+				env[knob] = value
+			}
+		}
+	}
+	result["environments"] = env
+	return result
+}
+
+func TestManagerVectorPostureDefaultsPreserveExplicitKnobs(t *testing.T) {
+	expected := map[string]any{"environments": map[string]any{"transitive_system_modules": "drop", "require_source_signers": false, "other_knob": "unchanged"}}
+	for _, tc := range []struct {
+		name       string
+		input      map[string]any
+		transitive string
+		signers    bool
+	}{
+		{"schema2-default", map[string]any{"schema_version": float64(2)}, "error", true},
+		{"schema1", map[string]any{"schema_version": float64(1)}, "drop", false},
+		{"permissive", map[string]any{"schema_version": float64(2), "security_posture": "permissive"}, "drop", false},
+		{"explicit-knobs", map[string]any{"schema_version": float64(2), "environments": map[string]any{"transitive_system_modules": "drop", "require_source_signers": false}}, "drop", false},
+		{"one-explicit-knob", map[string]any{"schema_version": float64(2), "environments": map[string]any{"require_source_signers": false}}, "error", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := managerVectorExpectedForShippedPosture(tc.input, expected)["environments"].(map[string]any)
+			if got["transitive_system_modules"] != tc.transitive || got["require_source_signers"] != tc.signers || got["other_knob"] != "unchanged" || len(got) != 3 {
+				t.Fatalf("adjusted vector = %#v", got)
+			}
+		})
+	}
+	if original := expected["environments"].(map[string]any); original["transitive_system_modules"] != "drop" || original["require_source_signers"] != false {
+		t.Fatal("posture expectation selection mutated the published vector")
+	}
 }
 
 // exactManagerEffectiveJSON compares canonical JSON bytes for the full
@@ -630,7 +685,8 @@ func TestOverlayConformancePassesWithPermissionsAndSourceSigners(t *testing.T) {
 			t.Fatal(err)
 		}
 		gotEnv, gotOK := got["environments"].(map[string]any)
-		wantEnv, wantOK := tc.Expected["environments"].(map[string]any)
+		want := managerVectorExpectedForShippedPosture(tc.Input, tc.Expected)
+		wantEnv, wantOK := want["environments"].(map[string]any)
 		if !gotOK || !wantOK {
 			t.Errorf("%s lacks the environments EffectiveJSON object", tc.Name)
 			continue

@@ -186,7 +186,7 @@ func installEnvTestProfile(t *testing.T, source stubConfigSource) {
 func TestEnvResolveIsolatedSystemLockUsesDirection(t *testing.T) {
 	source, _ := profileHome(t)
 	writeNativeCredentials(t)
-	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
+	user := `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`
 	system := `{"schema_version": 2, "locked": ["environments.isolation"], "environments": {"isolation": {"acme": {"codex_cli": "isolated"}}}}`
 	source = loadEnvironmentIsolationConfig(t, source, user, system)
 	if !source.cfg.Locked["environments.isolation"] || source.cfg.Env.Isolation["acme"]["codex_cli"] != "isolated" {
@@ -209,10 +209,10 @@ func TestEnvResolveIsolatedSystemLockUsesDirection(t *testing.T) {
 func TestEnvResolveExplicitSharedConflictsWithIsolatedSystemLock(t *testing.T) {
 	source, _ := profileHome(t)
 	writeNativeCredentials(t)
-	base := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
+	base := `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`
 	source = loadEnvironmentIsolationConfig(t, source, base, "")
 	installEnvTestProfile(t, source)
-	user := `{"schema_version": 2, "skills_root": "x", "projects": {}, "environments": {"isolation": {"acme": {"codex_cli": "shared"}}}}`
+	user := `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}, "environments": {"isolation": {"acme": {"codex_cli": "shared"}}}}`
 	system := `{"schema_version": 2, "locked": ["environments.isolation"], "environments": {"isolation": {"acme": {"codex_cli": "isolated"}}}}`
 	source = loadEnvironmentIsolationConfig(t, source, user, system)
 	code, stdout, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair")
@@ -237,7 +237,7 @@ func TestEnvResolveLockedIsolationRequiresMigration(t *testing.T) {
 	requireLinkCapability(t)
 	source, _ := profileHome(t)
 	writeNativeCredentials(t)
-	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
+	user := `{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {}}`
 	source = loadEnvironmentIsolationConfig(t, source, user, "")
 	installEnvTestProfile(t, source)
 	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
@@ -715,7 +715,7 @@ func TestEnvStatusS4Posture(t *testing.T) {
 func TestEnvStatusEffectivePassableList(t *testing.T) {
 	source, home := profileHome(t)
 	userPath := filepath.Join(home, "machine.json")
-	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {},`+
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "security_posture": "permissive", "skills_root": "x", "projects": {},`+
 		`"environments": {"passable_env_names": ["A_B"]}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -3,16 +3,16 @@ package config
 import "fmt"
 
 // SecurityPostureRevision is the one release switch for the machine posture
-// default. Revision A ships first with the permissive warning; Revision B is
-// the later default flip owned by its bounded rollout task.
-const SecurityPostureRevision = "A"
+// default. Revision A shipped the permissive warning before revision B
+// selected hardened defaults for schema-2 machines.
+const SecurityPostureRevision = "B"
 
 const (
 	// SecurityPosturePermissive selects today's default-open gate values.
 	SecurityPosturePermissive = "permissive"
 	// SecurityPostureHardened selects the strict end of each posture gate.
 	SecurityPostureHardened = "hardened"
-	// DiagSecurityPosturePermissive identifies the revision-A migration warning.
+	// DiagSecurityPosturePermissive identifies the permissive migration warning.
 	DiagSecurityPosturePermissive = "security_posture_permissive"
 	// DiagSourceAllowlistEmpty identifies the hardened install/update refusal.
 	DiagSourceAllowlistEmpty = "source_allowlist_empty"
@@ -20,8 +20,8 @@ const (
 	DiagMCPAllowlistEmpty = "mcp_package_allowlist_empty"
 	// DiagPassableEnvUnbounded identifies explicit-null passthrough refusal.
 	DiagPassableEnvUnbounded = "passable_env_names_unbounded_refused" // #nosec G101 -- diagnostic identifier, not a credential.
-	// SecurityPostureMigrationHint is shown while revision A defaults permissive.
-	SecurityPostureMigrationHint = "set security_posture: hardened in the machine configuration to adopt the hardened defaults before revision B flips the default"
+	// SecurityPostureMigrationHint is shown for explicit permissive configurations.
+	SecurityPostureMigrationHint = "set security_posture: hardened in the machine configuration to adopt the hardened defaults"
 )
 
 // SecurityPostureDiagnostic is a posture operation finding. Optional fields
@@ -82,7 +82,7 @@ func (c *Config) SecurityPostureHardened() bool {
 	return c != nil && c.EffectiveSecurityPosture() == SecurityPostureHardened
 }
 
-// SecurityPostureWarning returns the revision-A migration warning once per
+// SecurityPostureWarning returns the permissive migration warning once per
 // loaded manager operation when the effective posture is permissive.
 func (c *Config) SecurityPostureWarning() string {
 	if c == nil || c.SecurityPostureHardened() {

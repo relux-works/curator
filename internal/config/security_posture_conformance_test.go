@@ -41,10 +41,9 @@ type securityPostureExpectation struct {
 	EnvStatusRows           json.RawMessage             `json:"env_status_rows"`
 }
 
-// TestSecurityPostureVectors drives every revision-A-owned vector through
-// config.Load and the same diagnostics, outcome, and status-row APIs consumed
-// by the manager. Registry reachability belongs to 1sapuy; revision-B default
-// and flipped shipped-row cases belong to the flip leaf.
+// TestSecurityPostureVectors drives the current posture vectors through
+// config.Load and the diagnostics, outcome, and status-row APIs consumed by
+// the manager. Historical revision-A defaults and registry I/O are bounded.
 func TestSecurityPostureVectors(t *testing.T) {
 	root := conformanceRoot(t)
 	payload, err := os.ReadFile(filepath.Join(root, "vectors", "security-posture.json")) // #nosec G304 -- pinned conformance input
@@ -61,13 +60,13 @@ func TestSecurityPostureVectors(t *testing.T) {
 	if len(cases) == 0 {
 		t.Fatal("security-posture vectors publish no cases")
 	}
-	conformancecoverage.RunOutcomes(t, "security-posture/vectors", cases,
+	tally := conformancecoverage.RunOutcomes(t, "security-posture/vectors", cases,
 		func(tc securityPostureVector) string { return tc.Name }, func(caseT *testing.T, tc securityPostureVector) conformancecoverage.Observation {
 			if reason := securityPostureBound(tc.Name); reason != "" {
 				return conformancecoverage.Observation{BoundReason: reason}
 			}
-			cfg := loadSecurityPostureVector(t, tc)
-			checkJSONEqual(t, "effective posture", tc.Expected.Effective, securityPostureEffective(cfg, tc.ShippedRevisions.EnvPassthrough))
+			cfg := loadSecurityPostureVector(caseT, tc)
+			checkJSONEqual(caseT, "effective posture", tc.Expected.Effective, securityPostureEffective(cfg, tc.ShippedRevisions.EnvPassthrough))
 			if got := cfg.EffectiveSecurityPosture(); got != tc.Expected.Profile {
 				caseT.Fatalf("profile = %q, want %q", got, tc.Expected.Profile)
 			}
@@ -95,6 +94,9 @@ func TestSecurityPostureVectors(t *testing.T) {
 			checkJSONEqual(caseT, "env status rows", wantEnvRows, gotEnvRows)
 			return conformancecoverage.Observation{}
 		})
+	if tally.Driven != 12 || tally.Bound != 5 || tally.KnownGap != 0 || tally.Skipped != 0 || tally.Total() != 17 {
+		t.Fatalf("unexpected posture coverage: %+v", tally)
+	}
 }
 
 func TestSecurityPostureSchema1MachineRemainsPermissiveWithSystemPosture(t *testing.T) {
@@ -145,8 +147,8 @@ func securityPostureBound(name string) string {
 	switch name {
 	case "unreachable-registry-permissive-warns", "unreachable-registry-hardened-refuses":
 		return "install-time unreachable-registry behavior is owned by TASK-260910-1sapuy"
-	case "revision-B-default-hardened-flip-install", "refusal-mcp-allowlist-empty-with-declarations", "hardened-contradiction-status-check-non-current", "posture-rows-flipped-revisions":
-		return "revision-B posture default or shipped-row flip is owned by TASK-260927-25hk87"
+	case "revision-A-default-permissive-status", "revision-A-permissive-warning-once-install", "locked-value-beats-explicit":
+		return "historical revision-A implicit permissive default; this manager ships revision B (explicit permissive compatibility is tested separately)"
 	default:
 		return ""
 	}

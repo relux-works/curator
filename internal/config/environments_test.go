@@ -676,12 +676,12 @@ func TestEffectiveJSONShape(t *testing.T) {
 	}
 }
 
-// TestTransitiveSystemModulesDefaults proves the §12.1 defaults: drop for
-// the policy, empty for the waiver list.
+// TestTransitiveSystemModulesDefaults proves hardened revision-B defaults:
+// error for the policy, empty for the waiver list.
 func TestTransitiveSystemModulesDefaults(t *testing.T) {
 	cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
-	if cfg.Env.TransitiveSystemModules != "drop" {
-		t.Fatalf("transitive_system_modules = %q, want drop", cfg.Env.TransitiveSystemModules)
+	if cfg.Env.TransitiveSystemModules != "error" {
+		t.Fatalf("transitive_system_modules = %q, want error", cfg.Env.TransitiveSystemModules)
 	}
 	if len(cfg.Env.SystemModuleWaivers) != 0 {
 		t.Fatalf("system_module_waivers = %+v, want empty", cfg.Env.SystemModuleWaivers)
