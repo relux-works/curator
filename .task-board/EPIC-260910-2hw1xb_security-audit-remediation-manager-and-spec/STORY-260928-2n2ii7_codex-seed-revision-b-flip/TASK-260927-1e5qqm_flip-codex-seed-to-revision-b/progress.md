@@ -161,7 +161,6 @@ spawn run completed: codex (run=RUN-261008-4ad1db, pid=30506, exit=0)
 ## Outcome Resources
 - [TASK-260927-1e5qqm_spawn-log_-implementer--developer--codex-_RUN-261004-d0f461.log](file://TASK-260927-1e5qqm/TASK-260927-1e5qqm_spawn-log_-implementer--developer--codex-_RUN-261004-d0f461.log) — System spawn log captured by task-board
 - [TASK-260927-1e5qqm_results.md](file://TASK-260927-1e5qqm/TASK-260927-1e5qqm_results.md)
-- [TASK-260927-1e5qqm_validation-evidence.tar.gz](file://TASK-260927-1e5qqm/TASK-260927-1e5qqm_validation-evidence.tar.gz) — Normalized validation transcripts, exact conformance counts, expected-red mutants, exit codes and candidate digests
 - [TASK-260927-1e5qqm_change-request_rev1.patch](file://TASK-260927-1e5qqm/TASK-260927-1e5qqm_change-request_rev1.patch) — Change Request CR-TASK-260927-1e5qqm-1 revision 1 candidate patch (repository_delta=present, 6 changed paths)
 - [TASK-260927-1e5qqm_change-request_rev1-validation.log](file://TASK-260927-1e5qqm/TASK-260927-1e5qqm_change-request_rev1-validation.log) — Change Request CR-TASK-260927-1e5qqm-1 revision 1 bounded validation log
 - [TASK-260927-1e5qqm_spawn-log_-reviewer--reviewer--codex-_RUN-261005-3d123e.log](file://TASK-260927-1e5qqm/TASK-260927-1e5qqm_spawn-log_-reviewer--reviewer--codex-_RUN-261005-3d123e.log) — System spawn log captured by task-board
@@ -187,7 +186,7 @@ spawn run completed: codex (run=RUN-261008-4ad1db, pid=30506, exit=0)
 2026-09-27T09:43:36Z
 
 ## Last Update
-2026-10-08T03:37:16Z
+2026-10-08T05:07:49Z
 
 ## Assigned To
 [implementer] developer (codex)
