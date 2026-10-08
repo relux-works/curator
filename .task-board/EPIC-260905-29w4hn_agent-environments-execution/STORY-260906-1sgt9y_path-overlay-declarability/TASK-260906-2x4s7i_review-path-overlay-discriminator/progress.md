@@ -1,5 +1,5 @@
 ## Status
-to-review
+done
 
 ## Review
 required
@@ -187,7 +187,7 @@ recovery parked after 3 successor attempts for chain RUN-260906-d7ee94; operator
 2026-09-06T13:36:47Z
 
 ## Last Update
-2026-09-06T17:54:34Z
+2026-10-08T12:15:59Z
 
 ## Assigned To
 [reviewer] reviewer (claude)
