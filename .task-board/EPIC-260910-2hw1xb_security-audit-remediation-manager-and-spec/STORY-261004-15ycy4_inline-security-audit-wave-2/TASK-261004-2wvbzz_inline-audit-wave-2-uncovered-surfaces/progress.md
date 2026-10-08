@@ -78,8 +78,6 @@ spawn run completed: codex (run=RUN-261008-5ccda3, pid=8916, exit=0)
 - [TASK-261004-2wvbzz_spawn-log_-analyst--researcher--codex-_RUN-261004-6b0f1b.log](file://TASK-261004-2wvbzz/TASK-261004-2wvbzz_spawn-log_-analyst--researcher--codex-_RUN-261004-6b0f1b.log) — System spawn log captured by task-board
 - [TASK-261004-2wvbzz_results.md](file://TASK-261004-2wvbzz/TASK-261004-2wvbzz_results.md)
 - [TASK-261004-2wvbzz_logbook.md](file://TASK-261004-2wvbzz/TASK-261004-2wvbzz_logbook.md) — Task-scoped research logbook; findings, decisions, and harness anomalies
-- [TASK-261004-2wvbzz_probes.tar.gz](file://TASK-261004-2wvbzz/TASK-261004-2wvbzz_probes.tar.gz) — Eleven exact local Go probes and replay instructions for reviewer; N6-N9 expected red
-- [TASK-261004-2wvbzz_evidence.tar.gz](file://TASK-261004-2wvbzz/TASK-261004-2wvbzz_evidence.tar.gz) — Thirteen exact test command records with exit codes, redacted logs, source identity, and artifact verifier
 - [TASK-261004-2wvbzz_change-request_rev1.patch](file://TASK-261004-2wvbzz/TASK-261004-2wvbzz_change-request_rev1.patch) — Change Request CR-TASK-261004-2wvbzz-1 revision 1 candidate patch (repository_delta=present, 1 changed paths)
 - [TASK-261004-2wvbzz_change-request_rev1-validation.log](file://TASK-261004-2wvbzz/TASK-261004-2wvbzz_change-request_rev1-validation.log) — Change Request CR-TASK-261004-2wvbzz-1 revision 1 bounded validation log
 - [TASK-261004-2wvbzz_spawn-log_-reviewer--reviewer--claude-_RUN-261008-47b916.log](file://TASK-261004-2wvbzz/TASK-261004-2wvbzz_spawn-log_-reviewer--reviewer--claude-_RUN-261008-47b916.log) — System spawn log captured by task-board
@@ -91,7 +89,7 @@ spawn run completed: codex (run=RUN-261008-5ccda3, pid=8916, exit=0)
 2026-10-04T14:05:15Z
 
 ## Last Update
-2026-10-08T14:33:28Z
+2026-10-08T15:58:55Z
 
 ## Assigned To
 [analyst] researcher (codex)
