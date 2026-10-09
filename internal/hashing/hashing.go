@@ -282,3 +282,23 @@ func contentSHA256V2(root string, exclude map[string]bool) (string, error) {
 func Normalize(hash string) string {
 	return strings.ToLower(strings.TrimPrefix(strings.TrimSpace(hash), "sha256:"))
 }
+
+// ParseDigest validates a supported content identity and returns its
+// normalized directory form: the lowercase bare 64-hex digest. An
+// optional "sha256:" prefix is accepted; every other spelling — paths,
+// traversal, wrong length, non-hex — is refused before any filesystem
+// access, so pin state can never escape its audit namespace.
+func ParseDigest(hash string) (string, error) {
+	trimmed := strings.TrimPrefix(strings.TrimSpace(hash), "sha256:")
+	if len(trimmed) != 64 {
+		return "", fmt.Errorf("invalid content hash %q: want 64 hex characters with an optional sha256: prefix", hash)
+	}
+	for i := 0; i < len(trimmed); i++ {
+		c := trimmed[i]
+		if c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F' {
+			continue
+		}
+		return "", fmt.Errorf("invalid content hash %q: want 64 hex characters with an optional sha256: prefix", hash)
+	}
+	return strings.ToLower(trimmed), nil
+}

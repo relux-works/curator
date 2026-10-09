@@ -2168,18 +2168,37 @@ func (c cli) cmdAudit(args []string) int {
 	if err != nil {
 		return exitUsage
 	}
-	cfg, code := c.loadConfig()
-	if code != exitOK {
-		return code
-	}
-	if *allow != "" {
+	// N8: --allow presence is explicit, not inferred from its value: an
+	// explicitly supplied empty value is still a supplied non-digest and
+	// must refuse before any configuration or filesystem access. Plain
+	// `audit` without --allow keeps its existing behavior.
+	allowSupplied := false
+	flags.Visit(func(f *flag.Flag) {
+		if f.Name == "allow" {
+			allowSupplied = true
+		}
+	})
+	if allowSupplied {
 		if *reason == "" {
 			_, _ = fmt.Fprintln(c.stderr, "curator: --allow requires --reason")
 			return exitUsage
 		}
+		// N8: parse the supported content identity before any
+		// filesystem access; non-digests never reach config or pin state.
+		if _, err := hashing.ParseDigest(*allow); err != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+			return exitUsage
+		}
+	}
+	cfg, code := c.loadConfig()
+	if code != exitOK {
+		return code
+	}
+	if allowSupplied {
 		// New pins record the writer framing explicitly (Spec §8): a pin
 		// authorizes only the (version, digest) identity it was issued
-		// for, so legacy v1 pins never approve v2 reads.
+		// for, so legacy v1 pins never approve v2 reads. PinAtVersion
+		// re-validates the digest and the audit-namespace containment.
 		path, err := audit.PinAtVersion(cfg.Home(), *allow, hashing.WriteVersion(), *reason, os.Getenv("USER"))
 		if err != nil {
 			_, _ = fmt.Fprintln(c.stderr, "curator:", err)

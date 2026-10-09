@@ -469,6 +469,12 @@ func Pin(home, contentHash, reason, pinnedBy string) (string, error) {
 // no hash_version member, v2 writes schema 2 with hash_version 2. Both
 // shapes stamp the UTC creation time in the created_at member.
 func PinAtVersion(home, contentHash string, version hashing.Version, reason, pinnedBy string) (string, error) {
+	// N8: parse the supported content identity before any filesystem
+	// access; non-digests never reach the trust directory.
+	digest, err := hashing.ParseDigest(contentHash)
+	if err != nil {
+		return "", err
+	}
 	record := map[string]any{
 		"content_sha256": strings.ToLower(contentHash),
 		"pinned":         true,
@@ -485,7 +491,10 @@ func PinAtVersion(home, contentHash string, version hashing.Version, reason, pin
 	default:
 		return "", fmt.Errorf("unsupported content hash version %d", version)
 	}
-	dir := trustDir(home, contentHash)
+	dir, err := pinDir(home, digest)
+	if err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
@@ -531,6 +540,19 @@ func isPinned(cfg *config.Config, contentHash string, version hashing.Version) b
 
 func trustDir(home, contentHash string) string {
 	return filepath.Join(home, "audit", hashing.Normalize(contentHash))
+}
+
+// pinDir resolves the trust directory for an already-parsed digest and
+// refuses any path that escapes the audit namespace. A parsed digest is
+// bare hex by construction, so this check is defense in depth: it holds
+// even if the digest grammar ever widens.
+func pinDir(home, digest string) (string, error) {
+	root := filepath.Join(home, "audit")
+	dir := filepath.Join(root, digest)
+	if dir == root || !strings.HasPrefix(dir, root+string(filepath.Separator)) {
+		return "", fmt.Errorf("pin for %q escapes the audit namespace", digest)
+	}
+	return dir, nil
 }
 
 func verdictPath(cfg *config.Config, contentHash string) string {

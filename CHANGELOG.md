@@ -25,6 +25,10 @@ All notable implementation changes are recorded here.
   status currentness cover the migrated lane, and local audit records bind
   the full package identity so a verdict is never reused across another
   repository, commit, or directory.
+- `curator audit --allow` now accepts only a supported content identity (64
+  hexadecimal characters with an optional `sha256:` prefix) and refuses
+  anything else before touching pin state, so a malformed value can no
+  longer write trust records outside the audit directory.
 
 ## v0.15.0-rc.5 — 2026-10-08
 
