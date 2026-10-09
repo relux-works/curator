@@ -218,24 +218,20 @@ spawn run completed: codex (run=RUN-261002-242293, pid=22401, exit=0)
 - [TASK-261002-2ipeqa_spawn-log_-implementer--developer--codex-_RUN-261002-e45044.log](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_spawn-log_-implementer--developer--codex-_RUN-261002-e45044.log) — System spawn log captured by task-board
 - [TASK-261002-2ipeqa_corpus-audit.json](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_corpus-audit.json) — Authenticated rc.14 corpus, exact 103-family count template, 21 measured gap rows, writer OFF and unchanged rc.13 SPEC_PIN
 - [TASK-261002-2ipeqa_results.md](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_results.md) — Revision 3 fresh exits, missing lifecycle pins, one new snapshot gap and hosted candidate re-dispatch pending; preserves earlier results
-- [TASK-261002-2ipeqa_validation-evidence.tar.gz](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_validation-evidence.tar.gz) — Raw command logs and JSON streams, real exit codes and host counts, exact spec consumption, audit and narrowing probes; includes explicitly failing/stopped attempts
 - [TASK-261002-2ipeqa_change-request_rev1.patch](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_change-request_rev1.patch) — Change Request CR-TASK-261002-2ipeqa-1 revision 1 candidate patch (repository_delta=present, 16 changed paths)
 - [TASK-261002-2ipeqa_change-request_rev1-validation.log](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_change-request_rev1-validation.log) — Change Request CR-TASK-261002-2ipeqa-1 revision 1 bounded validation log
 - [TASK-261002-2ipeqa_spawn-log_-implementer--developer--codex-_RUN-261002-f042a1.log](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_spawn-log_-implementer--developer--codex-_RUN-261002-f042a1.log) — System spawn log captured by task-board
 - [TASK-261002-2ipeqa_spawn-log_-implementer--developer--codex-_RUN-261002-831445.log](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_spawn-log_-implementer--developer--codex-_RUN-261002-831445.log) — System spawn log captured by task-board
 - [TASK-261002-2ipeqa_revision2-count-audit.json](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_revision2-count-audit.json) — Independent authenticated rc.14 counts: 103/103 families, 1870 case entries
 - [TASK-261002-2ipeqa_revision2-host-interruption.md](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_revision2-host-interruption.md) — Two repeated host process stalls despite -work/backoff/lock; crashes 366 to 367 to 368
-- [TASK-261002-2ipeqa_revision2-validation-evidence.tar.gz](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_revision2-validation-evidence.tar.gz) — Revision 2 raw logs, real wrapper/command exit codes, durations/crash counts, count audits, frozen identity and blocker
 - [TASK-261002-2ipeqa_spawn-log_-implementer--developer--codex-_RUN-261002-c01d0d.log](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_spawn-log_-implementer--developer--codex-_RUN-261002-c01d0d.log) — System spawn log captured by task-board
 - [TASK-261002-2ipeqa_hosted-gate-handoff.md](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_hosted-gate-handoff.md) — Hosted validation pending; local unverified requirements explicitly routed per binding decision
-- [TASK-261002-2ipeqa_hosted-handoff-evidence.tar.gz](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_hosted-handoff-evidence.tar.gz) — Fresh audit, unchanged Revision 2 source identity, actual exits and checklist alignment
 - [TASK-261002-2ipeqa_change-request_rev2.patch](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_change-request_rev2.patch) — Change Request CR-TASK-261002-2ipeqa-2 revision 2 candidate patch (repository_delta=present, 16 changed paths)
 - [TASK-261002-2ipeqa_change-request_rev2-validation.log](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_change-request_rev2-validation.log) — Change Request CR-TASK-261002-2ipeqa-2 revision 2 bounded validation log
 - [TASK-261002-2ipeqa_spawn-log_-reviewer--reviewer--codex-_RUN-261002-087f28.log](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_spawn-log_-reviewer--reviewer--codex-_RUN-261002-087f28.log) — System spawn log captured by task-board
 - [TASK-261002-2ipeqa_review-verdict-rev2.md](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_review-verdict-rev2.md) — Revision 2 review: candidate hosted job skipped; changes requested with independent corpus checks
 - [TASK-261002-2ipeqa_spawn-log_-implementer--developer--codex-_RUN-261002-be8b8b.log](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_spawn-log_-implementer--developer--codex-_RUN-261002-be8b8b.log) — System spawn log captured by task-board
 - [TASK-261002-2ipeqa_revision3-results.md](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_revision3-results.md) — Revision 3 exact ten gaps, 107-family recount, real candidate/default/spec exits, two narrowing failures and hosted routing
-- [TASK-261002-2ipeqa_revision3-evidence.tar.gz](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_revision3-evidence.tar.gz) — All 3 hosted rev2 candidate streams; fresh rev3 logs/exits/crash durations, exact spec JSON, count audit, two narrowing mutants and frozen tree
 - [TASK-261002-2ipeqa_change-request_rev3.patch](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_change-request_rev3.patch) — Change Request CR-TASK-261002-2ipeqa-3 revision 3 candidate patch (repository_delta=present, 17 changed paths)
 - [TASK-261002-2ipeqa_change-request_rev3-validation.log](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_change-request_rev3-validation.log) — Change Request CR-TASK-261002-2ipeqa-3 revision 3 bounded validation log
 - [TASK-261002-2ipeqa_spawn-log_-reviewer--reviewer--codex-_RUN-261002-570bd0.log](file://TASK-261002-2ipeqa/TASK-261002-2ipeqa_spawn-log_-reviewer--reviewer--codex-_RUN-261002-570bd0.log) — System spawn log captured by task-board
@@ -251,7 +247,7 @@ spawn run completed: codex (run=RUN-261002-242293, pid=22401, exit=0)
 2026-10-02T06:17:57Z
 
 ## Last Update
-2026-10-03T17:43:03Z
+2026-10-09T11:06:02Z
 
 ## Assigned To
 [reviewer] reviewer (codex)
