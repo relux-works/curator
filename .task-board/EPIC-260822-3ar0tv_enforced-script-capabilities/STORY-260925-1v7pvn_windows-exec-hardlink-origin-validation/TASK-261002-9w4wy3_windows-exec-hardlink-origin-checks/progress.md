@@ -65,12 +65,10 @@ spawn run completed: codex (run=RUN-261002-972715, pid=86176, exit=0)
 ## Outcome Resources
 - [TASK-261002-9w4wy3_spawn-log_-implementer--developer--codex-_RUN-261002-b230a2.log](file://TASK-261002-9w4wy3/TASK-261002-9w4wy3_spawn-log_-implementer--developer--codex-_RUN-261002-b230a2.log) — System spawn log captured by task-board
 - [TASK-261002-9w4wy3_results.md](file://TASK-261002-9w4wy3/TASK-261002-9w4wy3_results.md) — Verified resolver coverage, four failing mutants, two green hosted Windows lanes, and host-stall recovery
-- [TASK-261002-9w4wy3_evidence.zip](file://TASK-261002-9w4wy3/TASK-261002-9w4wy3_evidence.zip) — Hosted Windows logs, job conclusions, mutation logs, local validation logs and recovery rerun
 - [TASK-261002-9w4wy3_change-request_rev1.patch](file://TASK-261002-9w4wy3/TASK-261002-9w4wy3_change-request_rev1.patch) — Change Request CR-TASK-261002-9w4wy3-1 revision 1 candidate patch (repository_delta=present, 13 changed paths)
 - [TASK-261002-9w4wy3_change-request_rev1-validation.log](file://TASK-261002-9w4wy3/TASK-261002-9w4wy3_change-request_rev1-validation.log) — Change Request CR-TASK-261002-9w4wy3-1 revision 1 bounded validation log
 - [TASK-261002-9w4wy3_spawn-log_-reviewer--reviewer--codex-_RUN-261002-68bfa8.log](file://TASK-261002-9w4wy3/TASK-261002-9w4wy3_spawn-log_-reviewer--reviewer--codex-_RUN-261002-68bfa8.log) — System spawn log captured by task-board
 - [TASK-261002-9w4wy3_review-verdict-rev1.md](file://TASK-261002-9w4wy3/TASK-261002-9w4wy3_review-verdict-rev1.md)
-- [TASK-261002-9w4wy3_reviewer-mutants.zip](file://TASK-261002-9w4wy3/TASK-261002-9w4wy3_reviewer-mutants.zip)
 - [TASK-261002-9w4wy3_spawn-log_-implementer--developer--codex-_RUN-261002-972715.log](file://TASK-261002-9w4wy3/TASK-261002-9w4wy3_spawn-log_-implementer--developer--codex-_RUN-261002-972715.log) — System spawn log captured by task-board
 - [TASK-261002-9w4wy3_integration-land.md](file://TASK-261002-9w4wy3/TASK-261002-9w4wy3_integration-land.md) — Fresh accepted story_final candidate identity and runner-owned landing preflight
 
@@ -78,7 +76,7 @@ spawn run completed: codex (run=RUN-261002-972715, pid=86176, exit=0)
 2026-10-02T02:13:10Z
 
 ## Last Update
-2026-10-02T04:54:06Z
+2026-10-09T11:06:18Z
 
 ## Assigned To
 [implementer] developer (codex)
