@@ -1,0 +1,67 @@
+TASK-261008-1j34ro (N8: audit --allow accepts a path in place of a content digest) — developer results
+
+CHANGE
+- internal/hashing/hashing.go: new hashing.ParseDigest. Validates a supported
+  content identity (64 hex chars, either case, with an optional "sha256:"
+  prefix) and returns the lowercase bare digest. Everything else (paths,
+  traversal, wrong length, non-hex) is refused before any filesystem access.
+- internal/audit/audit.go: PinAtVersion parses the digest first (refusal
+  before MkdirAll/WriteFile), then resolves the trust dir through a new
+  pinDir helper that verifies containment inside home/audit before writing
+  any pin state. trustDir, the pin record shape, and the version switch are
+  unchanged, so all previously valid pins behave identically.
+- cmd/curator/main.go (cmdAudit): --allow/--reason are validated up front,
+  including a ParseDigest refusal with exit 2, before loadConfig — so a
+  malformed --allow value never reaches config, trust, or pin state.
+  PinAtVersion re-validates at the library boundary.
+- CHANGELOG.md: one operator-visible line under Unreleased/Fixed.
+
+TESTS (no "wave2" in names; both fail without the fix, pass with it)
+- cmd/curator/audit_allow_test.go: TestAuditAllowPinsOnlySupportedContentIdentity
+  drives the production run() entry via profileHome/runProfile. 3 allow rows
+  (bare hex, upper hex, sha256:-prefixed) pin exit 0 with the record under
+  home/audit/<digest>/trust.json; 4 refuse rows (../outside-audit, sub/dir,
+  63-hex, 64x non-hex) require a nonzero exit, no escape-path record, and no
+  trust.json anywhere under the manager home.
+- internal/audit/pin_digest_test.go: TestPinRefusesNonDigest calls Pin
+  directly: 4 malformed inputs refused with no home/audit directory created;
+  one sha256:-prefixed digest still pins to the expected path.
+
+COMPILE-ONLY TAIL (local, R223 — no `go test` on the mini)
+- go vet ./...            -> exit 0
+- go build ./...          -> exit 0
+- gofmt -l <5 touched files> -> no output (clean)
+- golangci-lint run ./internal/hashing/... ./internal/audit/... ./cmd/curator/... -> 0 issues, exit 0
+
+HOSTED EVIDENCE (full CI matrix per run; branches deleted after recording)
+- GREEN (fix + tests): https://github.com/relux-works/curator/actions/runs/37869043464
+  conclusion success; 20/20 jobs success (2 skips are trigger-inapplicable:
+  candidate-suite needs dispatch input, rose-air lane not on this trigger).
+  test-evidence-ubuntu-latest ledger: TestAuditAllowPinsOnlySupportedContentIdentity
+  8/8 pass (parent + 7 subtests), TestPinRefusesNonDigest pass.
+  Negative controls green in the same run: TestPinAtVersionWritesVersionedCarrier,
+  TestV2RejectsLegacyV1Pin, TestV1RejectsV2Pin, TestRequirePinForOldSchemas,
+  TestCheckSourceAuditPinPreserved, TestAuditAllowWritesWriterVersionPinCarrier
+  (v1+v2 writers), TestDraftAuditPinDoesNotWaiveStrictFindings (fresh+cached);
+  zero fail rows in the ubuntu lane ledger.
+- RED (tests + CHANGELOG, 3 production files at HEAD): https://github.com/relux-works/curator/actions/runs/37873727909
+  conclusion failure; all 5 test/race lanes fail; Lint passes (red tree builds).
+  Failing cases are exactly the new regression tests, nothing else:
+  cmd/curator TestAuditAllowPinsOnlySupportedContentIdentity + its 4 refuse
+  subtests (`audit --allow "../outside-audit" = 0, want a refusal`, etc.),
+  internal/audit TestPinRefusesNonDigest (`Pin("../escape") succeeded, want a
+  refusal`). The 3 allow subtests pass on red too, proving the refusal rows —
+  not setup — detect the bug.
+
+PROCEDURE NOTE
+- The brief's scratch/** branch names do not trigger CI (ci.yml push filter is
+  main + gate/**), so both hosted runs used throwaway gate/** snapshot branches
+  (the scripts/remote-gate.sh mechanism): gate/STORY-261009-33rpbn/261009-n8-green
+  (commit 7090e630) and .../261009-n8-red (commit 66272755, diff vs green is
+  exactly the 3 reverted production files). Both branches deleted after the run
+  URLs and verdicts were recorded above. The red snapshot was built in a
+  disposable /tmp clone so the worktree was never reverted; the worktree still
+  holds the exact green candidate, uncommitted. One red push initially went to
+  the clone's local origin by mistake; the stray local ref was removed and the
+  same commit re-pushed to github — no history or worktree effect.
+- Logbook: no LOGBOOK edits per the task brief ("No LOGBOOK edits").

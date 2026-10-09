@@ -1,0 +1,348 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 09cf1679f3c159f6081583cbf478f974fcf2d5af..2d8b3773ba86891608fc37cb8127ce6c60f3538a 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -13,6 +13,10 @@ All notable implementation changes are recorded here.
+   instead of failing on it: the recognized link is replaced transactionally
+   while foreign shims and changed preimages are still refused
+   (TASK-261008-eaqg8a).
++- `curator audit --allow` now accepts only a supported content identity (64
++  hexadecimal characters with an optional `sha256:` prefix) and refuses
++  anything else before touching pin state, so a malformed value can no
++  longer write trust records outside the audit directory.
+ 
+ ## v0.15.0-rc.5 — 2026-10-08
+ 
+diff --git a/cmd/curator/audit_allow_test.go b/cmd/curator/audit_allow_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..e3c971a2b00c0fefd4372742bed9fdf3dbc53e86
+--- /dev/null
++++ b/cmd/curator/audit_allow_test.go
+@@ -0,0 +1,149 @@
++package main
++
++// N8 regression: `audit --allow` addresses a content identity. It pins a
++// supported digest and refuses everything else before any filesystem
++// access, so pin state can never escape the audit namespace. This test
++// drives the production run() entry point.
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/config"
++)
++
++// TestAuditAllowPinsOnlySupportedContentIdentity pins supported digests
++// through the CLI and refuses path-shaped and malformed values without
++// writing any pin state. A mutant that restores the direct --allow join
++// pins the traversal input with exit 0 and fails the refusal rows.
++func TestAuditAllowPinsOnlySupportedContentIdentity(t *testing.T) {
++	t.Setenv("USER", "fixture")
++	bare := strings.Repeat("a", 64)
++	upper := strings.Repeat("B", 64)
++	for _, valid := range []struct{ name, allow, dir string }{
++		{"bare-hex", bare, bare},
++		{"upper-hex", upper, strings.ToLower(upper)},
++		{"sha256-prefixed", "sha256:" + bare, bare},
++	} {
++		t.Run("allow/"+valid.name, func(t *testing.T) {
++			source, home := profileHome(t)
++			if code, _, stderr := runProfile(t, source, "audit", "--allow", valid.allow, "--reason", "synthetic approval"); code != exitOK {
++				t.Fatalf("audit --allow %q = %d, want %d\nstderr:\n%s", valid.allow, code, exitOK, stderr)
++			}
++			if _, err := os.Stat(filepath.Join(home, "audit", valid.dir, "trust.json")); err != nil {
++				t.Fatalf("pin record for %q: %v", valid.allow, err)
++			}
++		})
++	}
++	for _, refused := range []struct{ name, allow, escape string }{
++		{"parent-traversal", "../outside-audit", "outside-audit"},
++		{"nested-path", "sub/dir", "sub"},
++		{"short-digest", strings.Repeat("a", 63), ""},
++		{"non-hex-digest", strings.Repeat("z", 64), ""},
++	} {
++		t.Run("refuse/"+refused.name, func(t *testing.T) {
++			source, home := profileHome(t)
++			code, _, _ := runProfile(t, source, "audit", "--allow", refused.allow, "--reason", "synthetic approval")
++			if code == exitOK {
++				t.Fatalf("audit --allow %q = %d, want a refusal", refused.allow, code)
++			}
++			if refused.escape != "" {
++				if _, err := os.Stat(filepath.Join(home, refused.escape, "trust.json")); err == nil {
++					t.Fatalf("non-digest hash escaped the audit namespace")
++				}
++			}
++			assertNoPinState(t, home)
++		})
++	}
++}
++
++// loadCountingSource wraps a stubConfigSource and records configuration
++// Load calls, proving refusal happens before any configuration access.
++type loadCountingSource struct {
++	stubConfigSource
++	loads *int
++}
++
++func (s loadCountingSource) Load(warn func(string)) (*config.Config, error) {
++	*s.loads++
++	return s.stubConfigSource.Load(warn)
++}
++
++func runWithSource(t *testing.T, source configSource, args ...string) (int, string, string) {
++	t.Helper()
++	var stdout, stderr strings.Builder
++	code := run(args, source, &stdout, &stderr)
++	return code, stdout.String(), stderr.String()
++}
++
++// TestAuditAllowRefusalPrecedesConfigLoad proves every refused --allow
++// value exits usage before any configuration access: the config source
++// records zero Load calls. The admitted-digest control row pins with a
++// nonzero Load count, proving the counter observes real loads. An ordering
++// mutant that loads configuration ahead of the CLI parse fails the no-Load
++// assertion. This test drives the production run() entry point.
++func TestAuditAllowRefusalPrecedesConfigLoad(t *testing.T) {
++	t.Setenv("USER", "fixture")
++	for _, refused := range []struct {
++		name string
++		argv []string
++	}{
++		{"empty-split", []string{"audit", "--allow", "", "--reason", "synthetic approval"}},
++		{"empty-equals", []string{"audit", "--allow=", "--reason", "synthetic approval"}},
++		{"parent-traversal", []string{"audit", "--allow", "../outside-audit", "--reason", "synthetic approval"}},
++		{"nested-path", []string{"audit", "--allow", "sub/dir", "--reason", "synthetic approval"}},
++		{"short-digest", []string{"audit", "--allow", strings.Repeat("a", 63), "--reason", "synthetic approval"}},
++		{"non-hex-digest", []string{"audit", "--allow", strings.Repeat("z", 64), "--reason", "synthetic approval"}},
++	} {
++		t.Run("refuse/"+refused.name, func(t *testing.T) {
++			base, home := profileHome(t)
++			var loads int
++			source := loadCountingSource{stubConfigSource: base, loads: &loads}
++			code, _, stderr := runWithSource(t, source, refused.argv...)
++			if code != exitUsage {
++				t.Fatalf("audit %s = %d, want usage refusal (%d)\nstderr:\n%s", refused.name, code, exitUsage, stderr)
++			}
++			if loads != 0 {
++				t.Fatalf("refused --allow reached configuration (%d Load calls), want zero: refusal must precede config access", loads)
++			}
++			assertNoPinState(t, home)
++		})
++	}
++	t.Run("allow/admitted-loads-config", func(t *testing.T) {
++		base, home := profileHome(t)
++		var loads int
++		source := loadCountingSource{stubConfigSource: base, loads: &loads}
++		digest := strings.Repeat("a", 64)
++		code, _, stderr := runWithSource(t, source, "audit", "--allow", digest, "--reason", "synthetic approval")
++		if code != exitOK {
++			t.Fatalf("audit --allow %q = %d, want %d\nstderr:\n%s", digest, code, exitOK, stderr)
++		}
++		if loads == 0 {
++			t.Fatalf("admitted pin bypassed configuration; the Load counter cannot distinguish refusal from a dead probe")
++		}
++		if _, err := os.Stat(filepath.Join(home, "audit", digest, "trust.json")); err != nil {
++			t.Fatalf("pin record for %q: %v", digest, err)
++		}
++	})
++}
++
++// assertNoPinState fails when any pin record exists under home: a refused
++// --allow value must not write trust state anywhere. A failed read is
++// reported, never treated as an absence of records.
++func assertNoPinState(t *testing.T, home string) {
++	t.Helper()
++	err := filepath.WalkDir(home, func(path string, entry os.DirEntry, err error) error {
++		if err != nil {
++			return err
++		}
++		if !entry.IsDir() && entry.Name() == "trust.json" {
++			t.Fatalf("refused --allow wrote pin state at %s", path)
++		}
++		return nil
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++}
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index f3e52dcca57b77cff7ef2500e7583d68f09664b7..1b91a09ad8a9265790c78f9e60b3a9719dac6451 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -2138,18 +2138,37 @@ func (c cli) cmdAudit(args []string) int {
+ 	if err != nil {
+ 		return exitUsage
+ 	}
+-	cfg, code := c.loadConfig()
+-	if code != exitOK {
+-		return code
+-	}
+-	if *allow != "" {
++	// N8: --allow presence is explicit, not inferred from its value: an
++	// explicitly supplied empty value is still a supplied non-digest and
++	// must refuse before any configuration or filesystem access. Plain
++	// `audit` without --allow keeps its existing behavior.
++	allowSupplied := false
++	flags.Visit(func(f *flag.Flag) {
++		if f.Name == "allow" {
++			allowSupplied = true
++		}
++	})
++	if allowSupplied {
+ 		if *reason == "" {
+ 			_, _ = fmt.Fprintln(c.stderr, "curator: --allow requires --reason")
+ 			return exitUsage
+ 		}
++		// N8: parse the supported content identity before any
++		// filesystem access; non-digests never reach config or pin state.
++		if _, err := hashing.ParseDigest(*allow); err != nil {
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
++			return exitUsage
++		}
++	}
++	cfg, code := c.loadConfig()
++	if code != exitOK {
++		return code
++	}
++	if allowSupplied {
+ 		// New pins record the writer framing explicitly (Spec §8): a pin
+ 		// authorizes only the (version, digest) identity it was issued
+-		// for, so legacy v1 pins never approve v2 reads.
++		// for, so legacy v1 pins never approve v2 reads. PinAtVersion
++		// re-validates the digest and the audit-namespace containment.
+ 		path, err := audit.PinAtVersion(cfg.Home(), *allow, hashing.WriteVersion(), *reason, os.Getenv("USER"))
+ 		if err != nil {
+ 			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+diff --git a/internal/audit/audit.go b/internal/audit/audit.go
+index f75aa0c729d83cd553eedfc9b23aebf608ad9db1..b4fa515a7f5d75aca4ad9f9c6bca7345591062d1 100644
+--- a/internal/audit/audit.go
++++ b/internal/audit/audit.go
+@@ -450,6 +450,12 @@ func Pin(home, contentHash, reason, pinnedBy string) (string, error) {
+ // never inferred from digest bytes: v1 writes the frozen schema-1 shape
+ // byte-identically, v2 writes schema 2 with hash_version 2.
+ func PinAtVersion(home, contentHash string, version hashing.Version, reason, pinnedBy string) (string, error) {
++	// N8: parse the supported content identity before any filesystem
++	// access; non-digests never reach the trust directory.
++	digest, err := hashing.ParseDigest(contentHash)
++	if err != nil {
++		return "", err
++	}
+ 	record := map[string]any{
+ 		"content_sha256": strings.ToLower(contentHash),
+ 		"pinned":         true,
+@@ -465,7 +471,10 @@ func PinAtVersion(home, contentHash string, version hashing.Version, reason, pin
+ 	default:
+ 		return "", fmt.Errorf("unsupported content hash version %d", version)
+ 	}
+-	dir := trustDir(home, contentHash)
++	dir, err := pinDir(home, digest)
++	if err != nil {
++		return "", err
++	}
+ 	if err := os.MkdirAll(dir, 0o755); err != nil {
+ 		return "", err
+ 	}
+@@ -513,6 +522,19 @@ func trustDir(home, contentHash string) string {
+ 	return filepath.Join(home, "audit", hashing.Normalize(contentHash))
+ }
+ 
++// pinDir resolves the trust directory for an already-parsed digest and
++// refuses any path that escapes the audit namespace. A parsed digest is
++// bare hex by construction, so this check is defense in depth: it holds
++// even if the digest grammar ever widens.
++func pinDir(home, digest string) (string, error) {
++	root := filepath.Join(home, "audit")
++	dir := filepath.Join(root, digest)
++	if dir == root || !strings.HasPrefix(dir, root+string(filepath.Separator)) {
++		return "", fmt.Errorf("pin for %q escapes the audit namespace", digest)
++	}
++	return dir, nil
++}
++
+ func verdictPath(cfg *config.Config, contentHash string) string {
+ 	key := strings.Join([]string{cfg.Audit.Backend, cfg.Audit.Model, PromptVersion, RulesetVersion}, "-")
+ 	return filepath.Join(trustDir(cfg.Home(), contentHash), "verdict-"+key+".json")
+diff --git a/internal/audit/pin_digest_test.go b/internal/audit/pin_digest_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c112696c4df49dab1a159e69f890a87f25c546f
+--- /dev/null
++++ b/internal/audit/pin_digest_test.go
+@@ -0,0 +1,47 @@
++package audit
++
++// N8 regression at the library boundary: Pin parses a supported content
++// identity before any filesystem access and refuses everything else, so
++// pin state stays inside the audit namespace.
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// TestPinRefusesNonDigest refuses path-shaped and malformed values without
++// touching the filesystem, and still pins a supported digest through the
++// same entry. A mutant that drops the Pin validation pins the traversal
++// input and fails the refusal rows.
++func TestPinRefusesNonDigest(t *testing.T) {
++	for _, allow := range []string{
++		"",
++		"../escape",
++		"sub/dir",
++		strings.Repeat("a", 63),
++		strings.Repeat("z", 64),
++	} {
++		home := t.TempDir()
++		if _, err := Pin(home, allow, "synthetic approval", "fixture"); err == nil {
++			t.Fatalf("Pin(%q) succeeded, want a refusal", allow)
++		}
++		if _, err := os.Stat(filepath.Join(home, "audit")); !os.IsNotExist(err) {
++			t.Fatalf("refused Pin(%q) touched the audit namespace", allow)
++		}
++		if _, err := os.Stat(filepath.Join(home, "escape")); !os.IsNotExist(err) {
++			t.Fatalf("refused Pin(%q) wrote outside the audit namespace", allow)
++		}
++	}
++	digest := "sha256:" + strings.Repeat("c", 64)
++	home := t.TempDir()
++	path, err := Pin(home, digest, "synthetic approval", "fixture")
++	if err != nil {
++		t.Fatalf("Pin(%q): %v", digest, err)
++	}
++	want := filepath.Join(home, "audit", strings.Repeat("c", 64), "trust.json")
++	if path != want {
++		t.Fatalf("Pin(%q) = %s, want %s", digest, path, want)
++	}
++}
+diff --git a/internal/hashing/hashing.go b/internal/hashing/hashing.go
+index 632833758da7fb79ede5b822cf97e5764982b079..12590d2d18a68e71e636cac24ceade3c2f3db517 100644
+--- a/internal/hashing/hashing.go
++++ b/internal/hashing/hashing.go
+@@ -282,3 +282,23 @@ func contentSHA256V2(root string, exclude map[string]bool) (string, error) {
+ func Normalize(hash string) string {
+ 	return strings.ToLower(strings.TrimPrefix(strings.TrimSpace(hash), "sha256:"))
+ }
++
++// ParseDigest validates a supported content identity and returns its
++// normalized directory form: the lowercase bare 64-hex digest. An
++// optional "sha256:" prefix is accepted; every other spelling — paths,
++// traversal, wrong length, non-hex — is refused before any filesystem
++// access, so pin state can never escape its audit namespace.
++func ParseDigest(hash string) (string, error) {
++	trimmed := strings.TrimPrefix(strings.TrimSpace(hash), "sha256:")
++	if len(trimmed) != 64 {
++		return "", fmt.Errorf("invalid content hash %q: want 64 hex characters with an optional sha256: prefix", hash)
++	}
++	for i := 0; i < len(trimmed); i++ {
++		c := trimmed[i]
++		if c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F' {
++			continue
++		}
++		return "", fmt.Errorf("invalid content hash %q: want 64 hex characters with an optional sha256: prefix", hash)
++	}
++	return strings.ToLower(trimmed), nil
++}

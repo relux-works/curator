@@ -1,0 +1,83 @@
+TASK-261008-1j34ro (N8 rework 1: answer rev1 F1+F2) — developer results (revision 2)
+
+CHANGE vs revision 1 (production boundary cmdAudit + regression tests only;
+rev1 ParseDigest/pinDir/PinAtVersion logic and CHANGELOG entries kept as-is)
+- cmd/curator/main.go (cmdAudit): --allow presence is now explicit via
+  flags.Visit instead of `*allow != ""`. A supplied value — including an
+  explicit empty one in both `--allow ""` and `--allow=` spellings — is
+  validated (reason required, then hashing.ParseDigest) with a usage refusal
+  before loadConfig, i.e. before any configuration or filesystem access. The
+  same presence flag drives the pin branch. Plain `audit` without --allow
+  keeps its existing behavior (F1).
+- cmd/curator/audit_allow_test.go: new TestAuditAllowRefusalPrecedesConfigLoad
+  drives the production run() entry with a loadCountingSource that records
+  configuration Load calls. All 6 refused values (empty in both spellings,
+  parent traversal, nested path, short digest, non-hex digest) must exit
+  usage AND record zero Load calls. An admitted-digest control row pins with
+  exit 0 and a nonzero Load count, proving the counter observes real loads.
+  assertNoPinState now propagates WalkDir read errors instead of ignoring
+  them (a failed read is reported, never treated as absence) (F2).
+- internal/audit/pin_digest_test.go: added "" to the refused inputs at the
+  library boundary (F1 class).
+- CHANGELOG.md: unchanged this revision; N7 and N8 entries both present.
+
+TESTS (no "wave2" in names)
+- TestAuditAllowPinsOnlySupportedContentIdentity (rev1, kept): 3 allow rows
+  pin exit 0; 4 refuse rows require nonzero exit and no pin state.
+- TestAuditAllowRefusalPrecedesConfigLoad (new, F2): 6 refuse rows require
+  exitUsage + zero Load calls; 1 admitted control row pins exit 0 with
+  nonzero loads.
+- TestPinRefusesNonDigest (rev1 + empty row): 5 malformed inputs refused by
+  Pin with no audit-namespace writes; one sha256:-prefixed digest pins.
+
+COMPILE-ONLY TAIL (local, R223 — no `go test`, test binaries, or `go run`)
+- go vet ./...            -> exit 0
+- go build ./...          -> exit 0
+- gofmt -l <5 touched files> -> no output (clean)
+- git diff --check        -> exit 0
+- Disposable-clone vet of the red tree (cmd/curator + internal/audit) and
+  of the ordering tree (cmd/curator) -> exit 0 (mutants compile; refusals
+  are behavioral, not build breaks)
+
+HOSTED EVIDENCE (full CI matrix per run; all snapshot branches deleted)
+- GREEN (exact candidate, 3573df19): https://github.com/relux-works/curator/actions/runs/37891286118
+  conclusion success; 20/20 jobs success (2 skips trigger-inapplicable:
+  candidate-suite needs dispatch input, rose-air lane not on this trigger).
+  test-evidence-ubuntu-latest ledger: TestAuditAllowPinsOnlySupportedContentIdentity
+  8/8 pass (parent + 7 subtests), TestAuditAllowRefusalPrecedesConfigLoad 8/8
+  pass (parent + 6 refuse + 1 admitted control), TestPinRefusesNonDigest pass.
+  Negative controls green in the same run: TestPinAtVersionWritesVersionedCarrier,
+  TestV2RejectsLegacyV1Pin, TestV1RejectsV2Pin, TestRequirePinForOldSchemas,
+  TestCheckSourceAuditPinPreserved, TestAuditAllowWritesWriterVersionPinCarrier
+  (parent + v1/v2 writers), TestDraftAuditPinDoesNotWaiveStrictFindings
+  (parent + fresh/cached); zero fail rows in the ubuntu lane ledger.
+- RED (only the 3 production files reverted to d46f2b1f, 2deff1c7):
+  https://github.com/relux-works/curator/actions/runs/37891285927
+  conclusion failure; Test lanes fail on ubuntu/macos/windows + both Race
+  lanes fail; Lint passes (red tree builds). Failing cases are exactly the
+  new regression tests, nothing else: TestAuditAllowPinsOnlySupportedContentIdentity
+  + its 4 refuse subtests, TestAuditAllowRefusalPrecedesConfigLoad + its 6
+  refuse subtests (incl. refuse/empty-split and refuse/empty-equals),
+  TestPinRefusesNonDigest; only the cmd/curator and internal/audit packages
+  fail. The allow/admitted control subtests pass on red, proving the refusal
+  rows — not setup — detect the bug.
+- ORDERING (candidate with loadConfig moved ahead of the CLI parse, 1eada290;
+  diff vs green is exactly that 4-line move):
+  https://github.com/relux-works/curator/actions/runs/37891285902
+  conclusion failure. Only TestAuditAllowRefusalPrecedesConfigLoad + its 6
+  refuse subtests fail, with `refused --allow reached configuration
+  (1 Load calls), want zero`; the older refusal test passes on this mutant,
+  proving the no-Load assertion — not the exit code — establishes ordering.
+
+PROCEDURE NOTE
+- scratch/** pushes do not trigger CI (ci.yml push filter is main + gate/**),
+  so the three hosted runs used throwaway gate/** snapshot branches pushed
+  from a disposable /tmp clone: gate/STORY-261009-33rpbn/261009-n8-rev2-green
+  (3573df19, tree byte-identical to the worktree candidate at push time),
+  .../261009-n8-rev2-red (2deff1c7), .../261009-n8-rev2-ordering (1eada290).
+  The worktree was never reverted and still holds the exact green candidate,
+  uncommitted. All 3 scratch/* and all 3 gate/* branches deleted after the
+  run URLs and verdicts were recorded (verified empty via ls-remote).
+- Scratch commits are unsigned (-c commit.gpgsign=false): the signing key
+  needs an interactive passphrase; branches were deleted after use.
+- Logbook: no LOGBOOK edits per the task brief.
