@@ -13,6 +13,9 @@ All notable implementation changes are recorded here.
   instead of failing on it: the recognized link is replaced transactionally
   while foreign shims and changed preimages are still refused
   (TASK-261008-eaqg8a).
+- `audit --allow` pins now record their creation time: every new pin stores
+  when it was issued alongside the content hash, operator, and reason, so
+  approvals carry provenance (TASK-261008-1pg0pd).
 
 ## v0.15.0-rc.5 — 2026-10-08
 

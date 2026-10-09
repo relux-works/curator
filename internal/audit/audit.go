@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/config"
@@ -439,22 +440,26 @@ const (
 )
 
 // Pin records operator trust for a v1 content hash with a reason (Spec
-// §12.2). It writes the frozen schema-1 shape, which authorizes v1 reads
-// only; v2 identities need PinAtVersion with the v2 framing.
+// §12.2). It writes the schema-1 shape, which authorizes v1 reads
+// only; v2 identities need PinAtVersion with the v2 framing. Every pin
+// records its creation time alongside the content identity, operator
+// identity, and reason (manager source-audit contract).
 func Pin(home, contentHash, reason, pinnedBy string) (string, error) {
 	return PinAtVersion(home, contentHash, hashing.VersionV1, reason, pinnedBy)
 }
 
 // PinAtVersion records operator trust for a content hash in the given
 // framing version with a reason (Spec §12.2). The version is explicit,
-// never inferred from digest bytes: v1 writes the frozen schema-1 shape
-// byte-identically, v2 writes schema 2 with hash_version 2.
+// never inferred from digest bytes: v1 writes the schema-1 shape with
+// no hash_version member, v2 writes schema 2 with hash_version 2. Both
+// shapes stamp the UTC creation time in the created_at member.
 func PinAtVersion(home, contentHash string, version hashing.Version, reason, pinnedBy string) (string, error) {
 	record := map[string]any{
 		"content_sha256": strings.ToLower(contentHash),
 		"pinned":         true,
 		"pinned_by":      pinnedBy,
 		"reason":         reason,
+		"created_at":     time.Now().UTC().Format(time.RFC3339),
 	}
 	switch version {
 	case 0, hashing.VersionV1:

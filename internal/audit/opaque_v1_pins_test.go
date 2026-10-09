@@ -18,8 +18,9 @@ import (
 )
 
 // A new v2 pin records schema 2 with hash_version 2; v1 pins keep the
-// byte-identical frozen schema-1 shape with no hash_version member,
-// whether written by the legacy writer or the versioned writer.
+// schema-1 shape with no hash_version member, whether written by the
+// legacy writer or the versioned writer. (Both shapes also stamp
+// created_at; the CLI creation-time regression asserts that member.)
 func TestPinAtVersionWritesVersionedCarrier(t *testing.T) {
 	digest := "sha256:" + strings.Repeat("a", 64)
 
