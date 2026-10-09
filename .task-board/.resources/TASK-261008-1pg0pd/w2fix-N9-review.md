@@ -1,0 +1,2 @@
+# Review note (TASK-261008-1pg0pd, fix N9)
+Check the fix against section N9 of .research/261004_inline-audit-wave-2.md: the invariant holds at the production boundary, the regression test fails without the fix (name the mutant you ran in a disposable clone; compile-only locally per R223, the hosted gate runs suites), the negative controls still pass, the CHANGELOG line is accurate. accept_cr with the live checklist if it holds.

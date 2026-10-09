@@ -1,0 +1,147 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 09cf1679f3c159f6081583cbf478f974fcf2d5af..538ab3a20dba42b46a33d4df75d8e59dff349690 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -13,6 +13,9 @@ All notable implementation changes are recorded here.
+   instead of failing on it: the recognized link is replaced transactionally
+   while foreign shims and changed preimages are still refused
+   (TASK-261008-eaqg8a).
++- `audit --allow` pins now record their creation time: every new pin stores
++  when it was issued alongside the content hash, operator, and reason, so
++  approvals carry provenance (TASK-261008-1pg0pd).
+ 
+ ## v0.15.0-rc.5 — 2026-10-08
+ 
+diff --git a/cmd/curator/audit_pin_creation_time_test.go b/cmd/curator/audit_pin_creation_time_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..99438f177ae6677692af472b44ceaabc23a2ad0b
+--- /dev/null
++++ b/cmd/curator/audit_pin_creation_time_test.go
+@@ -0,0 +1,68 @@
++package main
++
++// Wave-2 finding N9 regression at the CLI production entry: `audit
++// --allow` records a defined creation time alongside the content
++// identity, operator identity, and reason (pinned manager source-audit
++// contract). A mutant that drops the timestamp leaves a pin with no
++// created_at member, which this test refuses; every other pin field
++// keeps its existing contract. This test runs on the hosted gate
++// (R194), like every cmd/curator suite.
++
++import (
++	"path/filepath"
++	"strings"
++	"testing"
++	"time"
++)
++
++func TestAuditAllowRecordsPinCreationTime(t *testing.T) {
++	digest := "sha256:" + strings.Repeat("c", 64)
++	t.Setenv("USER", "synthetic-operator")
++
++	for _, writer := range []struct {
++		name string
++		v2   bool
++	}{
++		{"v2-writer", true},
++		{"v1-writer", false},
++	} {
++		t.Run(writer.name, func(t *testing.T) {
++			pinAuditHashWriters(t, writer.v2)
++			_, home := legacyProject(t)
++			configPath := filepath.Join(home, "config.json")
++			before := time.Now().UTC()
++			if code, stdout, stderr := capture(t, configPath, "audit", "--allow", digest, "--reason", "synthetic approval"); code != exitOK {
++				t.Fatalf("audit --allow = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
++			}
++			after := time.Now().UTC()
++
++			raw := readCLIPinCarrier(t, home, digest)
++			if raw["content_sha256"] != strings.ToLower(digest) {
++				t.Fatalf("pin content_sha256 = %v, want %s", raw["content_sha256"], strings.ToLower(digest))
++			}
++			if raw["pinned"] != true {
++				t.Fatalf("pin pinned = %v, want true", raw["pinned"])
++			}
++			if raw["pinned_by"] != "synthetic-operator" {
++				t.Fatalf("pin pinned_by = %v, want synthetic-operator", raw["pinned_by"])
++			}
++			if raw["reason"] != "synthetic approval" {
++				t.Fatalf("pin reason = %v, want synthetic approval", raw["reason"])
++			}
++			stamped, ok := raw["created_at"].(string)
++			if !ok || stamped == "" {
++				t.Fatalf("pin created_at = %v, want a defined creation timestamp", raw["created_at"])
++			}
++			if !strings.HasSuffix(stamped, "Z") {
++				t.Fatalf("pin created_at = %q, want an RFC3339 UTC timestamp", stamped)
++			}
++			parsed, err := time.Parse(time.RFC3339, stamped)
++			if err != nil {
++				t.Fatalf("pin created_at = %q, want a valid timestamp: %v", stamped, err)
++			}
++			if parsed.Before(before.Add(-time.Minute)) || parsed.After(after.Add(time.Minute)) {
++				t.Fatalf("pin created_at = %q outside the pin window %v..%v", stamped, before, after)
++			}
++		})
++	}
++}
+diff --git a/internal/audit/audit.go b/internal/audit/audit.go
+index f75aa0c729d83cd553eedfc9b23aebf608ad9db1..ef69f88d93c7a30d91f64ddbaee0a37378e063e0 100644
+--- a/internal/audit/audit.go
++++ b/internal/audit/audit.go
+@@ -14,6 +14,7 @@ import (
+ 	"regexp"
+ 	"sort"
+ 	"strings"
++	"time"
+ 
+ 	"github.com/relux-works/curator/internal/capabilities"
+ 	"github.com/relux-works/curator/internal/config"
+@@ -439,22 +440,26 @@ const (
+ )
+ 
+ // Pin records operator trust for a v1 content hash with a reason (Spec
+-// §12.2). It writes the frozen schema-1 shape, which authorizes v1 reads
+-// only; v2 identities need PinAtVersion with the v2 framing.
++// §12.2). It writes the schema-1 shape, which authorizes v1 reads
++// only; v2 identities need PinAtVersion with the v2 framing. Every pin
++// records its creation time alongside the content identity, operator
++// identity, and reason (manager source-audit contract).
+ func Pin(home, contentHash, reason, pinnedBy string) (string, error) {
+ 	return PinAtVersion(home, contentHash, hashing.VersionV1, reason, pinnedBy)
+ }
+ 
+ // PinAtVersion records operator trust for a content hash in the given
+ // framing version with a reason (Spec §12.2). The version is explicit,
+-// never inferred from digest bytes: v1 writes the frozen schema-1 shape
+-// byte-identically, v2 writes schema 2 with hash_version 2.
++// never inferred from digest bytes: v1 writes the schema-1 shape with
++// no hash_version member, v2 writes schema 2 with hash_version 2. Both
++// shapes stamp the UTC creation time in the created_at member.
+ func PinAtVersion(home, contentHash string, version hashing.Version, reason, pinnedBy string) (string, error) {
+ 	record := map[string]any{
+ 		"content_sha256": strings.ToLower(contentHash),
+ 		"pinned":         true,
+ 		"pinned_by":      pinnedBy,
+ 		"reason":         reason,
++		"created_at":     time.Now().UTC().Format(time.RFC3339),
+ 	}
+ 	switch version {
+ 	case 0, hashing.VersionV1:
+diff --git a/internal/audit/opaque_v1_pins_test.go b/internal/audit/opaque_v1_pins_test.go
+index f2d317210bb777a682743c60cc7fc887383d0c70..65d6d818f09f07a280674edfe34122c840392a05 100644
+--- a/internal/audit/opaque_v1_pins_test.go
++++ b/internal/audit/opaque_v1_pins_test.go
+@@ -18,8 +18,9 @@ import (
+ )
+ 
+ // A new v2 pin records schema 2 with hash_version 2; v1 pins keep the
+-// byte-identical frozen schema-1 shape with no hash_version member,
+-// whether written by the legacy writer or the versioned writer.
++// schema-1 shape with no hash_version member, whether written by the
++// legacy writer or the versioned writer. (Both shapes also stamp
++// created_at; the CLI creation-time regression asserts that member.)
+ func TestPinAtVersionWritesVersionedCarrier(t *testing.T) {
+ 	digest := "sha256:" + strings.Repeat("a", 64)
+ 
