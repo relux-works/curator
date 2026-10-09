@@ -94,21 +94,17 @@ spawn run completed: codex (run=RUN-261002-858673, pid=22471, exit=0)
 ## Outcome Resources
 - [BUG-260923-2afgyq_spawn-log_-implementer--developer--codex-_RUN-261002-e4234e.log](file://BUG-260923-2afgyq/BUG-260923-2afgyq_spawn-log_-implementer--developer--codex-_RUN-261002-e4234e.log) — System spawn log captured by task-board
 - [BUG-260923-2afgyq_results.md](file://BUG-260923-2afgyq/BUG-260923-2afgyq_results.md) — Revision 2 refresh proof, green gates, and documented checklist handoff retry
-- [BUG-260923-2afgyq_evidence.tar.gz](file://BUG-260923-2afgyq/BUG-260923-2afgyq_evidence.tar.gz) — Validation logs and exit codes, eight mutants, exact row removals, and handoff diagnostic
 - [BUG-260923-2afgyq_change-request_rev1.patch](file://BUG-260923-2afgyq/BUG-260923-2afgyq_change-request_rev1.patch) — Change Request CR-BUG-260923-2afgyq-1 revision 1 candidate patch (repository_delta=present, 4 changed paths)
 - [BUG-260923-2afgyq_change-request_rev1-validation.log](file://BUG-260923-2afgyq/BUG-260923-2afgyq_change-request_rev1-validation.log) — Change Request CR-BUG-260923-2afgyq-1 revision 1 bounded validation log
 - [BUG-260923-2afgyq_spawn-log_-reviewer--reviewer--codex-_RUN-261002-f68e22.log](file://BUG-260923-2afgyq/BUG-260923-2afgyq_spawn-log_-reviewer--reviewer--codex-_RUN-261002-f68e22.log) — System spawn log captured by task-board
-- [BUG-260923-2afgyq_review-evidence-rev1.tar.gz](file://BUG-260923-2afgyq/BUG-260923-2afgyq_review-evidence-rev1.tar.gz) — Independent review logs, five killed mutants, exact ledger counts, and failed install attempts
 - [BUG-260923-2afgyq_review-verdict-rev1.md](file://BUG-260923-2afgyq/BUG-260923-2afgyq_review-verdict-rev1.md) — Accepted revision 1: scoped review evidence and explicit full-install validation limits
 - [BUG-260923-2afgyq_acceptance-receipt-rev1.md](file://BUG-260923-2afgyq/BUG-260923-2afgyq_acceptance-receipt-rev1.md) — Persisted acceptance and non-blocking board boundary warning
 - [BUG-260923-2afgyq_spawn-log_-implementer--developer--codex-_RUN-261002-23622f.log](file://BUG-260923-2afgyq/BUG-260923-2afgyq_spawn-log_-implementer--developer--codex-_RUN-261002-23622f.log) — System spawn log captured by task-board
 - [BUG-260923-2afgyq_integration-preflight_RUN-261002-23622f.md](file://BUG-260923-2afgyq/BUG-260923-2afgyq_integration-preflight_RUN-261002-23622f.md) — Fresh integration preflight, accepted candidate identity, validation evidence bounds, and observed remote advance
 - [BUG-260923-2afgyq_spawn-log_-implementer--developer--codex-_RUN-261002-3a0a51.log](file://BUG-260923-2afgyq/BUG-260923-2afgyq_spawn-log_-implementer--developer--codex-_RUN-261002-3a0a51.log) — System spawn log captured by task-board
-- [BUG-260923-2afgyq_refresh-evidence.tar.gz](file://BUG-260923-2afgyq/BUG-260923-2afgyq_refresh-evidence.tar.gz) — Revision 2 refresh evidence: exact source merge, ledger counts, command exit codes and raw logs
 - [BUG-260923-2afgyq_change-request_rev2.patch](file://BUG-260923-2afgyq/BUG-260923-2afgyq_change-request_rev2.patch) — Change Request CR-BUG-260923-2afgyq-2 revision 2 candidate patch (repository_delta=present, 4 changed paths)
 - [BUG-260923-2afgyq_change-request_rev2-validation.log](file://BUG-260923-2afgyq/BUG-260923-2afgyq_change-request_rev2-validation.log) — Change Request CR-BUG-260923-2afgyq-2 revision 2 bounded validation log
 - [BUG-260923-2afgyq_spawn-log_-reviewer--reviewer--codex-_RUN-261002-f26ac2.log](file://BUG-260923-2afgyq/BUG-260923-2afgyq_spawn-log_-reviewer--reviewer--codex-_RUN-261002-f26ac2.log) — System spawn log captured by task-board
-- [BUG-260923-2afgyq_review-evidence-rev2.tar.gz](file://BUG-260923-2afgyq/BUG-260923-2afgyq_review-evidence-rev2.tar.gz) — Independent rev2 patch comparison and three passing -work package logs
 - [BUG-260923-2afgyq_review-verdict-rev2.md](file://BUG-260923-2afgyq/BUG-260923-2afgyq_review-verdict-rev2.md) — Accepted refresh identity, exact ledger counts, inherited rev1 substantive review and validation bounds
 - [BUG-260923-2afgyq_acceptance-receipt-rev2.md](file://BUG-260923-2afgyq/BUG-260923-2afgyq_acceptance-receipt-rev2.md) — Persisted rev2 acceptance and non-blocking write-boundary diagnostic
 - [BUG-260923-2afgyq_spawn-log_-implementer--developer--codex-_RUN-261002-858673.log](file://BUG-260923-2afgyq/BUG-260923-2afgyq_spawn-log_-implementer--developer--codex-_RUN-261002-858673.log) — System spawn log captured by task-board
@@ -118,7 +114,7 @@ spawn run completed: codex (run=RUN-261002-858673, pid=22471, exit=0)
 2026-09-23T13:03:36Z
 
 ## Last Update
-2026-10-02T08:52:33Z
+2026-10-09T11:04:46Z
 
 ## Assigned To
 [implementer] developer (codex)
