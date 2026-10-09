@@ -1,0 +1,159 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 2293473c2f97ae7b58e2160e7e35a13889128c45..09cf1679f3c159f6081583cbf478f974fcf2d5af 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -9,6 +9,10 @@ All notable implementation changes are recorded here.
+ - A credential helper answer larger than the 64-KiB bound is now refused
+   outright instead of being silently truncated and accepted as a different
+   credential; the affected host simply reports no credential.
++- Global installs now reconcile a manager-owned legacy forwarding symlink
++  instead of failing on it: the recognized link is replaced transactionally
++  while foreign shims and changed preimages are still refused
++  (TASK-261008-eaqg8a).
+ 
+ ## v0.15.0-rc.5 — 2026-10-08
+ 
+diff --git a/internal/globalbins/globalbins.go b/internal/globalbins/globalbins.go
+index 20280127952bd77446860fb3606d866e8a6468c1..3aaf3c9386596dc01c5be0346995a007e90d8579 100644
+--- a/internal/globalbins/globalbins.go
++++ b/internal/globalbins/globalbins.go
+@@ -385,6 +385,17 @@ func ownedTarget(path, canonical, platform string) bool {
+ 	return samePath(target, canonical, platform)
+ }
+ 
++// ownedLegacyLink reports whether path is the pre-transaction symlink form of
++// a manager-owned forwarding shim. Only a link recognized by ownedTarget
++// qualifies; a foreign or otherwise unrecognized link never becomes a target.
++func ownedLegacyLink(path, canonical, platform string) bool {
++	info, err := os.Lstat(path)
++	if err != nil || info.Mode()&os.ModeSymlink == 0 {
++		return false
++	}
++	return ownedTarget(path, canonical, platform)
++}
++
+ // ledgerPayload renders the canonical ownership ledger bytes so a staged ledger
+ // is byte-identical to a directly written one.
+ func ledgerPayload(entries map[string]bool) ([]byte, error) {
+diff --git a/internal/globalbins/stage.go b/internal/globalbins/stage.go
+index f2f71805da1a568d592479b5d0670c1351e12f30..8fa177c3f8464a19b18a096114fae924c20cea65 100644
+--- a/internal/globalbins/stage.go
++++ b/internal/globalbins/stage.go
+@@ -131,9 +131,22 @@ func StageForwarding(
+ 		return Forwarding{}, err
+ 	}
+ 	for _, desired := range transition.Desired {
++		canonical := shimPath(canonicalBin, desired.Command, platform)
++		if ownedLegacyLink(desired.LivePath, canonical, platform) {
++			// A recognized legacy link is the directory entry itself, not
++			// byte content: the transaction journals the link and restores
++			// its exact destination on rollback.
++			forwarding.plan.ReplaceEntry(staging.ClassForwardingShim, desired.Command, desired.LivePath, desired.StagedPath)
++			continue
++		}
+ 		forwarding.plan.Replace(staging.ClassForwardingShim, desired.Command, desired.LivePath, desired.StagedPath)
+ 	}
+ 	for _, removal := range transition.Removals {
++		canonical := shimPath(canonicalBin, removal.Command, platform)
++		if ownedLegacyLink(removal.LivePath, canonical, platform) {
++			forwarding.plan.RemoveEntry("forwarding-shim/"+removal.Command, removal.LivePath)
++			continue
++		}
+ 		forwarding.plan.Remove("forwarding-shim/"+removal.Command, removal.LivePath)
+ 	}
+ 
+diff --git a/internal/install/global_legacy_link_test.go b/internal/install/global_legacy_link_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..abb69800d9e60f7438271818898d126881d623c0
+--- /dev/null
++++ b/internal/install/global_legacy_link_test.go
+@@ -0,0 +1,89 @@
++package install
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/globalbins"
++	"github.com/relux-works/curator/internal/runtimestore"
++	"github.com/relux-works/curator/internal/transaction"
++)
++
++// TestGlobalReconcilesOwnedLegacyForwardingLink drives install.Global against
++// every user-bin shim state: an owned regular launcher and an owned legacy
++// symlink must both reconcile, while foreign bytes — present at planning or
++// swapped in after preparation — must be preserved and never adopted.
++func TestGlobalReconcilesOwnedLegacyForwardingLink(t *testing.T) {
++	for _, shape := range []string{"owned-regular", "foreign-regular", "owned-legacy-link", "foreign-after-prepare"} {
++		t.Run(shape, func(t *testing.T) {
++			e := newEnv(t)
++			e.skill("legacy-skill")
++			e.globalDeclareAll("legacy-skill")
++			user := t.TempDir()
++			bin := filepath.Join(user, "bin")
++			if err := os.Mkdir(bin, 0o700); err != nil {
++				t.Fatal(err)
++			}
++			t.Setenv(globalbins.UserBinEnv, bin)
++			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
++			opts := Options{Platform: installPlatform()}
++			first := Global(e.cfg, user, opts)
++			if first.Status != "ok" {
++				t.Fatalf("initial global install: %+v", first)
++			}
++			name := "legacy-skill-tool"
++			published := filepath.Join(bin, shimName(name))
++			switch shape {
++			case "foreign-regular":
++				if err := os.WriteFile(published, []byte("foreign bytes\n"), 0o700); err != nil {
++					t.Fatal(err)
++				}
++			case "owned-legacy-link":
++				if installPlatform() == "windows" {
++					t.Skip("Unix legacy-link reconciliation is exercised on Linux and macOS")
++				}
++				messages := globalbins.Refresh(e.home, map[string]bool{name: true}, installPlatform(), nil, user)
++				info, err := os.Lstat(published)
++				if err != nil || info.Mode()&os.ModeSymlink == 0 {
++					t.Fatalf("Refresh did not make legacy link: %v %v", err, messages)
++				}
++			case "foreign-after-prepare":
++				opts.Commit.Hooks = transaction.Hooks{Fault: func(event transaction.Event) error {
++					if event.Point == transaction.PointPrepared {
++						return os.WriteFile(published, []byte("foreign bytes\n"), 0o700)
++					}
++					return nil
++				}}
++			}
++			result := Global(e.cfg, user, opts)
++			t.Logf("Global status=%s errors=%v", result.Status, result.Errors)
++			if strings.HasPrefix(shape, "foreign") {
++				got, err := os.ReadFile(published)
++				if err != nil || string(got) != "foreign bytes\n" {
++					t.Fatalf("foreign shim changed: %q %v", got, err)
++				}
++				if shape == "foreign-after-prepare" && result.Status == "ok" {
++					t.Fatal("preimage drift must fail")
++				}
++			} else if result.Status != "ok" {
++				t.Fatalf("manager-owned forwarding shim cannot be reconciled: %+v", result)
++			}
++			if shape == "owned-legacy-link" && result.Status == "ok" {
++				info, err := os.Lstat(published)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if info.Mode()&os.ModeSymlink != 0 {
++					t.Fatal("reconciled forwarding shim is still a link")
++				}
++				canonical := filepath.Join(GlobalRoot(e.home), "bin", shimName(name))
++				got, err := os.ReadFile(published)
++				if err != nil || string(got) != runtimestore.UnixShimContent(canonical, nil) {
++					t.Fatalf("reconciled shim bytes = %q, %v; want the current forwarding launcher", got, err)
++				}
++			}
++		})
++	}
++}

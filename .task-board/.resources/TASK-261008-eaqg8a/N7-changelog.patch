@@ -1,0 +1,18 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 6c8c0e42..17b7512b 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,13 @@ All notable implementation changes are recorded here.
+ 
+ ## Unreleased
+ 
++### Fixed
++
++- Global installs now reconcile a manager-owned legacy forwarding symlink
++  instead of failing on it: the recognized link is replaced transactionally
++  while foreign shims and changed preimages are still refused
++  (TASK-261008-eaqg8a).
++
+ ## v0.15.0-rc.5 — 2026-10-08
+ 
+ ### Added
