@@ -884,7 +884,7 @@ func TestStatusReportMarksCompiledStateThatMovedDuringTheCheck(t *testing.T) {
 
 	scope := projectStatusScope(cfg, project, "app")
 	settled := markerDigests(scope.stores...)
-	_, rows := statusReport(cfg, scope, facts, settled)
+	_, rows := statusReport(cfg, scope, facts, settled, nil, "")
 	if len(rows) != 1 || rows[0].State != buildCurrent {
 		t.Fatalf("settled compiled state = %+v", rows)
 	}
@@ -892,7 +892,7 @@ func TestStatusReportMarksCompiledStateThatMovedDuringTheCheck(t *testing.T) {
 	// The marker really does move between the two fingerprints, exactly as a
 	// concurrent install would move it.
 	rewriteMarker(t, installed, func(object map[string]any) { object["ref"] = "v2" })
-	drift, rows := statusReport(cfg, scope, facts, settled)
+	drift, rows := statusReport(cfg, scope, facts, settled, nil, "")
 	if len(rows) != 1 || rows[0].State != buildStateChanged {
 		t.Fatalf("moved compiled state = %+v", rows)
 	}
@@ -911,7 +911,7 @@ func TestStatusReportReportsCompiledCommandsOfAnUninstalledSkill(t *testing.T) {
 	cfg := &config.Config{Path: filepath.Join(t.TempDir(), "home", "config.json"), SkillsRoot: t.TempDir()}
 	facts := []buildFacts{testFacts(string(install.BuildCacheHit))}
 
-	drift, rows := statusReport(cfg, projectStatusScope(cfg, project, "app"), facts, map[string]string{})
+	drift, rows := statusReport(cfg, projectStatusScope(cfg, project, "app"), facts, map[string]string{}, nil, "")
 	if len(rows) != 1 || rows[0].State != stateNotInstalled {
 		t.Fatalf("rows = %+v", rows)
 	}
@@ -1073,7 +1073,7 @@ func TestStatusReportFindsASchema8InstallationCurrent(t *testing.T) {
 
 			scope := projectStatusScope(cfg, project, "app")
 			drift, rows := statusReport(cfg, scope, []buildFacts{testFacts(string(install.BuildCacheHit))},
-				markerDigests(scope.stores...))
+				markerDigests(scope.stores...), nil, "")
 			if len(rows) != 1 || rows[0].State != buildCurrent {
 				t.Fatalf("marker schema %d: rows = %+v", band.markerSchema, rows)
 			}

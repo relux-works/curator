@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -1005,7 +1006,7 @@ func (c cli) cmdStatus(args []string) int {
 				builds = classifyScopeBuilds(cfg, scope, facts, before, drift)
 			}
 		} else {
-			drift, builds = statusReport(cfg, scope, facts, before)
+			drift, builds = statusReport(cfg, scope, facts, before, result.LegacyPackages, result.LegacyLockSHA256)
 		}
 		// The shell-hook trust posture (Manager profile §8.6) extends
 		// the document additively under its own key; an all-approved
@@ -1138,7 +1139,7 @@ func globalStatusScope(cfg *config.Config) statusScope {
 
 // statusDrift compares declared skills with installed markers.
 func statusDrift(cfg *config.Config, projectRoot string) map[string]string {
-	return scopeStatusDrift(cfg, projectRoot, filepath.Join(projectRoot, ".agents", "skills"))
+	return scopeStatusDrift(cfg, projectRoot, filepath.Join(projectRoot, ".agents", "skills"), nil, "")
 }
 
 // statusReport is the complete read-only currentness verdict of one scope: the
@@ -1153,8 +1154,10 @@ func statusReport(
 	scope statusScope,
 	builds []buildFacts,
 	before map[string]string,
+	legacyPackages map[string]*marker.Package,
+	legacyLock string,
 ) (map[string]string, []buildReport) {
-	drift := scopeStatusDrift(cfg, scope.manifestRoot, scope.skillsDir)
+	drift := scopeStatusDrift(cfg, scope.manifestRoot, scope.skillsDir, legacyPackages, legacyLock)
 	if len(builds) == 0 {
 		return drift, nil
 	}
@@ -1278,7 +1281,11 @@ func installedSkillDir(scope statusScope, skill string) (string, bool, error) {
 	return filepath.Join(scope.skillsDir, skill), false, nil
 }
 
-func scopeStatusDrift(cfg *config.Config, manifestRoot, skillsDir string) map[string]string {
+// legacyPackages and legacyLock carry the staged legacy-lane migration of
+// the read-only status plan (install.Result): the expected package per
+// migrated node plus the shared effective-lock digest. Package markers
+// compare against them exactly like the install currentness check.
+func scopeStatusDrift(cfg *config.Config, manifestRoot, skillsDir string, legacyPackages map[string]*marker.Package, legacyLock string) map[string]string {
 	drift := map[string]string{}
 	projectManifest, err := manifest.Load(manifestRoot)
 	if err != nil || projectManifest == nil {
@@ -1336,6 +1343,29 @@ func scopeStatusDrift(cfg *config.Config, manifestRoot, skillsDir string) map[st
 		resolved, err := gitops.Resolve(repo, decl.Ref.Kind, decl.Ref.Value)
 		if err != nil {
 			drift[decl.Name] = stateUnresolvable
+			continue
+		}
+		if recorded.Package != nil {
+			// A legacy-lane package marker (a schema-9 or
+			// subdirectory-selected installation under a schema-1
+			// Skillfile) compares against the staged effective
+			// plan exactly like the install currentness check:
+			// the recorded package and lock must equal the
+			// staged expectation. A changed declared ref is
+			// non-current even when it resolves to the same
+			// commit, because the staged lock binds the
+			// declaration (skillfile-sources §4). A commit-only
+			// comparison would admit that stale binding. A
+			// package with no staged expectation — the node no
+			// longer migrates, or the plan staged nothing — can
+			// never prove current and needs an install.
+			staged, ok := legacyPackages[decl.Name]
+			if !ok || staged == nil || legacyLock == "" ||
+				!reflect.DeepEqual(recorded.Package, staged) || recorded.LockSHA256 != legacyLock {
+				drift[decl.Name] = stateNeedsInstall
+			} else {
+				drift[decl.Name] = stateUpToDate
+			}
 			continue
 		}
 		if recorded.RefKind == decl.Ref.Kind && recorded.Ref == decl.Ref.Value && recorded.Commit == resolved.Commit {
@@ -1754,7 +1784,7 @@ func (c cli) reportGlobalStatus(cfg *config.Config, opts globalStatusOptions, ac
 		c.printStatusRefusal(result)
 	}
 
-	drift, builds := statusReport(cfg, scope, factsList(result.Builds), before)
+	drift, builds := statusReport(cfg, scope, factsList(result.Builds), before, result.LegacyPackages, result.LegacyLockSHA256)
 	if opts.jsonOut {
 		// The machine-wide document carries no `path`: the scope has no
 		// operator-supplied root, `alias` already identifies it, and the manager
@@ -2274,11 +2304,16 @@ func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string, 
 	}
 	subjects := make([]audit.Subject, 0, len(nodes))
 	for _, node := range nodes {
+		directory := node.Directory
+		if directory == "" {
+			directory = "."
+		}
+		packageIdentity, _ := audit.SkillPackage(node.Identity, node.Decl.Source, node.Name, node.Resolved.Commit, directory)
 		subjects = append(subjects, audit.Subject{
 			Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
 			Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
 			SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
-			Commands: node.Spec.Commands,
+			Directory: node.Directory, Package: packageIdentity, Commands: node.Spec.Commands,
 			// The audit CLI reports what an install would trust:
 			// the writer-version identity.
 			HashVersion: hashing.WriteVersion(),

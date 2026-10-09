@@ -70,7 +70,21 @@ type Subject struct {
 	Commit        string
 	Snapshot      string
 	SchemaVersion int
-	Capabilities  capabilities.Manifest
+	// Directory is the normalized selected package directory (core §4.4,
+	// draft-sources-v2): "." for a repository root, the portable
+	// repository-relative path otherwise. It is part of the audit-cache
+	// key, so a verdict for one directory is never reused for another
+	// directory merely because repository and commit match. Empty reads
+	// as "." for callers that predate the member.
+	Directory string
+	// Package is the selected source-types schema-1 package identity the
+	// audit-cache equality includes in full (core §4.4,
+	// skillfile-sources §4): a verdict cached for one repository,
+	// commit, or directory is a miss for any other. A zero Package
+	// states no identity; only callers without a statable package
+	// leave it unset, and their verdicts never match a stated one.
+	Package      SourcePackage
+	Capabilities capabilities.Manifest
 	// HashVersion is the content-hash framing the caller will compute
 	// or trust for this subject (Spec §8). The opaque-NUL interim rule
 	// applies exactly when it is v1: v2 hashes 0x00 as ordinary data.
@@ -359,9 +373,10 @@ func auditSubjectWithOpaquePaths(cfg *config.Config, subject Subject, persist bo
 	}
 
 	// Verdict cache: findings cached by (framing version, content hash),
-	// backend, model, and versions; the decision is recomputed under the
-	// current policy.
-	if findings, hit := loadCachedFindings(cfg, contentHash, version); hit {
+	// backend, model, versions, and the complete selected package
+	// identity (repository, commit, directory); the decision is
+	// recomputed under the current policy.
+	if findings, hit := loadCachedFindings(cfg, contentHash, version, subject); hit {
 		report.CacheHit = true
 		report.Findings = findings
 		report.Decision = decideWithPins(cfg, subject, contentHash, findings)
@@ -534,7 +549,88 @@ const (
 	verdictSchemaV2 = 2
 )
 
-func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.Version) ([]Finding, bool) {
+// subjectDirectory normalizes the audit-cache directory dimension of one
+// subject. Empty predates the member and reads as the repository root.
+func subjectDirectory(subject Subject) string {
+	if subject.Directory == "" {
+		return "."
+	}
+	return subject.Directory
+}
+
+// SkillPackage derives the source-types schema-1 Git package identity one
+// audit subject binds: the network-git arm for a canonical network
+// identity, the configured-git root arm for a local configured source.
+// source defaults to the skill name exactly as in schema 1; directory
+// normalizes an unset selection to the repository root. The second result
+// is false when no valid arm is statable — a commit that is not a full
+// object id, or a subdirectory selection without a network identity —
+// and the caller audits without a stated package instead of binding an
+// identity the arms forbid.
+func SkillPackage(identity, source, name, commit, directory string) (SourcePackage, bool) {
+	var format string
+	switch len(commit) {
+	case 40:
+		format = "sha1"
+	case 64:
+		format = "sha256"
+	default:
+		return SourcePackage{}, false
+	}
+	for _, c := range commit {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return SourcePackage{}, false
+		}
+	}
+	if directory == "" {
+		directory = "."
+	}
+	if identity != "" {
+		return SourcePackage{
+			Kind: SourcePackageNetworkGit, Repository: identity,
+			Commit: &SourceCommit{ObjectFormat: format, Hex: commit}, Directory: directory,
+		}, true
+	}
+	if directory != "." {
+		return SourcePackage{}, false
+	}
+	if source == "" {
+		source = name
+	}
+	return SourcePackage{
+		Kind: SourcePackageConfiguredGit, Source: source,
+		Commit: &SourceCommit{ObjectFormat: format, Hex: commit}, Directory: ".",
+	}, true
+}
+
+// sameAuditPackage reports whether a stored verdict package equals the
+// stated subject identity field for field. Either side unstated never
+// equals: a verdict cached without an identity cannot satisfy a subject
+// that states one, and a stated record cannot satisfy a subject that
+// states none.
+func sameAuditPackage(record, subject SourcePackage) bool {
+	if (record.Kind == "") != (subject.Kind == "") {
+		return false
+	}
+	if record.Kind == "" {
+		return true
+	}
+	if record.Kind != subject.Kind || record.Snapshot != subject.Snapshot ||
+		record.Repository != subject.Repository || record.Source != subject.Source ||
+		record.Directory != subject.Directory {
+		return false
+	}
+	if (record.Commit == nil) != (subject.Commit == nil) {
+		return false
+	}
+	if record.Commit != nil &&
+		(record.Commit.ObjectFormat != subject.Commit.ObjectFormat || record.Commit.Hex != subject.Commit.Hex) {
+		return false
+	}
+	return true
+}
+
+func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.Version, subject Subject) ([]Finding, bool) {
 	payload, err := os.ReadFile(verdictPath(cfg, contentHash)) // #nosec G304
 	if err != nil {
 		return nil, false
@@ -542,6 +638,9 @@ func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.
 	var data struct {
 		SchemaVersion int             `json:"schema_version"`
 		HashVersion   hashing.Version `json:"hash_version"`
+		Commit        string          `json:"commit"`
+		Directory     string          `json:"directory"`
+		Package       SourcePackage   `json:"package"`
 		Findings      []Finding       `json:"findings"`
 	}
 	if err := json.Unmarshal(payload, &data); err != nil {
@@ -557,6 +656,25 @@ func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.
 		return nil, false
 	}
 	if recordVersion != version {
+		return nil, false
+	}
+	// The local audit record binds the complete package identity (core
+	// §4.4, skillfile-sources §4 cache equality): a verdict cached for
+	// one repository, commit, or directory is a miss for any other, even
+	// when the content hash matches. Records that predate the package
+	// member state no identity and only ever match a subject that states
+	// none; records that predate the directory member bind the root.
+	if data.Commit != subject.Commit {
+		return nil, false
+	}
+	recordDirectory := data.Directory
+	if recordDirectory == "" {
+		recordDirectory = "."
+	}
+	if recordDirectory != subjectDirectory(subject) {
+		return nil, false
+	}
+	if !sameAuditPackage(data.Package, subject.Package) {
 		return nil, false
 	}
 	return data.Findings, true
@@ -609,12 +727,20 @@ func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject
 		"content_sha256":  strings.ToLower(contentHash),
 		"skill":           subject.Name,
 		"commit":          subject.Commit,
+		"directory":       subjectDirectory(subject),
 		"backend":         cfg.Audit.Backend,
 		"model":           cfg.Audit.Model,
 		"prompt_version":  PromptVersion,
 		"ruleset_version": RulesetVersion,
 		"findings":        findings,
 		"script_policies": policies,
+	}
+	// The record binds the stated package identity, when the subject
+	// states one, so cache equality covers the complete identity
+	// (core §4.4, skillfile-sources §4). Subjects without a statable
+	// package omit the member and match only unstated records.
+	if subject.Package.Kind != "" {
+		record["package"] = subject.Package
 	}
 	if version == hashing.VersionV2 {
 		record["schema_version"] = verdictSchemaV2

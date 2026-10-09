@@ -19,6 +19,7 @@ import (
 
 	"github.com/relux-works/curator/internal/adapters"
 	"github.com/relux-works/curator/internal/audit"
+	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/buildsource"
 	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
@@ -141,6 +142,16 @@ type Result struct {
 	// or key is non-current); it never authorizes. Nil when resolution
 	// never ran or failed.
 	Attestations map[string]*marker.Attestation
+	// LegacyPackages stages the legacy-lane package migration
+	// (skillfile-sources §4): the expected package per migrated node.
+	// LegacyLockSHA256 is the shared effective-lock digest those
+	// markers bind. A read-only status caller compares the recorded
+	// package and lock against them exactly like the install
+	// currentness check: a changed declared ref, package, or lock is
+	// non-current even when the commit matches. Both stay nil/empty
+	// when no node migrates or the run never staged the migration.
+	LegacyPackages   map[string]*marker.Package
+	LegacyLockSHA256 string
 }
 
 // Diagnostic is a structured operation-level notice surfaced by the CLI.
@@ -499,6 +510,36 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 		}
 	}
 
+	// 7b. Legacy-lane package migration. On the schema-1 lane, schema-9
+	// installations and subdirectory-selected installations escalate to
+	// package markers (skillfile-sources §4); the migration stages once
+	// here — packages, source-v1 runtime leaves, receipt-3 build
+	// identities, and the shared effective-lock digest — so the marker,
+	// the runtime, the receipts, and the audit record bind one staged
+	// identity. An unstatable package fails here, before any audit,
+	// registry, or compiler work. The draft lane migrates through its
+	// frozen lock instead and skips this entirely.
+	var legacy *legacyLanePlan
+	if draftLock == nil {
+		// A status plan stages the effective lock even though it is a
+		// dry run: the read-only currentness check compares the
+		// recorded package and lock against this staged expectation,
+		// and a changed declared ref is non-current even when the
+		// commit matches (skillfile-sources §4). Staging the digest
+		// is pure computation over the resolved closure and writes
+		// nothing.
+		plan, err := planLegacyLane(projectManifestPayload, effectiveManifest, nodes, !opts.DryRun || opts.Operation == OperationStatus)
+		if err != nil {
+			result.failf("%v", err)
+			return result, nil
+		}
+		legacy = plan
+		if legacy != nil {
+			result.LegacyPackages = legacy.Packages
+			result.LegacyLockSHA256 = legacy.LockSHA256
+		}
+	}
+
 	// 8. Validate every node with the same rules as `skill check`. Manifest
 	// parsing alone is insufficient because runtime-only nodes still require
 	// SKILL.md and must pass locale consistency checks (Spec §4, §8.1).
@@ -580,11 +621,14 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 			}
 			subjects := make([]audit.Subject, 0, len(nodes))
 			for _, node := range nodes {
+				packageIdentity, _ := auditPackageForNode(node, draftLock)
 				subjects = append(subjects, audit.Subject{
 					Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
 					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
-					Commands: node.Spec.Commands, HashVersion: auditVersion,
+					Directory: normalizedNodeDirectory(node),
+					Package:   packageIdentity,
+					Commands:  node.Spec.Commands, HashVersion: auditVersion,
 				})
 			}
 			var warnings, errs []string
@@ -677,9 +721,9 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 		observed.observe("marker/"+kind+"/"+node.Name, filepath.Join(store, node.Name, marker.Name))
 	}
 	// On the draft lane install never re-resolves refs, so a tag move is
-	// observable only at explicit refresh; schema-5 markers never match
-	// the gate below (see detectMovedTagsIn).
-	movedTags, movedTagsErr := detectMovedTags(projectRoot, nodes, deps.Generation)
+	// observable only at explicit refresh; draft package markers never
+	// match the gate below (see detectMovedTagsIn).
+	movedTags, movedTagsErr := detectMovedTagsIn(skillsDir, nodes, deps.Generation, draftLock == nil, observed)
 	if movedTagsErr != nil {
 		result.failf("inspect installed markers for moved tags: %v", movedTagsErr)
 		return result, nil
@@ -698,9 +742,14 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	// trusted toolchain identity and inspects protected cache state, but runs
 	// no go list or go build and writes no persistent state.
 	// Draft members installed under marker schema 5 record their builds
-	// under the receipt-3 package wrapper on both arms; every other member
-	// keeps the legacy receipts, keys and namespaces byte-identical.
+	// under the receipt-3 package wrapper on both arms, and so do
+	// migrated legacy-lane nodes under their v5/v6 package markers; every
+	// other member keeps the legacy receipts, keys and namespaces
+	// byte-identical.
 	buildPackages := draftBuildPackages(draftLock)
+	if legacy != nil {
+		buildPackages = legacy.BuildPackages
+	}
 	plan, planErr := planBuilds(opts.context(), buildPlanRequest{
 		scope: alias, nodes: nodes, deps: deps, dryRun: opts.DryRun, packages: buildPackages,
 	})
@@ -790,7 +839,11 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	// deterministic classes, with the machine-wide consumer ledger last.
 	// The draft lane publishes script runtimes under the frozen source-v1
 	// keys derived here, before any staging runs: a member whose package
-	// identity cannot be hashed fails before the first live mutation.
+	// identity cannot be hashed fails before the first live mutation. A
+	// migrated legacy-lane node publishes under the source-v1 key of the
+	// same staged package its marker records, so the runtime, the marker,
+	// and GC agree; every other legacy node keeps the commit-keyed leaf
+	// byte-identically.
 	var runtimeKeys map[string]string
 	if draftLock != nil {
 		keys, err := draftRuntimeKeys(draftLock)
@@ -799,6 +852,8 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 			return result, nil
 		}
 		runtimeKeys = keys
+	} else if legacy != nil {
+		runtimeKeys = legacy.RuntimeKeys
 	}
 	outcome, commitErr := runCommit(opts.context(), commitRequest{
 		scope:       alias,
@@ -817,7 +872,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 				skillsDir: skillsDir, binDir: binDir, hybridStore: hybridStore,
 				plan: plan, deps: deps, scoped: scoped, verbose: opts.Verbose,
 				external: externalStaged, externalStoreRoot: externalPlan.deps.StoreRoot,
-				draftLock: draftLock, runtimeKeys: runtimeKeys,
+				draftLock: draftLock, runtimeKeys: runtimeKeys, legacy: legacy,
 			})
 		},
 	})
@@ -878,9 +933,13 @@ type projectTargetRequest struct {
 	externalStoreRoot string
 	// draftLock is the consumed frozen lock on the draft lane and nil on
 	// the frozen v1 lane. runtimeKeys overrides the commit-keyed runtime
-	// leaf per node with the frozen source-v1 key.
+	// leaf per node with the frozen source-v1 key. legacy is the staged
+	// package-marker migration of a legacy-lane install and nil when no
+	// node migrates (or on the draft lane, which migrates through the
+	// lock instead).
 	draftLock   *sourcelock.Lock
 	runtimeKeys map[string]string
+	legacy      *legacyLanePlan
 }
 
 // stageProjectTargets derives the complete desired state of one project under
@@ -944,6 +1003,11 @@ func stageProjectTargets(request projectTargetRequest) (scopeTargets, error) {
 			return scopeTargets{}, fmt.Errorf("%s: %w", node.Name, err)
 		}
 		targets.plan.Merge(nodePlan)
+		generationPlan, err := stageLegacyGeneration(stageRoot, store, kind, node.Name, request.legacy)
+		if err != nil {
+			return scopeTargets{}, err
+		}
+		targets.plan.Merge(generationPlan)
 		if node.ContextActive() {
 			if isHybrid {
 				hybridContextNames = append(hybridContextNames, node.Name)
@@ -1167,7 +1231,11 @@ func validateNodes(nodes []*closure.Node, localeValue, alias string, result *Res
 // package replaces the legacy source identity on every arm, Git members
 // carry the registry attestation the effective plan selected and the
 // substitution identifier they carry, and a local snapshot admits
-// neither. Frozen v1 nodes record the legacy marker byte-identically.
+// neither. Schema-9 members record draft marker v6 instead, on both lanes
+// (skillfile-sources §4, draft-sources-v2). On the legacy lane, migrated
+// nodes (every schema-9 installation, every subdirectory-selected
+// installation) record the staged package and the shared effective-lock
+// digest; every other node records the legacy marker byte-identically.
 func (request projectTargetRequest) buildNodeMarker(
 	node *closure.Node,
 	nodeLocale string,
@@ -1188,7 +1256,7 @@ func (request projectTargetRequest) buildNodeMarker(
 	}
 	return buildMarker(node, nodeLocale, nodeAgents, active,
 		request.mcpFound[node.Name], request.attestations[node.Name],
-		builds, source), nil
+		builds, source, request.legacy)
 }
 
 func buildMarker(
@@ -1200,7 +1268,8 @@ func buildMarker(
 	attestation *marker.Attestation,
 	builds map[string]marker.Build,
 	source *buildsource.Identity,
-) *marker.Marker {
+	legacy *legacyLanePlan,
+) (*marker.Marker, error) {
 	// Commands lists every command the marker may carry build state for, so a
 	// compiled command is exported here exactly like a script one.
 	var commands []string
@@ -1226,10 +1295,46 @@ func buildMarker(
 	if builds == nil {
 		builds = map[string]marker.Build{}
 	}
-	// The v2 marker shape uses the marker-v4 build-record rules for every
-	// manifest band. While the rc.13 write gate is off, preserve its existing
-	// rule: only schema-7+ markers carry the receipt and execution-policy pair.
-	if hashing.WriteVersion() == hashing.VersionV2 || node.Spec.SchemaVersion >= 7 {
+	// No legacy schema can record manifest version 9 or a subdirectory
+	// selection, so those nodes escalate to the staged package marker on
+	// the schema-1 lane too: v6 exactly for schema-9 installations, v5 for
+	// a subdirectory-selected installation of an earlier schema
+	// (skillfile-sources §4, draft-sources-v2). The package and the
+	// effective-lock digest come from the install's one staged migration,
+	// the same identity the runtime leaf and the build receipts bind; a
+	// migrated node without one fails closed instead of recording a
+	// legacy marker no reader may accept for it.
+	var migrated *marker.Package
+	var lockSHA256 string
+	if legacyMigrated(node) {
+		if legacy == nil {
+			return nil, fmt.Errorf("source_member_missing: %s migrates to a package marker but the install staged no legacy migration", node.Name)
+		}
+		staged, ok := legacy.Packages[node.Name]
+		if !ok || staged == nil || legacy.LockSHA256 == "" {
+			return nil, fmt.Errorf("source_member_missing: %s migrates to a package marker but the install staged no package identity for it", node.Name)
+		}
+		migrated, lockSHA256 = staged, legacy.LockSHA256
+	}
+	if migrated != nil {
+		// Marker-5/6 build entries bind receipt version 3 and the
+		// execution policy for every driver, whatever the skill schema:
+		// the receipt the cache holds for this member is the package
+		// wrapper, so no legacy record shape can describe it
+		// (skillfile-sources §4). Core §4.4 permits build commands from
+		// schema-9 providers, so a migrated node records its builds
+		// instead of refusing them.
+		upgraded := make(map[string]marker.Build, len(builds))
+		for command, build := range builds {
+			build.ReceiptSchemaVersion = buildmeta.SourceAwareSchemaVersion
+			build.ExecutionPolicy = buildmeta.ExecutionPolicy
+			upgraded[command] = build
+		}
+		builds = upgraded
+	} else if hashing.WriteVersion() == hashing.VersionV2 || node.Spec.SchemaVersion >= 7 {
+		// The v2 marker shape uses the marker-v4 build-record rules for every
+		// manifest band. While the rc.13 write gate is off, preserve its existing
+		// rule: only schema-7+ markers carry the receipt and execution-policy pair.
 		upgraded := make(map[string]marker.Build, len(builds))
 		for command, build := range builds {
 			if build.Driver == "go-v1" {
@@ -1280,7 +1385,43 @@ func buildMarker(
 		expected.Locale = ""
 		expected.Agents = []string{}
 	}
-	return expected
+	// The staged package replaces the legacy source identity the same way
+	// the draft lane replaces it.
+	if migrated != nil {
+		expected.Package = migrated
+		expected.LockSHA256 = lockSHA256
+		expected.Source = ""
+		expected.RefKind = ""
+		expected.Ref = ""
+		expected.Commit = ""
+		expected.Git = ""
+	}
+	return expected, nil
+}
+
+// normalizedNodeDirectory reports the selected package directory of one
+// closure node, with an unset directory reading as the repository root.
+func normalizedNodeDirectory(node *closure.Node) string {
+	if node.Directory == "" {
+		return "."
+	}
+	return node.Directory
+}
+
+// auditPackageForNode binds the complete package identity one audit subject
+// carries (core §4.4, skillfile-sources §4 cache equality): the frozen
+// lock member on the draft lane, the staged node identity on the legacy
+// lane. The second result is false when no valid arm is statable; the
+// subject then audits without a stated package instead of refusing.
+func auditPackageForNode(node *closure.Node, lock *sourcelock.Lock) (audit.SourcePackage, bool) {
+	if lock != nil {
+		member, ok := lock.Find(node.Name)
+		if !ok {
+			return audit.SourcePackage{}, false
+		}
+		return toSourceAuditPackage(member.Package), true
+	}
+	return audit.SkillPackage(node.Identity, node.Decl.Source, node.Name, node.Resolved.Commit, normalizedNodeDirectory(node))
 }
 
 func checkSystemCommands(nodes []*closure.Node) error {
@@ -1352,20 +1493,11 @@ func checkLegacySkillDependencies(nodes []*closure.Node) error {
 	return nil
 }
 
-func detectMovedTags(projectRoot string, nodes []*closure.Node, generation GenerationReader) ([]string, error) {
-	return detectMovedTagsIn(filepath.Join(projectRoot, ".agents", "skills"), nodes, generation)
-}
-
-// detectMovedTagsIn is a read-only gate: it only reads the recorded
-// installation generation of each node through the injected reader.
-//
-// A draft schema-5 marker never matches this gate: the closed shape
-// carries no ref, so a commit difference between the marker and the
-// frozen node cannot distinguish "the same tag moved" from "the operator
-// declared a different tag". On the draft lane install never re-resolves
-// refs — the frozen lock binds the declared ref — so a tag move is
-// observable only at explicit refresh, never here.
-func detectMovedTagsIn(skillsDir string, nodes []*closure.Node, generation GenerationReader) ([]string, error) {
+// detectMovedTagsIn compares a previously installed declaration with the newly
+// resolved one. Draft installs consume frozen locks and do not evaluate live
+// tags here. Legacy package markers recover their prior ref from the validated
+// installed-generation lock and manifest, never from arbitrary live tags.
+func detectMovedTagsIn(skillsDir string, nodes []*closure.Node, generation GenerationReader, legacyLane bool, observed *observations) ([]string, error) {
 	var warnings []string
 	for _, node := range nodes {
 		if node.Resolved.Kind != "tag" {
@@ -1387,6 +1519,27 @@ func detectMovedTagsIn(skillsDir string, nodes []*closure.Node, generation Gener
 			continue
 		}
 		if recorded.Package != nil {
+			if !legacyLane {
+				continue
+			}
+			if recorded.Package.Commit == nil || recorded.Package.Commit.Hex == node.Resolved.Commit {
+				continue
+			}
+			current, err := legacyLockPackage(node)
+			if err != nil {
+				return nil, err
+			}
+			if !sameLegacyPackageSource(recorded.Package, draftMarkerPackage(current)) {
+				continue
+			}
+			previous, err := previousLegacyRef(skillsDir, recorded, observed)
+			if err != nil {
+				return nil, fmt.Errorf("cannot establish prior declared ref for %s: %w", node.Name, err)
+			}
+			if previous.Kind == "tag" && previous.Value == node.Resolved.Ref {
+				warnings = append(warnings, fmt.Sprintf(
+					"moved tag for %s: %s %s -> %s", node.Name, node.Resolved.Ref, recorded.Package.Commit.Hex, node.Resolved.Commit))
+			}
 			continue
 		}
 		if recorded.RefKind == "tag" && recorded.Ref == node.Resolved.Ref && recorded.Commit != node.Resolved.Commit {

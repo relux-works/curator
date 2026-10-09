@@ -122,23 +122,23 @@ func digestDeclaration(payload []byte) string {
 }
 
 // readManifestDocument reads and parses one Skillfile — project or machine-wide,
-// which share both format and writer — and returns the generation of the exact
-// bytes it parsed. An absent manifest is (nil, documentAbsent, nil), matching
-// manifest.Load, so each scope keeps its own absent semantics.
-func readManifestDocument(root string) (*manifest.Manifest, string, error) {
+// which share both format and writer — and returns the generation and the
+// exact bytes it parsed. An absent manifest is (nil, documentAbsent, nil, nil),
+// matching manifest.Load, so each scope keeps its own absent semantics.
+func readManifestDocument(root string) (*manifest.Manifest, string, []byte, error) {
 	path := manifest.PathIn(root)
 	current, err := readDocument(path)
 	if err != nil {
-		return nil, "", err
+		return nil, "", nil, err
 	}
 	if !current.exists {
-		return nil, current.generation, nil
+		return nil, current.generation, nil, nil
 	}
 	parsed, err := manifest.ParseBytes(current.payload, path)
 	if err != nil {
-		return nil, "", err
+		return nil, "", nil, err
 	}
-	return parsed, current.generation, nil
+	return parsed, current.generation, current.payload, nil
 }
 
 // readSubstitutionsDocument reads and parses the project development

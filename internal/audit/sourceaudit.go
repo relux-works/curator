@@ -1089,6 +1089,11 @@ func CheckSourceAudit(cfg *config.Config, subject SourceSubject, persist bool, n
 		Name: subject.Name, Source: subject.Source, Git: subject.Git,
 		Commit: subject.Commit, Snapshot: subject.Snapshot,
 		SchemaVersion: subject.SchemaVersion, Capabilities: subject.Capabilities,
+		Directory: subject.Package.Directory,
+		// The live verdict binds the same frozen package identity the
+		// source-audit object binds, so cache equality covers the
+		// complete identity (skillfile-sources §4).
+		Package: subject.Package,
 		// The draft source-audit lane carries frozen v1 identities, so
 		// the opaque-NUL interim rule stays in force here.
 		HashVersion: hashing.VersionV1,

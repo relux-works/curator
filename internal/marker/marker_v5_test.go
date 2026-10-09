@@ -152,12 +152,28 @@ func TestMarkerV5RefusesMalformedIdentity(t *testing.T) {
 	}
 }
 
-func TestMarkerV5AcceptsSkillSchema9(t *testing.T) {
+// TestMarkerV5RefusesSkillSchema9 pins the accepted marker-v5 rejection:
+// marker v5 cannot record manifest version 9 (skillfile-sources §4,
+// draft-sources-v2). Writers emit v6 for schema-9 installations instead,
+// so the pin splices skill 9 into a written v5 document and proves the
+// reader refuses it.
+func TestMarkerV5RefusesSkillSchema9(t *testing.T) {
 	m := v5LocalMarker()
-	m.SkillSchemaVersion = 9
-	_, recorded := writeV5(t, m)
-	if recorded.SchemaVersion != SchemaV5 || recorded.SkillSchemaVersion != 9 {
-		t.Fatalf("recorded marker = %+v, want marker schema 5 carrying skill schema 9", recorded)
+	m.SkillSchemaVersion = 8
+	dir, _ := writeV5(t, m)
+	payload, err := os.ReadFile(filepath.Join(dir, Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rewritten := strings.Replace(string(payload), `"skill_schema_version": 8`, `"skill_schema_version": 9`, 1)
+	if rewritten == string(payload) {
+		t.Fatal("splice target missing from the written v5 marker")
+	}
+	if err := os.WriteFile(filepath.Join(dir, Name), []byte(rewritten), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if recorded := Read(dir); recorded != nil {
+		t.Fatalf("Read admitted a v5 marker carrying skill schema 9: %+v", recorded)
 	}
 }
 

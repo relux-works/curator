@@ -73,7 +73,9 @@ func TestCheckSourceAuditV1NULRefusesWithoutVerdict(t *testing.T) {
 		!strings.Contains(err.Error(), "audit.opaque.nul-byte") {
 		t.Fatalf("draft source audit over NUL = %v, want the opaque refusal", err)
 	}
-	if _, hit := loadCachedFindings(cfg, v1Hash, hashing.VersionV1); hit {
+	absent := Subject{Name: "review", Snapshot: nulTree, SchemaVersion: 3,
+		Capabilities: capabilities.ImplicitNone(), Package: testLocalPackage()}
+	if _, hit := loadCachedFindings(cfg, v1Hash, hashing.VersionV1, absent); hit {
 		t.Fatal("draft source audit cached a verdict for a NUL tree")
 	}
 }

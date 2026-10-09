@@ -9,6 +9,7 @@ import (
 
 	"github.com/relux-works/curator/internal/adapters"
 	"github.com/relux-works/curator/internal/audit"
+	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/devsub"
@@ -79,7 +80,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 	// resolution instead of committing the closure that was planned.
 	observed := newObservations()
 
-	globalManifest, globalManifestGeneration, err := readManifestDocument(GlobalRoot(home))
+	globalManifest, globalManifestGeneration, globalManifestPayload, err := readManifestDocument(GlobalRoot(home))
 	if err != nil {
 		result.failf("%v", err)
 		return result, nil
@@ -141,6 +142,25 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 	for _, repo := range newSetEntries(fetchedBefore, opts.FetchedRepos) {
 		result.Messages = append(result.Messages, "global: fetched "+filepath.Base(repo))
 	}
+	// Legacy-lane package migration, exactly like the project scope: the
+	// global scope has no draft lane, so every schema-9 or
+	// subdirectory-selected installation escalates through the one staged
+	// migration the marker, runtime, receipts, and audit record share.
+	// An unstatable package fails here, before any audit, registry, or
+	// compiler work.
+	// A status plan stages the effective lock even though it is a dry
+	// run, exactly like the project scope: the read-only currentness
+	// check compares the recorded package and lock against this staged
+	// expectation (skillfile-sources §4).
+	legacy, err := planLegacyLane(globalManifestPayload, globalManifest, nodes, !opts.DryRun || opts.Operation == OperationStatus)
+	if err != nil {
+		result.failf("%v", err)
+		return result, nil
+	}
+	if legacy != nil {
+		result.LegacyPackages = legacy.Packages
+		result.LegacyLockSHA256 = legacy.LockSHA256
+	}
 	if !validateNodes(nodes, effectiveLocale, "global", &result) {
 		return result, nil
 	}
@@ -187,11 +207,14 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 		auditGate = func(nodes []*closure.Node) ([]string, []string) {
 			subjects := make([]audit.Subject, 0, len(nodes))
 			for _, node := range nodes {
+				packageIdentity, _ := auditPackageForNode(node, nil)
 				subjects = append(subjects, audit.Subject{
 					Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
 					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
-					Commands: node.Spec.Commands,
+					Directory: normalizedNodeDirectory(node),
+					Package:   packageIdentity,
+					Commands:  node.Spec.Commands,
 					// The global scope has no draft lane: the
 					// audited identity is the writer version.
 					HashVersion: hashing.WriteVersion(),
@@ -270,7 +293,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 	for _, node := range nodes {
 		observed.observe("marker/global/"+node.Name, filepath.Join(skillsDir, node.Name, marker.Name))
 	}
-	movedTags, movedTagsErr := detectMovedTagsIn(skillsDir, nodes, deps.Generation)
+	movedTags, movedTagsErr := detectMovedTagsIn(skillsDir, nodes, deps.Generation, true, observed)
 	if movedTagsErr != nil {
 		result.failf("inspect installed markers for moved tags: %v", movedTagsErr)
 		return result, nil
@@ -287,9 +310,16 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 
 	// Build planning is the last read-only phase: it resolves the trusted
 	// toolchain identity and inspects protected cache state, but runs no go
-	// list or go build and writes no persistent state.
+	// list or go build and writes no persistent state. Migrated nodes
+	// record their builds under the receipt-3 package wrapper on both
+	// arms; every other member keeps the legacy receipts, keys and
+	// namespaces byte-identical.
+	var buildPackages map[string]*buildmeta.Package
+	if legacy != nil {
+		buildPackages = legacy.BuildPackages
+	}
 	plan, planErr := planBuilds(opts.context(), buildPlanRequest{
-		scope: "global", nodes: nodes, deps: deps, dryRun: opts.DryRun,
+		scope: "global", nodes: nodes, deps: deps, dryRun: opts.DryRun, packages: buildPackages,
 	})
 	defer func() { releasePlan(&result, plan) }()
 	result.Messages = append(result.Messages, plan.Lines()...)
@@ -300,7 +330,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 		result.failBuild(planErr)
 		return result, nil
 	}
-	externalPlan, externalPlanErr := planExternalBuilds(opts.context(), "global", "global", home, nodes, nil, nil, deps.Toolchain, opts.External, deps.Assurance, opts.DryRun)
+	externalPlan, externalPlanErr := planExternalBuilds(opts.context(), "global", "global", home, nodes, nil, buildPackages, deps.Toolchain, opts.External, deps.Assurance, opts.DryRun)
 	if externalPlanErr != nil {
 		result.failBuild(externalPlanErr)
 		return result, nil
@@ -368,6 +398,13 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 		staged:   staged,
 		observed: observed,
 		stageTargets: func(scoped scopeCommit) (scopeTargets, error) {
+			// A migrated node publishes its script runtime under the
+			// source-v1 key of the same staged package its marker
+			// records; every other node keeps the commit-keyed leaf.
+			var runtimeKeys map[string]string
+			if legacy != nil {
+				runtimeKeys = legacy.RuntimeKeys
+			}
 			return stageGlobalTargets(globalTargetRequest{
 				cfg: cfg, home: home, userHome: userHome, platform: platform,
 				nodes: nodes, agents: agents, effectiveLocale: effectiveLocale,
@@ -375,6 +412,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 				skillsDir: skillsDir, binDir: binDir,
 				plan: plan, deps: deps, scoped: scoped,
 				external: externalStaged, externalStoreRoot: externalPlan.deps.StoreRoot,
+				runtimeKeys: runtimeKeys, legacy: legacy,
 			})
 		},
 	})
@@ -405,6 +443,11 @@ type globalTargetRequest struct {
 	scoped            scopeCommit
 	external          stagedExternal
 	externalStoreRoot string
+	// runtimeKeys overrides the commit-keyed runtime leaf per migrated
+	// node with the staged source-v1 key; legacy is the staged
+	// package-marker migration, nil when no node migrates.
+	runtimeKeys map[string]string
+	legacy      *legacyLanePlan
 }
 
 // stageGlobalTargets derives the complete desired machine-wide state under the
@@ -423,11 +466,12 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
 	}
 
 	// The global scope has no draft lane: a nil key map keeps the
-	// resolved-commit runtime behavior byte-identically.
+	// resolved-commit runtime behavior byte-identically. Migrated nodes
+	// publish under their staged source-v1 keys instead.
 	runtime, err := stageRuntimeAndShims(
 		stageRoot, request.home, request.binDir, request.nodes,
 		runtimestore.GlobalCanonicalShim, request.platform, request.scoped, request.plan.plannedInputs(), request.external.entries, request.externalStoreRoot,
-		nil, "",
+		request.runtimeKeys, "",
 	)
 	if err != nil {
 		return scopeTargets{}, err
@@ -442,9 +486,12 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
 	var contextNames []string
 	for _, node := range request.nodes {
 		expectedSkills[node.Name] = true
-		expected := buildMarker(node, request.effectiveLocale, request.agents, node.ActiveCommandNames(),
+		expected, err := buildMarker(node, request.effectiveLocale, request.agents, node.ActiveCommandNames(),
 			request.mcpFound[node.Name], request.attestations[node.Name],
-			runtime.builds[node.Name], request.plan.sourceIdentity(node.Name))
+			runtime.builds[node.Name], request.plan.sourceIdentity(node.Name), request.legacy)
+		if err != nil {
+			return scopeTargets{}, fmt.Errorf("%s: %w", node.Name, err)
+		}
 		nodePlan, status, err := stageNode(stageRoot, nodeInstall{
 			node: node, store: request.skillsDir, kind: "global",
 			locale: request.effectiveLocale, agents: request.agents, expected: expected,
@@ -453,6 +500,11 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
 			return scopeTargets{}, fmt.Errorf("%s: %w", node.Name, err)
 		}
 		targets.plan.Merge(nodePlan)
+		generationPlan, err := stageLegacyGeneration(stageRoot, request.skillsDir, "global", node.Name, request.legacy)
+		if err != nil {
+			return scopeTargets{}, err
+		}
+		targets.plan.Merge(generationPlan)
 		if node.ContextActive() {
 			contextNames = append(contextNames, node.Name)
 		}

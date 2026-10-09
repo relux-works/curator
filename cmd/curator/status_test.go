@@ -1415,7 +1415,7 @@ func assertProtectedCacheStateThatMovedDuringTheCheck(t *testing.T, fixture comp
 	scope := projectStatusScope(cfg, project, "app")
 	before := markerDigests(scope.stores...)
 
-	drift, rows := statusReport(cfg, scope, facts, before)
+	drift, rows := statusReport(cfg, scope, facts, before, nil, "")
 	if len(rows) != 1 || rows[0].State != buildCurrent {
 		t.Fatalf("settled compiled state = %+v", rows)
 	}
@@ -1482,7 +1482,7 @@ func assertProtectedCacheStateThatMovedDuringTheCheck(t *testing.T, fixture comp
 				t.Fatal("the case moved the install marker, so it proves nothing about the cache recheck")
 			}
 
-			drift, rows := statusReport(cfg, scope, facts, before)
+			drift, rows := statusReport(cfg, scope, facts, before, nil, "")
 			if len(rows) != 1 || rows[0].State != buildStateChanged {
 				t.Fatalf("moved compiled state = %+v", rows)
 			}

@@ -16,6 +16,15 @@ All notable implementation changes are recorded here.
 - `audit --allow` pins now record their creation time: every new pin stores
   when it was issued alongside the content hash, operator, and reason, so
   approvals carry provenance (TASK-261008-1pg0pd).
+- Schema-9 skill installations now record draft install-marker v6 with the
+  normalized dependency directory, including in the Skillfile schema-1 lane
+  (TASK-260924-4mzun5): marker v5 no longer records manifest version 9; the
+  v6 lock binding is the effective skillfile-lock digest, script runtimes
+  publish under the source-v1 package key, builds from schema-9 providers
+  record receipt-3 entries instead of being refused, moved-tag policy and
+  status currentness cover the migrated lane, and local audit records bind
+  the full package identity so a verdict is never reused across another
+  repository, commit, or directory.
 
 ## v0.15.0-rc.5 — 2026-10-08
 

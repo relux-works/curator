@@ -59,7 +59,7 @@ func TestMovedTagReaderTreatsInvalidMarkerAsStaleButKeepsReadFailure(t *testing.
 	if !errors.As(invalidErr, &invalid) {
 		t.Fatalf("invalid marker read error = %v, want typed invalid marker", invalidErr)
 	}
-	warnings, err := detectMovedTagsIn(t.TempDir(), []*closure.Node{node}, generationErrorReader{err: invalidErr})
+	warnings, err := detectMovedTagsIn(t.TempDir(), []*closure.Node{node}, generationErrorReader{err: invalidErr}, true, nil)
 	if err != nil || len(warnings) != 0 {
 		t.Fatalf("invalid marker moved-tag result = (%v, %v), want no warning and re-derivation", warnings, err)
 	}
@@ -69,7 +69,7 @@ func TestMovedTagReaderTreatsInvalidMarkerAsStaleButKeepsReadFailure(t *testing.
 		t.Fatal(err)
 	}
 	_, _, unreadableErr := marker.ReadState(unreadableDir)
-	warnings, err = detectMovedTagsIn(t.TempDir(), []*closure.Node{node}, generationErrorReader{err: unreadableErr})
+	warnings, err = detectMovedTagsIn(t.TempDir(), []*closure.Node{node}, generationErrorReader{err: unreadableErr}, true, nil)
 	if len(warnings) != 0 || err == nil || !strings.Contains(err.Error(), stateread.DiagUnreadable) {
 		t.Fatalf("unreadable marker moved-tag result = (%v, %v), want typed %s refusal", warnings, err, stateread.DiagUnreadable)
 	}

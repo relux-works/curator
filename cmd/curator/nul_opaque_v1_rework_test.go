@@ -68,7 +68,7 @@ func TestStatusCheckRefusesV1NULAppearingAfterInstall(t *testing.T) {
 		t.Fatalf("clean v1 skills = %v, want skill-a up-to-date", report.Skills)
 	}
 	cfg := &config.Config{SkillsRoot: cliSkillsRoot(home)}
-	if drift := scopeStatusDrift(cfg, project, skillsDir); drift["skill-a"] != stateUpToDate {
+	if drift := scopeStatusDrift(cfg, project, skillsDir, nil, ""); drift["skill-a"] != stateUpToDate {
 		t.Fatalf("clean v1 drift = %v, want skill-a up-to-date", drift)
 	}
 	if state := classifyDraftMember(skillsDir, sourcelock.Member{Name: "skill-a"}, "", nil); state != stateNeedsInstall {
@@ -102,7 +102,7 @@ func TestStatusCheckRefusesV1NULAppearingAfterInstall(t *testing.T) {
 		!strings.Contains(stderr, "audit.opaque.nul-byte") {
 		t.Fatalf("reinstall after v1-collision edit = %d, want a failing opaque refusal\nstderr:\n%s", code, stderr)
 	}
-	if drift := scopeStatusDrift(cfg, project, skillsDir); drift["skill-a"] != stateContentDrift {
+	if drift := scopeStatusDrift(cfg, project, skillsDir, nil, ""); drift["skill-a"] != stateContentDrift {
 		t.Fatalf("drift after v1-collision edit = %v, want skill-a content-drift", drift)
 	}
 	if state := classifyDraftMember(skillsDir, sourcelock.Member{Name: "skill-a"}, "", nil); state != stateUnresolvable {

@@ -84,11 +84,21 @@ const (
 	// SchemaV5 is the current core marker shape and also the frozen draft
 	// package shape. Core v5 carries hash_version 2; the disjoint package
 	// shape retains its frozen v1 meaning until its own schema advances.
+	// Source-extension v5 records skill schemas 1 through 8 only: a
+	// schema-9 installation uses SchemaV6 (skillfile-sources §4).
 	SchemaV5 = 5
+	// SchemaV6 is the draft marker v6 carrier for core schema-9
+	// installations (skillfile-sources §4, draft-sources-v2). It is
+	// marker v5 with schema_version 6 and skill_schema_version through 9;
+	// every other field, requiredness rule, and currentness comparison is
+	// unchanged, including the frozen v1 content framing of package
+	// markers. Writers use it exactly for schema-9 installations,
+	// including when the root project still uses Skillfile schema 1.
+	SchemaV6 = 6
 	// NewestSchemaVersion is the highest marker schema this release reads. It
 	// is what an operator is told when a document from a newer manager is
 	// refused, so it must advance with every new readable schema.
-	NewestSchemaVersion = SchemaV5
+	NewestSchemaVersion = SchemaV6
 )
 
 var (
@@ -335,6 +345,26 @@ func Read(installedDir string) *Marker {
 	return read
 }
 
+// packageRequired is the required member set shared by the
+// source-extension v5 shape and draft marker v6: the frozen package
+// replaces every legacy source field (skillfile-sources §4 migration
+// table).
+func packageRequired() []string {
+	return []string{
+		"schema_version", "name", "package", "lock_sha256", "content_sha256", "locale",
+		"agents", "commands", "dependencies", "skill_schema_version", "runtime_roots",
+		"build_roots", "builds", "installed_at", "files",
+	}
+}
+
+// packageAllowed is the allowed member set shared by the
+// source-extension v5 shape and draft marker v6.
+func packageAllowed(required []string) []string {
+	return append(append([]string(nil), required...),
+		"requirements", "mcp_servers", "attestation", "activation", "requirers", "substituted",
+		"build_source")
+}
+
 func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 	commonRequired := []string{
 		"schema_version", "name", "source", "ref_kind", "ref", "commit", "content_sha256", "locale",
@@ -363,15 +393,17 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 		} else {
 			// The frozen package replaces every legacy source field, so the
 			// source-extension v5 shape keeps its own required set.
-			required = []string{
-				"schema_version", "name", "package", "lock_sha256", "content_sha256", "locale",
-				"agents", "commands", "dependencies", "skill_schema_version", "runtime_roots",
-				"build_roots", "builds", "installed_at", "files",
-			}
-			allowed = append(append([]string(nil), required...),
-				"requirements", "mcp_servers", "attestation", "activation", "requirers", "substituted",
-				"build_source")
+			required = packageRequired()
+			allowed = packageAllowed(required)
 		}
+	case SchemaV6:
+		// Draft marker v6 is the v5 package shape with the version
+		// bumped and nothing else changed (skillfile-sources §4). There
+		// is no core v6 shape: a v6 document without a package is
+		// invalid, and the required-set check below refuses it through
+		// the missing package member.
+		required = packageRequired()
+		allowed = packageAllowed(required)
 	default:
 		return false
 	}
@@ -391,6 +423,12 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 		} else if !validCoreV5Identity(m) {
 			return false
 		}
+	} else if m.SchemaVersion == SchemaV6 {
+		// Draft marker v6 carries the v5 package identity unchanged;
+		// a missing package was already refused by the required set.
+		if m.Package == nil || !validV5Identity(m, raw) {
+			return false
+		}
 	} else if !identifiers.PortablePath(m.Source) || !validLegacyTriple(m) {
 		return false
 	}
@@ -403,6 +441,10 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 		} else if hasHashVersion || m.HashVersion != 0 {
 			return false
 		}
+	} else if m.SchemaVersion == SchemaV6 {
+		if _, hasHashVersion := raw["hash_version"]; hasHashVersion || m.HashVersion != 0 {
+			return false
+		}
 	} else if m.HashVersion != 0 {
 		return false
 	}
@@ -412,11 +454,12 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 		(m.SchemaVersion == ExternalSchemaVersion && m.SkillSchemaVersion != 7) ||
 		(m.SchemaVersion == PolicySchemaVersion && m.SkillSchemaVersion != 8) ||
 		(m.SchemaVersion == SchemaV5 && m.Package == nil && m.SkillSchemaVersion > 8) ||
-		(m.SchemaVersion == SchemaV5 && m.Package != nil && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 9)) {
+		(m.SchemaVersion == SchemaV5 && m.Package != nil && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 8)) ||
+		(m.SchemaVersion == SchemaV6 && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 9)) {
 		return false
 	}
 	setsSorted := m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion ||
-		m.SchemaVersion == PolicySchemaVersion || m.SchemaVersion == SchemaV5
+		m.SchemaVersion == PolicySchemaVersion || m.SchemaVersion == SchemaV5 || m.SchemaVersion == SchemaV6
 	if !validNullableLocale(raw["locale"], m.Locale) || !validTimestamp(m.InstalledAt) ||
 		!validIdentifierSet(m.Agents, setsSorted) || !validIdentifierSet(m.Commands, setsSorted) ||
 		!validIdentifierSet(m.Dependencies, setsSorted) || !validPathSet(m.RuntimeRoots, setsSorted) ||
@@ -464,13 +507,15 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 		}
 	}
 	if (m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion ||
-		m.SchemaVersion == PolicySchemaVersion || m.SchemaVersion == SchemaV5) && !validBuildState(m, raw) {
+		m.SchemaVersion == PolicySchemaVersion || m.SchemaVersion == SchemaV5 ||
+		m.SchemaVersion == SchemaV6) && !validBuildState(m, raw) {
 		return false
 	}
 	return true
 }
 
-// validV5Identity enforces the draft marker-v5 identity: the frozen package
+// validV5Identity enforces the draft package identity shared by
+// source-extension marker v5 and draft marker v6: the frozen package
 // replaces every legacy source field, the lock binds the installed selection
 // through the validated lock, and a local snapshot admits neither a network
 // attestation nor a development substitution.
@@ -903,7 +948,7 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
 		return false
 	}
 	var buildsRaw map[string]json.RawMessage
-	if m.SchemaVersion == SchemaV5 {
+	if m.SchemaVersion == SchemaV5 || m.SchemaVersion == SchemaV6 {
 		if err := json.Unmarshal(raw["builds"], &buildsRaw); err != nil || buildsRaw == nil {
 			return false
 		}
@@ -920,10 +965,11 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
 		if unixErr != nil || windowsErr != nil || (build.ArtifactPath != unixPath && build.ArtifactPath != windowsPath) {
 			return false
 		}
-		// A draft v5 marker binds receipt version 3 on every build entry,
-		// whatever the skill schema: its cache entries are receipt-3 package
-		// wrappers, so a legacy record shape can never describe them.
-		if m.SchemaVersion == SchemaV5 && m.Package != nil {
+		// A draft package marker (v5 or v6) binds receipt version 3 on
+		// every build entry, whatever the skill schema: its cache entries
+		// are receipt-3 package wrappers, so a legacy record shape can
+		// never describe them.
+		if (m.SchemaVersion == SchemaV5 || m.SchemaVersion == SchemaV6) && m.Package != nil {
 			rawBuild, present := buildsRaw[command]
 			if !present {
 				return false
@@ -1151,14 +1197,15 @@ func rawObject(raw json.RawMessage) (map[string]json.RawMessage, bool) {
 // silently reports a perfectly current installation as needing reinstallation
 // the moment the written schema advances.
 func BuildBearingSchema(version int) bool {
-	return version == SchemaVersion || version == SchemaV5 || externalCapableSchema(version)
+	return version == SchemaVersion || version == SchemaV5 || version == SchemaV6 || externalCapableSchema(version)
 }
 
 // externalCapableSchema reports whether a marker of this schema can record
 // external go-repository-v1 commands alongside local ones. Marker v4 is v3
-// with the version bumped and nothing else changed, so both answer yes.
+// with the version bumped and nothing else changed, so both answer yes;
+// draft marker v6 shares the v5 package build records unchanged.
 func externalCapableSchema(version int) bool {
-	return version == ExternalSchemaVersion || version == PolicySchemaVersion || version == SchemaV5
+	return version == ExternalSchemaVersion || version == PolicySchemaVersion || version == SchemaV5 || version == SchemaV6
 }
 
 // SupportedSchema reports whether version is a marker schema this release
@@ -1167,19 +1214,25 @@ func externalCapableSchema(version int) bool {
 func SupportedSchema(version int) bool {
 	return version == LegacySchemaVersion || version == SchemaVersion ||
 		version == ExternalSchemaVersion || version == PolicySchemaVersion ||
-		version == SchemaV5
+		version == SchemaV5 || version == SchemaV6
 }
 
 // Write stores the marker inside dir with sorted keys and a trailing newline.
 //
-// A marker carrying a frozen draft package retains its v5 source-extension
-// shape. Core markers preserve the rc.13 schema and v1 hash by default; the
-// internal hash writer switch selects the v5/v2 form.
+// A marker carrying a frozen draft package retains its source-extension
+// shape: v6 exactly for schema-9 installations, v5 otherwise
+// (skillfile-sources §4). Core markers preserve the rc.13 schema and v1
+// hash by default; the internal hash writer switch selects the v5/v2
+// form. A schema-9 installation without a package fails closed below:
+// no legacy schema can record manifest version 9.
 func Write(dir string, m *Marker) error {
 	if m == nil {
 		return errors.New("install marker is nil")
 	}
 	switch {
+	case m.Package != nil && m.SkillSchemaVersion == 9:
+		m.SchemaVersion = SchemaV6
+		m.HashVersion = 0
 	case m.Package != nil:
 		m.SchemaVersion = SchemaV5
 		m.HashVersion = 0
@@ -1305,11 +1358,21 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 	// package identity while the projected context stays identical, so the
 	// lock comparison below is what observes it. The expectation is staged
 	// fresh on every run, so its schema version is unset until Write; the
-	// frozen package it carries is what selects the v5 comparison. A v5
-	// marker never matches a legacy one; changed registry, substitution,
+	// frozen package it carries is what selects the package comparison,
+	// and its skill schema selects the carrier: v6 exactly for schema-9
+	// installations, v5 otherwise (skillfile-sources §4). Neither a core
+	// marker nor a source-extension v5 marker can establish currentness
+	// for a schema-9 installation; changed registry, substitution,
 	// declared ref, package or lock makes the installation non-current.
 	if recorded.Package != nil || expected.Package != nil {
-		if recorded.SchemaVersion != SchemaV5 || expected.Package == nil {
+		if expected.Package == nil {
+			return false, nil
+		}
+		wantVersion := SchemaV5
+		if expected.SkillSchemaVersion == 9 {
+			wantVersion = SchemaV6
+		}
+		if recorded.SchemaVersion != wantVersion {
 			return false, nil
 		}
 		if !reflect.DeepEqual(recorded.Package, expected.Package) || recorded.LockSHA256 != expected.LockSHA256 {

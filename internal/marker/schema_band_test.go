@@ -18,6 +18,7 @@ func TestSupportedSchemaBandIsExactAndNewestIsItsMaximum(t *testing.T) {
 		ExternalSchemaVersion: true,
 		PolicySchemaVersion:   true,
 		SchemaV5:              true,
+		SchemaV6:              true,
 	}
 	for version := -1; version <= NewestSchemaVersion+3; version++ {
 		if got := SupportedSchema(version); got != supported[version] {
@@ -50,6 +51,7 @@ func TestBuildBearingSchemaCoversEverySchemaThatCanRecordABuild(t *testing.T) {
 		ExternalSchemaVersion: true,
 		PolicySchemaVersion:   true,
 		SchemaV5:              true,
+		SchemaV6:              true,
 	}
 	for version := -1; version <= NewestSchemaVersion+3; version++ {
 		if got := BuildBearingSchema(version); got != bearing[version] {

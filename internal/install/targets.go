@@ -194,7 +194,9 @@ type runtimeStaging struct {
 // runtimeKeys optionally overrides the commit-keyed runtime leaf per node:
 // the draft lane passes frozen source-v1 keys for its local-snapshot
 // members (which carry no commit) so they materialize under their package
-// identity. A nil map keeps the resolved-commit behavior byte-identically.
+// identity, and the legacy lane passes staged source-v1 keys for its
+// migrated nodes for the same reason. A nil map keeps the resolved-commit
+// behavior byte-identically.
 //
 // A compiled command resolves through the protected cache entry that the
 // commit phase already published or verified, so a launcher can only ever point

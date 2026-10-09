@@ -75,8 +75,9 @@ func receiptPackage(pkg sourcelock.Package) *buildmeta.Package {
 }
 
 // draftRuntimeKey selects the runtime-store leaf of one node: the frozen
-// source-v1 key on the draft lane, the resolved commit on the frozen v1
-// lane. An empty key map keeps the legacy behavior byte-identically.
+// source-v1 key on the draft lane, the staged source-v1 key of a migrated
+// node on the legacy lane, the resolved commit everywhere else. An empty
+// key map keeps the legacy behavior byte-identically.
 func draftRuntimeKey(node *closure.Node, runtimeKeys map[string]string) string {
 	if key, ok := runtimeKeys[node.Name]; ok && key != "" {
 		return key

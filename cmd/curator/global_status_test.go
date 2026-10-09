@@ -97,6 +97,43 @@ func legacyGlobalScope(t *testing.T) string {
 	return home
 }
 
+// TestReviewGlobalStatusDetectsChangedTagAtSameCommit is the F6
+// regression on the machine-wide entry: after changing the declared tag
+// from v1 to an unchanged v2 at the same commit, the v6 package
+// installation is non-current — the staged lock binds the declaration,
+// so commit equality alone must not report up-to-date
+// (skillfile-sources §4). The narrowing mutant `status-commit-only`
+// compares the recorded commit against the live resolution instead of
+// the staged package and lock; it fails both assertions below.
+func TestReviewGlobalStatusDetectsChangedTagAtSameCommit(t *testing.T) {
+	t.Parallel()
+	home := globalScopeDeclaring(t, `{"name":"consumer","tag":"v1"}`)
+	consumer := filepath.Join(filepath.Dir(home), "skills", "consumer")
+	writeAuditDirectorySkill(t, consumer, "consumer", 9, nil)
+	runGit(t, consumer, "init", "-q", "-b", "main")
+	runGit(t, consumer, "add", ".")
+	runGit(t, consumer, "commit", "-qm", "schema9 consumer")
+	runGit(t, consumer, "tag", "v1")
+	configPath := filepath.Join(home, "config.json")
+	if code, stdout, stderr := capture(t, configPath, "global", "install"); code != exitOK {
+		t.Fatalf("global install = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
+	}
+	runGit(t, consumer, "tag", "v2")
+	writeFile(t, filepath.Join(install.GlobalRoot(home), manifest.Name),
+		`{"schema_version":1,"agents":["codex_cli"],"skills":[{"name":"consumer","tag":"v2"}]}`)
+	code, stdout, stderr := capture(t, configPath, "global", "status", "--json")
+	if code != exitOK {
+		t.Fatalf("global status --json = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	report := decodeGlobalStatus(t, stdout)
+	if report.Skills["consumer"] == stateUpToDate {
+		t.Errorf("changed declaration is incorrectly current: %s", stdout)
+	}
+	if code, stdout, stderr := capture(t, configPath, "global", "status", "--check"); code == exitOK {
+		t.Errorf("global status --check admitted stale ref binding: %s %s", stdout, stderr)
+	}
+}
+
 // globalPlan is one read-only machine-wide plan a test acquired for itself,
 // through the exact acquisition phase a command run uses.
 type globalPlan struct {

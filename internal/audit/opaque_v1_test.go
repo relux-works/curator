@@ -96,7 +96,7 @@ func TestGateV2ReportsV2IdentityAndStoresNothingUnderV1(t *testing.T) {
 	if warnings, errs := Gate(cfg, []Subject{clean}); len(errs) != 0 || len(warnings) != 0 {
 		t.Fatalf("NUL-free v2 twin: warnings=%v errs=%v", warnings, errs)
 	}
-	if findings, hit := loadCachedFindings(cfg, v2Twin, hashing.VersionV2); !hit || len(findings) != 0 {
+	if findings, hit := loadCachedFindings(cfg, v2Twin, hashing.VersionV2, clean); !hit || len(findings) != 0 {
 		t.Fatalf("clean twin v2 cache = (%+v, hit=%v), want cached allow", findings, hit)
 	}
 
@@ -119,7 +119,7 @@ func TestGateV2ReportsV2IdentityAndStoresNothingUnderV1(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(cfg.Home(), "audit", hashing.Normalize(v1Hash))); !os.IsNotExist(err) {
 		t.Fatalf("v2 audit left trust state under the v1 digest: %v", err)
 	}
-	if _, hit := loadCachedFindings(cfg, v1Hash, hashing.VersionV1); hit {
+	if _, hit := loadCachedFindings(cfg, v1Hash, hashing.VersionV1, opaque); hit {
 		t.Fatal("v2 audit cached a verdict under the v1 digest")
 	}
 }
@@ -169,7 +169,7 @@ func TestGateV1KeepsOpaqueBlockWithUnchangedFinding(t *testing.T) {
 				t.Fatalf("v1 opaque finding %+v, want the unchanged critical file-naming finding", finding)
 			}
 			// The blocked v1 result stays outside the verdict cache.
-			if _, hit := loadCachedFindings(cfg, v1Hash, hashing.VersionV1); hit {
+			if _, hit := loadCachedFindings(cfg, v1Hash, hashing.VersionV1, subject); hit {
 				t.Fatal("blocked v1 NUL result was stored in the verdict cache")
 			}
 		})

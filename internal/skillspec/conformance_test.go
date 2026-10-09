@@ -90,7 +90,7 @@ func TestReleasedSchemaCases(t *testing.T) {
 }
 
 func TestDraftManifestDependencyDirectoryGrammar(t *testing.T) {
-	vectorPath := filepath.Join("testdata", "draft-sources-v1", "manifest-dependency-directories.json")
+	vectorPath := filepath.Join("testdata", "draft-sources-v2", "manifest-dependency-directories.json")
 	payload, err := os.ReadFile(vectorPath)
 	if err != nil {
 		t.Fatal(err)
@@ -110,34 +110,52 @@ func TestDraftManifestDependencyDirectoryGrammar(t *testing.T) {
 	}
 	for _, testCase := range vector.DirectoryGrammarCases {
 		t.Run(testCase.Name, func(t *testing.T) {
-			manifest := map[string]any{
-				"schema_version": 9,
-				"capabilities":   map[string]any{},
-				"dependencies": map[string]any{"skills": map[string]any{
-					"developer": map[string]any{
-						"git":       "https://github.com/example/role-skills.git",
-						"ref":       map[string]any{"kind": "revision", "value": strings.Repeat("a", 40)},
-						"directory": testCase.Input,
-					},
-				}},
-			}
-			raw, err := json.Marshal(manifest)
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, err = Load(writeSkill(t, string(raw), nil))
-			if (err == nil) != testCase.Valid {
-				t.Fatalf("valid=%v, error=%v", testCase.Valid, err)
-			}
-			if err != nil && !strings.Contains(err.Error(), "dependencies.skills.developer.directory") {
-				t.Fatalf("error %q does not identify the directory field", err)
-			}
+			assertDependencyDirectoryValid(t, testCase.Input, testCase.Valid)
 		})
 	}
 }
 
+// TestDraftManifestDependencyDirectoryGlobClass pins the remaining members
+// of the dependency-path glob class on top of the spec's `*` vector
+// (draft-sources-v2 `glob` grammar case and `invalid-directory-glob`
+// schema cases): the shared directory grammar forbids `[*?\[\]]`, so `?`
+// and `[` are refused on the dependency path exactly like `*`.
+func TestDraftManifestDependencyDirectoryGlobClass(t *testing.T) {
+	for _, input := range []string{"skills/devel?per", "skills/[abc]per", "skills/devel[", "skills/devel?"} {
+		t.Run(strings.ReplaceAll(input, "/", "_"), func(t *testing.T) {
+			assertDependencyDirectoryValid(t, input, false)
+		})
+	}
+}
+
+func assertDependencyDirectoryValid(t *testing.T, input string, valid bool) {
+	t.Helper()
+	manifest := map[string]any{
+		"schema_version": 9,
+		"capabilities":   map[string]any{},
+		"dependencies": map[string]any{"skills": map[string]any{
+			"developer": map[string]any{
+				"git":       "https://github.com/example/role-skills.git",
+				"ref":       map[string]any{"kind": "revision", "value": strings.Repeat("a", 40)},
+				"directory": input,
+			},
+		}},
+	}
+	raw, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Load(writeSkill(t, string(raw), nil))
+	if (err == nil) != valid {
+		t.Fatalf("valid=%v, error=%v", valid, err)
+	}
+	if err != nil && !strings.Contains(err.Error(), "dependencies.skills.developer.directory") {
+		t.Fatalf("error %q does not identify the directory field", err)
+	}
+}
+
 func TestDraftManifestDependencyDirectorySchemaCases(t *testing.T) {
-	root := filepath.Join("testdata", "draft-sources-v1", "schema-cases")
+	root := filepath.Join("testdata", "draft-sources-v2", "schema-cases")
 	for _, suite := range []struct{ directory, manifest string }{
 		{"agent-skill-v9", CanonicalManifestName},
 		{"csk-skill-v9", LegacyManifestName},
