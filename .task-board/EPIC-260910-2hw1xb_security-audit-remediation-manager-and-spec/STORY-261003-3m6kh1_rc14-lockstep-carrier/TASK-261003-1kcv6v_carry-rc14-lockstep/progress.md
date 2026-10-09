@@ -71,7 +71,6 @@ spawn run completed: codex (run=RUN-261003-bcd3b2, pid=32894, exit=0)
 ## Outcome Resources
 - [TASK-261003-1kcv6v_spawn-log_-implementer--developer--codex-_RUN-261003-93729f.log](file://TASK-261003-1kcv6v/TASK-261003-1kcv6v_spawn-log_-implementer--developer--codex-_RUN-261003-93729f.log) — System spawn log captured by task-board
 - [TASK-261003-1kcv6v_results.md](file://TASK-261003-1kcv6v/TASK-261003-1kcv6v_results.md) — 16/16 byte identity, exact fresh exits and durations, gate green, evidence reuse bounds
-- [TASK-261003-1kcv6v_validation-evidence.tar.gz](file://TASK-261003-1kcv6v/TASK-261003-1kcv6v_validation-evidence.tar.gz) — Sanitized test streams, gate logs, command exits and host observations
 - [TASK-261003-1kcv6v_change-request_rev1.patch](file://TASK-261003-1kcv6v/TASK-261003-1kcv6v_change-request_rev1.patch) — Change Request CR-TASK-261003-1kcv6v-1 revision 1 candidate patch (repository_delta=present, 16 changed paths)
 - [TASK-261003-1kcv6v_change-request_rev1-validation.log](file://TASK-261003-1kcv6v/TASK-261003-1kcv6v_change-request_rev1-validation.log) — Change Request CR-TASK-261003-1kcv6v-1 revision 1 bounded validation log
 - [TASK-261003-1kcv6v_spawn-log_-reviewer--reviewer--codex-_RUN-261003-d17dc9.log](file://TASK-261003-1kcv6v/TASK-261003-1kcv6v_spawn-log_-reviewer--reviewer--codex-_RUN-261003-d17dc9.log) — System spawn log captured by task-board
@@ -83,7 +82,7 @@ spawn run completed: codex (run=RUN-261003-bcd3b2, pid=32894, exit=0)
 2026-10-03T15:36:12Z
 
 ## Last Update
-2026-10-03T17:40:45Z
+2026-10-09T11:06:26Z
 
 ## Assigned To
 [implementer] developer (codex)
