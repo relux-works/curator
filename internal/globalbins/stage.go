@@ -131,9 +131,22 @@ func StageForwarding(
 		return Forwarding{}, err
 	}
 	for _, desired := range transition.Desired {
+		canonical := shimPath(canonicalBin, desired.Command, platform)
+		if ownedLegacyLink(desired.LivePath, canonical, platform) {
+			// A recognized legacy link is the directory entry itself, not
+			// byte content: the transaction journals the link and restores
+			// its exact destination on rollback.
+			forwarding.plan.ReplaceEntry(staging.ClassForwardingShim, desired.Command, desired.LivePath, desired.StagedPath)
+			continue
+		}
 		forwarding.plan.Replace(staging.ClassForwardingShim, desired.Command, desired.LivePath, desired.StagedPath)
 	}
 	for _, removal := range transition.Removals {
+		canonical := shimPath(canonicalBin, removal.Command, platform)
+		if ownedLegacyLink(removal.LivePath, canonical, platform) {
+			forwarding.plan.RemoveEntry("forwarding-shim/"+removal.Command, removal.LivePath)
+			continue
+		}
 		forwarding.plan.Remove("forwarding-shim/"+removal.Command, removal.LivePath)
 	}
 

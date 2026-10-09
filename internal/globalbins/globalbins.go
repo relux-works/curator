@@ -385,6 +385,17 @@ func ownedTarget(path, canonical, platform string) bool {
 	return samePath(target, canonical, platform)
 }
 
+// ownedLegacyLink reports whether path is the pre-transaction symlink form of
+// a manager-owned forwarding shim. Only a link recognized by ownedTarget
+// qualifies; a foreign or otherwise unrecognized link never becomes a target.
+func ownedLegacyLink(path, canonical, platform string) bool {
+	info, err := os.Lstat(path)
+	if err != nil || info.Mode()&os.ModeSymlink == 0 {
+		return false
+	}
+	return ownedTarget(path, canonical, platform)
+}
+
 // ledgerPayload renders the canonical ownership ledger bytes so a staged ledger
 // is byte-identical to a directly written one.
 func ledgerPayload(entries map[string]bool) ([]byte, error) {

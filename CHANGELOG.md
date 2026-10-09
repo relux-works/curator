@@ -9,6 +9,10 @@ All notable implementation changes are recorded here.
 - A credential helper answer larger than the 64-KiB bound is now refused
   outright instead of being silently truncated and accepted as a different
   credential; the affected host simply reports no credential.
+- Global installs now reconcile a manager-owned legacy forwarding symlink
+  instead of failing on it: the recognized link is replaced transactionally
+  while foreign shims and changed preimages are still refused
+  (TASK-261008-eaqg8a).
 
 ## v0.15.0-rc.5 — 2026-10-08
 
