@@ -113,25 +113,21 @@ spawn run completed: codex (run=RUN-261002-b49486, pid=38110, exit=0)
 ## Outcome Resources
 - [BUG-261002-ot3ea1_spawn-log_-implementer--developer--codex-_RUN-261002-71ac37.log](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_spawn-log_-implementer--developer--codex-_RUN-261002-71ac37.log) — System spawn log captured by task-board
 - [BUG-261002-ot3ea1_developer-results_RUN-261002-71ac37.md](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_developer-results_RUN-261002-71ac37.md) — Implementation, coverage bounds, actual validation exit codes, and expected-red mutants
-- [BUG-261002-ot3ea1_validation_RUN-261002-71ac37.tar.gz](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_validation_RUN-261002-71ac37.tar.gz) — Raw package and CLI GC logs, expected-red mutants, lint/build/cross-vet evidence, and frozen source digests
 - [BUG-261002-ot3ea1_handoff-exemption_RUN-261002-71ac37.md](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_handoff-exemption_RUN-261002-71ac37.md) — Explicit No LOGBOOK exemption and initial handoff exit code
 - [BUG-261002-ot3ea1_change-request_rev1.patch](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_change-request_rev1.patch) — Change Request CR-BUG-261002-ot3ea1-1 revision 1 candidate patch (repository_delta=present, 16 changed paths)
 - [BUG-261002-ot3ea1_change-request_rev1-validation.log](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_change-request_rev1-validation.log) — Change Request CR-BUG-261002-ot3ea1-1 revision 1 bounded validation log
 - [BUG-261002-ot3ea1_spawn-log_-implementer--developer--codex-_RUN-261002-12b1fa.log](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_spawn-log_-implementer--developer--codex-_RUN-261002-12b1fa.log) — System spawn log captured by task-board
 - [BUG-261002-ot3ea1_recovery-results_RUN-261002-12b1fa.md](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_recovery-results_RUN-261002-12b1fa.md) — Current developer results: remote gate repairs, real local exit codes, mutant coverage and validation bounds
-- [BUG-261002-ot3ea1_recovery-validation_RUN-261002-12b1fa.tar.gz](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_recovery-validation_RUN-261002-12b1fa.tar.gz) — Recovery logs, expected-red mutants, platform ledger, source hashes and prior remote diagnostic evidence
 - [BUG-261002-ot3ea1_change-request_rev2.patch](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_change-request_rev2.patch) — Change Request CR-BUG-261002-ot3ea1-2 revision 2 candidate patch (repository_delta=present, 18 changed paths)
 - [BUG-261002-ot3ea1_change-request_rev2-validation.log](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_change-request_rev2-validation.log) — Change Request CR-BUG-261002-ot3ea1-2 revision 2 bounded validation log
 - [BUG-261002-ot3ea1_spawn-log_-reviewer--reviewer--codex-_RUN-261002-072a11.log](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_spawn-log_-reviewer--reviewer--codex-_RUN-261002-072a11.log) — System spawn log captured by task-board
 - [BUG-261002-ot3ea1_spawn-log_-implementer--developer--codex-_RUN-261002-2bca1f.log](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_spawn-log_-implementer--developer--codex-_RUN-261002-2bca1f.log) — System spawn log captured by task-board
 - [BUG-261002-ot3ea1_results_rev3_RUN-261002-2bca1f.md](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_results_rev3_RUN-261002-2bca1f.md) — Revision 3 re-apply and actual verification, including post-validation host crash/stall observation
-- [BUG-261002-ot3ea1_validation_rev3_RUN-261002-2bca1f.tar.gz](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_validation_rev3_RUN-261002-2bca1f.tar.gz) — Revision 3 verification and mutant logs, source equality and post-validation host crash observation
 - [BUG-261002-ot3ea1_change-request_rev3.patch](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_change-request_rev3.patch) — Change Request CR-BUG-261002-ot3ea1-3 revision 3 candidate patch (repository_delta=present, 18 changed paths)
 - [BUG-261002-ot3ea1_change-request_rev3-validation.log](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_change-request_rev3-validation.log) — Change Request CR-BUG-261002-ot3ea1-3 revision 3 bounded validation log
 - [BUG-261002-ot3ea1_spawn-log_-implementer--developer--codex-_RUN-261002-7b4ca1.log](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_spawn-log_-implementer--developer--codex-_RUN-261002-7b4ca1.log) — System spawn log captured by task-board
 - [BUG-261002-ot3ea1_spawn-log_-implementer--developer--codex-_RUN-261002-212a6b.log](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_spawn-log_-implementer--developer--codex-_RUN-261002-212a6b.log) — System spawn log captured by task-board
 - [BUG-261002-ot3ea1_results_rev4_RUN-261002-212a6b.md](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_results_rev4_RUN-261002-212a6b.md) — Revision 4 republish: CHANGELOG preservation, unchanged implementation, actual buildcache exit code and host observations
-- [BUG-261002-ot3ea1_validation_rev4_RUN-261002-212a6b.tar.gz](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_validation_rev4_RUN-261002-212a6b.tar.gz) — Revision 4 raw test log, exit/duration/crash counts, source hashes and CHANGELOG preservation evidence
 - [BUG-261002-ot3ea1_change-request_rev4.patch](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_change-request_rev4.patch) — Change Request CR-BUG-261002-ot3ea1-4 revision 4 candidate patch (repository_delta=present, 18 changed paths)
 - [BUG-261002-ot3ea1_change-request_rev4-validation.log](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_change-request_rev4-validation.log) — Change Request CR-BUG-261002-ot3ea1-4 revision 4 bounded validation log
 - [BUG-261002-ot3ea1_spawn-log_-implementer--developer--codex-_RUN-261002-2027dc.log](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_spawn-log_-implementer--developer--codex-_RUN-261002-2027dc.log) — System spawn log captured by task-board
@@ -139,7 +135,6 @@ spawn run completed: codex (run=RUN-261002-b49486, pid=38110, exit=0)
 - [BUG-261002-ot3ea1_change-request_rev5.patch](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_change-request_rev5.patch) — Change Request CR-BUG-261002-ot3ea1-5 revision 5 candidate patch (repository_delta=present, 17 changed paths)
 - [BUG-261002-ot3ea1_change-request_rev5-validation.log](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_change-request_rev5-validation.log) — Change Request CR-BUG-261002-ot3ea1-5 revision 5 bounded validation log
 - [BUG-261002-ot3ea1_spawn-log_-reviewer--reviewer--codex-_RUN-261002-e2f897.log](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_spawn-log_-reviewer--reviewer--codex-_RUN-261002-e2f897.log) — System spawn log captured by task-board
-- [BUG-261002-ot3ea1_review-validation-rev5.tar.gz](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_review-validation-rev5.tar.gz) — Independent rev5 review checks, two killed overlay mutants, exit codes and host crash counts
 - [BUG-261002-ot3ea1_review-verdict-rev5.md](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_review-verdict-rev5.md) — Accepted revision 5: reviewed surfaces, validation, mutants and explicit coverage bounds
 - [BUG-261002-ot3ea1_spawn-log_-implementer--developer--codex-_RUN-261002-b49486.log](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_spawn-log_-implementer--developer--codex-_RUN-261002-b49486.log) — System spawn log captured by task-board
 - [BUG-261002-ot3ea1_integration-preconditions_RUN-261002-b49486.md](file://BUG-261002-ot3ea1/BUG-261002-ot3ea1_integration-preconditions_RUN-261002-b49486.md) — Revision 5 bound integration preconditions
@@ -148,7 +143,7 @@ spawn run completed: codex (run=RUN-261002-b49486, pid=38110, exit=0)
 2026-10-02T04:24:14Z
 
 ## Last Update
-2026-10-02T13:10:36Z
+2026-10-09T11:05:25Z
 
 ## Assigned To
 [implementer] developer (codex)
