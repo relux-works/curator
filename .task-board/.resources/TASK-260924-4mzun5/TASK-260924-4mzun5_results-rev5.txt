@@ -1,0 +1,142 @@
+TASK-260924-4mzun5 — record-dependency-directory-in-legacy-lane: revision 5 results
+
+Candidate base: 3cb461b37d572bcbbb84182fab50fff323c7f9a8
+Candidate commit: 95f43e318b01c4af71a4a9bc277da844b7970ca5
+Candidate tree: 5bc982a25b05c43a419f538357e76280f398579b
+
+Decision retained: RECORD. Curator-spec 7eaeb73fcf22cb8ce8e21325a8237accdfaf9646, protocol/skillfile-sources.md §4 explicitly requires draft marker v6 for core schema-9 installations, including Skillfile schema 1. Core §4.4 requires normalized dependency-directory identity in install/lock/audit records. Marker v5 remains the subdirectory carrier for earlier skill schemas. Source §3 specifies the CCJ-1 digest of the whole lock with only lock_sha256 omitted; §4 binds the selection/ref through that validated lock and matching manifest. Core §10 and manager §2.1 retain same-tag movement policy, including read-only planning.
+
+F4 fix: retain the existing effective lock and exact declaring manifest as historical installed-generation evidence, outside closed v5/v6 markers and projected skill context. Publish that record transactionally with each migrated marker. Check its lock digest against the marker, validate lock self-integrity, check the manifest digest and parse the manifest, match the member package and root selection, then compare its prior ref kind/name with the newly resolved ref. Dependency refs are recovered by deterministic declaration traversal over the prior lock’s Git commit objects; repository locations are private acquisition hints, never tag evidence. Read bytes join the existing optimistic generation recheck before publication. Schema-1 still resolves live refs on every install.
+
+No prior ref is inferred from arbitrary live tags. The old tag-enumeration helper is removed from production. Missing, unreadable, malformed, manifest-mismatched and self-minted lock evidence are reported without treating them as proof of a declaration change. The record is historical evidence, not a new Skillfile freeze mode or a marker member.
+
+Permanent production-entry coverage added:
+- TestLegacyLaneSameTagMoveWithAlias: Project/Global × no alias/lightweight/annotated; strict refusal and unchanged prior marker.
+- TestLegacyLaneChangedTagAfterOldTagDeleted: Project/Global legitimate v1-to-v2 declaration admitted after old v1 is deleted. This also addresses the probe in separate P2 BUG-261009-2s6t3y; no separate bug-status mutation is claimed.
+- TestLegacyLaneRejectsUnboundPreviousGeneration: Project/Global × missing/unreadable/malformed/manifest tampering/lock tampering/rehashed foreign lock; dry and real installs must refuse and preserve the marker.
+- TestLegacyLaneDependencyTagMovement: Project/Global same-tag dependency movement with an alias refuses, and explicit changed dependency declarations remain admitted.
+- TestLegacyPackageStatusBindingAndRepair: Project/Global real CLI initial currentness, same-commit declared-tag change, read-only status/check refusal, and reinstall repair. Existing F6 regressions remain.
+
+Inherited implementation retained: directory marker/audit identity, source-v1 runtime publication, canonical effective-lock binding, receipt-3 builds, full-package audit cache binding, production directory positives/negatives, and dependency-path ?, [, * grammar rows. No v1 fixture changes (0 paths). All 24 v2 copies match the pinned spec Git blobs. The merged audit.go from current trunk is in the compiled and hosted candidate.
+
+Local compile-only evidence: initial go build ./... exited 1 for an unused gitops import after removing the heuristic. After removing that import, go build ./... ran twice with exit 0; go vet ./... ran twice with exit 0. The latest gofmt -w invocation and standalone git diff --check each exited 0. Successful build/vet tails contained only WORK=<temporary-build-directory>, no diagnostics. No local go test, test-binary execution, or go run occurred.
+
+Hosted verification performed in this pass:
+- GREEN exact candidate: https://github.com/relux-works/curator/actions/runs/37900038171. Full configured CI succeeded: 20/20 executed jobs passed, including Linux/macOS/Windows suites, Linux/macOS race, all nine Go driver jobs, lint, interop, naming, and three gate self-tests. gh run watch --exit-status exited 0. The candidate-suite and rose-air jobs were skipped, not proven. GitHub commit metadata independently confirms the candidate tree listed above. A fresh snapshot of the unchanged Story worktree matches that tree.
+- RED previous package-marker gate restored: https://github.com/relux-works/curator/actions/runs/37900037908. Hosted go build ./... exited 0; go test exited 1; gh run watch --exit-status exited 1. Expected product failure: the restored live-tag heuristic admits same-tag movement when an alias remains on the old commit. Only the production gate and its required tag-enumeration helper were restored; history publication and regression tests were retained.
+- NARROWING alias-waiver mutant: https://github.com/relux-works/curator/actions/runs/37900038056. Hosted go build ./... exited 0; go test exited 1; gh run watch --exit-status exited 1. Expected product failure: the otherwise validated prior-ref comparison waives same-tag refusal when another live tag remains on the old commit.
+- Each mutation is killed by 4/4 alias rows in TestLegacyLaneSameTagMoveWithAlias (project/global x lightweight/annotated), and 2/2 same-tag dependency rows in TestLegacyLaneDependencyTagMovement. All 7/7 controls pass: two no-alias rows, two explicit root-tag changes, two explicit dependency-ref changes, and the existing strict-refusal/default-warning test. The standalone log/step validator exited 0; neither failing product gate is presented as passing.
+- Uploaded full-suite JSON independently confirms all 33/33 selected regression leaves pass on EACH of Linux, macOS and Windows (99/99 across these three platforms). Counts by test follow below. Artifact-count verification exited 0.
+- All three scratch branches were deleted (git push --delete exit 0; fresh ls-remote shows 0/3 refs remaining). No product code or tests changed after the green candidate was frozen. The disposable clone was removed after evidence capture.
+
+Hosted regression counts:
+macos: TestLegacyLaneSameTagMoveWithAlias: 6/6 passed
+macos: TestLegacyLaneChangedTagAfterOldTagDeleted: 2/2 passed
+macos: TestLegacyLaneRejectsUnboundPreviousGeneration: 12/12 passed
+macos: TestLegacyLaneDependencyTagMovement: 4/4 passed
+macos: TestLegacyPackageStatusBindingAndRepair: 2/2 passed
+macos: TestReviewChangedDeclaredTagIsNotMovedTag: 2/2 passed
+macos: TestReviewCLIStatusDetectsChangedTagAtSameCommit: 1/1 passed
+macos: TestReviewGlobalStatusDetectsChangedTagAtSameCommit: 1/1 passed
+macos: TestLegacyLaneRefusesGlobDependencyDirectory: 3/3 passed
+ubuntu: TestLegacyLaneSameTagMoveWithAlias: 6/6 passed
+ubuntu: TestLegacyLaneChangedTagAfterOldTagDeleted: 2/2 passed
+ubuntu: TestLegacyLaneRejectsUnboundPreviousGeneration: 12/12 passed
+ubuntu: TestLegacyLaneDependencyTagMovement: 4/4 passed
+ubuntu: TestLegacyPackageStatusBindingAndRepair: 2/2 passed
+ubuntu: TestReviewChangedDeclaredTagIsNotMovedTag: 2/2 passed
+ubuntu: TestReviewCLIStatusDetectsChangedTagAtSameCommit: 1/1 passed
+ubuntu: TestReviewGlobalStatusDetectsChangedTagAtSameCommit: 1/1 passed
+ubuntu: TestLegacyLaneRefusesGlobDependencyDirectory: 3/3 passed
+windows: TestLegacyLaneSameTagMoveWithAlias: 6/6 passed
+windows: TestLegacyLaneChangedTagAfterOldTagDeleted: 2/2 passed
+windows: TestLegacyLaneRejectsUnboundPreviousGeneration: 12/12 passed
+windows: TestLegacyLaneDependencyTagMovement: 4/4 passed
+windows: TestLegacyPackageStatusBindingAndRepair: 2/2 passed
+windows: TestReviewChangedDeclaredTagIsNotMovedTag: 2/2 passed
+windows: TestReviewCLIStatusDetectsChangedTagAtSameCommit: 1/1 passed
+windows: TestReviewGlobalStatusDetectsChangedTagAtSameCommit: 1/1 passed
+windows: TestLegacyLaneRefusesGlobDependencyDirectory: 3/3 passed
+
+
+
+Changes in this producer pass versus the inherited revision-4 candidate:
+- internal/install/legacygeneration.go: transactional historical record, lock/manifest/member validation, prior-ref recovery and source comparison.
+- internal/install/legacypackage.go: retain the existing validated effective lock and declaring manifest for generation publication.
+- internal/install/install.go and internal/install/global.go: publish history at both real entries; compare validated prior declarations; observe history bytes for commit-time revalidation.
+- internal/gitops/gitops.go: remove the superseded live-tag enumeration helper (this file now matches trunk).
+- internal/install/legacy_movedtags_test.go: permanent reviewer alias and deleted-prior-tag reproductions.
+- internal/install/legacy_generation_test.go: missing/forged/unreadable history negatives and dependency-ref production rows.
+- internal/install/generation_read_state_test.go: updated private gate signature.
+- cmd/curator/legacy_generation_test.go: independent production CLI currentness and repair regression.
+
+The unchanged candidate work from previous revisions remains part of the 59-path delta listed below. No LOGBOOK edit; findings and decisions are recorded in the task outcomes as instructed. The existing Unreleased entry is retained. No commit, switch, reset, rebase, merge, or converge was performed in the Story worktree.
+
+Stated evidence bounds: the new adversarial proof covers project/global roots and subdirectory dependency selections, prior-evidence corruption, same-tag aliases, explicit ref changes, and CLI currentness. This pass makes no new independent hybrid/substitution/concurrency qualification claim. The configured full gate carries its existing broader coverage. Prior glob-star-only and status-commit-only mutation experiments were not rerun; their earlier reviewer evidence is retained, while their permanent regression tests run again in this candidate's hosted suites.
+
+Candidate changed paths (against the actual starting base):
+CHANGELOG.md
+cmd/curator/audit_directory_test.go
+cmd/curator/builds_test.go
+cmd/curator/global_status_test.go
+cmd/curator/legacy_generation_test.go
+cmd/curator/main.go
+cmd/curator/nul_opaque_v1_rework_test.go
+cmd/curator/status_test.go
+internal/audit/audit.go
+internal/audit/audit_test.go
+internal/audit/directory_test.go
+internal/audit/opaque_v1_rework_test.go
+internal/audit/opaque_v1_test.go
+internal/audit/package_test.go
+internal/audit/sourceaudit.go
+internal/install/draftruntime.go
+internal/install/generation.go
+internal/install/generation_read_state_test.go
+internal/install/global.go
+internal/install/install.go
+internal/install/legacy_builds_test.go
+internal/install/legacy_directory_test.go
+internal/install/legacy_generation_test.go
+internal/install/legacy_movedtags_test.go
+internal/install/legacy_runtime_test.go
+internal/install/legacygeneration.go
+internal/install/legacypackage.go
+internal/install/targets.go
+internal/marker/marker.go
+internal/marker/marker_v5_schema_test.go
+internal/marker/marker_v5_test.go
+internal/marker/marker_v6_schema_test.go
+internal/marker/marker_v6_test.go
+internal/marker/schema_band_test.go
+internal/marker/testdata/draft-sources-v2/install-marker-v6.schema.json
+internal/skillspec/conformance_test.go
+internal/skillspec/testdata/draft-sources-v2/manifest-dependency-directories.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-absolute.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-backslash.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-empty.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-escape.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-glob.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-parent-component.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid-directory-absent.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid-directory-root.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid-directory-subfolder.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-absolute.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-backslash.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-empty.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-escape.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-glob.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-parent-component.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid-directory-absent.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid-directory-root.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid-directory-subfolder.json
+internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid.json
+
+Mutation identities:
+red: commit 6cc4922ddedd82160e9803d2b17a8b6351654395; tree 62737801907fc52555a0a89cf7c41ad26255677b; mutation patch SHA-256 8f5e0308363bbc20843da67e17980b86c98b0a02e4a5e0659fcb51058f57f229
+narrowing: commit ed997b03dfb7f2cb3943380bc87d7bcea054b88e; tree c9aa7eecd444b3abbea31c7d4ec77bf21f72e89f; mutation patch SHA-256 e0dc25bcab657b0a27358bfb87a2381527f61ec09b8a9cee85a4a9038940dc25
+
+Companion resource: TASK-260924-4mzun5_harness-rev5.txt (exact mutation patches, hosted workflow, run identities, named outcomes and validator source).

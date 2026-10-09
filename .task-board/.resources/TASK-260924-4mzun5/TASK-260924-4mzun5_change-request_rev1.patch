@@ -1,0 +1,2932 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 6c8c0e421f7a2047043fc411c4a20cae57ed5c33..0d74c041e4850d48b6fd05066e8798875ac0bbb5 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,12 @@ All notable implementation changes are recorded here.
+ 
+ ## Unreleased
+ 
++- Schema-9 skill installations now record draft install-marker v6 with the
++  normalized dependency directory, including in the Skillfile schema-1 lane
++  (TASK-260924-4mzun5): marker v5 no longer records manifest version 9, and
++  local audit records bind the selected directory so a verdict for one
++  directory is never reused for another.
++
+ ## v0.15.0-rc.5 — 2026-10-08
+ 
+ ### Added
+diff --git a/cmd/curator/audit_directory_test.go b/cmd/curator/audit_directory_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..18ab824a67d54044a8b62ddc7fba2129622bdcda
+--- /dev/null
++++ b/cmd/curator/audit_directory_test.go
+@@ -0,0 +1,129 @@
++package main
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"testing"
++
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/manifest"
++)
++
++// auditDirectoryProject lays out a schema-1 project whose schema-9 consumer
++// requires a subdirectory-selected schema-9 package, and returns the config
++// path that points the CLI at it plus the manager home that will hold the
++// persisted verdict records.
++func auditDirectoryProject(t *testing.T) (string, string) {
++	t.Helper()
++	root := t.TempDir()
++	home := filepath.Join(root, "home")
++	configPath := filepath.Join(home, "config.json")
++	skillsRoot := filepath.Join(root, "skills")
++	project := filepath.Join(root, "project")
++	provider := filepath.Join(skillsRoot, "backend")
++	consumer := filepath.Join(skillsRoot, "consumer")
++	for _, dir := range []string{provider, consumer, project} {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	writeAuditDirectorySkill(t, filepath.Join(provider, "skills", "backend"), "backend", 9, nil)
++	runGit(t, provider, "init", "-q", "-b", "main")
++	runGit(t, provider, "add", ".")
++	runGit(t, provider, "commit", "-qm", "role package")
++	runGit(t, provider, "tag", "v1")
++
++	writeAuditDirectorySkill(t, consumer, "consumer", 9, map[string]any{
++		"backend": map[string]any{
++			"git":       "https://github.com/example/role-skills.git",
++			"ref":       map[string]any{"kind": "tag", "value": "v1"},
++			"directory": "skills/backend",
++		},
++	})
++	runGit(t, consumer, "init", "-q", "-b", "main")
++	runGit(t, consumer, "add", ".")
++	runGit(t, consumer, "commit", "-qm", "init")
++	runGit(t, consumer, "tag", "v1")
++
++	runGit(t, project, "init", "-q", "-b", "main")
++	if err := os.WriteFile(filepath.Join(project, manifest.Name), []byte(
++		`{"schema_version":1,"agents":["codex_cli"],"skills":[{"name":"consumer","tag":"v1"}]}`), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := config.Bootstrap(configPath, skillsRoot, "", []string{"codex_cli"}, false); err != nil {
++		t.Fatal(err)
++	}
++	if err := config.AddProject(configPath, "app", project, []string{"codex_cli"}); err != nil {
++		t.Fatal(err)
++	}
++	return configPath, home
++}
++
++func writeAuditDirectorySkill(t *testing.T, dir, name string, schema int, requirements map[string]any) {
++	t.Helper()
++	if requirements == nil {
++		requirements = map[string]any{}
++	}
++	if err := os.MkdirAll(filepath.Join(dir, "references"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"),
++		[]byte("---\nname: "+name+"\ndescription: Test "+name+"\n---\n# "+name+"\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "references", "info.md"), []byte("context\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	payload, err := json.Marshal(map[string]any{
++		"schema_version": schema,
++		"capabilities":   map[string]any{},
++		"commands":       map[string]any{},
++		"dependencies":   map[string]any{"skills": requirements},
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "agent-skill.json"), payload, 0o644); err != nil {
++		t.Fatal(err)
++	}
++}
++
++// TestCLIAuditBindsDependencyDirectory drives `curator audit` over a
++// schema-1 project with a subdirectory-selected dependency and proves the
++// persisted verdicts bind the normalized selected directory (core §4.4):
++// the subfolder package binds its directory, the root consumer binds ".".
++// Without the subject directory the backend verdict would be stored under
++// the root and a later root audit of identical content would reuse it.
++func TestCLIAuditBindsDependencyDirectory(t *testing.T) {
++	t.Parallel()
++	configPath, home := auditDirectoryProject(t)
++	code, stdout, stderr := capture(t, configPath, "audit", "app")
++	if code != exitOK {
++		t.Fatalf("audit = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
++	}
++	matches, err := filepath.Glob(filepath.Join(home, "audit", "*", "verdict-*.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	audited := map[string]string{}
++	for _, path := range matches {
++		payload, err := os.ReadFile(path)
++		if err != nil {
++			t.Fatal(err)
++		}
++		var record struct {
++			Skill     string `json:"skill"`
++			Directory string `json:"directory"`
++		}
++		if err := json.Unmarshal(payload, &record); err != nil {
++			t.Fatal(err)
++		}
++		audited[record.Skill] = record.Directory
++	}
++	for skill, want := range map[string]string{"backend": "skills/backend", "consumer": "."} {
++		if audited[skill] != want {
++			t.Fatalf("audit record for %s binds directory %q, want %q (records: %v)", skill, audited[skill], want, audited)
++		}
++	}
++}
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index f3e52dcca57b77cff7ef2500e7583d68f09664b7..7a2b26042722ecf15f05b1f01fd0b2306c25144e 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -2278,7 +2278,7 @@ func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string,
+ 			Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
+ 			Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+ 			SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
+-			Commands: node.Spec.Commands,
++			Directory: node.Directory, Commands: node.Spec.Commands,
+ 			// The audit CLI reports what an install would trust:
+ 			// the writer-version identity.
+ 			HashVersion: hashing.WriteVersion(),
+diff --git a/internal/audit/audit.go b/internal/audit/audit.go
+index f75aa0c729d83cd553eedfc9b23aebf608ad9db1..f0755db458c7277e7dcced1dc98c6985837bf215 100644
+--- a/internal/audit/audit.go
++++ b/internal/audit/audit.go
+@@ -69,7 +69,14 @@ type Subject struct {
+ 	Commit        string
+ 	Snapshot      string
+ 	SchemaVersion int
+-	Capabilities  capabilities.Manifest
++	// Directory is the normalized selected package directory (core §4.4,
++	// draft-sources-v2): "." for a repository root, the portable
++	// repository-relative path otherwise. It is part of the audit-cache
++	// key, so a verdict for one directory is never reused for another
++	// directory merely because repository and commit match. Empty reads
++	// as "." for callers that predate the member.
++	Directory    string
++	Capabilities capabilities.Manifest
+ 	// HashVersion is the content-hash framing the caller will compute
+ 	// or trust for this subject (Spec §8). The opaque-NUL interim rule
+ 	// applies exactly when it is v1: v2 hashes 0x00 as ordinary data.
+@@ -358,9 +365,9 @@ func auditSubjectWithOpaquePaths(cfg *config.Config, subject Subject, persist bo
+ 	}
+ 
+ 	// Verdict cache: findings cached by (framing version, content hash),
+-	// backend, model, and versions; the decision is recomputed under the
+-	// current policy.
+-	if findings, hit := loadCachedFindings(cfg, contentHash, version); hit {
++	// backend, model, versions, and selected package directory; the
++	// decision is recomputed under the current policy.
++	if findings, hit := loadCachedFindings(cfg, contentHash, version, subjectDirectory(subject)); hit {
+ 		report.CacheHit = true
+ 		report.Findings = findings
+ 		report.Decision = decideWithPins(cfg, subject, contentHash, findings)
+@@ -529,7 +536,16 @@ const (
+ 	verdictSchemaV2 = 2
+ )
+ 
+-func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.Version) ([]Finding, bool) {
++// subjectDirectory normalizes the audit-cache directory dimension of one
++// subject. Empty predates the member and reads as the repository root.
++func subjectDirectory(subject Subject) string {
++	if subject.Directory == "" {
++		return "."
++	}
++	return subject.Directory
++}
++
++func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.Version, directory string) ([]Finding, bool) {
+ 	payload, err := os.ReadFile(verdictPath(cfg, contentHash)) // #nosec G304
+ 	if err != nil {
+ 		return nil, false
+@@ -537,6 +553,7 @@ func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.
+ 	var data struct {
+ 		SchemaVersion int             `json:"schema_version"`
+ 		HashVersion   hashing.Version `json:"hash_version"`
++		Directory     string          `json:"directory"`
+ 		Findings      []Finding       `json:"findings"`
+ 	}
+ 	if err := json.Unmarshal(payload, &data); err != nil {
+@@ -554,6 +571,21 @@ func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.
+ 	if recordVersion != version {
+ 		return nil, false
+ 	}
++	// The local audit record binds the package identity including the
++	// normalized directory (core §4.4): a verdict cached for one
++	// directory is a miss for another, even when the content hash
++	// matches. Records that predate the member bind the root.
++	recordDirectory := data.Directory
++	if recordDirectory == "" {
++		recordDirectory = "."
++	}
++	wantDirectory := directory
++	if wantDirectory == "" {
++		wantDirectory = "."
++	}
++	if recordDirectory != wantDirectory {
++		return nil, false
++	}
+ 	return data.Findings, true
+ }
+ 
+@@ -604,6 +636,7 @@ func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject
+ 		"content_sha256":  strings.ToLower(contentHash),
+ 		"skill":           subject.Name,
+ 		"commit":          subject.Commit,
++		"directory":       subjectDirectory(subject),
+ 		"backend":         cfg.Audit.Backend,
+ 		"model":           cfg.Audit.Model,
+ 		"prompt_version":  PromptVersion,
+diff --git a/internal/audit/audit_test.go b/internal/audit/audit_test.go
+index 642b3ab35370db0079b7d8a8985ee21688ad0b89..a1df64e8ac242f5b8fc4c656c91c1171306c751d 100644
+--- a/internal/audit/audit_test.go
++++ b/internal/audit/audit_test.go
+@@ -110,7 +110,7 @@ func TestOpaqueNULBlocksEvenWhenAV1TwinHasCachedAllow(t *testing.T) {
+ 	if warnings, errs := Gate(cfg, []Subject{clean}); len(errs) != 0 || len(warnings) != 0 {
+ 		t.Fatalf("NUL-free twin: warnings=%v errs=%v", warnings, errs)
+ 	}
+-	if findings, hit := loadCachedFindings(cfg, leftHash, hashing.VersionV1); !hit || len(findings) != 0 {
++	if findings, hit := loadCachedFindings(cfg, leftHash, hashing.VersionV1, subjectDirectory(clean)); !hit || len(findings) != 0 {
+ 		t.Fatalf("clean twin cache = (%+v, hit=%v), want cached allow", findings, hit)
+ 	}
+ 
+@@ -265,7 +265,7 @@ func TestGatePinPolicyFreshAndCached(t *testing.T) {
+ 							t.Fatalf("warm cache: %v", errs)
+ 						}
+ 					}
+-					if _, hit := loadCachedFindings(cfg, contentHash, hashing.VersionV1); hit != cached {
++					if _, hit := loadCachedFindings(cfg, contentHash, hashing.VersionV1, subjectDirectory(subject)); hit != cached {
+ 						t.Fatalf("cache hit before gate = %v, want %v", hit, cached)
+ 					}
+ 					if tc.pinned {
+diff --git a/internal/audit/directory_test.go b/internal/audit/directory_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..1abe8f16949967b3d21ea4c55a9b29f772bd97e4
+--- /dev/null
++++ b/internal/audit/directory_test.go
+@@ -0,0 +1,75 @@
++package audit
++
++import (
++	"encoding/json"
++	"os"
++	"testing"
++
++	"github.com/relux-works/curator/internal/capabilities"
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++// TestVerdictCacheBindsSelectedDirectory pins the core §4.4 audit-cache
++// key: a verdict cached for one selected package directory is a miss for
++// another directory, even when the content hash matches, so an audit
++// result for one directory is never reused for another merely because
++// repository and commit match.
++func TestVerdictCacheBindsSelectedDirectory(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
++	digest, err := hashing.ContentSHA256(root, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	cfg := newCfg(t, "advisory", "off")
++	seeded := Subject{Name: "seeded", Snapshot: root, SchemaVersion: 3,
++		Capabilities: capabilities.ImplicitNone(), Directory: "skills/backend"}
++	storeCachedFindings(cfg, digest, seeded, nil, nil)
++	if _, hit := loadCachedFindings(cfg, digest, hashing.VersionV1, "skills/backend"); !hit {
++		t.Fatalf("same-directory verdict missed")
++	}
++	for _, other := range []string{"skills/frontend", "."} {
++		if _, hit := loadCachedFindings(cfg, digest, hashing.VersionV1, other); hit {
++			t.Fatalf("verdict cached for skills/backend was reused for %q", other)
++		}
++	}
++	other := Subject{Name: "other", Snapshot: root, SchemaVersion: 3,
++		Capabilities: capabilities.ImplicitNone(), Directory: "skills/frontend"}
++	report, err := auditSubject(cfg, other, false)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if report.CacheHit || len(report.Findings) == 0 {
++		t.Fatalf("report %+v, want a fresh detection, not the cached verdict of another directory", report)
++	}
++}
++
++// TestVerdictCacheLegacyRecordWithoutDirectoryBindsRoot proves records
++// that predate the directory member keep binding the repository root:
++// a root subject still hits them, a subdirectory subject misses.
++func TestVerdictCacheLegacyRecordWithoutDirectoryBindsRoot(t *testing.T) {
++	root := t.TempDir()
++	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
++	digest, err := hashing.ContentSHA256(root, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	cfg := newCfg(t, "advisory", "off")
++	dir := trustDir(cfg.Home(), digest)
++	if err := os.MkdirAll(dir, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	payload, err := json.Marshal(map[string]any{"schema_version": 1, "findings": []Finding{}})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(verdictPath(cfg, digest), payload, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if _, hit := loadCachedFindings(cfg, digest, hashing.VersionV1, "."); !hit {
++		t.Fatalf("root subject missed a legacy record without a directory member")
++	}
++	if _, hit := loadCachedFindings(cfg, digest, hashing.VersionV1, "skills/backend"); hit {
++		t.Fatalf("subdirectory subject reused a legacy root verdict")
++	}
++}
+diff --git a/internal/audit/opaque_v1_rework_test.go b/internal/audit/opaque_v1_rework_test.go
+index 99ab75e844ea508ebeafe40ea84f94ecaa41af99..0e32f32d40e8a0edf4360cfcce76dd49dd541c3b 100644
+--- a/internal/audit/opaque_v1_rework_test.go
++++ b/internal/audit/opaque_v1_rework_test.go
+@@ -73,7 +73,7 @@ func TestCheckSourceAuditV1NULRefusesWithoutVerdict(t *testing.T) {
+ 		!strings.Contains(err.Error(), "audit.opaque.nul-byte") {
+ 		t.Fatalf("draft source audit over NUL = %v, want the opaque refusal", err)
+ 	}
+-	if _, hit := loadCachedFindings(cfg, v1Hash, hashing.VersionV1); hit {
++	if _, hit := loadCachedFindings(cfg, v1Hash, hashing.VersionV1, "."); hit {
+ 		t.Fatal("draft source audit cached a verdict for a NUL tree")
+ 	}
+ }
+diff --git a/internal/audit/opaque_v1_test.go b/internal/audit/opaque_v1_test.go
+index a2222110dfc648cbc0d9d4875464982e8034fd50..93fdbaca5f188d4278a0ee20d945865762306ea0 100644
+--- a/internal/audit/opaque_v1_test.go
++++ b/internal/audit/opaque_v1_test.go
+@@ -96,7 +96,7 @@ func TestGateV2ReportsV2IdentityAndStoresNothingUnderV1(t *testing.T) {
+ 	if warnings, errs := Gate(cfg, []Subject{clean}); len(errs) != 0 || len(warnings) != 0 {
+ 		t.Fatalf("NUL-free v2 twin: warnings=%v errs=%v", warnings, errs)
+ 	}
+-	if findings, hit := loadCachedFindings(cfg, v2Twin, hashing.VersionV2); !hit || len(findings) != 0 {
++	if findings, hit := loadCachedFindings(cfg, v2Twin, hashing.VersionV2, subjectDirectory(clean)); !hit || len(findings) != 0 {
+ 		t.Fatalf("clean twin v2 cache = (%+v, hit=%v), want cached allow", findings, hit)
+ 	}
+ 
+@@ -119,7 +119,7 @@ func TestGateV2ReportsV2IdentityAndStoresNothingUnderV1(t *testing.T) {
+ 	if _, err := os.Stat(filepath.Join(cfg.Home(), "audit", hashing.Normalize(v1Hash))); !os.IsNotExist(err) {
+ 		t.Fatalf("v2 audit left trust state under the v1 digest: %v", err)
+ 	}
+-	if _, hit := loadCachedFindings(cfg, v1Hash, hashing.VersionV1); hit {
++	if _, hit := loadCachedFindings(cfg, v1Hash, hashing.VersionV1, "."); hit {
+ 		t.Fatal("v2 audit cached a verdict under the v1 digest")
+ 	}
+ }
+@@ -169,7 +169,7 @@ func TestGateV1KeepsOpaqueBlockWithUnchangedFinding(t *testing.T) {
+ 				t.Fatalf("v1 opaque finding %+v, want the unchanged critical file-naming finding", finding)
+ 			}
+ 			// The blocked v1 result stays outside the verdict cache.
+-			if _, hit := loadCachedFindings(cfg, v1Hash, hashing.VersionV1); hit {
++			if _, hit := loadCachedFindings(cfg, v1Hash, hashing.VersionV1, "."); hit {
+ 				t.Fatal("blocked v1 NUL result was stored in the verdict cache")
+ 			}
+ 		})
+diff --git a/internal/audit/sourceaudit.go b/internal/audit/sourceaudit.go
+index 5e0e3ffc93740875a3b05fc9f3eac81e52f2fafb..b0217aefec90ba898d00c1b413eac570638d8bfc 100644
+--- a/internal/audit/sourceaudit.go
++++ b/internal/audit/sourceaudit.go
+@@ -1089,6 +1089,7 @@ func CheckSourceAudit(cfg *config.Config, subject SourceSubject, persist bool, n
+ 		Name: subject.Name, Source: subject.Source, Git: subject.Git,
+ 		Commit: subject.Commit, Snapshot: subject.Snapshot,
+ 		SchemaVersion: subject.SchemaVersion, Capabilities: subject.Capabilities,
++		Directory: subject.Package.Directory,
+ 		// The draft source-audit lane carries frozen v1 identities, so
+ 		// the opaque-NUL interim rule stays in force here.
+ 		HashVersion: hashing.VersionV1,
+diff --git a/internal/install/global.go b/internal/install/global.go
+index c0d9ff76f154c0bb687bbd83cb477209ac3e1695..69d147d72d600cff6253857ed7f23c49aca62c0e 100644
+--- a/internal/install/global.go
++++ b/internal/install/global.go
+@@ -191,7 +191,8 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
+ 					Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
+ 					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+ 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
+-					Commands: node.Spec.Commands,
++					Directory: normalizedNodeDirectory(node),
++					Commands:  node.Spec.Commands,
+ 					// The global scope has no draft lane: the
+ 					// audited identity is the writer version.
+ 					HashVersion: hashing.WriteVersion(),
+@@ -442,9 +443,12 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
+ 	var contextNames []string
+ 	for _, node := range request.nodes {
+ 		expectedSkills[node.Name] = true
+-		expected := buildMarker(node, request.effectiveLocale, request.agents, node.ActiveCommandNames(),
++		expected, err := buildMarker(node, request.effectiveLocale, request.agents, node.ActiveCommandNames(),
+ 			request.mcpFound[node.Name], request.attestations[node.Name],
+ 			runtime.builds[node.Name], request.plan.sourceIdentity(node.Name))
++		if err != nil {
++			return scopeTargets{}, fmt.Errorf("%s: %w", node.Name, err)
++		}
+ 		nodePlan, status, err := stageNode(stageRoot, nodeInstall{
+ 			node: node, store: request.skillsDir, kind: "global",
+ 			locale: request.effectiveLocale, agents: request.agents, expected: expected,
+diff --git a/internal/install/install.go b/internal/install/install.go
+index 1a3971e12fa9993d5bf5aac2838aff2f1813f718..69757e8cc8a84b4e12274ba50d64bdbee741f075 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -584,7 +584,8 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 					Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
+ 					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+ 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
+-					Commands: node.Spec.Commands, HashVersion: auditVersion,
++					Directory: normalizedNodeDirectory(node),
++					Commands:  node.Spec.Commands, HashVersion: auditVersion,
+ 				})
+ 			}
+ 			var warnings, errs []string
+@@ -1167,7 +1168,9 @@ func validateNodes(nodes []*closure.Node, localeValue, alias string, result *Res
+ // package replaces the legacy source identity on every arm, Git members
+ // carry the registry attestation the effective plan selected and the
+ // substitution identifier they carry, and a local snapshot admits
+-// neither. Frozen v1 nodes record the legacy marker byte-identically.
++// neither. Schema-9 members record draft marker v6 instead, on both lanes
++// (skillfile-sources §4, draft-sources-v2). Frozen v1 nodes record the
++// legacy marker byte-identically.
+ func (request projectTargetRequest) buildNodeMarker(
+ 	node *closure.Node,
+ 	nodeLocale string,
+@@ -1188,7 +1191,7 @@ func (request projectTargetRequest) buildNodeMarker(
+ 	}
+ 	return buildMarker(node, nodeLocale, nodeAgents, active,
+ 		request.mcpFound[node.Name], request.attestations[node.Name],
+-		builds, source), nil
++		builds, source)
+ }
+ 
+ func buildMarker(
+@@ -1200,7 +1203,7 @@ func buildMarker(
+ 	attestation *marker.Attestation,
+ 	builds map[string]marker.Build,
+ 	source *buildsource.Identity,
+-) *marker.Marker {
++) (*marker.Marker, error) {
+ 	// Commands lists every command the marker may carry build state for, so a
+ 	// compiled command is exported here exactly like a script one.
+ 	var commands []string
+@@ -1280,7 +1283,38 @@ func buildMarker(
+ 		expected.Locale = ""
+ 		expected.Agents = []string{}
+ 	}
+-	return expected
++	// No legacy schema can record manifest version 9 or a subdirectory
++	// selection, so those nodes escalate to a package marker on the
++	// schema-1 lane too: v6 exactly for schema-9 installations, v5 for a
++	// subdirectory-selected installation of an earlier schema
++	// (skillfile-sources §4, draft-sources-v2). The package replaces the
++	// legacy source identity the same way the draft lane replaces it.
++	if node.Spec.SchemaVersion == 9 || normalizedNodeDirectory(node) != "." {
++		if len(builds) != 0 {
++			return nil, fmt.Errorf("source_selection_invalid: package-selected skill %s with compiled commands requires Skillfile schema 2; the schema-1 lane records no package build identity", node.Name)
++		}
++		pkg, binding, err := legacyMarkerPackage(node)
++		if err != nil {
++			return nil, err
++		}
++		expected.Package = pkg
++		expected.LockSHA256 = binding
++		expected.Source = ""
++		expected.RefKind = ""
++		expected.Ref = ""
++		expected.Commit = ""
++		expected.Git = ""
++	}
++	return expected, nil
++}
++
++// normalizedNodeDirectory reports the selected package directory of one
++// closure node, with an unset directory reading as the repository root.
++func normalizedNodeDirectory(node *closure.Node) string {
++	if node.Directory == "" {
++		return "."
++	}
++	return node.Directory
+ }
+ 
+ func checkSystemCommands(nodes []*closure.Node) error {
+diff --git a/internal/install/legacy_directory_test.go b/internal/install/legacy_directory_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3a4796c69640579bd23711eefeb72010d15fba0
+--- /dev/null
++++ b/internal/install/legacy_directory_test.go
+@@ -0,0 +1,337 @@
++package install
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/closure"
++	"github.com/relux-works/curator/internal/gitops"
++	manifestpkg "github.com/relux-works/curator/internal/manifest"
++	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/skillspec"
++)
++
++// legacyDirectoryGit is the canonical network identity shared by the
++// subdirectory-selected fixtures below.
++const legacyDirectoryGit = "https://github.com/example/role-skills.git"
++
++func (e *env) gitOutput(dir string, args ...string) string {
++	e.t.Helper()
++	gitArgs := append([]string{"-c", "commit.gpgsign=false", "-c", "tag.gpgSign=false"}, args...)
++	out := gitFixture(e.t, dir, args, gitArgs, []string{
++		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
++		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
++	})
++	return strings.TrimSpace(string(out))
++}
++
++// writeLegacyPackageSkill writes one skill package at dir with the given
++// manifest schema and skill requirements.
++func writeLegacyPackageSkill(e *env, dir, name string, schema int, requirements map[string]any) {
++	e.t.Helper()
++	e.write(dir, "SKILL.md", "---\nname: "+name+"\ndescription: Test "+name+"\n---\n# "+name+"\n")
++	e.write(dir, "references/info.md", "context\n")
++	spec := map[string]any{
++		"schema_version": schema,
++		"capabilities":   map[string]any{},
++		"commands":       map[string]any{},
++		"dependencies":   map[string]any{"skills": requirements},
++	}
++	payload, err := json.Marshal(spec)
++	if err != nil {
++		e.t.Fatal(err)
++	}
++	e.write(dir, "agent-skill.json", string(payload))
++}
++
++// setupLegacyDirectoryRepos builds the schema-1 lane fixture: a provider
++// repository holding schema-9 backend and schema-8 helper packages in
++// subfolders, and a schema-9 consumer repository requiring both at their
++// subfolders. It returns the provider commit the requirements pin.
++//
++// The provider checkout lives at the first-sorted requirement name: the
++// legacy lane resolves a requirement source below the skills root, and
++// the second requirement reuses the same repository by canonical network
++// identity, so both subfolders share one snapshot at one commit.
++func setupLegacyDirectoryRepos(e *env, backendDir, helperDir string) string {
++	e.t.Helper()
++	provider := filepath.Join(e.skillsRoot, "backend")
++	if err := os.MkdirAll(provider, 0o755); err != nil {
++		e.t.Fatal(err)
++	}
++	e.git(provider, "init", "-q", "-b", "main")
++	writeLegacyPackageSkill(e, filepath.Join(provider, "skills", "backend"), "backend", 9, map[string]any{})
++	writeLegacyPackageSkill(e, filepath.Join(provider, "skills", "helper"), "helper", 8, map[string]any{})
++	e.git(provider, "add", ".")
++	e.git(provider, "commit", "-qm", "role packages")
++	commit := e.gitOutput(provider, "rev-parse", "HEAD")
++
++	consumer := filepath.Join(e.skillsRoot, "consumer")
++	if err := os.MkdirAll(consumer, 0o755); err != nil {
++		e.t.Fatal(err)
++	}
++	e.git(consumer, "init", "-q", "-b", "main")
++	writeLegacyPackageSkill(e, consumer, "consumer", 9, map[string]any{
++		"backend": map[string]any{
++			"git":       legacyDirectoryGit,
++			"ref":       map[string]any{"kind": "revision", "value": commit},
++			"directory": backendDir,
++		},
++		"helper": map[string]any{
++			"git":       legacyDirectoryGit,
++			"ref":       map[string]any{"kind": "revision", "value": commit},
++			"directory": helperDir,
++		},
++	})
++	e.git(consumer, "add", ".")
++	e.git(consumer, "commit", "-qm", "init")
++	e.git(consumer, "tag", "v1")
++	return commit
++}
++
++func readLegacyMarker(t *testing.T, dir string) (*marker.Marker, map[string]json.RawMessage) {
++	t.Helper()
++	recorded := marker.Read(dir)
++	if recorded == nil {
++		t.Fatalf("marker missing in %s", dir)
++	}
++	payload, err := os.ReadFile(filepath.Join(dir, marker.Name))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var raw map[string]json.RawMessage
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	return recorded, raw
++}
++
++// TestLegacyLaneRecordsDependencyDirectory installs a schema-1 project
++// whose schema-9 root requires subdirectory-selected packages through
++// the real install entry. The schema-9 installation records draft marker
++// v6 with the normalized directory; the schema-8 subdirectory selection
++// records v5 with its directory; the schema-9 root records v6 with the
++// configured-git root selection; and the local audit records bind the
++// same directories (core §4.4, skillfile-sources §4, draft-sources-v2).
++// A second install through the same entry is up-to-date.
++func TestLegacyLaneRecordsDependencyDirectory(t *testing.T) {
++	t.Parallel()
++	e := newEnv(t)
++	commit := setupLegacyDirectoryRepos(e, "skills/backend", "skills/helper")
++	e.declare("consumer")
++	e.cfg.Audit.Enabled = true
++
++	result := e.install(Options{})
++	if result.Status != "ok" {
++		t.Fatalf("install: %+v", result)
++	}
++
++	backend, backendRaw := readLegacyMarker(t, filepath.Join(e.project, ".agents", "skills", "backend"))
++	if backend.SchemaVersion != marker.SchemaV6 || backend.SkillSchemaVersion != 9 {
++		t.Fatalf("backend marker = schema %d skill %d, want marker 6 skill 9",
++			backend.SchemaVersion, backend.SkillSchemaVersion)
++	}
++	if backend.Package == nil || backend.Package.Kind != "network-git" ||
++		backend.Package.Repository != "github.com/example/role-skills" ||
++		backend.Package.Commit == nil || backend.Package.Commit.ObjectFormat != "sha1" ||
++		backend.Package.Commit.Hex != commit || backend.Package.Directory != "skills/backend" {
++		t.Fatalf("backend marker lost the selected package identity: %+v", backend.Package)
++	}
++	if backend.LockSHA256 == "" {
++		t.Fatalf("backend marker carries no lock binding")
++	}
++	for _, field := range []string{"source", "git", "ref_kind", "ref", "commit"} {
++		if _, present := backendRaw[field]; present {
++			t.Fatalf("backend v6 marker carries replaced legacy field %q", field)
++		}
++	}
++
++	helper, _ := readLegacyMarker(t, filepath.Join(e.project, ".agents", "skills", "helper"))
++	if helper.SchemaVersion != marker.SchemaV5 || helper.SkillSchemaVersion != 8 {
++		t.Fatalf("helper marker = schema %d skill %d, want marker 5 skill 8",
++			helper.SchemaVersion, helper.SkillSchemaVersion)
++	}
++	if helper.Package == nil || helper.Package.Kind != "network-git" ||
++		helper.Package.Directory != "skills/helper" {
++		t.Fatalf("helper marker lost the selected package identity: %+v", helper.Package)
++	}
++
++	consumer, _ := readLegacyMarker(t, filepath.Join(e.project, ".agents", "skills", "consumer"))
++	if consumer.SchemaVersion != marker.SchemaV6 || consumer.SkillSchemaVersion != 9 {
++		t.Fatalf("consumer marker = schema %d skill %d, want marker 6 skill 9",
++			consumer.SchemaVersion, consumer.SkillSchemaVersion)
++	}
++	if consumer.Package == nil || consumer.Package.Kind != "configured-git" ||
++		consumer.Package.Source != "consumer" || consumer.Package.Directory != "." {
++		t.Fatalf("consumer marker lost the root package identity: %+v", consumer.Package)
++	}
++
++	audited := map[string]string{}
++	matches, err := filepath.Glob(filepath.Join(e.home, "audit", "*", "verdict-*.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, path := range matches {
++		payload, err := os.ReadFile(path)
++		if err != nil {
++			t.Fatal(err)
++		}
++		var record struct {
++			Skill     string `json:"skill"`
++			Directory string `json:"directory"`
++		}
++		if err := json.Unmarshal(payload, &record); err != nil {
++			t.Fatal(err)
++		}
++		audited[record.Skill] = record.Directory
++	}
++	for skill, want := range map[string]string{"backend": "skills/backend", "helper": "skills/helper", "consumer": "."} {
++		if audited[skill] != want {
++			t.Fatalf("audit record for %s binds directory %q, want %q (records: %v)", skill, audited[skill], want, audited)
++		}
++	}
++
++	second := e.install(Options{})
++	if second.Status != "ok" {
++		t.Fatalf("second: %+v", second)
++	}
++	if joined := strings.Join(second.Messages, "\n"); !strings.Contains(joined, "up-to-date") {
++		t.Fatalf("second install must be up-to-date:\n%s", joined)
++	}
++}
++
++// TestLegacyMarkerPackageArms pins the legacy-lane package staging: a
++// network identity records the network-git arm with the normalized
++// directory, a local source records the configured-git root arm, the lock
++// binding is deterministic and directory-sensitive, and a subdirectory
++// selection without a network identity fails closed instead of recording
++// a directory the configured-git arm forbids.
++func TestLegacyMarkerPackageArms(t *testing.T) {
++	t.Parallel()
++	commit := strings.Repeat("ab", 20)
++	network := &closure.Node{
++		Name:      "backend",
++		Decl:      manifestpkg.Decl{Name: "backend", Source: "backend", Git: legacyDirectoryGit, Ref: manifestpkg.Ref{Kind: "revision", Value: commit}},
++		Directory: "skills/backend",
++		Resolved:  gitops.ResolvedRef{Kind: "revision", Ref: commit, Commit: commit},
++		Identity:  "github.com/example/role-skills",
++	}
++	pkg, binding, err := legacyMarkerPackage(network)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if pkg.Kind != "network-git" || pkg.Repository != "github.com/example/role-skills" ||
++		pkg.Commit == nil || pkg.Commit.ObjectFormat != "sha1" || pkg.Commit.Hex != commit ||
++		pkg.Directory != "skills/backend" {
++		t.Fatalf("network-git arm = %+v", pkg)
++	}
++	again, bindingAgain, err := legacyMarkerPackage(network)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if bindingAgain != binding || again.Directory != pkg.Directory {
++		t.Fatalf("binding is not deterministic: %q vs %q", binding, bindingAgain)
++	}
++	moved := *network
++	moved.Directory = "skills/frontend"
++	_, movedBinding, err := legacyMarkerPackage(&moved)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if movedBinding == binding {
++		t.Fatalf("binding does not observe the directory: %q", binding)
++	}
++
++	local := &closure.Node{
++		Name:      "consumer",
++		Decl:      manifestpkg.Decl{Name: "consumer", Source: "consumer", Ref: manifestpkg.Ref{Kind: "tag", Value: "v1"}},
++		Directory: ".",
++		Resolved:  gitops.ResolvedRef{Kind: "tag", Ref: "v1", Commit: commit},
++	}
++	localPkg, localBinding, err := legacyMarkerPackage(local)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if localPkg.Kind != "configured-git" || localPkg.Source != "consumer" || localPkg.Directory != "." {
++		t.Fatalf("configured-git arm = %+v", localPkg)
++	}
++	if localBinding == "" || !strings.HasPrefix(localBinding, "sha256:") {
++		t.Fatalf("binding = %q, want a sha256 digest", localBinding)
++	}
++
++	subdirLocal := *local
++	subdirLocal.Directory = "skills/backend"
++	if _, _, err := legacyMarkerPackage(&subdirLocal); err == nil ||
++		!strings.Contains(err.Error(), "source_selection_invalid") {
++		t.Fatalf("subdir without network identity = %v, want source_selection_invalid", err)
++	}
++
++	badCommit := *network
++	badCommit.Resolved.Commit = "not-a-commit"
++	if _, _, err := legacyMarkerPackage(&badCommit); err == nil {
++		t.Fatalf("malformed commit was staged")
++	}
++}
++
++// TestBuildMarkerRefusesPackageSelectedBuildsOnLegacyLane pins the
++// fail-closed guard: a package marker binds receipt-3 build records, which
++// the schema-1 lane never produces, so a package-selected skill with
++// compiled commands is refused with a named diagnostic instead of
++// shipping a marker the reader must reject.
++func TestBuildMarkerRefusesPackageSelectedBuildsOnLegacyLane(t *testing.T) {
++	t.Parallel()
++	commit := strings.Repeat("ab", 20)
++	node := &closure.Node{
++		Name:      "backend",
++		Decl:      manifestpkg.Decl{Name: "backend", Source: "backend", Git: legacyDirectoryGit, Ref: manifestpkg.Ref{Kind: "revision", Value: commit}},
++		Directory: "skills/backend",
++		Resolved:  gitops.ResolvedRef{Kind: "revision", Ref: commit, Commit: commit},
++		Identity:  "github.com/example/role-skills",
++		Spec: &skillspec.Spec{
++			SchemaVersion: 9,
++			Commands:      map[string]skillspec.Command{"tool": {Name: "tool", Type: "script"}},
++			Dependencies:  map[string]skillspec.CommandDependency{},
++			Requirements:  map[string]skillspec.Requirement{},
++		},
++		Edges: []closure.Edge{{Consumer: closure.ProjectEdge, Mode: "full"}},
++	}
++	builds := map[string]marker.Build{"tool": {Driver: "go-v1"}}
++	if _, err := buildMarker(node, "en", []string{"claude_code"}, []string{"tool"}, nil, nil, builds, nil); err == nil ||
++		!strings.Contains(err.Error(), "requires Skillfile schema 2") {
++		t.Fatalf("package-selected builds = %v, want the schema-2 diagnostic", err)
++	}
++}
++
++// TestLegacyLaneRefusesGlobDependencyDirectory pins the dependency-path
++// glob class through the real install entry: `?` and `[` are refused on
++// the dependency path exactly like the spec's `*` vector, the diagnostic
++// names the directory field, and nothing is materialized.
++func TestLegacyLaneRefusesGlobDependencyDirectory(t *testing.T) {
++	t.Parallel()
++	for _, directory := range []string{"skills/back?end", "skills/back[eo]nd", "skills/*"} {
++		t.Run(strings.ReplaceAll(directory, "/", "_"), func(t *testing.T) {
++			t.Parallel()
++			e := newEnv(t)
++			setupLegacyDirectoryRepos(e, directory, "skills/helper")
++			e.declare("consumer")
++
++			result := e.install(Options{})
++			if result.Status != "failed" {
++				t.Fatalf("install with directory %q = %+v, want failed", directory, result)
++			}
++			joined := strings.Join(append(append([]string{}, result.Errors...), result.Messages...), "\n")
++			if !strings.Contains(joined, "dependencies.skills.backend.directory") {
++				t.Fatalf("error does not name the directory field:\n%s", joined)
++			}
++			if !strings.Contains(joined, "portable contained path") {
++				t.Fatalf("error does not carry the directory grammar diagnostic:\n%s", joined)
++			}
++			if _, err := os.Stat(filepath.Join(e.project, ".agents")); !os.IsNotExist(err) {
++				t.Fatalf("refused install materialized state: %v", err)
++			}
++		})
++	}
++}
+diff --git a/internal/install/legacypackage.go b/internal/install/legacypackage.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..69f09ec4a37062ebb8d438d2ef4687c703799945
+--- /dev/null
++++ b/internal/install/legacypackage.go
+@@ -0,0 +1,125 @@
++package install
++
++import (
++	"crypto/sha256"
++	"encoding/hex"
++	"encoding/json"
++	"fmt"
++
++	"github.com/relux-works/curator/internal/closure"
++	"github.com/relux-works/curator/internal/marker"
++)
++
++// legacyLockBinding is the canonical preimage of a legacy-lane (Skillfile
++// schema 1) package-marker lock binding. The schema-1 lane keeps no lock
++// document, so the binding hashes exactly what the marker must attest in
++// place of one: the installed selection (name plus full package identity
++// including the normalized directory) and the declared ref. Struct field
++// order is the canonical order; the digest form matches the draft lane.
++type legacyLockBinding struct {
++	Name         string `json:"name"`
++	Kind         string `json:"kind"`
++	Repository   string `json:"repository,omitempty"`
++	Source       string `json:"source,omitempty"`
++	ObjectFormat string `json:"object_format,omitempty"`
++	Hex          string `json:"hex,omitempty"`
++	Directory    string `json:"directory"`
++	RefKind      string `json:"ref_kind"`
++	Ref          string `json:"ref"`
++}
++
++// legacyMarkerPackage stages the frozen package identity and lock binding
++// of one legacy-lane (Skillfile schema 1) node that no legacy marker can
++// record: every schema-9 installation, and every installation selected at
++// a repository subdirectory (core §4.4, skillfile-sources §4,
++// draft-sources-v2). A node with a canonical network identity records the
++// network-git arm with the normalized selected directory; a node from a
++// local configured source records the configured-git arm, whose directory
++// is always "." — roots select "." by construction, and a subdirectory
++// selection without a network identity is refused instead of recorded
++// with a directory the arm forbids.
++func legacyMarkerPackage(node *closure.Node) (*marker.Package, string, error) {
++	directory := node.Directory
++	if directory == "" {
++		directory = "."
++	}
++	format, err := legacyCommitFormat(node.Resolved.Commit)
++	if err != nil {
++		return nil, "", fmt.Errorf("source_member_invalid: locked commit for %s is not a full object id: %w", node.Name, err)
++	}
++	commit := &marker.Commit{ObjectFormat: format, Hex: node.Resolved.Commit}
++	var pkg *marker.Package
++	if node.Identity != "" {
++		pkg = &marker.Package{
++			Kind:       "network-git",
++			Repository: node.Identity,
++			Commit:     commit,
++			Directory:  directory,
++		}
++	} else {
++		if directory != "." {
++			return nil, "", fmt.Errorf("source_selection_invalid: selecting a repository subdirectory for %s requires a canonical network repository identity", node.Name)
++		}
++		pkg = &marker.Package{
++			Kind:      "configured-git",
++			Source:    node.Decl.Source,
++			Commit:    commit,
++			Directory: ".",
++		}
++	}
++	binding, err := legacyLockDigest(node, pkg)
++	if err != nil {
++		return nil, "", err
++	}
++	return pkg, binding, nil
++}
++
++// legacyCommitFormat resolves the locked-commit object format from the
++// resolved commit hex: 40 lowercase hex is sha1, 64 is sha256. Anything
++// else is not a locked object the package arms can carry.
++func legacyCommitFormat(commit string) (string, error) {
++	raw, err := hex.DecodeString(commit)
++	if err != nil || hex.EncodeToString(raw) != commit {
++		if err == nil {
++			err = fmt.Errorf("commit %q is not lowercase hex", commit)
++		}
++		return "", err
++	}
++	switch len(raw) {
++	case 20:
++		return "sha1", nil
++	case 32:
++		return "sha256", nil
++	default:
++		return "", fmt.Errorf("length %d is neither sha1 nor sha256", len(raw))
++	}
++}
++
++// legacyLockDigest binds the installed selection and declared ref of one
++// legacy-lane package marker. The digest is deterministic across runs, so
++// status compares it exactly like a draft-lane lock generation.
++func legacyLockDigest(node *closure.Node, pkg *marker.Package) (string, error) {
++	preimage := legacyLockBinding{
++		Name:      node.Name,
++		Kind:      pkg.Kind,
++		Directory: pkg.Directory,
++		RefKind:   node.Decl.Ref.Kind,
++		Ref:       node.Decl.Ref.Value,
++	}
++	switch pkg.Kind {
++	case "network-git":
++		preimage.Repository = pkg.Repository
++	case "configured-git":
++		preimage.Source = pkg.Source
++	}
++	if pkg.Commit != nil {
++		preimage.ObjectFormat = pkg.Commit.ObjectFormat
++		preimage.Hex = pkg.Commit.Hex
++	}
++	payload, err := json.Marshal(preimage)
++	if err != nil {
++		return "", fmt.Errorf("source_member_invalid: cannot bind the package selection of %s: %w", node.Name, err)
++	}
++	sum := sha256.Sum256(payload)
++	return "sha256:" + hex.EncodeToString(sum[:]), nil
++}
+diff --git a/internal/marker/marker.go b/internal/marker/marker.go
+index c7c997da45c39341de85695ae452c89aa00b2889..67a3034bad66fc89a509d9472655cc752b9eb9cd 100644
+--- a/internal/marker/marker.go
++++ b/internal/marker/marker.go
+@@ -84,11 +84,21 @@ const (
+ 	// SchemaV5 is the current core marker shape and also the frozen draft
+ 	// package shape. Core v5 carries hash_version 2; the disjoint package
+ 	// shape retains its frozen v1 meaning until its own schema advances.
++	// Source-extension v5 records skill schemas 1 through 8 only: a
++	// schema-9 installation uses SchemaV6 (skillfile-sources §4).
+ 	SchemaV5 = 5
++	// SchemaV6 is the draft marker v6 carrier for core schema-9
++	// installations (skillfile-sources §4, draft-sources-v2). It is
++	// marker v5 with schema_version 6 and skill_schema_version through 9;
++	// every other field, requiredness rule, and currentness comparison is
++	// unchanged, including the frozen v1 content framing of package
++	// markers. Writers use it exactly for schema-9 installations,
++	// including when the root project still uses Skillfile schema 1.
++	SchemaV6 = 6
+ 	// NewestSchemaVersion is the highest marker schema this release reads. It
+ 	// is what an operator is told when a document from a newer manager is
+ 	// refused, so it must advance with every new readable schema.
+-	NewestSchemaVersion = SchemaV5
++	NewestSchemaVersion = SchemaV6
+ )
+ 
+ var (
+@@ -335,6 +345,26 @@ func Read(installedDir string) *Marker {
+ 	return read
+ }
+ 
++// packageRequired is the required member set shared by the
++// source-extension v5 shape and draft marker v6: the frozen package
++// replaces every legacy source field (skillfile-sources §4 migration
++// table).
++func packageRequired() []string {
++	return []string{
++		"schema_version", "name", "package", "lock_sha256", "content_sha256", "locale",
++		"agents", "commands", "dependencies", "skill_schema_version", "runtime_roots",
++		"build_roots", "builds", "installed_at", "files",
++	}
++}
++
++// packageAllowed is the allowed member set shared by the
++// source-extension v5 shape and draft marker v6.
++func packageAllowed(required []string) []string {
++	return append(append([]string(nil), required...),
++		"requirements", "mcp_servers", "attestation", "activation", "requirers", "substituted",
++		"build_source")
++}
++
+ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
+ 	commonRequired := []string{
+ 		"schema_version", "name", "source", "ref_kind", "ref", "commit", "content_sha256", "locale",
+@@ -363,15 +393,17 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
+ 		} else {
+ 			// The frozen package replaces every legacy source field, so the
+ 			// source-extension v5 shape keeps its own required set.
+-			required = []string{
+-				"schema_version", "name", "package", "lock_sha256", "content_sha256", "locale",
+-				"agents", "commands", "dependencies", "skill_schema_version", "runtime_roots",
+-				"build_roots", "builds", "installed_at", "files",
+-			}
+-			allowed = append(append([]string(nil), required...),
+-				"requirements", "mcp_servers", "attestation", "activation", "requirers", "substituted",
+-				"build_source")
+-		}
++			required = packageRequired()
++			allowed = packageAllowed(required)
++		}
++	case SchemaV6:
++		// Draft marker v6 is the v5 package shape with the version
++		// bumped and nothing else changed (skillfile-sources §4). There
++		// is no core v6 shape: a v6 document without a package is
++		// invalid, and the required-set check below refuses it through
++		// the missing package member.
++		required = packageRequired()
++		allowed = packageAllowed(required)
+ 	default:
+ 		return false
+ 	}
+@@ -391,6 +423,12 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
+ 		} else if !validCoreV5Identity(m) {
+ 			return false
+ 		}
++	} else if m.SchemaVersion == SchemaV6 {
++		// Draft marker v6 carries the v5 package identity unchanged;
++		// a missing package was already refused by the required set.
++		if m.Package == nil || !validV5Identity(m, raw) {
++			return false
++		}
+ 	} else if !identifiers.PortablePath(m.Source) || !validLegacyTriple(m) {
+ 		return false
+ 	}
+@@ -403,6 +441,10 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
+ 		} else if hasHashVersion || m.HashVersion != 0 {
+ 			return false
+ 		}
++	} else if m.SchemaVersion == SchemaV6 {
++		if _, hasHashVersion := raw["hash_version"]; hasHashVersion || m.HashVersion != 0 {
++			return false
++		}
+ 	} else if m.HashVersion != 0 {
+ 		return false
+ 	}
+@@ -412,11 +454,12 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
+ 		(m.SchemaVersion == ExternalSchemaVersion && m.SkillSchemaVersion != 7) ||
+ 		(m.SchemaVersion == PolicySchemaVersion && m.SkillSchemaVersion != 8) ||
+ 		(m.SchemaVersion == SchemaV5 && m.Package == nil && m.SkillSchemaVersion > 8) ||
+-		(m.SchemaVersion == SchemaV5 && m.Package != nil && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 9)) {
++		(m.SchemaVersion == SchemaV5 && m.Package != nil && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 8)) ||
++		(m.SchemaVersion == SchemaV6 && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 9)) {
+ 		return false
+ 	}
+ 	setsSorted := m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion ||
+-		m.SchemaVersion == PolicySchemaVersion || m.SchemaVersion == SchemaV5
++		m.SchemaVersion == PolicySchemaVersion || m.SchemaVersion == SchemaV5 || m.SchemaVersion == SchemaV6
+ 	if !validNullableLocale(raw["locale"], m.Locale) || !validTimestamp(m.InstalledAt) ||
+ 		!validIdentifierSet(m.Agents, setsSorted) || !validIdentifierSet(m.Commands, setsSorted) ||
+ 		!validIdentifierSet(m.Dependencies, setsSorted) || !validPathSet(m.RuntimeRoots, setsSorted) ||
+@@ -464,13 +507,15 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
+ 		}
+ 	}
+ 	if (m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion ||
+-		m.SchemaVersion == PolicySchemaVersion || m.SchemaVersion == SchemaV5) && !validBuildState(m, raw) {
++		m.SchemaVersion == PolicySchemaVersion || m.SchemaVersion == SchemaV5 ||
++		m.SchemaVersion == SchemaV6) && !validBuildState(m, raw) {
+ 		return false
+ 	}
+ 	return true
+ }
+ 
+-// validV5Identity enforces the draft marker-v5 identity: the frozen package
++// validV5Identity enforces the draft package identity shared by
++// source-extension marker v5 and draft marker v6: the frozen package
+ // replaces every legacy source field, the lock binds the installed selection
+ // through the validated lock, and a local snapshot admits neither a network
+ // attestation nor a development substitution.
+@@ -903,7 +948,7 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
+ 		return false
+ 	}
+ 	var buildsRaw map[string]json.RawMessage
+-	if m.SchemaVersion == SchemaV5 {
++	if m.SchemaVersion == SchemaV5 || m.SchemaVersion == SchemaV6 {
+ 		if err := json.Unmarshal(raw["builds"], &buildsRaw); err != nil || buildsRaw == nil {
+ 			return false
+ 		}
+@@ -920,10 +965,11 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
+ 		if unixErr != nil || windowsErr != nil || (build.ArtifactPath != unixPath && build.ArtifactPath != windowsPath) {
+ 			return false
+ 		}
+-		// A draft v5 marker binds receipt version 3 on every build entry,
+-		// whatever the skill schema: its cache entries are receipt-3 package
+-		// wrappers, so a legacy record shape can never describe them.
+-		if m.SchemaVersion == SchemaV5 && m.Package != nil {
++		// A draft package marker (v5 or v6) binds receipt version 3 on
++		// every build entry, whatever the skill schema: its cache entries
++		// are receipt-3 package wrappers, so a legacy record shape can
++		// never describe them.
++		if (m.SchemaVersion == SchemaV5 || m.SchemaVersion == SchemaV6) && m.Package != nil {
+ 			rawBuild, present := buildsRaw[command]
+ 			if !present {
+ 				return false
+@@ -1151,14 +1197,15 @@ func rawObject(raw json.RawMessage) (map[string]json.RawMessage, bool) {
+ // silently reports a perfectly current installation as needing reinstallation
+ // the moment the written schema advances.
+ func BuildBearingSchema(version int) bool {
+-	return version == SchemaVersion || version == SchemaV5 || externalCapableSchema(version)
++	return version == SchemaVersion || version == SchemaV5 || version == SchemaV6 || externalCapableSchema(version)
+ }
+ 
+ // externalCapableSchema reports whether a marker of this schema can record
+ // external go-repository-v1 commands alongside local ones. Marker v4 is v3
+-// with the version bumped and nothing else changed, so both answer yes.
++// with the version bumped and nothing else changed, so both answer yes;
++// draft marker v6 shares the v5 package build records unchanged.
+ func externalCapableSchema(version int) bool {
+-	return version == ExternalSchemaVersion || version == PolicySchemaVersion || version == SchemaV5
++	return version == ExternalSchemaVersion || version == PolicySchemaVersion || version == SchemaV5 || version == SchemaV6
+ }
+ 
+ // SupportedSchema reports whether version is a marker schema this release
+@@ -1167,19 +1214,25 @@ func externalCapableSchema(version int) bool {
+ func SupportedSchema(version int) bool {
+ 	return version == LegacySchemaVersion || version == SchemaVersion ||
+ 		version == ExternalSchemaVersion || version == PolicySchemaVersion ||
+-		version == SchemaV5
++		version == SchemaV5 || version == SchemaV6
+ }
+ 
+ // Write stores the marker inside dir with sorted keys and a trailing newline.
+ //
+-// A marker carrying a frozen draft package retains its v5 source-extension
+-// shape. Core markers preserve the rc.13 schema and v1 hash by default; the
+-// internal hash writer switch selects the v5/v2 form.
++// A marker carrying a frozen draft package retains its source-extension
++// shape: v6 exactly for schema-9 installations, v5 otherwise
++// (skillfile-sources §4). Core markers preserve the rc.13 schema and v1
++// hash by default; the internal hash writer switch selects the v5/v2
++// form. A schema-9 installation without a package fails closed below:
++// no legacy schema can record manifest version 9.
+ func Write(dir string, m *Marker) error {
+ 	if m == nil {
+ 		return errors.New("install marker is nil")
+ 	}
+ 	switch {
++	case m.Package != nil && m.SkillSchemaVersion == 9:
++		m.SchemaVersion = SchemaV6
++		m.HashVersion = 0
+ 	case m.Package != nil:
+ 		m.SchemaVersion = SchemaV5
+ 		m.HashVersion = 0
+@@ -1305,11 +1358,21 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
+ 	// package identity while the projected context stays identical, so the
+ 	// lock comparison below is what observes it. The expectation is staged
+ 	// fresh on every run, so its schema version is unset until Write; the
+-	// frozen package it carries is what selects the v5 comparison. A v5
+-	// marker never matches a legacy one; changed registry, substitution,
++	// frozen package it carries is what selects the package comparison,
++	// and its skill schema selects the carrier: v6 exactly for schema-9
++	// installations, v5 otherwise (skillfile-sources §4). Neither a core
++	// marker nor a source-extension v5 marker can establish currentness
++	// for a schema-9 installation; changed registry, substitution,
+ 	// declared ref, package or lock makes the installation non-current.
+ 	if recorded.Package != nil || expected.Package != nil {
+-		if recorded.SchemaVersion != SchemaV5 || expected.Package == nil {
++		if expected.Package == nil {
++			return false, nil
++		}
++		wantVersion := SchemaV5
++		if expected.SkillSchemaVersion == 9 {
++			wantVersion = SchemaV6
++		}
++		if recorded.SchemaVersion != wantVersion {
+ 			return false, nil
+ 		}
+ 		if !reflect.DeepEqual(recorded.Package, expected.Package) || recorded.LockSHA256 != expected.LockSHA256 {
+diff --git a/internal/marker/marker_v5_schema_test.go b/internal/marker/marker_v5_schema_test.go
+index 979ba351a3dd26e151b5e359bd64bc1de361b109..7e59a0b37f5e9954e0cb52c9604a612d06fa798e 100644
+--- a/internal/marker/marker_v5_schema_test.go
++++ b/internal/marker/marker_v5_schema_test.go
+@@ -282,8 +282,8 @@ func validateV5AgainstSchema(t *testing.T, raw map[string]json.RawMessage) error
+ 	}
+ 	var skillSchema int
+ 	if err := json.Unmarshal(raw["skill_schema_version"], &skillSchema); err != nil ||
+-		skillSchema < 1 || skillSchema > 9 {
+-		return fmt.Errorf("skill_schema_version = %s, want 1..9", raw["skill_schema_version"])
++		skillSchema < 1 || skillSchema > 8 {
++		return fmt.Errorf("skill_schema_version = %s, want 1..8", raw["skill_schema_version"])
+ 	}
+ 	var pkg struct {
+ 		Kind string `json:"kind"`
+diff --git a/internal/marker/marker_v5_test.go b/internal/marker/marker_v5_test.go
+index c74d1ce5ca8460a7dca8c6484adb437bc76ba509..275ef76d03d75fa7af328792353992fac332fa73 100644
+--- a/internal/marker/marker_v5_test.go
++++ b/internal/marker/marker_v5_test.go
+@@ -152,12 +152,28 @@ func TestMarkerV5RefusesMalformedIdentity(t *testing.T) {
+ 	}
+ }
+ 
+-func TestMarkerV5AcceptsSkillSchema9(t *testing.T) {
++// TestMarkerV5RefusesSkillSchema9 pins the accepted marker-v5 rejection:
++// marker v5 cannot record manifest version 9 (skillfile-sources §4,
++// draft-sources-v2). Writers emit v6 for schema-9 installations instead,
++// so the pin splices skill 9 into a written v5 document and proves the
++// reader refuses it.
++func TestMarkerV5RefusesSkillSchema9(t *testing.T) {
+ 	m := v5LocalMarker()
+-	m.SkillSchemaVersion = 9
+-	_, recorded := writeV5(t, m)
+-	if recorded.SchemaVersion != SchemaV5 || recorded.SkillSchemaVersion != 9 {
+-		t.Fatalf("recorded marker = %+v, want marker schema 5 carrying skill schema 9", recorded)
++	m.SkillSchemaVersion = 8
++	dir, _ := writeV5(t, m)
++	payload, err := os.ReadFile(filepath.Join(dir, Name))
++	if err != nil {
++		t.Fatal(err)
++	}
++	rewritten := strings.Replace(string(payload), `"skill_schema_version": 8`, `"skill_schema_version": 9`, 1)
++	if rewritten == string(payload) {
++		t.Fatal("splice target missing from the written v5 marker")
++	}
++	if err := os.WriteFile(filepath.Join(dir, Name), []byte(rewritten), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if recorded := Read(dir); recorded != nil {
++		t.Fatalf("Read admitted a v5 marker carrying skill schema 9: %+v", recorded)
+ 	}
+ }
+ 
+diff --git a/internal/marker/marker_v6_schema_test.go b/internal/marker/marker_v6_schema_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef23705190e551762302e12dc4ed0e954d8b0ffa
+--- /dev/null
++++ b/internal/marker/marker_v6_schema_test.go
+@@ -0,0 +1,219 @@
++package marker
++
++import (
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++// The closed v6 shape is pinned against the draft schema vendored under
++// testdata/draft-sources-v2 (byte-identical to curator-spec
++// schemas/draft-sources-v2/install-marker-v6.schema.json at 7eaeb73f).
++// Draft marker v6 is marker v5 with schema_version 6 and
++// skill_schema_version through 9; every other field, requiredness rule,
++// and currentness comparison is unchanged (skillfile-sources §4).
++
++func loadV6Schema(t *testing.T) map[string]any {
++	t.Helper()
++	payload, err := os.ReadFile(filepath.Join("testdata", "draft-sources-v2", "install-marker-v6.schema.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var schema map[string]any
++	if err := json.Unmarshal(payload, &schema); err != nil {
++		t.Fatal(err)
++	}
++	return schema
++}
++
++// TestMarkerV6TopLevelMatchesDraftSchema pins the closed v6 top level
++// against the vendored draft schema: the schema is closed, its property
++// and required sets are exactly the v5 migration-table sets, the five
++// replaced legacy fields are not properties at all, the version const is
++// 6 with skill schemas through 9, and the local arm forbids attestation
++// and substituted.
++func TestMarkerV6TopLevelMatchesDraftSchema(t *testing.T) {
++	schema := loadV6Schema(t)
++	if closed, ok := schema["additionalProperties"].(bool); !ok || closed {
++		t.Fatalf("install-marker-v6 must be closed (additionalProperties:false)")
++	}
++	properties, ok := schema["properties"].(map[string]any)
++	if !ok {
++		t.Fatalf("install-marker-v6 properties missing")
++	}
++	if len(properties) != len(v5SchemaTopLevel) {
++		t.Fatalf("schema properties = %d members, table = %d", len(properties), len(v5SchemaTopLevel))
++	}
++	for _, member := range v5SchemaTopLevel {
++		if _, ok := properties[member]; !ok {
++			t.Fatalf("schema property %q missing from the table", member)
++		}
++	}
++	for member := range properties {
++		found := false
++		for _, want := range v5SchemaTopLevel {
++			if member == want {
++				found = true
++			}
++		}
++		if !found {
++			t.Fatalf("schema property %q missing from the table", member)
++		}
++	}
++	for _, field := range []string{"source", "git", "ref_kind", "ref", "commit"} {
++		if _, ok := properties[field]; ok {
++			t.Fatalf("schema admits replaced legacy field %q", field)
++		}
++	}
++	if version, ok := properties["schema_version"].(map[string]any); !ok || version["const"] != float64(SchemaV6) {
++		t.Fatalf("schema_version const = %v, want %d", properties["schema_version"], SchemaV6)
++	}
++	skill, ok := properties["skill_schema_version"].(map[string]any)
++	if !ok || skill["minimum"] != float64(1) || skill["maximum"] != float64(9) {
++		t.Fatalf("skill_schema_version range = %v, want 1..9", properties["skill_schema_version"])
++	}
++	requiredAny, ok := schema["required"].([]any)
++	if !ok {
++		t.Fatalf("install-marker-v6 required missing")
++	}
++	if len(requiredAny) != len(v5SchemaRequired) {
++		t.Fatalf("schema required = %v, table = %v", requiredAny, v5SchemaRequired)
++	}
++	for _, reqAny := range requiredAny {
++		req, ok := reqAny.(string)
++		if !ok {
++			t.Fatalf("schema required entry not a string: %v", reqAny)
++		}
++		found := false
++		for _, want := range v5SchemaRequired {
++			if req == want {
++				found = true
++			}
++		}
++		if !found {
++			t.Fatalf("schema required %q missing from the table", req)
++		}
++	}
++}
++
++// validateV6AgainstSchema checks one raw v6 document against the closed
++// sets of the vendored draft schema, mirroring validateV5AgainstSchema:
++// every top-level member is a schema property, every required member is
++// present, the schema version is 6, the skill schema is in 1..9, and the
++// package matches its arm's closed shape exactly.
++func validateV6AgainstSchema(t *testing.T, raw map[string]json.RawMessage) error {
++	t.Helper()
++	schema := loadV6Schema(t)
++	properties, ok := schema["properties"].(map[string]any)
++	if !ok {
++		t.Fatalf("install-marker-v6 properties missing")
++	}
++	for member := range raw {
++		if _, ok := properties[member]; !ok {
++			return fmt.Errorf("document carries member %q outside the schema properties", member)
++		}
++	}
++	for _, req := range v5SchemaRequired {
++		if _, ok := raw[req]; !ok {
++			return fmt.Errorf("document misses required member %q", req)
++		}
++	}
++	var version int
++	if err := json.Unmarshal(raw["schema_version"], &version); err != nil || version != SchemaV6 {
++		return fmt.Errorf("schema_version = %s, want %d", raw["schema_version"], SchemaV6)
++	}
++	var skillSchema int
++	if err := json.Unmarshal(raw["skill_schema_version"], &skillSchema); err != nil ||
++		skillSchema < 1 || skillSchema > 9 {
++		return fmt.Errorf("skill_schema_version = %s, want 1..9", raw["skill_schema_version"])
++	}
++	var pkg struct {
++		Kind string `json:"kind"`
++	}
++	if err := json.Unmarshal(raw["package"], &pkg); err != nil {
++		return fmt.Errorf("package is not an object: %v", err)
++	}
++	arm, ok := v5PackageArms[pkg.Kind]
++	if !ok {
++		return fmt.Errorf("package kind %q is not a schema arm", pkg.Kind)
++	}
++	var pkgRaw map[string]json.RawMessage
++	if err := json.Unmarshal(raw["package"], &pkgRaw); err != nil {
++		t.Fatal(err)
++	}
++	if !closedRawShape(pkgRaw, arm) {
++		return fmt.Errorf("package does not match the closed %s arm: %s", pkg.Kind, raw["package"])
++	}
++	if commitRaw, present := pkgRaw["commit"]; present {
++		var commitRawMap map[string]json.RawMessage
++		if err := json.Unmarshal(commitRaw, &commitRawMap); err != nil ||
++			!closedRawShape(commitRawMap, v5CommitShape) {
++			return fmt.Errorf("commit is not the closed lockedCommit shape: %s", commitRaw)
++		}
++	}
++	if pkg.Kind == "local-snapshot" {
++		if _, present := raw["attestation"]; present {
++			return fmt.Errorf("local-snapshot document carries attestation")
++		}
++		if _, present := raw["substituted"]; present {
++			return fmt.Errorf("local-snapshot document carries substituted")
++		}
++	}
++	return nil
++}
++
++// TestMarkerV6WrittenMarkersValidateAgainstDraftSchema validates a
++// written v6 marker of every arm — network-git, configured-git and
++// local-snapshot — against the vendored draft schema, so a writer that
++// emits a non-conformant document fails here instead of shipping. The
++// trailing controls prove the check is not vacuous.
++func TestMarkerV6WrittenMarkersValidateAgainstDraftSchema(t *testing.T) {
++	configured := v5GitAttestedConfiguredMarker()
++	configured.SkillSchemaVersion = 9
++	local := v5LocalMarker()
++	local.SkillSchemaVersion = 9
++	for name, base := range map[string]*Marker{
++		"network-git":    v6NetworkMarker(),
++		"configured-git": configured,
++		"local-snapshot": local,
++	} {
++		t.Run(name, func(t *testing.T) {
++			dir, _ := writeV5(t, base)
++			payload, err := os.ReadFile(filepath.Join(dir, Name))
++			if err != nil {
++				t.Fatal(err)
++			}
++			var raw map[string]json.RawMessage
++			if err := json.Unmarshal(payload, &raw); err != nil {
++				t.Fatal(err)
++			}
++			if err := validateV6AgainstSchema(t, raw); err != nil {
++				t.Fatal(err)
++			}
++		})
++	}
++	t.Run("control/replaced-field-refused", func(t *testing.T) {
++		dir, _ := writeV5(t, v6NetworkMarker())
++		spliceV5Member(t, dir, `"source":"review"`)
++		payload, err := os.ReadFile(filepath.Join(dir, Name))
++		if err != nil {
++			t.Fatal(err)
++		}
++		var raw map[string]json.RawMessage
++		if err := json.Unmarshal(payload, &raw); err != nil {
++			t.Fatal(err)
++		}
++		if err := validateV6AgainstSchema(t, raw); err == nil {
++			t.Fatalf("schema validation admitted a v6 Git marker carrying source")
++		}
++	})
++	t.Run("control/hash-version-refused", func(t *testing.T) {
++		dir, _ := writeV5(t, v6NetworkMarker())
++		spliceV5Member(t, dir, `"hash_version":2`)
++		if recorded := Read(dir); recorded != nil {
++			t.Fatalf("Read admitted a v6 marker carrying hash_version: %+v", recorded)
++		}
++	})
++}
+diff --git a/internal/marker/marker_v6_test.go b/internal/marker/marker_v6_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..377a4b9b12b53c5c0edcbc263cf9829cadb9e20f
+--- /dev/null
++++ b/internal/marker/marker_v6_test.go
+@@ -0,0 +1,147 @@
++package marker
++
++import (
++	"strings"
++	"testing"
++)
++
++// v6NetworkMarker returns a schema-9 network-git draft marker selecting a
++// repository subdirectory: the draft-sources-v2 carrier for a schema-9
++// installation (skillfile-sources §4). The caller stamps content fields
++// through writeV5 like production staging does.
++func v6NetworkMarker() *Marker {
++	m := v5GitAttestedMarker()
++	m.SkillSchemaVersion = 9
++	m.Package = &Package{
++		Kind:       "network-git",
++		Repository: "github.com/example/role-skills",
++		Commit:     &Commit{ObjectFormat: "sha1", Hex: strings.Repeat("44", 20)},
++		Directory:  "skills/backend",
++	}
++	return m
++}
++
++// TestMarkerV6CarrierSelection pins the writer rule: v6 exactly for
++// schema-9 installations with a package, v5 for every other packaged
++// installation (skillfile-sources §4).
++func TestMarkerV6CarrierSelection(t *testing.T) {
++	for name, tc := range map[string]struct {
++		skill int
++		want  int
++	}{
++		"skill-9-network-git": {9, SchemaV6},
++		"skill-8-network-git": {8, SchemaV5},
++		"skill-4-network-git": {4, SchemaV5},
++	} {
++		t.Run(name, func(t *testing.T) {
++			m := v6NetworkMarker()
++			m.SkillSchemaVersion = tc.skill
++			_, recorded := writeV5(t, m)
++			if recorded.SchemaVersion != tc.want {
++				t.Fatalf("recorded schema = %d, want %d", recorded.SchemaVersion, tc.want)
++			}
++		})
++	}
++	t.Run("skill-9-local-snapshot", func(t *testing.T) {
++		m := v5LocalMarker()
++		m.SkillSchemaVersion = 9
++		_, recorded := writeV5(t, m)
++		if recorded.SchemaVersion != SchemaV6 {
++			t.Fatalf("recorded schema = %d, want %d", recorded.SchemaVersion, SchemaV6)
++		}
++	})
++	t.Run("skill-9-configured-git", func(t *testing.T) {
++		m := v5GitAttestedConfiguredMarker()
++		m.SkillSchemaVersion = 9
++		_, recorded := writeV5(t, m)
++		if recorded.SchemaVersion != SchemaV6 {
++			t.Fatalf("recorded schema = %d, want %d", recorded.SchemaVersion, SchemaV6)
++		}
++	})
++}
++
++// TestMarkerV6RecordsSelectedDirectory proves the v6 round trip keeps the
++// normalized dependency directory on the package: the legacy-lane record
++// duty of core §4.4.
++func TestMarkerV6RecordsSelectedDirectory(t *testing.T) {
++	_, recorded := writeV5(t, v6NetworkMarker())
++	if recorded.SchemaVersion != SchemaV6 || recorded.SkillSchemaVersion != 9 {
++		t.Fatalf("recorded marker = %+v, want marker schema 6 carrying skill schema 9", recorded)
++	}
++	if recorded.Package == nil || recorded.Package.Directory != "skills/backend" {
++		t.Fatalf("recorded marker lost the selected directory: %+v", recorded)
++	}
++}
++
++func TestMarkerV6RefusesMalformedIdentity(t *testing.T) {
++	cases := map[string]func(*Marker){
++		"missing-package": func(m *Marker) { m.Package = nil },
++		"missing-lock":    func(m *Marker) { m.LockSHA256 = "" },
++		"malformed-lock":  func(m *Marker) { m.LockSHA256 = "sha256:xyz" },
++		"legacy-source":   func(m *Marker) { m.Source = "review" },
++		"legacy-git":      func(m *Marker) { m.Git = "https://example.org/kit.git" },
++		"legacy-ref":      func(m *Marker) { m.RefKind = "tag"; m.Ref = "v1"; m.Commit = strings.Repeat("22", 20) },
++		"unknown-kind":    func(m *Marker) { m.Package.Kind = "bad-kind" },
++		"skill-schema-0":  func(m *Marker) { m.SkillSchemaVersion = 0 },
++		"skill-schema-10": func(m *Marker) { m.SkillSchemaVersion = 10 },
++		"glob-directory":  func(m *Marker) { m.Package.Directory = "skills/*" },
++	}
++	for name, mutate := range cases {
++		t.Run(name, func(t *testing.T) {
++			m := v6NetworkMarker()
++			mutate(m)
++			if err := Write(t.TempDir(), m); err == nil {
++				t.Fatalf("Write admitted a v6 marker with %s", name)
++			}
++		})
++	}
++}
++
++// TestMarkerV6Currentness pins the v6 currentness comparison: a v6
++// installation is current only for the exact frozen package and lock
++// generation it was installed from, and neither a core marker nor a
++// source-extension v5 marker can establish currentness for a schema-9
++// installation.
++func TestMarkerV6Currentness(t *testing.T) {
++	base := v6NetworkMarker()
++	dir, _ := writeV5(t, base)
++	control := v6NetworkMarker()
++	control.ContentSHA256 = base.ContentSHA256
++	control.Files = append([]string(nil), base.Files...)
++	if current, err := Current(dir, control); err != nil || !current {
++		t.Fatalf("control Current = %v, %v, want true", current, err)
++	}
++	t.Run("directory-mismatch", func(t *testing.T) {
++		fresh := v6NetworkMarker()
++		fresh.ContentSHA256 = base.ContentSHA256
++		fresh.Files = append([]string(nil), base.Files...)
++		fresh.Package = &Package{
++			Kind:       "network-git",
++			Repository: "github.com/example/role-skills",
++			Commit:     &Commit{ObjectFormat: "sha1", Hex: strings.Repeat("44", 20)},
++			Directory:  "skills/frontend",
++		}
++		if current, err := Current(dir, fresh); err != nil || current {
++			t.Fatalf("Current = %v, %v across directory mismatch, want false", current, err)
++		}
++	})
++	t.Run("v5-recorded-never-current-for-schema-9", func(t *testing.T) {
++		legacy := v5GitAttestedMarker()
++		legacy.Package = &Package{
++			Kind:       "network-git",
++			Repository: "github.com/example/role-skills",
++			Commit:     &Commit{ObjectFormat: "sha1", Hex: strings.Repeat("44", 20)},
++			Directory:  "skills/backend",
++		}
++		// Both fixtures stamp the same content bytes, so the recorded
++		// v5 content identity already matches the expectation and the
++		// schema mismatch is the only possible verdict.
++		v5Dir, recorded := writeV5(t, legacy)
++		fresh := v6NetworkMarker()
++		fresh.ContentSHA256 = recorded.ContentSHA256
++		fresh.Files = append([]string(nil), recorded.Files...)
++		if current, err := Current(v5Dir, fresh); err != nil || current {
++			t.Fatalf("Current = %v, %v for a v5 record against a schema-9 expectation, want false", current, err)
++		}
++	})
++}
+diff --git a/internal/marker/schema_band_test.go b/internal/marker/schema_band_test.go
+index 43ac99a31bc1c901919d642a41e67a1c08bf8550..455bd9e8c7e5cb621fe14353b334a3cabb9f0c72 100644
+--- a/internal/marker/schema_band_test.go
++++ b/internal/marker/schema_band_test.go
+@@ -18,6 +18,7 @@ func TestSupportedSchemaBandIsExactAndNewestIsItsMaximum(t *testing.T) {
+ 		ExternalSchemaVersion: true,
+ 		PolicySchemaVersion:   true,
+ 		SchemaV5:              true,
++		SchemaV6:              true,
+ 	}
+ 	for version := -1; version <= NewestSchemaVersion+3; version++ {
+ 		if got := SupportedSchema(version); got != supported[version] {
+@@ -50,6 +51,7 @@ func TestBuildBearingSchemaCoversEverySchemaThatCanRecordABuild(t *testing.T) {
+ 		ExternalSchemaVersion: true,
+ 		PolicySchemaVersion:   true,
+ 		SchemaV5:              true,
++		SchemaV6:              true,
+ 	}
+ 	for version := -1; version <= NewestSchemaVersion+3; version++ {
+ 		if got := BuildBearingSchema(version); got != bearing[version] {
+diff --git a/internal/marker/testdata/draft-sources-v2/install-marker-v6.schema.json b/internal/marker/testdata/draft-sources-v2/install-marker-v6.schema.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..c008fa90e6b7beeb1bf54b22239884f73397c54f
+--- /dev/null
++++ b/internal/marker/testdata/draft-sources-v2/install-marker-v6.schema.json
+@@ -0,0 +1,344 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/draft-sources-v2/install-marker-v6.schema.json",
++  "type": "object",
++  "properties": {
++    "name": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/name"
++    },
++    "content_sha256": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/content_sha256"
++    },
++    "build_source": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/build_source"
++    },
++    "locale": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/locale"
++    },
++    "agents": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/agents"
++    },
++    "commands": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/commands"
++    },
++    "dependencies": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/dependencies"
++    },
++    "runtime_roots": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/runtime_roots"
++    },
++    "build_roots": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/build_roots"
++    },
++    "installed_at": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/installed_at"
++    },
++    "files": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/files"
++    },
++    "requirements": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/requirements"
++    },
++    "mcp_servers": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/mcp_servers"
++    },
++    "activation": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/activation"
++    },
++    "requirers": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/requirers"
++    },
++    "schema_version": {
++      "const": 6
++    },
++    "skill_schema_version": {
++      "type": "integer",
++      "minimum": 1,
++      "maximum": 9
++    },
++    "package": {
++      "$ref": "../skillfile-sources-v1/source-types-v1.schema.json#/$defs/package"
++    },
++    "lock_sha256": {
++      "$ref": "../v1/common.schema.json#/$defs/sha256"
++    },
++    "builds": {
++      "type": "object",
++      "propertyNames": {
++        "$ref": "../v1/common.schema.json#/$defs/identifier"
++      },
++      "additionalProperties": {
++        "oneOf": [
++          {
++            "type": "object",
++            "required": [
++              "driver",
++              "receipt_schema_version",
++              "execution_policy",
++              "cache_key",
++              "receipt_sha256",
++              "artifact_sha256",
++              "artifact_path"
++            ],
++            "properties": {
++              "driver": {
++                "const": "go-v1"
++              },
++              "receipt_schema_version": {
++                "const": 3
++              },
++              "execution_policy": {
++                "$ref": "../v1/common.schema.json#/$defs/goExecutionPolicyV1"
++              },
++              "cache_key": {
++                "$ref": "../v1/common.schema.json#/$defs/sha256"
++              },
++              "receipt_sha256": {
++                "$ref": "../v1/common.schema.json#/$defs/sha256"
++              },
++              "artifact_sha256": {
++                "$ref": "../v1/common.schema.json#/$defs/sha256"
++              },
++              "artifact_path": {
++                "$ref": "../v1/common.schema.json#/$defs/portablePath"
++              }
++            },
++            "additionalProperties": false
++          },
++          {
++            "type": "object",
++            "required": [
++              "driver",
++              "receipt_schema_version",
++              "execution_policy",
++              "repository",
++              "declared_identity",
++              "declared_locked_commit",
++              "effective_identity",
++              "object_format",
++              "commit",
++              "substituted",
++              "build_source",
++              "descriptor_target",
++              "cache_key",
++              "receipt_sha256",
++              "artifact_sha256",
++              "artifact_path"
++            ],
++            "properties": {
++              "driver": {
++                "const": "go-repository-v1"
++              },
++              "receipt_schema_version": {
++                "const": 3
++              },
++              "execution_policy": {
++                "$ref": "../v1/common.schema.json#/$defs/goExecutionPolicyV1"
++              },
++              "repository": {
++                "$ref": "../v1/common.schema.json#/$defs/identifier"
++              },
++              "declared_identity": {
++                "$ref": "../v1/common.schema.json#/$defs/networkSourceIdentity"
++              },
++              "declared_locked_commit": {
++                "$ref": "../v1/common.schema.json#/$defs/lockedCommit"
++              },
++              "declared_tag": {
++                "$ref": "../v1/common.schema.json#/$defs/gitRefName"
++              },
++              "effective_identity": {
++                "oneOf": [
++                  {
++                    "$ref": "../v1/common.schema.json#/$defs/networkSourceIdentity"
++                  },
++                  {
++                    "$ref": "../v1/common.schema.json#/$defs/localSourceIdentity"
++                  }
++                ]
++              },
++              "object_format": {
++                "enum": [
++                  "sha1",
++                  "sha256"
++                ]
++              },
++              "commit": {
++                "$ref": "../v1/common.schema.json#/$defs/commit"
++              },
++              "substituted": {
++                "type": "boolean"
++              },
++              "substitution": {
++                "oneOf": [
++                  {
++                    "type": "object",
++                    "required": [
++                      "type"
++                    ],
++                    "properties": {
++                      "type": {
++                        "const": "local-path"
++                      }
++                    },
++                    "additionalProperties": false
++                  },
++                  {
++                    "type": "object",
++                    "required": [
++                      "type",
++                      "ref"
++                    ],
++                    "properties": {
++                      "type": {
++                        "const": "network-git"
++                      },
++                      "ref": {
++                        "$ref": "../v1/common.schema.json#/$defs/repositoryStructuredRef"
++                      }
++                    },
++                    "additionalProperties": false
++                  }
++                ]
++              },
++              "build_source": {
++                "$ref": "../v1/common.schema.json#/$defs/buildSourceIdentity"
++              },
++              "descriptor_target": {
++                "$ref": "../v1/common.schema.json#/$defs/identifier"
++              },
++              "cache_key": {
++                "$ref": "../v1/common.schema.json#/$defs/sha256"
++              },
++              "receipt_sha256": {
++                "$ref": "../v1/common.schema.json#/$defs/sha256"
++              },
++              "artifact_sha256": {
++                "$ref": "../v1/common.schema.json#/$defs/sha256"
++              },
++              "artifact_path": {
++                "$ref": "../v1/common.schema.json#/$defs/portablePath"
++              }
++            },
++            "allOf": [
++              {
++                "if": {
++                  "properties": {
++                    "object_format": {
++                      "const": "sha1"
++                    }
++                  },
++                  "required": [
++                    "object_format"
++                  ]
++                },
++                "then": {
++                  "properties": {
++                    "commit": {
++                      "type": "string",
++                      "pattern": "^[0-9a-f]{40}$"
++                    }
++                  }
++                },
++                "else": {
++                  "properties": {
++                    "commit": {
++                      "type": "string",
++                      "pattern": "^[0-9a-f]{64}$"
++                    }
++                  }
++                }
++              },
++              {
++                "if": {
++                  "properties": {
++                    "substituted": {
++                      "const": true
++                    }
++                  },
++                  "required": [
++                    "substituted"
++                  ]
++                },
++                "then": {
++                  "required": [
++                    "substitution"
++                  ]
++                },
++                "else": {
++                  "not": {
++                    "required": [
++                      "substitution"
++                    ]
++                  }
++                }
++              }
++            ],
++            "additionalProperties": false
++          }
++        ]
++      }
++    },
++    "attestation": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/attestation"
++    },
++    "substituted": {
++      "$ref": "../v1/install-marker-v4.schema.json#/properties/substituted"
++    }
++  },
++  "required": [
++    "name",
++    "content_sha256",
++    "locale",
++    "agents",
++    "commands",
++    "dependencies",
++    "runtime_roots",
++    "build_roots",
++    "installed_at",
++    "files",
++    "schema_version",
++    "skill_schema_version",
++    "package",
++    "lock_sha256",
++    "builds"
++  ],
++  "additionalProperties": false,
++  "allOf": [
++    {
++      "if": {
++        "properties": {
++          "package": {
++            "properties": {
++              "kind": {
++                "const": "local-snapshot"
++              }
++            },
++            "required": [
++              "kind"
++            ]
++          }
++        },
++        "required": [
++          "package"
++        ]
++      },
++      "then": {
++        "not": {
++          "anyOf": [
++            {
++              "required": [
++                "attestation"
++              ]
++            },
++            {
++              "required": [
++                "substituted"
++              ]
++            }
++          ]
++        }
++      }
++    }
++  ]
++}
+diff --git a/internal/skillspec/conformance_test.go b/internal/skillspec/conformance_test.go
+index e6217eb73799a5b4e04639d92a905f64e1f451a9..68dd8332ada7f867f58780989154dbc59ee43746 100644
+--- a/internal/skillspec/conformance_test.go
++++ b/internal/skillspec/conformance_test.go
+@@ -90,7 +90,7 @@ func TestReleasedSchemaCases(t *testing.T) {
+ }
+ 
+ func TestDraftManifestDependencyDirectoryGrammar(t *testing.T) {
+-	vectorPath := filepath.Join("testdata", "draft-sources-v1", "manifest-dependency-directories.json")
++	vectorPath := filepath.Join("testdata", "draft-sources-v2", "manifest-dependency-directories.json")
+ 	payload, err := os.ReadFile(vectorPath)
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -110,34 +110,52 @@ func TestDraftManifestDependencyDirectoryGrammar(t *testing.T) {
+ 	}
+ 	for _, testCase := range vector.DirectoryGrammarCases {
+ 		t.Run(testCase.Name, func(t *testing.T) {
+-			manifest := map[string]any{
+-				"schema_version": 9,
+-				"capabilities":   map[string]any{},
+-				"dependencies": map[string]any{"skills": map[string]any{
+-					"developer": map[string]any{
+-						"git":       "https://github.com/example/role-skills.git",
+-						"ref":       map[string]any{"kind": "revision", "value": strings.Repeat("a", 40)},
+-						"directory": testCase.Input,
+-					},
+-				}},
+-			}
+-			raw, err := json.Marshal(manifest)
+-			if err != nil {
+-				t.Fatal(err)
+-			}
+-			_, err = Load(writeSkill(t, string(raw), nil))
+-			if (err == nil) != testCase.Valid {
+-				t.Fatalf("valid=%v, error=%v", testCase.Valid, err)
+-			}
+-			if err != nil && !strings.Contains(err.Error(), "dependencies.skills.developer.directory") {
+-				t.Fatalf("error %q does not identify the directory field", err)
+-			}
++			assertDependencyDirectoryValid(t, testCase.Input, testCase.Valid)
++		})
++	}
++}
++
++// TestDraftManifestDependencyDirectoryGlobClass pins the remaining members
++// of the dependency-path glob class on top of the spec's `*` vector
++// (draft-sources-v2 `glob` grammar case and `invalid-directory-glob`
++// schema cases): the shared directory grammar forbids `[*?\[\]]`, so `?`
++// and `[` are refused on the dependency path exactly like `*`.
++func TestDraftManifestDependencyDirectoryGlobClass(t *testing.T) {
++	for _, input := range []string{"skills/devel?per", "skills/[abc]per", "skills/devel[", "skills/devel?"} {
++		t.Run(strings.ReplaceAll(input, "/", "_"), func(t *testing.T) {
++			assertDependencyDirectoryValid(t, input, false)
+ 		})
+ 	}
+ }
+ 
++func assertDependencyDirectoryValid(t *testing.T, input string, valid bool) {
++	t.Helper()
++	manifest := map[string]any{
++		"schema_version": 9,
++		"capabilities":   map[string]any{},
++		"dependencies": map[string]any{"skills": map[string]any{
++			"developer": map[string]any{
++				"git":       "https://github.com/example/role-skills.git",
++				"ref":       map[string]any{"kind": "revision", "value": strings.Repeat("a", 40)},
++				"directory": input,
++			},
++		}},
++	}
++	raw, err := json.Marshal(manifest)
++	if err != nil {
++		t.Fatal(err)
++	}
++	_, err = Load(writeSkill(t, string(raw), nil))
++	if (err == nil) != valid {
++		t.Fatalf("valid=%v, error=%v", valid, err)
++	}
++	if err != nil && !strings.Contains(err.Error(), "dependencies.skills.developer.directory") {
++		t.Fatalf("error %q does not identify the directory field", err)
++	}
++}
++
+ func TestDraftManifestDependencyDirectorySchemaCases(t *testing.T) {
+-	root := filepath.Join("testdata", "draft-sources-v1", "schema-cases")
++	root := filepath.Join("testdata", "draft-sources-v2", "schema-cases")
+ 	for _, suite := range []struct{ directory, manifest string }{
+ 		{"agent-skill-v9", CanonicalManifestName},
+ 		{"csk-skill-v9", LegacyManifestName},
+diff --git a/internal/skillspec/testdata/draft-sources-v2/manifest-dependency-directories.json b/internal/skillspec/testdata/draft-sources-v2/manifest-dependency-directories.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..fbcc3b2e284582ea3ae0d44eb66e22f6512ad3c0
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/manifest-dependency-directories.json
+@@ -0,0 +1,367 @@
++{
++  "schema_version": 1,
++  "directory_grammar_cases": [
++    {
++      "name": "root-selector",
++      "input": ".",
++      "valid": true
++    },
++    {
++      "name": "portable-subfolder",
++      "input": "skills/developer",
++      "valid": true
++    },
++    {
++      "name": "empty",
++      "input": "",
++      "valid": false
++    },
++    {
++      "name": "absolute",
++      "input": "/skills/developer",
++      "valid": false
++    },
++    {
++      "name": "parent-escape",
++      "input": "../developer",
++      "valid": false
++    },
++    {
++      "name": "parent-component",
++      "input": "skills/../developer",
++      "valid": false
++    },
++    {
++      "name": "backslash",
++      "input": "skills\\developer",
++      "valid": false
++    },
++    {
++      "name": "drive-prefix",
++      "input": "C:/skills/developer",
++      "valid": false
++    },
++    {
++      "name": "glob",
++      "input": "skills/*",
++      "valid": false
++    }
++  ],
++  "resolution_cases": [
++    {
++      "name": "valid-subfolder-dependency",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/developer"
++      },
++      "snapshot": {
++        "directories": [
++          "skills",
++          "skills/developer"
++        ],
++        "files": [
++          "skills/developer/SKILL.md"
++        ],
++        "frontmatter_names": {
++          "skills/developer/SKILL.md": "developer"
++        }
++      },
++      "expected": {
++        "status": "accepted",
++        "normalized_directory": "skills/developer",
++        "identity": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "skills/developer"
++        },
++        "lock_directory": "skills/developer",
++        "audit_package": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "skills/developer"
++        },
++        "marker_schema_version": 6,
++        "marker_skill_schema_version": 9
++      }
++    },
++    {
++      "name": "absent-directory-selects-root",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        }
++      },
++      "snapshot": {
++        "directories": [],
++        "files": [
++          "SKILL.md"
++        ],
++        "frontmatter_names": {
++          "SKILL.md": "developer"
++        }
++      },
++      "expected": {
++        "status": "accepted",
++        "normalized_directory": ".",
++        "identity": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "."
++        },
++        "lock_directory": ".",
++        "audit_package": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "."
++        },
++        "marker_schema_version": 6,
++        "marker_skill_schema_version": 9
++      }
++    },
++    {
++      "name": "explicit-root-selects-root",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "."
++      },
++      "snapshot": {
++        "directories": [],
++        "files": [
++          "SKILL.md"
++        ],
++        "frontmatter_names": {
++          "SKILL.md": "developer"
++        }
++      },
++      "expected": {
++        "status": "accepted",
++        "normalized_directory": ".",
++        "identity": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "."
++        },
++        "lock_directory": ".",
++        "audit_package": {
++          "kind": "network-git",
++          "repository": "github.com/example/role-skills",
++          "commit": {
++            "object_format": "sha1",
++            "hex": "0123456789abcdef0123456789abcdef01234567"
++          },
++          "directory": "."
++        },
++        "marker_schema_version": 6,
++        "marker_skill_schema_version": 9
++      }
++    },
++    {
++      "name": "missing-folder",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/missing"
++      },
++      "snapshot": {
++        "directories": [
++          "skills"
++        ],
++        "files": [],
++        "frontmatter_names": {}
++      },
++      "expected": {
++        "status": "rejected",
++        "reason": "directory-missing"
++      }
++    },
++    {
++      "name": "folder-without-skill-md",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/no-manifest"
++      },
++      "snapshot": {
++        "directories": [
++          "skills",
++          "skills/no-manifest"
++        ],
++        "files": [],
++        "frontmatter_names": {}
++      },
++      "expected": {
++        "status": "rejected",
++        "reason": "skill-md-missing"
++      }
++    },
++    {
++      "name": "symlinked-directory-escape",
++      "dependency": {
++        "name": "developer",
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/escape"
++      },
++      "snapshot": {
++        "directories": [
++          "skills",
++          "skills/escape"
++        ],
++        "files": [],
++        "frontmatter_names": {},
++        "symlinks": {
++          "skills/escape": "../outside"
++        }
++      },
++      "expected": {
++        "status": "rejected",
++        "reason": "directory-escapes-repository"
++      }
++    },
++    {
++      "name": "diamond-different-directories-same-repository",
++      "repository": "github.com/example/role-skills",
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "requirements": [
++        {
++          "requirer": "app",
++          "name": "frontend",
++          "directory": "skills/frontend"
++        },
++        {
++          "requirer": "app",
++          "name": "backend",
++          "directory": "skills/backend"
++        },
++        {
++          "requirer": "frontend",
++          "name": "shared",
++          "directory": "skills/shared"
++        },
++        {
++          "requirer": "backend",
++          "name": "shared",
++          "directory": "skills/shared"
++        }
++      ],
++      "snapshot": {
++        "directories": [
++          "skills",
++          "skills/backend",
++          "skills/frontend",
++          "skills/shared"
++        ],
++        "skill_names": {
++          "skills/backend": "backend",
++          "skills/frontend": "frontend",
++          "skills/shared": "shared"
++        }
++      },
++      "expected": {
++        "status": "accepted",
++        "provider_order": [
++          "shared",
++          "backend",
++          "frontend",
++          "app"
++        ],
++        "repository_acquisitions": 1,
++        "package_identities": [
++          {
++            "kind": "network-git",
++            "repository": "github.com/example/role-skills",
++            "commit": {
++              "object_format": "sha1",
++              "hex": "0123456789abcdef0123456789abcdef01234567"
++            },
++            "directory": "skills/backend"
++          },
++          {
++            "kind": "network-git",
++            "repository": "github.com/example/role-skills",
++            "commit": {
++              "object_format": "sha1",
++              "hex": "0123456789abcdef0123456789abcdef01234567"
++            },
++            "directory": "skills/frontend"
++          },
++          {
++            "kind": "network-git",
++            "repository": "github.com/example/role-skills",
++            "commit": {
++              "object_format": "sha1",
++              "hex": "0123456789abcdef0123456789abcdef01234567"
++            },
++            "directory": "skills/shared"
++          }
++        ],
++        "shared_package_nodes": 1
++      }
++    },
++    {
++      "name": "same-name-different-directory-conflicts",
++      "repository": "github.com/example/role-skills",
++      "commit": "0123456789abcdef0123456789abcdef01234567",
++      "requirements": [
++        {
++          "requirer": "app",
++          "name": "shared",
++          "directory": "skills/shared-a"
++        },
++        {
++          "requirer": "app",
++          "name": "shared",
++          "directory": "skills/shared-b"
++        }
++      ],
++      "expected": {
++        "status": "rejected",
++        "reason": "package-identity-conflict"
++      }
++    }
++  ]
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-absolute.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-absolute.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..363d02853ce94600867f9ef11d8886f6f2214d58
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-absolute.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "/skills/developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-backslash.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-backslash.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..f191cafb9979a54c62bc42c01c224ee43ddae384
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-backslash.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills\\developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-empty.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-empty.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..5e168a2f8e210cfa56e294ceb5cd17ec56f8ef43
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-empty.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": ""
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-escape.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-escape.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..73cc93990e98a9798b1b977367ffd40c1f3db013
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-escape.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "../developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-glob.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-glob.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..94645d7f00239eb5c07bf8f9654ad49984d5bce6
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-glob.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/*"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-parent-component.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-parent-component.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..3db678f8f4b16cfdf5753d200ded64a41ce0c1e6
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid-directory-parent-component.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/../developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..4cc3b536014c6927c1e52981b82ebfc2a4ea9185
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/invalid.json
+@@ -0,0 +1,4 @@
++{
++  "schema_version": 8,
++  "capabilities": {}
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid-directory-absent.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid-directory-absent.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..1dcaf3dfe2c7208837c6c43c46b05e80681fbb94
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid-directory-absent.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        }
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid-directory-root.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid-directory-root.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..3a2ac5397df12a6815f4f21aaa5296900587606c
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid-directory-root.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "."
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid-directory-subfolder.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid-directory-subfolder.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..63c6c2a6a7ee1d614cce5521d63712de3844f0e5
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid-directory-subfolder.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..16ad2cff4d7fa53a905d7f97ab2fd4b753b685c9
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/agent-skill-v9/valid.json
+@@ -0,0 +1,4 @@
++{
++  "schema_version": 9,
++  "capabilities": {}
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-absolute.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-absolute.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..363d02853ce94600867f9ef11d8886f6f2214d58
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-absolute.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "/skills/developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-backslash.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-backslash.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..f191cafb9979a54c62bc42c01c224ee43ddae384
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-backslash.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills\\developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-empty.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-empty.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..5e168a2f8e210cfa56e294ceb5cd17ec56f8ef43
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-empty.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": ""
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-escape.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-escape.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..73cc93990e98a9798b1b977367ffd40c1f3db013
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-escape.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "../developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-glob.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-glob.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..94645d7f00239eb5c07bf8f9654ad49984d5bce6
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-glob.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/*"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-parent-component.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-parent-component.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..3db678f8f4b16cfdf5753d200ded64a41ce0c1e6
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid-directory-parent-component.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/../developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..4cc3b536014c6927c1e52981b82ebfc2a4ea9185
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/invalid.json
+@@ -0,0 +1,4 @@
++{
++  "schema_version": 8,
++  "capabilities": {}
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid-directory-absent.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid-directory-absent.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..1dcaf3dfe2c7208837c6c43c46b05e80681fbb94
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid-directory-absent.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        }
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid-directory-root.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid-directory-root.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..3a2ac5397df12a6815f4f21aaa5296900587606c
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid-directory-root.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "."
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid-directory-subfolder.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid-directory-subfolder.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..63c6c2a6a7ee1d614cce5521d63712de3844f0e5
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid-directory-subfolder.json
+@@ -0,0 +1,16 @@
++{
++  "schema_version": 9,
++  "capabilities": {},
++  "dependencies": {
++    "skills": {
++      "developer": {
++        "git": "https://github.com/example/role-skills.git",
++        "ref": {
++          "kind": "revision",
++          "value": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "directory": "skills/developer"
++      }
++    }
++  }
++}
+diff --git a/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid.json b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..16ad2cff4d7fa53a905d7f97ab2fd4b753b685c9
+--- /dev/null
++++ b/internal/skillspec/testdata/draft-sources-v2/schema-cases/csk-skill-v9/valid.json
+@@ -0,0 +1,4 @@
++{
++  "schema_version": 9,
++  "capabilities": {}
++}

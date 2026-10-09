@@ -1,0 +1,139 @@
+Initial targeted snapshot 8b19472fce2779df4d5bd87ab93e8ad6d6af3de2
+
+name: Review 4mzun5 revision 2
+on:
+  push:
+    branches: ['gate/review-4mzun5-rev2/**']
+permissions:
+  contents: read
+jobs:
+  targeted:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [baseline, probes, runtime-project-only, glob-star-only, audit-commit-only]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Narrow selected production behavior
+        env:
+          MODE: ${{ matrix.mode }}
+        run: python3 .github/ci/review-4mzun5-rev2.py
+      - name: Hosted targeted verification
+        env:
+          MODE: ${{ matrix.mode }}
+        run: |
+          set -o pipefail
+          if [ "$MODE" = baseline ]; then
+            go test -count=1 -timeout=8m -v ./internal/install -run '^Test(LegacyLane|GlobalLaneRuntime|ReviewLegacyLock|ReviewGlobalBuild)' | tee install.log
+            go test -count=1 -timeout=3m -v ./cmd/curator -run '^Test(CLIAuditBindsDependencyDirectory|CLIStatusReportsLegacyPackageMarkerCurrent|ReviewCLIAuditRepositoryChangeMissesCache)$' | tee cli.log
+            go test -count=1 -timeout=3m -v ./internal/skillspec -run '^TestDraftManifestDependencyDirectory' | tee grammar.log
+            go test -count=1 -timeout=3m -v ./internal/audit -run '^Test(VerdictCacheBindsFullPackageIdentity|SkillPackageArms)$' | tee audit.log
+          elif [ "$MODE" = probes ]; then
+            go test -count=1 -timeout=3m -v ./internal/install -run '^TestReviewChangedDeclaredTagIsNotMovedTag$' | tee probe.log
+          else
+            case "$MODE" in
+              runtime-project-only) package=./internal/install; test=TestGlobalLaneRuntimeMatchesPackageMarker ;;
+              glob-star-only) package=./internal/install; test=TestLegacyLaneRefusesGlobDependencyDirectory ;;
+              audit-commit-only) package=./cmd/curator; test=TestReviewCLIAuditRepositoryChangeMissesCache ;;
+            esac
+            set +e
+            go test -count=1 -timeout=3m -v "$package" -run "^$test$" 2>&1 | tee mutant.log
+            result=${PIPESTATUS[0]}
+            set -e
+            [ "$result" -ne 0 ]
+            grep -F -- "--- FAIL: $test" mutant.log
+            echo "Killed narrowing mutant $MODE by $test"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: review-${{ matrix.mode }}
+          path: '*.log'
+
+Status/native snapshot 5d4323c792f6756e56ac2a55d201499e1bddc045
+
+name: Review 4mzun5 revision 2 extra probes
+on:
+  push:
+    branches: ['gate/review-4mzun5-rev2-extra/**']
+permissions:
+  contents: read
+jobs:
+  status-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: set -o pipefail; go test -count=1 -timeout=3m -v ./cmd/curator -run '^TestReviewCLIStatusDetectsChangedTagAtSameCommit$' | tee status.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: status-probe
+          path: status.log
+  real-build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: set -o pipefail; go test -count=1 -timeout=8m -v ./cmd/curator -run '^TestReviewCLIRealSchema9BuildAndLaunch$' | tee real-build.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-build
+          path: real-build.log
+
+Corrected audit snapshot decc8973ecaddd9783bd289d965c8344e5cfb6b1
+
+name: Review 4mzun5 corrected audit cache probe
+on:
+  push:
+    branches: ['gate/review-4mzun5-rev2-audit/**']
+permissions:
+  contents: read
+jobs:
+  corrected-audit-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Baseline repository mismatch must miss
+        run: set -o pipefail; go test -count=1 -timeout=3m -v ./cmd/curator -run '^TestReviewCLIAuditRepositoryChangeMissesCache$' | tee baseline-audit.log
+      - name: Narrow cache comparison to kind and commit
+        run: MODE=audit-commit-only python3 .github/ci/review-4mzun5-rev2.py
+      - name: Corrected probe must kill the narrowing mutant
+        run: |
+          set -o pipefail
+          set +e
+          go test -count=1 -timeout=3m -v ./cmd/curator -run '^TestReviewCLIAuditRepositoryChangeMissesCache$' 2>&1 | tee mutant-audit.log
+          result=${PIPESTATUS[0]}
+          set -e
+          [ "$result" -ne 0 ]
+          grep -F -- '--- FAIL: TestReviewCLIAuditRepositoryChangeMissesCache' mutant-audit.log
+          echo 'Killed audit-commit-only narrowing mutant'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: corrected-audit
+          path: '*.log'
+
+Narrowing mutation driver (shared by snapshots):
+
+import os
+from pathlib import Path
+mode=os.environ['MODE']
+if mode=='runtime-project-only':
+ p=Path('internal/install/global.go');s=p.read_text();old='runtimeKeys = legacy.RuntimeKeys';assert s.count(old)==1;p.write_text(s.replace(old,'runtimeKeys = nil // review mutant: migrate only project runtime'))
+elif mode=='glob-star-only':
+ p=Path('internal/identifiers/identifiers.go');s=p.read_text();old='strings.ContainsAny(value, "*?[]")';assert s.count(old)==1;p.write_text(s.replace(old,'strings.ContainsAny(value, "*")'))
+elif mode=='audit-commit-only':
+ p=Path('internal/audit/audit.go');s=p.read_text();old='!sameAuditPackage(data.Package, subject.Package)';assert s.count(old)==1;p.write_text(s.replace(old,'(data.Package.Kind != subject.Package.Kind)'))

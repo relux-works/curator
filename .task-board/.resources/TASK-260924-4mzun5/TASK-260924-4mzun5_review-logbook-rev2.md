@@ -1,0 +1,3 @@
+TASK-260924-4mzun5 — record-dependency-directory-in-legacy-lane: review revision 2
+
+Hosted production probes reproduce two declaration-binding regressions: explicit v1-to-v2 changes falsely fail strict-tag installs in project/global scopes; changed tag names at the same commit incorrectly pass CLI checking status. Verdict: changes requested. Previous runtime/lock/build/audit fixes and selected grammar mutations passed. The first cache oracle was corrected to avoid policy-backfill false positives; corrected baseline and mutant were rerun. Evidence and exact snapshots are in the revision-2 review verdict. This private-run logbook is persisted as a public-safe task outcome; tracked repository LOGBOOK/CHANGELOG files are unchanged under the reviewer read-only constraint.

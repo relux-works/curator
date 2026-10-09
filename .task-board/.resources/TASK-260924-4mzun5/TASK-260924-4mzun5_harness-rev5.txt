@@ -1,0 +1,344 @@
+TASK-260924-4mzun5 — record-dependency-directory-in-legacy-lane: revision 5 hosted mutation harness
+
+All mutations ran only in a disposable shared clone; the Story worktree remained uncommitted.
+
+Workflow (red and narrowing branches only):
+
+name: Rework 4mzun5 revision 5 evidence
+on:
+  push:
+    branches: ['review/4mzun5-rev5-*']
+permissions:
+  contents: read
+env:
+  GOTOOLCHAIN: local
+  GOENV: 'off'
+jobs:
+  production-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Compile mutated candidate
+        run: go build ./...
+      - name: Alias regressions and controls (expected red)
+        shell: bash
+        run: |
+          set +e
+          go test -count=1 -timeout=8m -v ./internal/install -run '^Test(LegacyLaneSameTagMoveWithAlias|LegacyLaneDependencyTagMovement|ReviewChangedDeclaredTagIsNotMovedTag|LegacyLaneMovedTagRefusesStrictSecondInstall)$' > targeted.log 2>&1
+          result=$?
+          cat targeted.log
+          echo "GO_TEST_EXIT_CODE=$result"
+          exit "$result"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-regressions
+          path: targeted.log
+
+
+red production mutation:
+
+diff --git a/internal/gitops/gitops.go b/internal/gitops/gitops.go
+index 678aa6c7..cd22ec31 100644
+--- a/internal/gitops/gitops.go
++++ b/internal/gitops/gitops.go
+@@ -330,6 +330,43 @@ func revParse(repo, spec string) (string, error) {
+ 	return out, nil
+ }
+ 
++// TagsPointingAt lists the tag names whose commit is exactly commit: the
++// peeled target for annotated tags, the direct target for lightweight
++// ones. One for-each-ref invocation enumerates every tag with both object
++// names, so the peeling comparison stays exact on every git version and
++// never depends on --points-at dereference semantics. The commit is
++// compared as an opaque string; a malformed value simply matches nothing.
++// A failed enumeration is an error, never an empty result: callers must
++// not read "no tag binds this commit" from an unreadable repository.
++func TagsPointingAt(repo, commit string) ([]string, error) {
++	if err := EnsureRepo(repo); err != nil {
++		return nil, err
++	}
++	out, err := run(repo, "for-each-ref", "--format=%(refname:short) %(*objectname) %(objectname)", "refs/tags")
++	if err != nil {
++		return nil, fmt.Errorf("could not list tags in %s: %w", repo, err)
++	}
++	var bound []string
++	for _, line := range strings.Split(out, "\n") {
++		// Split on single spaces, not fields: a lightweight tag leaves
++		// the peeled slot empty ("v1  <sha>"), and collapsing
++		// whitespace would merge it away. Tag names and object names
++		// never contain spaces, so three slots always parse exactly.
++		fields := strings.Split(line, " ")
++		if len(fields) != 3 || fields[0] == "" || fields[2] == "" {
++			continue
++		}
++		target := fields[1]
++		if target == "" {
++			target = fields[2]
++		}
++		if target == commit {
++			bound = append(bound, fields[0])
++		}
++	}
++	return bound, nil
++}
++
+ // HasRemote reports whether repo declares at least one remote. Absence
+ // and failure are distinct: a successful empty enumeration reports
+ // (false, nil) and Fetch treats it as a no-op, while a failed enumeration
+diff --git a/internal/install/install.go b/internal/install/install.go
+index 850c121f..ca1ce03b 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -26,6 +26,7 @@ import (
+ 	"github.com/relux-works/curator/internal/devsub"
+ 	"github.com/relux-works/curator/internal/envfiles"
+ 	"github.com/relux-works/curator/internal/gitignore"
++	"github.com/relux-works/curator/internal/gitops"
+ 	"github.com/relux-works/curator/internal/godriver"
+ 	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/manifest"
+@@ -1522,23 +1523,34 @@ func detectMovedTagsIn(skillsDir string, nodes []*closure.Node, generation Gener
+ 			if !legacyLane {
+ 				continue
+ 			}
+-			if recorded.Package.Commit == nil || recorded.Package.Commit.Hex == node.Resolved.Commit {
+-				continue
+-			}
+-			current, err := legacyLockPackage(node)
+-			if err != nil {
+-				return nil, err
+-			}
+-			if !sameLegacyPackageSource(recorded.Package, draftMarkerPackage(current)) {
+-				continue
+-			}
+-			previous, err := previousLegacyRef(skillsDir, recorded, observed)
+-			if err != nil {
+-				return nil, fmt.Errorf("cannot establish prior declared ref for %s: %w", node.Name, err)
+-			}
+-			if previous.Kind == "tag" && previous.Value == node.Resolved.Ref {
+-				warnings = append(warnings, fmt.Sprintf(
+-					"moved tag for %s: %s %s -> %s", node.Name, node.Resolved.Ref, recorded.Package.Commit.Hex, node.Resolved.Commit))
++			// The package marker carries no prior ref to compare the
++			// live tag name against, so a commit difference alone
++			// cannot distinguish "the same tag moved" from "the
++			// operator declared a different tag" (core §10 limits
++			// strict-tag refusal to a moved tag). The live tag
++			// bindings prove it: when the recorded commit is still
++			// the value of a tag, the previous tag-bound
++			// installation is intact and the new binding is an
++			// explicit declaration change, which stays silent; only
++			// a recorded commit that lost every tag binding warns.
++			// A package without a locked commit names nothing
++			// comparable and stays silent. A move whose old commit
++			// remains tagged elsewhere reads as a declaration
++			// change: the closed v5/v6 shape persists no prior ref
++			// (skillfile-sources §4), so that case needs
++			// prior-declaration evidence this gate does not have.
++			// A failed tag enumeration fails the gate instead of
++			// warning or staying silent: unreadable evidence is
++			// neither a move nor an intact binding.
++			if recorded.Package.Commit != nil && recorded.Package.Commit.Hex != node.Resolved.Commit {
++				bound, err := gitops.TagsPointingAt(node.Repo, recorded.Package.Commit.Hex)
++				if err != nil {
++					return nil, err
++				}
++				if len(bound) == 0 {
++					warnings = append(warnings, fmt.Sprintf(
++						"moved tag for %s: %s %s -> %s", node.Name, node.Resolved.Ref, recorded.Package.Commit.Hex, node.Resolved.Commit))
++				}
+ 			}
+ 			continue
+ 		}
+
+
+red hosted evidence:
+
+--- FAIL: TestLegacyLaneDependencyTagMovement (3.27s)
+
+--- FAIL: TestLegacyLaneDependencyTagMovement/project/same-tag (0.91s)
+
+--- PASS: TestLegacyLaneDependencyTagMovement/project/changed-declaration (0.86s)
+
+--- FAIL: TestLegacyLaneDependencyTagMovement/global/same-tag (0.74s)
+
+--- PASS: TestLegacyLaneDependencyTagMovement/global/changed-declaration (0.75s)
+
+--- FAIL: TestLegacyLaneSameTagMoveWithAlias (2.04s)
+
+--- PASS: TestLegacyLaneSameTagMoveWithAlias/project/none (0.22s)
+
+--- FAIL: TestLegacyLaneSameTagMoveWithAlias/project/lightweight (0.42s)
+
+--- FAIL: TestLegacyLaneSameTagMoveWithAlias/project/annotated (0.42s)
+
+--- PASS: TestLegacyLaneSameTagMoveWithAlias/global/none (0.20s)
+
+--- FAIL: TestLegacyLaneSameTagMoveWithAlias/global/lightweight (0.36s)
+
+--- FAIL: TestLegacyLaneSameTagMoveWithAlias/global/annotated (0.42s)
+
+--- PASS: TestReviewChangedDeclaredTagIsNotMovedTag (0.00s)
+
+--- PASS: TestReviewChangedDeclaredTagIsNotMovedTag/global (0.59s)
+
+--- PASS: TestReviewChangedDeclaredTagIsNotMovedTag/project (0.61s)
+
+--- PASS: TestLegacyLaneMovedTagRefusesStrictSecondInstall (0.63s)
+
+GO_TEST_EXIT_CODE=1
+
+##[error]Process completed with exit code 1.
+
+narrowing production mutation:
+
+diff --git a/internal/gitops/gitops.go b/internal/gitops/gitops.go
+index 678aa6c7..cd22ec31 100644
+--- a/internal/gitops/gitops.go
++++ b/internal/gitops/gitops.go
+@@ -330,6 +330,43 @@ func revParse(repo, spec string) (string, error) {
+ 	return out, nil
+ }
+ 
++// TagsPointingAt lists the tag names whose commit is exactly commit: the
++// peeled target for annotated tags, the direct target for lightweight
++// ones. One for-each-ref invocation enumerates every tag with both object
++// names, so the peeling comparison stays exact on every git version and
++// never depends on --points-at dereference semantics. The commit is
++// compared as an opaque string; a malformed value simply matches nothing.
++// A failed enumeration is an error, never an empty result: callers must
++// not read "no tag binds this commit" from an unreadable repository.
++func TagsPointingAt(repo, commit string) ([]string, error) {
++	if err := EnsureRepo(repo); err != nil {
++		return nil, err
++	}
++	out, err := run(repo, "for-each-ref", "--format=%(refname:short) %(*objectname) %(objectname)", "refs/tags")
++	if err != nil {
++		return nil, fmt.Errorf("could not list tags in %s: %w", repo, err)
++	}
++	var bound []string
++	for _, line := range strings.Split(out, "\n") {
++		// Split on single spaces, not fields: a lightweight tag leaves
++		// the peeled slot empty ("v1  <sha>"), and collapsing
++		// whitespace would merge it away. Tag names and object names
++		// never contain spaces, so three slots always parse exactly.
++		fields := strings.Split(line, " ")
++		if len(fields) != 3 || fields[0] == "" || fields[2] == "" {
++			continue
++		}
++		target := fields[1]
++		if target == "" {
++			target = fields[2]
++		}
++		if target == commit {
++			bound = append(bound, fields[0])
++		}
++	}
++	return bound, nil
++}
++
+ // HasRemote reports whether repo declares at least one remote. Absence
+ // and failure are distinct: a successful empty enumeration reports
+ // (false, nil) and Fetch treats it as a no-op, while a failed enumeration
+diff --git a/internal/install/install.go b/internal/install/install.go
+index 850c121f..b51a3cb3 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -26,6 +26,7 @@ import (
+ 	"github.com/relux-works/curator/internal/devsub"
+ 	"github.com/relux-works/curator/internal/envfiles"
+ 	"github.com/relux-works/curator/internal/gitignore"
++	"github.com/relux-works/curator/internal/gitops"
+ 	"github.com/relux-works/curator/internal/godriver"
+ 	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/manifest"
+@@ -1537,6 +1538,14 @@ func detectMovedTagsIn(skillsDir string, nodes []*closure.Node, generation Gener
+ 				return nil, fmt.Errorf("cannot establish prior declared ref for %s: %w", node.Name, err)
+ 			}
+ 			if previous.Kind == "tag" && previous.Value == node.Resolved.Ref {
++				// Narrowing mutant: an unrelated live tag waives same-tag refusal.
++				bound, err := gitops.TagsPointingAt(node.Repo, recorded.Package.Commit.Hex)
++				if err != nil {
++					return nil, err
++				}
++				if len(bound) > 0 {
++					continue
++				}
+ 				warnings = append(warnings, fmt.Sprintf(
+ 					"moved tag for %s: %s %s -> %s", node.Name, node.Resolved.Ref, recorded.Package.Commit.Hex, node.Resolved.Commit))
+ 			}
+
+
+narrowing hosted evidence:
+
+--- FAIL: TestLegacyLaneDependencyTagMovement (4.69s)
+
+--- FAIL: TestLegacyLaneDependencyTagMovement/project/same-tag (2.26s)
+
+--- PASS: TestLegacyLaneDependencyTagMovement/project/changed-declaration (0.89s)
+
+--- FAIL: TestLegacyLaneDependencyTagMovement/global/same-tag (0.79s)
+
+--- PASS: TestLegacyLaneDependencyTagMovement/global/changed-declaration (0.76s)
+
+--- FAIL: TestLegacyLaneSameTagMoveWithAlias (2.01s)
+
+--- PASS: TestLegacyLaneSameTagMoveWithAlias/project/none (0.23s)
+
+--- FAIL: TestLegacyLaneSameTagMoveWithAlias/project/lightweight (0.42s)
+
+--- FAIL: TestLegacyLaneSameTagMoveWithAlias/project/annotated (0.42s)
+
+--- PASS: TestLegacyLaneSameTagMoveWithAlias/global/none (0.20s)
+
+--- FAIL: TestLegacyLaneSameTagMoveWithAlias/global/lightweight (0.37s)
+
+--- FAIL: TestLegacyLaneSameTagMoveWithAlias/global/annotated (0.37s)
+
+--- PASS: TestReviewChangedDeclaredTagIsNotMovedTag (0.00s)
+
+--- PASS: TestReviewChangedDeclaredTagIsNotMovedTag/global (0.58s)
+
+--- PASS: TestReviewChangedDeclaredTagIsNotMovedTag/project (0.62s)
+
+--- PASS: TestLegacyLaneMovedTagRefusesStrictSecondInstall (0.62s)
+
+GO_TEST_EXIT_CODE=1
+
+##[error]Process completed with exit code 1.
+
+Hosted run identities:
+
+green: https://github.com/relux-works/curator/actions/runs/37900038171; commit 95f43e318b01c4af71a4a9bc277da844b7970ca5; tree 5bc982a25b05c43a419f538357e76280f398579b
+
+red: https://github.com/relux-works/curator/actions/runs/37900037908; commit 6cc4922ddedd82160e9803d2b17a8b6351654395; tree 62737801907fc52555a0a89cf7c41ad26255677b
+
+narrowing: https://github.com/relux-works/curator/actions/runs/37900038056; commit ed997b03dfb7f2cb3943380bc87d7bcea054b88e; tree c9aa7eecd444b3abbea31c7d4ec77bf21f72e89f
+
+Standalone mutation-evidence validator (exit 0; hosted product gates remain exit 1):
+
+import json,pathlib,re,subprocess
+root=pathlib.Path(__file__).parent
+alias_cases=[f'TestLegacyLaneSameTagMoveWithAlias/{scope}/{alias}' for scope in ['project','global'] for alias in ['lightweight','annotated']]
+dependency_cases=[f'TestLegacyLaneDependencyTagMovement/{scope}/same-tag' for scope in ['project','global']]
+controls=[f'TestLegacyLaneSameTagMoveWithAlias/{scope}/none' for scope in ['project','global']]+[f'TestReviewChangedDeclaredTagIsNotMovedTag/{scope}' for scope in ['project','global']]+['TestLegacyLaneMovedTagRefusesStrictSecondInstall']+[f'TestLegacyLaneDependencyTagMovement/{scope}/changed-declaration' for scope in ['project','global']]
+for mode,run_id in [('red',37900037908),('narrowing',37900038056)]:
+    raw=subprocess.check_output(['gh','run','view',str(run_id),'--repo','relux-works/curator','--json','status,conclusion,jobs'],text=True)
+    meta=json.loads(raw)
+    assert meta['status']=='completed' and meta['conclusion']=='failure',meta
+    steps=meta['jobs'][0]['steps']
+    assert next(s for s in steps if s['name']=='Compile mutated candidate')['conclusion']=='success'
+    assert next(s for s in steps if s['name']=='Alias regressions and controls (expected red)')['conclusion']=='failure'
+    log=(root/(mode+'-hosted.log')).read_text()
+    failed=set(re.findall(r'--- FAIL: (\S+) \(',log))
+    passed=set(re.findall(r'--- PASS: (\S+) \(',log))
+    assert set(alias_cases+dependency_cases)<=failed,(mode,failed)
+    assert set(controls)<=passed,(mode,passed)
+    assert re.search(r'\bGO_TEST_EXIT_CODE=1\s*$',log,re.M),mode
+    print(f'{mode}: hosted compile exit 0; go test exit 1 (expected failing product gate); alias regressions fail 4/4; dependency regressions fail 2/2; controls pass 7/7')
+print('Mutation-evidence validator exit 0; both product gates remain reported as failing.')
+

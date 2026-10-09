@@ -1,0 +1,109 @@
+.github/workflows/review-4mzun5-rev4.yml
+sha256:f251c74e40173ae9d0801a87e00657fcc091f7432b730a1e80f285d772faabe5
+
+name: Review 4mzun5 revision 4
+on:
+  push:
+    branches: ['review/4mzun5-rev4-*']
+permissions:
+  contents: read
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Production baseline and independent status probe
+        run: |
+          set -o pipefail
+          go test -count=1 -timeout=8m -v ./internal/install -run '^Test(LegacyLane|GlobalLaneRuntime|ReviewChangedDeclaredTag)' | tee install.log
+          go test -count=1 -timeout=5m -v ./cmd/curator -run '^Test(CLIAuditBindsDependencyDirectory|CLIStatusReportsLegacyPackageMarkerCurrent|ReviewCLIStatusDetectsChangedTagAtSameCommit|ReviewGlobalStatusDetectsChangedTagAtSameCommit|ReviewR4StatusBindingAndRepair)$' | tee cli.log
+          go test -count=1 -timeout=3m -v ./internal/skillspec -run '^TestDraftManifestDependencyDirectory' | tee grammar.log
+          go test -count=1 -timeout=3m -v ./internal/audit -run '^Test(VerdictCacheBindsFullPackageIdentity|SkillPackageArms)$' | tee audit.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: baseline
+          path: '*.log'
+  attack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Same-tag aliases and changed declaration probes
+        run: |
+          set -o pipefail
+          set +e
+          go test -count=1 -timeout=5m -v ./internal/install -run '^TestReviewR4(SameTagMoveWithAlias|ChangedTagAfterOldTagDeleted)$' 2>&1 | tee attack.log
+          result=${PIPESTATUS[0]}
+          set -e
+          [ "$result" -ne 0 ]
+          for scope in project global; do
+            for alias in lightweight annotated; do
+              grep -F -- "--- FAIL: TestReviewR4SameTagMoveWithAlias/$scope/$alias" attack.log
+            done
+            grep -F -- "--- PASS: TestReviewR4SameTagMoveWithAlias/$scope/none" attack.log
+            grep -F -- "--- FAIL: TestReviewR4ChangedTagAfterOldTagDeleted/$scope" attack.log
+          done
+          echo 'Confirmed same-tag alias bypass 4/4; changed-declaration refusal 2/2; no-alias controls 2/2'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: attack
+          path: '*.log'
+  mutants:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [movedtag-commit-only, status-commit-only, glob-star-only]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Narrow production behavior
+        env:
+          MODE: ${{ matrix.mode }}
+        run: python3 .github/ci/review-4mzun5-rev4.py
+      - name: Hosted compile and mutation check
+        env:
+          MODE: ${{ matrix.mode }}
+        run: |
+          set -o pipefail
+          go build ./...
+          case "$MODE" in
+            movedtag-commit-only) package=./internal/install; test=TestReviewChangedDeclaredTagIsNotMovedTag ;;
+            status-commit-only) package=./cmd/curator; test='TestReview(CLIStatusDetectsChangedTagAtSameCommit|GlobalStatusDetectsChangedTagAtSameCommit|R4StatusBindingAndRepair)' ;;
+            glob-star-only) package=./internal/install; test=TestLegacyLaneRefusesGlobDependencyDirectory ;;
+          esac
+          set +e
+          go test -count=1 -timeout=5m -v "$package" -run "^$test$" 2>&1 | tee mutant.log
+          result=${PIPESTATUS[0]}
+          set -e
+          [ "$result" -ne 0 ]
+          grep -E -- "--- FAIL: $test" mutant.log
+          echo "Killed narrowing mutant $MODE"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutant-${{ matrix.mode }}
+          path: '*.log'
+
+
+.github/ci/review-4mzun5-rev4.py
+sha256:814e96bb64c23cf9bab6138435e80648e440f41ac7400c545f17c538653449d6
+
+import os
+from pathlib import Path
+mode=os.environ['MODE']
+if mode=='movedtag-commit-only':
+ p=Path('internal/install/install.go');s=p.read_text();old='if len(bound) == 0 {';assert s.count(old)==1;p.write_text(s.replace(old,'if len(bound) >= 0 { // review: omit binding evidence'))
+elif mode=='glob-star-only':
+ p=Path('internal/identifiers/identifiers.go');s=p.read_text();old='strings.ContainsAny(value, "*?[]")';assert s.count(old)==1;p.write_text(s.replace(old,'strings.ContainsAny(value, "*")'))
+elif mode=='status-commit-only':
+ p=Path('cmd/curator/main.go');s=p.read_text();old='!reflect.DeepEqual(recorded.Package, staged) || recorded.LockSHA256 != legacyLock';assert s.count(old)==1;s=s.replace(old,'recorded.Package.Commit == nil || recorded.Package.Commit.Hex != resolved.Commit');s=s.replace('\n\t"reflect"','');p.write_text(s)

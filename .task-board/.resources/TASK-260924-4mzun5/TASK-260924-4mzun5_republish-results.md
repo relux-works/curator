@@ -1,0 +1,1 @@
+Republish on trunk 97822069 after worktree converge. No code changes. Checked: git diff 97822069 -- CHANGELOG.md adds only the 4mzun5 entry (pure addition, no merge defect). No build/test run on host per republish instruction; hosted gate is the arbiter. Candidate = rework-3 delta (F4 same-tag move vs explicit tag change, F6 declared-ref currentness).

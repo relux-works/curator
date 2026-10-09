@@ -1,0 +1,81 @@
+workflow:
+name: Review 4mzun5 revision 5
+on:
+  push:
+    branches: ['review/4mzun5-rev5-*']
+permissions:
+  contents: read
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Probes and permanent rows
+        run: |
+          set -o pipefail
+          go build ./...
+          go test -count=1 -timeout=9m -v ./internal/install -run '^Test(ReviewR5|ReviewR4|LegacyLane|ReviewChangedDeclaredTag)' | tee install.log
+          go test -count=1 -timeout=5m -v ./cmd/curator -run '^Test(CLIStatus|ReviewCLIStatus|ReviewGlobalStatus|LegacyPackageStatus|CLIAudit)' | tee cli.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: baseline
+          path: '*.log'
+  mutants:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [any-prior-tag, never-prior, skip-source-check, no-lock-digest-check, no-stale-check]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Mutate
+        env:
+          MODE: ${{ matrix.mode }}
+        run: python3 .github/ci/review-4mzun5-rev5.py
+      - name: Run
+        run: |
+          set -o pipefail
+          go build ./...
+          set +e
+          go test -count=1 -timeout=9m -v ./internal/install -run '^Test(ReviewR5|LegacyLane|ReviewChangedDeclaredTag)' 2>&1 | tee mutant.log
+          r=${PIPESTATUS[0]}
+          set -e
+          echo "exit=$r"
+          grep -E -- '^(\s*)--- FAIL' mutant.log || true
+          [ "$r" -ne 0 ]
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutant-${{ matrix.mode }}
+          path: '*.log'
+
+mutation script:
+import os
+from pathlib import Path
+mode=os.environ['MODE']
+p=Path('internal/install/install.go');s=p.read_text()
+if mode=='any-prior-tag':
+    old='previous.Kind == "tag" && previous.Value == node.Resolved.Ref';assert s.count(old)==1
+    s=s.replace(old,'previous.Kind == "tag"')
+elif mode=='never-prior':
+    old='previous.Kind == "tag" && previous.Value == node.Resolved.Ref';assert s.count(old)==1
+    s=s.replace(old,'false && previous.Kind == "tag"')
+elif mode=='skip-source-check':
+    old='if !sameLegacyPackageSource(recorded.Package, draftMarkerPackage(current)) {';assert s.count(old)==1
+    s=s.replace(old,'if false && !sameLegacyPackageSource(recorded.Package, draftMarkerPackage(current)) {')
+p.write_text(s)
+if mode=='no-lock-digest-check':
+    p=Path('internal/install/legacygeneration.go');s=p.read_text()
+    old='if lock.LockSHA256 != recorded.LockSHA256 {';assert s.count(old)==1
+    p.write_text(s.replace(old,'if false {'))
+if mode=='no-stale-check':
+    p=Path('internal/install/legacygeneration.go');s=p.read_text()
+    old='if err := lock.CheckStale(generation.Manifest); err != nil {';assert s.count(old)==1
+    p.write_text(s.replace(old,'if false {'))
