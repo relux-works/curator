@@ -1,0 +1,16 @@
+# TASK-261010-2iqn63 — platform-docs-audit rev2 evidence
+
+Candidate: `.research/261010_platform-docs-audit.md`. Responds to `TASK-261010-2iqn63_review-B-deciding-verdict-rev1.md`; detailed row-by-row changes and command outcomes are in the study's Rev2 changes section. Audit sources remain read-only.
+
+- `rev2_verify.py citations`: exit 0; 22/22 requested/swept rows, 87/87 ranges and label/anchor pairs, 21/21 pinned `gh api` reads (each exit 0), 21/21 blob hashes. Latest invocation reads the candidate including its revision appendix.
+- Named documentary regression test `rev2_rejection_regression`, via `rev2_verify.py regression`: exit 0 on candidate. Initial invocation after adding the appendix exited 1 because revision-table IDs shadowed matrix rows; corrected the checker to read section A only and reran.
+- Narrowing mutant 1: in scratch copies of A06.1/A08.4, replace both link label `C09:L164–169` and anchor `#L164-L169` with L164–168. Same regression command exits 1, identifying A06.1's missing L169 first-slice clause. The mutated range remains valid and contains the D11 heading. This measured rejection is of A06.1; no independent mutation coverage of A08.4 is claimed.
+- Narrowing mutant 2: in scratch A09.9, replace `**v0 refusal**` with `**v1 refusal**`, leaving capacity, quota and all citations intact. Same regression command exits 1, identifying A09.9's lost phase distinction. Both mutant failures are expected-red, not passes.
+- Full report verifier `audit_check_rev2.py`: exit 0; 777/777 actual-report citation ranges, 108/108 original cached blob hashes, 8/8 original untruncated trees, 122/122 coverage groups, 40/40 primary reviews, 43/43 original diagram identities. Original corpus inventory was rechecked locally; changed-row content was fetched afresh. No renewed visual inspection of all figures is claimed.
+- Scope check: exit 0; after normalizing the five permitted private-heading title replacements and excluding 21 permitted edited rows plus the appended revision record, all other original content is identical. `git status --short` exit 0 lists only the untracked research file.
+- `git diff --check`: exit 0. Untracked report whitespace/table shape and bounded path/token pattern checks also passed in the report verifier.
+- `git diff --exit-code HEAD -- LOGBOOK.md`: exit 0; LOGBOOK unchanged.
+
+No product tests, builds, renderers, deployment or commits ran. The first researcher handoff exited 1 because generic Tests green and logbook checklist items were unchecked. They were removed as inapplicable under the explicit no-tests/no-LOGBOOK brief; a documentary-verification item replaces Tests green, and the existing checked no-LOGBOOK/outcome-recording item covers the logbook exception. No unexecuted product test was marked passing. Findings are recorded here, in the study and in board notes. Owner-decision labels commission future decisions without choosing product behavior in this research rework.
+
+The portable `TASK-261010-2iqn63_rev2_verify.py` outcome provides both citation and regression entry points; give it the downloaded study filename. It needs Python 3 and authenticated read access through `gh` for citation mode. Public attachments contain findings, checker code and neutral links only, not source corpora or private-heading excerpts.
