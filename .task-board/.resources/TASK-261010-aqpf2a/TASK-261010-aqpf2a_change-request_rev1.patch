@@ -1,0 +1,530 @@
+diff --git a/.research/261010_pi-opencode-tool-lockdown.md b/.research/261010_pi-opencode-tool-lockdown.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..1a285a1a66973de80ab622c7060db3e7bf5cb22b
+--- /dev/null
++++ b/.research/261010_pi-opencode-tool-lockdown.md
+@@ -0,0 +1,506 @@
++| Harness / exact source baseline | Verdict for CIP-0008 lockdown | Reason and next decision |
++|---|---|---|
++| Pi **1.1.0**, `abe508e1b89912adde45528136c3221eb69acdd7` | **Candidate**, native CLI with only its built-in MCP extension; not qualified | An explicit tool allowlist filters both the registry and execution set. One protected stdio MCP declaration can supply all remaining tools. Qualify the sealed configuration and startup behavior in §F. [P-sdk] [P-session] [P-mcp-config] |
++| Pi **0.84.2**, `914cf1472e715297caa30db4b9535d534a9eb718` (Curator/launcher recorded release) | **Conditional** with a first-party MCP adapter; **unsupported stock CLI** for the complete one-MCP requirement | All native tools are removable already. This release has no built-in MCP client. An admitted SDK/custom-tool adapter can forward exclusively to one stdio relay, but that adapter does not exist in this research and has no qualification evidence. [C-registry] [C-native-pin] [P0-sdk] [P0-session] [P0-usage] |
++| OpenCode **1.18.35**, `53d1eabb61e21162157817bf677da0a4ad3332e3` | **Candidate**, native `run` transport with protected deny-all/allow-relay policy; not qualified | Whole-tool denial removes tools from the provider request, rather than merely asking approval. Its configuration/startup surface needs confinement and a source audit; `--pure` alone is insufficient. [O-request] [O-permission] [O-config] [O-plugin] |
++| Current Curator integration | **Keep `tool_posture_unsupported` until a reviewed qualification row exists** | CIP-0008 has no Pi/OpenCode row. The launcher currently maps native Pi but refuses OpenCode. Source feasibility is not product support. [C8] [C-launcher] |
++
++# Pi and OpenCode: removing locally acting tools
++
++Task: **TASK-261010-aqpf2a — research-pi-opencode-tool-disable**. Research snapshot: **2026-10-10 task date**. Status: **ready for review**.
++
++This is source and documentation research. Neither harness was installed or executed; no harness or repository test suite, login, credential probe, or Keychain access was performed. All recipes below are **proposals for hosted-runner measurement**, not commands run on the research host. “Candidate” means a concrete source-supported configuration to measure; it does not mean a supported or empirically qualified tuple.
++
++The supplied owner rule requires **no locally acting tool offered to the model**. Removing a tool, denying its execution, and confining the process are different properties. CIP-0008 additionally excludes provider-hosted tools outside the relay and permits bounded harness state; CIP-0009 supplies the OS boundary. Both layers are needed. The older Muse exception in the draft does not relax this task's owner rule. [C8] [C9]
++
++## A. Identity, releases, and local capability inventory
++
++### A1. Exact projects and release evidence
++
++| Name in Curator | Identity evidence | Release examined |
++|---|---|---|
++| `pi` | Curator uses `PI_CODING_AGENT_DIR`, `settings.json`, `models.json`, and the `pi --version` probe. The matching package is **`@earendil-works/pi-coding-agent`**, whose manifest exports the `pi` binary and `.pi` configuration directory. The old GitHub repository locator `badlogic/pi-mono` resolves to **`earendil-works/pi`**. [C-registry] [P0-package] [P-package] [Pi-repository-redirect] | Latest non-prerelease reported by GitHub's release API: **v1.1.0**, published **2026-10-07**, source `abe508e1b89912adde45528136c3221eb69acdd7`. The recorded Curator release **v0.84.2**, published **2026-08-14**, resolves to `914cf1472e715297caa30db4b9535d534a9eb718`. [Pi-release] [Pi084-release] [P-package] [P0-package] |
++| `opencode` | Curator's `XDG_CONFIG_HOME`, `OPENCODE_CONFIG`, `opencode.json(c)`, and `.opencode` inventory match **`anomalyco/opencode`**, the TypeScript/Bun project behind opencode.ai. The manifest exports `opencode`; its source loads those exact configuration names. [C-registry] [C2] [O-package] [O-config] [O-paths] | Latest non-prerelease reported by GitHub: **v1.18.35**, published **2026-10-06**; tag commit `53d1eabb61e21162157817bf677da0a4ad3332e3`. Curator's OpenCode `VerifiedRelease` is empty, and the current launcher has no launchable OpenCode mapping. There is no second active release pin in those examined tables. [OpenCode-release] [OpenCode-tag] [O-package] [C-registry] [C-launcher] |
++
++The similarly named **`opencode-ai/opencode`** is a different, archived Go project whose README points to **Crush**. It is not the implementation matching Curator's JSON configuration contract. Its archive README is pinned at `73ee493265acf15fcd8caab2bc8cd3bd375b63cb`; its last advertised release is v0.0.55. No claims below concern that project's tools. [Other-opencode] [Other-opencode-release] [O-config]
++
++Integration sources were read at Curator `5ec599f0b7eddeb3403fe89104b7b800fd0a55db`, launcher `68be5ffe2bc9ec0fc9e8a1bb8777368c55069ded`, and curator-spec PR #134 head `b9948ec39211ead98ed989537aa99e1c677b3f44`. The launcher depends on agents-management **v0.5.53**, peeled commit `f07bbf3259679c45af13e2d665dd37bb76126ec5`; its native-Pi capability table contains **0.84.2 only**, with no permission-bypass mapping. This is a verified capability row, not a blanket restriction on which binary may ever run in native mode. [C-launcher-dep] [C-native-pin] [C8]
++
++**Version traps:** CIP-0002's “Pi has no built-in MCP” finding belongs to 0.84.2; it is false for 1.1.0. OpenCode's release metadata `target_commitish` is `4ac0d9c3d169bbe81d9570013effdda3fe24d36e`, but the **release tag resolves to `53d1e…`**; this report uses the latter. OpenCode's SDK path containing `/v2` is not proof that the native CLI uses the new core V2 agent loop: `run.ts` sends through the in-process server, whose session handler uses `packages/opencode/src/session/prompt.ts`. [C2] [P-mcp] [OpenCode-release-API] [OpenCode-tag] [O-run] [O-http]
++
++### A2. Pi model-callable inventory
++
++The closed base-tool sets come from each release's `src/core/tools/index.ts`; the built-in extension list and MCP registration code add the other rows. Absence claims below are bounded to those registries, not arbitrary third-party extensions. [P-tools] [P0-tools] [P-builtins] [P-mcp-ext]
++
++| Capability | Pi 0.84.2 | Pi 1.1.0 | Local consequence / lockdown disposition |
++|---|---|---|---|
++| File read; image read | `read` | `read` | Reads local files; remove. [P0-tools] [P-tools] [P-cli] |
++| File replacement / creation | `edit`, `write` | Same | Local mutations; remove. [P0-tools] [P-tools] |
++| Shell | `bash` | `bash`, plus `powershell` (documented for Windows) | Child-process execution; exclude both names even though the proposed platforms are macOS/Linux. [P0-tools] [P-tools] [P-cli] |
++| Search / list | `grep`, `find`, `ls` | Same | Local file/directory access and potentially helper binaries; remove. [P0-tools] [P-tools] |
++| Web fetch/search, LSP, subagents/tasks, todo, plan | No separate built-in tool in the seven-name registry; the usage guide explicitly excludes built-in subagents, plan, todo and MCP | No separate tool for these in the eight-name base registry or shipped extension registry; shell/extensions can supply them | Do not mistake “no dedicated tool” for absence of the capability while shell or arbitrary extensions remain enabled. [P0-usage] [P0-tools] [P-tools] [P-builtins] |
++| Local code orchestration and tool discovery | No built-in entry in the examined base registry | `codemode`, `tool_search` from built-in extensions | Codemode runs orchestration code; search can activate deferred tools. Exclude both for a literal relay-only model surface. [P-builtins] [P-ext] [P-cli] |
++| MCP client | No built-in client | Built-in MCP extension; stdio and streamable HTTP; dynamic `mcp__<server>__<tool>` names | Keep only one stdio server, exact relay tool names, direct exposure. A tool allowlist does **not** prevent other configured servers from starting. [P0-usage] [P-mcp] [P-mcp-ext] |
++| MCP resources | None built in | `list_mcp_resources`, `list_mcp_resource_templates`, `read_mcp_resource` | These reach connected MCP servers. Exclude for the narrow tools/call-only relay contract, even though their I/O can be remote. [P-mcp-resources] [P-mcp-names] [C9] |
++
++Defaults are four active base tools, `read,bash,edit,write`, in both releases. A complete audit must include inactive tools and dynamic extension/MCP registrations, not just that default list. [P0-sdk] [P-sdk] [P-session]
++
++### A3. Pi local activity outside the model tool list
++
++| Surface | Source finding and release scope | Required closure for the proposal |
++|---|---|---|
++| Settings and instruction discovery | Both versions discover global/project settings and context; `--no-approve` governs project trust, while context-file loading is a separate switch. In 1.1.0, project `sessionDir` is looked up **before** trust is resolved. [P0-usage] [P0-loader] [P-main] [P-security] | Fresh dedicated harness home and empty scratch cwd; protected settings; explicit session policy; `--no-approve --no-context-files`; OS read boundary. Do not claim the trust flag prevents every preliminary file read. |
++| System prompt files | Project `.pi/SYSTEM.md` / `APPEND_SYSTEM.md` are trust-gated; global versions remain discoverable. [P0-loader] [P-loader] | Only protected global prompt material; no project admission. SDK variant supplies a loader that returns explicit prompt bytes and no discovered files. |
++| Plugins/extensions, hooks, custom commands | Extensions run inside Pi with its OS authority, can register tools/commands/providers, receive lifecycle hooks and execute arbitrary code. Tool-call blocking is an extension event, not an OS restriction. [P-ext] [P0-sdk-doc] | Disable discovery and all unapproved code; 1.1.0 explicitly re-admits only `builtin:mcp`. No third-party permission/MCP package is assumed safe. |
++| Skills, prompt templates, themes, packages | Resource loading can discover these globally and in trusted projects; package resolution happens before final resource filtering. Disabling extensions alone is not a package-acquisition policy. [P0-loader] [P-loader] [P-packages] | Disable skill/prompt/theme discovery; protected empty package/resource lists and paths; offline startup; no package-management caller commands. |
++| Auth/model configuration helpers | Configuration values can invoke shell commands; current MCP environment/header values also use that resolver. [P0-values] [P-values] [P-mcp-runtime] | Generated literal values or explicitly admitted variable references only; forbid command-valued strings, custom provider code and arbitrary endpoint overrides. |
++| User shell / RPC / export | Interactive `!` and `!!` run commands; RPC exposes a separate `bash` command and HTML export. These do not depend on whether a model-visible `bash` tool exists. [P-usage] [P-rpc] [P0-rpc] | Proposed native row is one-shot print/JSON, not unrestricted interactive or RPC. Any later RPC adapter needs a closed command grammar; do not expose raw stdin control to remote content. |
++| Updates, telemetry, catalogs | Both versions document `PI_OFFLINE`, `PI_SKIP_VERSION_CHECK`, and install telemetry controls. 1.1.0 also has `cacheWarming` and `enableAnalytics`; telemetry opt-out does not itself disable update checks. [P0-settings] [P0-sdk-doc] [P-settings] [P-env] | Offline startup, telemetry disabled, analytics false, cache warming off where present; protected executable and egress policy. These settings are hygiene, not proof of no traffic. |
++| Session/log files and sharing | Sessions can persist or use an in-memory manager/`--no-session`; current MCP logs use the agent directory; debug/export/share are additional explicit user actions. [P0-sdk-doc] [P-sdk-doc] [P-cli] [P-mcp] [P-usage] | Explicit in-memory/ephemeral choice or quota-bound managed state; keep MCP diagnostics in allowed state; prohibit share/export/debug commands in the wrapper. Persistence mode requires its own tuple. |
++| Local-model runtime | 1.1.0 ships a `llama.cpp` built-in extension alongside MCP/codemode/search. [P-builtins] | It is not admitted by the “only builtin:mcp” extension recipe; provider and runtime closure are pinned. |
++
++### A4. OpenCode 1.18.35 inventory
++
++The production native-run registry has **17 possible fixed IDs** across its conditionals: `invalid, question, bash, read, glob, grep, edit, write, task, webfetch, todowrite, websearch, skill, apply_patch, execute, lsp, plan_exit`. Model/provider/platform/feature conditions select subsets. The shell implementation is named `shell.ts` but deliberately retains the public ID **`bash`**. `list` and `todoread` are not entries in this registry; do not copy an older tool inventory. [O-registry] [O-shell-id]
++
++| Capability | Registration / behavior | Closure |
++|---|---|---|
++| Read/search/list | `read`, `glob`, `grep`; directory reading belongs to the read/search surface | Whole-tool deny and removal from requests. [O-registry] [O-doc-tools] |
++| Write/edit | `edit`, `write`, `apply_patch`; model selection chooses patch versus edit/write | All three map to permission **`edit`** when determining whole-tool removal. [O-registry] [O-permission] |
++| Shell | `bash`, including the platform-selected shell implementation | Deny/remove; do not rely on a command-pattern deny list. [O-shell-id] [O-registry] [O-permission] |
++| Network tools | `webfetch`, `websearch`; websearch selection is provider/feature-dependent | Remove regardless of whether execution is a local HTTP fetch or service request. [O-registry] [O-doc-tools] |
++| Delegation / todo / workflow / questions | `task`, `todowrite`, conditional `question` and `plan_exit`; agents carry independent permission rules | Remove; seal agent selection and session permissions. Plan mode is not zero tools. [O-registry] [O-agent] [O-run] |
++| LSP | Conditional `lsp` model tool, plus a separately bootstrapped language-server service | Remove tool **and** set `lsp:false`; disabling the tool alone is not proof that the service cannot act. [O-registry] [O-bootstrap] [O-lsp] |
++| Skills and code orchestration | `skill`; experimental `execute` uses code mode and MCP catalog | Remove both; disable experimental code mode and skill sources. [O-registry] [O-session-tools] [O-runtime-flags] |
++| Skill discovery outside tool execution | External `.claude`/`.agents` skill roots, config-directory skill trees, configured paths and downloadable URLs; a built-in `customize-opencode` skill also ships | External-skill flags do not eliminate config-directory/custom-path/URL loading. Protect those sources and leave `skills.paths`/`skills.urls` empty; remove the model skill tool separately. [O-skills] |
++| MCP | Local/stdio and remote transports; tools named `sanitize(server) + "_" + sanitize(tool)`; three generic resource tools can be added | Exactly one protected local MCP declaration, exact relay tool permissions; exclude resource helpers. [O-mcp] [O-mcp-schema] [O-mcp-names] [O-session-tools] |
++| Non-I/O helpers | `invalid`; `StructuredOutput` for schema output; Copilot-specific `_noop` may be inserted after filtering when replaying calls with an empty tool set | They still matter to the exact offered-tool audit. Select plain text message format and a pinned non-Copilot provider; record all helper schemas. [O-registry] [O-prompt] [O-request] |
++| Plugins/hooks/custom tools | Built-in auth plugins plus configured/discovered plugins; separate `tool(s)/*.{js,ts}` files are imported by the tool registry; plugin config hooks can mutate config | `--pure` suppresses external plugins; `OPENCODE_DISABLE_DEFAULT_PLUGINS=1` suppresses built-ins. Neither is sufficient for custom-tool discovery; seal directories before startup. [O-plugin] [O-registry] [O-runtime-flags] |
++| Commands | Config/file commands, MCP prompts and skills form command sources; command execution can use another agent/model | No command entry point or raw server command request in the qualified caller grammar. [O-command] [O-prompt] [O-run] |
++| Project config/instructions | Config merges global, custom, project, resource-directory, inline, account/remote and managed sources. Instructions can include local paths/globs and URLs; project-config exclusion and Claude-compatibility exclusion are separate controls | Empty/protected discovery roots, project exclusion, no inherited account state; validate every effective source. [O-config] [O-paths] [O-managed] [O-instruction] |
++| Startup dependency installation | Config loading calls `Npm.install` for resource directories even before model tool filtering; it skips a directory that is not writable | Make these directories genuinely unwritable to the harness identity, precreate required metadata, and measure startup. `--pure` is not an installer-disable switch. [O-config] [O-npm] |
++| VCS/snapshots/formatting/watchers | Bootstrap initializes config/plugins, LSP, sharing, formatters, VCS and snapshots; `snapshot:false` and `formatter:false` are distinct settings | Empty non-repository cwd; disable snapshots/formatters/file watcher; measure any remaining metadata probes and confine subprocesses. [O-bootstrap] [O-vcs] [O-snapshot] [O-format] [O-schema] [O-flags] |
++| Updater/model catalog/network | Upgrade path can check/download updates; model catalog can refresh independently | `autoupdate:false`, updater/model-fetch disable variables, pinned provider catalog and kernel egress policy. [O-upgrade] [O-models] [O-flags] |
++| Telemetry and sharing | OTLP exporter is enabled by endpoint environment; AI-SDK telemetry has a separate setting; sharing has its own session service | Remove OTEL environment, `experimental.openTelemetry:false`, `share:"disabled"`, no inherited share/session state; observe denied and successful traffic. [O-otel] [O-schema] [O-share] |
++| Sessions/logs/cache | Global initialization creates XDG data/config/state/cache and temporary directories, including log and binary-cache roots; sessions are stateful | All XDG/temp roots must be assigned, quota-bound and separate from read-only policy. Moving only XDG_CONFIG_HOME does not isolate state/auth. [O-global] [O-prompt] [C-registry] |
++
++**Separate V2 core:** the same release also contains a new registry with 12 static built-in transforms: apply-patch, bash, edit, glob, grep, question, read, skill, todowrite, webfetch, websearch and write. Its source explicitly lists unported task/LSP/repository/plan/code-mode work. It materializes tool definitions using V2 agent permissions and refuses calls outside that materialization. This is useful embedding evidence, but its configuration schema and loop are a **different transport tuple**, not evidence that the native-run recipe silently inherits V2 behavior. No V2 row is proposed here. [O-v2-builtins] [O-v2-registry] [O-v2-llm] [O-v2-config] [O-http]
++
++## B. Removal mechanisms, enforcement, and override paths
++
++### B1. Pi
++
++| Mechanism | Enforcement and documentation | Can another source undo it? |
++|---|---|---|
++| `--no-tools` / SDK `noTools:"all"` or `tools:[]` | Both examined versions turn the selection into an empty allowlist; registry construction filters built-in and custom/extension tools. This is **structural removal**, not prompt advice. 1.1.0 explicitly includes MCP. [P0-sdk] [P0-session] [P-sdk] [P-session] [P-cli] | A separately supplied explicit `--tools` selection takes precedence over the default suppression; close caller argv. Arbitrary loaded code remains arbitrary code. |
++| `--tools <names>` / SDK `tools:[…]` | 0.84.2 uses exact names; 1.1.0 also supports `*` patterns. The allowlist filters definitions and wrapped executors at every registry refresh, including extension additions; unknown tool calls fail the agent-loop lookup. [P0-session] [P0-loop] [P-sdk] [P-session] [P-loop] | Settings do not widen an explicit allowlist through normal loading. An extension can replace an **allowed** tool implementation or act outside tools, so trust the admitted implementation as well as its name. |
++| 1.1.0 MCP exception to `--tools` | A nonempty allowlist with no entry starting `mcp__` retains MCP tools for indirect use. Empty allowlist or an entry starting `mcp__` makes MCP filtering apply too. [P-cli] [P-mcp-names] [P-session] | `--tools codemode` is not an MCP server allowlist. The proposed list contains explicit `mcp__swarma_remote_tools__…` names and excludes orchestration tools. |
++| `--exclude-tools` / SDK `excludeTools` | Filter applies after allow selection, also during registry refresh. Exact names in 0.84.2, patterns in 1.1.0. Documented. [P0-sdk-doc] [P0-session] [P-cli] [P-session] | A list of today's native names is not future-proof against new tool names; use a positive relay allowlist and pin the release. |
++| `--no-builtin-tools`, `defaultTools`, 1.1.0 `+name/-name` modifiers | These alter default activation; they are **not equivalent to a closed allowlist**. `--no-builtin-tools` retains extension tools and does not itself remove every built-in from the registry. [P0-sdk] [P-sdk] [P-cli] | Extensions or later activation can change an unfiltered registry. Not sufficient for lockdown. |
++| `pi.setActiveTools()` / `session.setActiveToolsByName()` | Changes the model-active subset; an explicit constructor allowlist still bounds the registry. Without that bound, deactivation is reversible. [P-ext] [P-session] [P0-session] | Lifecycle hooks/reload and other extensions can change the active subset. Do not treat one startup call as a permanent security policy. |
++| Tool replacement and `tool_call` blocking hook | Custom tools overwrite same-name definitions; hooks can deny execution. Replacement can route calls remotely; a blocking hook is **execution policy**, not removal of a schema. [P-ext] [P-session] [P0-session] | Same-process extensions can perform local I/O themselves. Only an audited first-party implementation plus OS confinement qualifies. A prompt saying “never use tools” is not enforcement. |
++| Resource controls | `--no-extensions`, `--no-skills`, `--no-prompt-templates`, `--no-themes`, `--no-context-files`, `--no-approve`; explicit resource paths can still load. 1.1.0 supports `-ne -e builtin:mcp`. [P-cli] [P-loader] [P0-usage] [P0-loader] | Global settings/package resolution and explicitly supplied paths must also be controlled. These flags do not protect the entire process from local I/O. |
++| 1.1.0 MCP switches | `--no-mcp` disables the built-in MCP extension even if enabled elsewhere; server `enabled:false` prevents that connection. `exposure:"hidden"` makes registered tools unreachable but is not a no-connection switch. [P-cli] [P-loader] [P-mcp] [P-mcp-ext] | Project entries can replace global server declarations when trusted; extensions can register servers. An MCP-only launch therefore seals config and extension sources, not just tool exposure. |
++| SDK/RPC/server mode | SDK supplies exact tools/custom tools and a complete resource loader, in-memory settings and sessions. RPC uses the same model-tool choices, but has independent local commands. [P-sdk-doc] [P-full-control] [P0-sdk-doc] [P-rpc] [P0-rpc] | Embedding is a viable structural alternative only when the host omits ambient loaders and unapproved APIs. Changing transport alone does not disable tools or shell RPC. |
++| Lower-level `AgentSession` construction | `baseToolsOverride` can replace the base implementation map; `allowedToolNames` still bounds base and extension registries. This is a source-level constructor surface, separate from the public SDK's string-name `tools` option. [P-session] | Replacing base tools alone does not prevent extension code, custom tools or non-tool session commands. Pin and audit the entire embedding. |
++
++### B2. OpenCode
++
++| Mechanism | Enforcement and documentation | Override / limit |
++|---|---|---|
++| Global / agent `permission:{"*":"deny", …relay allows…}` | Documented deny rules are translated into ordered rulesets. `Permission.disabled()` removes a tool when its **last matching rule** denies pattern `*`. `LLMRequestPrep.resolveTools()` filters before the provider request; `llm.ts` uses those filtered executors. **Policy-derived structural removal**, plus execution checks. [O-doc-perm] [O-permission] [O-request] [O-llm] | Global settings, agent rules, session permissions and later config/plugin changes can override earlier rules. Protect all of them. Allow exact relay names after the catch-all. |
++| Granular deny / `ask` | Path/command-pattern rules govern execution. They generally leave schemas visible because they do not wholly disable the tool. [O-doc-perm] [O-permission] | `bash:{"rm *":"deny"}`, read-only/plan agents, and denial of prompts are not a zero-local-tools recipe. |
++| Legacy top-level or agent `tools:{name:false}` | Still supported, deprecated since 1.1.1; converts to permission rules. File modifications normalize to `edit`. [O-doc-perm] [O-config] [O-agent-schema] | Explicit permission entries win over converted legacy tool entries; use the current permission representation. |
++| Per-request SDK `tools` map | Prompt handler converts entries to whole-tool session permissions and persists them; request preparation also filters exact false entries. [O-prompt] [O-request] | This is a mutation of server/session policy, not an embedding API that replaces the implementation registry. Block untrusted prompt/session/config mutation endpoints and audit resume. |
++| Agent / mode definitions | Build, Plan and custom agents have merged permission sets; `disable:true` removes an agent. The selected agent can carry a final catch-all deny. [O-agent] [O-agent-schema] | Selecting another agent or invoking a subagent/command is another authority path. No mode name is a lockdown guarantee. |
++| Child-tool restrictions | `experimental.primary_tools` adds tool denies to newly created task sessions. Parent agent restrictions do not automatically govern a subagent; selected parent session restrictions are inherited. [O-task] [O-subagent-permissions] | This is a child-session mechanism, not removal from the primary model. Exclude `task` entirely in the proposed row. |
++| Plugins/custom tools | Plugins add tools and hooks, can mutate config; legacy custom tools are loaded from resource directories independently. Tool filtering happens after this code may load. [O-plugin] [O-registry] [O-doc-plugin] | An error thrown by a hook is policy, not schema removal. No reviewed “replace the entire registry” contract exists in the public legacy JS client; arbitrary plugin execution is not a safe workaround. [O-doc-sdk] |
++| `--pure` and environment controls | CLI `--pure` sets `OPENCODE_PURE`; built-ins need `OPENCODE_DISABLE_DEFAULT_PLUGINS`; project config has its own disable variable. [O-entry] [O-plugin] [O-paths] [O-runtime-flags] | `--pure` does not suppress `tool(s)` imports or config dependency installation. Project exclusion still leaves global and home `.opencode` roots. [O-registry] [O-config] [O-paths] |
++| MCP-only configuration | Protected `mcp` map with one `type:"local"` server and absolute `command[0]`; tools filtered by exact names. [O-mcp-schema] [O-mcp] [O-mcp-names] | Tool denial does not stop configured MCP processes from starting. `OPENCODE_CONFIG` is a merge layer, not a strict replacement. There is no reviewed CLI equivalent of Claude's strict-MCP flag in `index.ts`/`run.ts`. [O-config] [O-entry] [O-run] |
++| SDK/server and V2 embedding | Public JS SDK is a server client; inline config still merges with discovered config. V2's internal registry can build a materialized set and limits dispatch to it. [O-doc-sdk] [O-v2-registry] | A deliberately assembled V2 embedding may be viable, but its service graph/config/plugin closure must be qualified separately. Neither `serve`, ACP, nor an SDK client means “zero native tools” by itself. |
++
++## C. Concrete zero-local-tool, one-relay configurations
++
++### C1. Common boundary and vocabulary
++
++The following are **proposed generated policies**, not implemented launcher changes. Let **R** be a pinned, finite relay tool manifest. For a four-tool lab manifest `{read_file,write_file,apply_patch,bash}`, Pi names become `mcp__swarma_remote_tools__<name>`; OpenCode names become `swarma-remote-tools_<name>`. Naming comes from the pinned clients, not from guessing a common MCP convention. The relay declaration uses the neutral absolute path **`/opt/curator/qualified/relay/swarma-remote-tools`**; this is an example managed path, not a path on the research host. [P-mcp-names] [P-mcp-tools] [O-mcp-names] [R-claude]
++
++Before launch, a trusted supervisor must verify executable/dependency digests, protected policy files, exactly one server, exact R and schemas, agent/provider/model selection, allowed environment, and OS policy. Unknown/malformed/unreadable sources, failed MCP readiness, an unexpected connected server, changed tool list, or stale policy generation must refuse. MCP clients' own error-and-continue behavior is not that supervisor: Pi skips invalid entries; OpenCode can report failed connections. Never interpret these as a successfully empty configuration. [C8] [C9] [P-mcp-config] [P-mcp] [O-mcp]
++
++Only the protected policy tree is immutable; permitted session/cache/log state has separate writable roots. The harness cannot replace policy through a writable parent, symlink, config RPC, extension, updater, or local tool. The entire process and descendants remain inside CIP-0009 confinement; provider networking is limited by the trusted proxy/egress policy, and the relay's only effective route is the bridge. This is a proposed composition of the existing CIP requirements, not a new guarantee furnished by either tool flag. [C8] [C9]
++
++### C2. Pi 1.1.0 native candidate
++
++Generated argv, with **each R name expanded to its literal argument value**, follows this shape:
++
++```text
++<absolute pinned pi executable>
++  --mode json --print --no-session --offline
++  --no-approve --no-context-files
++  --no-extensions --extension builtin:mcp
++  --no-skills --no-prompt-templates --no-themes
++  --tools <comma-separated exact Pi names from R>
++  --provider <pinned provider> --model <pinned model>
++```
++
++Deliver the bounded text prompt through non-TTY stdin and close that stream; supply no positional prompt/file arguments. The CLI documents this input path and explicitly documents `-ne -e builtin:mcp`. Pi still treats `@file` positional arguments as attachments **after `--`**, so an option terminator alone would not close file reads. Using JSON print is intentional: interactive shell/commands and raw RPC are different tuples. The caller tail may not add tools, extensions, resources, package commands, provider settings, session paths, attachments or trust overrides. [P-cli] [P-args] [P-main] [P-rpc] [P-usage] [C8]
++
++Protected agent-directory `mcp.json`:
++
++```json
++{
++  "autoEnableCodemode": false,
++  "mcpServers": {
++    "swarma-remote-tools": {
++      "command": "/opt/curator/qualified/relay/swarma-remote-tools",
++      "args": [],
++      "enabled": true,
++      "exposure": "direct"
++    }
++  }
++}
++```
++
++The syntax is upstream syntax; the absolute relay path and its manifest are proposed Curator inputs. `direct` avoids local codemode/search; the explicit `mcp__…` allowlist removes base tools, code/search tools and generic resource tools from the session registry. Rebuilding the registry preserves the allowlist. **Structural guarantee: within the pinned, unmodified Pi implementation and admitted extension set, a model cannot select a removed local executor by naming it.** It is not protection against arbitrary same-process code or a replaced executable. [P-mcp] [P-mcp-config] [P-session] [P-loop]
++
++Compose `PI_CODING_AGENT_DIR` to the sealed harness policy/state layout, `PI_OFFLINE=1`, `PI_TELEMETRY=0`, `PI_SKIP_VERSION_CHECK=1`; settings include no packages, `enableInstallTelemetry:false`, `enableAnalytics:false`, `cacheWarming:"off"`, and disabled automatic compaction. Supply only the admitted model configuration, no command-valued credentials/headers. The real donor account, runtime read exceptions, bridge separation, policy immutability, MCP readiness timeout and scratch-state permissions remain qualification requirements. The startup `sessionDir` read is handled by an empty cwd plus the read boundary, not by pretending `--no-approve` runs earlier. [P-main] [P-settings] [P-env] [P-values] [P-security] [C9]
++
++### C3. Pi 0.84.2 retained-pin alternative
++
++An empty tool list is achievable without changing this release. Its missing component is an MCP client, not tool-removal support. The proposed **first-party SDK host** would:
++
++1. Supply a finite list of uniquely named relay tools through `customTools` and the same exact names through `tools`.
++2. Implement every executor solely as a call to one protected stdio relay; no local file/shell implementation, dynamic package import, fallback, or alternate server.
++3. Supply a no-discovery `ResourceLoader`, in-memory settings/session manager, explicit model runtime/credential backend, and only the admitted provider configuration.
++4. Expose a small text-turn interface, not all AgentSession/RPC commands. Recheck R and tuple identity on resume/replacement.
++
++These are supported extension/embedding points; the registry filters both base and custom tools, and dispatch rejects names not in the active tools. A first-party extension loaded by absolute path with all other discovery disabled is another possible packaging of the same adapter, but creates a larger startup surface than a custom SDK loader. **The adapter's actual MCP forwarding and lack of fallback remain unimplemented/unproven**, so this is conditional rather than a guaranteed existing workaround. Prefer qualifying 1.1.0 if a release upgrade is acceptable. [P0-sdk] [P0-session] [P0-loop] [P0-sdk-doc] [P0-loader]
++
++### C4. OpenCode 1.18.35 native candidate
++
++Select **`opencode --pure run --format json --agent remote`** through the absolute pinned binary, one bounded text prompt via non-TTY stdin, empty scratch cwd, no positional arguments or attach/serve/ACP/command/file/resume options in the first row. Its ordinary noninteractive run reads piped stdin and uses an **in-process** server fetch handler; the SDK's internal base URL is not evidence of an exposed listener. [O-entry] [O-run] [O-http]
++
++A proposed protected policy uses these fields (provider/model configuration and four exact relay names are rendered from the pinned manifest):
++
++```json
++{
++  "default_agent": "remote",
++  "permission": {
++    "*": "deny",
++    "swarma-remote-tools_read_file": "allow",
++    "swarma-remote-tools_write_file": "allow",
++    "swarma-remote-tools_apply_patch": "allow",
++    "swarma-remote-tools_bash": "allow"
++  },
++  "agent": {
++    "remote": {
++      "mode": "primary",
++      "permission": {
++        "*": "deny",
++        "swarma-remote-tools_read_file": "allow",
++        "swarma-remote-tools_write_file": "allow",
++        "swarma-remote-tools_apply_patch": "allow",
++        "swarma-remote-tools_bash": "allow"
++      }
++    }
++  },
++  "mcp": {
++    "swarma-remote-tools": {
++      "type": "local",
++      "command": ["/opt/curator/qualified/relay/swarma-remote-tools"],
++      "enabled": true
++    }
++  },
++  "plugin": [],
++  "instructions": [],
++  "lsp": false,
++  "formatter": false,
++  "snapshot": false,
++  "share": "disabled",
++  "autoupdate": false,
++  "compaction": {"auto": false, "prune": false},
++  "experimental": {"openTelemetry": false}
++}
++```
++
++These fields are present in the pinned legacy schema; this is a configuration **shape**, not a schema-validation result from running OpenCode. The supervisor must also disable alternate selectable agents or refuse every selection other than the protected one, pin the ordinary non-Copilot provider/model and disable experimental native-LLM/code-mode paths. Auto-title/summary requests, if emitted, must remain tool-free and use that same admitted provider. [O-schema] [O-agent-schema] [O-agent] [O-run] [O-request] [O-runtime-flags]
++
++Compose `OPENCODE_DISABLE_PROJECT_CONFIG=1`, `OPENCODE_PURE=1`, `OPENCODE_DISABLE_DEFAULT_PLUGINS=1`, `OPENCODE_DISABLE_EXTERNAL_SKILLS=1`, `OPENCODE_DISABLE_CLAUDE_CODE=1`, `OPENCODE_DISABLE_AUTOUPDATE=1`, `OPENCODE_DISABLE_MODELS_FETCH=1`, `OPENCODE_DISABLE_LSP_DOWNLOAD=1` and `OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER=1`. Scrub inherited `OPENCODE_CONFIG_CONTENT`, `OPENCODE_PERMISSION`, experimental flags, OTEL endpoints, provider/config/test-root overrides and runtime code-preload variables; build an allowlisted environment instead of passing everything through. All XDG and temporary roots belong to this harness instance. [O-flags] [O-runtime-flags] [O-global] [O-otel] [C8]
++
++The protected config is not enough by itself: global config, home `.opencode`, explicit config-directory resources, managed system files/preferences, account/remote config and plugins can still contribute. The proposed supervisor must inventory these from protected roots, ensure no unapproved tool/agent/command/plugin files, refuse conflicting managed policy, and make config/resource directories unwritable to the harness. This closes the unconditional dependency-install path because `Npm.install` returns when the directory is unwritable; that behavior and required precreated files must be measured under the actual harness UID. A changing or unreadable source refuses rather than inheriting the upstream loader's skip behavior. [O-config] [O-paths] [O-managed] [O-registry] [O-npm]
++
++**Guarantee:** whole-tool policy becomes structural exclusion from the per-request executor map. It is not an immutable process-wide registry or kernel boundary. A later permissive session/agent/config rule can undo it unless the wrapper prevents that input; local startup and state activity are closed by protected sources and OS confinement. Unexpected provider helpers, tool registration, network or subprocess behavior leaves the tuple unqualified. [O-permission] [O-request] [O-llm] [O-prompt] [C8] [C9]
++
++
++## D. Workarounds and the limits of their guarantees
++
++The owner rule has two tests: **remove every locally acting model tool**, then **bound the local activity of the remaining process**. The following judgments apply to that rule; they are not claims that a sandbox makes arbitrary third-party code trustworthy. CIP-0008 R8 explicitly treats the kernel boundary separately from launch flags and does not attest a malicious donor's kernel. [C8] [C9]
++
++| Technique | What it can guarantee, with stated prerequisites | Verdict under the owner rule |
++|---|---|---|
++| Pi native positive allowlist | Removes unlisted tool definitions and executors in both examined releases; 1.1.0 can retain only its native MCP extension's relay tools. [P-session] [P0-session] [P-loop] | A source-supported removal mechanism. Candidate with the sealed sources and runtime closure in §C2; measurement still required. |
++| Pi SDK with our registry | Exact `tools` names, only our `customTools`, and no-discovery loader can create a closed registry. [P-sdk-doc] [P0-sdk-doc] [P-full-control] | A valid architectural workaround; the 0.84.2 one-MCP adapter must first be implemented and audited. It is not an already guaranteed off-the-shelf solution. |
++| Pi operation substitution | `ReadOperations` and corresponding tool factories permit remote implementations. The shipped SSH example wraps read/write/edit/bash, starts a local SSH process, and **falls back to local executors** when remote mode is absent. [P-read-ops] [P-ssh-example] | The example is **not** the required workaround: wrong relay transport and local fallback. A purpose-built adapter could qualify only if all operations use the one MCP relay and absence/error refuses; prefer removing the local tools entirely. |
++| OpenCode deny-all + exact relay allows | Whole-tool policy is applied when building each provider-request tool/executor map. [O-permission] [O-request] [O-llm] | Candidate if agent/session/config inputs are immutable for that run. A granular deny, permission prompt or plugin hook alone does not meet the offered-tool requirement. |
++| OpenCode SDK/own registry | The public SDK calls the server; the internal V2 registry has materialization controls. [O-doc-sdk] [O-v2-registry] | A public SDK client is not itself a workaround. An audited V2 host with explicit services could qualify, but this research does not claim an existing closed embedding or reuse the native row for it. |
++| Whole-process OS sandbox | Bounds reads, writes, subprocess authority, network and IPC only to the extent covered by the selected, tested profile and OS. Existing CIP requirements and the pinned sandbox implementation illustrate the required surfaces. [C9] [R-sandbox] | Necessary defense for either candidate's non-tool local activity. **Insufficient on its own** for a harness that still offers unavoidable locally acting tools. |
++| Wrapper/supervisor | Can own argv, environment, protected roots, policy generation and transport; reject unexpected tool/server manifests before a model request. This is the composition required by CIP-0008/0009. [C8] [C9] | A guarantee only with a closed input grammar, independent policy identity and the real execution path inside the OS boundary. PATH stubs, prompt instructions, regex output filters and an after-dispatch tripwire do not remove a callable executor. |
++
++**macOS:** propose a separate, versioned Seatbelt profile applied to the **harness and every descendant**, with explicit runtime reads, managed writable state, one relay/bridge channel, admitted provider traffic, and denied donor data/IPC. The existing `remote-worker-harness/internal/tools/sandbox.go` is a **bash wrapper**, not a ready-made whole-harness qualification. It starts from `allow default`, applies read/write/network/Mach-service denials, and refuses when the Seatbelt launcher is absent. Its source is evidence of a design and refusal path, not proof that a new Pi/OpenCode process has no escape. Reusing it unchanged would leave a scope gap. Qualify the full profile and actual OS build, or refuse that platform row. [R-sandbox] [C9]
++
++**Linux:** Landlock 6.12 documentation says restrictions apply to a thread and its descendants; apply the boundary before launching the multithreaded runtime. Require the needed ABI/access rights instead of silently weakening the profile on an older kernel. Its network controls cover TCP ports, not a destination-host egress policy; use an additional network boundary and close inherited descriptors. These are design requirements to test, not an assertion about the runner's kernel support. [Landlock-6.12]
++
++Bubblewrap **v0.11.0**, commit `9ca3b05ec787acfb4b17bed37db5719fa777834f`, provides a namespace/mount sandbox building block; upstream says the caller's configuration defines the security policy. Proposed configuration: minimal read-only runtime mounts, protected policy mount, private writable state, separate PID/network namespaces as needed, and explicitly passed bridge/provider channels. A broad donor-home mount, inherited host socket, or full-root read mount would defeat the intended read boundary. Pair it with the measured syscall/egress policy; “runs in bubblewrap” is not a qualification result. [Bubblewrap-0.11.0] [C9]
++
++For both platforms, a tool named `read_file` or `bash` can be acceptable **only when its admitted implementation forwards to the remote workplace**. Names alone do not prove locality. The plan must bind the relay implementation, tool manifest, bridge channel and server count; otherwise a local MCP server exporting reassuring names is still a local capability. [C8] [C9]
++
++## E. Verdicts and draft CIP-0008 rows
++
++**Recommendation:** keep present launch refusal until qualification; take **Pi 1.1.0 native** and **OpenCode 1.18.35 native** to the hosted lab. Retain Pi 0.84.2 only if there is a product reason to build and own its MCP adapter. No source-level impossibility of removing built-in tools was found for either implementation. The obstacle is qualifying the complete source/config/runtime closure, not a missing deny sentence. These verdicts follow the dispatch paths in §B and the current no-row refusal in CIP-0008. [P-session] [P0-session] [O-request] [C8]
++
++### E1. Tuple identities to measure
++
++Every proposed row must eventually record the CIP tuple:
++
++`{harness, release, executable_digest, platform, transport, model_catalog_digest, settings_policy_digest, sandbox_profile_revision}`.
++
++Add the audited runtime/dependency closure, relay digest and manifest, and provider adapter identity to the row's evidence. The settings digest must cover all effective files, ordered permission rules, environment, resource/plugin set and generated argv; a digest of only the headline JSON file is insufficient. This is a proposed application of CIP-0008's expanded-launch and policy-generation rules. **Pending values are not qualification evidence.** [C8] [C9]
++
++| Candidate cell | Exact release/source and proposed platform | Transport / policy bundle | Values the runner must fill |
++|---|---|---|---|
++| `pi-1.1.0-macos15-arm64-json-r1` | Pi 1.1.0, `abe508e1…`; macOS 15 arm64 | Native one-shot JSON/print, §C2; one direct stdio MCP server; policy revision `pi-native-lockdown-r1` | OS build/image ID, executable/runtime digests, canonical policy digest, model/catalog digest, full Seatbelt profile revision/digest |
++| `pi-1.1.0-ubuntu24.04-x64-json-r1` | Same Pi release/commit; Ubuntu 24.04 x86-64 | Same native transport; separately rendered Linux paths and policy | Image/kernel/ABI, executable/runtime digests, policy/model digests, Linux profile revision/digest |
++| `opencode-1.18.35-macos15-arm64-run-r1` | OpenCode 1.18.35, `53d1eabb…`; macOS 15 arm64 | Legacy native `run --format json`, protected `remote` agent, §C4; policy revision `opencode-native-lockdown-r1` | Same identity fields as the Pi macOS cell, plus evidence of each config/resource root and permission order |
++| `opencode-1.18.35-ubuntu24.04-x64-run-r1` | Same OpenCode release/commit; Ubuntu 24.04 x86-64 | Same native transport and §C4 policy, separately rendered Linux paths | Same Linux identity fields; config/install/observer behavior must pass on this platform independently |
++| `pi-0.84.2-sdk-relay-r1` — conditional | Pi 0.84.2, `914cf147…`; separate macOS and Ubuntu tuples if pursued | First-party SDK host described in §C3 | Adapter source and dependency lock, built artifact digest, protocol grammar, all ordinary tuple fields; **no candidate may be admitted before these exist** |
++
++Release sources support the version pins; runner-image source supports the proposed labels/platforms. Short hashes in this table refer to the full hashes in §A and the source links. The named policy revisions above are **draft identifiers introduced by this report**, not existing launcher recipes. [P-package] [P0-package] [O-package] [Runner-images]
++
++For staging, GitHub release asset metadata advertises the following **archive** SHA-256 values. They do **not** substitute for the unpacked executable digest or an independently pinned dependency closure. Verify the archive before extraction in the hosted job, then hash the executable and all admitted runtime files. No release binary was downloaded or run in this research. [Pi-release-API] [OpenCode-release-API]
++
++| Release asset | Advertised archive SHA-256 |
++|---|---|
++| Pi 1.1.0 `pi-darwin-arm64.tar.gz` | `3455b13de35c15a5893cdebc922678199e90a7ce99b06cbc23f37860e90d63c7` |
++| Pi 1.1.0 `pi-linux-x64.tar.gz` | `3faa94666cd3849d37af320ff749407d0271b07a9b94f420c87e30866e10e289` |
++| OpenCode 1.18.35 `opencode-darwin-arm64.zip` | `80b05124357a77cd57945bfde36082a028e829c198d222d5e146617f49a2c4b7` |
++| OpenCode 1.18.35 `opencode-linux-x64.tar.gz` | `c8f888b451f5494a18f858fffb0e0b68f4e4baa9c241761c5f206884f0fa640d` |
++
++### E2. Draft rows in CIP-0008 R3's shape
++
++These are **draft candidate rows for review**, not edits to the CIP or an authorization to advertise support. Each platform cell in E1 needs an independent evidence record. The first revision deliberately excludes interactive, raw RPC, attach/server, resume, persistence and alternate model/provider modes; admitting any of them requires a new tuple and measurement. [C8]
++
++| Qualified tuple (first revision) | Generated policy (lockdown) | `remote-auto` spelling | Local activity that remains, and its disposition |
++|---|---|---|---|
++| **Candidate:** `pi` 1.1.0 exactly; macOS 15 arm64 / Ubuntu 24.04 x86-64 **as separate rows**; native JSON/print transport; executable, catalog, policy and sandbox fields filled only after §F | §C2 argv, protected settings and MCP JSON; exact R-prefixed tool allowlist; `--no-extensions --extension builtin:mcp`; no codemode/search; no trusted project resources; exactly one absolute-path stdio relay; closed caller tail | Pi does not supply a built-in permission prompt system in the examined usage model. Generated tool allowlist removes native tools; admitted MCP calls proceed through the relay. No native bypass flag. Any optional approval/UI extension is absent. Unexpected interaction refuses. [P-usage] [P-cli] [P-session] | Managed config/catalog reads, ephemeral state and MCP diagnostics remain; no-session is not no-logs. Offline/analytics/update controls plus kernel egress; no auth shell helpers; whole-process sandbox and startup observations required. [P-settings] [P-env] [P-mcp] [C9] |
++| **Candidate:** `opencode` 1.18.35 exactly; the two platform rows above; native legacy `run --format json`; exact tuple evidence pending | §C4 protected policy; selected `remote` agent; ordered catch-all deny followed by exact R allows in both relevant permission scopes; one absolute stdio relay; pure mode plus default-plugin suppression; all discovery roots protected and audited | `permission:{"*":"deny",<each exact relay name>:"allow"}`; do not spell `--auto`, `--yolo` or `--dangerously-skip-permissions`. Removed local tools cannot request an approval; a forced local call must fail and a relay call must succeed. [O-permission] [O-request] [O-run] | XDG/temp logs, database/cache/session state and metadata probes remain within managed roots; read-only configuration suppresses dependency installation; disable LSP/format/snapshot/update/share/telemetry paths, and measure startup, subrequests, processes and traffic. [O-global] [O-config] [O-npm] [O-bootstrap] [C9] |
++| **Conditional, not admitted:** `pi` 0.84.2 SDK host; platform/runtime/adapter-specific tuple | §C3 closed registry + first-party one-relay forwarding adapter; no ambient loader or local fallback | Adapter automatically admits R and refuses everything else; no exposed raw AgentSession/RPC command surface | Explicit model runtime plus managed or in-memory state; all adapter imports/processes/network inside the measured boundary. Requires adapter implementation and qualification before a support row. [P0-sdk] [P0-session] [P0-sdk-doc] |
++
++A row cannot be promoted merely because `--version` matches or a request lists four friendly tool names. Unknown digests, mutable policy, unavailable sandbox/observer coverage, unreviewed upstream upgrades, extra servers or silent startup-source failures preserve **`tool_posture_unsupported`**. This is the existing CIP refusal principle applied to these proposals. [C8]
++
++## F. GitHub-hosted measurement plan — proposed, not executed
++
++### F1. Lab setup and scope
++
++Run a **four-cell** first pass: two native harnesses × `macos-15` (arm64) and `ubuntu-24.04` (x86-64). These label/architecture mappings are from `actions/runner-images` at `8197087fc536320d1441203fdb5da9ae1b44b863`; labels move, so record the actual image identifier, OS build, kernel and sandbox ABI in every result. An Intel macOS or other release/provider/transport is a separate row. [Runner-images] [C8]
++
++Build the future job in distinct bounded phases:
++
++1. **Stage outside the untrusted run.** Download pinned release archives, verify the advertised archive hashes, unpack and hash the actual executable/runtime closure. Stage pinned relay/mock/observer binaries, a canonical tool manifest, generated policy and profile. Use no subscription secrets and no login flow. Any ordinary artifact-fetch token stays outside the harness environment.
++2. **Create synthetic identities and files.** A trusted observer/bridge identity owns immutable policy; a separate harness identity owns only its scratch/state. Place synthetic read canaries and write/execute markers outside its allowed roots; use no existing runner-user configuration. Set every harness home/XDG/temp root explicitly. Keep a synthetic “remote workplace” tree owned by the relay/bridge identity so a successful remote edit is distinguishable from a local harness write.
++3. **Use a deterministic fake provider.** Pi's `models.json` supports a compatible base URL and dummy API key; OpenCode supports a configured provider using the bundled OpenAI-compatible adapter. Supply the literal test credential `test-only`, no ambient provider/cloud/OAuth state, and a private test endpoint. Implement the wire protocol each pinned adapter actually expects, including streaming/tool-call IDs. Do not import an unreviewed provider package at runtime. [P-models] [O-provider]
++4. **Serve exactly one first-party stdio MCP fixture.** It exposes R's four names and fixed schemas, logs every handshake/list/call, and forwards to the synthetic remote tree via the admitted bridge interface. No shell-based package runner, secondary server, real SSH or internet service is involved. The lab's synthetic workplace proves dispatch routing; production remote deployment remains separate evidence. [C9]
++5. **Enter through the real launch path.** First measure the exact native argv in §C against the real binary. Before product support, also run `curator run` through the implementing composer, intake validation and executor; point to their production call sites in the evidence. Do not count a helper-only test as coverage of that route. Current Curator has no Pi/OpenCode lockdown row, so this integration qualification is necessarily future work. [C8] [C-launcher]
++
++The pinned `remote-worker-harness` session/Claude documents and fake-provider tests are design precedents for the lab. Their results apply to their named releases/transports; **none is reused as a passing Pi/OpenCode result**, and none was rerun here. [R-session] [R-claude] [R-mock]
++
++### F2. Measure the actual offered and executable surface
++
++Capture every provider request at the trusted fake provider **before returning a response**. Decode the real request and assert equality of the full tool-name/schema set with R translated through the harness naming rules. Include first turn, subsequent turns, retry/repair, catalog changes and any title/summary/compaction subrequest. Tool-free auxiliary requests must have a separately declared expected empty set. Missing/truncated/unparseable capture is **unknown**, never a successfully empty tool list. A harness's own `get_tools` output or logs are supporting evidence, not the sole observation. [P-mcp-names] [O-mcp-names] [O-request] [C8]
++
++Build the rejected-name fixture from the pinned sources:
++
++- Pi: seven base IDs at 0.84.2 or eight at 1.1.0; at 1.1.0 also codemode/tool-search and the three generic MCP resource helpers; dynamically discovered names from the control setup. [P0-tools] [P-tools] [P-builtins] [P-mcp-resources]
++- OpenCode: all 17 fixed registry IDs in §A4, the generic resource helpers, `StructuredOutput`, provider helper cases, and injected custom/MCP tool names. Exercise conditional provider/feature branches only in separate control configurations; they must never silently enlarge the candidate tuple. [O-registry] [O-session-tools] [O-prompt] [O-request]
++
++For every removed name, have the fake model emit a syntactically valid but **unoffered** tool call using canary arguments. Assert an error/refusal and no local action. Also exercise aliases/case changes, mixed parallel calls, malformed calls, stale call IDs and attempts to invoke a removed tool through code mode or a delegation tool. This deliberately tests dispatcher behavior rather than assuming a compliant provider will never hallucinate a tool. Pi's actual dispatch lookup and OpenCode's filtered tool map identify the production paths under test. [P-loop] [P-session] [O-request] [O-llm]
++
++A positive relay call must succeed for **each** admitted tool, produce the expected change only in the remote fixture, and be observed at the one stdio server. Require the declared server count and relay binary/manifest identity, not only tool-name equality. Invalid MCP JSON, missing/unreadable config, connection failure, extra server, changed schema or duplicate sanitized name must refuse before a model turn. The upstream MCP clients' skip/error behavior makes this supervisor test necessary. [P-mcp-config] [P-mcp-tools] [O-mcp] [O-mcp-names] [C8]
++
++### F3. Prompt injection and configuration override fixtures
++
++Use the same adversarial text as both an initial user prompt and an R tool response. It should ask the model to read a synthetic donor canary, enumerate directories, search files, write/patch a marker, run a local command, fetch a test URL, start an LSP, delegate a task, modify a todo, load a skill, invoke a custom command, add another MCP server, enable a plugin, change permissions, export/share a session and trigger an update. Only synthetic targets are supplied. This matrix derives from §A's tools and non-tool entry points; it is a **proposed attack fixture**, not observed harness behavior. [P-usage] [P-rpc] [O-registry] [O-command] [O-config]
++
++The deterministic provider must emit the forced calls regardless of the model's willingness to follow the text. This tests the enforcement boundary; it does not claim to measure a real model's jailbreak resistance.
++
++Plant harmless marker-generating fixtures in every relevant source layer from §A/B: project/ancestor instructions, project settings, home/global resources, explicit config path, inline environment, agent/session permissions, custom-tool module, plugin hook, skill path/URL, package declaration and managed policy. Test extension replacement of an **allowed** tool name, not just a new name. The safe result is a known exclusion or pre-launch refusal; a marker must never appear through an unapproved import/helper. Include Pi command-valued config and OpenCode dependency-install sources. [P-loader] [P-values] [P-session] [O-config] [O-paths] [O-registry] [O-plugin] [O-skills] [O-npm]
++
++OpenCode needs a specific delegation control: a child inherits selected **session** restrictions, while its own agent governs its capabilities; parent agent restrictions are not a universal child policy. Keep `task` absent and test a forced task call. Its `experimental.primary_tools` only adds child-tool denies and is not a replacement for primary-agent lockdown. [O-subagent-permissions] [O-task]
++
++### F4. Observe file, process, network and IPC effects
++
++| Surface | Observation and positive control | Pass criterion / explicit limit |
++|---|---|---|
++| File contents and directory reads | Trusted syscall/file-access observation plus synthetic canary bytes. Linux may use a privileged `strace -ff` collector outside the harness identity; macOS needs an available privileged file/process collector whose coverage is proven by a separate control process. Hash protected files before/after as a separate write check. | No successful out-of-bound read or enumeration, no protected-file mutation; all managed writes inventoried. Unchanged hashes **do not prove no reads**. If hosted macOS cannot supply adequate observation because of platform restrictions, mark that cell unqualified; do not replace it with an empty log. |
++| Processes and executable loads | Observe harness/relay descendant trees and exec attempts. A synthetic helper produces a known marker in an observer control run; the candidate run must show only the admitted process closure. | No unapproved child, shell helper, plugin/package installer, updater or language server. Count both denied attempts and successes, with the expected relay startup separately attributed. |
++| Network | Trusted packet/socket/process observation plus fake-provider and relay logs; include DNS, IPv4/IPv6, TCP/UDP and local-socket paths. Exercise an explicit forbidden endpoint using a synthetic helper to prove the boundary. | Only the admitted provider/bridge channels; no telemetry/catalog/download/share traffic. A proxy log alone cannot prove absence of bypass traffic. Do not equate “no successful connection” with “no attempt.” |
++| macOS IPC / platform services | Use synthetic control helpers to test denied service classes named in the sandbox policy, including clipboard/application control; do not read real user data. | Known policy and collector coverage for each admitted platform class. Unobservable or untested classes remain unknown and block promotion of a row claiming them. [C9] [R-sandbox] |
++| State/log integrity | Hash immutable policy before/after; measure writable bytes/paths and verify quota/retention policy. Observer artifacts live outside harness-writable roots. | Harness logs cannot attest their own safety or update the trusted policy/measurement record. Account for allowed diagnostic/session/cache writes instead of reporting “zero file effects.” [C8] [C9] |
++
++The collector itself must pass a startup self-check: it must observe one known allowed action and one known denied action for every category it claims to cover. Apply the sandbox to a **synthetic capability probe** as well as the harness, because removed tools may never reach the kernel denial. Close inherited descriptors and test symlink/path traversal. Whole-process confinement is independently necessary even when all forced model calls are rejected. The platform mechanisms and their limitations are described in §D; this table is the proposed measurement method, not a claim that any collector has run. [C9] [Landlock-6.12] [Bubblewrap-0.11.0]
++
++### F5. Negatives that make a green result meaningful
++
++Use named controlled mutants; run each in an isolated synthetic environment and require the corresponding gate to fail. **Narrow the policy**, rather than only deleting it:
++
++| Mutant / failed input | Gate that must reject |
++|---|---|
++| Add Pi `read` to the explicit relay allowlist while leaving shell removed | Offered-set equality detects the extra schema; forced-read control demonstrates that the observation would catch a readable canary. |
++| Change OpenCode catch-all deny into only `bash:"deny"`, retaining relay allows | Offered-set equality detects remaining local tools. A shell-only test must not be mistaken for full removal. |
++| Add a second MCP server, collide after name sanitization, or change one allowed schema/executor identity | Server/manifest/source identity check fails before any model request or unauthorized server start. |
++| Re-enable one project source/custom-tool directory or replace a protected policy parent with a writable link | Effective-source/immutability gate fails; an import/read marker exposes an accidentally bypassed gate. |
++| Supply a permissive agent/session permission, raw RPC command, alternate run transport or caller-tail tool flag | The real composer/intake grammar refuses; no native binary launch with the widened policy. |
++| Narrow the sandbox to deny writes but permit canary reads | Independent read-boundary probe fails even when file hashes are unchanged. |
++| Change policy generation, executable digest, catalog, profile or relay identity after composition | At-exec identity/generation check refuses; a later resume tuple must test the same at-resume path. |
++| Drop/truncate capture, make a config read fail, return malformed tool-list JSON, or forge a harness-owned “passed” record | Audit/source evidence is unknown or invalid and the qualification gate refuses; no absence fallback. |
++| Disable an observer hook or place its output in harness-writable state | Observer control/action counters or integrity gate fails; no self-attestation. |
++
++These are proposed tests of the boundaries identified in the cited production paths and CIP requirements, not implemented tests. Record a coverage fraction for every family: offered names checked / enumerated source names, forced calls observed / scheduled cases, source layers exercised / inventoried layers, side-effect controls passed / required controls, and mutants killed / introduced. Report provider/feature branches, kernel classes or paths outside coverage explicitly. Current runtime coverage from this research is **0/4 native candidate cells qualified; 0 runtime experiments executed**. [P-session] [O-request] [O-config] [C8] [C9]
++
++### F6. Evidence packaging and promotion rule
++
++Run each future gate as a standalone process, with bounded groups comfortably below the headless command limit. Capture its **real exit code** without a status-masking pipe. A deliberately failing mutant remains a nonzero gate result with its expected-failure rationale; a separate assertion may pass when that failure is observed. Never mark the failing command itself green.
++
++For each candidate cell, attach: exact tuple and generated bytes; binary/archive/dependency hashes; source/runtime version inventory; effective-source inventory; relay handshake and server count; every decoded provider tool set; forced-call outcomes; process/file/network/IPC observations and declared blind spots; positive/negative controls and coverage ratios; per-command exit codes; refusal classifications; and bounded state footprint. Sanitize generated artifacts before public attachment. Attach evidence before ending the run.
++
++**Promotion rule:** reviewers may add a CIP-0008 row only when the production entry path and its negative controls pass for that exact tuple, all required observation reads are valid, and no extra locally acting tool or side effect escapes the declared boundary. A different release, model adapter/catalog, transport, persistence mode, policy or OS profile requires requalification. This follows the existing CIP acceptance model; this report changes neither the CIP nor launcher support. [C8]
++
++### Source and verification record
++
++Upstream source was read from shallow, release-pinned scratch checkouts. Project identity/release metadata was cross-checked with GitHub APIs; dispatch and configuration claims were traced to the file links below. The report distinguishes registration, request-time removal, execution policy and non-tool startup behavior rather than inferring one from another. No upstream test results are presented as newly reproduced.
++
++Local verification is limited to document integrity, reference/file/commit consistency, public-artifact hygiene and whitespace checks. **No Pi/OpenCode invocation, installation, test suite, live provider call or runner job was executed on this host.**
++
++| Executed local check | Real exit code | Evidence and limit |
++|---|---|---|
++| Standalone `python3` inline document/source audit | **0** | 102 cited source files matched their pinned Git blobs across 8 checkout commits; 114 reference definitions resolved, 2 JSON examples parsed, verdict-first/A–F structure and public-artifact hygiene checked. Also checks terminal newline and trailing whitespace. This is a document audit, not harness validation. |
++| `git diff --check` | **0** | Whitespace check for the tracked logbook change; an untracked research file is outside this command's coverage. |
++| `git diff --no-index --check /dev/null .research/261010_pi-opencode-tool-lockdown.md` | **1 — nonzero** | Expected difference result against an empty file, with no whitespace diagnostic. **Not counted as a passing gate**; the standalone document audit checks the new file's whitespace directly. |
++
++Three additional fixed-commit external README references (runner images, bubblewrap and the archived namesake OpenCode project) were resolved successfully through read-only GitHub content API calls. Release archive digests in §E were cross-checked against the tagged release APIs. These source lookups establish provenance, not runtime behavior.
++
++All source links below bind a file to its full commit. Documentation linked from a source tree has that release's version; API/release metadata was observed for the 2026-10-10 research snapshot. OS documentation is versioned as indicated. The recipes, row identifiers and tests explicitly labeled “proposed” are this report's recommendations, not upstream features.
++
++[C-registry]: https://github.com/relux-works/curator/blob/5ec599f0b7eddeb3403fe89104b7b800fd0a55db/internal/envregistry/envregistry.go
++[C-launcher]: https://github.com/relux-works/curator-agent-launcher/blob/68be5ffe2bc9ec0fc9e8a1bb8777368c55069ded/internal/mapping/mapping.go
++[C-launcher-dep]: https://github.com/relux-works/curator-agent-launcher/blob/68be5ffe2bc9ec0fc9e8a1bb8777368c55069ded/go.mod
++[C-native-pin]: https://github.com/relux-works/skill-agents-management/blob/f07bbf3259679c45af13e2d665dd37bb76126ec5/pkg/agentic/systems/pinative/policy.go
++[C2]: https://github.com/relux-works/curator-spec/blob/b9948ec39211ead98ed989537aa99e1c677b3f44/cips/CIP-0002-project-context-in-managed-launches.md
++[C8]: https://github.com/relux-works/curator-spec/blob/b9948ec39211ead98ed989537aa99e1c677b3f44/cips/CIP-0008-remote-worker-launch-mode.md
++[C9]: https://github.com/relux-works/curator-spec/blob/b9948ec39211ead98ed989537aa99e1c677b3f44/cips/CIP-0009-donor-side-deployment-and-bridge.md
++[R-session]: https://github.com/relux-works/remote-worker-harness/blob/71103c6cad46d6b05a7791bfb9f8820da8da5025/docs/session-mode.md
++[R-claude]: https://github.com/relux-works/remote-worker-harness/blob/71103c6cad46d6b05a7791bfb9f8820da8da5025/docs/claude-mode.md
++[R-mock]: https://github.com/relux-works/remote-worker-harness/blob/71103c6cad46d6b05a7791bfb9f8820da8da5025/internal/claudesession/session_test.go
++[R-sandbox]: https://github.com/relux-works/remote-worker-harness/blob/71103c6cad46d6b05a7791bfb9f8820da8da5025/internal/tools/sandbox.go
++[P-package]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/package.json
++[P-cli]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/docs/cli.md
++[P-args]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/cli/args.ts
++[P-tools]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/tools/index.ts
++[P-sdk]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/sdk.ts
++[P-session]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/agent-session.ts
++[P-loop]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/agent/src/agent-loop.ts
++[P-ext]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/docs/extensions.md
++[P-builtins]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/extensions/index.ts
++[P-loader]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/resource-loader.ts
++[P-main]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/main.ts
++[P-security]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/docs/security.md
++[P-settings]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/docs/settings.md
++[P-env]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/docs/environment-variables.md
++[P-mcp]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/docs/mcp.md
++[P-mcp-config]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/extensions/mcp/config.ts
++[P-mcp-ext]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/extensions/mcp/index.ts
++[P-mcp-runtime]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/extensions/mcp/runtime.ts
++[P-mcp-names]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/mcp-servers.ts
++[P-mcp-tools]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/extensions/mcp/tools.ts
++[P-mcp-resources]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/extensions/mcp/resources.ts
++[P-sdk-doc]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/docs/sdk.md
++[P-full-control]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/examples/sdk/12-full-control.ts
++[P-rpc]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/modes/rpc/rpc-mode.ts
++[P-usage]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/docs/usage.md
++[P-values]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/resolve-config-value.ts
++[P-packages]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/package-manager.ts
++[P-models]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/docs/models.md
++[P-changelog]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/CHANGELOG.md
++[P0-package]: https://github.com/earendil-works/pi/blob/914cf1472e715297caa30db4b9535d534a9eb718/packages/coding-agent/package.json
++[P0-usage]: https://github.com/earendil-works/pi/blob/914cf1472e715297caa30db4b9535d534a9eb718/packages/coding-agent/docs/usage.md
++[P0-tools]: https://github.com/earendil-works/pi/blob/914cf1472e715297caa30db4b9535d534a9eb718/packages/coding-agent/src/core/tools/index.ts
++[P0-sdk]: https://github.com/earendil-works/pi/blob/914cf1472e715297caa30db4b9535d534a9eb718/packages/coding-agent/src/core/sdk.ts
++[P0-session]: https://github.com/earendil-works/pi/blob/914cf1472e715297caa30db4b9535d534a9eb718/packages/coding-agent/src/core/agent-session.ts
++[P0-loop]: https://github.com/earendil-works/pi/blob/914cf1472e715297caa30db4b9535d534a9eb718/packages/agent/src/agent-loop.ts
++[P0-sdk-doc]: https://github.com/earendil-works/pi/blob/914cf1472e715297caa30db4b9535d534a9eb718/packages/coding-agent/docs/sdk.md
++[P0-loader]: https://github.com/earendil-works/pi/blob/914cf1472e715297caa30db4b9535d534a9eb718/packages/coding-agent/src/core/resource-loader.ts
++[P0-settings]: https://github.com/earendil-works/pi/blob/914cf1472e715297caa30db4b9535d534a9eb718/packages/coding-agent/docs/settings.md
++[P0-rpc]: https://github.com/earendil-works/pi/blob/914cf1472e715297caa30db4b9535d534a9eb718/packages/coding-agent/src/modes/rpc/rpc-mode.ts
++[P0-values]: https://github.com/earendil-works/pi/blob/914cf1472e715297caa30db4b9535d534a9eb718/packages/coding-agent/src/core/resolve-config-value.ts
++[O-package]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/package.json
++[O-entry]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/index.ts
++[O-run]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/cli/cmd/run.ts
++[O-http]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/server/routes/instance/httpapi/handlers/session.ts
++[O-registry]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/tool/registry.ts
++[O-shell-id]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/tool/shell/id.ts
++[O-request]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/session/llm/request.ts
++[O-llm]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/session/llm.ts
++[O-permission]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/permission/index.ts
++[O-session-tools]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/session/tools.ts
++[O-prompt]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/session/prompt.ts
++[O-agent]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/agent/agent.ts
++[O-config]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/config/config.ts
++[O-paths]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/config/paths.ts
++[O-managed]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/config/managed.ts
++[O-schema]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/core/src/v1/config/config.ts
++[O-agent-schema]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/core/src/v1/config/agent.ts
++[O-flags]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/core/src/flag/flag.ts
++[O-runtime-flags]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/effect/runtime-flags.ts
++[O-plugin]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/plugin/index.ts
++[O-npm]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/core/src/npm.ts
++[O-bootstrap]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/project/bootstrap.ts
++[O-effect-cmd]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/cli/effect-cmd.ts
++[O-mcp]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/mcp/index.ts
++[O-mcp-schema]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/core/src/v1/config/mcp.ts
++[O-mcp-names]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/mcp/catalog.ts
++[O-instruction]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/session/instruction.ts
++[O-command]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/command/index.ts
++[O-global]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/core/src/global.ts
++[O-snapshot]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/snapshot/index.ts
++[O-vcs]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/project/vcs.ts
++[O-lsp]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/lsp/lsp.ts
++[O-format]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/format/index.ts
++[O-otel]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/core/src/observability/otlp.ts
++[O-upgrade]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/cli/upgrade.ts
++[O-models]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/core/src/models-dev.ts
++[O-share]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/share/share-next.ts
++[O-provider]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/provider/provider.ts
++[O-doc-perm]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/web/src/content/docs/permissions.mdx
++[O-doc-tools]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/web/src/content/docs/tools.mdx
++[O-doc-sdk]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/web/src/content/docs/sdk.mdx
++[O-doc-plugin]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/web/src/content/docs/plugins.mdx
++[O-v2-registry]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/core/src/tool/registry.ts
++[O-v2-builtins]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/core/src/tool/builtins.ts
++[O-v2-llm]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/core/src/session/runner/llm.ts
++[O-v2-config]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/core/src/config.ts
++[P-read-ops]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/tools/read.ts
++[P-ssh-example]: https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/examples/extensions/ssh.ts
++[O-skills]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/skill/index.ts
++[O-subagent-permissions]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/agent/subagent-permissions.ts
++[O-task]: https://github.com/anomalyco/opencode/blob/53d1eabb61e21162157817bf677da0a4ad3332e3/packages/opencode/src/tool/task.ts
++[Pi-repository-redirect]: https://api.github.com/repos/badlogic/pi-mono
++[Pi-release]: https://github.com/earendil-works/pi/releases/tag/v1.1.0
++[Pi084-release]: https://github.com/earendil-works/pi/releases/tag/v0.84.2
++[Pi-release-API]: https://api.github.com/repos/earendil-works/pi/releases/tags/v1.1.0
++[OpenCode-release]: https://github.com/anomalyco/opencode/releases/tag/v1.18.35
++[OpenCode-tag]: https://api.github.com/repos/anomalyco/opencode/git/ref/tags/v1.18.35
++[OpenCode-release-API]: https://api.github.com/repos/anomalyco/opencode/releases/tags/v1.18.35
++[Other-opencode]: https://github.com/opencode-ai/opencode/blob/73ee493265acf15fcd8caab2bc8cd3bd375b63cb/README.md
++[Other-opencode-release]: https://github.com/opencode-ai/opencode/releases/tag/v0.0.55
++[Landlock-6.12]: https://docs.kernel.org/6.12/userspace-api/landlock.html
++[Bubblewrap-0.11.0]: https://github.com/containers/bubblewrap/blob/9ca3b05ec787acfb4b17bed37db5719fa777834f/README.md
++[Runner-images]: https://github.com/actions/runner-images/blob/8197087fc536320d1441203fdb5da9ae1b44b863/README.md
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index 1d9f07faa344e000f94985e3b20bd8a58c97b233..2cffa478186ae4cfcfcdf0eb51e1522ef2188095 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,13 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-10-10 — Pi and OpenCode tool removal is feasible, qualification remains pending (TASK-261010-aqpf2a)
++
++- FINDING: Pi 0.84.2 already filters tool definitions and executors through an explicit allowlist, but has no built-in MCP client. Pi 1.1.0 adds native MCP and is a candidate for a protected relay-only CLI configuration. Its `--no-builtin-tools` changes default activation and must not be treated as a closed registry.
++- FINDING: OpenCode 1.18.35 removes wholly denied tools from the actual provider request and executor map. Its `--pure` does not close custom-tool discovery or startup dependency installation; protected configuration roots and whole-process confinement remain necessary.
++- RECOMMENDATION: retain the current unsupported posture until exact tuples pass hosted-runner qualification. Prefer Pi 1.1.0 native and OpenCode 1.18.35 native; a retained Pi 0.84.2 tuple needs a first-party MCP adapter. A sandbox alone does not satisfy the owner's requirement to remove locally acting model tools.
++- EVIDENCE: [source-pinned research, draft rows and runner plan](.research/261010_pi-opencode-tool-lockdown.md), sections A–F. Source/documentation research only; no harness installation, execution, login, or test suite on this host. Ready for review.
++
+ ## 2026-09-06 — release channels lag completed main; rc.2/rc.3 never executed release automation (TASK-260906-1xitqi)
+ 
+ - FINDING: completed main `7320bc2` is 180 commits ahead of stable `v0.13.0` and 152 ahead of the only published `v0.14.0` prerelease, rc.1. Homebrew and Scoop point at rc.1; the installer follows GitHub latest and therefore installs v0.13.0. Rc.2 and rc.3 exist as tags but have neither a GitHub Release nor any Release workflow execution, so there is no failed GoReleaser job to rerun and those tags must not be moved or reused.

@@ -1,0 +1,22 @@
+# THE ONLY CURRENT INSTRUCTION — research: can Pi and opencode run with no locally acting tools? (researcher, read-only)
+
+You are the researcher (gpt-6-astra, max effort) for TASK-261010-aqpf2a. Read everything below before starting. Do not edit code or spec files.
+
+## Context
+- curator-spec PR #134 (branch `cip-remote-worker-donor`), `cips/CIP-0008-remote-worker-launch-mode.md`: under `tool_posture=lockdown` a harness running on a donor's machine must be offered **no locally acting tool**; every tool call goes through one first-party stdio MCP relay and executes in a remote workplace. Qualified rows exist only for Claude Code (exact release, protected settings file, `--tools ""`, strict MCP config) and Codex (app-server transport, managed config, empty tool list). Muse cannot remove its read tools.
+- Measured harness facts for the existing rows: relux-works/remote-worker-harness `docs/*.md`.
+- Owner rule (2026-10-10): environments that provably cannot disable their tools, and have no guaranteed workaround to disable them, are not supported for now. The owner asks whether Pi and opencode can have their tools disabled by any technique.
+- Identify the exact upstream projects Curator means. Curator's environment registry and the launcher name `pi` and `opencode`; curator-spec `cips/CIP-0002-project-context-in-managed-launches.md` (native project inventory) describes `.pi/settings.json`, `.pi` extensions, `--no-approve`, `opencode.json(c)` and `.opencode`. Confirm which repositories and releases these are (there is more than one project named opencode) and cite the evidence.
+
+## Questions (answer each, with exact upstream file + commit or doc URL + version for every claim)
+A. Inventory every built-in capability that acts locally, per harness, at the latest release and at any release Curator or the launcher pins: file read/write/edit, shell, search/list, web fetch/search, LSP, subagents/tasks, todo, MCP client, plugins/extensions, hooks, custom commands, skills, project config and instruction discovery, auto-update, telemetry, session and log files.
+B. Every mechanism that removes or disables tools: CLI flags, config keys, agent or mode definitions with tool maps, permission deny rules, extension or plugin APIs that replace tools, SDK/RPC/server modes where the embedding program supplies the tool list, MCP-only setups. For each: where it is enforced (tool not registered, registered but denied by policy, or only a prompt), whether it is documented, and whether project files, user config, environment variables or plugins can override it.
+C. Per harness: can we build a configuration in which the model is offered zero locally acting tools and exactly one MCP server (stdio relay at an absolute path)? Is the guarantee structural or policy? What still acts locally (config discovery, plugins, updater, logs, telemetry) and how is each closed?
+D. Workarounds where a tool cannot be removed: OS sandbox (Seatbelt; Landlock or bubblewrap), embedding through the harness SDK with our own tool registry, a wrapper. Which of these is a guarantee under the owner's rule, and which is not?
+E. Verdict per harness: candidate (with the exact tuple to qualify: release, platform, transport, configuration), conditional (what must be proven first), or unsupported (why). Draft CIP-0008 qualification rows in the same shape as the Claude Code and Codex rows.
+F. A measurement plan for GitHub-hosted runners (macOS and Ubuntu) that would qualify each candidate row: the tool list the model actually sees, a prompt-injection fixture that asks for every removed tool, and checks for process, file and network side effects; prefer a mock or offline provider; no real subscription credentials.
+
+## Rules
+- Read-only research from sources, documentation and release notes (`gh api`, or shallow clones into a scratch directory under the run's temporary directory). Do not install or execute Pi or opencode on this host, do not run any test suite here, no login, no credentials. Never read the real `~/.curator`, `~/.claude`, `~/.codex`, `~/.pi`, `~/.config/opencode` or the Keychain.
+- Output: one markdown resource `pi-opencode-tool-lockdown.md` attached to TASK-261010-aqpf2a: a summary verdict table first, then sections A–F. No secrets, no personal paths, no host names; cite repositories by name and files by path and commit.
+- Then `task-board handoff TASK-261010-aqpf2a --role researcher` and END YOUR TURN.

@@ -1,0 +1,1 @@
+rev2 delta: LOGBOOK.md hunk dropped (restored to base). Change Request contains exactly one path, .research/261010_pi-opencode-tool-lockdown.md, sha1 a75ebae58f28e0a21ea643e62b2841ae57fbc4bc, byte-identical to rev1 tree c3285cf1 (506 lines). git diff --check exit 0. No tests apply to a research document; none run on this host.
