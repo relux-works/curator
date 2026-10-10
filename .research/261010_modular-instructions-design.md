@@ -1,0 +1,242 @@
+# Modular instruction chapters: preliminary design
+
+Task: **TASK-261010-2uqd3t — research-modular-agents-md**. Research date: 2026-10-10. Decision input for [Curator issue #114][issue]. This document proposes a design; it does not change a schema, implement an adapter, or certify a launch boundary.
+
+**Recommendation:** extend the existing context-package materializer with a derived, project-specific chapter plan. Keep authoring sources outside the checkout, snapshot approved repository imports, and render environment-specific outputs into manager-owned storage. Preserve native repository discovery only as an explicitly identified legacy compatibility mode. An admitted launch must exclude unapproved native sources; producing a managed `AGENTS.md` alone cannot establish that property. This follows the issue's chapter model and the operator's admission requirement, while reusing the existing deterministic renderer. [issue] [C-render] [S-cip]
+
+Research bounds: one study and one task-scoped outcome, no archives; a 60-minute working budget and a 60 KiB artifact ceiling; no second research prerequisite proposed. `grammar_frozen: not applicable`: this is a preliminary decision document, not a wire-format specification. The consuming first implementation slice is described in §7. Source inspection covers all five environments; **0/5 harnesses were executed**, and no tests or builds ran. Existing probe reports are identified as historical evidence, not reruns or new qualification. [E-prior]
+
+## 1. Baseline and composition today
+
+The implementation baseline is `relux-works/curator` commit **`aec9e800db12669871e0815f9952228202fe3a4f`**. Its CI specification pin is curator-spec **`43bf0a2506d5c354a73bbc3ea4623d4653db10c7`**, tag `v1.0.0-rc.14`. The forward-looking CIP is read separately at PR #136 commit **`2f0531b4edcc99c6118c277deb00e8736392c04d`**; its status is Draft. PR #136 was open when read. Consequently the operator input is design direction, not an already released protocol feature. [C-ci] [S-env] [S-cip] [S-pr]
+
+Curator records **verified releases**, rather than installing or enforcing exact harness versions through this registry. The records are Claude Code **2.1.261**, Codex **0.153.2**, Pi **0.84.2**, Muse **1.4.1-R4503.1**; OpenCode's verified-release field is empty. Unknown releases can produce an unverified-version warning. “Pinned” below means this recorded evidence baseline. [C-reg] [C-managed]
+
+### Inputs, identity and order
+
+| Current mechanism | What the inspected code establishes |
+|---|---|
+| Context package | `agent-context.json` defines package name/version, weight, requirements and ordered modules. A module has a path, environment selector and `root` or `system` class. There is no chapter-specific stable ID or path-applicability predicate in this module structure. [C-package] |
+| Immutable inputs | Lock members use a Git commit or a state hash. Context-store entries are keyed by kind/name/pin. Machine path overlays are snapshotted; Git overlays resolve a requirement to a commit. [C-lock] [C-store] [C-overlays] |
+| Machine composition | `profile compose <profile> add/remove` edits the machine's overlay declarations. It does not update the lock immediately: a profile update does that. These overlays affect the profile, not a separate project/profile composite. [C-compose] [S-cip] |
+| Effective weights | The precedence chain is manifest weight → agreeing direct-requirer edge weights → root weights → machine-overlay weight. Default overlay weight is 1000. Version requirements resolve jointly; chapter weights do not settle version conflicts. [S-env] |
+| Emitted order | The renderer computes dependency-first, name-tiebroken topological order, then stable-sorts by effective weight. Defaults are higher weight wins, winner last; both primitives are configurable. Equal weights retain topological order. Modules within a chapter retain manifest order. This is textual ordering, not enforcement of an instruction's meaning. [C-render] |
+| Skills | Skill requirements are separate lock members and are exposed through the skill surface. `EmittedOrder` selects context members, so installing a skill does not automatically concatenate its `SKILL.md` into root instructions. [C-lock] [C-render] [C-managed] |
+
+Monolithic output contains a generation header, package chapter headings and applicable root-module bytes. The header identifies the lock, pins, weights and precedence. A root with no context declaration produces **no root-context surface**, even if another package could supply modules; a declared context with zero applicable modules has a header-only output. The proposed project layer must deliberately handle a profile with no root context rather than accidentally losing the project's chapters at this existing early return. [C-render]
+
+### Current materialization per environment
+
+All `<home>` paths in this document are schematic managed-home paths, not workstation locations.
+
+| Environment | Current root output and dialect | Other channels and limits |
+|---|---|---|
+| Claude Code | `<home>/CLAUDE.md`; monolithic Markdown by default, or a referenced file using native `@` imports into `.agent-context/modules/<package>/<module>`. The root is a copied regular file. [C-ref] [C-managed] | Separate system-prompt append/replace file flags; these are not root-context aliases. [C-reg] |
+| Codex | `<home>/AGENTS.md`; monolithic only, backed by the rendered store document. [C-reg] [C-managed] | `model_instructions_file` is the separate replacement system-prompt channel. Do not move ordinary chapters there implicitly. [C-reg] |
+| OpenCode | `<xdg-parent>/opencode/AGENTS.md`; monolithic or a header-only root plus an ordered `instructions` array in manager-authored `opencode.json`. [C-ref] [C-reg] | Existing unmanaged `opencode.json` causes the referenced form to fall back to monolithic with a warning. The registry has no verified release or system-prompt channel. [C-managed] [C-reg] |
+| Pi | `<home>/AGENTS.md`; monolithic only. [C-reg] | Separate append flag and optional `APPEND_SYSTEM.md`/`SYSTEM.md` outputs; active system files are machine-selected, off by default. [C-managed] [C-config] |
+| Muse | **No admitted root target or form.** Four XDG roots are configured, but this does not authorize emitting `AGENTS.md` anywhere. [C-reg] [S-env] | No admitted system-prompt channel. Foreign personal instruction sources remain an acknowledged isolation gap. [S-env] |
+
+Today the home key is profile × environment, without a project dimension. Resolve checks the recorded surfaces and emits a fragment when current; stale materialization requires repair. Thus “assembled at launch” should mean ensuring the selected generation is materialized and verified before launch, not re-resolving moving sources or rewriting live files on every invocation. [C-managed]
+
+## 2. Native instruction discovery: what remains outside that output
+
+The following separates exact-release source evidence from rolling documentation. A home redirect does not by itself redirect discovery rooted at the working directory. The current CIP inventory is the starting point, with corrections and limits below. [C-reg] [S-cip]
+
+### Claude Code — 2.1.261 baseline
+
+Vendor documentation describes user and managed-policy instructions, plus ancestor/current `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md`; local instructions follow the main file. [V-claude-memory] Descendant instructions load when relevant files are accessed; rules under `.claude/rules/` may carry `paths` conditions. Directory layers accumulate rather than replacing the whole instruction set. [V-claude-large] `@` imports expand referenced files, including recursive imports. [V-claude-memory]
+
+The version boundary matters: native `AGENTS.md` support starts at **2.1.277**, after the recorded release. It cannot be assumed at 2.1.261; an explicit `CLAUDE.md` import is the documented older alternative. The same documentation describes `claudeMdExcludes`; the release-pinned changelog confirms its symlink exclusion correction in 2.1.239 and the project-rule settings-source correction in 2.1.211. Both precede 2.1.261. This establishes available controls, not a tested all-source suppression recipe. [V-claude-memory] [V-claude-release]
+
+**Bound:** current detailed memory documentation is not an archived 2.1.261 implementation. This study checked the release changelog and version annotations, and uses prior specification evidence for the managed root/import form. It did not inspect or execute that closed-source binary. No blanket exclusion guarantee is claimed for lazy reads, imports, memory, plugins or settings. [V-claude-release] [S-env]
+
+### Codex — 0.153.2 source
+
+The exact tag peels to **`657a993cbee87acf52d14b758ce49dbd46d1b8eb`**. Its home provider chooses nonempty `AGENTS.override.md` before `AGENTS.md`, independently of project discovery. The project loader walks the configured project-root boundary to CWD; default root marker is `.git`, and without a root it checks CWD only. Per directory it selects `AGENTS.override.md`, then `AGENTS.md`, then configured fallback names. It reads ordinary bytes, without an `@` import expander. It does not recursively scan descendants. [V-codex-home] [V-codex-project]
+
+The project loader skips explicitly untrusted projects and stops at a zero project-document budget; home instructions are already retained. A subtlety absent from the simplified docs: it selects an existing project candidate before discarding empty content, so an empty project override does not necessarily fall through to that directory's `AGENTS.md`. Its manager caches discovery by environment selections and project trust, refreshing when those change. Ordinary descendant file reads are not this refresh mechanism. [V-codex-project] [V-codex-manager]
+
+Current official docs describe the usual startup chain and the 32 KiB default project budget. For this study the exact source qualifies that account; no older probe on **0.159.0** is treated as a measurement of 0.153.2. [V-codex-doc] [E-prior]
+
+### OpenCode — no recorded verified release
+
+The V1 documentation describes upward `AGENTS.md` discovery with `CLAUDE.md` compatibility, global `AGENTS.md` with personal Claude fallback, and first-match precedence. Configured `instructions` can add files, globs and URLs. Plain `@` references in `AGENTS.md` are not an automatic import mechanism. The V1 page does not provide enough release-bound evidence here to certify every lazy descendant case. [V-opencode-v1]
+
+The **V2** documentation is materially different: only `AGENTS.md`; global then upward files in nearest-first order; descendants discovered as files/directories are explored; ambient instruction changes can update a running session. It documents `OPENCODE_DISABLE_PROJECT_CONFIG=1` as skipping project instruction discovery while retaining global instructions. Its `instructions` configuration array is accepted but **not resolved**. These are rolling V2 docs, not a Curator-pinned binary contract. Curator's referenced V1-style output must therefore not be advertised as portable to V2 without a separately qualified adapter. [V-opencode-v2] [C-ref]
+
+### Pi — 0.84.2 source
+
+At **`914cf1472e715297caa30db4b9535d534a9eb718`**, the loader selects the first readable regular candidate from `AGENTS.override.md`, `AGENTS.md`, `AGENTS.MD`, `CLAUDE.md`, `CLAUDE.MD`. It loads the agent-home file, then filesystem ancestors root-to-CWD, with a special duplicate-scope correction for nested linked worktrees. The inspected loader reads text directly; it neither walks child directories on file access nor expands native `@` imports. Reload reconstructs the context. [V-pi-loader]
+
+`--no-context-files` disables **both global and project** context files. Trust is separate: context files can load before project trust, whereas project `SYSTEM.md` and `APPEND_SYSTEM.md` discovery checks that trust. For each system-file role the trusted CWD `.pi/` candidate precedes the global candidate; explicit prompt sources precede discovery. Therefore `--no-approve` alone is not an instruction-file exclusion, and `--no-context-files` alone also removes the desired global assembly. [V-pi-loader] [V-pi-usage]
+
+### Muse — 1.4.1-R4503.1 baseline, rolling vendor documentation
+
+Vendor docs describe a workspace-to-nearest-`.git` walk. At each level, first existing wins among `AGENTS.md`, `CLAUDE.md`, `.agents/AGENTS.md`, `.claude/CLAUDE.md`; deeper project guidance takes precedence, and project rules require workspace trust. User rules always load. Project memory includes an index and on-demand files. The page does not establish `AGENTS.override.md`, automatic `@` expansion, or lazy discovery below the launch workspace. Those details remain **unknown**, not absent. [V-muse]
+
+This page is not versioned to 1.4.1-R4503.1. It does not fill Curator's explicitly unverified managed-root target or establish selective suppression of foreign personal context. Full-folder trust is broader than the proposed approval of individual chapters. [C-reg] [S-env] [V-muse-trust]
+
+### Consequence for a managed launch
+
+| Adapter | Candidate instruction control | What it does not establish |
+|---|---|---|
+| Claude | Review explicit exclusions and selected settings sources against 2.1.261. `--safe-mode` disables broad customizations; `--bare` also changes authentication/resource behavior. [V-claude-release] [V-claude-cli] | A selective, complete exclusion/re-admission recipe. Settings-source exclusion does cover project rules after the recorded fix, but is not evidence for all instruction sources. |
+| Codex | Zero project-document budget, with the generated home file preserved; prevent an unmanaged home override from shadowing it. [V-codex-project] [V-codex-home] | Exclusion of project settings, skills, hooks, plugins or permission rules. The zero budget is an instruction-loader control, not a complete CIP-0002 trust wall. [S-cip] |
+| OpenCode | V1 documents Claude-compatibility switches, including `OPENCODE_DISABLE_CLAUDE_CODE` and its prompt-only variant; V2 documents a project-config disable switch. [V-opencode-v1] [V-opencode-v2] | Disabling Claude compatibility does not establish exclusion of `AGENTS.md`. Neither documentation branch establishes compatibility with Curator's unversioned referenced adapter or complete exclusion of other resources. |
+| Pi | Disable context discovery and independently reject project resources; explicit prompt channels are candidates for re-admission. [V-pi-loader] [V-pi-usage] | Keeping the home `AGENTS.md` active while `--no-context-files` is set. Re-admission through an append channel would need an explicit, reviewed adapter mapping. |
+| Muse | No selective recipe established by the reviewed sources. [S-env] [V-muse-trust] | An admitted output target, or isolation merely from four XDG redirects. |
+
+**Inference:** copying chapters into a home is only one side of admission. Every adapter needs a release-specific account of startup, ancestor, descendant, import, override and other configuration sources. Unknown coverage must prevent a strict capability claim; it need not prevent a clearly labeled legacy launch. [S-cip]
+
+## 3. Proposed chapter model
+
+Everything in this section is a design recommendation, not an existing manifest schema. The current `Module` type is too small to represent independent chapter approval or conditional scope. Reuse its content rendering, but introduce a versioned declaration/plan rather than silently extending the closed existing grammar. [C-package]
+
+| Concern | Proposed rule |
+|---|---|
+| Authoring location | Reusable chapters live in profile/context repositories or machine-owned directories outside the working checkout. A registered project's own chapter declarations live in its manager-owned project layer. Repository instruction files are optional import candidates. |
+| Identity | Give each chapter an owner-qualified logical ID, for example `profile:base/conventions` or `project:project-a/build`. Keep ID distinct from content digest, source location and presentation heading. An edit retains logical identity but creates a new revision needing applicable approval. |
+| Pin | Record source package pin, relative module path, exact-byte digest, metadata/dialect revision and resolved import-closure digest. Git tags/ranges are authoring selectors, not launch identities. Local sources become immutable snapshots. |
+| Skill contribution | Require explicit chapter exports or explicitly approved imports from a skill's pinned package. Do not promote every `SKILL.md` to always-loaded text: the current skill surface is distinct. Use companion context packages for an initial slice before adding a skill-export grammar. [C-package] [C-managed] |
+| Environment | Select common text plus explicitly authored environment-specific variants. No model-generated translation at launch. Preserve root/system class; system replacement is a distinct requested capability. |
+| Dependencies/imports | Approve the entire finite reference closure. Preserve source provenance privately and rewrite admitted references only toward protected snapshots. Reject cycles, path escape, unresolved references and unsupported import dialects; network fetches require an explicit acquisition step. |
+| Conditions | Start with environment selection and unconditional root scope. A later revision may support directory scope or a named bounded path-glob dialect. Record scope as data, not an informal heading. No arbitrary shell/template evaluation or interpolation of ambient secrets. |
+| Required/optional | Missing or unsupported required chapters refuse the plan. Optional omissions must be explicitly approved and visible in preview and the composition record. A read error is never a missing optional chapter. |
+
+**Ordering recommendation:** preserve the selected profile's existing ordered sequence, including machine overlays. Append project-general chapters, then project-environment chapters; for an explicitly supported scoped dialect, deeper applicable project scopes follow shallower ones. This retains CIP-0002's root-context intent without changing the semantics of existing profile weights. Within each new tier, make order explicit and deterministic; ties use stable IDs, not filesystem enumeration. [C-render] [S-cip]
+
+Do not simulate this outer layer with a magic project weight such as “greater than 1000”: configurable winner direction and placement make that unreliable. Do not silently move existing machine overlays behind the project. If an operator needs a final machine instruction tier, model that as a separately approved ordering choice. Hard policy ceilings remain outside prose ordering; chapter position cannot grant permissions. These are proposed consequences of retaining the existing weight contract. [S-env]
+
+The current PR input also permits alternative profiles and profile stacks. A selected alternative contributes only its own resolved base; a stack must first resolve one shared constraint closure, rather than concatenate independently incompatible locks. Bind the selection/stack identity into the chapter plan, then apply the project layer. This integrates the new input without making “one generated profile per project” necessary. [S-cip]
+
+## 4. Assembly, output placement and nested directories
+
+Proposed lifecycle:
+
+1. **Discover and preview:** inventory candidates as data, identify native imports/overrides and show what each environment would receive. Show source IDs, order, scope, changed digests, omissions and expected native-discovery mode.
+2. **Admit and snapshot:** record approval of exact inputs, reference closure, dialect and requested capabilities. Importing a file is a snapshot operation, not permanent approval of that path's future contents.
+3. **Compile:** derive one plan from the selected locked profile/stack, project admission, machine policy, environment and adapter release contract. Include ordered chapter IDs/revisions and all output hashes. Keep the profile lock unchanged.
+4. **Prepare:** materialize into a manager-owned view for the project/profile/environment. Reuse unchanged bytes. Separate immutable generated files from writable harness state; a live session retains its selected generation.
+5. **Launch:** validate approval, protected bytes and the native-discovery contract before issuing a fragment or child. Refuse strict launch if any required native exclusion or re-admission channel is unqualified. Resume must identify its recorded generation.
+
+This is a proposed chapter-specific application of the draft's derived record, protected-copy and session-lease architecture. It is not present merely because current `env resolve` verifies profile surfaces. [S-cip] [C-managed]
+
+**Output names:** initially use the existing renderer table in §1 for Claude, Codex and Pi. OpenCode needs a versioned dialect choice before referenced output is usable. Muse remains unsupported for assembly until a target is admitted. An external root file is not a repository wrapper; never create `AGENTS.md`, `CLAUDE.md`, `.claude/rules/` or symlinks inside the checkout to make discovery work. [C-reg] [C-ref]
+
+**Nested directories need two distinct semantics.** Launch-CWD scoping can select a known approved ancestor chain at preparation. File-access scoping must remain conditional as the agent traverses the tree. Concatenating all nested rules into an unconditional root file loses that distinction; headings cannot reproduce native conditional loading. A future adapter may emit protected scoped rules or use a protected runtime resolver, but only for a declared and qualified dialect. Otherwise reject required scoped chapters or omit explicitly optional ones. The first slice accepts unconditional project-root content only. This recommendation follows the differences in §2 rather than assuming every harness has Claude's lazy rule machinery. [V-claude-large] [V-codex-project] [V-pi-loader] [V-opencode-v2]
+
+Native references require similar care: moving a file changes the base of relative imports. Monolithic assembly is preferable initially, with explicit closure resolution before approval. A native referenced form must not leave an import pointing back into the writable repository. A header comment or manager hash is provenance, not an execution permission. [C-ref] [S-cip]
+
+## 5. Coexistence and migration for committed AGENTS.md
+
+| Mode | Behavior | Suitable use |
+|---|---|---|
+| Native/legacy compatibility | Leave the committed file to the harness and report all known ambient discovery. The manager must not also append an imported copy of the same file. | Existing projects pending enrollment; no claim of CIP-0002 per-item instruction admission. |
+| Approved snapshot — recommended for admission | Preview the file and supported imports, snapshot it into the project layer, record approval, compile once, and suppress the original native discovery path for the managed launch. The committed source stays available to other tools and collaborators. | A project adopting admitted launches without removing its shared instruction document. |
+| Fully external authoring | Move future authoring into reusable outside-checkout chapters after an explicit repository migration decision; keep the same admitted snapshot/plan process. | Teams choosing the issue's external-chapter workflow. Removal of existing tracked instructions is a separate project change. |
+
+These are proposed migration modes. Only the snapshot/external modes can satisfy the operator input that repository control material reaches the harness as approved protected copies. A “native but already approved” path remains mutable and can re-import changed bytes, so it is not interchangeable with an admitted snapshot. [S-cip]
+
+Recommended migration: inventory root/ancestor/override/nested files → show supported import and scope semantics → approve a generation → prepare a managed view → enable admitted launch only for a qualified adapter. Future repository edits appear as candidate drift. They do not silently replace the approved chapter. Preserve the old generation for reproducible resume; revocation governs new admission and requires an explicit mechanism to affect an already-running session. [S-cip]
+
+For a Claude 2.1.261 project that commits only `AGENTS.md`, import that text through the manager and render `CLAUDE.md`; do not generate a repository wrapper. For Codex/Pi, account for native override files before concluding that the imported `AGENTS.md` was the file the native tool would have used. Muse must not be enrolled by guessing a home target from the repository discovery names. [V-claude-memory] [V-codex-project] [V-pi-loader] [C-reg]
+
+## 6. Operator mode and agent mode
+
+The 2026-10-10 input permits both modes to inspect, preview and approve, but agents may approve only within a granted ceiling; approvals record their actor. Repository control files must be approved protected copies with native discovery suppressed. [S-cip]
+
+Proposed admission record for chapters:
+
+- Bind actor, manager/project identity, exact review-package digest, selected profile/stack lock, environment/dialect, chapter ordering/scope, closure and output hashes.
+- Agent approval must reference an independently granted ceiling and its current revision. Repository text, a chapter's frontmatter or a generated file cannot grant that ceiling. Revalidate grants on admission and launch; expired, revoked or widened requirements need another decision.
+- Evaluate a semantic request, not a file extension. Plain Markdown can contain native imports; a rules file can be conditional; a root chapter is not permission policy. MCP endpoints, hooks or system-prompt replacement cannot enter through an “instructions only” approval.
+- Where authority exceeds the grant, return an operator-required decision with the exact delta. Inspection and proposal remain available. Do not make the agent re-approve each unchanged launch, and do not let a digest stand in for approval.
+- Keep secret-bearing/machine-specific source material in private storage. Public research/board resources contain neutral descriptions and public source references, never captured operator chapters.
+
+The scope and actor binding above is a proposed concrete representation of the operator direction. It does not imply the current renderer enforces admission. Existing transitive system-module policy remains applicable; chapter assembly must not use a convenient system-prompt channel to bypass it. [S-cip] [C-admission]
+
+## 7. Options, recommendation and smallest first slice
+
+The trade-offs below are design judgments based on the current renderer and native inventory, not benchmark results. [C-render] [C-ref] [S-cip]
+
+| Option | Benefits | Costs / limits |
+|---|---|---|
+| A. Extend profile packages/overlays only; keep repository instructions native | Smallest change to current operations; existing pins, weights and materialization remain useful. | Machine overlays affect every launch of that profile. Project instructions retain native discovery, mutable imports and differing scope semantics; this cannot provide the requested admitted project layer. |
+| B. Derived project chapter plan and protected adapter outputs | Reuses deterministic composition; gives chapter-level provenance, reproducible approval, no repository output and an explicit source boundary. | Needs a versioned declaration/plan and per-release adapter qualification. Strict support will initially be narrower than the registry. |
+| C. Delegate assembly to each harness's native imports | Minimal compiler logic; can preserve rich native rule behavior on a supported harness. | No common import dialect; Codex/Pi lack the reviewed referenced form, V2 OpenCode ignores the referenced array, and Muse has no admitted target. Native imports still require snapshot rebasing and suppression controls. |
+
+**Recommend B**, with A available only as labeled legacy compatibility. Keep the first compiler deterministic and monolithic. Defer path-scoped/native-import compilation and additional harness qualification until they are demanded by an actual admitted use case; do not create another general research chain.
+
+### Smallest first implementation leaf
+
+Suggested consuming leaf: **chapter-plan preview and protected Codex materialization**. This is a future implementation sketch, not authorization to implement it in this task.
+
+1. Freeze one bounded declaration revision for an unconditional UTF-8 Markdown chapter: stable ID, exact source pin/digest, environment selector, order, requiredness and approval reference. Accept a selected profile plus one project-root chapter. Reject imports, dynamic predicates and system-prompt replacement in this first subset.
+2. Drive a real production path from declaration parsing and admission lookup through a derived plan to the existing Codex monolithic renderer. Produce `<managed-view>/AGENTS.md` and a plan receipt outside the repository. Include the no-profile-root-context case. No new skill-export grammar is required.
+3. Ship a useful preview/materialization capability with explicit output status. **It is not yet a strict-launch capability.** At launch preparation, unsupported native-source exclusion must return a typed refusal and issue no fragment/child; the ordinary legacy launch remains a separately selected mode.
+4. Qualify enabling launch in the owning implementation leaf, using the exact release and real entry point. Codex is the first candidate because its source provides a zero-project-document control while retaining the ordinary home instruction channel; other configuration/resource sources still require a full contract. If that contract cannot be established, keep preview/materialization available and strict launch unavailable. Do not manufacture a fake checkout, change CWD, silently raise instruction class or patch around the boundary.
+
+This scope reuses a supported output without needing Pi's alternate prompt mapping or inventing Muse's target. It does **not** supersede CIP-0002's broader proposed Pi context/command slice; the two scopes are different. The renderer/admission work can be consumed by that slice after its native-source contract is qualified. [C-reg] [C-render] [V-codex-home] [V-codex-project] [S-cip]
+
+Future implementation verification should cover exact output/order and refusal behavior: changed content/import closure, forged approval, agent authority outside its ceiling, unmanaged home override, empty profile context, unsupported scope/dialect, unreadable input, and a live composition change. An adapter qualification must name covered versus total discovery surfaces, including late reads; a successful prompt alone is not exclusion evidence. These are proposed acceptance cases only. No such test ran in this research task.
+
+## 8. Findings register and evidence limits
+
+Important findings are recorded here and in task notes. **`LOGBOOK.md` is not edited**, as required by the campaign brief.
+
+| Finding | Consequence |
+|---|---|
+| Existing profile chapters already solve deterministic byte assembly; project ownership/admission is the missing layer. [C-render] [C-compose] | Reuse the renderer; do not introduce a second templating engine. |
+| No context declaration on the root currently means no root file. [C-render] | A derived project plan must make its own root-surface presence explicit. |
+| Native loading and suppression vary by release; OpenCode has no recorded pin and Muse no admitted target. [C-reg] | Treat support as per-capability evidence, not five uniformly supported adapters. |
+| Claude settings-source exclusion has a release-pinned project-rule fix before 2.1.261. [V-claude-release] | Refine the earlier inventory; avoid saying settings-source selection has no effect on any rules. Full suppression remains unproven. |
+| Codex exact source distinguishes global/project loading and refreshes on selection/trust changes. [V-codex-home] [V-codex-project] [V-codex-manager] | Do not rely solely on the simplified once-per-start documentation. |
+| Pi's no-context switch also removes the managed global instruction file. [V-pi-loader] | An admitted Pi recipe needs explicit re-admission, not merely another flag beside the existing root output. |
+| PR #136 changed during the read. The later head adds alternative profiles/stacks to operator input. [S-cip] | This study uses the later pinned head and includes the stack effect in §3. |
+
+Evidence bounds: current Curator production code and the pinned spec were read directly; Codex/Pi upstream files were read at exact tag commits; Claude's exact-release changelog and current version-annotated docs were checked; OpenCode V1/V2 and Muse vendor pages were read as rolling documentation on 2026-10-10. **5/5 environment inventories, 2/5 exact-release instruction implementations inspected, 0/5 runtime qualifications.** Claude's implementation, OpenCode's release binding and Muse's target/suppression remain stated blind spots. This is enough to choose the chapter architecture, not enough to certify an admitted launch.
+
+Source-retrieval failures were not evidence of absence: an obsolete Codex `project_doc.rs` path returned HTTP 404; the exact tag's `agents_md.rs` and home provider were located through its repository tree and read successfully. No native probe results from the earlier CIP study were rerun or counted as passing here. [V-codex-project] [V-codex-home] [E-prior]
+
+Brief coverage: question 1 → §§1–2; question 2 → §3; question 3 → §4 and the adapter tables; question 4 → §5; question 5 → §6; question 6 → §7. All six questions have an answer; unsupported native capabilities are explicitly bounded rather than assumed.
+
+Editorial verification: the standalone Python document/locator check exited **0**: **31/31** citation IDs resolved, **21/21** GitHub blob links carried full commits, and **13/13** local source locators were read successfully with `git show` exit **0** each. It also checked UTF-8/LF formatting, trailing whitespace, the artifact budget, common personal-path/address/secret patterns and that this research file was the sole repository delta. This checks document mechanics and locators; source meanings were reviewed manually, and the pattern scan is not proof of universal secret detection.
+
+`git diff --no-index --check /dev/null .research/261010_modular-instructions-design.md` returned **1**, with no diagnostics. It is recorded as **nonzero / expected new-file difference**, not as a passing gate: the nonempty new document differs from the empty comparator. Formatting is covered by the separate green editorial check. No harness, test or build command ran; no behavior gate is claimed. Board attachment and role handoff are separate lifecycle operations.
+
+## References
+
+Repository links below pin both path and commit. Vendor documentation is rolling unless a release/commit is explicitly given; URLs were consulted on 2026-10-10. The document contains no captured private product material or actual machine paths.
+
+[issue]: https://github.com/relux-works/curator/issues/114
+[C-ci]: https://github.com/relux-works/curator/blob/aec9e800db12669871e0815f9952228202fe3a4f/.github/workflows/ci.yml#L37
+[C-reg]: https://github.com/relux-works/curator/blob/aec9e800db12669871e0815f9952228202fe3a4f/internal/envregistry/envregistry.go#L228
+[C-managed]: https://github.com/relux-works/curator/blob/aec9e800db12669871e0815f9952228202fe3a4f/internal/envprofile/managed.go
+[C-config]: https://github.com/relux-works/curator/blob/aec9e800db12669871e0815f9952228202fe3a4f/internal/config/environments.go#L172
+[C-package]: https://github.com/relux-works/curator/blob/aec9e800db12669871e0815f9952228202fe3a4f/internal/contextpkg/contextpkg.go#L84
+[C-lock]: https://github.com/relux-works/curator/blob/aec9e800db12669871e0815f9952228202fe3a4f/internal/contextlock/contextlock.go#L41
+[C-store]: https://github.com/relux-works/curator/blob/aec9e800db12669871e0815f9952228202fe3a4f/internal/contextstore/contextstore.go#L41
+[C-overlays]: https://github.com/relux-works/curator/blob/aec9e800db12669871e0815f9952228202fe3a4f/internal/envprofile/overlays.go
+[C-compose]: https://github.com/relux-works/curator/blob/aec9e800db12669871e0815f9952228202fe3a4f/cmd/curator/compose.go
+[C-render]: https://github.com/relux-works/curator/blob/aec9e800db12669871e0815f9952228202fe3a4f/internal/contextmaterialize/contextmaterialize.go
+[C-ref]: https://github.com/relux-works/curator/blob/aec9e800db12669871e0815f9952228202fe3a4f/internal/contextmaterialize/referenced.go
+[C-admission]: https://github.com/relux-works/curator/blob/aec9e800db12669871e0815f9952228202fe3a4f/internal/contextmaterialize/admission.go
+[S-env]: https://github.com/relux-works/curator-spec/blob/43bf0a2506d5c354a73bbc3ea4623d4653db10c7/protocol/environments.md
+[S-cip]: https://github.com/relux-works/curator-spec/blob/2f0531b4edcc99c6118c277deb00e8736392c04d/cips/CIP-0002-project-context-in-managed-launches.md
+[S-pr]: https://github.com/relux-works/curator-spec/pull/136
+[E-prior]: https://github.com/relux-works/curator/blob/aec9e800db12669871e0815f9952228202fe3a4f/.research/261004_CIP-0002-project-context-in-managed-launches_evidence.md
+[V-claude-memory]: https://code.claude.com/docs/en/memory
+[V-claude-large]: https://code.claude.com/docs/en/large-codebases
+[V-claude-release]: https://github.com/anthropics/claude-code/blob/d7dbd9a09f59775726ed14bbea8fc9dfdff62f7b/CHANGELOG.md
+[V-claude-cli]: https://code.claude.com/docs/en/cli-reference
+[V-codex-home]: https://github.com/openai/codex/blob/657a993cbee87acf52d14b758ce49dbd46d1b8eb/codex-rs/codex-home/src/instructions/mod.rs
+[V-codex-project]: https://github.com/openai/codex/blob/657a993cbee87acf52d14b758ce49dbd46d1b8eb/codex-rs/core/src/agents_md.rs
+[V-codex-manager]: https://github.com/openai/codex/blob/657a993cbee87acf52d14b758ce49dbd46d1b8eb/codex-rs/core/src/agents_md_manager.rs
+[V-codex-doc]: https://learn.chatgpt.com/docs/agent-configuration/agents-md
+[V-opencode-v1]: https://opencode.ai/docs/rules/
+[V-opencode-v2]: https://opencode.ai/v2/docs/instructions
+[V-pi-loader]: https://github.com/earendil-works/pi/blob/914cf1472e715297caa30db4b9535d534a9eb718/packages/coding-agent/src/core/resource-loader.ts
+[V-pi-usage]: https://github.com/earendil-works/pi/blob/914cf1472e715297caa30db4b9535d534a9eb718/packages/coding-agent/docs/usage.md
+[V-muse]: https://dev.meta.ai/docs/muse-code/configuration
+[V-muse-trust]: https://dev.meta.ai/docs/muse-code/permissions
