@@ -1,0 +1,728 @@
+diff --git a/cips/CIP-0002-project-context-in-managed-launches.md b/cips/CIP-0002-project-context-in-managed-launches.md
+index dbff87a09e252723d41184cde8f2985a8333a021..07f816ef05d50c8316e9bc0ba0d1e617f1553226 100644
+--- a/cips/CIP-0002-project-context-in-managed-launches.md
++++ b/cips/CIP-0002-project-context-in-managed-launches.md
+@@ -1,11 +1,19 @@
+ # CIP-0002: Project context in managed launches
+ 
+ - **Status:** Draft
+-- **Owner:** ivan-curator (orchestrator); decision: operator
++- **Owner:** orchestrator; decision: operator
+ - **Created:** 2026-10-04
+ - **Related:** TASK-261004-2asduq — launch-command-environment-fragment-design; STORY-261004-1ffwh8 — design-launch-project-views; TASK-261004-34brhn — research-claude-login-transfer-modes; Decisions 0013, 0017, 0018 and 0019
+ - **Affects:** curator-spec environments §§1–5, 7–12; manager §§3, 5, 6, 10, 12; fragment and manager schemas; Curator, curator-run, agents-management and the tracked-session launch-plan consumer
+ 
++## Operative disposition (2026-10-11)
++
++- **Decided:** The operator input of 2026-10-10 governs project registration, saved composites, profile alternatives/stacks, approval ceilings and protected admission. D-PATH (2026-10-11) settles the managed-launch PATH recipe; see the shared contract below. The CIP remains Draft.
++- **Open:** Home architecture (persistent view versus serialized profile home or launch overlay), certified adapter delivery and the closed context/lease/transform grammar remain proposed. The questions at the end retain their stated options; deciding PATH does not adopt fragment v4.
++- **Superseded:** The repository-bin PATH recipe in CIP-0007 and the choice between raw project/global bins and one protected dispatcher are superseded by D-PATH. Shell activation approvals in CIP-0004 confer no project-context admission.
++
++[Cross-CIP contract, schema owners and versions](platform-contract-disposition.md) records the canonical values and owner decisions. Acceptance records design disposition; schema publication, implementation and runtime qualification are separate. Current-state observations and companion probes below are historical at their stated pins, not rerun evidence.
++
+ ## Operator input (2026-10-10)
+ 
+ The operator confirmed the model: a project layer composed over a profile, outside the repository, while the Skillfile stays in the project as the declaration of skills. To be integrated before acceptance:
+@@ -20,7 +28,7 @@ The operator confirmed the model: a project layer composed over a profile, outsi
+ 
+ ## Summary
+ 
+-Allow a registered project X to contribute individually approved context, rules, knowledge, MCP servers, permissions, skills and commands when launched with profile Y. Recommend a persistent manager-owned home for each checkout × profile × environment, backed by a digest-bound composition record and leased for the session lifetime. Repository files are candidate inputs to admission; native tools receive generated, protected copies and must not discover unapproved project configuration implicitly. A proposed fragment v4 carries the context identity and a single manager dispatcher directory through a typed channel, with PATH append performed after child-environment admission. This proposal asks for design decisions; it neither authorizes implementation nor claims that every native adapter can enforce the proposed boundary today.
++Allow a registered project X to contribute individually approved context, rules, knowledge, MCP servers, permissions, skills and commands when launched with profile Y. Recommend a persistent manager-owned home for each checkout × profile × environment, backed by a digest-bound composition record and leased for the session lifetime. Repository files are candidate inputs to admission; native tools receive generated, protected copies and must not discover unapproved project configuration implicitly. A proposed fragment v4 carries the context identity and a single manager dispatcher directory through a typed channel, with the combined D-PATH recipe performed after child-environment admission. This proposal asks for design decisions; it neither authorizes implementation nor claims that every native adapter can enforce the proposed boundary today.
+ 
+ ## Motivation and user stories
+ 
+@@ -158,13 +166,13 @@ Candidate shapes, with symbolic values rather than executable configuration:
+ }
+ ```
+ 
+-These are draft members, not an accepted schema. The normative revision must fix reference grammar, null/absence rules, bounds and diagnostics. Proposed invariants: object fields and enums are closed; one dispatcher directory; no append-list grammar, executable fragments, arbitrary environment maps or repository command root. Duplicate keys, unknown versions, mismatched context references/digests/roots and conflicting `path_prepend` are invalid. The project root is the sole typed external path exception; home, record and dispatcher paths remain manager-owned. Validators must stop deriving the environments root by stripping two path segments from a home: the project-view layout is deeper. E9.
++These are draft members, not an accepted schema. The illustrated append is only the final dispatcher step of D-PATH; the normative transform must also bind the protected tool prefix and admitted base PATH into the resolved plan and its digest. The normative revision must fix reference grammar, null/absence rules, bounds and diagnostics. Proposed invariants: object fields and enums are closed; one dispatcher directory; no append-list grammar, executable fragments, arbitrary environment maps or repository command root. Duplicate keys, unknown versions, mismatched context references/digests/roots and conflicting `path_prepend` are invalid. The project root is the sole typed external path exception; home, record and dispatcher paths remain manager-owned. Validators must stop deriving the environments root by stripping two path segments from a home: the project-view layout is deeper. E9.
+ 
+ The original sketch's at-most-two project/global roots is rejected in favor of **one manager dispatcher directory**. The effective project-then-profile precedence lives in the protected owner map; it does not require two search roots. Forwarders execute a manager-owned dispatcher by absolute identity, which resolves the captured context/lease, revalidates protected activation and invokes the admitted runtime/artifact. Never execute `.agents/bin` or source `.agents/env.sh`, `.envrc`, profile shell bytes or repository hooks. Context references are lookups, not bearer authority; the dispatcher authenticates its managed session binding independently.
+ 
+ Migrate existing manager-owned singleton forwarders to dispatch through the same context binding, or refuse when an older forwarder would shadow the new view. Appending cannot outrank such a shim. For unmanaged earlier executables with an admitted command's name, report/refuse ambiguous ordinary-command availability and offer an explicit manager command invocation; never silently invoke the wrong skill. Reserve all `curator-*` names and add the dispatcher directory and aliases to umbrella provider-discovery refusals, even if placed in a configured provider trust root. E3, E10, P6.
+ 
+-For a nonempty admitted base PATH, append the dispatcher once using the platform separator, retaining earlier entries and order. Normalize/deduplicate the manager-added directory by canonical identity; retain its existing position if already present. Reject malformed/unreadable manager roots and ambiguous PATH entries required for command selection. If PATH is absent or excluded by the environment policy, refuse command capability rather than recreate an environment variable that admission removed. Empty/relative/CWD-sensitive components and repository-writable search roots require explicit treatment in the upstream PATH-admission contract; strict mode must not accept them by accident. Native settings may not subsequently replace PATH or shell initialization defeat the recipe. Claude `settings.env` and Codex `shell_environment_policy.set` are assignment surfaces, not append operators. D2, D5.
++D-PATH (accepted 2026-10-11) defines one managed-launch order: protected tool directory of this launch (CIP-0007), admitted base PATH of this user in its existing order, then one protected manager dispatcher directory. Project commands run through that dispatcher only after admission and execution checks; repository `.agents/bin` is never executed in a managed launch. Use the platform separator and avoid duplicate manager entries by canonical identity. The closed transform grammar must preserve the accepted order; it is not adopted by this example. Reject malformed/unreadable manager roots and ambiguous PATH entries required for command selection. If PATH is absent or excluded by the environment policy, refuse command capability rather than recreate an environment variable that admission removed. Empty/relative/CWD-sensitive components and repository-writable search roots require explicit treatment in the upstream PATH-admission contract; strict mode must not accept them by accident. Native settings may not subsequently replace PATH or shell initialization defeat the recipe. Claude `settings.env` and Codex `shell_environment_policy.set` are assignment surfaces, not append operators. D2, D5.
+ 
+ Apply the operation on the **admitted child PATH**, not the parent shell's PATH. In tracked mode the destination performs the same typed transformation after its own environment admission and records both the operation/context digest and resolved PATH in the immutable effective plan identity. Do not transport the caller's inherited PATH as an owned literal. The launcher remains the only semantic composer; the destination evaluates its admitted transform and the provider translates the resulting plan without recomposition. Until the tracked schema, consumer and provider reproduce this contract, refuse tracked requests for command capability. A resume must reproduce the pinned effective plan or refuse a changed destination context.
+ 
+@@ -230,7 +238,7 @@ Use the repositories' existing Go tests and conformance-vector machinery. Drive
+ | Admission | Approved digest launches; changed bytes/dependencies, self-minted approval, optional-vs-required omission, malformed/unreadable manifest refuse correctly. | Bind only root file instead of transitive closure; trust same hash from another checkout. |
+ | Native discovery | Approved context/skill loads; unapproved ancestor/nested instructions, dynamic rules, settings, MCP, hooks, plugin resources and late-created files do not activate. Observe loader/tool behavior, not an LLM claim that it ignored a file. | Suppress only startup files; suppress config but leave rules/skills. |
+ | Composition | Same pin deduplicates; whole-skill replacement works; incompatible required provider, command collision and MCP same-ID conflict refuse. | Compare command names only in project, omitting profile or transitive providers. |
+-| PATH/dispatch | Base precedence, one append, duplicates and profile-only/null root; project P then selected Y; old singleton shims, symlinked dispatcher, missing PATH, hostile earlier entry, empty/relative segment and runtime re-prepend negatives. | Reject only direct `.agents/bin`, admitting a canonical alias or nested writable root. |
++| PATH/dispatch | D-PATH tool-prefix/base/dispatcher order, one dispatcher, duplicates and profile-only/null root; project P then selected Y; old singleton shims, symlinked dispatcher, missing PATH, hostile earlier entry, empty/relative segment and runtime re-prepend negatives. | Reject only direct `.agents/bin`, admitting a canonical alias or nested writable root. |
+ | Permissions/secrets | Approved grants within ceiling and added denies work; project bypass, secret-name widening, native PATH assignment, forbidden hooks and dialect ambiguity refuse. | Enforce global lock only on CLI flags, leaving imported native settings. |
+ | Leases/TOCTOU | Two projects on Y, two identical view sessions, busy update, revocation, detach, descendant, resume, crash and unknown liveness. No GC of referenced artifacts. | Key lease only by PID; release at launcher exit; collect on TTL alone. |
+ | Tracking | Same effective child environment at the destination, digest changes with composition/PATH/policy, replay and context substitution refuse before child creation. | Hash declared transform but omit resolved PATH or composition identity. |
+@@ -246,5 +254,5 @@ Research validation is limited to the file/source audit and P1–P6 in the compa
+ 3. **Permission expansion:** Allow project permission requests at all? **Recommend default deny, explicit per-project `review` opt-in**, exact per-item approval within fleet/manager ceilings; preserve all hard denies and the existing permission-mode lock.
+ 4. **Context replacement and memory:** May projects replace Y's root/system prompt or carry mutable memory? **Recommend additive context and memory off by default**, separately approved replacement, private per-view memory opt-in, and no auto-promotion of generated memory into admission.
+ 5. **Busy view updates:** Wait for active leases or allocate a fresh home automatically? **Recommend wait/refuse**, reusing the stable home after it becomes idle. An explicit additional view may incur another login; never silently switch active sessions.
+-6. **Command conflicts and tracked transport:** Use one protected dispatcher, fail on stale/ambiguous earlier command owners, and refuse tracked capability until destination append exists? **Recommend yes**. Two raw append roots and caller-PATH literals do not meet the admission or identity boundary.
++6. **PATH selection — decided; transport still open:** D-PATH selects one protected dispatcher after the protected tool directory and admitted base PATH. Raw repository/global command roots are superseded. The remaining owner choice is the versioned destination transform and stale/ambiguous owner handling: adopt the proposed checked transform with refusal until supported, or defer command capability. Caller-PATH literals cannot replace destination admission.
+ 7. **Adapter delivery contract:** Accept a separately versioned optional capability whose certified environments/surfaces are advertised explicitly, with Pi as the first proposed direct slice? **Recommend yes**, with Claude/Codex next and OpenCode/Muse after their native contracts are established. All five remain in the design; an unsupported required feature refuses rather than being omitted.
+diff --git a/cips/CIP-0003-claude-managed-home-credential-modes.md b/cips/CIP-0003-claude-managed-home-credential-modes.md
+index cbcf5bbbe33ba5a5576fddfa9c932d2bc6984a57..2bd88e80d6677988478c5ba09812420640f5a890 100644
+--- a/cips/CIP-0003-claude-managed-home-credential-modes.md
++++ b/cips/CIP-0003-claude-managed-home-credential-modes.md
+@@ -1,14 +1,22 @@
+ # CIP-0003: Claude managed-home credential modes
+ 
+ - **Status:** Accepted (operator, 2026-10-10): narrowed, adopted together with CIP-0010 (its C6 disposition)
+-- **Owner:** ivan-curator (orchestrator); decision: operator
++- **Owner:** orchestrator; decision: operator
+ - **Created:** 2026-10-04
+ - **Related:** TASK-261004-34brhn — research-claude-login-transfer-modes; STORY-261004-1pwxri — claude-macos-managed-home-login-modes; Decision 0017 — environment credential modes.
+ - **Affects:** curator-spec rc.14 environments §§7.4, 7.7, 7.9, 8.2, 8.4.1, 10.1–10.4, 12.1–12.2; manager §§1, 12.4–12.5; configuration, marker and launch-fragment schemas; curator; curator-run/launcher and its tracked execution boundary.
+ 
++## Operative disposition (2026-10-11)
++
++- **Decided:** Accepted, narrowed by CIP-0010 C6 (2026-10-10). Source-policy v1 keeps per-home when no entry exists; source-policy v2 requires an explicit entry and migrates existing logins to explicit per-home. Token becomes node-sourced; helper remains an API-key lane. The first node store is a protected 0600 file on macOS and Linux.
++- **Open:** The coordinated v4 grammar and supported-release qualification remain publication/implementation work. Personal-plan Codex adoption and Muse subscription support remain owner questions in CIP-0010 and the shared contract.
++- **Superseded:** The earlier default, Keychain-first token leaf, shared-file adoption and general acceptance/Q7 questions below are historical, superseded by CIP-0010 C1/C3/C6 and Revision 2.2. Native per-home Keychain evidence remains historical evidence; it is not the node backend.
++
++[Cross-CIP contract, schema owners and versions](platform-contract-disposition.md) records the canonical values and owner decisions. Acceptance records design disposition; schema publication, implementation and runtime qualification are separate. Current-state observations and companion probes below are historical at their stated pins, not rerun evidence.
++
+ ## Summary
+ 
+-Offer an operator-controlled credential source for each profile and environment: `token`, `helper`, or `per-home`, with `shared-file` admitted only by a verified platform capability. A setup token reuses the operator's subscription authorization without extracting the existing native login; a helper supplies an externally managed API credential; a per-home login remains owned and refreshed by Claude Code. Curator resolves references and manages metadata, while the launcher obtains a selected token from a protected store immediately before starting the child. Keep `per-home` as the new macOS default and preserve existing installations until explicit adoption. This proposal does not discharge Decision 0017 Q1's disposable-account gate or authorize native credential copying under Q7.
++CIP-0010 C6 adopts this CIP narrowed: `per-home` remains the source-policy v1 default, token becomes an explicitly selected node source, helper remains for API-key setups, and shared-file is replaced by node. Source-policy v2 requires explicit entries, preserving existing logins through migration. The first node backend is a protected 0600 file on macOS/Linux. Protected-source validation, no fallback, credential no-copy and inspect → plan → apply remain requirements; qualification and coordinated schema publication remain pending. The older selector and Keychain-first design below is retained as historical reasoning with the operative replacements stated above.
+ 
+ ## Motivation and user stories
+ 
+@@ -20,7 +28,7 @@ Research bounds: one decision proposal and its evidence companion, at most 96 Ki
+ 
+ ## Current state
+ 
+-This CIP is filed from the research draft in [.research/261004_CIP-0003-claude-managed-home-credential-modes.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0003-claude-managed-home-credential-modes.md) on `relux-works/curator` `main` @ `fae2ff9c`. Evidence identifiers used below resolve in the companion [.research/261004_CIP-0003-claude-managed-home-credential-modes_evidence.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0003-claude-managed-home-credential-modes_evidence.md) at the same commit; they are cited, not copied. The operator has made no acceptance decision on this proposal. Repository citations are pinned to curator main `ca1b776fb580ec0cee0173bf150daf063023aeaa`, curator-spec rc.14 `43bf0a2506d5c354a73bbc3ea4623d4653db10c7`, and launcher main `2517d2753945d0a8b0c40a291e4aef883a7c16ee`.
++This CIP is filed from the research draft in [.research/261004_CIP-0003-claude-managed-home-credential-modes.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0003-claude-managed-home-credential-modes.md) on `relux-works/curator` `main` @ `fae2ff9c`. Evidence identifiers used below resolve in the companion [.research/261004_CIP-0003-claude-managed-home-credential-modes_evidence.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0003-claude-managed-home-credential-modes_evidence.md) at the same commit; they are cited, not copied. At the original research pin no acceptance decision had been recorded; the operative disposition above records the later acceptance and its scope. Repository citations are pinned to curator main `ca1b776fb580ec0cee0173bf150daf063023aeaa`, curator-spec rc.14 `43bf0a2506d5c354a73bbc3ea4623d4653db10c7`, and launcher main `2517d2753945d0a8b0c40a291e4aef883a7c16ee`.
+ 
+ - Curator exposes `environments.isolation.<profile>.<env>` with `shared|isolated`, rather than credential-source modes (`internal/config/environments.go:20`, `:799`). Its macOS Claude adapter declares no shared passthrough, pins 2.1.261, defaults to isolated, and refuses shared (`internal/envregistry/envregistry.go:240`, `:450`). The production resolve path calls this policy (`internal/envprofile/managed.go:319`). [C1–C3]
+ - The macOS isolated marker currently records `strategy=per-home-keychain`, `backend=keychain`, and the registry's release without observing a successful Keychain write (`internal/envprofile/managed.go:598`). This is strategy metadata, not evidence of actual authentication or of the selected backend. [C3]
+@@ -40,7 +48,9 @@ This CIP is filed from the research draft in [.research/261004_CIP-0003-claude-m
+ 
+ For ordinary first-party CLI operation, documented priority is provider selection, then `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY`, `apiKeyHelper`, `CLAUDE_CODE_OAUTH_TOKEN`, qualifying Anthropic profile/federation sources, and stored subscription login. Gateway sessions and some profile choices have additional rules. API-key approval differs between interactive use and `-p`. Treat this as the vendor's source-selection logic, not the Curator configuration precedence defined below. [D1; synthetic confirmation limited to P4–P6]
+ 
+-## Design
++## Historical design (superseded where listed)
++
++The original selector/Keychain sketch, implementation ordering and approval questions are retained as design history. Apply CIP-0010 C6 clause by clause: defaults follow Revision 2.2; the node store follows C1; shared-file is replaced by node; protected-store validation/no-fallback, migration and final-executor checks survive under C3. No historical v4 example below is a published schema.
+ 
+ ### Options considered
+ 
+@@ -150,7 +160,7 @@ Explicit adoption uses the existing inspect → plan → apply discipline. A pla
+ 
+ The compatibility path retains legacy macOS isolated-by-default behavior and Linux shared-file behavior, with their current evidence limits. Do not silently classify a legacy ambient API key as `token` or `helper`; mode adoption is explicit. The revised marker separates the declared source mode, source role, strategy, capability release and optional observation from actual authentication state. New per-home records must not assert `backend=keychain` solely from GOOS.
+ 
+-## Specification changes
++## Historical specification changes (apply CIP-0010 C6)
+ 
+ Adopt CIP-0003 and a follow-on decision record referencing Decision 0017; preserve the historical observations.
+ 
+@@ -160,7 +170,7 @@ Adopt CIP-0003 and a follow-on decision record referencing Decision 0017; preser
+ 4. **§§7.7, 7.9, 8.2, 8.4.1, 10, 12 and manager §§1, 12.4–12.5:** add the union, defaults, precedence, migration and capability tables; distinguish absent, unreadable, unsupported, source-conflict, store-denied and known-expired states. None may produce an authenticated claim or a fallback fragment. Define launch-reference provenance and final-executor obligations.
+ 5. **Schemas and vectors:** source definitions live only in protected operator machine configuration. Fragment-v4 carries only `{mode, source_ref?}` plus a non-secret trusted-configuration binding; no helper body, store value, token-derived hash or arbitrary auth env assignment. Marker-v4 records metadata without credential bytes. The consumer independently verifies the binding instead of trusting caller-minted metadata. `passable_env_names` remains the MCP name surface and cannot authorize provider credential injection.
+ 
+-## Implementation plan
++## Historical implementation plan (superseded ordering)
+ 
+ Sizes are relative: S is a bounded schema/docs leaf, M is a cross-module behavior leaf with production tests. These are consuming leaves, not additional serial research tasks.
+ 
+@@ -189,11 +199,11 @@ Tests below are **planned implementation/qualification work**, not results from
+ 
+ Report coverage as executed rows over the independent spec-derived matrix, not a list of passing helper unit tests. Q1 presently has **0/3 required disposable-account facts established by this run**. No product test suite or previously attached login evidence was replayed or accepted as a current-release pass.
+ 
+-## Open questions for the operator
++## Superseded operator questions
+ 
+-1. **Default and rollout:** adopt `per-home` for newly opted-in macOS profiles, preserve legacy behavior until inspect → plan → apply, and allow `token`/`helper` overrides? **Recommend yes.** All three mechanisms remain available; no automatic login extraction is involved.
+-2. **Q7 boundary:** authorize dedicated setup-token enrollment plus transient final-executor injection, while native/per-home credential export and copying stay refused? **Recommend yes.** Without this narrow revision, the new launcher secret-read behavior has no normative authority.
+-3. **Conflicting ambient auth:** refuse explicit-mode launch when another source or endpoint can win, rather than accepting native precedence silently? **Recommend yes.** Preserve the legacy path for existing ambient setups; do not claim a mode that was not selected.
+-4. **Helper scope:** define `helper` as an external API credential mechanism, with the protected bridge and native cache behavior, rather than promise subscription-login equivalence? **Recommend yes.** Require fresh-account qualification before claiming any additional token kind.
+-5. **Shared-file and undocumented selector:** retain the Q1 gate and exclude `CLAUDE_SECURESTORAGE_CONFIG_DIR` from supported modes? **Recommend yes.** Run its approved disposable-account experiment only if shared-store support is still desired; token/helper delivery can proceed independently.
+-6. **Qualification access:** schedule an authorized disposable-account/OS-user check as part of implementation qualification, with no operator-account access? **Recommend yes.** Keep unmeasured capability rows unavailable rather than treating this research's synthetic status results as successful authentication.
++1. **Superseded by CIP-0010 Revision 2.2/C6 — default and rollout:** adopt `per-home` for newly opted-in macOS profiles, preserve legacy behavior until inspect → plan → apply, and allow `token`/`helper` overrides? **Recommend yes.** All three mechanisms remain available; no automatic login extraction is involved.
++2. **Superseded by CIP-0010 C3/C6 — Q7 boundary (Q7 no-copy unchanged):** authorize dedicated setup-token enrollment plus transient final-executor injection, while native/per-home credential export and copying stay refused? **Recommend yes.** Without this narrow revision, the new launcher secret-read behavior has no normative authority.
++3. **Retained requirement in CIP-0010 C3 — conflicting ambient auth:** refuse explicit-mode launch when another source or endpoint can win, rather than accepting native precedence silently? **Recommend yes.** Preserve the legacy path for existing ambient setups; do not claim a mode that was not selected.
++4. **Retained API-key scope in CIP-0010 C6 — helper scope:** define `helper` as an external API credential mechanism, with the protected bridge and native cache behavior, rather than promise subscription-login equivalence? **Recommend yes.** Require fresh-account qualification before claiming any additional token kind.
++5. **Superseded by CIP-0010 C6 — shared-file replaced by node; undocumented selector remains unsupported:** retain the Q1 gate and exclude `CLAUDE_SECURESTORAGE_CONFIG_DIR` from supported modes? **Recommend yes.** Run its approved disposable-account experiment only if shared-store support is still desired; token/helper delivery can proceed independently.
++6. **Deferred qualification work, not an acceptance question — qualification access:** schedule an authorized disposable-account/OS-user check as part of implementation qualification, with no operator-account access? **Recommend yes.** Keep unmeasured capability rows unavailable rather than treating this research's synthetic status results as successful authentication.
+diff --git a/cips/CIP-0004-shell-hook-without-sourcing-and-path-append.md b/cips/CIP-0004-shell-hook-without-sourcing-and-path-append.md
+index 96e8a0b39e98cf882d805e94bcbb8c5cb40919c5..e990f7df376586f9287a78f8a705f7d7c1b42c04 100644
+--- a/cips/CIP-0004-shell-hook-without-sourcing-and-path-append.md
++++ b/cips/CIP-0004-shell-hook-without-sourcing-and-path-append.md
+@@ -1,14 +1,22 @@
+ # CIP-0004: Shell hook without sourcing and PATH append
+ 
+ - **Status:** Accepted (operator, 2026-10-10)
+-- **Owner:** ivan-curator (orchestrator); decision: operator
++- **Owner:** orchestrator; decision: operator
+ - **Created:** 2026-10-04
+ - **Related:** TASK-261004-1z2pgb — shell-hook-no-source-and-path-append-design; STORY-261004-7fglii — shell-hook-path-and-backend-env-hardening; K3 / historical S6; reviewer input `shell-hook-test-matrix.md`
+ - **Affects:** curator-spec rc.14 Manager §§3, 8, 10 and environment-exposure text; Environments §§11–12; shell conformance vectors; curator hook generation, generated env helpers, cache installation and status. Launcher and launch-fragment contracts require boundary clarification, not a PATH-policy change here.
+ 
++## Operative disposition (2026-10-11)
++
++- **Decided:** Accepted on 2026-10-10: no-source-v1 interactive activation; inherited PATH, optional global bin, optional project bin, in that order. Shell approvals no longer authorize activation. Managed launches use D-PATH and never execute repository .agents/bin.
++- **Open:** The cache metadata grammar, adopting release and native shell qualification remain to be published. Cache refresh and activation/restoration follow Compatibility and migration; loaded-shell state remains unknown unless observed.
++- **Superseded:** The acceptance request and warn-first K3 rollout below are superseded by the accepted header. This changes interactive activation only; project-context approval remains the separate CIP-0002 admission boundary.
++
++[Cross-CIP contract, schema owners and versions](platform-contract-disposition.md) records the canonical values and owner decisions. Acceptance records design disposition; schema publication, implementation and runtime qualification are separate. Current-state observations and companion probes below are historical at their stated pins, not rerun evidence.
++
+ ## Summary
+ 
+-Adopt an interactive hook that discovers the project root and assigns its environment directly, without reading or sourcing project or global env files. Append the project `.agents/bin` at the end of PATH, after inherited entries and any optional global bin. Remove the warning-and-source exception immediately in the adopting revision, replacing the K3 staged A→B plan with a single `no-source-v1` contract. Preserve optional activation and opt-outs, retire approvals as an activation dependency, and make all human-facing paths and remedy commands safe to display. This draft asks for a design decision; it authorizes neither implementation nor scheduling.
++Adopt an interactive hook that discovers the project root and assigns its environment directly, without reading or sourcing project or global env files. Append the project `.agents/bin` at the end of PATH, after inherited entries and any optional global bin. Remove the warning-and-source exception immediately in the adopting revision, replacing the K3 staged A→B plan with a single `no-source-v1` contract. Preserve optional activation and opt-outs, retire approvals as an activation dependency, and make all human-facing paths and remedy commands safe to display. This direction is accepted; adopting contract publication and runtime qualification remain separate work.
+ 
+ ## Motivation and user stories
+ 
+@@ -22,7 +30,7 @@ Research bounds: one design decision, one CIP plus evidence below 100 KB combine
+ 
+ ## Current state
+ 
+-This CIP is filed from the research draft in [.research/261004_CIP-0004-shell-hook-no-source-path-append.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0004-shell-hook-no-source-path-append.md) on `relux-works/curator` `main` @ `fae2ff9c`. Companion evidence and reproduction remain in [.research/261004_CIP-0004-shell-hook-no-source-path-append_evidence.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0004-shell-hook-no-source-path-append_evidence.md) at the same commit; they are cited, not copied. References C1–C10, S1–S7 and P1–P4 below resolve there. The operator has made no acceptance decision on this proposal.
++This CIP is filed from the research draft in [.research/261004_CIP-0004-shell-hook-no-source-path-append.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0004-shell-hook-no-source-path-append.md) on `relux-works/curator` `main` @ `fae2ff9c`. Companion evidence and reproduction remain in [.research/261004_CIP-0004-shell-hook-no-source-path-append_evidence.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0004-shell-hook-no-source-path-append_evidence.md) at the same commit; they are cited, not copied. References C1–C10, S1–S7 and P1–P4 below resolve there. At the original research pin no acceptance decision had been recorded; the operative disposition above records the later acceptance and its scope.
+ 
+ | Verified behavior | Evidence and consequence |
+ |---|---|
+@@ -93,7 +101,7 @@ No credential, token, Keychain entry or operator configuration content is requir
+ 
+ ## Specification changes
+ 
+-The following is a normative sketch to publish in curator-spec only after review and operator acceptance:
++The following is the accepted direction to publish in normative Manager/Environments contracts with reviewed schemas and vectors:
+ 
+ > **Manager §8, no-source-v1.** Shell activation is optional. A hook MUST NOT source, dot-source, evaluate, import or otherwise execute any project or global env-file content. No approval record or rollout mode may relax this rule. Discovery MUST use directory metadata and MUST NOT depend on env-file bytes, readability or approval. The nearest `.agents` directory identifies the physical project root; invalid or indeterminate discovery disables activation for that scope. The hook MUST append its bin entries after inherited PATH entries, with the project bin last, MUST NOT introduce empty entries, and MUST clear project-root state when leaving. Reloading MUST be idempotent. Global activation follows the same no-source rule, is enabled by default, and respects an explicitly retained opt-out.
+ 
+@@ -103,11 +111,11 @@ The following is a normative sketch to publish in curator-spec only after review
+ 
+ > **Environments §§11–12.** Describe historical S6/K3 env-file execution as removed by Manager §8's new hook while retaining the provider trust-root requirement for all untrusted PATH entries. Cross-reference `no-source-v1` in the shared posture inventory and distinguish cache status from live-shell status. Do not revise Environments §9.2's independent update-confirmation A→B plan, §10.2's reserved `path_prepend`, or §11's provider rollout through this decision.
+ 
+-**Proposed decision record — replace the K3 warn-first plan.** Status: Pending operator acceptance. Context: rc.14 Manager §8.5 requires warning-and-source before enforcement; measured directory entry executes hostile bytes and prepend displaces inherited commands. Decision: adopt C, with no-source activation and append together in the adopting release; supersede §8.5's staged A→B rule only for shell activation/K3. Consequences: custom automatic env scripts and approval authorization end; helpers/approval cleanup get a bounded deprecation window; caches and open shells need explicit migration; inherited-before-global-before-project becomes normative. Rejected alternatives: A keeps arbitrary approved code and verification/use risk; B restricts code but retains store/snapshot complexity. Acceptance must name the target release and approve the global collision behavior. The orchestrator assigns the decision filename/number when publishing this reviewed CIP under `cips/`; this research edits neither spec nor decision files.
++**Accepted disposition — replace the K3 warn-first plan.** Status: accepted 2026-10-10; normative landing/release pending. Context: rc.14 Manager §8.5 requires warning-and-source before enforcement; measured directory entry executes hostile bytes and prepend displaces inherited commands. Decision: adopt C, with no-source activation and append together in the adopting release; supersede §8.5's staged A→B rule only for shell activation/K3. Consequences: custom automatic env scripts and approval authorization end; helpers/approval cleanup get a bounded deprecation window; caches and open shells need explicit migration; inherited-before-global-before-project becomes normative. Rejected alternatives: A keeps arbitrary approved code and verification/use risk; B restricts code but retains store/snapshot complexity. Publication must name the target release; interactive inherited/global/project ordering follows the accepted disposition. The orchestrator assigns the decision filename/number when publishing this reviewed CIP under `cips/`; this research edits neither spec nor decision files.
+ 
+ ## Implementation plan
+ 
+-These are **proposed leaves, not scheduled or authorized tasks**. Sizes are relative estimates: S is one focused surface; M spans several related production paths and platform tests. Implementation starts only after the operator accepts the design.
++These are **proposed leaves, not scheduled or authorized tasks**. Sizes are relative estimates: S is one focused surface; M spans several related production paths and platform tests. Implementation consumes the accepted design after the normative contract is published.
+ 
+ | Order | Proposed leaf | Size | Deliverable and gate |
+ |---|---|---|---|
+@@ -150,10 +158,10 @@ Research coverage is intentionally bounded: P1–P4 touched 9/18 reviewer rows,
+ 
+ ## Open questions for the operator
+ 
+-1. **Accept C as the sole default, with no warning-and-source or approval escape hatch? Recommended: yes.** A preserves arbitrary approved scripts; B requires canonical verification plus race-safe snapshot execution and state hardening. Neither has a demonstrated benefit for a two-variable PATH helper.
+-2. **Accept inherited → global → project, making the project addition literally last? Recommended: yes.** This changes project/global collision behavior. Preserving project-over-global precedence would instead require inherited → project → global and relaxing the literal-last requirement.
+-3. **Accept physical-root discovery by nearest `.agents` directory and refusal of PATH-separator-containing roots? Recommended: yes.** This removes env-file presence as a prerequisite and avoids splitting one hostile name into search entries. Inaccessible discovery disables that scope.
+-4. **Accept the one-release compatibility window for explicit-use helpers and approval inspection/cleanup, with approval authorization retired immediately? Recommended: yes.** Keep old files/state untouched until normal regeneration or explicit cleanup; do not retain a mode that sources them automatically. Preserve the existing snapshot-restoration semantics for PATH edits while a scope is active.
++1. **Superseded acceptance question — decided 2026-10-10:** C is the accepted no-source default with no approval escape hatch. A preserves arbitrary approved scripts; B requires canonical verification plus race-safe snapshot execution and state hardening. Neither has a demonstrated benefit for a two-variable PATH helper.
++2. **Superseded ordering question — decided 2026-10-10:** inherited → global → project, with project literally last. This changes project/global collision behavior. Preserving project-over-global precedence would instead require inherited → project → global and relaxing the literal-last requirement.
++3. **Publication detail — proposed:** physical-root discovery by nearest `.agents` directory and refusal of PATH-separator-containing roots. Publish this bounded grammar (recommended), or revise the discovery grammar before qualification. This removes env-file presence as a prerequisite and avoids splitting one hostile name into search entries. Inaccessible discovery disables that scope.
++4. **Compatibility timing — open:** publish the proposed one-release window for explicit-use helpers and approval inspection/cleanup (recommended), or choose a different explicit deprecation window. Activation approval authority is already retired by the accepted no-source decision. Keep old files/state untouched until normal regeneration or explicit cleanup; do not retain a mode that sources them automatically. Preserve the existing snapshot-restoration semantics for PATH edits while a scope is active.
+ 5. **Which release adopts the new contract, and does Windows PowerShell 5.1 remain supported? Recommended: the first jointly qualified spec/manager release after acceptance, with current shell support retained until native evidence justifies a separate support decision.** Refresh existing managed caches with retained options and tell users to restart/reload; do not attest that a running shell has changed merely because the manager was upgraded.
+ 
+-Recommended decision package: **C + literal-tail project append + no global sourcing + safe output + explicit cache migration**. Acceptance enables the proposed L1–L5 leaves; prioritization remains the operator's next decision.
++Recommended decision package: **C + literal-tail project append + no global sourcing + safe output + explicit cache migration**. The acceptance questions above are superseded; normative publication, compatibility timing and release qualification remain separate work.
+diff --git a/cips/CIP-0005-audit-backends-and-cli-secret-transport.md b/cips/CIP-0005-audit-backends-and-cli-secret-transport.md
+index 2fff41f3a6b9dd4ef9d48b76d3632cf694d36f5d..354504f8255ff18f04cc5ad559053d53d3ea0399 100644
+--- a/cips/CIP-0005-audit-backends-and-cli-secret-transport.md
++++ b/cips/CIP-0005-audit-backends-and-cli-secret-transport.md
+@@ -1,14 +1,22 @@
+ # CIP-0005: Audit backends and CLI secret transport
+ 
+ - **Status:** Accepted (operator, 2026-10-10); the first step is the CLI secret transport
+-- **Owner:** ivan-curator (orchestrator); decision: operator
++- **Owner:** orchestrator; decision: operator
+ - **Created:** 2026-10-04
+ - **Related:** TASK-261004-hy8zmn — audit-token-argv-and-backend-env-allowlist-design; STORY-261004-2b8pnx — design-audit-backends-and-secret-transport; K24; public cocoaskills PR #142, commit 0da153a54e7f8b446e63a6a177a9b5392e30da11; adopted Decisions 0019 and 0021
+ - **Affects:** curator-spec manager profile §§1, 7, 12.6; registry protocol §9.1; CLI audit reference; manager configuration, local verdict and backend schemas; curator; shared agents-management launch layer. No proposed curator-run headless mode or launch-fragment wire change.
+ 
++## Operative disposition (2026-10-11)
++
++- **Decided:** Accepted on 2026-10-10, with CLI secret transport first: refuse literal argv tokens; explicit token-file failure never falls back to CURATOR_REGISTRY_TOKEN. Native backend launch construction remains with the existing shared launch owner.
++- **Open:** Option B backend details, Windows privacy qualification, descriptors/cache versions, canary verification and later-leaf ordering retain the explicit options in Open questions. CLI-transport-first does not decide every backend policy.
++- **Superseded:** The general no-acceptance statement and the question whether secret transport should be first are superseded by the accepted header. Additional backend questions remain open; this CIP does not enact the D-EXECUTOR broker mode.
++
++[Cross-CIP contract, schema owners and versions](platform-contract-disposition.md) records the canonical values and owner decisions. Acceptance records design disposition; schema publication, implementation and runtime qualification are separate. Current-state observations and companion probes below are historical at their stated pins, not rerun evidence.
++
+ ## Summary
+ 
+-Refuse literal registry tokens in CLI arguments and support CURATOR_REGISTRY_TOKEN or a bounded, private, no-follow token file. Implement explicitly selected audit backends through a shared process runner, with Codex and Claude launch plans constructed by the existing owner of harness flags and a direct command adapter. Every manager-launched backend process receives the same allowlist policy, with unconditional secret-variable exclusions; Git transport retains its separate authentication policy. Make egress, canary results, incomplete backend coverage, cache identity, and strict/advisory failures explicit. This draft recommends a design for operator review; it authorizes no implementation, scheduling, or producer runs.
++Refuse literal registry tokens in CLI arguments and support CURATOR_REGISTRY_TOKEN or a bounded, private, no-follow token file. Implement explicitly selected audit backends through a shared process runner, with Codex and Claude launch plans constructed by the existing owner of harness flags and a direct command adapter. Every manager-launched backend process receives the same allowlist policy, with unconditional secret-variable exclusions; Git transport retains its separate authentication policy. Make egress, canary results, incomplete backend coverage, cache identity, and strict/advisory failures explicit. The CLI secret transport direction is accepted first; backend subcontracts and release publication remain separate work.
+ 
+ ## Motivation and user stories
+ 
+@@ -20,7 +28,7 @@ Refuse literal registry tokens in CLI arguments and support CURATOR_REGISTRY_TOK
+ 
+ ## Current state
+ 
+-The inspected curator main revision is **ca1b776fb580ec0cee0173bf150daf063023aeaa**, equal to the public main ref observed during research. The specification baseline is **v1.0.0-rc.14**, peeled commit **43bf0a2506d5c354a73bbc3ea4623d4653db10c7**, also pinned by curator CI. Source references below are relative to those repositories at those revisions; curator package paths such as audit/audit.go are under internal/. This CIP is filed from the research draft in [.research/261004_CIP-0005-audit-backends-and-cli-secret-transport.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0005-audit-backends-and-cli-secret-transport.md) on `relux-works/curator` `main` @ `fae2ff9c`. Links, probe procedures, real exit codes and verification bounds remain in the companion [.research/261004_CIP-0005-audit-backends-and-cli-secret-transport_evidence.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0005-audit-backends-and-cli-secret-transport_evidence.md) at the same commit; they are cited, not copied. The operator has made no acceptance decision on this proposal.
++The inspected curator main revision is **ca1b776fb580ec0cee0173bf150daf063023aeaa**, equal to the public main ref observed during research. The specification baseline is **v1.0.0-rc.14**, peeled commit **43bf0a2506d5c354a73bbc3ea4623d4653db10c7**, also pinned by curator CI. Source references below are relative to those repositories at those revisions; curator package paths such as audit/audit.go are under internal/. This CIP is filed from the research draft in [.research/261004_CIP-0005-audit-backends-and-cli-secret-transport.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0005-audit-backends-and-cli-secret-transport.md) on `relux-works/curator` `main` @ `fae2ff9c`. Links, probe procedures, real exit codes and verification bounds remain in the companion [.research/261004_CIP-0005-audit-backends-and-cli-secret-transport_evidence.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0005-audit-backends-and-cli-secret-transport_evidence.md) at the same commit; they are cited, not copied. At the original research pin no acceptance decision had been recorded; the operative disposition above records the later acceptance and its scope.
+ 
+ | Finding | Evidence and consequence |
+ | --- | --- |
+@@ -258,7 +266,7 @@ Derive expected adapter/phase/call-site members from the accepted spec and produ
+ ## Open questions for the operator
+ 
+ 1. **Accept option B and its launch ownership?** Recommend yes: Curator owns execution/policy; agents-management owns Codex/Claude flag spelling. If the shared typed audit purpose is not yet available, keep those kinds explicitly unsupported and ship only the accepted earlier slices.
+-2. **Release priority?** Recommend token transport first, then command runner/egress/profile integration, then native adapters. This is proposed ordering only; no producer or schedule starts from this draft.
++2. **First step — decided; later order open.** CLI secret transport is first (2026-10-10). The remaining options are command runner/egress/profile integration before native adapters (recommended), or a separately approved later order. No release schedule is established here.
+ 3. **Windows file input and privacy strength?** Recommend native DACL/no-follow qualification before enabling --token-file there; otherwise a clear refusal with environment input available. On POSIX, require the brief's group/other read-bit check and document ACL limits; adopting owner-only/no-group-write and ACL checks as stronger mandatory rules needs an explicit conformance scope.
+ 4. **Environment authentication exceptions?** Recommend none, including OPENAI_API_KEY, ANTHROPIC_API_KEY and subscription token variables. Use explicitly provisioned saved provider authentication. If environment-only providers are essential, choose a separately designed credential broker; do not weaken the deny rule.
+ 5. **Local model scope?** Recommend native codex/claude version 1 classified cloud, with local analyzers through an explicitly trusted command descriptor. Add OSS/provider endpoint controls only with a later versioned contract that proves effective locality.
+@@ -266,4 +274,4 @@ Derive expected adapter/phase/call-site members from the accepted spec and produ
+ 7. **Canary and model findings?** Recommend started-canary failures always block, with fixture-specific verification; model findings block only after manager-owned deterministic verification. This preserves the spec's canary and verifiable-finding distinction without treating model assertions as evidence.
+ 8. **Contract/migration direction?** Recommend versioned selected descriptors and new local cache state, preserving frozen manager/registry/fragment schemas. Spec adoption must settle the exact source-pattern and response-verification vectors before leaves 4–8 consume them.
+ 
+-Accepting these answers implies the spec/Decision leaves and bounded implementation leaves above. Until that acceptance, this packet is ready for review as research only.
++Accepting these answers implies the spec/Decision leaves and bounded implementation leaves above. The accepted first transport slice and the remaining open backend choices are distinguished in the operative disposition; qualification remains pending.
+diff --git a/cips/CIP-0006-legacy-provider-settings-and-mcp-opt-outs.md b/cips/CIP-0006-legacy-provider-settings-and-mcp-opt-outs.md
+index efaa0e9555fd549572078d9497194f7a3e3d9350..f57243657df19b1fd99cdef001e0b2dece826787 100644
+--- a/cips/CIP-0006-legacy-provider-settings-and-mcp-opt-outs.md
++++ b/cips/CIP-0006-legacy-provider-settings-and-mcp-opt-outs.md
+@@ -1,14 +1,22 @@
+ # CIP-0006: Legacy provider settings and MCP opt-outs
+ 
+ - **Status:** Accepted (operator, 2026-10-10): the narrow profile-settings record
+-- **Owner:** ivan-curator (orchestrator); decision: operator
++- **Owner:** orchestrator; decision: operator
+ - **Created:** 2026-10-04
+ - **Related:** [curator#105 — preserve legacy provider settings and explicit MCP opt-outs](https://github.com/relux-works/curator/issues/105); Decision 0014 — tool-configuration surfaces (**proposed, not adopted**); Decision 0018 — curator run permission interface (**adopted**); TASK-261004-2iewnz — research-105-design-and-implementation-plan; STORY-261004-3v2zm2 — legacy-provider-settings-and-mcp-optouts-105; TASK-260927-367jb7 — infra-exit (external dependency named by the brief); TASK-260929-3hrwzn — transactional-legacy-config-import (PM-owned importer).
+ - **Affects:** environments §§5.8, 7.4, 7.8, 8, 9.2, 10, 12–13; manager configuration and profile cleanup; CLI `env config`, `env resolve`, `env status`; implementations: curator, curator-run/launcher and its agents-management integration; PM importer as a consumer.
+ 
++## Operative disposition (2026-10-11)
++
++- **Decided:** Accepted on 2026-10-10: the narrow machine-owned profile_settings record on existing profiles. Package settings and Decision 0014 as a whole remain outside this acceptance. Presence, scope, negative MCP intent and conservative key ownership must be preserved.
++- **Open:** Project/global selection, bounded native-rule semantics, provider suppression and deny/release details retain the explicit alternatives in Open questions. Coordinated schemas and adapter qualification remain pending.
++- **Superseded:** The no-acceptance statement and the option-A-versus-package-authority approval question are superseded by narrow acceptance. Detailed subcontracts do not become accepted merely because the header is Accepted.
++
++[Cross-CIP contract, schema owners and versions](platform-contract-disposition.md) records the canonical values and owner decisions. Acceptance records design disposition; schema publication, implementation and runtime qualification are separate. Current-state observations and companion probes below are historical at their stated pins, not rerun evidence.
++
+ ## Summary
+ 
+-Add one closed, machine-owned `environments.profile_settings.<profile>` record to the existing profile configuration surface, covering exactly the nine provider paths and per-server MCP choices in issue #105. Keep global and project declarations separate, apply them through the existing managed-home resolver, and expose explicit negative MCP intent through the existing launch fragment. Curator owns only the selected configuration keys, preserving unrelated managed values and leaving native provider files and authentication stores untouched. This is a narrow adoption of the machine-configuration approach discussed in Decision 0014, not adoption of that decision or its package-distribution, rules, model, or plugin-installation proposals. Every new name and behavior below is proposed; none is claimed to exist on current main.
++Add one closed, machine-owned `environments.profile_settings.<profile>` record to the existing profile configuration surface, covering exactly the nine provider paths and per-server MCP choices in issue #105. Keep global and project declarations separate, apply them through the existing managed-home resolver, and expose explicit negative MCP intent through the existing launch fragment. Curator owns only the selected configuration keys, preserving unrelated managed values and leaving native provider files and authentication stores untouched. This is a narrow adoption of the machine-configuration approach discussed in Decision 0014, not adoption of that decision or its package-distribution, rules, model, or plugin-installation proposals. The authority location is accepted; exact new grammar and unresolved subcontracts below remain proposed; none is claimed to exist on current main.
+ 
+ ## Motivation and user stories
+ 
+@@ -21,7 +29,7 @@ The decision to unblock is **where the narrow import authority lives and how its
+ 
+ ## Current state
+ 
+-Source baseline: curator main `ca1b776fb580ec0cee0173bf150daf063023aeaa`, equal to the worktree HEAD and advertised remote main when inspected. Specification baseline: `v1.0.0-rc.14`, peeled commit `43bf0a2506d5c354a73bbc3ea4623d4653db10c7`. This CIP is filed from the research draft in [.research/261004_CIP-0006-legacy-provider-settings-and-mcp-optouts.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0006-legacy-provider-settings-and-mcp-optouts.md) on `relux-works/curator` `main` @ `fae2ff9c`. Detailed citations, commands, exit codes, and bounds remain in the companion [.research/261004_CIP-0006-legacy-provider-settings-and-mcp-optouts_evidence.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0006-legacy-provider-settings-and-mcp-optouts_evidence.md) at the same commit; they are cited, not copied. The operator has made no acceptance decision on this proposal.
++Source baseline: curator main `ca1b776fb580ec0cee0173bf150daf063023aeaa`, equal to the worktree HEAD and advertised remote main when inspected. Specification baseline: `v1.0.0-rc.14`, peeled commit `43bf0a2506d5c354a73bbc3ea4623d4653db10c7`. This CIP is filed from the research draft in [.research/261004_CIP-0006-legacy-provider-settings-and-mcp-optouts.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0006-legacy-provider-settings-and-mcp-optouts.md) on `relux-works/curator` `main` @ `fae2ff9c`. Detailed citations, commands, exit codes, and bounds remain in the companion [.research/261004_CIP-0006-legacy-provider-settings-and-mcp-optouts_evidence.md](https://github.com/relux-works/curator/blob/fae2ff9cab17a031c26a2b4c776afd8dc5e8b4f6/.research/261004_CIP-0006-legacy-provider-settings-and-mcp-optouts_evidence.md) at the same commit; they are cited, not copied. At the original research pin no acceptance decision had been recorded; the operative disposition above records the later acceptance and its scope.
+ 
+ | Surface | What exists | Consequence for #105 |
+ |---|---|---|
+@@ -225,7 +233,7 @@ Run platform CI on Linux, macOS and Windows for parsing, path identity, case col
+ 
+ ## Open questions for the operator
+ 
+-1. **Approve the narrow authority location?** Recommended: option A, the machine-owned `profile_settings` knob on existing profiles. Keep package distribution and Decision 0014 adoption deferred. If portable settings packages are required now, choose B explicitly and add its trust/admission leaf.
++1. **Authority location — decided, 2026-10-10.** Option A, the narrow machine-owned `profile_settings` knob on existing profiles, is accepted. This approval question is superseded; package distribution and Decision 0014 adoption remain deferred. Portable settings packages require a separate decision.
+ 2. **Approve project selection and the meaning of global?** Recommended: explicit named project profiles with guarded roots; PM copies the preserved global contribution into each migrated profile record and selects that profile through existing launch configuration. No automatic cwd profile selector or implicit all-profile inheritance. Confirm the PM consumer can supply that existing selection before its importer switches over.
+ 3. **Approve the bounded native-rule contract and semantic preservation?** Recommended: refuse unproved rule forms and values, preserve supported values and source intent, and permit managed JSON/TOML formatting changes while preserving unrelated parsed values. Source-relative permission anchors must be translated and tested; no raw relocation. `status_line_use_colors` must be verified at L2, or reported as an unresolved source value that still blocks retirement.
+ 4. **Approve old-Codex-home suppression if the reserved layer cannot express it?** Recommended: first prove explicit `enabled=false` in the existing layer. If the pinned tool rejects negative-only layering, authorize key-level suppression only in the managed base, with projection ownership and conservative restoration. If neither suppresses a higher-precedence source reliably, refuse that launch and request a pinned-provider/spec decision; do not purge/re-provision auth homes or silently drop the opt-out.
+diff --git a/cips/CIP-0007-manager-provisioned-cli-tools.md b/cips/CIP-0007-manager-provisioned-cli-tools.md
+index a48afe6ad9e07a713c9e17968e4f2b28a1ade8d0..28b3f3a3ec236f7976fc54ef2afb0c66ae27c28e 100644
+--- a/cips/CIP-0007-manager-provisioned-cli-tools.md
++++ b/cips/CIP-0007-manager-provisioned-cli-tools.md
+@@ -13,6 +13,14 @@
+   status); skillfile and lock schemas; conformance vectors. No normative
+   change is made by this document.
+ 
++## Operative disposition (2026-10-11)
++
++- **Decided:** Option B accepted on 2026-10-10 with several signed registries, revocation veto across every enabled registry, dedicated rotating key sets, system/fleet trust configuration, a separate release-shipped trust bundle and no compiled-in trust keys. Launch aliases use the combined D-PATH recipe.
++- **Open:** Registry publisher/service, snapshot distribution, manifest/identity grammar and future option C retain the alternatives in Open questions. A default registry entry is configuration, not a trust key; exact configuration/bundle delivery remains an owner question in the shared contract.
++- **Superseded:** The example executing project .agents/bin is superseded by D-PATH. Earlier default-policy/probe questions cannot reopen accepted registry-only, provisioned-alias B exposure; option C remains a later decision.
++
++[Cross-CIP contract, schema owners and versions](platform-contract-disposition.md) records the canonical values and owner decisions. Acceptance records design disposition; schema publication, implementation and runtime qualification are separate. Current-state observations and companion probes below are historical at their stated pins, not rerun evidence.
++
+ ## Operator decision (2026-10-10)
+ 
+ Option B is accepted with these conditions:
+@@ -24,9 +32,11 @@ Option B is accepted with these conditions:
+   ```
+   ~/.curator/tools/store/github.com/cli/cli/2.62.0/darwin-arm64/gh   sealed store, read-only
+   <launch home>/.launch/<id>/bin/gh  ->  the store file
+-  session PATH = <launch home>/.launch/<id>/bin : <inherited PATH> : <project>/.agents/bin
++  session PATH = <protected launch tool directory> : <admitted base PATH> : <protected manager dispatcher directory>
+   ```
+ 
++D-PATH (2026-10-11) supersedes the earlier project-bin suffix. Project commands run only through the protected manager dispatcher after checks; repository `.agents/bin` is never executed in a managed launch. The resolved PATH is recorded in the launch plan and covered by its digest. Enforced script-worker PATH remains its separate declared-exec contract.
++
+ ## Summary
+ 
+ Skills that need an ordinary infrastructure CLI (for example a
+@@ -238,8 +248,7 @@ operator control surface for B:
+   explicit operator downgrade approval; lock replay provisions exactly the
+   locked bytes after re-running current revocation, key-validity, and
+   freshness authorization checks.
+-- Defaults: built-in registry only; no organization registry configured;
+-  overrides empty. A skill needing an unlisted tool fails with a refusal that
++- Default proposal: a release-supplied registry entry in editable system/fleet configuration, with its trusted keys in a separate release-shipped trust bundle; no organization registry configured and overrides empty. Registry coordinates are configuration, never compiled-in trust keys. Exact entry/bundle delivery and snapshot distribution remain the open owner choices below. A skill needing an unlisted tool fails with a refusal that
+   names the tool, constraint, policy, and the exact remediation (add a
+   registry, or install the tool on PATH where policy permits).
+ 
+@@ -418,8 +427,8 @@ Threat model and trust boundaries (all options; B/C deltas noted):
+   old markers remain readable on their lanes and must not attest tool
+   currency.
+ - Rollout: option A diagnostics first (no protocol change), then the B lane
+-  behind operator-configured registries (default: built-in only, so default
+-  behavior is unchanged until the operator opts in), then C's policy modes
++  behind operator-configured registries (proposed release-default entry and
++  separate trust bundle; exact distribution remains open), then C's policy modes
+   only after the service decisions land.
+ 
+ ## Specification changes
+@@ -507,7 +516,7 @@ S = one narrow surface; M = one production path plus its vectors.
+ 
+ | Order | Leaf / size | Consumes and produces |
+ | --- | --- | --- |
+-| 1 | Spec and Decision adoption, M | Approve the decisions above; freeze the declaration, record, lock, refusal, and offline vectors. No runtime work before operator acceptance. |
++| 1 | Spec and Decision adoption, M | Publish accepted B conditions, resolve the remaining schema/service questions, and freeze declaration, record, lock, refusal and offline vectors. Runtime adoption requires that coordinated publication. |
+ | 2 | Hint/diagnostic improvements (option A), S | Better missing-command diagnostics and readiness reporting. Independently useful; no protocol change. |
+ | 3 | Registry-only resolution and store, M | Ordered registry configuration, two-phase revocation-then-selection verification, staging download, content-addressed sealed store, B minimal provisioned-only binding with collision refusal (no probes). |
+ | 4 | Lock, marker, and transaction integration, M | Proposed lock-v2 per-member tool entries, replay/refresh with current authorization and downgrade approval, marker bindings, journaled publication and rollback, `tool_snapshot_changed`-class diagnostics. |
+@@ -562,15 +571,8 @@ platform.
+    file-distributed snapshots? Recommend: charter one operator-owned
+    snapshot pipeline before leaf 3, even if it starts as reviewed files;
+    no client resolves from a registry with no owner.
+-2. **Signing keys.** Which keys sign the built-in and organization
+-   snapshots, and where do operators obtain pins out of band?
+-   Recommend: Ed25519 pins distributed with the manager release for the
+-   built-in snapshot, operator-configured pins for organization
+-   registries, rotation per `registry.md` §2.1.
+-3. **Default policy.** Ship option B's fixed `registry-only`, or also
+-   charter option C's `verified`/`prompt` modes now? Recommend:
+-   `registry-only` only, until the mirror and approval-store designs are
+-   accepted.
++2. **Signing keys — conditions decided; concrete pins open.** Dedicated registry key sets, rotation and a separate release-shipped trust bundle are accepted; no keys are compiled into the binary. The registry owner must select concrete pins and their distribution. Options: release bundle plus administrator-managed system configuration, or a network-replaced bundle/configuration; snapshot distribution remains question 7.
++3. **Default policy — decided.** Option B is accepted: `registry-only` with provisioned aliases. The earlier B-versus-C approval question is superseded. Chartering C remains a separate later owner decision; it is not admitted by B acceptance.
+ 4. **Client vs service resolution for `verified` mode.** If C is chartered,
+    do clients resolve on demand or only consume pre-signed records?
+    Recommend: service-only resolution; clients consume pre-signed records,
+@@ -589,10 +591,7 @@ platform.
+ 7. **Built-in registry distribution.** Ship in the manager release or fetch
+    as a signed snapshot on first use? Recommend: ship a pinned snapshot
+    with the release (zero-config, no first-use network trust decision).
+-8. **Version probes vs provisioned-only.** Registry-declared PATH probes,
+-   or trust only provisioned copies for constrained tools? Recommend:
+-   provisioned-only first; add probes only with an execution model the
+-   operator accepts.
++8. **Exposure — decided for B.** Provisioned locked aliases use D-PATH. Earlier probe-versus-provisioned approval wording is superseded for this slice. Registry-declared system probes belong to a separately accepted option C execution model.
+ 9. **Upstream expected-signer policy (C `verified` mode).** Who owns the
+    per-tool allowed publisher/subject pins and their revocation, and where
+    are they distributed? Recommend: the registry owner publishes the
+@@ -608,5 +607,4 @@ platform.
+    extension).
+ 
+ Accepting the recommendation implies the spec/Decision leaf and the
+-bounded B-lane leaves above. Until acceptance, this packet is ready for
+-review as research only.
++bounded B-lane leaves above. B acceptance records the conditions above; open schema/service choices and runtime qualification remain separate.
+diff --git a/cips/CIP-0010-credentials-setup-token-and-inherited-auth.md b/cips/CIP-0010-credentials-setup-token-and-inherited-auth.md
+index 7b6127760a5a5b001a9f8f18f8d6c76322252737..6cf977aec3234efde0c6d39d23f11afe5b23bf06 100644
+--- a/cips/CIP-0010-credentials-setup-token-and-inherited-auth.md
++++ b/cips/CIP-0010-credentials-setup-token-and-inherited-auth.md
+@@ -1,10 +1,18 @@
+ # CIP-0010: Credentials for managed launches: `setup-token` adoption, homes with inherited authentication, and the disposition of CIP-0003
+ 
+ - **Status:** Draft (revision 2, after the architecture review of 2026-10-08)
+-- **Owner:** ivan-curator (orchestrator); decision: operator
++- **Owner:** orchestrator; decision: operator
+ - **Created:** 2026-10-08
+-- **Related:** owner brief 2026-10-08 §8; [CIP-0003](CIP-0003-claude-managed-home-credential-modes.md) (Draft); [Decision 0017](../decisions/0017-environment-credential-modes.md) (`shared|isolated`, Q4, Q7 no-copy); environments [§7.4](../protocol/environments.md#74-credential-passthrough-provisioning-seeds-and-isolation), §10.3, §12.1–§12.2; wiki `research/harness-auth/RESEARCH.md` (2026-10-07) and `PLAN-expiry-check.ru.md`; wiki `session-host/architecture.ru.md` §7.3 (credential broker); VISION v1.3 LCH §7; [CIP-0008](CIP-0008-remote-worker-launch-mode.md), [CIP-0009](CIP-0009-donor-side-deployment-and-bridge.md); relux-works/remote-worker-harness `docs/session-mode.md` ("Login: the single auth owner")
+-- **Affects:** environments §7.4 and §12.1 (new user-owned knob), Decision 0013 (a required plan extension), Decision 0017 (Q4 evidence label; Q7 unchanged), the marker schema, curator (`env credential` commands, the Codex auth owner), curator-run/launcher, the final executors (session host, task-board spawn runner, the remote-worker supervisor)
++- **Related:** owner brief 2026-10-08 §8; [CIP-0003](CIP-0003-claude-managed-home-credential-modes.md) (accepted, narrowed); [Decision 0017](../decisions/0017-environment-credential-modes.md) (`shared|isolated`, Q4, Q7 no-copy); environments [§7.4](../protocol/environments.md#74-credential-passthrough-provisioning-seeds-and-isolation), §10.3, §12.1–§12.2; wiki `research/harness-auth/RESEARCH.md` (2026-10-07) and `PLAN-expiry-check.ru.md`; wiki `session-host/architecture.ru.md` §7.3 (credential broker); VISION v1.3 LCH §7; [CIP-0008](CIP-0008-remote-worker-launch-mode.md), [CIP-0009](CIP-0009-donor-side-deployment-and-bridge.md); relux-works/remote-worker-harness `docs/session-mode.md` ("Login: the single auth owner")
++- **Affects:** environments §7.4 and §12.1 (new user-owned knob), Decision 0013 (a required plan extension), Decision 0017 (Q4 evidence label; Q7 unchanged), the marker schema, curator (`env credential` commands, the Codex auth owner), curator-run/launcher, the final executors (agent-account curator-run first; board and session host through the dispatcher; donor supervisor later)
++
++## Operative disposition (2026-10-11)
++
++- **Decided:** Revision 2.1 and Revision 2.2 decide the first file backend and source-policy v1/v2; CIP-0003 is adopted narrowed. D-EXECUTOR (2026-10-11) makes curator-run under the agent account the first broker consumer. Board and session host request the dispatcher; neither embeds the first broker client.
++- **Open:** Personal-plan Codex adoption/qualification, Muse subscription channel and release scheduling retain the explicit options below. Credential extension, binding and capability names describe pending contracts, not qualified runtime adoption.
++- **Superseded:** Keychain-first node storage, the CIP-0003 acceptance/default questions and board-spawn-first client sequencing are superseded by Revision 2.1, Revision 2.2/C6 and D-EXECUTOR respectively.
++
++[Cross-CIP contract, schema owners and versions](platform-contract-disposition.md) records the canonical values and owner decisions. Acceptance records design disposition; schema publication, implementation and runtime qualification are separate. Current-state observations and companion probes below are historical at their stated pins, not rerun evidence.
+ 
+ ## Revision 2: what the architecture review changed
+ 
+@@ -23,12 +31,12 @@
+ 
+ ## Revision 2.2 (owner decisions 2026-10-10)
+ 
+-- **A launch whose credential source is not configured.** Version 1 keeps `per-home`, today's behaviour; a node, a helper or the broker (CIP-0011) is used only through an explicit entry. Owner, verbatim: «без контекста сегодняшних запусков - как правильно? а можем брать но если вдруг c - правильнее - то просто пишем потом в спеку к v2 конкретно этого решения». The correct end state is an explicit entry for every profile and harness: **version 2 refuses** a launch whose credential source is not configured, and the migration to version 2 writes `per-home` explicitly for every existing home that already holds a login, so nothing that works today breaks.
++- **A launch whose credential source is not configured.** Version 1 keeps `per-home`, today's behaviour; a node, a helper or the broker (CIP-0011) is used only through an explicit entry. The owner preserves working launches now and requires a separately explicit version-2 migration. The correct end state is an explicit entry for every profile and harness: **version 2 refuses** a launch whose credential source is not configured, and the migration to version 2 writes `per-home` explicitly for every existing home that already holds a login, so nothing that works today breaks.
+ - **CIP-0003** is adopted, narrowed, as part of this CIP (C6).
+ 
+ ## Summary
+ 
+-Three related changes. (1) **Adopt `claude setup-token`** (`CLAUDE_CODE_OAUTH_TOKEN`) for tracked and headless launches behind explicit gates: the token is enrolled once into a per-user protected store under an *authentication node*, referenced by an opaque `source_ref`, re-resolved through a protected binding and injected into the harness process environment by the **final executor** only; the plan and the fragment never carry it. (2) **Homes with inherited authentication**: a managed home may start with no credential of its own and use the authentication of a node higher up (the operator's root login or a named account node) instead of a per-home Keychain login on macOS or a per-home `auth.json`; for Claude this is the enrolled token; for Codex it is an access token handed out by a single auth owner per account; each with stated limits. (3) **CIP-0003 disposition**: its `token` mode is the core of this CIP and should be accepted in a narrowed revision; its `shared-file` mode is replaced by the node; `per-home` stays the interactive default; `helper` stays for API keys; its gates, precedence, protected-store reads and migration rules are retained clause by clause. Priority: high, right after v0.15.0-rc.5, with slice 0 (the cross-user broker interface) first, because the owner's MVP, tracked spawns and remote workers depend on it.
++Three related changes. (1) **Adopt `claude setup-token`** (`CLAUDE_CODE_OAUTH_TOKEN`) for tracked and headless launches behind explicit gates: the token is enrolled once into a per-user protected store under an *authentication node*, referenced by an opaque `source_ref`, re-resolved through a protected binding and injected into the harness process environment by the **final executor** only; the plan and the fragment never carry it. (2) **Homes with inherited authentication**: a managed home may start with no credential of its own and use the authentication of a node higher up (the operator's root login or a named account node) instead of a per-home Keychain login on macOS or a per-home `auth.json`; for Claude this is the enrolled token; for Codex it is an access token handed out by a single auth owner per account; each with stated limits. (3) **CIP-0003 disposition**: its `token` mode is the core of this CIP and is accepted in a narrowed revision (2026-10-10); its `shared-file` mode is replaced by the node; `per-home` stays the interactive default; `helper` stays for API keys; its gates, precedence, protected-store reads and migration rules are retained clause by clause. Priority: high, right after v0.15.0-rc.5, with slice 0 (the cross-user broker interface) first, because the owner's MVP, tracked spawns and remote workers depend on it.
+ 
+ ## Motivation and user stories
+ 
+@@ -44,7 +52,7 @@ Facts are measured, vendor-documented or source-inspected, with the label stated
+ - **Claude Code.** `claude setup-token` opens the browser flow and prints a one-year OAuth access-only token; it saves nothing. `CLAUDE_CODE_OAUTH_TOKEN` takes precedence over Keychain credentials for the whole session; it cannot be shortened, scoped or renewed in place ("generate a new one and restart"); revocation only in the claude.ai UI; `apiKeyHelper` accepts API keys or JWTs only; `--bare` never reads OAuth. On macOS a native login is a Keychain item keyed by `CLAUDE_CONFIG_DIR` (service suffix sha256[0:8]), so every managed home is its own login and `shared` is refused (`environment_shared_unsupported`); sharing the OS Keychain does not make two homes share an item. A plaintext `.credentials.json` path exists as the fallback (and the Linux form); CIP-0003 records synthetic linked-file reads for it and correctly withholds any refresh-safety qualification. Subscription logins are refresh-token families with single-use rotation: a copy that refreshes invalidates its siblings. Terms: no account sharing; `CLAUDE_CODE_OAUTH_TOKEN` in CI is documented practice. Whether the native Keychain lookup is suppressed when the environment token is present is the **effective-source check** of PLAN step 2: proposed, not yet measured.
+ - **Codex.** `auth.json` is rewritten in place (0600) and rotated at every refresh (5 minutes before `exp`, or after 8 days); OpenAI: one `auth.json` per runner, never shared across concurrent jobs or machines; stores `file|keyring|auto|ephemeral`; the keyring entry is keyed by `CODEX_HOME` (**source inspection**, RESEARCH §B; the live probe of Decision 0017 Q4 is pending); Business/Enterprise access tokens (`CODEX_ACCESS_TOKEN`, 1–90 days, admin-revocable) are a clean per-launch path; `CODEX_API_KEY` wins over everything. **Measured by `rwh`:** several app-servers sharing one `auth.json` race on refresh; with its `auth.json.rwh-lock` and one refresh owner an eight-caller test produced one refresh, without the lock eight; its tenants receive external access tokens and hold no `auth.json`. Curator links the managed `auth.json` to the native one (`keyring-preferred` strategy; in-place writer verified), never copies; the in-place writer preserves link identity and says nothing about concurrent refresh ownership.
+ - **Muse.** `META_API_KEY` always wins; account login is Keychain-first with an `auth.json` fallback; `muse exec --api-key-stdin`; no helper. The spawn allowlist does not pass `META_API_KEY` yet (TASK-261007-hjwgiz).
+-- **CIP-0003 (Draft)** proposes four Claude modes — `per-home`, `token` (opaque `source_ref`, e.g. a Keychain item), `helper`, gated `shared-file` — with configuration precedence and defaults, protected-store reads in a defined order, a legacy Linux path, migration rules, no fallback, and item 5: refuse `token` and `helper` for tracked runs until the final executor does the protected lookup itself. Nothing of it is implemented. VISION v1.3 (CUR-R3) already assumes M1 does the lookup with `source_ref` in the plan.
++- **CIP-0003 at the historical research pin** proposed four Claude modes — `per-home`, `token` (opaque `source_ref`, e.g. a Keychain item), `helper`, gated `shared-file` — with configuration precedence and defaults, protected-store reads in a defined order, a legacy Linux path, migration rules, no fallback, and item 5: refuse `token` and `helper` for tracked runs until the final executor does the protected lookup itself. Nothing of it is implemented. VISION v1.3 (CUR-R3) already assumes M1 does the lookup with `source_ref` in the plan.
+ - **Owner decisions 2026-10-07:** subscriptions now, tokens architecturally; Team/Enterprise (Claude) and Business (Codex) not for the first release; the personal-plan Codex workaround (one serialized copy per account) is admitted; "one person = one subscription; the broker substitutes it only into that person's launches, in the volume of one person"; no traffic interception in the first implementation.
+ 
+ ## Design
+@@ -70,7 +78,7 @@ Facts are measured, vendor-documented or source-inspected, with the label stated
+ 
+ ### Recommendation
+ 
+-**C1. Authentication nodes.** A new managed object, the **authentication node**: a per-OS-user, per-harness, per-account-label record under the manager's environments root, `auth/<label>/`, holding *references and metadata* only: `{harness, account_label, kind: claude-oauth-token | codex-auth-owner | codex-access-token | meta-api-key | gemini-api-key, source_ref, enrolled_at, issued_at?, expires_at | unknown, last_refusal?}`. Material lives in the node's **secret store**, never in the node record. The secret store is a pluggable backend behind one interface (`put`, `get`, `delete`, `describe`), so other backends can be added without changing nodes, plans or executors. **First release: one backend, a 0600 file** in a 0700 directory owned by the OS user (`~/.curator/auth/<label>/secret`, identically on macOS and Linux) — the same protection level as Codex's default `auth.json` and Claude's Linux `.credentials.json`. The macOS Keychain and the Linux Secret Service are **not** implemented in the first release (owner decision 2026-10-09: «везде файл 0600, Keychain как хранилище узла вообще не делать в первой версии — ок, просто заложимся архитектурно»). Reasons: tracked and headless launches cannot answer Keychain access prompts and often run without an unlocked GUI login keychain or under another OS user; Keychain "Always Allow" is bound to the binary's code-signing designated requirement, so locally built or unsigned curator binaries re-prompt after every rebuild; and the protection gain is small because the executor hands the token to the harness process anyway. When a keychain backend is added later, tracked and headless launches MUST refuse a node whose backend can prompt (`credential_store_interactive_only`) rather than block on a prompt; it is meant for interactive use with signed (Developer ID) releases. The **root node** is the label `root` of a user; several accounts are several labels. A node belongs to the OS user that enrolled it; another OS user cannot read it by construction. Crossing OS users is the credential broker of architecture §7.3, whose minimal interface is slice 0 of this CIP (C7).
++**C1. Authentication nodes.** A new managed object, the **authentication node**: a per-OS-user, per-harness, per-account-label record under the manager's environments root, `auth/<label>/`, holding *references and metadata* only: `{harness, account_label, kind: claude-oauth-token | codex-auth-owner | codex-access-token | meta-api-key | gemini-api-key, source_ref, enrolled_at, issued_at?, expires_at | unknown, last_refusal?}`. Material lives in the node's **secret store**, never in the node record. The secret store is a pluggable backend behind one interface (`put`, `get`, `delete`, `describe`), so other backends can be added without changing nodes, plans or executors. **First release: one backend, a 0600 file** in a 0700 directory owned by the OS user (`~/.curator/auth/<label>/secret`, identically on macOS and Linux) — the same protection level as Codex's default `auth.json` and Claude's Linux `.credentials.json`. The macOS Keychain and the Linux Secret Service are **not** implemented in the first release (owner decision 2026-10-09: files on both systems first; a node Keychain backend is deferred). Reasons: tracked and headless launches cannot answer Keychain access prompts and often run without an unlocked GUI login keychain or under another OS user; Keychain "Always Allow" is bound to the binary's code-signing designated requirement, so locally built or unsigned curator binaries re-prompt after every rebuild; and the protection gain is small because the executor hands the token to the harness process anyway. When a keychain backend is added later, tracked and headless launches MUST refuse a node whose backend can prompt (`credential_store_interactive_only`) rather than block on a prompt; it is meant for interactive use with signed (Developer ID) releases. The **root node** is the label `root` of a user; several accounts are several labels. A node belongs to the OS user that enrolled it; another OS user cannot read it by construction. Crossing OS users is the credential broker of architecture §7.3, whose minimal interface is slice 0 of this CIP (C7).
+ 
+ **C2. Homes with inherited authentication.** `isolation` keeps the Decision 0017 meaning (`shared|isolated`: whether the native store is shared). A separate axis, the **credential source**, is set per profile and harness in the user-owned machine configuration: `credential_source.<profile>.<harness>` = `per-home` (default) | `node:<label>` | `helper`. A home whose source is a node holds no credential of its own: no seed, no link (for Claude), and the executor injects by the harness's channel table at every launch:
+ 
+@@ -96,7 +104,7 @@ So "inherited authentication" for Claude is one token from `setup-token`, enroll
+ 
+ **C5. Remote workers.** On the donor machine the node is enrolled by the donor (the machine's owner) during `curator remote-worker init` (CIP-0009) under the **bridge identity**; the supervisor is the executor with `credential-injection/1` and resolves the binding from the bridge's store; the harness is launched in lockdown with the token in its environment only. The project side never holds a donor credential (architecture §7.9).
+ 
+-**C6. CIP-0003 disposition, clause by clause (F23).** Recommended: adopt CIP-0003 (narrowed) and this CIP together in one decision record.
++**C6. CIP-0003 disposition, clause by clause (F23).** Decided 2026-10-10: CIP-0003 is adopted narrowed. The table below is operative; coordinated normative schema publication remains pending.
+ 
+ | CIP-0003 clause | Disposition |
+ |---|---|
+@@ -105,7 +113,7 @@ So "inherited authentication" for Claude is one token from `setup-token`, enroll
+ | Mode `helper` | retained for API-key setups |
+ | Mode `shared-file` and its gate | replaced by the node; the Linux legacy linked-file path stays described as the legacy lane with its unqualified refresh safety, never as a sharing strategy |
+ | Configuration precedence and defaults | retained; `credential_source` takes the place of `credential_sources` with the same precedence rules |
+-| Protected-store read order and the no-fallback rule | retained verbatim |
++| Protected-store read order and the no-fallback rule | validation order and no-fallback retained; the Keychain-first backend is superseded by C1's first 0600 file backend |
+ | Legacy Linux handling | retained |
+ | Migration (`inspect → plan → apply`, marker revision) | retained; this CIP's marker members ride the same revision |
+ | Item 5 (refuse `token`/`helper` for tracked runs until the executor does the lookup) | retained in substance as `credential_injection_unavailable`; lifted per executor only when that executor implements `credential_binding/1` and passes the qualification of C3.4 |
+@@ -145,8 +153,8 @@ So "inherited authentication" for Claude is one token from `setup-token`, enroll
+ 0. **Slice 0:** `credential_binding/1` over a peer-authenticated Unix socket across two OS users on one host; one chain proven with refusals (wrong peer, wrong account, expired). Size M.
+ 1. Spec text and the decision record. Size S–M.
+ 2. curator: nodes, `credential_source`, the Codex auth owner (from `rwh`), `env credential` commands, status and events, marker members. Size M.
+-3. Executors: `credential-injection/1` with the binding and the qualification suite in the task-board spawn runner (the first consumer), then the session host, then the donor supervisor. Size M each.
+-4. Lab (the owner's laptop, per PLAN): step 2 (effective source: no Keychain read with the environment token), steps 3–4 for Claude (revocation signal, `--resume` with a new token), the Codex owner race test (eight callers, one refresh) at 0.159.0. Size S of operator time.
++3. **First broker consumer (D-EXECUTOR):** `curator-run` under the agent account, in its narrow one-shot mode, verifies and executes the caller-composed immutable plan and implements the protected binding/qualification gate. Board spawn and session host request the dispatcher, which launches through `curator-run`; neither embeds a broker client. Shared launch library with `swarma-session-runner`; donor supervisor integration is later and independently qualified. The intake release/grammar belongs to R-LR1 and Decision 0021's amendment. Size M each.
++4. Authorized qualification lab (future work, not run on this host): step 2 (effective source: no Keychain read with the environment token), steps 3–4 for Claude (revocation signal, `--resume` with a new token), the Codex owner race test (eight callers, one refresh) at 0.159.0. Size S of operator time.
+ 5. Muse: `META_API_KEY` pass-through (TASK-261007-hjwgiz) then node kind `meta-api-key`. Size S.
+ 
+ ## Test plan
+@@ -160,7 +168,7 @@ So "inherited authentication" for Claude is one token from `setup-token`, enroll
+ ## Open questions for the operator
+ 
+ 1. **Default for tracked launches once an executor passes the qualification:** decided 2026-10-10: version 1 keeps `per-home`; version 2 requires an explicit entry (Revision 2.2).
+-2. **Codex personal plan:** adopt the single auth owner with external tokens (recommended, measured by `rwh`), with the race test at 0.159.0 as the precondition?
++2. **Codex personal plan — OPEN (contract C4):** adopt the single auth owner with external tokens and named supported-release qualification (recommended), or defer the personal-plan lane. The historical `rwh` race test at 0.159.0 is an input, not current qualification or an owner adoption decision.
+ 3. **Accept CIP-0003 narrowed together with this CIP:** decided 2026-10-10, yes.
+-4. **Muse:** node kind `meta-api-key` only (recommended), or also an account-login node once refresh semantics are measured?
++4. **Muse — OPEN (contract C7):** keep only the separately specified `meta-api-key` lane and defer subscription support (recommended), or prioritize subscription qualification and choose its source/refresh/channel from evidence. No subscription channel is invented here.
+ 5. **Slice 0 before rc.6?** The broker interface is the prerequisite of the owner's MVP; recommended: yes, as the first item after rc.5.
+diff --git a/cips/CIP-0011-credential-broker-and-agent-users.md b/cips/CIP-0011-credential-broker-and-agent-users.md
+index 0f5e19d644721bc26e53654f124c6564cec8fe67..9ce04e51d94a5ae2666dcdc9d185949a9369d7fc 100644
+--- a/cips/CIP-0011-credential-broker-and-agent-users.md
++++ b/cips/CIP-0011-credential-broker-and-agent-users.md
+@@ -1,10 +1,18 @@
+ # CIP-0011: Credential broker leases and agent OS users
+ 
+ - **Status:** Draft (revision 3)
+-- **Owner:** ivan-curator (orchestrator); decision: operator
++- **Owner:** orchestrator; decision: operator
+ - **Created:** 2026-10-09
+ - **Related:** [CIP-0010](CIP-0010-credentials-setup-token-and-inherited-auth.md) (credential sources, protected credential binding C3.4, executor capability, CIP-0003 disposition); [CIP-0008](CIP-0008-remote-worker-launch-mode.md), [CIP-0009](CIP-0009-donor-side-deployment-and-bridge.md); [Decision 0013](../decisions/0013-execution-ownership-and-launch-plans.md) (launch plans); [Decision 0017](../decisions/0017-environment-credential-modes.md) (credential modes); environments §7.4, §10.3, §12.1–§12.2; relux-works/swarma-credential-broker `spec/broker.md` (draft v0.3); relux-works/swarma-user-manager `spec/helper.md` (draft v0.3, with the launcher and `exec.stop`); relux-works/swarma-dispatcher `spec/dispatcher.md` (draft v0.2); relux-works/curator-network-profiles (binding records)
+-- **Affects:** environments §7.4 and §12.1 (a credential source value), Decision 0013 (the credential extension), the launcher SPEC, the manager command set (`broker`, `agent-user` as a dispatcher client), the final executors (task-board spawn runner first, then the session host and the remote-worker supervisor)
++- **Affects:** environments §7.4 and §12.1 (a credential source value), Decision 0013 (the credential extension), the launcher SPEC, the manager command set (`broker`, `agent-user` as a dispatcher client), agent-account curator-run as first broker consumer; board/session-host dispatcher clients; donor supervisor later
++
++## Operative disposition (2026-10-11)
++
++- **Decided:** The dispatcher is a separate module. D-EXECUTOR selects agent-account curator-run first: caller composes, executor verifies and executes without profile resolution and with no network except the broker; it shares a launch library with swarma-session-runner. Board and session host call the dispatcher. D-WIRE-NAMES governs platform identifiers.
++- **Open:** The executor intake release/grammar, general-grant adapter/registry, helper v2 signature grammar and joint launch-ticket/host-role activation remain pending; the shared contract states owner options. Codex is slice 1 with qualification; networking is slice 2.
++- **Superseded:** Commands playing dispatcher, board-spawn-first and the first-consumer recommendation question are superseded by the separate dispatcher decision and D-EXECUTOR. Acceptance of a direction does not publish a schema or attest a running cross-user launch.
++
++[Cross-CIP contract, schema owners and versions](platform-contract-disposition.md) records the canonical values and owner decisions. Acceptance records design disposition; schema publication, implementation and runtime qualification are separate. Current-state observations and companion probes below are historical at their stated pins, not rerun evidence.
+ 
+ ## Revision 2
+ 
+@@ -21,7 +29,7 @@ CIP-0010 lets a managed home use a credential enrolled once instead of a login p
+ - **swarma-credential-broker** holds each account once, under its own service user, and leases it to launches that a signed grant authorises, identifying the launching process by its kernel-reported UID and the account's never-reused generation. It also runs the single Codex auth owner per account.
+ - **swarma-user-manager** creates and retires per-agent OS accounts through a closed, journaled operation schema run with `sudo`, and its **launcher** starts one approved executor under one active agent account. (Its v1 adds per-account firewall rules.)
+ 
+-Curator gains a credential source `broker:<account>`, the broker mode of the credential extension, a broker client in the final executor, `curator broker …` commands, and `curator agent-user …` commands that play the dispatcher's role until a dispatcher exists. The result is the owners' first MVP shape: one subscription, one machine, a chain of OS accounts, each agent running under its own account and receiving the subscription's credential from the broker.
++Curator gains a credential source `broker:<account>`, the broker mode of the credential extension, a broker client in the final executor, `curator broker …` commands, and `curator agent-user …` commands that act only as clients of the separate `swarma-dispatcher` module. The result is the owners' first MVP shape: one subscription, one machine, a chain of OS accounts, each agent running under its own account and receiving the subscription's credential from the broker.
+ 
+ ## Motivation
+ 
+@@ -34,7 +42,7 @@ Curator gains a credential source `broker:<account>`, the broker mode of the cre
+ 
+ CIP-0010's `credential_source.<profile>.<harness>` (user-owned layer, never lockable) gains the value `broker:<account>`, naming a broker account id. The value enters the closed configuration schema together with its CLI and marker changes; a Curator profile's bytes still never select accounts, endpoints, executables or injected values (environments §10.3), and no system lock selects credential material (§12.2).
+ 
+-A profile with this source holds no credential of its own. At every launch the final executor, running under the agent's account, requests a lease and delivers the material through the harness's channel (environment variable at exec, stdin, or the Codex app-server's external tokens), never into argv, files or logs.
++A profile with this source holds no credential of its own. At every launch the final executor, running under the agent's account, requests a lease and delivers the material through the harness's channel (environment variable at exec, stdin, or the Codex app-server's external tokens), never into argv, files or logs. Platform wire identifiers follow the [D-WIRE-NAMES rule and owner/version table](platform-contract-disposition.md#wire-naming-rule); renamed domains require matching module vectors before activation.
+ 
+ `node:<label>` (CIP-0010, the same-user file store) remains for single-user machines without a broker. A machine that runs agents as separate OS accounts uses `broker:`.
+ 
+@@ -58,12 +66,12 @@ CIP-0010's single auth owner for Codex personal plans is implemented inside the
+ 
+ ### 4. Agent OS accounts: the dispatcher and `curator agent-user`
+ 
+-relux-works/swarma-dispatcher does the dispatcher's work from the platform design (architecture §7.1): it accepts a launch request, authenticates the caller by its OS account, checks the caller's grant and the machine's capacity, provisions the agent (helper `user.create`, a leaf grant for `agent:<generation>` narrowed to the request and the caller's grant, broker `bind`), starts the executor under the agent account through the helper's launcher, tracks the run in a durable record keyed by the caller's request id, cleans up (unbind, retire), and reconciles after crashes. It runs under its own unprivileged service account, which is the only account configured as a dispatcher in the helper and the broker.
++relux-works/swarma-dispatcher does the dispatcher's work from the platform design (architecture §7.1): it accepts a launch request, authenticates the caller by its OS account, checks the caller's grant and the machine's capacity, provisions the agent (helper `user.create`, a leaf grant for `agent:<generation>` narrowed to the request and the caller's grant, broker `bind`), starts the executor under the agent account through the helper's launcher, tracks the execution in a durable record with caller-scoped root request correlation and distinct per-effect idempotency IDs, cleans up (unbind, retire), and reconciles after crashes. It runs under its own unprivileged service account, which is the only account configured as a dispatcher in the helper and the broker.
+ 
+ Curator's commands are its clients:
+ 
+ ```
+-curator agent-user create --label dev-7f3 --profile dev --account ivan/claude/personal \
++curator agent-user create --label dev-7f3 --profile dev --account primary/claude/personal \
+     [--until <time>] [--network egress-a]            # dispatcher: provision
+ curator agent-user run    --label dev-7f3 [--plan <launch plan> | --profile dev]   # dispatcher: start
+ curator agent-user run    --dispatch --profile dev …  # dispatcher: dispatch (provision, start, clean up)
+@@ -71,7 +79,8 @@ curator agent-user retire --label dev-7f3            # dispatcher: retire
+ curator agent-user list
+ ```
+ 
+-- Curator composes the plan (compose-only) and passes it to the dispatcher as opaque bytes with its digest; the dispatcher never reads fragments or credentials.
++- Caller-side `curator-run` composes the plan (compose-only) and passes it to the dispatcher as opaque bytes with its digest; the dispatcher never reads fragments or credentials.
++- D-EXECUTOR: agent-account `curator-run` only verifies and executes that caller-composed plan. It does not compose or resolve profiles, and it has no network except the broker. It shares one launch library with `swarma-session-runner`; a minimal separate executor binary remains a later option.
+ - In the dispatcher's v0, the client runs the dispatcher command under the dispatcher's account through one sudoers rule; in v1 it talks to the dispatcher's socket. The commands and their results do not change between the two.
+ - A caller administers only the agents it provisioned, and can never obtain for an agent more than its own grant allows. Its requests are signed with a key associated with its OS account, and the broker keeps the caller's authorization as a dependency of every binding: revoking the caller's grant cuts its agents' new leases and renewals at once (owner decision 2026-10-10). Arbitrary `sudo -u` is never used instead of the launcher.
+ - Platform paths and accounts follow the root `/opt/swarma` (agent accounts `worker-<label>` with homes in `/opt/swarma/workers/`, services in `/opt/swarma/services/`); retired homes are archived under the helper's retention policy.
+@@ -97,7 +106,7 @@ A broker account may require a network profile. Curator's launch already resolve
+ ## Implementation plan
+ 
+ 1. **Formats** in swarma-credential-broker: grants, revocations and socket frames frozen with canonical and negative vectors; the verifier with its mutant suite.
+-2. **Slice 0: one protected Claude launch.** Helper v0 with the launcher; broker slice 0 (file store, local grants and revocations, bind, lease, release, the `env` channel, audit); dispatcher v0 (requests, run records, grants, capacity, provisioning, start, cleanup, reconciliation); in Curator the executor with the broker client, the `broker:` source, the plan extension, `curator broker`, `curator agent-user` as the dispatcher's client, `env status` lines. Acceptance on hosted runners through `curator agent-user` and the dispatcher, with exactly the deployed sudoers rules.
++2. **Slice 0: one protected Claude launch.** Helper v0 with the launcher; broker slice 0 (file store, local grants and revocations, bind, lease, release, the `env` channel, audit); dispatcher v0 (requests, run records, grants, capacity, provisioning, start, cleanup, reconciliation); the first broker client in agent-account `curator-run` (D-EXECUTOR; narrow execution only). The caller-side manager publishes the `broker:` source, plan extension, `curator broker`, `curator agent-user` dispatcher-client commands and `env status` lines; those management operations are not part of the agent-account executor mode. Acceptance on hosted runners through `curator agent-user` and the dispatcher, with exactly the deployed sudoers rules.
+ 3. **Slice 1: Codex** external tokens, the enrolment ceremony and the auth owner, qualified on the supported release.
+ 4. **Slice 2: enforced networking** with helper v1 and applied state.
+ 
+@@ -115,5 +124,5 @@ Hosted runners only; no account, launcher or firewall test runs on a developer's
+ ## Open questions for the operator
+ 
+ 1. Resolved (owner, 2026-10-09): the dispatcher is its own module and `curator agent-user` is its client.
+-2. Which executor gets the broker client first. Recommended: Curator's own small executor (started by the launcher under the agent account); the board's spawn path and the session host then start agents through the dispatcher instead of embedding the client.
+-3. Grant registry beyond the broker's local state: open platform question (D-R6).
++2. **First consumer — decided, 2026-10-11 (D-EXECUTOR).** `curator-run` under the agent account gets the first broker client. Board spawn and session host call the dispatcher, which launches through `curator-run`; neither embeds a client. The earlier approval question is superseded. Intake schema/version publication and qualification remain R-LR1 work.
++3. **Grant registry — OPEN (D-R6).** Retain broker-local envelopes/state for the first slice, or publish a separately versioned shared registry/verifier adapter for general platform grants. General `grant/1` role/action grammar is not the broker's closed envelope; no adapter or registry activation is claimed.
+diff --git a/cips/platform-contract-disposition.md b/cips/platform-contract-disposition.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..1f3f93e6c44e26abbd64d252483482a358d1908b
+--- /dev/null
++++ b/cips/platform-contract-disposition.md
+@@ -0,0 +1,111 @@
++# Cross-CIP platform contract disposition
++
++## Authority and status
++
++This is the shared R-CS2 disposition for CIP-0002 to CIP-0007, CIP-0010 and CIP-0011, dated 2026-10-11. Canonical values come from the [platform contract table](https://github.com/relux-works/curator/blob/177cb554/.research/261010_platform-contract-table.md); coverage comes from [audit R-CS2, D1 and C4](https://github.com/relux-works/curator/blob/48789217/.research/261010_platform-docs-audit.md). The later owner decisions supplied in the task precondition `owner-decisions-20261010-audit.md` override the table only where stated: D-EXECUTOR resolves N6/P1/C9, D-PATH resolves X1, D-WIRE-NAMES replaces W2's historical domain retention and qualifies W3/I4 naming; the other decisions retain their own scopes.
++
++**Decided** means accepted direction. **Specified** means a module's pinned design. **Open** means an owner choice remains; a recommendation does not resolve it. **Superseded** text is design history. None of these labels, or an Accepted CIP header, establishes schema publication, implementation or runtime qualification. Current-state probes at older pins remain historical; no test, build, login or renderer result is claimed here.
++
++## Managed and interactive PATH
++
++**D-PATH, accepted 2026-10-11:** after child-environment admission, managed launches use, in order:
++
++1. The protected tool directory of this launch (CIP-0007).
++2. The admitted base PATH of this user, in its existing order.
++3. One protected manager dispatcher directory, through which project commands run only after checks (CIP-0002).
++
++Repository `.agents/bin` is never executed in a managed launch. The resolved PATH is recorded in the launch plan and covered by its digest. Excluded/absent PATH must not be recreated; malformed/unreadable admission state refuses command capability. Direct and tracked launches must bind the same context, destination transformation and resolved PATH; caller PATH literals do not replace destination admission. The exact coordinated fragment/transform grammar remains pending. The reserved `path_prepend` field at the historical launcher pin does not implement this recipe.
++
++CIP-0004 concerns interactive shell activation: inherited PATH, optional global bin, optional project bin, appended without sourcing any env file. That hook's bins confer no managed-launch authority. On entering/switching/leaving a project, restore the owned prior snapshot, clear old project state and activate the newly discovered scope; on opt-out clear project state and retain only an enabled global scope. Cache refresh retains the selected options; loaded old shell functions need reload/restart and must not be reported current by inference. See [CIP-0004 compatibility and migration](CIP-0004-shell-hook-without-sourcing-and-path-append.md#compatibility-and-migration).
++
++Enforced script-worker commands retain the core declared-interpreter/exec PATH contract; inherited PATH is discarded there. D-PATH does not widen that lane.
++
++## Executor and consumer phases
++
++**D-EXECUTOR, confirmed 2026-10-11:** agent-account `curator-run` is the first broker consumer. It only verifies and executes a plan composed on the caller's side; it never composes or resolves profiles under the agent account and has no network except the broker. It shares one launch library with `swarma-session-runner`. A separate minimal executor binary is a later option.
++
++| Phase | Request/composition owner | Launch and credential owner | Publication/qualification limit |
++|---|---|---|---|
++| Human direct / interactive hosting | Caller-side `curator-run`; the existing shared launch construction site owns harness flags | Existing direct/hosting contract | Preserved separately from the Swarma one-shot amendment |
++| Broker slice 0, one protected Claude launch | Board, session host or other caller asks `swarma-dispatcher` with a caller-composed plan | Dispatcher admits/provisions/tracks; root `swarma-user-launcher` passes the immutable plan to approved agent-account `curator-run`; that executor leases and injects | First consumer decided; versioned intake, required-understanding checks and supported-release qualification pending R-LR1 |
++| Later Codex / enforced networking | Same dispatcher boundary | Codex single broker auth owner and external-token lane in slice 1; helper v1 applied network state in slice 2 | Codex adoption/qualification question remains open; no current support inferred |
++| SH2 session runner / donor integration | Session host requests dispatcher; donor has its separately specified supervisor | Agent-side `swarma-session-runner` owns PTY/app-server and lease renewal in the SH2 target; donor supervisor is a later qualified executor | Shared library is accepted; joint host-role/ticket activation and donor qualification remain separate |
++
++Board runner and session host do not embed the first broker client. Dispatcher is its own module; `curator agent-user` is a client, never a temporary dispatcher substitute. [Decision 0021 amendment v1](../decisions/0021-sessions-enter-through-curator-run.md#amendment-v1--agent-account-one-shot-execution-2026-10-11) records the narrow amendment. The illustrative `exec --plan-fd N` entry is not published CLI syntax. The helper's specified plan FD3 transport does not settle the executor command grammar or release version.
++
++## Credential source, channel and disposition
++
++Source-policy **v1** treats a missing entry as `per-home`; node/helper/broker use requires an explicit user-owned entry. Source-policy **v2** refuses missing entries and migrates existing logins to explicit `per-home`. These policy labels are not schema or broker wire versions. `isolation` remains the independent native-store sharing axis.
++
++The first node and broker secret stores are 0600 files inside owner-only 0700 directories on macOS/Linux. Keychain and Secret Service node backends are later work; a prompting backend cannot serve tracked/headless launches. Native per-home Keychain observations do not contradict this node-store decision. Source/channel binding admits no fallback: failed, partial or unreadable state is an error, never absence. Plans/fragments contain metadata only; the destination executor re-resolves the protected binding and qualifies effective source and covered children. The harness can read its injected credential; no universal secret-free-agent claim is made.
++
++| Provider / source | Channel | Phase and owner decision |
++|---|---|---|
++| Native per-home | Provider-native local channel/store under admitted isolation | Retained v1 default; enrollment never permits native-login copying/export |
++| Claude enrolled setup-token via node/broker | `CLAUDE_CODE_OAUTH_TOKEN` in harness environment at exec; no launch credential file or native fallback | First protected provider launch, broker slice 0; no refresh; re-enroll/restart on expiry/auth failure |
++| Claude API-key helper | Qualified protected helper pipe | Separate API-key lane retained from CIP-0003; no subscription equivalence or mode fallback |
++| Codex personal node/broker | External access token plus account ID into a per-session app-server; no launch `auth.json` or broker-mode `codex exec` | One auth owner per account, broker slice 1; supported-release qualification and C4 owner adoption choice still open |
++| Codex Business/Enterprise explicit token | `CODEX_ACCESS_TOKEN` | Specified later lane, outside first release; no broker refresh |
++| Muse API key | Explicitly selected `META_API_KEY` or supported `exec --api-key-stdin` | Separate API-key lane; exact executor/harness admission required |
++| Gemini/agy/qwen API key | Explicit provider API-key environment channel | Per-harness admission required; no automatic channel substitution |
++| Muse subscription | Source/refresh/channel reserved | Open C7 choice: prioritize evidence-based qualification or defer; no subscription parity promised |
++
++[CIP-0010 C6](CIP-0010-credentials-setup-token-and-inherited-auth.md#recommendation) is the clause-by-clause CIP-0003 disposition: token becomes node, helper remains API-key, shared-file is replaced by node, Linux linked-file behavior stays legacy with unqualified refresh safety. Precedence, validation/no-fallback, inspect → plan → apply, marker coordination and final-executor capability checks survive. The earlier Keychain-first token implementation and recommended-default questions are superseded.
++
++## Wire naming rule
++
++**D-WIRE-NAMES, 2026-10-11:** versioned platform-module wire identifiers carry their repository name: `swarma-<component> <object>/<n>`. Nothing has shipped; no migration is required. This is an explicit owner rename before shipping, not an inference from executable renaming. Owning module documents and canonical/verifier vectors must publish the same bytes before activation.
++
++Broker grant and revocation domains are now `swarma-credential-broker grant/1` and `swarma-credential-broker revocation/1`, replacing historical `curator-broker …/1`. Each domain is followed by newline and CCJ-1 body; grant IDs hash the same preimage. Dispatcher mutating signatures remain `swarma-dispatcher request/1`, newline and CCJ-1 request without `auth`. The broker peer-authenticated transport does not thereby gain a signed request format.
++
++The rule also prefixes the existing user-manager request kinds and dispatcher/broker transport and record identifiers in the table below. It does not invent a user-manager v2 signature domain, launch-ticket object/version, canonical bytes or host-role schema where none has been published. Curator credential extension/capability labels remain the separate Curator-owned contracts; general platform grants are not interchangeable with broker envelopes.
++
++## Schema owner and version table
++
++Module owners are the pinned [broker specification](https://github.com/relux-works/swarma-credential-broker/blob/f910e68f882900f03ffd036ecc2481f35bf8988b/spec/broker.md), [dispatcher specification](https://github.com/relux-works/swarma-dispatcher/blob/9cec4115b8666aa1f3325a792359135a9df5a2f7/spec/dispatcher.md) and [user-manager/helper specification](https://github.com/relux-works/swarma-user-manager/blob/92bdf1d59478b8fd28d2d98cfe9fb95716d10e8e/spec/helper.md); section owners below follow the contract table. D-WIRE-NAMES is a later override to those pinned designs.
++
++This is the single coordination table for these CIPs. A named candidate is a reservation/proposal, not a shipped schema. Existing frozen shapes remain unchanged. Manager/fragment/marker v4 proposals in CIP-0002, CIP-0003 and CIP-0006 must be published together with the credential amendments, or explicitly deferred; they cannot each allocate incompatible v4 shapes. Exact release pins and still-unallocated candidate numbers must be checked at publication.
++
++| Schema / contract | Owner and normative landing | Version / naming disposition | Adoption limit |
++|---|---|---|---|
++| Project declaration, composition, approval and lease | CIP-0002; Curator manager and environments contracts | Closed grammar/references/limits pending; no new fixed version | Draft operator model, not supported project CLI |
++| Manager machine configuration | Curator manager / environments §12; CIPs 0002/0003/0006/0010/0011 | `manager-config-v4` candidate after v3; coordinate project, settings and source members | Unpublished coordinated revision |
++| System configuration | Manager system policy; CIP-0006 | `system-config-v3` candidate after v2 for settings policy | Credentials remain user-owned and not lock-selected |
++| Launch fragment and PATH transform | Environments §10, manager emitter, launcher consumer; CIPs 0002/0003/0006/0007 | `launch-env-fragment-v4` candidate after v3; exact D-PATH/context/settings/source grammar pending | Reserved field or accepted PATH is not implemented transport |
++| Environment marker | Manager materialization / environments §8; CIPs 0003/0006/0010 | `agent-environment-marker-v4` candidate after v3; metadata only | No login/backend attestation from GOOS or marker alone |
++| Credential launch-plan extension | Decision 0013 §6.4, launcher SPEC; CIPs 0010/0011 | Required `works.relux.curator.credential/1` proposal | Old/unsupported executors refuse; never secret values |
++| Credential binding and injection capability | CIPs 0010 C3 / 0011 §2; broker §8.2 and launcher intake | `credential_binding/1`, `credential-injection/1` | Protected destination resolution and qualification; capability alone is not authority |
++| Narrow one-shot plan intake | Launcher SPEC / R-LR1 and Decision 0021 amendment v1 | Separate versioned intake/release pending; no number invented | D-EXECUTOR rails accepted; activation waits for publication and qualification |
++| Interactive hook/cache metadata | CIP-0004 → Manager §8 and conformance | Accepted `no-source-v1`; proposed cache `schema_version: 1` | Native shell/cache qualification pending; no fragment bump merely to stop sourcing |
++| CLI secret transport and audit backend/cache descriptors | CIP-0005 → CLI/Manager audit and registry §9.1 | Transport first accepted; closed descriptor/cache versions and vectors pending | No headless broker capability implied |
++| Tool declaration, lock and registry records/trust | CIP-0007 → core §4, registry §§1–5, skillfile-sources §3, manager | Option B accepted; declaration/record/schema revisions pending | Keys in system/fleet config and separate bundle; service/distribution questions below |
++| Broker grant / revocation signed domains | `swarma-credential-broker` spec §§6.1–6.4 | `swarma-credential-broker grant/1`, `swarma-credential-broker revocation/1` (D-WIRE-NAMES) | General `grant/1` role/action grammar needs a separately versioned adapter |
++| Broker peer-authenticated frames | Broker spec §13 | `swarma-credential-broker broker/1` by D-WIRE-NAMES, hello versions `[1]`; replaces unprefixed `broker/1` | Transport identity, not a broker request-signature domain |
++| Dispatcher command / socket and signed domains | `swarma-dispatcher` spec §§3.3, 4.5, 8 | `swarma-dispatcher dispatch-op/1`, `swarma-dispatcher dispatch/1`; `swarma-dispatcher request/1`, `swarma-dispatcher effect/1` | D-WIRE-NAMES applies to command/socket labels; signature/effect domains already repository-prefixed |
++| Dispatcher allocation / execution records | Dispatcher spec §§4.3–4.4 | `swarma-dispatcher agent/1`, `swarma-dispatcher run/1` by D-WIRE-NAMES | `agent_id`, dispatcher `run_id`, execution claim `execution_id` and board IDs remain distinct |
++| User-manager helper / launcher requests | `swarma-user-manager` spec §§2–3, 7 | `swarma-user-manager helper-op/1`, `swarma-user-manager launch-op/1`, `v:1` (D-WIRE-NAMES) | Configured sudo caller/role policy in v0/v1; grants refused until v2; no signed-request grammar invented |
++| User-manager v2 signed request | User-manager §9 with dispatcher/grant owners | Domain/object/version/canonical bytes open (W3) | Choose component-specific format or versioned shared adapter before activation |
++| Launch ticket and host role | Joint dispatcher §12, user-manager extension, session-host §§3.3–3.4 | Object/version/signature bytes and role schema open (I4); eventual issuer namespace `swarma-dispatcher` per D-WIRE-NAMES | Jointly version and activate, or leave SH2 backend disabled |
++
++## Open owner questions and related decision boundaries
++
++| Question / contract row | Owner | Explicit options / current disposition |
++|---|---|---|
++| Default registry configuration, trust-bundle delivery and snapshot distribution (X2 / A09.4) | CIP-0007 registry and manager owners; operator | Ship editable system/fleet default entry and separate release trust bundle with a pinned snapshot, or fetch a signed snapshot on first use using configured pins. A network may replace the bundle/configuration. Which concrete delivery contract and publisher/service? Reviewed file snapshots or an operator-owned registry service remain options. No concrete URL, keys or delivery grammar chosen. |
++| Tool grammar and option C (CIP-0007) | Core/registry/manager owners; operator | `dependencies.tools` versus a separately versioned system-command extension; own namespace versus upstream identities. Retain accepted B now; separately charter C client resolution versus pre-signed service records, expected-signer ownership and downgrade/air-gap authorization. |
++| Personal-plan Codex adoption/qualification (C4) | CIP-0010 / broker owner; operator | Adopt single auth owner with external tokens and named supported-release evidence, or defer the lane. Historical race evidence is not current qualification. |
++| Muse subscription (C7) | CIP-0010 / broker owner; operator | Prioritize source/refresh/channel qualification from evidence, or defer and keep the API-key lane separate. |
++| Remaining launch intake publication (N6/P1) | Launcher R-LR1 with dispatcher/user-manager owners | D-EXECUTOR resolves the executor model. Publish the narrow versioned intake/verification/receipts and qualified release before activation, or defer activation; do not reopen the chosen first consumer. |
++| Shared grant adapter / registry (W2/W4; CIP-0011 D-R6) | Broker / platform trust owners | Retain broker-local envelopes/state, or publish a versioned general-grant/keeper adapter and registry with explicit key/role mapping. Caller keys, broker software root and keeper identity keys remain separate. |
++| Helper v2 signed bytes (W3) | User-manager / platform trust owners | Explicit component-specific signed format, or versioned shared adapter. D-WIRE-NAMES fixes the naming rule only, not unpublished grammar. |
++| Launch ticket/host-role activation (I4) | Dispatcher, user-manager and session-host jointly | Jointly version and activate, or leave SH2 backend disabled. Ticket generation, execution ID, ticket epoch and controller epoch remain distinct. |
++| Retire `keep` request (P7) | User-manager owner / operator | Admit operator-only `keep` and align the closed schema, or remove it from policy and retain archive/delete. Dispatcher/installer authority is not expanded. |
++| Release scheduling / reauthentication (CIP-0010) | CIP and harness owners / operator | Schedule slice 0 in the proposed release window or defer; re-enroll/restart after setup-token failure, with no automatic fallback. Supported-release recovery evidence remains qualification work. |
++
++D-GOALS keeps session host board-free and goal-free: only the initiating caller or optional board/orchestrator authors goals now, with no agent-account goal capability on the host socket. This keeps authorship with the initiating authority while the separate agent namespace/bounds await SH2+ design. A later item chooses self-goals in a separate namespace or continued caller/board-only authorship; no strict coupling to task-board, goals or the orchestrator toolchain is permitted.
++
++D-IDENTITY allows dispatcher revocation only for identities it registered with the one-shot flag, as a separate cleanup operation after account retirement. Standing account retirement preserves identity; only the operator revokes with a signed record. The account helper does not own blanket identity revocation.
++
++D-DONOR-PROVISIONING selects a separate small donor-side privileged component, with its own short spec, rules and removal; libraries may be shared, but binary and privileges are separate from user-manager. Variant B remains disabled until specified. Donor figures and protocol repairs belong to R-CS1, not evidence of supported helper extensions.
++
++D-RESUME settles P8 for native resume on the same machine: semver non-breaking harness changes are allowed (same major, and for 0.x same minor), without an extra qualification row. Different major/0.x minor refuses. Harness failure reports `resume-failed` and the caller decides the next action; no automatic fallback or portable seed. Other integrity/home/profile/lock/auth/grant preconditions retain their scopes. Per-harness notes identify vendors known not to follow semver.
