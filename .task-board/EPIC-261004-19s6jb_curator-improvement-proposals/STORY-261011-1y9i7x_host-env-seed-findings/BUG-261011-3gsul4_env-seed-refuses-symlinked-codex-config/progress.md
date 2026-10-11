@@ -1,5 +1,5 @@
 ## Status
-backlog
+closed
 
 ## Review
 required
@@ -34,4 +34,4 @@ Confirmed against v0.15.0-rc.4 source: internal/stateread/stateread.go ReadRegul
 2026-10-11T03:05:01Z
 
 ## Last Update
-2026-10-11T11:42:06Z
+2026-10-11T11:45:25Z
