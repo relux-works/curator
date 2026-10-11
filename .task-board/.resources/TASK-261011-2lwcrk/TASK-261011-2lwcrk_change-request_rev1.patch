@@ -1,0 +1,841 @@
+diff --git a/.research/TASK-261011-2lwcrk_alignment.md b/.research/TASK-261011-2lwcrk_alignment.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4338333da10d94e152815bb3c8d969b4a2a6a5d5
+--- /dev/null
++++ b/.research/TASK-261011-2lwcrk_alignment.md
+@@ -0,0 +1,27 @@
++# TASK-261011-2lwcrk — R-CS1 contract alignment
++
++Docs-only developer candidate for review. Sources: `relux-works/curator` contract table at `177cb554`, `.research/261010_platform-contract-table.md`; audit at `48789217`, `.research/261010_platform-docs-audit.md`, D1/R-CS1 and B2; attached `owner-decisions-20261010-audit.md`, including the 2026-10-11 decisions. No code, schema implementation or published capability is claimed.
++
++The R-CS1 basis lists 10 A-rows and the five B2 diagram rows. Each is mapped below: **10/10 A-rows and 5/5 B2 rows** reviewed and addressed as documentation. This is a manual source/diff assessment, not measured runtime or renderer coverage.
++
++| Audit row | Section/source changed | Canonical value / recorded owner decision / explicit pending question |
++|---|---|---|
++| A04.4 | [CIP-0009 D0/D4 and revision summary](../cips/CIP-0009-donor-side-deployment-and-bridge.md); first-deployment/C4 sources | Contract D1: three separate signing/SSH/encryption keys; A/C qualified Secure Enclave P-256 signing/SSH keys on supported Macs, files elsewhere; B bridge-owned 0600 Ed25519 signing/SSH files, no Keychain; X25519 package decryption separate. Algorithm/key-store admission belongs to the qualified tuple, not an all-Ed25519 recipe. |
++| A04.5 | CIP-0009 D4–D7/D12, specification changes and connection/lifecycle test plan; all five diagram sources | Contract D3: separate host CA and user CA, DNS TXT host-CA publication/package, `@cert-authority`, workplace principal through `TrustedUserCAKeys`, short certificates/renewal/KRL, overlap rotation. About one year/day are policy examples. Raw host-key and authorized-key recipes removed. |
++| A11.2 | CIP-0009 D0–D3, revision summaries, security, implementation/cut list and test plan; [CIP-0008 R6–R8/security](../cips/CIP-0008-remote-worker-launch-mode.md); deployment/turn/retirement/C4 sources | Contract D1 and D-DONOR-PROVISIONING: A first/no admin/no OS isolation; B one admin request/two UIDs/no Keychain, separate donor provisioner and disabled while spec/rules/removal pending; C donor-UID sandbox fallback. No user-manager donor operations. Existing **open owner question 7** preserved: retain A after B/C qualification, or offer only B/C? |
++| A11.5 | CIP-0009 D4/D6, options, summaries, cut list, test plan, decision 2; [protocol trust section](../protocol/remote-worker.md#trust-and-ssh); deployment/join/C4 sources | Contract D2: Web PKI; local DNSSEC validation by default, DoH transport fallback; invitation pins only for a declared no-DNSSEC environment. Pins agree when both present; failed/malformed/bogus/indeterminate reads and mismatches refuse, never activate fallback. Per-environment records, no human second channel; open application without pins requires DNSSEC. |
++| A11.6 | CIP-0009 D4/specification changes; [publication register](../protocol/remote-worker.md#publication-status); deployment/join sources | Contract D4: challenge proof, three keys, operator admission, atomic invited consumption/tombstone, authenticated-encrypted package with transcript associated data and no carrier credentials. Invitation, join and package **closed schemas individually PENDING**; bridge-owned names follow D-WIRE-NAMES. Open-application binding/retry format also pending, not invented. |
++| A11.7 | CIP-0009 D9 and specification changes; [join service/limits](../protocol/remote-worker.md#join-service-and-limits); join/C4 sources | Contract D4/decision 3: HTTPS entry service, only challenge/cert/collect, no signing key or commands; owner-approved D9 policy values retained: 10/minute, 100/day/address, five challenges/invitation, one use, 72-hour invitation, 16 KiB body, five-minute challenge, 50 pending applications. **API/request/response/error schemas PENDING**, explicitly registered. |
++| A11.8 | CIP-0009 D4/D10; protocol deployment boundary; first-deployment/join sources | Contract D4/decision 6: human donor alone initializes with consent. TTY, typed summary and managed-session environment checks are policy admission heuristics, not proof of human identity. |
++| A11.9 | CIP-0009 D4/D5/D12 and connection/protocol test plan; protocol publication/trust sections; turn/deployment/join/C4 sources | Contract D3/D4: certificate SSH, root-controlled forced executor and CA/KRL policy, no forwarding/PTY/user rc/environment; framing/caps/idempotency/leases/cleanup preserved as requirements. Standalone channel/backend contracts **PENDING**. **Explicit open owner question**: bridge-owned wire objects or a separately owned executor repository? Existing `swarma-rb/1` and `swarma-workplace-exec/1` are design labels until that owner/format is frozen; D-WIRE-NAMES rule is recorded, no unsupported format claimed. |
++| A11.10 | CIP-0009 D5/D11 and signing/delivery test plan; protocol tools/mailbox section; turn/join/C4 sources | Contract D4: policy-intersected tools, donor admission before a turn, durable cursors/dedup/application receipt, final-envelope donor signing, distinct audited project carrier authority in slice 1; no project carrier credential on donor. Later organisation accounts/allowlisted federation remain a separate phase; disconnected turns pause and posts queue. |
++| A11.11 | CIP-0009 D7/D8 and lifecycle test plan; protocol lifecycle; retirement source | Contract D4 and D-IDENTITY: independent installation/execution/workplace/identity axes, local stop/leave/purge distinct from project suspend/retire/revoke. A/C preserve donor account and unrelated processes; B removes only allocated artifacts via pending separate provisioner. Stop renewal/KRL/close sessions/cleanup on project retirement, preserve signing identity; operator separately revokes. Offline purge reports remote outcome as unknown. |
++| B2 — donor-side.dsl | [Existing C4 source](../cips/diagrams/donor-side.dsl) | B explicitly labeled future/disabled; A/C differences recorded; separate donor provisioner pending, no invented user-manager operations; root/host-CA/TLS environment records and declared invitation fallback; SSH host/user certificates and protected CA/KRL policy. Channel/backend labels marked pending. |
++| B2 — donor-first-deployment.puml | [Existing deployment source](../cips/diagrams/donor-first-deployment.puml) | A/C/B branches, one admin request for future B, pending provisioner closed operations; release-manifest check uses variant-owned root instead of stale layout. Trust-mode/refusal branches, invited/open application differences, variant-scoped keys and CA package. Project workplace/user certificate precede package issue. |
++| B2 — join-handshake.puml | [Existing join source](../cips/diagrams/join-handshake.puml) | Declared no-DNSSEC branch selected before lookup; failure never falls back; challenge/proof/admission and schema-pending labels, separate invited/open handling, host/user CAs, certificate renewal/KRL/rotation. |
++| B2 — remote-worker-turn.puml | [Existing turn source](../cips/diagrams/remote-worker-turn.puml) | B boundary explicitly scoped/disabled, A/C limits recorded; host certificate CA/name/validity/KRL checked on each connection, short user certificate/renewal, root-controlled policy; launch consumes qualified plan. Existing remote tool/admission/signing/disconnect flows retained. |
++| B2 — remote-worker-retire.puml | [Existing lifecycle source](../cips/diagrams/remote-worker-retire.puml) | Independent state axes; owned-process stop, A/C donor-account preservation, pending B provisioner removal, stopped renewal/KRL/closed sessions, signing identity preserved on retirement, separate root-signed revoke, offline purge unknown. |
++
++Adjacent covered rows A11.1/A11.3/A11.4 are retained: one donor-originated connection and OS-user first backend; relay owns no keys/network; strict lockdown plus remote-auto and exact qualified build required. The carrier separation supporting A06.1/A08.4 and SSH qualification supporting A15.10 are retained in this repository; no external wiki/module edit or global audit closure is claimed.
++
++Verification: manual review against the pinned contract and owner decisions, all five diagram sources, and the 15-row mapping above. `git diff --check` is run directly after the documentation edits; its real result is recorded in the task logbook evidence. No test, build, renderer or runtime/provider qualification runs are authorized on this host by the task brief. The future test plan was updated, with no passing-test claim. No prior attached runtime evidence was accepted as a current pass. The original generic code/test/build/lint checklist entries were not checked: they are inapplicable or expressly forbidden for this docs-only task. They were replaced with documentation-scoped manual-review and tracked-whitespace items so the required handoff can reflect the actual brief. Whitespace evidence does not imply a general linter or renderer pass.
+diff --git a/.research/TASK-261011-2lwcrk_logbook.md b/.research/TASK-261011-2lwcrk_logbook.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ffe93f6ac0410efe8eb8e2cde3354769690f67a3
+--- /dev/null
++++ b/.research/TASK-261011-2lwcrk_logbook.md
+@@ -0,0 +1,19 @@
++# TASK-261011-2lwcrk — R-CS1 logbook
++
++2026-10-11, documentation reconciliation:
++
++- Read the contract table at `177cb554`, the audit at `48789217` and the attached owner decisions. The task covers 10 A-rows plus five B2 diagram rows; the alignment artifact maps all 15.
++- D-DONOR-PROVISIONING resolves contract D5's ownership choice: a separate donor-side binary/privilege boundary, not an added user-manager operation. B remains disabled while its short spec, rules, removal and closed schema are pending. No unsupported operation names are presented as an API.
++- Found contradictions between universal DNSSEC and the declared invitation fallback; raw SSH recipes and the CA model; shared-user A and B-only confidentiality/egress guarantees; a linear lifecycle and independent donor/project/identity states. Prose, future test vectors and all five existing diagram sources now use the canonical decisions.
++- Published `protocol/remote-worker.md` with individual pending schema/API/channel/backend/provisioner references. Exact fields/encodings and transport/backend repository ownership remain unpublished. Recorded the ownership options instead of inventing a wire owner for the two design labels. Existing A-after-B/C selection question remains open with both options.
++- Donor TTY/environment checks are policy heuristics; offline purge is not remote revocation evidence. Project-side retirement stops user-certificate renewal, uses KRL and closes established sessions; it preserves the donor signing identity until a separate operator revocation.
++- No implementation, qualification, test, build, renderer or deployment occurred. The explicit docs-only brief prohibits tests/builds on this host. Diagram sources received manual review; rendering and syntax-tool validation remain unverified. No prior runtime evidence is claimed as current verification.
++
++| Standalone verification command | Real exit code | Result and bound |
++|---|---|---|
++| `git diff --check` | **0** | Tracked documentation diff whitespace check passed; no parser, renderer or runtime claim. |
++| `git diff --no-index --check /dev/null protocol/remote-worker.md` | **1** | Non-passing: no-index reports the new file differs from the empty file; no diagnostic output. Not reported as a green lint gate. |
++| `git diff --no-index --check /dev/null .research/TASK-261011-2lwcrk_alignment.md` | **1** | Same new-file difference exit; no diagnostic output; not a passing gate. |
++| `git diff --no-index --check /dev/null .research/TASK-261011-2lwcrk_logbook.md` | **1** | Same new-file difference exit; no diagnostic output; not a passing gate. |
++
++New documents were read manually. The artifact text was subsequently updated to record these actual results and the documentation-specific checklist adjustment; no repeated no-index pass is claimed. Generic code/test/build/lint items were never checked as passing; replaced as inapplicable under the only-current docs-only/no-tests/no-builds brief with manual documentation review and the tracked-whitespace command. Tests, builds, general lint and diagram rendering remain unrun/unverified.
+diff --git a/cips/CIP-0008-remote-worker-launch-mode.md b/cips/CIP-0008-remote-worker-launch-mode.md
+index 86549a82db972f6094b5b4d4057b3ca2467b2257..2b576ea79c50a05930ef0d033d1532ea4028e436 100644
+--- a/cips/CIP-0008-remote-worker-launch-mode.md
++++ b/cips/CIP-0008-remote-worker-launch-mode.md
+@@ -93,13 +93,13 @@ Surfaces that are not model tools but still act locally, and how the rows treat
+ 
+ **R6. Donor visibility and control.**
+ - *See:* `curator env status` on the donor machine shows, per managed home, `tool posture: lockdown (tuple <id>, policy generation <n>)`, `permissions: remote-auto (no local tool is offered to the model; the harness runtime keeps its own managed state; tools execute in the project's remote workplace)`, the remote-tools server identity and the project it is bound to. The same sentence is the harness's banner at session start and the `remote-auto` spelling includes a system-prompt sentence stating it to the model (F5: the sentence promises the permitted local runtime and the remote tools, not "nothing can act on this machine").
+-- *Audit on the donor side:* the trusted bridge identity (CIP-0009 D1) writes one record per tool call it forwards: tool name, argument hash and size, timestamps, result size and exit, never arguments or environment; the records are owned by the bridge identity and readable by the donor; the harness cannot alter them.
++- *Audit on the donor side:* the trusted bridge identity (CIP-0009 D1) writes one record per tool call it forwards: tool name, argument hash and size, timestamps, result size and exit, never arguments or environment; the records are owned by the bridge identity and readable by the donor; B/C prevent harness edits through UID/sandbox; A makes no OS integrity claim against a compromised harness process.
+ - *Stop and leave:* `curator remote-worker stop` ends the harness processes and persists the stopped mark **before** anything else; `curator remote-worker leave` retires the workplace and keeps the identity; `curator remote-worker purge` destroys keys, configuration and home (CIP-0009 D7, F17). All are local commands of the donor under the bridge identity or the donor's own account; nothing on our side can prevent them.
+ - *Locked posture:* the donor's system configuration (manager §12) locks `tool_posture.remote-worker` with `permissions.remote-worker` as a pair (R1); a flag that conflicts with a locked member is a `usage` error (0018 item 2); `--tool-posture lockdown` on the command line may only tighten (`open → lockdown`), never loosen.
+ 
+-**R7. Conformance.** One vector per row of R3, per allowed tail option and per refusal class of R4, plus the production-entry negatives of the test plan, on the hosted lab runners (tb-R194: suites that spawn harness binaries do not run on the mini). **Acceptance evidence (F25):** the model-visible tool set is measured against the complete permitted set (`tools/list` and the harness's own tool inventory), alongside enforcement negatives; unknown audit coverage, an unknown tuple, a failed read of the protected settings file or missing sandbox support each refuse; mutation checks narrow the gate so that a broader unauthorized class demonstrably fails; `rwh` evidence is reused only for the releases and modes it states.
++**R7. Conformance.** One vector per row of R3, per allowed tail option and per refusal class of R4, plus the production-entry negatives of the test plan, on the hosted lab runners (tb-R194: suites that spawn harness binaries do not run on the mini). **Acceptance evidence (F25):** the model-visible tool set is measured against the complete permitted set (`tools/list` and the harness's own tool inventory), alongside enforcement negatives; unknown audit coverage, an unknown tuple or a failed read of protected settings each refuse; missing sandbox support refuses B/C, while A explicitly has no sandbox; mutation checks narrow the gate so that a broader unauthorized class demonstrably fails; `rwh` evidence is reused only for the releases and modes it states.
+ 
+-**R8. What this CIP does not claim.** On someone else's machine, no argument a launcher writes is a security boundary against that machine's owner, and a harness binary that could update itself would change its flags. The lockdown is the *declared and checked* posture; the enforced boundary is the OS confinement of CIP-0009 (separate identities, kernel sandbox, per-UID egress) plus the fact that the only capability with effect is the remote-tools relay, whose calls execute in our workplace under its policy. The remote harness stays untrusted in every case (architecture §7.9).
++**R8. What this CIP does not claim.** On someone else's machine, no argument a launcher writes is a security boundary against that machine's owner, and a harness binary that could update itself would change its flags. The lockdown is the *declared and checked* posture; the donor boundary depends on CIP-0009 D0: B has separate identities, kernel sandbox and per-UID egress; C has a sandbox under the donor UID; A has qualified lockdown only and no OS isolation. Remote-tools calls execute in the project workplace under its policy. A compromised harness process in A can act as the donor user; qualification is not a kernel boundary. The remote harness stays untrusted in every case (architecture §7.9).
+ 
+ **R9. Owner decisions of 2026-10-10.**
+ - *Admission rule.* Owner, verbatim: «среды которые проверенно не умеют выключать тулы (а также для которых нет обходных путей отключить тулы с гарантией) мы пока не поддерживаем». Environments that provably cannot disable their tools, and have no guaranteed workaround, are not supported for now. The Muse row of R3 is therefore not admitted for donors: its read tools cannot be removed and the Seatbelt read boundary is not yet accepted as a guarantee; it stays a lab row. Pi and OpenCode keep `tool_posture_unsupported`: the source research TASK-261010-aqpf2a (curator board) found candidate configurations for Pi 1.1.0 and OpenCode 1.18.35 that remove their built-in tools from the model's tool set, and each must be qualified under R7 before a row exists.
+@@ -109,11 +109,11 @@ Surfaces that are not model tools but still act locally, and how the rows treat
+ 
+ ## Security considerations
+ 
+-- **Threat model.** The remote harness is compromised or prompt-injected. Goals: it must not read, write or execute on the donor's machine beyond its own managed home and scratch dir; it must not reach the network beyond the provider API; it must not reach the bridge's keys, audit or lifecycle state (separate identity, CIP-0009 D1); and whatever it does must be visible to the donor. **Credential posture (F22):** the provider credential is delivered into the harness process environment per launch (CIP-0010); a compromised harness can read it and pass it to a child inside its sandbox; eliminating the store copy limits the blast radius to one token, it does not make the token non-extractable. That is the owner-approved initial trusted-process posture (owner decision 2026-10-07: no provider interception in the first implementation); a stronger non-extraction mechanism needs a separately approved design.
+-- **Layers, in order of strength:** (1) separate OS identities, kernel sandbox and per-UID egress on the donor (CIP-0009); (2) no local tool offered to the model (R3); (3) the launcher grammar and the intake check of the expanded launch against the generated policy (R4, R5); (4) the executor's tripwire and audit of every tool name the model requests, as detection after dispatch (kept from `rwh`); (5) the workplace's own policy on our host (CIP-0009 D5, the `swarma-workplace-exec/1` contract). Layers 2–4 are posture and evidence; 1 and 5 are the boundaries.
++- **Threat model.** The remote harness is compromised or prompt-injected. In B/C the OS boundary confines reads, writes and execution to admitted runtime roots, managed home and scratch, and network/IPC to the provider proxy and relay; B additionally splits UIDs. A has no such OS guarantee: it relies on exactly qualified lockdown with no local tools, and a compromised harness could act as the donor user or read bridge state. Audit protects state through UID/sandbox in B/C; A does not claim this protection (CIP-0009 D0). **Credential posture (F22):** the provider credential is delivered into the harness process environment per launch (CIP-0010); a compromised harness can read it and pass it to a child inside its sandbox; eliminating the store copy limits the blast radius to one token, it does not make the token non-extractable. That is the owner-approved initial trusted-process posture (owner decision 2026-10-07: no provider interception in the first implementation); a stronger non-extraction mechanism needs a separately approved design.
++- **Layers, in order of strength:** (1) B: separate OS identities, kernel sandbox and per-UID egress; C: same-UID sandbox; A: no OS confinement (CIP-0009 D0); (2) no local tool offered to the model (R3); (3) the launcher grammar and the intake check of the expanded launch against the generated policy (R4, R5); (4) the executor's tripwire and audit of every tool name the model requests, as detection after dispatch (kept from `rwh`); (5) the workplace's own policy on our host (CIP-0009 D5, the `swarma-workplace-exec/1` contract). Layers 2–4 are posture and evidence; 1 (B/C only) and 5 are the boundaries.
+ - **Policy freshness (F9).** The plan binds the policy generation; the executor rechecks the current generation at exec and resume; a sandbox-profile revision in the plan proves which profile was requested, not that a process runs under it, so the executor's acceptance record carries the boot qualification separately.
+ - **Hostile repository.** Nothing in this CIP reads repository bytes to decide the posture; CIP-0002 strict project context keeps project files out of the managed launch, and the cwd is an empty scratch directory.
+-- **Secrets.** No secret enters argv, the plan or a fragment; the bridge's keys belong to the bridge identity (CIP-0009), not to the harness.
++- **Secrets.** No secret enters argv, the plan or a fragment; the bridge's keys belong to the bridge identity (CIP-0009), with storage and isolation scoped by variant (D0); A shares the donor UID and claims no OS key-confidentiality boundary.
+ 
+ ## Compatibility and migration
+ 
+diff --git a/cips/CIP-0009-donor-side-deployment-and-bridge.md b/cips/CIP-0009-donor-side-deployment-and-bridge.md
+index 3ce5fa25b0c7c8d0ce1e95a602373a18a988b5cb..fd16b2738d1067145815d0d4a0d56b382cee2730 100644
+--- a/cips/CIP-0009-donor-side-deployment-and-bridge.md
++++ b/cips/CIP-0009-donor-side-deployment-and-bridge.md
+@@ -1,27 +1,31 @@
+ # CIP-0009: Donor-side deployment and the worker-to-project bridge
+ 
+-- **Status:** Draft (revision 3, the owner decisions of 2026-10-10; revision 2 followed the architecture review of 2026-10-08)
+-- **Owner:** ivan-curator (orchestrator); decision: operator (both owners for the bridge contract)
++- **Status:** Draft (revision 4, contract audit R-CS1 and the owner decisions of 2026-10-10/11; no implementation or qualification claimed)
++- **Owner:** project orchestrator; decision: project operator and donor owner for the bridge contract
+ - **Created:** 2026-10-08
+ - **Related:** owner brief 2026-10-08; [CIP-0008](CIP-0008-remote-worker-launch-mode.md) (the lockdown posture); [CIP-0010](CIP-0010-credentials-setup-token-and-inherited-auth.md); [CIP-0007](CIP-0007-manager-provisioned-cli-tools.md) (provisioned binaries); [Decision 0009](../decisions/0009-first-party-module-roots.md); environments [§2.2](../protocol/environments.md#22-mcp-declaration-packages); VISION v1.3 (relux-works/swarm-platform-architecture) §0, LCH §7–§8, ADM, the sequences `external-agent-onboarding`, `remote-workplace-attach`, `remote-worker-start`, `mailbox-delivery`, `keeper-sign`; wiki `session-host/architecture.ru.md` §7.2, §7.4, §7.5, §7.9, §7.10; relux-works/remote-workplace protocol v2.1 (RWP); relux-works/remote-worker-harness (`rwh`)
+-- **Affects:** a new Curator command group `remote-worker`; two first-party modules (`swarma-remote-tools` relay, `swarma-bridge` service) and the privileged helper; manager §12 (locked donor configuration); the project-side executor (`swarma-rb-exec`) and the `swarma-workplace-exec/1` contract; diagrams in `cips/diagrams/`
++- **Affects:** a new Curator command group `remote-worker`; two first-party modules (`swarma-remote-tools` relay, `swarma-bridge` service) and a separately specified donor provisioner (variant B disabled until its spec exists); manager §12 (locked donor configuration); the project-side executor (`swarma-rb-exec`) and the `swarma-workplace-exec/1` contract; diagrams in `cips/diagrams/`
++
++## Revision 4: contract reconciliation
++
++The contract table at `relux-works/curator` revision `177cb554` and the recorded owner decisions govern this revision. D-DONOR-PROVISIONING selects a separate donor-side binary and privilege boundary; B stays disabled until its short spec, rules and removal contract exist. D-WIRE-NAMES requires versioned wire identifiers of the form `swarma-<component> <object>/<n>`; pending formats are registered in [the remote-worker protocol](../protocol/remote-worker.md#publication-status). These are documentation decisions, not qualification evidence.
+ 
+ ## Revision 3: the owner decisions of 2026-10-10
+ 
+-- **Three deployment variants (D0).** Owner, verbatim: «в целом неплохо разделить, но только если это не требует админ привелегий для пользователя - для него это будет красный флаг» and «делаем три варианты - без песочницы и без юзеров (как первый майлстоун - потом с юзерами как самый надежный по разовому спросу админа -- третий - через песочницу которая будет фоллбеком когда пользователь не дал или не может дать права админа». Variant A (lockdown only, no administrator rights) is the first milestone; variant B (two OS identities, one administrator request) is the most reliable; variant C (an OS sandbox under the donor's own user) is the fallback when the rights are not granted. D1 and D2 describe variant B; D0 says what A and C keep and drop.
+-- **First contact without a human second channel (D4, D6).** A donor is often someone who only heard of an environment; there is no channel to read a fingerprint back over. Owner, verbatim: «ок, если сам человек оператор удаленного сотрудника ничего не должен настраивать сам»; on validating DNSSEC inside our client: «ок делаем так»; on the DNS-over-HTTPS fallback: «ок. в идеале». The anchors are the Web PKI certificate of the join point's domain, the DNSSEC-signed fingerprints validated inside the client (mandatory), and the invitation's pins when an invitation exists. The voice check is removed; the donor configures nothing.
++- **Three deployment variants (D0).** A (qualified lockdown under the donor user, no administrator rights) is the first milestone; B (separate harness and bridge OS identities, one administrator request, no Keychain) follows once its separate donor provisioner is specified and qualified; C (sandbox under the donor user) is the fallback when administrator rights are declined or unavailable. D1 and D2 describe B; D0 scopes A and C.
++- **First contact without a human second channel (D4, D6).** Web PKI is required. DNSSEC validated inside the client is the default, with DoH as a transport fallback. Only an environment explicitly declared to lack a DNSSEC domain uses invitation pins instead. When both are present they must agree; a read or validation failure never selects the invitation fallback. Records are per environment; the donor configures nothing.
+ - **Strict harness admission** for every variant: CIP-0008 R9 (the admission rule, exact qualified builds checked before exec, the bridge refusing any session that is not `lockdown` + `remote-auto`).
+-- **Join point and `init`** are specified (D9, D10); the carrier-identity model for the two kinds of donors the owner described is an open question (5).
++- **Join point and `init`** are specified (D9, D10); the carrier phases are decided in D11 and decision 5.
+ 
+ ## Revision 2: what the architecture review changed
+ 
+-- **F10:** the harness and the bridge no longer share one OS user. The donor side has an **untrusted harness identity** and a **trusted bridge identity**; keys, audit, lifecycle state, the SSH client and the signer live in the bridge identity; the harness reaches it only through a minimal stdio relay and an authenticated local socket with peer credentials (D1).
+-- **F11:** the OS setup is an executable, qualified capability on one platform first (macOS), with an explicit service domain, account lifecycle, key-unlock strategy, protected executable roots, writable state roots, a mandatory read boundary with explicit runtime exceptions, transactional provisioning and rollback; unsupported hosts refuse (D2).
++- **F10, variant B only:** the harness and bridge use separate OS identities. A/C share the donor UID, with a sandbox only in C (D0). In B the donor side has an **untrusted harness identity** and a **trusted bridge identity**; keys, audit, lifecycle state, the SSH client and the signer live in the bridge identity; the harness reaches it only through a minimal stdio relay and an authenticated local socket with peer credentials (D1).
++- **F11:** the OS setup is an executable, qualified capability on one platform first (macOS), with an explicit service domain, account lifecycle, key-storage strategy, protected executable roots, writable state roots, a mandatory read boundary with explicit runtime exceptions, transactional provisioning and rollback; unsupported hosts refuse (D2).
+ - **F12:** the MCP declaration pin covers declaration content only; the executed binaries are pinned and verified separately by absolute path from a protected root; the allowlist entry is a canonical source identity; installation is an explicit operator-owned provisioning contract (D3).
+-- **F13:** the bootstrap has a versioned, domain-separated transcript, a server challenge, atomic invitation consumption with replay tombstones, cryptographically random codes with attempt limits, separate keys per role, standard authenticated encryption, a root-validated operator chain, and an explicit DNS validation model; revision 2 bootstrapped trust from the out-of-band pin (the invitation plus a human fingerprint check) with DNSSEC/DANE as a cross-check where a trusted validator existed. **Superseded by Revision 3:** the Web PKI, DNSSEC validated inside the client (the default) and the invitation's pins (the fallback), with no human check. Nothing downgrades on failure (D4, D6).
+-- **F14:** SSH authorization lives outside the workplace user's write authority, the forced command is an absolute protected path, unneeded SSH features are disabled in the qualified server policy, host pins are rechecked on every reconnect with no trust-on-first-use, and the privileged helper has a closed operation schema with allocated identifiers and safe paths (D2, D4, D5).
+-- **F15:** `swarma-rb/1` defines bounded frames, canonical encoding, version negotiation, connection-scoped ids, idempotency keys with a result cache for uncertain results after reconnect, server-authoritative caps, method authorization, ownership rules for `cancel` and `stdin`, backpressure, and job lifetime ownership with leases and proven descendant cleanup (D5).
+-- **F16:** the first backend is named (the OS-user workplace of VISION v1.3) and its contract `swarma-workplace-exec/1` is specified with the guarantees it must give; RWP's container conformance is not borrowed; the effective tool set is the intersection with the workplace policy; mailbox methods are control plane, not tools by default (D3, D5).
++- **F13:** the bootstrap has a versioned, domain-separated transcript, a server challenge, atomic invitation consumption with replay tombstones, cryptographically random codes with attempt limits, separate keys per role, standard authenticated encryption, a root-validated operator chain, and an explicit DNS validation model; the current trust branches are Web PKI with locally validated DNSSEC by default, or invitation pins for an explicitly declared no-DNSSEC environment, with no human second channel. Nothing downgrades on failure (D4, D6).
++- **F14:** SSH authorization lives outside the workplace user's write authority, the forced command is an absolute protected path, unneeded SSH features are disabled in the qualified server policy, host pins are rechecked on every reconnect with no trust-on-first-use, and B requires a separately specified donor provisioner with a closed schema, allocated identifiers and safe paths (D2, D4, D5).
++- **F15:** the pending channel protocol (design label `swarma-rb/1`) requires bounded frames, canonical encoding, version negotiation, connection-scoped ids, idempotency keys with a result cache for uncertain results after reconnect, server-authoritative caps, method authorization, ownership rules for `cancel` and `stdin`, backpressure, and job lifetime ownership with leases and proven descendant cleanup (D5).
++- **F16:** the first backend is named (the OS-user workplace of VISION v1.3) and its pending standalone contract (design label `swarma-workplace-exec/1`) lists the guarantees it must give; RWP's container conformance is not borrowed; the effective tool set is the intersection with the workplace policy; mailbox methods are control plane, not tools by default (D3, D5).
+ - **F17:** `stop`, `leave`, `purge` on the donor and `suspend`, `retire`, `revoke` on our side are separate transitions with defined ordering; the identity is preserved unless revoked; the donor is told the revocation outcome (D7).
+ - **F18:** the project bridge never signs as the donor-held worker key: the **donor-side bridge signs the final envelope bytes** with the worker's signing key; our side verifies, admits and carries the bytes unchanged under a distinct, audited carrier authority (D5).
+ - **F19:** delivery has host-side admission on the donor, a qualified session-input adapter for control turns, advisory and bounded notifications, durable cursors on both sides, acknowledgement after persistence, reconnect catch-up, deduplication, and an application receipt distinct from the transport receipt; disconnected behaviour is defined (D5).
+@@ -29,7 +33,7 @@
+ 
+ ## Summary
+ 
+-This CIP specifies the **donor side** of a remote worker and the **bridge** between the donor's machine and the project's host: what Curator installs on the donor machine at first deployment (in one of three variants: the lockdown posture only, two OS identities with a kernel sandbox and a per-UID egress policy, or a kernel sandbox under the donor's own user; plus a locked configuration, a trusted bridge service and a minimal remote-tools relay), how the initial exchange works (invitation, three role-separated keys, a signed enrolment transcript over a server challenge, join point, root-signed admission, an authenticated-encrypted credential package), how the harness talks to our host (one SSH connection from the donor's bridge identity towards our host, carrying the framed `swarma-rb/1` protocol and the mailbox), how MITM and replay are defended (the Web PKI and mandatory DNSSEC validated inside the client, plus the invitation's pins, pinned keys both ways, signed transcripts and envelopes over exact bytes), and how a worker is stopped, retired, revoked or purged on both sides. It decides that the remote tools are an **MCP relay** while the initial exchange is a **Curator CLI step**, never a tool the model can call. Diagrams: `diagrams/donor-first-deployment.puml`, `diagrams/join-handshake.puml`, `diagrams/remote-worker-turn.puml`, `diagrams/remote-worker-retire.puml`, `diagrams/donor-side.dsl` (C4 containers).
++This CIP specifies the **donor side** of a remote worker and the **bridge** between the donor's machine and the project's host: what Curator installs on the donor machine at first deployment (in one of three variants: the lockdown posture only, two OS identities with a kernel sandbox and a per-UID egress policy, or a kernel sandbox under the donor's own user; plus a locked configuration, a trusted bridge service and a minimal remote-tools relay), how the initial exchange works (invitation, three role-separated keys, a signed enrolment transcript over a server challenge, join point, root-signed admission, an authenticated-encrypted credential package), how the harness talks to our host (one SSH connection from the donor's bridge identity towards our host, carrying the framed `swarma-rb/1` protocol and the mailbox), how MITM and replay are defended (Web PKI with locally validated DNSSEC by default or invitation pins for a declared no-DNSSEC environment, host/user CAs, signed transcripts and envelopes over exact bytes), and how a worker is stopped, retired, revoked or purged on both sides. It decides that the remote tools are an **MCP relay** while the initial exchange is a **Curator CLI step**, never a tool the model can call. Diagrams: `diagrams/donor-first-deployment.puml`, `diagrams/join-handshake.puml`, `diagrams/remote-worker-turn.puml`, `diagrams/remote-worker-retire.puml`, `diagrams/donor-side.dsl` (C4 containers).
+ 
+ ## Motivation and user stories
+ 
+@@ -51,8 +55,8 @@ This CIP specifies the **donor side** of a remote worker and the **bridge** betw
+ 
+ **A. Where the remote tools live**
+ 1. *MCP server on our host, reached by the harness over `http`* (environments §2.2 `http`). The harness would need a network path and an authentication secret it holds itself. Rejected.
+-2. *One local MCP server in the harness's OS user, holding the SSH client and the keys* (revision 1). The review showed it defeats the separation the design claims: a shared UID cannot be told apart by a per-UID firewall, the shared home exposes audit, state and (on the file fallback) the private key, and a keyring item is not a non-exportable signing service. Rejected.
+-3. *A minimal stdio **relay** in the harness identity plus a trusted **bridge service** in a second identity, joined by an authenticated local socket with peer credentials.* The harness sees a local process with no keys and no network; the bridge holds everything that must not be reached. `rwh` measured the relay shape for Muse. **Recommended.**
++2. *One local MCP server in the harness's OS user, holding the SSH client and the keys* (revision 1). The review showed it defeats the separation the design claims: a shared UID cannot be told apart by a per-UID firewall, the shared home exposes audit, state and (on the file fallback) the private key, and a keyring item is not a non-exportable signing service. Rejected as a claim of OS isolation; A explicitly accepts a shared UID with qualified lockdown only.
++3. *A minimal stdio **relay** plus a trusted **bridge service**, joined by a local socket; separate identities and peer-UID admission in B, a sandbox in C, qualified lockdown only in A.* The harness sees a local process with no keys and no network; the bridge holds everything that must not be reached. `rwh` measured the relay shape for Muse. **Recommended.**
+ 4. *Curator skill with scripts.* Scripts need a local shell, which the lockdown removes. Rejected for tools; kept for prompts.
+ 
+ **B. How the donor receives tasks and messages**
+@@ -61,11 +65,11 @@ This CIP specifies the **donor side** of a remote worker and the **bridge** betw
+ 
+ **C. The initial exchange**
+ 1. *An MCP tool `enrol`.* The model would see the key material or at least drive the exchange. Rejected.
+-2. *A Curator CLI step run by a human on the donor machine* (`curator remote-worker init <invitation>`), with the keys generated by the bridge identity and never readable by the harness. **Recommended.**
++2. *A Curator CLI step run by a human on the donor machine* (`curator remote-worker init <invitation>`), with keys generated by the bridge role and D0 variant-specific storage; UID/sandbox isolation in B/C, no OS confidentiality guarantee in A. **Recommended.**
+ 
+ **D. Trust bootstrap for the first contact**
+-1. *DNSSEC-validated TXT/SSHFP/TLSA as a hard requirement.* Sound only with a trusted validator: an AD bit from an arbitrary upstream resolver proves nothing. **Chosen on 2026-10-10** with the validator built into the client (the embedded root trust anchor; DNS-over-HTTPS as the transport fallback), so the donor installs nothing; together with the Web PKI and the invitation's pins when present.
+-2. *Out-of-band pin bootstrap:* the invitation carries the root fingerprint and the SSH host key fingerprint, the human compares the worker fingerprint over a second channel, and everything after is pinned. Recommended in revision 2; **dropped on 2026-10-10**: a donor who only heard of an environment has no second channel. The invitation's pins remain an additional check when an invitation exists.
++1. *DNS-published trust with client-side DNSSEC validation.* Chosen on 2026-10-10 as the default: the embedded root trust anchor, DoH transport fallback, and Web PKI, with invitation pins cross-checked when present. Validation errors and mismatches refuse.
++2. *Invitation pins for an environment declared to lack a DNSSEC domain.* Chosen as the fallback on 2026-10-10; Web PKI still applies. The declaration is a trust-mode choice before lookup, not a response to a DNS failure. No human fingerprint comparison or second channel is required.
+ 
+ ### Recommendation
+ 
+@@ -74,22 +78,22 @@ This CIP specifies the **donor side** of a remote worker and the **bridge** betw
+ | Variant | Administrator rights | Donor-side boundary | Bridge runs as | Keys | Order |
+ |---|---|---|---|---|---|
+ | **A. Lockdown only** | none | the CIP-0008 lockdown posture with strict qualification (R9): the model is offered no local tool and only an exactly qualified harness build starts; no OS boundary beyond the donor's user | a user service of the donor (macOS LaunchAgent, Linux `systemd --user`), running while the donor is logged in | non-exportable Secure Enclave keys on Macs that have one (owner decision 2026-10-10; P-256 signing and SSH keys); 0600 files in the donor's state directory on Linux, TPM later | first milestone |
+-| **B. Two identities** | once, at `init` | D1 and D2: an untrusted harness identity and a trusted bridge identity, per-UID egress, the kernel read boundary, a root-owned executable root | the bridge identity, as a system service that survives logout | 0600 files owned by the bridge identity, **no Keychain** (owner decision 2026-10-10); non-exportable keys later only if the Secure Enclave proves usable from such a service without Keychain | the most reliable; used whenever the donor grants the rights |
+-| **C. Sandbox** | none | everything under the donor's user; the harness inside the OS sandbox (macOS Seatbelt; Linux Landlock, or bubblewrap with a private network namespace): it reads and writes only its managed home and scratch directory, connects only to the relay socket and the local provider proxy, and reaches no Keychain or other IPC service; the bridge's state and the executables sit outside its readable and writable set | a user service of the donor | as in A | the fallback when the rights are not granted or cannot be |
++| **B. Two identities** | once, at `init` | D1 and D2: an untrusted harness identity and a trusted bridge identity, per-UID egress, the kernel read boundary, a root-owned executable root | the bridge identity, as a system service that survives logout | 0600 files owned by the bridge identity, **no Keychain** (owner decision 2026-10-10); non-exportable keys later only if the Secure Enclave proves usable from such a service without Keychain | the most reliable; disabled until the separate donor provisioner is specified and qualified |
++| **C. Sandbox** | none | everything under the donor's user; the harness inside the OS sandbox (macOS Seatbelt; Linux Landlock, or bubblewrap with a private network namespace): it reads and writes only its managed home and scratch directory, connects only to the relay socket and the local provider proxy, and reaches no Keychain or other IPC service; the bridge's state is outside its readable/writable set; pinned runtime executables are admitted read/execute only, never writable | a user service of the donor | as in A | the fallback when the rights are not granted or cannot be |
+ 
+ - **A states its limit.** If a qualified harness build turned out to offer a local tool after all, the model would act as the donor's user. That is the risk accepted for the first milestone; exact builds checked before exec and the bridge's posture check (CIP-0008 R9) are its guards, and the qualification lab of CIP-0008 R7 is what keeps a build out.
+-- **The lock without a system layer.** In A and C the locked configuration lives in the donor's own files. The harness cannot change it (A: it has no tools; C: the file is outside its writable set); the donor can, and then the bridge stops the worker instead of running it open (CIP-0008 R9).
++- **The lock without a system layer.** In A and C the locked configuration lives in the donor's own files. A offers no local tool to the model but makes no OS integrity guarantee against a compromised harness process; C keeps the file outside its writable set; the donor can, and then the bridge stops the worker instead of running it open (CIP-0008 R9).
+ - **Executables.** In A and C they live in the donor's state directory (`~/Library/Application Support/swarma/<release>/` on macOS, `~/.local/share/swarma/<release>/` on Linux) and the bridge verifies each digest before exec; in B they live in the root-owned `/opt/swarma/releases/<release>/`.
+ - **Egress.** B uses per-UID firewall rules; C uses the sandbox's network rules (connect only to the proxy and the relay socket); A has no egress control of its own, and the harness reaches its provider directly.
+ - **Layout.** The donor side follows the layout of the central environment. In B the root is `/opt/swarma`: `libexec/`, `etc/`, `lib/`, `run/`, `services/swarma-bridge-<project>/` (the bridge identity's home), `workers/worker-<project>/` (the harness identity's home) and `releases/<release>/` (pinned executables). In A and C the same subdirectories sit under the donor's state root.
+ - **Selection.** `init` asks for administrator rights only when the donor chooses B. Once B and C are qualified on a platform, `init` offers B and falls back to C; whether A then stays selectable is open question 7.
+ 
+-**D1. Components on the donor machine, variant B** (C4: `diagrams/donor-side.dsl`). In A and C the two identities are the donor's own user, and the privileged helper, the system service and the per-UID egress are absent; C keeps the sandbox of D2.
++**D1. Components on the donor machine, variant B** (C4: `diagrams/donor-side.dsl`). In A and C the roles share the donor's own user, and the donor provisioner, the system service and the per-UID egress are absent; C keeps the sandbox of D2.
+ 
+ | Component | Runs as | Job |
+ |---|---|---|
+ | `curator` (donor install) | the donor (the machine's owner) for `init`, `leave`, `purge`; the bridge identity for `run`, `status`, `stop` | first deployment, status, stop, leave, purge; requests the composed lockdown plan from the construction site (CIP-0008 §Compatibility) |
+-| privileged helper (`swarma-helper`) | root for one command (sudoers rule limited to this absolute path) | a **closed operation schema**: `create-worker`, `remove-worker`, `set-egress`, `apply-sandbox`, `rollback`; allocates the two accounts and their identifiers from its own range (the caller passes only the project label, validated as `[a-z0-9-]{1,32}`); fixed templates for firewall and sandbox profiles; refuses any other input; writes a provisioning journal and rolls back a failed step; never removes a pre-existing account |
++| donor provisioner (separate component; binary name and closed request schema **pending**) | a separate privileged boundary for B only | provisions and removes the two accounts, homes, egress, sandbox and system service transactionally, with allocated identifiers, safe paths, a journal and rollback. D-DONOR-PROVISIONING: may share UID/path libraries, but is not `swarma-user-manager`, and no donor operation is added to its closed schema. B remains disabled until the provisioner spec, rules and removal contract exist. |
+ | harness identity `worker-<project>` | — | the **untrusted** side: home 0700, no password, no interactive login, process and disk quotas; owns only the managed home and the scratch dir |
+ | bridge identity `swarma-bridge-<project>` | — | the **trusted** side: owns the keys, the pinned configuration, the audit log, the lifecycle state, the SSH client and the signer; its home is unreadable by the harness identity |
+ | bridge service (`swarma-bridge`) | the bridge identity, as a system service (macOS: `launchd` daemon with `UserName`; it survives logout and needs no login session) | holds the one SSH connection to our host; serves the relay over an authenticated Unix socket (peer credentials checked: only the harness identity of this project may connect); signs outbound envelopes; admits inbound mailbox items; counts budgets; writes audit; executes `stop` |
+@@ -97,21 +101,21 @@ This CIP specifies the **donor side** of a remote worker and the **bridge** betw
+ | remote-worker supervisor (`curator remote-worker run`) | the bridge identity (part of the bridge service) | consumes the composed lockdown plan (never composes), launches the harness **as the harness identity** under the sandbox profile, turns admitted mailbox items into turns through the session-input adapter, posts results, enforces budgets and lifetimes (the `rwh worker` guards: allow-from, daily tokens, rate, ping-pong, turn timeout, lifetime) with the trusted-side counters as the authority |
+ | egress policy | kernel | harness identity: loopback to the local provider proxy only; bridge identity: our SSH host and our join point only; nothing else, nothing inbound |
+ | provider proxy | the bridge identity or a system service | the harness's only path to the provider API: a host allowlist per qualified tuple; no other destination |
+-| locked machine configuration | files owned by the bridge identity, read by Curator | `tool_posture.remote-worker: lockdown`, `permissions.remote-worker: remote-auto` (the lockable pair of CIP-0008 R1), `policy_generation`, `mcp_package_allowlist: [<canonical source identity of swarma-remote-tools>]`, `passable_env_names: []`, the qualified tuple, the project binding (host, SSH host key fingerprint, root fingerprint), the sandbox profile revision |
++| locked machine configuration | files owned by the bridge identity, read by Curator | `tool_posture.remote-worker: lockdown`, `permissions.remote-worker: remote-auto` (the lockable pair of CIP-0008 R1), `policy_generation`, `mcp_package_allowlist: [<canonical source identity of swarma-remote-tools>]`, `passable_env_names: []`, the qualified tuple, the project binding (host, SSH host CA fingerprint, root fingerprint), the sandbox profile revision |
+ 
+-Everything the first draft put "in the same user, protected by the keyring's access control" is now in the bridge identity. The harness identity cannot read the bridge's home, cannot connect to anything but the relay socket and the proxy, and cannot alter any control state; this is true by UID and sandbox, not by promise.
++In B, everything the first draft put "in the same user, protected by the keyring's access control" is in the bridge identity. The harness identity cannot read the bridge's home, cannot connect to anything but the relay socket and the proxy, and cannot alter any control state; this is true by UID and sandbox, not by promise.
+ 
+ **D2. OS sandbox and provisioning (F11, F14), variants B and C.** Variant C applies the sandbox bullet below without the accounts, the per-UID egress and the root-owned executable root; variant A applies none of this section. One platform is qualified first: **macOS** (the platform `rwh` measured). Linux follows with its own qualification; Windows is out of scope (owners' call C18). Unsupported hosts refuse at `init`.
+-- *Accounts:* two hidden accounts without login shell or password, created by the helper with allocated UIDs; the bridge account's home holds the keys (0600 files owned by the bridge identity in the first release; keyring-backed non-exportable keys are a later hardening, since a headless daemon cannot rely on a login keychain) and the state; the harness account's home holds the managed home and the scratch dir.
++- *Accounts:* two hidden accounts without login shell or password, created by the separately specified donor provisioner with allocated UIDs (B disabled while pending); the bridge account's home holds the keys (0600 files owned by the bridge identity in the first release; non-exportable keys are later hardening only if usable without Keychain; B does not use Keychain) and the state; the harness account's home holds the managed home and the scratch dir.
+ - *Service domain:* the bridge service is a `launchd` system daemon running as the bridge identity, so it starts at boot, survives logout and does not need a user session; the harness is launched by the bridge service as the harness identity.
+ - *Egress:* a `pf` anchor with per-UID rules (harness → loopback proxy port only; bridge → our SSH host and join point only; everything else blocked both ways). Because the identities are distinct, UID rules are meaningful.
+ - *Sandbox:* a Seatbelt profile applied to the harness process with an explicit allow-list: read and execute of the pinned executable root and its runtime libraries, read and write of the managed home and the scratch dir, connect to the relay socket and the proxy port; deny everything else (file reads, AppleEvents, pasteboard, LaunchServices `open`, other sockets). The **read boundary is mandatory**, not "where available"; it is what makes Muse's retained read tools harmless and what keeps the bridge's home unreadable even if the file permissions were wrong. The profile revision is part of the qualified tuple (CIP-0008 R3) and of the plan (R5).
+ - *Protected executable root:* `/opt/swarma/releases/<release>/` owned by root, read-only, no writable predecessor directory; the bridge launches every binary (harness, relay, proxy, itself) by absolute path from it and verifies the digest against the pinned release manifest first (D3).
+-- *Transactional provisioning:* the helper journals each step (accounts, homes, egress anchor, sandbox profile, daemon unit) and `rollback` undoes a failed provisioning in reverse order; a half-provisioned machine never keeps a relaxed rule; `init` reports the exact step that failed.
++- *Transactional provisioning:* the separate donor provisioner must journal each step (accounts, homes, egress anchor, sandbox profile, daemon unit) and undo a failed provisioning in reverse order; a half-provisioned machine never keeps a relaxed rule; `init` reports the exact step that failed.
+ - *Linux (second platform):* two system users with `nologin`; `nftables` with `meta skuid`; the bridge as a `systemd` system service; the harness started through `systemd-run --uid` with `NoNewPrivileges`, `PrivateTmp`, `RestrictAddressFamilies`, a cgroup for lifetime ownership, and **Landlock** as the read boundary (ProtectSystem is a write boundary, not a read-confidentiality one); the managed home mounted writable, the executable root read-only. Qualified separately before any Linux donor.
+-- *Negative tests per platform* at the real `init`, launch, tool and stop entries: reads outside the allow-list refused, egress outside the allowlist refused, the proxy refuses a non-provider host, the relay socket refuses a connection from another UID, the helper refuses a second account with the same label, a symlink in a path argument, an arbitrary user name in `remove-worker`, and an injected argument; provisioning interrupted halfway rolls back; a pre-existing account with a colliding name is never removed.
++- *Negative tests per platform* at the real `init`, launch, tool and stop entries: reads outside the allow-list refused, egress outside the allowlist refused, the proxy refuses a non-provider host, in B the relay socket refuses a connection from another UID, the separately specified donor provisioner refuses a colliding label, a symlink in a path argument, arbitrary-account removal and an injected argument; provisioning interrupted halfway rolls back; a pre-existing account with a colliding name is never removed.
+ 
+-**D3. The relay as a declared package; the executable pinned separately (F12, F16).** `swarma-remote-tools` is a first-party module (Decision 0009) shipped with the toolchain, declared to profiles as an MCP declaration package (`agent-mcp.json`, `transport: stdio`, `command: /opt/swarma/releases/<release>/bin/swarma-remote-tools` as an absolute path, no `env_names`), pinned in the profile lock like any package, and the only entry of the donor's locked `mcp_package_allowlist`, which names its **canonical source identity** (environments §2.2), not a package name. The pin covers the declaration; the **executable** is covered by the release manifest: the bridge verifies the digest of every binary it starts and refuses a changed, unreadable or shadowed file (`executable_unpinned`). Installing the binaries on the donor is part of the operator-owned provisioning contract of `init` (CIP-0007 shape); the manager boundary of §2.2 ("the manager never installs or launches a server") is amended deliberately for this provisioning step and for nothing else.
++**D3. The relay as a declared package; the executable pinned separately (F12, F16).** `swarma-remote-tools` is a first-party module (Decision 0009) shipped with the toolchain, declared to profiles as an MCP declaration package (`agent-mcp.json`, `transport: stdio`, an absolute `command` in the selected variant's executable root (D0), no `env_names`), pinned in the profile lock like any package, and the only entry of the donor's locked `mcp_package_allowlist`, which names its **canonical source identity** (environments §2.2), not a package name. The pin covers the declaration; the **executable** is covered by the release manifest: the bridge verifies the digest of every binary it starts and refuses a changed, unreadable or shadowed file (`executable_unpinned`). Installing the binaries on the donor is part of the operator-owned provisioning contract of `init` (CIP-0007 shape); the manager boundary of §2.2 ("the manager never installs or launches a server") is amended deliberately for this provisioning step and for nothing else.
+ 
+ The relay's maximum tool set and where each executes:
+ 
+@@ -125,41 +129,43 @@ The relay's maximum tool set and where each executes:
+ The **effective** set offered to the model is the intersection of this list with the workplace policy of the worker (`tools` of the policy, fetched at connect and refreshed on `policy.changed`): a read-only worker gets `read_file` only, not `bash`, `write_file` or `apply_patch`. Mailbox operations are **control plane** between the bridge service and our bridge; `mailbox_read` and `mailbox_post` appear as tools only when the policy grants them, and the supervisor delivers task turns through the session-input adapter, not through a tool the model has to call (F19). No `enrol`, no `key`, no `config`. Any other `tools/call` is an error result and an audit line.
+ 
+ **D4. First deployment** (`diagrams/donor-first-deployment.puml`, `diagrams/join-handshake.puml`; F13).
+-1. We issue an **invitation** `swarma-invitation/1`: `{invitation_id (128-bit random), join_point_url, root_fingerprint, ssh_host_key_fingerprint, project, role, expires_at, code}`. The `code` is a cryptographically random one-use bearer bootstrap capability (at least 128 bits, base32), and the CIP says so: it is a secret for the duration of the enrolment, delivered with the invitation through whatever channel the donor found us by (a marketplace deal thread, an e-mail, our site), limited to a few attempts, and consumed atomically. A person who only knows our domain runs `init <domain>` instead; that starts an open application which waits for the operator (D9).
+-2. The donor (the machine's owner, D10) runs `curator remote-worker init <invitation-file>` and configures nothing else. Curator refuses unsupported hosts, sets up the chosen variant (D0; in B it calls the helper for accounts, homes, egress, sandbox and daemon), and the bridge identity generates **three keys**: `K_sig` (Ed25519, signing), `K_enc` (X25519, package decryption), `K_ssh` (Ed25519 SSH key). It builds the enrolment certificate `{K_sig, K_enc, K_ssh, name, role, invitation_id, expires}` self-signed by `K_sig` and shows the fingerprint (SHA-256 over the certificate bytes) to the donor.
+-3. *Challenge:* `POST /join/challenge {invitation_id}` → the join point returns a server challenge bound to the invitation (random, five-minute lifetime, attempt counter). *DNS check, mandatory:* Curator validates DNSSEC itself from the embedded root trust anchor, so the donor installs no resolver. It fetches `TXT _swarma.<domain>` (the root key fingerprint), the `SSHFP` records of our SSH host and the `TLSA` record of the join point through the system resolver and, when the network strips DNSSEC data, through DNS-over-HTTPS resolvers; the signatures are validated locally either way. A **secure** result must equal the invitation's fingerprints when an invitation exists; a **bogus** or still **indeterminate** result refuses with an explanation; nothing downgrades. These records describe the environment, not a worker: they are published once and change only when our keys rotate. The SSH host identity is our host certificate authority (D12), the same for every worker; a worker's own keys are never published. In a closed network with its own DNS, the internal zone's DNSSEC trust anchor comes from the network's configuration or from the invitation.
+-4. *Transcript:* the client builds the canonical `swarma-join/1` transcript (deterministic CBOR, domain-separated): `{version, invitation_id, project, role, K_sig, K_enc, K_ssh, server_challenge, client_nonce, expires_at, algorithms}`, signs it with `K_sig`, and sends `POST /join/cert {transcript, signature, code}` over HTTPS validated by the Web PKI for the join point's domain and pinned by its DNSSEC-validated `TLSA` record (and by the invitation's certificate fingerprint when there is one). The join point verifies the code in constant time, the signature, the challenge binding and the expiry, **consumes the invitation atomically** (a tombstone keyed by `invitation_id` prevents replay; a retry with the same `K_sig` returns the same pending enrolment, a retry with a different key refuses), rate-limits per address and per invitation, and stores the pending enrolment. The join point accepts only `challenge`, `cert` and `collect`; no commands.
+-5. *Admission:* the operator (or an orchestrator with the `onboard` grant plus operator confirmation) checks the enrolment against what is known of the donor: the key in the donor's signed marketplace card when there is one, otherwise the invitation the code binds; there is no voice comparison. The operator pins `K_sig`, `K_enc` and `K_ssh` in the registry, has the root sign the admission record, issues the grants (post to the project room's worker thread, read own mailbox, no delegation, expiry), and builds the **credential package** `swarma-credential-package/1`: `{our root public key, operator certificate (root-signed, scope onboard, validity), host, SSH host key, workplace user name, binding digest, qualified tuple, policy generation, expires}`, encrypted to `K_enc` with standard authenticated encryption (X25519 key agreement, HKDF, ChaCha20-Poly1305) with the transcript digest as associated data, and signed by the operator certificate.
+-6. *Collect:* `POST /join/collect {invitation_id, signature over a second server challenge by K_sig}` → the package. The bridge identity decrypts, verifies the operator certificate against the pinned root (the root fingerprint the invitation named, cross-checked by DNS when secure), verifies the package signature, checks the associated data, writes the locked machine configuration and the project binding, installs the relay declaration into the `remote-worker` profile, and prints "registered; waiting for tasks".
+-7. Our dispatcher provisions the workplace (an OS user on our host; the worker's `K_ssh` in a **root-owned** `AuthorizedKeysFile` outside the workplace user's home with `restrict,command="/opt/swarma/libexec/swarma-rb-exec"`; egress per UID), as in `remote-workplace-attach`.
++The following field lists describe required content, not published closed schemas. The invitation, join transcript and credential-package formats, including the no-invitation application branch, are individually **pending** in [protocol/remote-worker.md](../protocol/remote-worker.md#publication-status).
++
++1. We issue an **invitation** (`swarma-bridge invitation/1`, pending schema): invitation ID (128-bit random), join URL, root fingerprint, SSH host CA fingerprint, join TLS pin, declared trust mode, project, role, expiry and a one-use random code (at least 128 bits, base32). The code is a bearer bootstrap secret, bounded by attempts and consumed atomically. Someone who knows only the domain runs `init <domain>`: an open application that waits for operator admission; it requires the DNSSEC trust branch because it has no invitation pins.
++2. The human donor runs `curator remote-worker init <invitation-file>` (D10), reviews the variant and types consent. Unsupported hosts refuse. A uses the donor's user service; C adds the qualified sandbox; B requires one administrator request and the separate donor provisioner (disabled until specified). The bridge role generates three separate keys: `K_sig` for signing, `K_ssh` for SSH, and `K_enc` (X25519) for package decryption. On supported Secure Enclave Macs, A/C use non-exportable P-256 signing/SSH keys; elsewhere A/C use 0600 files. B uses bridge-owned 0600 Ed25519 signing/SSH files, no Keychain. The self-signed enrolment certificate includes the keys, name, role, variant, invitation reference when present and expiry; its fingerprint is SHA-256 over its bytes. Algorithm admission is part of the qualified tuple, not a claim that every platform supports every key store.
++3. *Trust and challenge:* Web PKI validates the join point's domain. By default Curator validates DNSSEC locally from the embedded root trust anchor: `TXT _swarma.<domain>` (root fingerprint), `TXT _swarma-ssh-ca.<domain>` (host CA public key), and join-point `TLSA`. System DNS and DoH are transports; an upstream AD bit is not validation. Secure records must agree with invitation pins when present. Bogus, failed, malformed or still indeterminate reads refuse; they do not activate fallback. Only an invitation declaring an environment without a DNSSEC domain selects invitation pins before lookup. A closed network may supply its own DNSSEC anchor through network configuration or the invitation. Records describe an environment, never a worker; adding a worker or a host certified by the same CA changes no record. `POST /join/challenge` returns a random, enrolment-bound challenge, five-minute lifetime and attempt counter; the closed request format for invited and open applications is pending.
++4. *Transcript:* deterministic CBOR, domain-separated (`swarma-bridge join/1`, pending schema), binds project, role, variant, three keys, server challenge, client nonce, expiry and algorithms, with invitation reference when invited. The client signs with `K_sig` and sends `POST /join/cert` over Web PKI HTTPS, pinned by locally validated TLSA or the declared invitation fallback. For invited enrolment the join point verifies code in constant time, signature, challenge and expiry, consumes the invitation atomically, and retains a replay tombstone. A same-key retry returns the same pending enrolment; a different key refuses. Open applications have no invitation code and wait in the bounded operator queue; their exact binding and retry schema is pending. No branch bypasses proof of possession or operator admission.
++5. *Admission:* the operator (or an orchestrator with `onboard` grant plus operator confirmation) checks a signed donor card when available, otherwise the invitation binding or the open application. No voice comparison. The registry pins all three keys; the root signs admission; the dispatcher provisions the workplace before package issue (step 7); grants scope posting to the worker thread and reading its own mailbox, with no delegation and an expiry. The **credential package** (`swarma-bridge credential-package/1`, pending schema) contains our root public key, root-signed operator certificate (onboard scope and validity), host, host CA key, workplace principal, short user certificate for `K_ssh`, binding digest, variant/qualified tuple, policy generation and expiry. It contains **no carrier credential**. It is encrypted to `K_enc` with X25519 + HKDF + ChaCha20-Poly1305, transcript digest as associated data, and signed by the operator.
++6. *Collect:* `POST /join/collect` proves possession of `K_sig` over a second server challenge. The bridge role decrypts, validates the operator chain against the already pinned root, verifies signature and associated data, and cross-checks the package's host CA against DNS or invitation pins. It writes the locked configuration and binding, installs the relay declaration into the remote-worker profile and prints "registered; waiting for tasks". Package replay/collection retry details remain part of the pending schema; they are not permission for repeated admission effects.
++7. As part of admission, before package issue in step 5, our dispatcher provisions the project-side OS-user workplace with per-UID egress. A separate user CA signs `K_ssh` with the workplace-user principal; root-controlled sshd policy uses `TrustedUserCAKeys`, revocation checks and the protected absolute forced executor, with no forwarding, PTY, user rc or environment. This project-side account operation is separate from donor provisioning (D12).
+ 
+ **D5. The bridge** (`diagrams/remote-worker-turn.puml`).
+-- *Connection (F14):* the bridge service opens **one SSH connection from the donor machine to our host**, as the workplace user, with `K_ssh`; the host key is checked on **every** connection against the pinned key from the package (and SSHFP when secure); there is no trust-on-first-use. On our side a `Match User` block for workplace users sets `AuthorizedKeysFile /etc/ssh/swarma/%u` (root-owned, so a workplace user cannot add a key through a shell tool), `PermitUserRC no`, `PermitUserEnvironment no`, `AllowAgentForwarding no`, `AllowTcpForwarding no`, `X11Forwarding no`, `PermitTTY no`, and the forced command by absolute path; `restrict` in the key options adds the same. Our host never connects to the donor and never sends commands into the donor's machine; the bridge service reconnects with backoff after a drop.
+-- *Framing `swarma-rb/1` (F15):* one multiplexed channel over the SSH session. A frame is a 4-byte big-endian length (bounded **before** allocation; maximum 1 MiB) followed by deterministic CBOR with canonical field types, no duplicate keys and byte strings for binary data. The first frames are `hello` with version negotiation (`versions: [1]`; an unknown version refuses and closes). Every request carries a connection-scoped monotonic `id` and a client-chosen `op_key` (UUID) that makes side effects idempotent: the server keeps a result cache per binding keyed by `op_key` for ten minutes, so a reconnect after an `exec` or a `mailbox.post` whose reply was lost returns the cached result or `unknown_result` and never replays the effect. Requests: `exec {cmd, cwd, env: {names from the policy's env_allow only}, timeout_s, max_output_bytes, lease_s}`, `cancel {target_id}`, `stdin {target_id, bytes}`, `file.read`, `file.write`, `patch.apply`, `mailbox.read {from_cursor}`, `mailbox.post {envelope_bytes, signature}`, `mailbox.applied {message_id}`; replies `stdout|stderr {seq, bytes}`, `exit {code}`, `error {code}`, `result`, server-initiated `mailbox.notify {message_id, cursor}` (advisory) and `policy.changed`. **Server policy is authoritative:** a caller may lower `timeout_s`, `max_output_bytes` or `lease_s`, never raise them above the workplace policy; `cancel` and `stdin` apply only to a live job owned by the same binding; each method is authorized against the policy; a window of outstanding frames and `flow` credits give backpressure; `env` names outside `env_allow` refuse.
++- *Connection (F14):* the bridge opens **one SSH connection from donor to project host** using `K_ssh` and its short user-CA certificate. On every connection/reconnect it verifies the host certificate against the pinned host CA (`@cert-authority`), host name, validity and KRL; no trust-on-first-use. Root-controlled sshd policy admits the workplace principal through `TrustedUserCAKeys` and user-certificate revocation checks, sets `PermitUserRC no`, `PermitUserEnvironment no`, `AllowAgentForwarding no`, `AllowTcpForwarding no`, `X11Forwarding no`, `PermitTTY no`, and a `ForceCommand` by protected absolute path. The workplace user cannot change this policy or the CA/KRL material. The project host never connects back or sends commands into the donor machine; reconnect with backoff is donor-owned.
++- *Framing `swarma-rb/1` (F15; design label, closed protocol/wire ownership pending in [the publication register](../protocol/remote-worker.md#publication-status)):* one multiplexed channel over the SSH session. A frame is a 4-byte big-endian length (bounded **before** allocation; maximum 1 MiB) followed by deterministic CBOR with canonical field types, no duplicate keys and byte strings for binary data. The first frames are `hello` with version negotiation (`versions: [1]`; an unknown version refuses and closes). Every request carries a connection-scoped monotonic `id` and a client-chosen `op_key` (UUID) that makes side effects idempotent: the server keeps a result cache per binding keyed by `op_key` for ten minutes, so a reconnect after an `exec` or a `mailbox.post` whose reply was lost returns the cached result or `unknown_result` and never replays the effect. Requests: `exec {cmd, cwd, env: {names from the policy's env_allow only}, timeout_s, max_output_bytes, lease_s}`, `cancel {target_id}`, `stdin {target_id, bytes}`, `file.read`, `file.write`, `patch.apply`, `mailbox.read {from_cursor}`, `mailbox.post {envelope_bytes, signature}`, `mailbox.applied {message_id}`; replies `stdout|stderr {seq, bytes}`, `exit {code}`, `error {code}`, `result`, server-initiated `mailbox.notify {message_id, cursor}` (advisory) and `policy.changed`. **Server policy is authoritative:** a caller may lower `timeout_s`, `max_output_bytes` or `lease_s`, never raise them above the workplace policy; `cancel` and `stdin` apply only to a live job owned by the same binding; each method is authorized against the policy; a window of outstanding frames and `flow` credits give backpressure; `env` names outside `env_allow` refuse.
+ - *Job lifetime:* every `exec` runs in its own process group (Linux: also a transient cgroup) with a server-side lease; the lease expiring, a `cancel`, or the transport dropping after a grace period kills the group and verifies that no process of the workplace UID descends from the job; descendant cleanup on transport loss is a test vector, not an assumption.
+-- *Backend contract `swarma-workplace-exec/1` (F16):* the first backend is the **OS-user workplace** of VISION v1.3 (one OS user per worker on our host, egress per UID). The contract names what every backend must give: an execution API with the caps above, a per-worker policy (tools, write scope, network mode, limits, `env_allow`) whose identity is recorded in each audit line, tool-set intersection, audit on our side (who, what, when, exit), output review and export of changes as reviewed patches, and cleanup of everything the job created. The RWP container backend maps to this contract through an adapter **after** its own qualification; a direct executor is never labelled an RWP-conformant workplace.
++- *Backend contract `swarma-workplace-exec/1` (F16; design label, standalone contract/wire ownership pending):* the first backend is the **OS-user workplace** of VISION v1.3 (one OS user per worker on our host, egress per UID). The contract names what every backend must give: an execution API with the caps above, a per-worker policy (tools, write scope, network mode, limits, `env_allow`) whose identity is recorded in each audit line, tool-set intersection, audit on our side (who, what, when, exit), output review and export of changes as reviewed patches, and cleanup of everything the job created. The RWP container backend maps to this contract through an adapter **after** its own qualification; a direct executor is never labelled an RWP-conformant workplace.
+ - *Audit, both sides:* our executor logs who, what, when, policy identity and exit; the donor's bridge logs tool name, argument hash and sizes (never arguments or environment), owned by the bridge identity, so the donor can see what left their machine and the harness cannot edit the record.
+ - *Signing (F18):* the worker's signing key `K_sig` never leaves the donor's bridge identity. For an outbound message the donor bridge builds the **final** envelope (canonical bytes with the audience and thread declared in the task record it answers; no projection after signing), signs it with `K_sig`, and sends `mailbox.post {envelope_bytes, signature}`. Our bridge verifies the signature against the pinned key, checks grants and freshness (ADM), admits, and carries the bytes **unchanged** into the carrier under its own carrier account for that worker; the carrier authentication is a distinct authority, recorded as such in the schema and the audit, never presented as a worker signature.
+ - *Delivery (F19):* the orchestrator posts a signed task message to the worker's mailbox (a snapshot of one element; no board access). Our bridge admits it (signature, grant, decision guard, fence) and sends an advisory `mailbox.notify`. The donor bridge pulls `mailbox.read {from_cursor}` and performs its **own admission**: the verification record is present, the target binding is this worker, the message is unexpired and not fenced or revoked, the delivery mode is allowed. An admitted **task turn** is handed to the harness through the supervisor's session-input adapter; ordinary data is readable through the `mailbox_read` tool when the policy grants it. Both sides keep durable high-water cursors; a cursor advances only after the item is persisted; after a reconnect the donor bridge catches up from its cursor and deduplicates by `message_id`; `mailbox.applied {message_id}` is the application receipt, distinct from the transport reply. Pending outbound posts are queued durably on the donor with stable `op_key`s and flushed after reconnect.
+-- *Disconnected behaviour:* while the SSH channel is down, the project mailbox stays durable and the donor bridge pauses the turn loop (no new turns); a running turn continues until its deadline, its tool calls fail with the retryable `channel_down`, and its result post is queued; after `disconnect_grace` the supervisor parks the session and reports `channel_down` in `status`. Never, in any state, does the donor receive a credential for the project's carrier server. A donor who holds a carrier account of their own, as a person (a member of the project's organisation, or a freelancer on a marketplace server joining through federation), keeps it; the worker's messages still carry the worker's signature (open question 5).
+-- *What the worker sees:* its managed home, the task snapshot, its admitted mailbox view. *What it never sees:* our board, the carrier, carrier credentials, the bridge's keys and state, other homes, the network beyond the proxy.
++- *Disconnected behaviour:* while the SSH channel is down, the project mailbox stays durable and the donor bridge pauses the turn loop (no new turns); a running turn continues until its deadline, its tool calls fail with the retryable `channel_down`, and its result post is queued; after `disconnect_grace` the supervisor parks the session and reports `channel_down` in `status`. Never, in any state, does the donor receive a credential for the project's carrier server. A donor who holds a carrier account of their own, as a person (a member of the project's organisation, or a freelancer on a marketplace server joining through federation), keeps it; the worker's messages still carry the worker's signature (D11; later phase).
++- *What the worker sees:* its managed home, the task snapshot, its admitted mailbox view. *What it never sees:* our board, the carrier, carrier credentials, the bridge's keys and state, other homes and the network beyond the proxy in B/C. In A, no OS isolation protects these resources from a compromised harness process: the guard is qualified lockdown with no local tools, not a separate UID, sandbox or egress policy.
+ 
+-**D6. MITM, replay and identity (F13).** First contact is protected by three independent checks that must agree: the Web PKI certificate of the join point's domain, the DNSSEC-signed fingerprints validated inside the client (mandatory), and the invitation's pins when an invitation exists; the enrolment is bound to a one-use random code (when invited) and a server challenge, by the signed transcript (proof of possession over a challenge, not over a client-chosen nonce), and an attacker would have to forge the invitation's path, the DNS signatures and a certificate for our domain at once. After that everything is pinned: the three worker keys in our registry and `K_ssh` in the root-owned authorized-keys file, our root, operator chain and SSH host key on the donor, operator-signed packages with associated data, and envelopes signed over exact bytes with freshness and replay rules (ADM). Replay of `cert` or `collect` meets the invitation tombstone; replay of a channel frame meets the connection-scoped ids and the `op_key` cache. Compromise of a worker key: the operator revokes with a root-signed record, the authorized key is removed and open sessions are closed (D7). Compromise of our host key: a new key, new SSHFP, and every donor runs `init --rotate-host` against a fresh invitation. Rotation of the operator certificate is a root-signed record the donor fetches at the next connection; a package signed by an expired or revoked operator certificate refuses.
++**D6. MITM, replay and identity (F13).** Web PKI plus the selected D4 trust branch protect first contact: locally validated DNSSEC by default, invitation pins only for a declared no-DNSSEC environment; when both exist they must agree. No validation failure downgrades. A one-use invitation code (when invited) and server-challenge-bound signed transcript prove possession. Afterwards the registry pins the three worker keys; the donor pins the root, operator chain and host CA; SSH uses host and short user certificates (D12). Packages bind their transcript with authenticated encryption; envelopes use exact bytes, freshness and replay rules. Invitation tombstones, connection-scoped IDs and `op_key` caches bound replays. Worker compromise requires operator/root-signed revocation, user-certificate/KRL enforcement, stopped renewal and closure of established sessions (D7); donor identities do not inherit the dispatcher one-shot automatic identity-revocation exception (D-IDENTITY). Host-key compromise is handled by KRL and a replacement host certificate under the same CA; adding/replacing such a host does not change DNS. CA rotation overlaps old/new public keys in DNS and authenticated policy/package updates. Operator-certificate rotation is root-authorized; expired or revoked chains refuse.
+ 
+-**D7. Lifecycle: stop, leave, purge; suspend, retire, revoke** (`diagrams/remote-worker-retire.puml`; F17). The worker's state is `enrolled → active ⇄ stopped (donor) | suspended (project) → retired → revoked → purged`.
+-- *Donor side.* `curator remote-worker stop`: persist the stopped mark first, end the harness processes, keep the bridge service and the keys; `status` says stopped; `run` resumes. `curator remote-worker leave`: close the channel, tell our side `retire` if reachable, keep the keys and the configuration, so the same identity can return to a new workplace with a new package (`init --rejoin`). `curator remote-worker purge --confirm`: delete the keys, the locked configuration and the managed home, call the helper to remove both accounts, the egress anchor, the sandbox profile and the daemon unit; print the revocation outcome reported by our side, or "channel unreachable; the project side must revoke separately", because loss of the channel is not evidence of remote revocation.
+-- *Project side.* `suspend`: grants paused, sessions closed, workplace kept. `retire`: revoke grants and channel authorization, close open sessions, kill every job and its descendants, remove the authorized key, archive only permitted noncredential artifacts, then release the account and firewall state after process absence is verified; the identity stays pinned. `revoke`: a root-signed revocation of `K_sig` (and the other two keys), after which every frame and envelope from that key refuses and a return needs a new key through a new enrolment. A key rotation for a returning worker is a root-authorized record, never silent.
+-- Ordering: stop and revocation marks are persisted before any service restart can race them; removing an SSH key never substitutes for closing established sessions.
++**D7. Lifecycle: stop, leave, purge; suspend, retire, revoke** (`diagrams/remote-worker-retire.puml`; F17). Track independent axes: donor installation (present / purged), donor execution (active / stopped / left), project workplace (admitted / suspended / retired), and signing identity (pinned / revoked). These are descriptive states, not a published closed state schema. Purge can occur offline and does not prove project retirement or revocation; retirement preserves the donor identity unless the operator separately revokes it.
++- *Donor side.* `stop`: persist the stopped mark, terminate this worker's harness and descendants, keep bridge service and keys; `run` resumes only if project admission, credentials and qualification remain valid. `leave`: request project retirement when reachable, close the channel and keep keys/configuration; `init --rejoin` returns the pinned identity to a new workplace/package unless revoked. `purge --confirm`: stop owned processes and remove keys, locked configuration and managed home. A removes its user service and owned installation artifacts; C also removes its sandbox artifacts; B requires the separate donor provisioner to remove only its allocated accounts, egress, sandbox and system service. No shared donor account is removed in A/C. Print the project-reported revocation result, or "channel unreachable; the project side must revoke separately". Local purge is independent of remote consent.
++- *Project side.* `suspend`: pause grants and close sessions, keep workplace. `retire`: persist grant/channel revocation, stop certificate renewal, revoke outstanding user certificates through KRL, close established sessions, kill jobs and descendants, verify process absence, archive permitted noncredential artifacts and release account/egress state. The identity stays pinned. `revoke`: operator-authorized root-signed revocation of all three worker keys, after which frames and envelopes refuse; a return needs new enrolment keys. This is a separate identity operation, never a consequence inferred from donor purge or account retirement.
++- Ordering: stop and revocation marks are persisted before any service restart can race them; certificate revocation or expiry never substitutes for closing established sessions.
+ 
+-**D8. Donor control surface.** `curator remote-worker status` (posture, tuple, policy generation, project, connection state, last tool call, budget used, audit path), `stop`, `run`, `leave`, `purge`, `audit tail`, and the locked configuration the donor owns. The harness identity cannot change any of it by construction; the operator on our side cannot either.
++**D8. Donor control surface.** `curator remote-worker status` (posture, tuple, policy generation, project, connection state, last tool call, budget used, audit path), `stop`, `run`, `leave`, `purge`, `audit tail`, and the locked configuration the donor owns. B/C enforce the harness boundary through UID/sandbox; A relies on qualified lockdown and has no OS isolation from a compromised harness. Project operators cannot prevent local stop, leave or purge.
+ 
+ **D12. SSH certificate authorities** (owner decision 2026-10-10 for the host side).
+-- **Hosts.** One host CA key (Ed25519), held by the key keeper or on a hardware token, never on a host. It signs each SSH host's own host key into a certificate that names the host and expires (about a year, renewed automatically); sshd presents it with `HostCertificate`. The CA's public key is published once as `TXT _swarma-ssh-ca.<domain>` under DNSSEC (an `SSHFP` record cannot carry a CA key) and delivered in the credential package. The client writes `@cert-authority` for our names. Adding a host changes no DNS record. Revocation is a key revocation list (`RevokedHostKeys`) shipped with the policy. A CA rotation publishes the new key beside the old one for an overlap period.
+-- **Workers.** Every worker has its own keys, generated on the donor and never shared or published; its public keys are pinned in our registry. Decided 2026-10-10: a separate user CA signs each worker's SSH key into a short certificate (about a day) whose principal is the worker's workplace user, renewed by the bridge over the authenticated channel. sshd trusts it with `TrustedUserCAKeys`, so expiry and revocation live in one place instead of a list of authorized keys.
++- **Hosts.** One host CA key (Ed25519), held by the key keeper or on a hardware token, never on a host. It signs each SSH host's own host key into a certificate that names the host and expires (about a year as a policy example, renewed automatically); sshd presents it with `HostCertificate`. The CA's public key is published once as `TXT _swarma-ssh-ca.<domain>` under DNSSEC (an `SSHFP` record cannot carry a CA key) and delivered in the credential package. The client writes `@cert-authority` for our names. Adding a host changes no DNS record. Revocation is a key revocation list (`RevokedHostKeys`) shipped with the policy. A CA rotation publishes the new key beside the old one for an overlap period.
++- **Workers.** Every worker has its own keys, generated on the donor and never shared or published; its public keys are pinned in our registry. Decided 2026-10-10: a separate user CA signs each worker's SSH key into a short certificate (about a day as a policy example) whose principal is the worker's workplace user, renewed by the bridge over the authenticated channel. sshd trusts it with `TrustedUserCAKeys`, so expiry and revocation live in one place with KRL checks and renewal disabled on retirement/revocation. These lifetimes are approximate policy examples, not fixed global limits.
+ 
+-**D9. The join point.** A small HTTPS service on the project's public entry host, behind its existing TLS ingress, under its own name (for example `join.<domain>`). It is the only public part of the bridge and holds no admission-signing key: admission records and credential packages are signed on the operator's side and only stored for `collect`. Contact is the three verbs of D4: `challenge`, then `cert` (the signed transcript, with the invitation code when invited), then, after admission, `collect`. Limits (proposed): per source address 10 requests a minute and 100 a day; per invitation five challenges, one use and a 72-hour validity; a request body of at most 16 KiB; a challenge lives five minutes; at most 50 pending applications, beyond which new ones refuse until the queue is worked. Open applications (no invitation) enter the same queue and wait for the operator.
++**D9. The join point.** A small HTTPS service on the project's public entry host, behind its existing TLS ingress, under its own name (for example `join.<domain>`). It is the only public part of the bridge and holds no admission-signing key: admission records and credential packages are signed on the operator's side and only stored for `collect`. Contact is the three verbs of D4: `challenge`, then `cert` (the signed transcript, with the invitation code when invited), then, after admission, `collect`. Limits (owner decision 2026-10-10, policy values): per source address 10 requests a minute and 100 a day; per invitation five challenges, one use and a 72-hour validity; a request body of at most 16 KiB; a challenge lives five minutes; at most 50 pending applications, beyond which new ones refuse until the queue is worked. Open applications (no invitation) enter the same queue and wait for the operator.
+ 
+-**D10. Who runs `init`.** Only the human owner of the donor machine. `init` is the consent step: the owner sees what is installed, under which variant, and what the worker may do. It also creates the worker's keys and pins the environment's keys, so an agent steered by injected text must not be able to join a foreign environment or leak an invitation code. `init` requires an interactive terminal and a typed confirmation of that summary, and refuses when stdin is not a terminal or a managed agent session's environment is present. This stops agents that follow the toolchain; it is not a defence against a hostile local user, who owns the machine anyway.
++**D10. Who runs `init`.** Only the human owner of the donor machine. `init` is the consent step: the owner sees what is installed, under which variant, and what the worker may do. It also creates the worker's keys and pins the environment's keys, so an agent steered by injected text must not be able to join a foreign environment or leak an invitation code. `init` requires an interactive terminal and a typed confirmation of that summary, and refuses when stdin is not a terminal or a managed agent session's environment is present. The TTY/environment/typed-confirmation checks are policy admission heuristics, not proof of human identity; a hostile local user owns the machine anyway.
+ 
+ **D11. The carrier server** (owner decision 2026-10-10). The platform's Matrix server is configured for least access from the start; today's experimental swarm server is not the model.
+ - Rooms are invite-only (or restricted to named spaces) and absent from any public join directory.
+@@ -170,13 +176,13 @@ The **effective** set offered to the model is the intersection of this list with
+ 
+ ## Security considerations
+ 
+-- **Boundary on the donor** depends on the variant (D0). In B, two identities, the kernel sandbox with a mandatory read boundary and the per-UID egress (D1, D2): a compromised harness is confined to its managed home, the scratch dir, the relay socket and the provider proxy; it cannot read the bridge's keys or state, cannot alter the audit, and cannot reach the network. Its provider token is in its environment (CIP-0010, trusted-process posture). In C, the same sandbox under the donor's user, without the identity split. In A, the lockdown posture and strict qualification only (CIP-0008 R9).
++- **Boundary on the donor** depends on the variant (D0). In B, two identities, the kernel sandbox with a mandatory read boundary and the per-UID egress (D1, D2): a compromised harness is confined to admitted read/execute runtime roots, its managed home, the scratch dir, the relay socket and the provider proxy; it cannot read the bridge's keys or state, cannot alter the audit, and cannot reach the network. Its provider token is in its environment (CIP-0010, trusted-process posture). In C, the same sandbox under the donor's user, without the identity split. In A, the lockdown posture and strict qualification only (CIP-0008 R9).
+ - **Boundary on our host:** the workplace user and the `swarma-workplace-exec/1` policy; the worker can only run what the policy allows, where it allows it; SSH authorization is outside its write authority.
+-- **Network:** the harness reaches the provider API only through the proxy; the bridge reaches only our hosts; nothing listens on the donor machine.
+-- **Secrets:** the worker's keys never leave the bridge identity; the provider credential enters the harness per launch (CIP-0010); the carrier credential stays in our bridge; the invitation code is a bootstrap secret with a short life; no secret is in argv or the plan.
++- **Network:** B/C confine the harness to the provider proxy and relay socket; B uses per-UID egress, C its sandbox. A reaches the provider directly and has no OS egress control. The bridge initiates the SSH/join connections; no network listener is exposed on the donor.
++- **Secrets:** worker keys stay in the donor bridge role (D0 storage by variant); A shares the donor UID and makes no OS confidentiality claim against a compromised harness. The provider credential enters the harness per launch (CIP-0010); carrier credentials stay on the project side. Invitation codes are short-lived bootstrap secrets; no secret enters argv or a plan.
+ - **Supply chain:** the binaries on the donor machine come from the toolchain release with checksums and attestations (R55 discipline), installed into a protected root and verified at every launch; CIP-0007 governs anything else the donor installs.
+ - **Replay and freshness:** invitation tombstones, server challenges, connection-scoped ids, `op_key` caches, and signed envelopes with `issued_at`, `expires_at` and nonces.
+-- **Privileged helper:** a closed schema, allocated identifiers, fixed templates, safe path handling (`O_NOFOLLOW`, no symlink following), a journal and rollback; tested against symlink substitution, arbitrary-user removal and argument injection.
++- **Donor provisioning:** separate binary and privileges under D-DONOR-PROVISIONING; spec, rules, removal and closed schema pending. B activation stays disabled. Required properties include allocated identifiers, fixed templates, no-follow paths, journal/rollback and negative vectors for substitution, arbitrary removal and injection; these are requirements, not existing user-manager operations.
+ 
+ ## Compatibility and migration
+ 
+@@ -186,12 +192,12 @@ The **effective** set offered to the model is the intersection of this list with
+ 
+ ## Specification changes
+ 
+-- A new Curator command group `remote-worker` (`init`, `status`, `stop`, `run`, `leave`, `purge`, `audit`), the two identities and the helper's closed schema, in manager §12 (donor profile) and a new manager section "remote worker on a donor machine".
++- A new Curator command group `remote-worker` (`init`, `status`, `stop`, `run`, `leave`, `purge`, `audit`) and variant-aware manager donor configuration. B provisioning is a separate donor-side component with a short spec, rules and removal; its binary name and schema are pending, and it must not extend `swarma-user-manager` operations.
+ - `swarma-remote-tools` (relay) and `swarma-bridge` (service) as first-party module roots (Decision 0009); the relay as an MCP declaration package with an absolute `command`; the maximum tool list and the intersection rule.
+-- The `swarma-rb/1` framed protocol as a protocol document (framing, encoding, negotiation, ids and `op_key`, methods, caps, authorization, leases, cursors, receipts, error codes).
+-- The `swarma-workplace-exec/1` backend contract.
++- The `swarma-rb/1` design label: framed protocol and D-WIRE-NAMES owner/name **pending**, tracked in the publication register; standalone protocol document (framing, encoding, negotiation, ids and `op_key`, methods, caps, authorization, leases, cursors, receipts, error codes).
++- The `swarma-workplace-exec/1` design label: standalone backend contract and D-WIRE-NAMES owner/name **pending**, tracked in the publication register.
+ - The deployment variants A, B and C as a member of the enrolment and of the qualified tuple (D0).
+-- The invitation, transcript and credential package as schemas (`swarma-invitation/1`, `swarma-join/1`, `swarma-credential-package/1`), the join point's three verbs and limits (D9), the DNS record conventions (`TXT _swarma.<domain>`, `SSHFP`, `TLSA`) and their validation model (embedded trust anchor, DNS-over-HTTPS fallback, no downgrade).
++- [Remote-worker protocol](../protocol/remote-worker.md): publication register for the invitation, join transcript and credential package (`swarma-bridge invitation/1`, `swarma-bridge join/1`, `swarma-bridge credential-package/1`), each closed schema **pending**; join API/error/request/response schemas also **pending**. DNS conventions are `TXT _swarma.<domain>`, `TXT _swarma-ssh-ca.<domain>`, join `TLSA`, with local DNSSEC validation/DoH by default and the declared invitation fallback. No raw-host-key recipe is retained.
+ - The donor's locked machine configuration as a named manager profile; the sshd `Match` policy for workplace users.
+ 
+ ## Implementation plan
+@@ -199,22 +205,22 @@ The **effective** set offered to the model is the intersection of this list with
+ 0. **Slice 0, the one-host MVP (F25), before any donor:** separate keeper, broker and worker identities on our host; root, admission and grant checks; one protected credential channel per harness (CIP-0010 slice 0); final-exec source binding; a composed-plan host; a durable mailbox with exact-byte signatures; one task spanning the chain of OS users; rejection of wrong-peer, wrong-account and expired requests; explicit human enrolment. This is the owner's first MVP and the prerequisite of every slice below. Size L.
+ 1. Protocol documents and schemas (this CIP's §Specification changes); the C4 and sequence diagrams folded into the platform repository's `diagrams/`, with `remote-worker-start` reconciled. Size M.
+ 2. Our-side executor: `swarma-rb-exec` speaking `swarma-rb/1` under the `swarma-workplace-exec/1` contract on the OS-user backend; the mailbox control plane bridged to M3; the sshd policy. Size L (reuses `rwh`).
+-3. Donor side, in the owner's order: **A** on macOS and Linux (milestone 1: the user-level bridge service with SSH client, signer, admission, cursors, budgets, audit and stop; the relay; `init|status|stop|run|leave|purge`; the in-client DNSSEC validation); then **B** on macOS (the helper, the two identities, the egress anchor and the Seatbelt profile); then **C** (Seatbelt under the donor's user, then Landlock or bubblewrap on Linux). Size L.
++3. Donor side, in the owner's order: **A** on macOS and Linux (milestone 1: the user-level bridge service with SSH client, signer, admission, cursors, budgets, audit and stop; the relay; `init|status|stop|run|leave|purge`; the in-client DNSSEC validation); then **B** on macOS after its separate provisioner spec and qualification (the donor provisioner, the two identities, the egress anchor and the Seatbelt profile); then **C** (Seatbelt under the donor's user, then Landlock or bubblewrap on Linux). Size L.
+ 4. Join point service: three verbs, invitation issue and tombstones, operator confirmation flow with the companion app or chat, operator certificates. Size M.
+ 5. Lab: one donor machine (a hosted macOS runner) joining a lab host; the measurements of D2; the negative vectors of the test plan; failure halfway through provisioning. Size M.
+ 6. Variants B and C on Linux; Muse donors only if Muse is admitted under CIP-0008 R9. Second wave.
+ 
+-**Cut from the first delivery:** marketplace, reputation and price mechanics; federation rollout; generic multi-provider node graphs; enterprise-token paths outside the owner's first slice; multi-OS parity; automatic backend interchangeability; Muse donors unless qualified promptly; keyring-backed non-exportable keys. **Not cut:** grant enforcement, the independent donor stop, signing-key ownership on the donor, credential-source checks, job cleanup, strict qualification, mandatory DNSSEC validation in the client.
++**Cut from the first delivery:** marketplace, reputation and price mechanics; federation rollout; generic multi-provider node graphs; enterprise-token paths outside the owner's first slice; multi-OS parity; automatic backend interchangeability; Muse donors unless qualified promptly; later non-exportable storage for B. **Not cut:** grant enforcement, the independent donor stop, signing-key ownership on the donor, credential-source checks, job cleanup, strict qualification, Web PKI and the selected trust branch (local DNSSEC validation with DoH by default; invitation pins only for a declared no-DNSSEC environment). Secure Enclave keys for qualified A/C Macs are not cut; the later key-store hardening cut concerns B, which remains without Keychain.
+ 
+ ## Test plan
+ 
+-- Handshake negatives: wrong or reused code, expired invitation, wrong challenge, transcript signed by another key, replayed `cert`, `collect` with a different key than `cert`, package signed by a wrong or expired operator certificate, package encrypted to a wrong key, associated data mismatch, bogus DNS result, attempt limit exceeded; a retry with the same key recovers the same enrolment.
+-- Connection negatives: host key mismatch (pinned vs offered) on first and on later connections, unknown worker key, a workplace shell tool trying to append to the authorized-keys file (not writable), an attempt at port or agent forwarding, a second connection while one is up.
++- Handshake negatives: wrong/reused code, expired invitation, wrong challenge, foreign signing key, replayed `cert`, different collection key, wrong/expired/revoked operator chain, wrong encryption key, associated-data mismatch, attempt limit exceeded; same-key retry recovers the same enrolment. Trust vectors cover DNSSEC with system DNS and DoH, pin agreement, mismatch, bogus/failed/malformed/indeterminate DNS refusing without fallback, an explicitly declared no-DNSSEC invitation succeeding only with valid pins and Web PKI, an open-domain application refusing without DNSSEC, and environment records unchanged by worker/host additions.
++- Connection negatives: wrong CA, wrong host principal, expired/revoked host certificate, unknown worker key, expired/revoked user certificate or wrong workplace principal on first/reconnected sessions; workplace code attempting to alter root-controlled CA/KRL/forced-command policy refuses; no forwarding, PTY, user rc/environment or second concurrent connection. Cover renewal failure and overlapping host-CA rotation; certificate revocation also closes established sessions.
+ - Protocol negatives: version rejection, truncated and oversized frames, duplicate ids, stale `cancel`, `stdin` to a finished job, caps above policy, `env` outside `env_allow`, unauthorized method, reconnect after an effect (cached result or `unknown_result`, never a replay), descendants after transport loss (none survive).
+-- Sandbox and provisioning per platform: file reads outside the allow-list refused (including the bridge's home), egress outside the allowlist refused, the proxy refuses a non-provider host, the relay socket refuses another UID, the helper refuses symlink substitution, an arbitrary user in `remove-worker` and an injected argument; provisioning interrupted halfway rolls back; a colliding pre-existing account is untouched.
++- Variants and provisioning: A asks for no administrator rights and claims no UID/sandbox/egress boundary; C uses the donor UID with a qualified sandbox; B is refused until the separate donor provisioner is specified/qualified, asks once and uses no Keychain. B/C refuse out-of-scope reads/egress and a non-provider proxy destination. B socket peer checks reject foreign UIDs; provisioner vectors reject symlink substitution, arbitrary-account removal, injection and collisions, and prove rollback after interrupted provisioning. A/C purge must preserve the donor account and unrelated processes/data. Key algorithms/storage are checked against the selected variant and tuple.
+ - Tool set: `tools/list` equals the intersection of the six with the policy; a `tools/call` of another name is an error result and an audit line; a read-only policy offers `read_file` only.
+ - Signing and delivery: an envelope altered after signing refuses; a valid carrier credential without a worker signature cannot post; a message with a foreign target binding or past its expiry is refused by the donor bridge; cursors survive a restart; a duplicate `message_id` is applied once; `mailbox.applied` is distinct from the transport reply.
+-- Lifecycle: after `stop` no harness process remains and the bridge is alive; after `leave` the keys remain and `init --rejoin` works; after `purge` no process, key, account or firewall rule remains and the printed revocation outcome matches our side; after `retire` on our side no job, descendant or authorized key remains; after `revoke` a frame from the old key refuses; a stop mark survives a service restart.
++- Lifecycle: stop persists before restart and leaves no owned harness descendant while bridge/keys remain; leave keeps identity for rejoin; purge removes only variant-owned artifacts and reports remote revocation as unknown when unreachable. Project retire stops renewal, revokes certificates/KRL, closes sessions and removes jobs/account/egress after process absence, while preserving signing identity; separate operator revoke rejects old keys. Exercise offline purge, suspended/revoked rejoin refusal and host-CA overlap. These are future qualification vectors, not tests run by this documentation change.
+ 
+ ## Operator decisions and open questions
+ 
+@@ -227,3 +233,5 @@ The **effective** set offered to the model is the intersection of this list with
+ 7. **Variant A after B and C exist.** Keep A selectable, or offer only B and C once both are qualified on a platform?
+ 8. **SSH host identity in DNS.** Decided 2026-10-10: one host certificate authority (D12).
+ 9. **Worker SSH certificates.** Decided 2026-10-10: the user CA with short certificates (D12).
++10. **Donor provisioner ownership.** Decided 2026-10-11 (D-DONOR-PROVISIONING): separate donor-side component, separate binary and privileges; shared UID/path libraries permitted. B disabled until its short spec, rules and removal exist.
++11. **Wire ownership still pending for transport/backend.** D-WIRE-NAMES fixes the naming rule; the publication register carries the remaining component-ownership question and options. No legacy design label is claimed as a frozen wire format.
+diff --git a/cips/diagrams/donor-first-deployment.puml b/cips/diagrams/donor-first-deployment.puml
+index 8ccde53d646b0a39afe3612fdf158bcca05f668e..ca882ab06cebe52fc90265e6298ce87fd8044fac 100644
+--- a/cips/diagrams/donor-first-deployment.puml
++++ b/cips/diagrams/donor-first-deployment.puml
+@@ -1,52 +1,68 @@
+ @startuml donor-first-deployment
+ !theme plain
+-title Remote worker on a donor machine, first deployment (revision 3; variant B shown, see CIP-0009 D0 for A and C): one invitation, one command, nothing to configure; two OS identities; three role-separated keys owned by the bridge identity; the posture is locked by the donor (the machine's owner)
++title Remote worker on a donor machine, first deployment (revision 4; variants A/B/C, B disabled until separate provisioner spec exists): one invitation, one command, nothing to configure; B has two OS identities; A/C share the donor UID; three role-separated keys stay on the donor; the posture is locked by the donor (the machine's owner)
+ 
+ actor "Donor (the machine's owner)" as ADM
+ participant "curator remote-worker init\n(donor install)" as C
+-participant "swarma-user-manager\n(sudoers: this absolute path only;\nclosed schema; journal + rollback)" as PH
+-participant "Bridge identity\nswarma-bridge-<project>\n(keys, config, audit)" as B
+-participant "Harness identity\nworker-<project>\n(managed home, scratch)" as U
++participant "Separate donor provisioner (B only)\n(binary/schema/rules/removal pending;\nnot swarma-user-manager)" as PH
++participant "Bridge role\nB: swarma-bridge-<project> UID\nA/C: donor UID (keys, config, audit)" as B
++participant "Harness role\nB: worker-<project> UID\nA/C: donor UID (managed home, scratch)" as U
+ database "DNS (DNSSEC, default)\nTXT _swarma, TXT _swarma-ssh-ca, TLSA\n(validated inside the client)" as DNS
+ participant "Join point\n(our host, HTTPS: challenge, cert, collect)" as JP
+ actor "Operator (our side)\nor orchestrator with onboard grant" as OP
+ participant "Trust registry + key keeper\n(our host)" as T
+ 
+ == 1. invitation ==
+-OP -> ADM: swarma-invitation/1 {invitation_id, join point, root fingerprint,\nSSH host CA fingerprint, project, role, expires, one-use random code}\nthrough the channel the donor found us by: marketplace deal thread, e-mail, our site\n(the code is a short-lived bootstrap secret; without an invitation: init <domain>, an open application)
++OP -> ADM: swarma-bridge invitation/1 {invitation_id, join point, root fingerprint,\nSSH host CA fingerprint, TLS pin, declared trust mode, project, role, expires, one-use random code}\nthrough the channel the donor found us by: marketplace deal thread, e-mail, our site\n(the code is a short-lived bootstrap secret; without an invitation: init <domain>, an open application)
+ 
+ == 2. local provisioning (transactional) ==
+ ADM -> C: curator remote-worker init <invitation>
+-C -> C: refuse unsupported host; verify the release manifest of /opt/swarma/<release>
+-C -> PH: create-worker <label>: two accounts (allocated UIDs), homes,\negress anchor by UID, Seatbelt profile (read boundary), launchd daemon unit
+-PH --> C: journal entry per step (rollback on failure)
+-C -> B: generate K_sig (Ed25519), K_enc (X25519), K_ssh (Ed25519); 0600, bridge-owned
+-B -> B: enrolment certificate {K_sig, K_enc, K_ssh, name, role, invitation_id, expires}\nself-signed by K_sig; fingerprint = SHA-256(certificate)
++C -> C: interactive TTY + typed consent + managed-session check (policy heuristic, not proof of humanity);\nrefuse unsupported tuple; verify manifest and variant-owned executable root
++alt A (first milestone, no administrator rights)
++  C -> C: donor user service, qualified lockdown only; no OS isolation or egress guarantee
++else C (no administrator rights, sandbox fallback)
++  C -> C: donor user service + qualified sandbox; bridge state excluded; pinned runtime roots read/execute only
++else B (one administrator request, future path)
++  break provisioner spec/rules/removal or qualification absent
++    C --> ADM: B disabled; choose an admitted variant
++  end
++  C -> PH: provision B-owned accounts/homes/egress/sandbox/system service\n(exact closed operation format pending; no user-manager donor operation)
++  PH --> C: journaled result; rollback on failure (required contract)
++end
++C -> B: three separate keys: K_sig, K_enc (X25519), K_ssh;\nA/C qualified Secure Enclave Macs: P-256 signing/SSH, non-exportable; files elsewhere;\nB: Ed25519 signing/SSH in bridge-owned 0600 files, no Keychain
++B -> B: enrolment certificate {K_sig, K_enc, K_ssh, name, role, variant, invitation_id when invited, expires}\nself-signed by K_sig; fingerprint = SHA-256(certificate)
+ C --> ADM: show fingerprint F
+ 
+ == 3. join (see join-handshake for the transcript) ==
+-C -> JP: POST /join/challenge {invitation_id}
+-JP --> C: server challenge (bound to the invitation, 5 min, attempt counter)
+-C -> DNS: TXT _swarma, TXT _swarma-ssh-ca, TLSA (system resolver; DNS-over-HTTPS when the network strips DNSSEC);\nsignatures validated in the client from the embedded root trust anchor
+-alt secure and equal to the invitation
+-  C -> C: record "dns: secure, matches"
+-else bogus
+-  C --> ADM: refused{dns_bogus}
+-else indeterminate (even over DNS-over-HTTPS)
+-  C --> ADM: refused{dns_unverifiable}: explain; no downgrade
++alt invitation declares environment without a DNSSEC domain
++  C -> C: select invitation root/host-CA/TLS pins before lookup; Web PKI required
++else DNSSEC default (also open-domain applications)
++  C -> DNS: TXT _swarma, TXT _swarma-ssh-ca, TLSA; system DNS / DoH transport; local validation
++  break mismatch, bogus, failed/malformed read or still indeterminate
++    C --> ADM: refused; no invitation fallback on DNS failure
++  end
++  C -> C: secure records; cross-check invitation pins when present
++end
++C -> JP: POST /join/challenge (invitation reference or open-application binding; schema pending)\nHTTPS: Web PKI + selected trust pins
++JP --> C: enrolment-bound server challenge (5 min, attempt counter)
++C -> JP: POST /join/cert {swarma-bridge join/1 transcript, sig_K_sig, code only when invited}\n(HTTPS: Web PKI plus selected DNSSEC/TLSA or declared invitation pins; schemas pending)
++alt invited
++  JP -> JP: code (constant time), signature, challenge, expiry;\nconsume invitation atomically (tombstone); same-key retry recovers, other key refuses
++else open application (no invitation code)
++  JP -> JP: signature, challenge, expiry; bounded operator queue\n(binding/retry schema pending)
+ end
+-C -> JP: POST /join/cert {swarma-join/1 transcript, sig_K_sig, code}\n(HTTPS: Web PKI for the domain, pinned by the TLSA record)
+-JP -> JP: code (constant time), signature, challenge, expiry;\nconsume invitation atomically (tombstone); rate limit
++JP -> JP: rate limit
+ JP -> OP: pending enrolment: fingerprint F, name, role
+-OP -> OP: check the enrolment: the key in the donor's signed marketplace card when there is one,\notherwise the invitation the code binds (no voice check)
++OP -> OP: check the enrolment: the key in the donor's signed marketplace card when there is one,\notherwise invitation binding or open application (no voice check)
+ alt rejected
+   OP -> JP: reject
+   JP --> C: refused
+ else admitted
+   OP -> T: pin K_sig, K_enc, K_ssh; root-signed admission "K admitted with role R";\ngrants: post to worker thread, read own mailbox, no delegation, expiry
+-  OP -> OP: swarma-credential-package/1 {root pubkey, operator cert (root-signed), host,\nSSH host CA key, workplace user, binding digest, qualified tuple, policy generation, expiry}\nAEAD to K_enc (X25519 + HKDF + ChaCha20-Poly1305), AAD = transcript digest, signed by the operator cert
+-  OP -> JP: package ready for <invitation_id>
+-  C -> JP: POST /join/collect {invitation_id, sig_K_sig(second challenge)}
++  OP -> T: provision workplace for K (dispatcher, grant user.create): OS user,\nTrustedUserCAKeys + KRL: short user certificates for K_ssh (principal = workplace user),\nprotected absolute ForceCommand swarma-rb-exec,\nsshd Match: no forwarding, no PTY, no user rc/env; egress by UID
++  OP -> OP: swarma-bridge credential-package/1 {root pubkey, operator cert (root-signed), host,\nSSH host CA key, short user certificate/principal, variant, binding digest, qualified tuple, policy generation, expiry}\nAEAD to K_enc (X25519 + HKDF + ChaCha20-Poly1305), AAD = transcript digest, signed by the operator cert
++  OP -> JP: package ready for this enrolment (reference schema pending)
++  C -> JP: POST /join/challenge (collection phase) -> second server challenge\nPOST /join/collect {enrolment reference, sig_K_sig(second challenge)} (schema pending)
+   JP --> C: package
+   C -> B: decrypt with K_enc; verify operator cert against the pinned root;\nverify package signature and AAD
+   C -> B: write LOCKED machine config: tool_posture=lockdown, permissions=remote-auto (pair),\npolicy_generation, mcp_package_allowlist=[canonical source of swarma-remote-tools],\npassable_env_names=[], qualified tuple, binding, sandbox revision
+@@ -54,7 +70,6 @@ else admitted
+   C --> ADM: registered; waiting for tasks (status, stop, leave, purge available)
+ end
+ 
+-== 4. workplace on our host ==
+-OP -> T: provision workplace for K (dispatcher, grant user.create): OS user,\nTrustedUserCAKeys: short user certificates for K_ssh (principal = workplace user), restrict + command="/opt/swarma/libexec/swarma-rb-exec",\nsshd Match: no forwarding, no PTY, no user rc/env; egress by UID
+-note right of T: see remote-worker-turn for the connection
++note over C, JP: Invitation, transcript, package and join API/error schemas PENDING: protocol/remote-worker.md\nOpen-domain init has no code; operator admission and challenge proof remain required.
++
+ @enduml
+diff --git a/cips/diagrams/donor-side.dsl b/cips/diagrams/donor-side.dsl
+index f7dcfab06e4403687fa079e22d99af2cbb16db33..10e4cf74f0744e240bed1286a57c57f7cad13929 100644
+--- a/cips/diagrams/donor-side.dsl
++++ b/cips/diagrams/donor-side.dsl
+@@ -1,22 +1,25 @@
+-// C4 (Structurizr DSL) fragment for CIP-0009 (revision 2): the donor machine and the bridge to our host.
++// C4 (Structurizr DSL) fragment for CIP-0009 (revision 4: B boundary shown; A/C differences in source notes; B disabled until separate provisioner contract exists): the donor machine and the bridge to our host.
+ // Style follows relux-works/swarm-platform-architecture diagrams/c4 (hierarchical identifiers, one container per process).
+-// Revision 2: two OS identities on the donor (untrusted harness, trusted bridge); the relay holds no keys and no network;
++// Variant B: two OS identities on the donor (untrusted harness, trusted bridge); the relay holds no keys and no network;
++// A/C: donor UID user service; A qualified lockdown only, no OS boundary or proxy; C sandbox without UID split.
++// A/C keys: qualified Secure Enclave P-256 signing/SSH on supported Macs, files elsewhere; B Ed25519 0600, no Keychain.
++// Invitation/transcript/package, join API/error, channel/backend and donor provisioner formats: pending protocol/remote-worker.md.
+ // the bridge signs outbound envelopes with the worker's key; the harness reaches only the relay socket and the provider proxy.
+ workspace "Remote worker on a donor machine" "CIP-0008/0009: lockdown harness, trusted bridge identity, minimal remote-tools relay, one SSH connection towards the project host" {
+   !identifiers hierarchical
+ 
+   model {
+     donorOwner = person "Donor (the machine's owner)" "Owns the donor machine; runs init, status, stop, leave, purge"
+-    operator = person "Project operator" "Confirms fingerprints, issues grants and packages"
++    operator = person "Project operator" "Reviews enrolment, issues admission, grants and packages; no voice comparison"
+ 
+     donor = softwareSystem "Donor machine" "A machine we do not own, lending a harness subscription" {
+       curator = container "curator (donor install)" "Go CLI" "init/status/stop/run/leave/purge; consumes the composed lockdown plan; writes the locked machine config (bridge-owned)"
+-      helper = container "swarma-helper" "privileged helper (sudoers, absolute path)" "closed schema: create-worker, remove-worker, set-egress, apply-sandbox, rollback; allocated identifiers; journal"
++      helper = container "Separate donor provisioner (B only; pending)" "Separate binary and privileges; not swarma-user-manager" "Short spec, closed schema, rules and removal pending; B disabled; allocated identifiers, journal/rollback required"
+       harnessUser = container "Harness identity worker-<project>" "OS user, home 0700, quotas, Seatbelt/Landlock read boundary" "the UNTRUSTED side: managed home and scratch dir only"
+       bridgeUser = container "Bridge identity swarma-bridge-<project>" "OS user, system service (launchd daemon / systemd)" "the TRUSTED side: keys, locked config, audit, lifecycle state"
+       supervisor = container "Bridge service: supervisor" "curator remote-worker run (bridge identity)" "launches the harness as the harness identity; admitted mailbox items become turns via the session-input adapter; budgets, rate, lifetime (trusted-side counters)"
+-      bridgeCore = container "Bridge service: SSH client + signer + admission" "swarma-bridge (bridge identity)" "one SSH connection to our host (K_ssh, host key pinned, rechecked on every reconnect); signs outbound envelopes with K_sig; admits inbound items; durable cursors; audit"
+-      keys = container "Key store" "0600 files owned by the bridge identity (keyring-backed later)" "K_sig (Ed25519), K_enc (X25519), K_ssh (Ed25519); unreadable by the harness identity"
++      bridgeCore = container "Bridge service: SSH client + signer + admission" "swarma-bridge (bridge identity)" "one SSH connection to our host (K_ssh + short user certificate; host CA/name/validity/KRL checked every reconnect); signs outbound envelopes with K_sig; admits inbound items; durable cursors; audit"
++      keys = container "Key store" "0600 files owned by the bridge identity (no Keychain; non-exportable later only without Keychain)" "K_sig (Ed25519), K_enc (X25519), K_ssh (Ed25519); unreadable by the harness identity"
+       harness = container "Harness" "Claude Code / Codex / Muse (harness identity, lockdown plan)" "no local tool offered to the model; only the relay; provider credential injected per launch"
+       relay = container "swarma-remote-tools" "local stdio MCP relay (harness identity)" "no keys, no network; forwards tools/call to the bridge socket; effective tool set = policy intersection"
+       socket = container "Relay socket" "Unix socket, peer credentials checked" "only the harness identity of this project may connect"
+@@ -26,20 +29,20 @@ workspace "Remote worker on a donor machine" "CIP-0008/0009: lockdown harness, t
+ 
+     project = softwareSystem "Project host" "Our host" {
+       joinPoint = container "Join point" "HTTPS, three verbs: challenge, cert, collect" "atomic invitation consumption, tombstones, rate limits; never commands"
+-      sshd = container "sshd + swarma-rb-exec" "Match block for workplace users; root-owned AuthorizedKeysFile; forced command by absolute path" "speaks swarma-rb/1; executes under swarma-workplace-exec/1"
+-      workplace = container "Remote workplace (OS-user backend)" "one OS user per worker; policy: tools, write scope, network, limits, env_allow" "where every tool call runs; audit; cleanup"
++      sshd = container "sshd + swarma-rb-exec" "Root-controlled Match, TrustedUserCAKeys + KRL + workplace principal; protected absolute forced command" "speaks swarma-rb/1; executes under swarma-workplace-exec/1"
++      workplace = container "Remote workplace (OS-user backend)" "one OS user per worker; policy: tools, write scope, network, limits, env_allow" "where execution/file tools run; audit; cleanup; mailbox control plane goes to project bridge"
+       bridge = container "Bridge (M3)" "broker, mailbox, trust gate" "admits messages; verifies the worker's signature; carries bytes unchanged under a distinct carrier account"
+       registry = container "Trust registry + key keeper" "pins K_sig, K_enc, K_ssh; grants; root-signed admission and revocations" "operator certificates chained to the root"
+-      dns = container "DNS zone (DNSSEC, mandatory)" "TXT _swarma, SSHFP, TLSA" "published fingerprints of the environment, validated inside the client"
++      dns = container "DNS zone (DNSSEC default)" "TXT _swarma, TXT _swarma-ssh-ca, TLSA" "Per-environment root/host-CA/TLS trust; validated in client; declared no-DNSSEC invitation uses pins, never fallback on failure"
+     }
+ 
+     provider = softwareSystem "Model provider API" "Anthropic / OpenAI / Meta" "External"
+ 
+     donorOwner -> donor.curator "init <invitation>, status, stop, leave, purge"
+-    donor.curator -> donor.helper "create/remove identities, egress, sandbox (sudo; closed schema)"
++    donor.curator -> donor.helper "B future provisioning/removal boundary (separate spec pending; not user-manager operations)"
+     donor.curator -> donor.keys "generate K_sig, K_enc, K_ssh (bridge identity); decrypt the package"
+-    donor.curator -> project.dns "validate the fingerprints (DNSSEC in the client; DNS-over-HTTPS fallback)"
+-    donor.curator -> project.joinPoint "challenge; cert (signed swarma-join/1 transcript + code); collect (HTTPS: Web PKI, pinned by TLSA)"
++    donor.curator -> project.dns "DNSSEC branch only: local validation, DoH transport; failed reads/mismatch refuse; pins must agree"
++    donor.curator -> project.joinPoint "challenge; cert (signed swarma-bridge join/1 transcript + code when invited); collect (HTTPS: Web PKI + DNSSEC/TLSA or declared invitation pins; schemas pending)"
+     donor.supervisor -> donor.harness "launch as the harness identity under the lockdown plan; next admitted turn"
+     donor.harness -> donor.relay "MCP stdio: tools/call"
+     donor.relay -> donor.socket "forward (peer credentials checked)"
+@@ -50,13 +53,13 @@ workspace "Remote worker on a donor machine" "CIP-0008/0009: lockdown harness, t
+     donor.bridgeCore -> project.sshd "one SSH connection; swarma-rb/1 frames (bounded CBOR, op_key idempotency)"
+     project.sshd -> project.workplace "exec / file ops as the workplace user; process-group lease"
+     project.sshd -> project.bridge "mailbox.read / mailbox.post (worker-signed bytes) / mailbox.notify (advisory)"
+-    operator -> project.joinPoint "check the enrolment against the signed card or the invitation; release package"
++    operator -> project.joinPoint "check the enrolment against signed card, invitation binding or open application; release package"
+     operator -> project.registry "pin keys; root-signed admission; grants"
+     project.bridge -> project.registry "verify signatures, grants, revocation, freshness"
+   }
+ 
+   views {
+-    container donor "DonorContainers" "Donor machine: the untrusted harness identity (harness, relay), the trusted bridge identity (supervisor, SSH client, signer, keys, audit), the proxy and the kernel boundary" {
++    container donor "DonorContainers" "Variant B (disabled until provisioner spec/qualification): the untrusted harness identity (harness, relay), the trusted bridge identity (supervisor, SSH client, signer, keys, audit), the proxy and the kernel boundary" {
+       include *
+       autolayout lr
+     }
+diff --git a/cips/diagrams/join-handshake.puml b/cips/diagrams/join-handshake.puml
+index a3d8e3b7f7c7049642893130fa5411e1af7b4874..8169877462f5047351cd34a9609b96cbfd90dbb7 100644
+--- a/cips/diagrams/join-handshake.puml
++++ b/cips/diagrams/join-handshake.puml
+@@ -1,8 +1,8 @@
+ @startuml join-handshake
+ !theme plain
+-title Join handshake (revision 3): a server challenge, a signed canonical transcript, atomic invitation consumption; anchors: the Web PKI, DNSSEC validated in the client (default), and the invitation's pins (fallback for an environment without a DNSSEC domain)
++title Join handshake (revision 4): a server challenge, a signed canonical transcript, atomic invitation consumption; anchors: the Web PKI, DNSSEC validated in the client (default), and the invitation's pins (fallback for an environment without a DNSSEC domain)
+ 
+-participant "Donor bridge identity\n(curator remote-worker init)" as C
++participant "Human-run init / donor bridge role\n(A/C: donor UID; B: bridge UID)" as C
+ database "DNS: system resolver,\nDNS-over-HTTPS as the fallback\n(signatures validated inside the client)" as R
+ participant "Join point\n(our host)" as JP
+ actor "Operator" as OP
+@@ -17,32 +17,50 @@ note over C, T
+   No human second channel and nothing for the donor to configure. No step downgrades on failure.
+ end note
+ 
+-C -> JP: POST /join/challenge {invitation_id}
+-JP -> JP: invitation known, unexpired, not consumed? attempt counter
++alt invitation declares no DNSSEC domain (chosen before lookup)
++  C -> C: use invitation root/host-CA/TLS pins; Web PKI required
++else default DNSSEC (open application requires this branch)
++  C -> R: TXT _swarma, TXT _swarma-ssh-ca, TLSA (per environment, not worker)
++  R --> C: records (client validates signatures, not resolver AD bit)
++  C -> C: indeterminate/system DNS missing signatures: retry transport over DoH
++  break mismatch, bogus, failed/malformed read or still indeterminate
++    C -> C: refuse; DNS failure never selects invitation fallback
++  end
++  C -> C: secure; must agree with invitation pins when present
++end
++C -> JP: POST /join/challenge (invited/open enrolment reference; schema pending)\nHTTPS: Web PKI + selected trust pins
++JP -> JP: bound to this enrolment, fresh, within attempt/queue limits?
+ JP --> C: server_challenge (5 min)
+-C -> R: TXT _swarma, TXT _swarma-ssh-ca, TLSA
+-R --> C: records + validation state (secure | bogus | indeterminate)
+-C -> C: secure: must equal the invitation when present; bogus: refuse;\nindeterminate: retry over DNS-over-HTTPS, then refuse (dns_unverifiable);\nan invitation that declares no DNSSEC domain: proceed on its pins, recorded
+-C -> C: transcript = canonical CBOR, domain-separated:\n{version, invitation_id, project, role, K_sig, K_enc, K_ssh, server_challenge, client_nonce, expires_at, algorithms}
+-C -> JP: HTTPS: Web PKI for the domain, pinned by the TLSA record (and the invitation when present)
+-C -> JP: POST /join/cert {transcript, sig_K_sig(transcript), code}
+-JP -> JP: code equal (constant time)? signature valid? challenge bound and fresh?\nconsume the invitation atomically -> tombstone(invitation_id, K_sig)\n(same K_sig retry -> same pending enrolment; other key -> refuse); rate limit
+-JP -> OP: show {invitation_id, fingerprint, name, role}
+-OP -> OP: check against the donor's signed marketplace card when there is one,\notherwise the invitation the code binds; no voice check
++C -> C: transcript = canonical CBOR, domain-separated:\n{version, invitation reference when invited, project, role, variant, K_sig, K_enc, K_ssh, server_challenge, client_nonce, expires_at, algorithms}
++C -> JP: HTTPS: Web PKI for the domain, selected DNSSEC/TLSA or declared invitation pins
++C -> JP: POST /join/cert {transcript, sig_K_sig(transcript), code only when invited}
++alt invited
++  JP -> JP: constant-time code check; signature/challenge/expiry; atomic consumption;\ntombstone; same-key retry -> same enrolment, other key -> refuse
++else open application (no code)
++  JP -> JP: signature/challenge/expiry; operator queue; exact binding/retry schema pending
++end
++JP -> JP: per-address/per-invitation/queue limits
++JP -> OP: show {enrolment reference (schema pending), fingerprint, name, role}
++OP -> OP: check against the donor's signed marketplace card when there is one,\notherwise invitation binding or open application; no voice check
+ OP -> T: pin K_sig, K_enc, K_ssh; root-signed admission; grants (scope, expiry)
+-OP -> OP: package: AEAD to K_enc with AAD = H(transcript); signed by the operator certificate (root-signed, scope onboard)
+-OP -> JP: release package for <invitation_id>
+-C -> JP: POST /join/challenge {invitation_id} (second challenge)
+-C -> JP: POST /join/collect {invitation_id, sig_K_sig(second challenge)}
++OP -> T: dispatcher provisions project workplace; issue short user certificate for its principal\n(project-side account boundary; separate from donor provisioner)
++OP -> OP: package with host CA + short user certificate/principal, variant/tuple and binding; no carrier credential; AEAD to K_enc with AAD = H(transcript); signed by the operator certificate (root-signed, scope onboard)
++OP -> JP: release package for this enrolment (reference schema pending)
++C -> JP: POST /join/challenge (collection phase, second challenge; pending schema)
++C -> JP: POST /join/collect {enrolment reference, sig_K_sig(second challenge)}
+ JP --> C: package
+ C -> C: decrypt with K_enc; verify operator cert chain to the pinned root;\nverify package signature; check AAD; pin our SSH host CA key from the package\nAND cross-check it against DNS (or the invitation)
+ 
+ note over C, T
++  All invitation/transcript/package and join API/error schemas PENDING (protocol/remote-worker.md).
++  Open-domain application has no code; exact identifiers/retry binding pending; operator admission required.
+   Pinned afterwards:
+   on our side K_sig, K_enc, K_ssh in the registry; K_ssh reaches the workplace user only through short certificates of our user CA (TrustedUserCAKeys);
+   on the donor side our root, the operator certificate, our SSH host CA key (@cert-authority), the binding digest, the qualified tuple, the policy generation.
+   Every later message: signed over exact bytes by K_sig on the donor, fresh, replay-checked, grant-checked (ADM).
+-  Replay: cert/collect meet the tombstone; frames meet connection-scoped ids and op_key caches.
+-  Rotation: a new host key gets a new host certificate (no DNS change); a host CA rotation publishes the new key beside the old; operator cert -> root-signed record; K -> revoke + new enrolment.
++  Replay: invited cert meets its tombstone; collection proof/retry format pending; frames meet connection-scoped ids and op_key caches.
++  Rotation: a new host key gets a new host certificate (no DNS change); a host CA rotation publishes the new key beside the old; operator cert -> root-signed record; K -> operator revocation, user KRL, close sessions + new enrolment.
++  Certificates: host about one year, user about one day (policy examples); bridge renews user certificate.
++  Key storage/algorithm admission follows D0; B disabled until separate provisioner contract exists.
+ end note
+ @enduml
+diff --git a/cips/diagrams/remote-worker-retire.puml b/cips/diagrams/remote-worker-retire.puml
+index 3fc3243d658e031e35a0eb367faaa77d40c6ac37..e7cf947cd16a7d0486e1cc0572775552bd3c2b57 100644
+--- a/cips/diagrams/remote-worker-retire.puml
++++ b/cips/diagrams/remote-worker-retire.puml
+@@ -1,41 +1,43 @@
+ @startuml remote-worker-retire
+ !theme plain
+-title Lifecycle of a remote worker (revision 2): stop, leave and purge on the donor; suspend, retire and revoke on our side; the identity stays pinned unless revoked
++title Lifecycle of a remote worker (revision 4; variant-aware cleanup and independent state axes): stop, leave and purge on the donor; suspend, retire and revoke on our side; the identity stays pinned unless revoked
+ 
+ actor "Operator (our side)" as OP
+ participant "Registry / key keeper" as T
+ participant "Dispatcher + helper\n(our host)" as D
+ participant "Bridge (M3) + sshd" as BR
+ actor "Donor (the machine's owner)" as ADM
+-participant "curator remote-worker\n(donor; bridge identity)" as C
+-participant "Privileged helper (donor)" as PH
++participant "curator remote-worker\n(donor bridge role; UID follows variant)" as C
++participant "Separate donor provisioner (B only)\n(binary/schema/rules/removal pending; B disabled)" as PH
+ 
+ note over OP, PH
+-  States: enrolled -> active <-> stopped (donor) | suspended (project) -> retired -> revoked -> purged.
++  Independent axes: installation present/purged; donor execution active/stopped/left;
++  project workplace admitted/suspended/retired; signing identity pinned/revoked.
++  A/C share donor UID; B has separate UIDs. Offline purge proves no remote revocation.
+   Stop and revocation marks are persisted BEFORE any process is touched, so a service restart cannot race them.
+-  Removing an SSH key never substitutes for closing established sessions and killing jobs.
++  User-certificate revocation/expiry never substitutes for closing established sessions and killing jobs.
+ end note
+ 
+ == donor: stop (pause) ==
+ ADM -> C: curator remote-worker stop
+-C -> C: persist "stopped"; end the harness identity's processes; keep the bridge service and the keys; audit line
+-C --> ADM: stopped (run resumes it)
++C -> C: persist "stopped"; end this worker's harness and descendants (never all donor-UID processes); keep the bridge service and the keys; audit line
++C --> ADM: stopped (run needs valid admission/credentials/qualification)
+ 
+ == donor: leave (retire the workplace, keep the identity) ==
+ ADM -> C: curator remote-worker leave
+ C -> BR: retire request over the channel (if reachable)
+ C -> C: close the channel; keep K_sig, K_enc, K_ssh and the configuration
+-C --> ADM: left; "init --rejoin" with a new invitation returns this identity to a new workplace
++C --> ADM: left; "init --rejoin" with a new invitation returns the pinned identity to a newly admitted workplace unless revoked
+ 
+ == project: suspend / retire / revoke ==
+ OP -> T: suspend: grants paused
+ OP -> D: retire workplace
+-D -> BR: revoke channel authorization; close open sessions
+-D -> D: kill every job and its descendants (process group / cgroup); verify no process of the workplace UID remains;\nremove the authorized key; archive permitted noncredential artifacts only; release account and egress rules
++D -> BR: persist channel/grant revocation; stop renewal; user-certificate KRL; close sessions
++D -> D: kill every job and its descendants (process group / cgroup); verify no process of the workplace UID remains;\narchive permitted noncredential artifacts only; release account and egress rules
+ BR -> BR: next frame or envelope from this worker refused (retired); mailbox kept durable
+ note right of BR: the donor's connection drops; its bridge reports "retired by project" and pauses
+ OP -> T: revoke (only on compromise or departure): root-signed revocation of K_sig, K_enc, K_ssh
+-T -> BR: revocation record: every frame and envelope from these keys refuses from now on;\na return needs a new key through a new enrolment (rotation is a root-authorized record)
++T -> BR: persist revocation; user-certificate KRL; close sessions; stop renewal;\nrevocation record: every frame and envelope from these keys refuses from now on;\na return needs a new key through a new enrolment (rotation is a root-authorized record)
+ 
+ == donor: purge (destroy) ==
+ ADM -> C: curator remote-worker purge --confirm
+@@ -45,8 +47,14 @@ alt channel reachable
+ else channel unreachable
+   C -> C: record "channel unreachable; the project side must revoke separately"
+ end
+-C -> C: delete keys, locked config, managed home; audit kept for the donor
+-C -> PH: remove-worker <label>: both accounts, egress anchor, sandbox profile, daemon unit (journal, rollback)
+-PH --> C: done
+-C --> ADM: removed; nothing of the project remains on this machine; revocation outcome printed
++C -> C: stop owned processes; delete keys, locked config, managed home; retain donor-visible audit
++alt A
++  C -> C: remove owned user service/artifacts; preserve donor account and unrelated data
++else C
++  C -> C: remove owned sandbox + user service/artifacts; preserve donor account
++else B (future path, disabled while provisioner contract pending)
++  C -> PH: remove only B-allocated accounts, egress, sandbox, system service\n(exact closed operation format pending; journal/rollback required)
++  PH --> C: removal result
++end
++C --> ADM: variant-owned artifacts removed; printed revocation result or unknown when unreachable
+ @enduml
+diff --git a/cips/diagrams/remote-worker-turn.puml b/cips/diagrams/remote-worker-turn.puml
+index 24aa214434b54075e9da08442cef88a472ff2ab9..d2a2279bdd480f75c3e989ec6611fa11143200ec 100644
+--- a/cips/diagrams/remote-worker-turn.puml
++++ b/cips/diagrams/remote-worker-turn.puml
+@@ -1,6 +1,6 @@
+ @startuml remote-worker-turn
+ !theme plain
+-title Remote worker turn (revision 2): the harness has no local tools; the relay (harness identity) forwards to the bridge service (bridge identity), which carries every tool call and the mailbox over ONE SSH connection from the donor to our host; our host never connects back
++title Remote worker turn (revision 4; B boundary shown, disabled until separate provisioner spec/qualification): the harness has no local tools; the relay (harness identity) forwards to the bridge service (bridge identity), which carries every tool call and the mailbox over ONE SSH connection from the donor to our host; our host never connects back
+ 
+ box "Donor machine: harness identity (sandboxed, egress = proxy only)" #WhiteSmoke
+   participant "Harness\n(Claude / Codex / Muse, lockdown plan)" as H
+@@ -17,16 +17,23 @@ box "Our host" #WhiteSmoke
+ end box
+ participant "Orchestrator" as O
+ 
++note over H, SUP
++  The role split is enforced by UID/sandbox in B; sandbox only in C; A shares the donor UID,
++  has no OS isolation/egress guarantee, and relies on qualified lockdown with no local tools.
++  Relay has no keys/network in every variant; protocol/backend closed formats are pending.
++end note
++
+ == standing connection ==
+-SUP -> RB: ssh workplace-user@host with K_ssh; host key checked against the pin on EVERY connection (no TOFU)
++SUP -> RB: ssh workplace-user@host with K_ssh + short user-CA certificate;\nhost certificate checked on EVERY connection: pinned host CA, host name, validity, KRL (no TOFU)
++note over SUP, RB: Bridge renews short user certificate; expiry/revocation refuses; retire stops renewal and closes sessions.
+ RB --> SUP: hello {versions:[1]} / swarma-rb/1 channel open (bounded CBOR frames, flow credits)
+ SUP -> RB: policy.get
+ RB --> SUP: workplace policy {tools, write scope, network, limits, env_allow} -> effective tool set
+-note right of RB: Match block: root-owned AuthorizedKeysFile, restrict, no forwarding, no PTY,\nno user rc/env; forced command by absolute path; reconnect is the donor side's job
++note right of RB: Match block: root-controlled TrustedUserCAKeys + KRL + workplace principal, no forwarding, no PTY,\nno user rc/env; forced command by absolute path; reconnect is the donor side's job
+ 
+ == launch ==
+ SUP -> SUP: obtain the composed plan from the construction site (agents-management);\ncheck expect_pin, tool_posture=lockdown, permissions=remote-auto, policy generation, qualified tuple;\nvalidate the expanded launch against the generated policy; resolve credential_binding/1
+-SUP -> H: start as the harness identity under the Seatbelt profile\n(e.g. claude --restricted --tools "" --strict-mcp-config --mcp-config <protected> --settings <protected>\n--setting-sources "" --disable-slash-commands --permission-prompts none --allowedTools mcp__swarma-remote-tools__*;\ntoken in the harness environment only, CIP-0010)
++SUP -> H: consume composed plan, launch exact qualified build;\nB: harness UID + sandbox + per-UID egress; C: donor UID + sandbox;\nA: donor UID, no OS confinement, direct provider path; credential per launch (CIP-0010)
+ H -> MCP: MCP initialize; tools/list = effective set (policy intersection)
+ 
+ == task arrives ==
+@@ -54,20 +61,20 @@ loop each tool call
+   SUP --> MCP: result
+   MCP --> H: tool result
+ end
+-H -> PX: model API calls (the only egress of the harness identity)
++H -> PX: B/C: model API calls through the qualified proxy only
+ alt the model requests a built-in tool (Bash, Edit, WebFetch ...)
+   H -> H: harness returns an error tool result (tool not available);\nthe tripwire logs the name after dispatch and may end the turn
+ end
+ alt SSH channel drops mid-turn
+   SUP -> SUP: pause the turn loop; running turn continues to its deadline;\ntool calls fail with channel_down (retryable); result post queued durably with its op_key
+-  SUP -> RB: reconnect with backoff; host key rechecked; catch up from the durable cursor;\nreplay-safe: cached result or unknown_result, never a second effect
++  SUP -> RB: reconnect with backoff; host certificate/CA/validity/KRL rechecked; catch up from the durable cursor;\nreplay-safe: cached result or unknown_result, never a second effect
+ end
+ 
+ == result ==
+ H -> MCP: tools/call mailbox_post {binding, text} (offered only when the policy grants it)
+ MCP -> SUP: forward
+-SUP -> SUP: build the FINAL envelope (canonical bytes; audience/thread from the task record);\nsign with K_sig (never leaves the bridge identity)
++SUP -> SUP: build the FINAL envelope (canonical bytes; audience/thread from the task record);\nsign with K_sig (D0 variant-specific storage; never sent to the project)
+ SUP -> RB: frame mailbox.post {op_key, envelope_bytes, signature}
+ RB -> BR: verify K_sig signature, grant, freshness; admit
+-BR -> O: carry the bytes UNCHANGED under the worker's carrier account (distinct authority, audited) -> outcome proposal
++BR -> O: carry the bytes UNCHANGED under the project bridge's carrier account for the worker (first slice) (distinct authority, audited) -> outcome proposal
+ @enduml
+diff --git a/protocol/remote-worker.md b/protocol/remote-worker.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..bc8babe69912a05c59ba03fb22cef54208895102
+--- /dev/null
++++ b/protocol/remote-worker.md
+@@ -0,0 +1,54 @@
++# Remote worker on a donor machine
++
++- **Status:** Draft contract reconciliation for R-CS1; no implemented capability or qualification asserted.
++- **Authority:** [CIP-0009](../cips/CIP-0009-donor-side-deployment-and-bridge.md), the platform contract table at `relux-works/curator` revision `177cb554` (D1–D5), and the recorded owner decisions of 2026-10-10/11. D-DONOR-PROVISIONING supersedes the open helper-extension choice; D-WIRE-NAMES sets wire naming.
++
++This document publishes the common contract and the status of its missing formats. The field lists in CIP-0009 are design requirements, not closed schemas. A pending format cannot be treated as an interoperable API or permission to activate its feature.
++
++## Publication status
++
++Versioned platform wire identifiers carry the owning repository name: `swarma-<component> <object>/<n>`. No format has shipped, so the clean naming rule requires no migration. The bridge owns join/admission delivery; its three enrolment objects use the names below. These names alone do not specify signing preimages, canonical field types or complete readers.
++
++| Reference | Owner / location | Publication status and remaining work |
++|---|---|---|
++| `swarma-bridge invitation/1` | CIP-0009 D4 | **PENDING closed schema.** Invitation ID, one-use code, environment/project/role, expiry, join URL, root and host-CA pins, TLS pin, explicit trust-mode declaration; exact encodings, field names and validation errors still need publication. |
++| `swarma-bridge join/1` | CIP-0009 D4 | **PENDING closed schema and signature preimage.** Deterministic CBOR, challenge-bound proof of possession, three separate keys, algorithms, variant/tuple and invitation/open-application binding. Open-application identifiers and retry binding are not frozen. |
++| `swarma-bridge credential-package/1` | CIP-0009 D4/D12 | **PENDING closed schema.** Root, operator chain, host CA, short user certificate/workplace principal, binding, tuple, variant, generation and expiry; authenticated encryption and transcript associated data; no carrier credential. Exact serialized envelope and algorithm negotiation remain unpublished. |
++| Join API: `challenge`, `cert`, `collect` | CIP-0009 D4/D9 | **PENDING request/response/error schemas.** Routes are proposed as `POST /join/challenge`, `/join/cert`, `/join/collect`. Invited/open application, polling, second challenge, collection retry/replay and rejection payloads require closed formats; no additional join verb is implied. |
++| Remote Bash framing (design shorthand `swarma-rb/1`) | CIP-0009 D5 | **PENDING standalone framed protocol and wire owner.** Bounds, deterministic CBOR, negotiation, request IDs, `op_key`, result cache, caps, method authorization, leases, flow credits, cursors, receipts and errors must be frozen together. |
++| Workplace execution (design shorthand `swarma-workplace-exec/1`) | CIP-0009 D5 | **PENDING standalone backend contract and wire owner.** OS-user backend first; policy/audit/output review/descendant cleanup requirements do not establish container conformance. |
++| Donor provisioning/removal | CIP-0009 D1/D2; D-DONOR-PROVISIONING | **PENDING separate short spec, rules, removal and closed schema; B disabled.** Separate donor-side binary and privileges; sharing UID/path libraries is allowed. No donor operation exists in `swarma-user-manager`'s closed schema. Binary naming is not decided here. |
++
++**Open owner question — transport/backend wire ownership:** Should the remote channel and execution contract belong to (a) the `swarma-bridge` repository, with bridge-owned object names, or (b) a separately owned executor component, with that repository's object names? The contract table specifies their design labels but does not record a repository owner for these wire formats. D-WIRE-NAMES fixes the naming rule, not this ownership choice. Keep these two labels as design shorthand until ownership and exact formats are recorded; neither is a frozen versioned wire identifier. This publication question does not change the decided separate donor-provisioner boundary.
++
++## Deployment and launch boundary
++
++A is first: qualified lockdown under the donor's own user, no administrator rights, separate UID, sandbox or egress guarantee. If the harness is compromised, it can act as that user. B follows with two identities, one administrator request, per-UID egress and a kernel read boundary; its 0600 bridge-owned keys use no Keychain, and B stays disabled while its separate provisioner contract is pending. C is the sandbox fallback under the donor UID when administrator rights are declined or unavailable. A/C use Secure Enclave P-256 signing/SSH keys on qualified Macs that support them, 0600 files elsewhere; package-decryption keys are separate X25519 keys. Algorithms and storage must be qualified for the selected tuple.
++
++Only the human donor initializes. Interactive TTY, typed consent and managed-session environment checks are policy admission heuristics, not proof of human identity. The bridge accepts only `lockdown` + `remote-auto` with an exact qualified build and current policy generation. Qualification requirements are not evidence that a tuple passed. The supervisor consumes a caller-composed plan; it does not compose one. The relay owns no keys or network; it forwards local MCP calls. Tools execute in the project workplace over one donor-originated SSH connection; the project never connects back to execute on the donor.
++
++**Open owner question — A after B/C qualification:** Keep A selectable, or offer only B/C once both are qualified on a platform? CIP-0009 question 7 is unresolved; neither answer is implied by this revision.
++
++## Trust and SSH
++
++Web PKI validates the join domain. DNSSEC is the default and is validated inside the client from an embedded root anchor; DoH is a transport fallback when system DNS strips signatures, not a different trust source. Closed networks may supply a zone anchor. Records are per environment: `TXT _swarma.<domain>` for root fingerprint, `TXT _swarma-ssh-ca.<domain>` for SSH host CA public key, and join-point `TLSA`.
++
++Invitation pins select the fallback only when the invitation explicitly declares an environment without a DNSSEC domain. When DNS and invitation pins coexist they must agree. Mismatch, malformed/failed reads, bogus or unresolved validation refuse; they never become evidence of absence or activate fallback. Open applications without invitation pins require DNSSEC. No second human channel is used.
++
++The host CA (Ed25519, kept in the keeper or hardware token) certifies host keys; the donor uses `@cert-authority` and verifies host name, validity and KRL on every connection. Host certificates of about a year are policy examples. Adding a certified host changes no DNS record; CA rotation overlaps the old/new keys. A separate user CA certifies donor-generated `K_ssh` with the workplace-user principal, with certificates of about a day as a policy example, renewed by the bridge. Root-controlled sshd trusts `TrustedUserCAKeys`, checks revocation and enforces the protected absolute forced command with no forwarding, PTY, user rc or environment. Retirement/revocation stops renewal, updates user-certificate KRL and closes established sessions; revocation alone does not terminate an existing connection.
++
++## Join service and limits
++
++The join point sits on the project's public entry host behind existing TLS ingress, under its own name. It holds no admission-signing key and executes no command: it challenges, stores signed enrolment/application data and returns operator-signed encrypted packages after admission. Invited enrolment uses a random one-use code of at least 128 bits, challenge-bound signature, atomic consumption and replay tombstone. Same-key retries recover the same pending enrolment; other-key retries refuse. Open applications have no invitation code and enter the same operator queue; exact schema is pending.
++
++D9 owner-approved policy values are 10 requests/minute and 100/day per source address, five challenges per invitation, one use, 72-hour invitation validity, 16 KiB maximum request body, five-minute challenge lifetime and 50 pending applications. New applications beyond the pending cap refuse until capacity is available. These values do not substitute for the pending API/error schemas or imply a published cleanup/polling format.
++
++## Tools, mailbox and lifecycle
++
++The effective tool set is the relay maximum intersected with workplace policy. Mailbox operations are control plane and appear as tools only when granted. Donor admission checks verification records, binding, expiry, fences/revocations and delivery mode before a session-input adapter receives a turn. Cursors advance after persistence; message IDs deduplicate; the application receipt is separate from transport acknowledgement. A dropped channel pauses new turns; a current turn reaches its deadline, calls fail `channel_down`, and outbound results queue durably. Reconnect checks SSH certificates and uses cached results or `unknown_result`, never a repeated effect.
++
++The donor bridge signs final envelope bytes with `K_sig`. The project verifies signature/grants/freshness and carries those bytes unchanged under a distinct audited carrier authority in the first slice. No project carrier credential enters the donor package. Later organisation accounts and allowlisted freelancer federation are a separate rollout phase.
++
++Track donor installation, donor execution, project workplace and signing identity separately (CIP-0009 D7). Local stop persists before termination and keeps bridge/keys; leave keeps identity for a new admitted workplace; purge removes only variant-owned artifacts and can happen offline. A/C never remove the donor account. B cleanup belongs to its pending separate provisioner. Project suspend/retire/revoke are independent: retirement closes sessions and jobs, revokes channel/grants/user certificates, archives permitted artifacts and releases the workplace after process absence; the donor identity remains pinned. Only a separate operator-authorized signed revocation revokes that identity; the one-shot dispatcher exception does not apply. Offline purge reports remote revocation as unknown.
++
++The [CIP-0009 test plan](../cips/CIP-0009-donor-side-deployment-and-bridge.md#test-plan) is future qualification work. This documentation publication claims no test, build, renderer or provider qualification result.
