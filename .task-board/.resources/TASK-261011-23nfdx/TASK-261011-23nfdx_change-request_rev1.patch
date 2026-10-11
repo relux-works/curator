@@ -1,0 +1,1417 @@
+diff --git a/README.md b/README.md
+index 0ed19255e69f2af81a835fb29577b454c8ce7397..c1f4acc82e2bf3b8d4b6a8328c92b1379badde88 100644
+--- a/README.md
++++ b/README.md
+@@ -79,6 +79,26 @@ Protocol and implementation designs are recorded as
+ [CIP-0001](cips/CIP-0001-curator-improvement-proposals.md); adoption follows
+ [GOVERNANCE.md](GOVERNANCE.md).
+ 
++## CIP diagram sources
++
++[Source index and phase/authority notes](cips/diagrams/README.md) map the B4 module views to their defining CIP sections. These views describe current contracts and proposed targets; they do not assert implementation or qualification.
++
++| Figure | Source | Defining section |
++|---|---|---|
++| Donor components (C4 retained) | [donor-side.dsl](cips/diagrams/donor-side.dsl) | [D0–D3, D5, D12](cips/CIP-0009-donor-side-deployment-and-bridge.md#recommendation) |
++| Donor components (PlantUML) | [donor-side.puml](cips/diagrams/donor-side.puml) | [D0–D3, D5, D9, D12](cips/CIP-0009-donor-side-deployment-and-bridge.md#recommendation) |
++| First deployment | [donor-first-deployment.puml](cips/diagrams/donor-first-deployment.puml) | [D0–D4, D9–D10, D12](cips/CIP-0009-donor-side-deployment-and-bridge.md#recommendation) |
++| Join handshake | [join-handshake.puml](cips/diagrams/join-handshake.puml) | [D4, D6, D9, D12](cips/CIP-0009-donor-side-deployment-and-bridge.md#recommendation) |
++| Remote-worker turn | [remote-worker-turn.puml](cips/diagrams/remote-worker-turn.puml) | [D0–D5, D12; CIP-0008 R3/R5/R9](cips/CIP-0009-donor-side-deployment-and-bridge.md#recommendation) |
++| Retirement sequence | [remote-worker-retire.puml](cips/diagrams/remote-worker-retire.puml) | [D7, D12](cips/CIP-0009-donor-side-deployment-and-bridge.md#recommendation) |
++| Deployment variants | [donor-variants.puml](cips/diagrams/donor-variants.puml) | [D0–D3; CIP-0008 R9](cips/CIP-0009-donor-side-deployment-and-bridge.md#recommendation) |
++| Independent lifecycle axes | [donor-lifecycle.puml](cips/diagrams/donor-lifecycle.puml) | [D7, D12](cips/CIP-0009-donor-side-deployment-and-bridge.md#recommendation) |
++| State layout | [donor-layout.puml](cips/diagrams/donor-layout.puml) | [D0–D3, D5, D7, D12](cips/CIP-0009-donor-side-deployment-and-bridge.md#recommendation) |
++| Credential source lifecycle | [credential-source-lifecycle.puml](cips/diagrams/credential-source-lifecycle.puml) | [C1–C6, Revision 2.2; CIP-0003 migration; CIP-0011 §2/§3](cips/CIP-0010-credentials-setup-token-and-inherited-auth.md#recommendation) |
++| Configuration publication | [configuration-publication.puml](cips/diagrams/configuration-publication.puml) | [CIP-0002 admission/leases/PATH; CIP-0004 recommendation/migration; CIP-0006 design/migration](cips/CIP-0002-project-context-in-managed-launches.md#recommendation) |
++| Tool admission | [tool-admission.puml](cips/diagrams/tool-admission.puml) | [Operator decision, option B, recommendation/security; shared D-PATH](cips/CIP-0007-manager-provisioned-cli-tools.md#recommendation) |
++| Audit transport | [audit-transport.puml](cips/diagrams/audit-transport.puml) | [Recommendation §§1–7](cips/CIP-0005-audit-backends-and-cli-secret-transport.md#recommendation) |
++
+ ## Tools
+ 
+ Published `release/<version>.json` records are byte-frozen against release
+diff --git a/cips/CIP-0002-project-context-in-managed-launches.md b/cips/CIP-0002-project-context-in-managed-launches.md
+index 07f816ef05d50c8316e9bc0ba0d1e617f1553226..3eabf1b704b4e734074719c177039b6b4cbc6cfb 100644
+--- a/cips/CIP-0002-project-context-in-managed-launches.md
++++ b/cips/CIP-0002-project-context-in-managed-launches.md
+@@ -6,6 +6,17 @@
+ - **Related:** TASK-261004-2asduq — launch-command-environment-fragment-design; STORY-261004-1ffwh8 — design-launch-project-views; TASK-261004-34brhn — research-claude-login-transfer-modes; Decisions 0013, 0017, 0018 and 0019
+ - **Affects:** curator-spec environments §§1–5, 7–12; manager §§3, 5, 6, 10, 12; fragment and manager schemas; Curator, curator-run, agents-management and the tracked-session launch-plan consumer
+ 
++## Operative summary
++
++| Field | Contract |
++|---|---|
++| Purpose | Registered project context composed over a selected profile. |
++| Boundary | Repository inputs are candidates; only protected, individually approved snapshots enter strict launches. |
++| Authority owner | Operator approves within fleet/manager ceilings; manager owns registrations, admissions, compositions and leases; launcher owns composition. |
++| Inputs → outputs | Registered checkout, selected profile lock, approved generation and adapter contract → protected view, metadata fragment and context-bound launch plan. |
++| Phase | Draft; D-PATH decided, home choice and coordinated v4 grammar/qualification pending. |
++| Normative links and proposed landing | [Environments §§1–5](../protocol/environments.md#1-environment-profiles-and-sources), [§10](../protocol/environments.md#10-resolution-and-the-launch-fragment), [Manager §12](../profiles/manager.md#12-agent-environments-manager-profile); amendments: [Specification changes](#specification-changes). |
++
+ ## Operative disposition (2026-10-11)
+ 
+ - **Decided:** The operator input of 2026-10-10 governs project registration, saved composites, profile alternatives/stacks, approval ceilings and protected admission. D-PATH (2026-10-11) settles the managed-launch PATH recipe; see the shared contract below. The CIP remains Draft.
+@@ -86,6 +97,8 @@ None of these home layouts alone provides the hostile-repository boundary. This
+ 
+ ### Recommendation
+ 
++The [configuration publication figure](diagrams/configuration-publication.puml) shows the proposed admission, composition, lease and destination PATH boundaries, with the independent shell/settings lanes.
++
+ Adopt option A as an **optional, separately versioned project-context capability**. Keep rc.14's existing environment capability intact. Release a strict adapter only when it can both exclude unadmitted native sources and expose the declared admitted surfaces; otherwise return a typed refusal for the requested capability.
+ 
+ #### Operator control surface
+@@ -172,7 +185,7 @@ The original sketch's at-most-two project/global roots is rejected in favor of *
+ 
+ Migrate existing manager-owned singleton forwarders to dispatch through the same context binding, or refuse when an older forwarder would shadow the new view. Appending cannot outrank such a shim. For unmanaged earlier executables with an admitted command's name, report/refuse ambiguous ordinary-command availability and offer an explicit manager command invocation; never silently invoke the wrong skill. Reserve all `curator-*` names and add the dispatcher directory and aliases to umbrella provider-discovery refusals, even if placed in a configured provider trust root. E3, E10, P6.
+ 
+-D-PATH (accepted 2026-10-11) defines one managed-launch order: protected tool directory of this launch (CIP-0007), admitted base PATH of this user in its existing order, then one protected manager dispatcher directory. Project commands run through that dispatcher only after admission and execution checks; repository `.agents/bin` is never executed in a managed launch. Use the platform separator and avoid duplicate manager entries by canonical identity. The closed transform grammar must preserve the accepted order; it is not adopted by this example. Reject malformed/unreadable manager roots and ambiguous PATH entries required for command selection. If PATH is absent or excluded by the environment policy, refuse command capability rather than recreate an environment variable that admission removed. Empty/relative/CWD-sensitive components and repository-writable search roots require explicit treatment in the upstream PATH-admission contract; strict mode must not accept them by accident. Native settings may not subsequently replace PATH or shell initialization defeat the recipe. Claude `settings.env` and Codex `shell_environment_policy.set` are assignment surfaces, not append operators. D2, D5.
++D-PATH (accepted 2026-10-11) defines one managed-launch order: protected tool directory of this launch (CIP-0007), admitted base PATH of this user in its existing order, then one protected manager dispatcher directory. Project commands run through that dispatcher only after admission and execution checks; repository `.agents/bin` is never executed in a managed launch. Use the platform separator; deduplicate by identity and preserve the existing position of the manager dispatcher directory when it is already in the admitted base PATH, otherwise append it. Do not move an existing dispatcher entry to the tail. The protected launch tool directory remains first; the admitted base entries retain their order. The closed transform grammar must preserve the accepted order; it is not adopted by this example. Reject malformed/unreadable manager roots and ambiguous PATH entries required for command selection. If PATH is absent or excluded by the environment policy, refuse command capability rather than recreate an environment variable that admission removed. Empty/relative/CWD-sensitive components and repository-writable search roots require explicit treatment in the upstream PATH-admission contract; strict mode must not accept them by accident. Native settings may not subsequently replace PATH or shell initialization defeat the recipe. Claude `settings.env` and Codex `shell_environment_policy.set` are assignment surfaces, not append operators. D2, D5.
+ 
+ Apply the operation on the **admitted child PATH**, not the parent shell's PATH. In tracked mode the destination performs the same typed transformation after its own environment admission and records both the operation/context digest and resolved PATH in the immutable effective plan identity. Do not transport the caller's inherited PATH as an owned literal. The launcher remains the only semantic composer; the destination evaluates its admitted transform and the provider translates the resulting plan without recomposition. Until the tracked schema, consumer and provider reproduce this contract, refuse tracked requests for command capability. A resume must reproduce the pinned effective plan or refuse a changed destination context.
+ 
+diff --git a/cips/CIP-0003-claude-managed-home-credential-modes.md b/cips/CIP-0003-claude-managed-home-credential-modes.md
+index 2bd88e80d6677988478c5ba09812420640f5a890..b5d3e328b42368fcb4ff784896083acb70d4eafc 100644
+--- a/cips/CIP-0003-claude-managed-home-credential-modes.md
++++ b/cips/CIP-0003-claude-managed-home-credential-modes.md
+@@ -6,6 +6,17 @@
+ - **Related:** TASK-261004-34brhn — research-claude-login-transfer-modes; STORY-261004-1pwxri — claude-macos-managed-home-login-modes; Decision 0017 — environment credential modes.
+ - **Affects:** curator-spec rc.14 environments §§7.4, 7.7, 7.9, 8.2, 8.4.1, 10.1–10.4, 12.1–12.2; manager §§1, 12.4–12.5; configuration, marker and launch-fragment schemas; curator; curator-run/launcher and its tracked execution boundary.
+ 
++## Operative summary
++
++| Field | Contract |
++|---|---|
++| Purpose | Explicit Claude credential selection, narrowed by CIP-0010 C6. |
++| Boundary | No native-login copying/export; source metadata is separate from secret material and native-store isolation. |
++| Authority owner | User owns source selection and node store; final executor validates and injects; Claude owns per-home refresh and helper cache. |
++| Inputs → outputs | Trusted selector, protected binding and explicit enrollment → non-secret source metadata and qualified child-only delivery. |
++| Phase | Accepted narrowed; source-policy v1 defaults per-home, v2 requires explicit entries; coordinated v4 pending. |
++| Normative links and proposed landing | [Environments §7.4](../protocol/environments.md#74-credential-passthrough-provisioning-seeds-and-isolation), [Decision 0017](../decisions/0017-environment-credential-modes.md); operative replacement: [CIP-0010 C6](CIP-0010-credentials-setup-token-and-inherited-auth.md#recommendation); landing: [Historical specification changes](#historical-specification-changes-apply-cip-0010-c6). |
++
+ ## Operative disposition (2026-10-11)
+ 
+ - **Decided:** Accepted, narrowed by CIP-0010 C6 (2026-10-10). Source-policy v1 keeps per-home when no entry exists; source-policy v2 requires an explicit entry and migrates existing logins to explicit per-home. Token becomes node-sourced; helper remains an API-key lane. The first node store is a protected 0600 file on macOS and Linux.
+@@ -154,6 +165,8 @@ A helper is intentional code execution and a credential supplier. Its bridge mus
+ 
+ ## Compatibility and migration
+ 
++The [credential source lifecycle](diagrams/credential-source-lifecycle.puml) shows this migration under CIP-0010 C6, including explicit v2 per-home entries, no-fallback refusals and operator recovery.
++
+ Existing manager schemas, fragments and markers stay frozen. Reserve **manager-config-v4**, **launch-env-fragment-v4** and **agent-environment-marker-v4** for enactment; v3 already exists. Old consumers reject v4, and new consumers still accept the existing shapes. Coordinate release/pin promotion between spec, manager and launcher. No system-config bump is proposed because this draft adds no system-selectable source field; revise it only if the operator later chooses a new mode-enforcement policy.
+ 
+ Explicit adoption uses the existing inspect → plan → apply discipline. A plan compares non-secret settings, links and marker metadata, records the new mode/source reference, and preserves credential bytes. A source-only rotation updates the protected store without relinking the home. A mode change of a provisioned home requires a plan even if it creates no filesystem link. Refuse a regular file where a shared link would be needed, unreadable metadata, unexpected targets, and conflicting locks. Do not reset or log out a native/per-home account to make migration pass.
+diff --git a/cips/CIP-0004-shell-hook-without-sourcing-and-path-append.md b/cips/CIP-0004-shell-hook-without-sourcing-and-path-append.md
+index e990f7df376586f9287a78f8a705f7d7c1b42c04..02f926092c8a2957f4bbc37c9b194392be1fc3f2 100644
+--- a/cips/CIP-0004-shell-hook-without-sourcing-and-path-append.md
++++ b/cips/CIP-0004-shell-hook-without-sourcing-and-path-append.md
+@@ -6,6 +6,17 @@
+ - **Related:** TASK-261004-1z2pgb — shell-hook-no-source-and-path-append-design; STORY-261004-7fglii — shell-hook-path-and-backend-env-hardening; K3 / historical S6; reviewer input `shell-hook-test-matrix.md`
+ - **Affects:** curator-spec rc.14 Manager §§3, 8, 10 and environment-exposure text; Environments §§11–12; shell conformance vectors; curator hook generation, generated env helpers, cache installation and status. Launcher and launch-fragment contracts require boundary clarification, not a PATH-policy change here.
+ 
++## Operative summary
++
++| Field | Contract |
++|---|---|
++| Purpose | Interactive activation without executing project/global env files. |
++| Boundary | Metadata-only discovery and literal assignments; shell bins confer no managed-launch admission. |
++| Authority owner | Generated hook owns its activation snapshot; manager owns canonical cache bytes/options; user controls opt-outs and reload. |
++| Inputs → outputs | Physical CWD, nearest .agents directory, inherited PATH and options → root variables and appended global/project bins; exit/switch restores prior state. |
++| Phase | Accepted no-source-v1; cache schema/release and native shell qualification pending. |
++| Normative links and proposed landing | [Manager §8](../profiles/manager.md#8-shell-activation), [§10](../profiles/manager.md#10-status-and-garbage-collection), [Environments §12](../protocol/environments.md#12-status-machine-configuration-and-garbage-collection); amendments: [Specification changes](#specification-changes). |
++
+ ## Operative disposition (2026-10-11)
+ 
+ - **Decided:** Accepted on 2026-10-10: no-source-v1 interactive activation; inherited PATH, optional global bin, optional project bin, in that order. Shell approvals no longer authorize activation. Managed launches use D-PATH and never execute repository .agents/bin.
+@@ -64,6 +75,8 @@ Snapshot execution also changes compatibility: today's POSIX canonical helper di
+ 
+ ### Recommendation
+ 
++The [configuration publication figure](diagrams/configuration-publication.puml) separates no-source interactive activation and cache reload from project-context admission and managed-launch PATH.
++
+ Select **C**, with one supported behavior, `no-source-v1`, and no configurable unsafe mode. In particular `_CURATOR_TRUST_PROFILE`, an old record, a file header or a “permissive” security profile must not re-enable sourcing.
+ 
+ **Discovery and roots.** The nearest ancestor containing a `.agents` directory is the project root; a symlink to a directory counts. The hook examines metadata only and never opens an env file, Skillfile, approval store or launch fragment. Start from the physical current directory; validate POSIX `PWD` is absolute and non-empty first, then obtain the physical location using shell builtins. Return one absolute physical root independent of checkout aliases. Preserve literal bytes, including trailing newlines when capturing shell output. A missing marker continues the bounded parent walk; an inaccessible/indeterminate directory stops activation, not a fallback to a different project. `.agents/bin` may be absent at discovery: its literal path can be appended and becomes usable after installation. An env file's absence or unreadability cannot prevent activation.
+diff --git a/cips/CIP-0005-audit-backends-and-cli-secret-transport.md b/cips/CIP-0005-audit-backends-and-cli-secret-transport.md
+index 354504f8255ff18f04cc5ad559053d53d3ea0399..c77f7ceea1ff3a4a50aae0a58985395c2d77400a 100644
+--- a/cips/CIP-0005-audit-backends-and-cli-secret-transport.md
++++ b/cips/CIP-0005-audit-backends-and-cli-secret-transport.md
+@@ -6,6 +6,17 @@
+ - **Related:** TASK-261004-hy8zmn — audit-token-argv-and-backend-env-allowlist-design; STORY-261004-2b8pnx — design-audit-backends-and-secret-transport; K24; public cocoaskills PR #142, commit 0da153a54e7f8b446e63a6a177a9b5392e30da11; adopted Decisions 0019 and 0021
+ - **Affects:** curator-spec manager profile §§1, 7, 12.6; registry protocol §9.1; CLI audit reference; manager configuration, local verdict and backend schemas; curator; shared agents-management launch layer. No proposed curator-run headless mode or launch-fragment wire change.
+ 
++## Operative summary
++
++| Field | Contract |
++|---|---|
++| Purpose | Private CLI registry-token input and explicitly selected audit backends. |
++| Boundary | Secrets never enter argv, plans or audit children; backend output cannot mint verification authority. |
++| Authority owner | Operator selects policy/backend; manager owns input, process, decision/cache; shared launch layer owns native flags; registry owns publication. |
++| Inputs → outputs | Private file or registry-token environment, frozen subject and audit policy → Bearer publication or bounded audit findings/coverage/cache status. |
++| Phase | CLI secret transport accepted first; backend descriptor/cache/native qualification details pending. |
++| Normative links and proposed landing | [Manager §7](../profiles/manager.md#7-source-audit-policy), [§12.6](../profiles/manager.md#126-profile-audit), [Registry §9.1](../protocol/registry.md#91-status-and-errors); amendments: [Specification changes](#specification-changes). |
++
+ ## Operative disposition (2026-10-11)
+ 
+ - **Decided:** Accepted on 2026-10-10, with CLI secret transport first: refuse literal argv tokens; explicit token-file failure never falls back to CURATOR_REGISTRY_TOKEN. Native backend launch construction remains with the existing shared launch owner.
+@@ -56,6 +67,8 @@ A blacklist-only environment, arbitrary inherited environment, and a native adap
+ 
+ ### Recommendation
+ 
++The [audit transport figure](diagrams/audit-transport.puml) separates registry-token input from proposed analyzer execution and shows refusal, cache and strict/advisory branches.
++
+ Adopt B, with independently reviewable leaves after operator acceptance. Preserve current defaults: audit.enabled false for optional skill gates, backend null, advisory mode, fail_on high, allow_cloud false, and internal source classification. Explicit CLI audit continues to enable its audit, and profiles remain always strict.
+ 
+ #### 1. Registry token sources
+diff --git a/cips/CIP-0006-legacy-provider-settings-and-mcp-opt-outs.md b/cips/CIP-0006-legacy-provider-settings-and-mcp-opt-outs.md
+index f57243657df19b1fd99cdef001e0b2dece826787..62d94b5d648fe6eb7e08cfdcf21d28595b8bc312 100644
+--- a/cips/CIP-0006-legacy-provider-settings-and-mcp-opt-outs.md
++++ b/cips/CIP-0006-legacy-provider-settings-and-mcp-opt-outs.md
+@@ -6,6 +6,17 @@
+ - **Related:** [curator#105 — preserve legacy provider settings and explicit MCP opt-outs](https://github.com/relux-works/curator/issues/105); Decision 0014 — tool-configuration surfaces (**proposed, not adopted**); Decision 0018 — curator run permission interface (**adopted**); TASK-261004-2iewnz — research-105-design-and-implementation-plan; STORY-261004-3v2zm2 — legacy-provider-settings-and-mcp-optouts-105; TASK-260927-367jb7 — infra-exit (external dependency named by the brief); TASK-260929-3hrwzn — transactional-legacy-config-import (PM-owned importer).
+ - **Affects:** environments §§5.8, 7.4, 7.8, 8, 9.2, 10, 12–13; manager configuration and profile cleanup; CLI `env config`, `env resolve`, `env status`; implementations: curator, curator-run/launcher and its agents-management integration; PM importer as a consumer.
+ 
++## Operative summary
++
++| Field | Contract |
++|---|---|
++| Purpose | Preserve narrow provider settings and explicit negative MCP intent on existing profiles. |
++| Boundary | Machine-owned declarations update exact managed keys; native files/auth remain outside ownership. |
++| Authority owner | Operator/system owns scoped declarations; manager owns key projection, prior values and journal; pinned adapter owns rendering/suppression semantics. |
++| Inputs → outputs | Closed profile_settings with presence/scope and MCP choices → managed key projection, marker/digest and explicit MCP launch channel, including empty sets. |
++| Phase | Narrow record accepted; coordinated v4 and adapter suppression grammar/qualification pending; Decision 0014 stays proposed. |
++| Normative links and proposed landing | [Environments §5.8](../protocol/environments.md#58-mcp-launch-channel-output), [§8](../protocol/environments.md#8-materialization-modes-and-the-environment-marker), [§10](../protocol/environments.md#10-resolution-and-the-launch-fragment), [§12.1](../protocol/environments.md#121-machine-configuration-knobs); amendments: [Specification changes](#specification-changes). |
++
+ ## Operative disposition (2026-10-11)
+ 
+ - **Decided:** Accepted on 2026-10-10: the narrow machine-owned profile_settings record on existing profiles. Package settings and Decision 0014 as a whole remain outside this acceptance. Presence, scope, negative MCP intent and conservative key ownership must be preserved.
+@@ -48,6 +59,8 @@ Measured on the baseline: the scratch package with the issue's Claude permission
+ 
+ ## Design
+ 
++The [configuration publication figure](diagrams/configuration-publication.puml) shows declaration versus per-home publication, owned-key conflict/recovery and authoritative negative MCP policy.
++
+ ### Options considered
+ 
+ | Option | Mechanism | Benefits | Costs and security tradeoffs |
+diff --git a/cips/CIP-0007-manager-provisioned-cli-tools.md b/cips/CIP-0007-manager-provisioned-cli-tools.md
+index 28b3f3a3ec236f7976fc54ef2afb0c66ae27c28e..e1fd1514085f35c32ef4409cc9737373aee24c03 100644
+--- a/cips/CIP-0007-manager-provisioned-cli-tools.md
++++ b/cips/CIP-0007-manager-provisioned-cli-tools.md
+@@ -13,6 +13,17 @@
+   status); skillfile and lock schemas; conformance vectors. No normative
+   change is made by this document.
+ 
++## Operative summary
++
++| Field | Contract |
++|---|---|
++| Purpose | Provision exact CLI-tool bytes from operator-trusted signed registries. |
++| Boundary | Skills declare identity/alias/constraint only; no author fetch URL, system-wide install or B-lane PATH version probe. |
++| Authority owner | System/fleet owns trust policy and keys; registry operators sign records/revocations; manager owns lock, sealed store and launch aliases. |
++| Inputs → outputs | Logical dependencies, platform, signed snapshots and current authorization → exact lock/store artifacts and protected launch tool directory; any verified revocation vetoes. |
++| Phase | Option B accepted with conditions; record/manifest grammar and registry delivery pending; option C later. |
++| Normative links and proposed landing | [Core §4](../protocol/core.md#4-skill-manifest), [Registry §§2–5](../protocol/registry.md#2-signature-envelope-and-keys), [source locks §3](../protocol/skillfile-sources.md#3-local-snapshots-and-lock-identity), [Manager §2](../profiles/manager.md#2-installation-lifecycle); amendments: [Specification changes](#specification-changes). |
++
+ ## Operative disposition (2026-10-11)
+ 
+ - **Decided:** Option B accepted on 2026-10-10 with several signed registries, revocation veto across every enabled registry, dedicated rotating key sets, system/fleet trust configuration, a separate release-shipped trust bundle and no compiled-in trust keys. Launch aliases use the combined D-PATH recipe.
+@@ -225,6 +236,8 @@ source.
+ 
+ ### Recommendation
+ 
++The [tool admission figure](diagrams/tool-admission.puml) shows all-registry revocation scanning before positive selection, current authorization on lock replay, and protected PATH exposure.
++
+ Adopt **option B**, per the triage recommendation, with option C held as the
+ explicit target architecture gated on the decisions in Open questions. The
+ operator control surface for B:
+diff --git a/cips/CIP-0008-remote-worker-launch-mode.md b/cips/CIP-0008-remote-worker-launch-mode.md
+index c59fa362292826ff17f5a0fd74c35431ec9d4754..737cc4f65e74bdf7cb54840f56f89b433b7b1ac5 100644
+--- a/cips/CIP-0008-remote-worker-launch-mode.md
++++ b/cips/CIP-0008-remote-worker-launch-mode.md
+@@ -6,6 +6,17 @@
+ - **Related:** owner brief 2026-10-08 (remote worker on a donor machine); [Decision 0018](../decisions/0018-curator-run-permission-interface.md) (`native|yolo`); [Decision 0013](../decisions/0013-execution-ownership-and-launch-plans.md) (launch plans, §6.4 extensions); [Decision 0019](../decisions/0019-fragment-consumers-and-one-construction-site.md); [Decision 0021](../decisions/0021-sessions-enter-through-curator-run.md); [Decision 0014](../decisions/0014-tool-configuration-surfaces.md) (proposed); [CIP-0002](CIP-0002-project-context-in-managed-launches.md) (strict MCP set); [CIP-0006](CIP-0006-legacy-provider-settings-and-mcp-opt-outs.md); [CIP-0009](CIP-0009-donor-side-deployment-and-bridge.md) (the donor machine and the bridge); [CIP-0010](CIP-0010-credentials-setup-token-and-inherited-auth.md) (credentials); environments [§2.2](../protocol/environments.md#22-mcp-declaration-packages), [§10.3](../protocol/environments.md#103-the-profile-influence-boundary), [§12.1](../protocol/environments.md#121-machine-configuration-knobs), §12.2 (locks)
+ - **Affects:** environments §12.1–§12.2 (new knob, lock amendment, policy generation), Decision 0013 (required plan extensions), Decisions 0018/0019/0021 (amendments), launcher SPEC (posture, caller-tail grammar, refusals, receipts), agents-management (per-harness qualified tuples); implementations: curator, curator-run/launcher, agents-management, the remote-worker supervisor (CIP-0009)
+ 
++## Operative summary
++
++| Field | Contract |
++|---|---|
++| Purpose | Qualified remote-worker tool lockdown and remote-auto permission posture. |
++| Boundary | One shared composer; caller tail is closed and validated; lockdown is a tool boundary, OS confinement belongs to CIP-0009. |
++| Authority owner | User owns machine posture; agents-management composes native policy; launcher/executor admits tuple and generation; bridge refuses other postures. |
++| Inputs → outputs | Profile lock, required posture extensions, exact tuple, caller tail and current generation → immutable plan/receipt and qualified launch or refusal. |
++| Phase | Draft target; current native/yolo remains separate; required extensions and qualification pending. |
++| Normative links and proposed landing | [Decision 0013 §6.4](../decisions/0013-execution-ownership-and-launch-plans.md#64-tracked-mode-delegates-untracked-mode-execs), [Decision 0018](../decisions/0018-curator-run-permission-interface.md), [Environments §12.2](../protocol/environments.md#122-lockable-knobs); amendments: [Specification changes](#specification-changes). |
++
+ ## Revision 2: what the architecture review changed
+ 
+ The first draft was reviewed on 2026-10-08 (research task, read-only, 25 findings). This revision folds in every finding that concerns this CIP; the finding numbers (F1–F25) refer to that review and are kept in the text so the owners can trace each change.
+@@ -56,6 +67,8 @@ A **remote worker** is a harness whose model runs on a machine we do not own (th
+ 
+ ### Recommendation
+ 
++The [donor component view](diagrams/donor-side.puml), [deployment variants](diagrams/donor-variants.puml) and [turn sequence](diagrams/remote-worker-turn.puml) show which executor checks the qualified posture and current generation. These are Draft target views; no native tuple qualification is claimed.
++
+ **R1. Posture knob and lock.** A new environments §12.1 knob `tool_posture.<profile>` with the closed values `open` (default, absent) and `lockdown`. It is a *machine* knob: lockable by system configuration (manager §12), never profile content, never a launcher-file entry. The donor's installation locks `tool_posture.remote-worker: lockdown` (CIP-0009), so no launch of that profile on that machine can be `open`. **Lock amendment (F7):** environments §12.2 today permits a `permissions` lock only toward `native`; this CIP amends it so that a lock may also pin the **pair** `tool_posture = lockdown` with `permissions = remote-auto` (and nothing else: a lock toward `yolo` stays refused). The §12.2 rule that a lock never selects or constrains credential material is unchanged; CIP-0010 keeps the credential source in the user-owned layer.
+ 
+ **R2. Permissions value for the posture.** Decision 0018's `permissions` gains a third value `remote-auto`, admitted **only** when the effective `tool_posture` is `lockdown`; `remote-auto` with `open`, or `yolo` with `lockdown`, is a `usage` refusal naming both. `remote-auto` means: the tools of the admitted remote-tools server are pre-approved, everything else that would prompt is denied without prompting, and **no native bypass is requested in any source** (a bypass spelling found in the generated policy, the caller tail, a settings file or a configuration key is a refusal). It is a distinct permission policy with two qualified spellings per harness, one for the print/headless branch and one for the interactive branch, each with its own conformance vector (F3). This is the "marked yolo" of the owner brief.
+diff --git a/cips/CIP-0009-donor-side-deployment-and-bridge.md b/cips/CIP-0009-donor-side-deployment-and-bridge.md
+index 92050e5c12948ec2fa32baa5d3531981936ac24b..20329b00e63bd6612339d28c0c6a2a2bc0bcb1c6 100644
+--- a/cips/CIP-0009-donor-side-deployment-and-bridge.md
++++ b/cips/CIP-0009-donor-side-deployment-and-bridge.md
+@@ -6,6 +6,17 @@
+ - **Related:** owner brief 2026-10-08; [CIP-0008](CIP-0008-remote-worker-launch-mode.md) (the lockdown posture); [CIP-0010](CIP-0010-credentials-setup-token-and-inherited-auth.md); [CIP-0007](CIP-0007-manager-provisioned-cli-tools.md) (provisioned binaries); [Decision 0009](../decisions/0009-first-party-module-roots.md); environments [§2.2](../protocol/environments.md#22-mcp-declaration-packages); VISION v1.3 (relux-works/swarm-platform-architecture) §0, LCH §7–§8, ADM, the sequences `external-agent-onboarding`, `remote-workplace-attach`, `remote-worker-start`, `mailbox-delivery`, `keeper-sign`; wiki `session-host/architecture.ru.md` §7.2, §7.4, §7.5, §7.9, §7.10; relux-works/remote-workplace protocol v2.1 (RWP); relux-works/remote-worker-harness (`rwh`)
+ - **Affects:** a new Curator command group `remote-worker`; two first-party modules (`swarma-remote-tools` relay, `swarma-bridge` service) and a separately specified donor provisioner (variant B disabled until its spec exists); manager §12 (locked donor configuration); the project-side executor (`swarma-rb-exec`) and the `swarma-workplace-exec/1` contract; diagrams in `cips/diagrams/`
+ 
++## Operative summary
++
++| Field | Contract |
++|---|---|
++| Purpose | Donor deployment, trust bootstrap, remote tools/mailbox and independent lifecycle axes. |
++| Boundary | Donor-originated SSH only; donor keeps signing keys; project carries signed bytes; no donor carrier credential in the first slice. |
++| Authority owner | Donor owns consent and local lifecycle; bridge role owns keys/state; project operator owns admission/revocation; separate provisioner owns future B privileges. |
++| Inputs → outputs | Invitation or DNSSEC open application, three keys, qualified tuple and caller-composed plan → protected binding/package, workplace channel and signed outcomes. |
++| Phase | Draft target: A first, B disabled pending separate provisioner, C sandbox fallback; closed wire formats pending. |
++| Normative links and proposed landing | [Remote-worker publication register](../protocol/remote-worker.md#publication-status), [MCP boundary §2.2](../protocol/environments.md#22-mcp-declaration-packages), [Decision 0009](../decisions/0009-first-party-module-roots.md); amendments: [Specification changes](#specification-changes). |
++
+ ## Revision 4: contract reconciliation
+ 
+ The contract table at `relux-works/curator` revision `177cb554` and the recorded owner decisions govern this revision. D-DONOR-PROVISIONING selects a separate donor-side binary and privilege boundary; B stays disabled until its short spec, rules and removal contract exist. D-WIRE-NAMES requires versioned wire identifiers of the form `swarma-<component> <object>/<n>`; pending formats are registered in [the remote-worker protocol](../protocol/remote-worker.md#publication-status). These are documentation decisions, not qualification evidence.
+@@ -33,7 +44,7 @@ The contract table at `relux-works/curator` revision `177cb554` and the recorded
+ 
+ ## Summary
+ 
+-This CIP specifies the **donor side** of a remote worker and the **bridge** between the donor's machine and the project's host: what Curator installs on the donor machine at first deployment (in one of three variants: the lockdown posture only, two OS identities with a kernel sandbox and a per-UID egress policy, or a kernel sandbox under the donor's own user; plus a locked configuration, a trusted bridge service and a minimal remote-tools relay), how the initial exchange works (invitation, three role-separated keys, a signed enrolment transcript over a server challenge, join point, root-signed admission, an authenticated-encrypted credential package), how the harness talks to our host (one SSH connection from the donor's bridge identity towards our host, carrying the framed `swarma-rb/1` protocol and the mailbox), how MITM and replay are defended (Web PKI with locally validated DNSSEC by default or invitation pins for a declared no-DNSSEC environment, host/user CAs, signed transcripts and envelopes over exact bytes), and how a worker is stopped, retired, revoked or purged on both sides. It decides that the remote tools are an **MCP relay** while the initial exchange is a **Curator CLI step**, never a tool the model can call. Diagrams: `diagrams/donor-first-deployment.puml`, `diagrams/join-handshake.puml`, `diagrams/remote-worker-turn.puml`, `diagrams/remote-worker-retire.puml`, `diagrams/donor-side.dsl` (C4 containers).
++This CIP specifies the **donor side** of a remote worker and the **bridge** between the donor's machine and the project's host: what Curator installs on the donor machine at first deployment (in one of three variants: the lockdown posture only, two OS identities with a kernel sandbox and a per-UID egress policy, or a kernel sandbox under the donor's own user; plus a locked configuration, a trusted bridge service and a minimal remote-tools relay), how the initial exchange works (invitation, three role-separated keys, a signed enrolment transcript over a server challenge, join point, root-signed admission, an authenticated-encrypted credential package), how the harness talks to our host (one SSH connection from the donor's bridge identity towards our host, carrying the framed `swarma-rb/1` protocol and the mailbox), how MITM and replay are defended (Web PKI with locally validated DNSSEC by default or invitation pins for a declared no-DNSSEC environment, host/user CAs, signed transcripts and envelopes over exact bytes), and how a worker is stopped, retired, revoked or purged on both sides. It decides that the remote tools are an **MCP relay** while the initial exchange is a **Curator CLI step**, never a tool the model can call. Diagrams: [first deployment](diagrams/donor-first-deployment.puml), [join handshake](diagrams/join-handshake.puml), [remote turn](diagrams/remote-worker-turn.puml), [retirement](diagrams/remote-worker-retire.puml), [C4 containers](diagrams/donor-side.dsl) and its [PlantUML component view](diagrams/donor-side.puml), [deployment variants](diagrams/donor-variants.puml), [independent lifecycle axes](diagrams/donor-lifecycle.puml), and [state layout](diagrams/donor-layout.puml).
+ 
+ ## Motivation and user stories
+ 
+@@ -73,6 +84,8 @@ This CIP specifies the **donor side** of a remote worker and the **bridge** betw
+ 
+ ### Recommendation
+ 
++Figure sources: [variants and deployment boundaries](diagrams/donor-variants.puml), [state/service/socket/CA layout](diagrams/donor-layout.puml), and [components](diagrams/donor-side.puml) describe D0–D3 and D12. [C4 source](diagrams/donor-side.dsl) retains the B component target with A/C differences stated; B remains disabled.
++
+ **D0. Deployment variants** (owner decision 2026-10-10). `init` records the variant in the enrolment and in the qualified tuple; the project's workplace policy may require a minimum variant (for example write access only for B or C), and `status` and the session banner name it.
+ 
+ | Variant | Administrator rights | Donor-side boundary | Bridge runs as | Keys | Order |
+@@ -128,7 +141,7 @@ The relay's maximum tool set and where each executes:
+ 
+ The **effective** set offered to the model is the intersection of this list with the workplace policy of the worker (`tools` of the policy, fetched at connect and refreshed on `policy.changed`): a read-only worker gets `read_file` only, not `bash`, `write_file` or `apply_patch`. Mailbox operations are **control plane** between the bridge service and our bridge; `mailbox_read` and `mailbox_post` appear as tools only when the policy grants them, and the supervisor delivers task turns through the session-input adapter, not through a tool the model has to call (F19). No `enrol`, no `key`, no `config`. Any other `tools/call` is an error result and an audit line.
+ 
+-**D4. First deployment** (`diagrams/donor-first-deployment.puml`, `diagrams/join-handshake.puml`; F13).
++**D4. First deployment** ([first deployment](diagrams/donor-first-deployment.puml), [join handshake](diagrams/join-handshake.puml); F13).
+ The following field lists describe required content, not published closed schemas. The invitation, join transcript and credential-package formats, including the no-invitation application branch, are individually **pending** in [protocol/remote-worker.md](../protocol/remote-worker.md#publication-status).
+ 
+ 1. We issue an **invitation** (`swarma-bridge invitation/1`, pending schema): invitation ID (128-bit random), join URL, root fingerprint, SSH host CA fingerprint, join TLS pin, declared trust mode, project, role, expiry and a one-use random code (at least 128 bits, base32). The code is a bearer bootstrap secret, bounded by attempts and consumed atomically. Someone who knows only the domain runs `init <domain>`: an open application that waits for operator admission; it requires the DNSSEC trust branch because it has no invitation pins.
+@@ -139,7 +152,10 @@ The following field lists describe required content, not published closed schema
+ 6. *Collect:* `POST /join/collect` proves possession of `K_sig` over a second server challenge. The bridge role decrypts, validates the operator chain against the already pinned root, verifies signature and associated data, and cross-checks the package's host CA against DNS or invitation pins. It writes the locked configuration and binding, installs the relay declaration into the remote-worker profile and prints "registered; waiting for tasks". Package replay/collection retry details remain part of the pending schema; they are not permission for repeated admission effects.
+ 7. As part of admission, before package issue in step 5, our dispatcher provisions the project-side OS-user workplace with per-UID egress. A separate user CA signs `K_ssh` with the workplace-user principal; root-controlled sshd policy uses `TrustedUserCAKeys`, revocation checks and the protected absolute forced executor, with no forwarding, PTY, user rc or environment. This project-side account operation is separate from donor provisioning (D12).
+ 
+-**D5. The bridge** (`diagrams/remote-worker-turn.puml`).
++**D5. The bridge** ([turn sequence](diagrams/remote-worker-turn.puml)).
++
++The [remote-worker turn sequence](diagrams/remote-worker-turn.puml) shows process identities, state owners and channel-loss recovery for this contract.
++
+ - *Connection (F14):* the bridge opens **one SSH connection from donor to project host** using `K_ssh` and its short user-CA certificate. On every connection/reconnect it verifies the host certificate against the pinned host CA (`@cert-authority`), host name, validity and KRL; no trust-on-first-use. Root-controlled sshd policy admits the workplace principal through `TrustedUserCAKeys` and user-certificate revocation checks, sets `PermitUserRC no`, `PermitUserEnvironment no`, `AllowAgentForwarding no`, `AllowTcpForwarding no`, `X11Forwarding no`, `PermitTTY no`, and a `ForceCommand` by protected absolute path. The workplace user cannot change this policy or the CA/KRL material. The project host never connects back or sends commands into the donor machine; reconnect with backoff is donor-owned.
+ - *Framing `swarma-rb/1` (F15; design label, closed protocol/wire ownership pending in [the publication register](../protocol/remote-worker.md#publication-status)):* one multiplexed channel over the SSH session. A frame is a 4-byte big-endian length (bounded **before** allocation; maximum 1 MiB) followed by deterministic CBOR with canonical field types, no duplicate keys and byte strings for binary data. The first frames are `hello` with version negotiation (`versions: [1]`; an unknown version refuses and closes). Every request carries a connection-scoped monotonic `id` and a client-chosen `op_key` (UUID) that makes side effects idempotent: the server keeps a result cache per binding keyed by `op_key` for ten minutes, so a reconnect after an `exec` or a `mailbox.post` whose reply was lost returns the cached result or `unknown_result` and never replays the effect. Requests: `exec {cmd, cwd, env: {names from the policy's env_allow only}, timeout_s, max_output_bytes, lease_s}`, `cancel {target_id}`, `stdin {target_id, bytes}`, `file.read`, `file.write`, `patch.apply`, `mailbox.read {from_cursor}`, `mailbox.post {envelope_bytes, signature}`, `mailbox.applied {message_id}`; replies `stdout|stderr {seq, bytes}`, `exit {code}`, `error {code}`, `result`, server-initiated `mailbox.notify {message_id, cursor}` (advisory) and `policy.changed`. **Server policy is authoritative:** a caller may lower `timeout_s`, `max_output_bytes` or `lease_s`, never raise them above the workplace policy; `cancel` and `stdin` apply only to a live job owned by the same binding; each method is authorized against the policy; a window of outstanding frames and `flow` credits give backpressure; `env` names outside `env_allow` refuse.
+ - *Job lifetime:* every `exec` runs in its own process group (Linux: also a transient cgroup) with a server-side lease; the lease expiring, a `cancel`, or the transport dropping after a grace period kills the group and verifies that no process of the workplace UID descends from the job; descendant cleanup on transport loss is a test vector, not an assumption.
+@@ -152,7 +168,7 @@ The following field lists describe required content, not published closed schema
+ 
+ **D6. MITM, replay and identity (F13).** Web PKI plus the selected D4 trust branch protect first contact: locally validated DNSSEC by default, invitation pins only for a declared no-DNSSEC environment; when both exist they must agree. No validation failure downgrades. A one-use invitation code (when invited) and server-challenge-bound signed transcript prove possession. Afterwards the registry pins the three worker keys; the donor pins the root, operator chain and host CA; SSH uses host and short user certificates (D12). Packages bind their transcript with authenticated encryption; envelopes use exact bytes, freshness and replay rules. Invitation tombstones, connection-scoped IDs and `op_key` caches bound replays. Worker compromise requires operator/root-signed revocation, user-certificate/KRL enforcement, stopped renewal and closure of established sessions (D7); donor identities do not inherit the dispatcher one-shot automatic identity-revocation exception (D-IDENTITY). Host-key compromise is handled by KRL and a replacement host certificate under the same CA; adding/replacing such a host does not change DNS. CA rotation overlaps old/new public keys in DNS and authenticated policy/package updates. Operator-certificate rotation is root-authorized; expired or revoked chains refuse.
+ 
+-**D7. Lifecycle: stop, leave, purge; suspend, retire, revoke** (`diagrams/remote-worker-retire.puml`; F17). Track independent axes: donor installation (present / purged), donor execution (active / stopped / left), project workplace (admitted / suspended / retired), and signing identity (pinned / revoked). These are descriptive states, not a published closed state schema. Purge can occur offline and does not prove project retirement or revocation; retirement preserves the donor identity unless the operator separately revokes it.
++**D7. Lifecycle: stop, leave, purge; suspend, retire, revoke** ([retirement sequence](diagrams/remote-worker-retire.puml), [independent state axes](diagrams/donor-lifecycle.puml); F17). Track independent axes: donor installation (present / purged), donor execution (active / stopped / left), project workplace (admitted / suspended / retired), and signing identity (pinned / revoked). These are descriptive states, not a published closed state schema. Purge can occur offline and does not prove project retirement or revocation; retirement preserves the donor identity unless the operator separately revokes it.
+ - *Donor side.* `stop`: persist the stopped mark, terminate this worker's harness and descendants, keep bridge service and keys; `run` resumes only if project admission, credentials and qualification remain valid. `leave`: request project retirement when reachable, close the channel and keep keys/configuration; `init --rejoin` returns the pinned identity to a new workplace/package unless revoked. `purge --confirm`: stop owned processes and remove keys, locked configuration and managed home. A removes its user service and owned installation artifacts; C also removes its sandbox artifacts; B requires the separate donor provisioner to remove only its allocated accounts, egress, sandbox and system service. No shared donor account is removed in A/C. Print the project-reported revocation result, or "channel unreachable; the project side must revoke separately". Local purge is independent of remote consent.
+ - *Project side.* `suspend`: pause grants and close sessions, keep workplace. `retire`: persist grant/channel revocation, stop certificate renewal, revoke outstanding user certificates through KRL, close established sessions, kill jobs and descendants, verify process absence, archive permitted noncredential artifacts and release account/egress state. The identity stays pinned. `revoke`: operator-authorized root-signed revocation of all three worker keys, after which frames and envelopes refuse; a return needs new enrolment keys. This is a separate identity operation, never a consequence inferred from donor purge or account retirement.
+ - Ordering: stop and revocation marks are persisted before any service restart can race them; certificate revocation or expiry never substitutes for closing established sessions.
+diff --git a/cips/CIP-0010-credentials-setup-token-and-inherited-auth.md b/cips/CIP-0010-credentials-setup-token-and-inherited-auth.md
+index 6cf977aec3234efde0c6d39d23f11afe5b23bf06..1bd4fe8c5f57e9ceeaf4f3d76d90e691baf69d72 100644
+--- a/cips/CIP-0010-credentials-setup-token-and-inherited-auth.md
++++ b/cips/CIP-0010-credentials-setup-token-and-inherited-auth.md
+@@ -6,6 +6,17 @@
+ - **Related:** owner brief 2026-10-08 §8; [CIP-0003](CIP-0003-claude-managed-home-credential-modes.md) (accepted, narrowed); [Decision 0017](../decisions/0017-environment-credential-modes.md) (`shared|isolated`, Q4, Q7 no-copy); environments [§7.4](../protocol/environments.md#74-credential-passthrough-provisioning-seeds-and-isolation), §10.3, §12.1–§12.2; wiki `research/harness-auth/RESEARCH.md` (2026-10-07) and `PLAN-expiry-check.ru.md`; wiki `session-host/architecture.ru.md` §7.3 (credential broker); VISION v1.3 LCH §7; [CIP-0008](CIP-0008-remote-worker-launch-mode.md), [CIP-0009](CIP-0009-donor-side-deployment-and-bridge.md); relux-works/remote-worker-harness `docs/session-mode.md` ("Login: the single auth owner")
+ - **Affects:** environments §7.4 and §12.1 (new user-owned knob), Decision 0013 (a required plan extension), Decision 0017 (Q4 evidence label; Q7 unchanged), the marker schema, curator (`env credential` commands, the Codex auth owner), curator-run/launcher, the final executors (agent-account curator-run first; board and session host through the dispatcher; donor supervisor later)
+ 
++## Operative summary
++
++| Field | Contract |
++|---|---|
++| Purpose | Enrollment and node-sourced credentials with explicit per-home migration. |
++| Boundary | User-owned source choice; no refresh-token cloning, silent source fallback or secret in fragments/plans. |
++| Authority owner | User owns node metadata and protected store; final executor owns destination binding/injection; one Codex auth owner owns refresh. |
++| Inputs → outputs | Explicit source, protected binding and intentionally enrolled material → metadata-only required extension and qualified per-launch channel; expiry reports stated/computed/unknown. |
++| Phase | Source-policy v1/v2 decided; first file backend decided; broker slice 0 first, Codex slice 1 qualification/open adoption, donor later. |
++| Normative links and proposed landing | [Environments §7.4](../protocol/environments.md#74-credential-passthrough-provisioning-seeds-and-isolation), [§12.1](../protocol/environments.md#121-machine-configuration-knobs), [Decision 0017](../decisions/0017-environment-credential-modes.md); amendments: [Specification changes](#specification-changes). |
++
+ ## Operative disposition (2026-10-11)
+ 
+ - **Decided:** Revision 2.1 and Revision 2.2 decide the first file backend and source-policy v1/v2; CIP-0003 is adopted narrowed. D-EXECUTOR (2026-10-11) makes curator-run under the agent account the first broker consumer. Board and session host request the dispatcher; neither embeds the first broker client.
+@@ -78,6 +89,8 @@ Facts are measured, vendor-documented or source-inspected, with the label stated
+ 
+ ### Recommendation
+ 
++The [credential source lifecycle](diagrams/credential-source-lifecycle.puml) shows C1–C6, source-policy v1/v2, enrollment, final-executor refusal and expiry recovery; broker slice 0 and later consumers retain their separate phases.
++
+ **C1. Authentication nodes.** A new managed object, the **authentication node**: a per-OS-user, per-harness, per-account-label record under the manager's environments root, `auth/<label>/`, holding *references and metadata* only: `{harness, account_label, kind: claude-oauth-token | codex-auth-owner | codex-access-token | meta-api-key | gemini-api-key, source_ref, enrolled_at, issued_at?, expires_at | unknown, last_refusal?}`. Material lives in the node's **secret store**, never in the node record. The secret store is a pluggable backend behind one interface (`put`, `get`, `delete`, `describe`), so other backends can be added without changing nodes, plans or executors. **First release: one backend, a 0600 file** in a 0700 directory owned by the OS user (`~/.curator/auth/<label>/secret`, identically on macOS and Linux) — the same protection level as Codex's default `auth.json` and Claude's Linux `.credentials.json`. The macOS Keychain and the Linux Secret Service are **not** implemented in the first release (owner decision 2026-10-09: files on both systems first; a node Keychain backend is deferred). Reasons: tracked and headless launches cannot answer Keychain access prompts and often run without an unlocked GUI login keychain or under another OS user; Keychain "Always Allow" is bound to the binary's code-signing designated requirement, so locally built or unsigned curator binaries re-prompt after every rebuild; and the protection gain is small because the executor hands the token to the harness process anyway. When a keychain backend is added later, tracked and headless launches MUST refuse a node whose backend can prompt (`credential_store_interactive_only`) rather than block on a prompt; it is meant for interactive use with signed (Developer ID) releases. The **root node** is the label `root` of a user; several accounts are several labels. A node belongs to the OS user that enrolled it; another OS user cannot read it by construction. Crossing OS users is the credential broker of architecture §7.3, whose minimal interface is slice 0 of this CIP (C7).
+ 
+ **C2. Homes with inherited authentication.** `isolation` keeps the Decision 0017 meaning (`shared|isolated`: whether the native store is shared). A separate axis, the **credential source**, is set per profile and harness in the user-owned machine configuration: `credential_source.<profile>.<harness>` = `per-home` (default) | `node:<label>` | `helper`. A home whose source is a node holds no credential of its own: no seed, no link (for Claude), and the executor injects by the harness's channel table at every launch:
+diff --git a/cips/CIP-0011-credential-broker-and-agent-users.md b/cips/CIP-0011-credential-broker-and-agent-users.md
+index 9ce04e51d94a5ae2666dcdc9d185949a9369d7fc..f8e5255a6e98c5aecb1bf9d46fc4a7359ecb37c6 100644
+--- a/cips/CIP-0011-credential-broker-and-agent-users.md
++++ b/cips/CIP-0011-credential-broker-and-agent-users.md
+@@ -6,6 +6,17 @@
+ - **Related:** [CIP-0010](CIP-0010-credentials-setup-token-and-inherited-auth.md) (credential sources, protected credential binding C3.4, executor capability, CIP-0003 disposition); [CIP-0008](CIP-0008-remote-worker-launch-mode.md), [CIP-0009](CIP-0009-donor-side-deployment-and-bridge.md); [Decision 0013](../decisions/0013-execution-ownership-and-launch-plans.md) (launch plans); [Decision 0017](../decisions/0017-environment-credential-modes.md) (credential modes); environments §7.4, §10.3, §12.1–§12.2; relux-works/swarma-credential-broker `spec/broker.md` (draft v0.3); relux-works/swarma-user-manager `spec/helper.md` (draft v0.3, with the launcher and `exec.stop`); relux-works/swarma-dispatcher `spec/dispatcher.md` (draft v0.2); relux-works/curator-network-profiles (binding records)
+ - **Affects:** environments §7.4 and §12.1 (a credential source value), Decision 0013 (the credential extension), the launcher SPEC, the manager command set (`broker`, `agent-user` as a dispatcher client), agent-account curator-run as first broker consumer; board/session-host dispatcher clients; donor supervisor later
+ 
++## Operative summary
++
++| Field | Contract |
++|---|---|
++| Purpose | Cross-user credential leases and dispatcher-managed agent OS accounts. |
++| Boundary | Caller composes; dispatcher provisions/tracks; agent-account executor verifies/executes and talks only to broker; capability is not authorization. |
++| Authority owner | Broker service owns accounts/bindings/leases/auth owner; dispatcher service owns run records; root helper owns accounts; executor owns injection. |
++| Inputs → outputs | Caller-composed plan/digest, signed caller grant, generation and protected binding → approved account/execution, lease/injection and metadata receipt or refusal. |
++| Phase | Slice 0 Claude / helper v0 and dispatcher v0 target; dispatcher v1 socket, Codex slice 1, enforced networking/helper v1 slice 2; SH2/donor later. |
++| Normative links and proposed landing | [Decision 0013](../decisions/0013-execution-ownership-and-launch-plans.md), [Decision 0021 amendment](../decisions/0021-sessions-enter-through-curator-run.md#amendment-v1--agent-account-one-shot-execution-2026-10-11), [Environments §7.4](../protocol/environments.md#74-credential-passthrough-provisioning-seeds-and-isolation); [module owner/version table with pinned broker/dispatcher/helper specifications](platform-contract-disposition.md#schema-owner-and-version-table); amendments: [Specification changes](#specification-changes). |
++
+ ## Operative disposition (2026-10-11)
+ 
+ - **Decided:** The dispatcher is a separate module. D-EXECUTOR selects agent-account curator-run first: caller composes, executor verifies and executes without profile resolution and with no network except the broker; it shares a launch library with swarma-session-runner. Board and session host call the dispatcher. D-WIRE-NAMES governs platform identifiers.
+@@ -48,6 +59,8 @@ A profile with this source holds no credential of its own. At every launch the f
+ 
+ ### 2. Launch-plan extension and the protected binding
+ 
++The [credential source lifecycle](diagrams/credential-source-lifecycle.puml) identifies caller composition, dispatcher/root-launcher handoff and agent-account final-executor checks, with broker store/lease ownership and refusal branches.
++
+ - The credential travels in the plan only as metadata, in `extensions["works.relux.curator.credential/1"]` with `mode: "broker"`, `account` and `channel`; no new top-level plan member. The extension is marked as required-understanding: an executor that does not implement it refuses the plan instead of ignoring it.
+ - Intake refuses a broker-mode plan unless the executor declares `credential-injection/1` and can reach the broker socket (`credential_broker_unavailable`).
+ - Broker mode implements CIP-0010 C3.4 explicitly. Immediately before exec, the executor resolves `credential_binding/1` destination-locally (peer identity, profile, harness, account, channel, vendor endpoint, approved executable digest, policy generation), sends it in the lease request, and re-checks it before exec; the broker checks it against its own records and approved lists (broker §8.2).
+diff --git a/cips/diagrams/README.md b/cips/diagrams/README.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c8e19cfde5016b8fff63f7004ed19f581ca012f
+--- /dev/null
++++ b/cips/diagrams/README.md
+@@ -0,0 +1,21 @@
++# CIP figure sources
++
++These are source views of the current CIP text, not runtime qualification. Phase, process identity, persistent-state authority and refusal/recovery appear in each view. Unknown formats, UIDs and retention rules are marked where the defining specification is silent. B activation stays disabled. PlantUML uses local basic syntax without themes, includes or a renderer dependency. The existing C4 source is retained and extended alongside the PlantUML component view.
++
++| Figure | Source | Defining specification | Audit row |
++|---|---|---|---|
++| Donor components (C4 retained) | [donor-side.dsl](donor-side.dsl) | [D0–D3, D5, D12](../CIP-0009-donor-side-deployment-and-bridge.md#recommendation) | M-CIP1 |
++| Donor components (PlantUML) | [donor-side.puml](donor-side.puml) | [D0–D3, D5, D9, D12](../CIP-0009-donor-side-deployment-and-bridge.md#recommendation) | M-CIP1 |
++| First deployment | [donor-first-deployment.puml](donor-first-deployment.puml) | [D0–D4, D9–D10, D12](../CIP-0009-donor-side-deployment-and-bridge.md#recommendation) | M-CIP1 |
++| Join handshake | [join-handshake.puml](join-handshake.puml) | [D4, D6, D9, D12](../CIP-0009-donor-side-deployment-and-bridge.md#recommendation) | M-CIP1 |
++| Remote-worker turn | [remote-worker-turn.puml](remote-worker-turn.puml) | [D0–D5, D12; CIP-0008 R3/R5/R9](../CIP-0009-donor-side-deployment-and-bridge.md#recommendation) | M-CIP1 |
++| Retirement sequence | [remote-worker-retire.puml](remote-worker-retire.puml) | [D7, D12](../CIP-0009-donor-side-deployment-and-bridge.md#recommendation) | M-CIP1 |
++| Deployment variants | [donor-variants.puml](donor-variants.puml) | [D0–D3; CIP-0008 R9](../CIP-0009-donor-side-deployment-and-bridge.md#recommendation) | M-CIP1 |
++| Independent lifecycle axes | [donor-lifecycle.puml](donor-lifecycle.puml) | [D7, D12](../CIP-0009-donor-side-deployment-and-bridge.md#recommendation) | M-CIP1 |
++| State layout | [donor-layout.puml](donor-layout.puml) | [D0–D3, D5, D7, D12](../CIP-0009-donor-side-deployment-and-bridge.md#recommendation) | M-CIP1 |
++| Credential source lifecycle | [credential-source-lifecycle.puml](credential-source-lifecycle.puml) | [C1–C6, Revision 2.2; CIP-0003 migration; CIP-0011 §2/§3](../CIP-0010-credentials-setup-token-and-inherited-auth.md#recommendation) | M-CIP2 |
++| Configuration publication | [configuration-publication.puml](configuration-publication.puml) | [CIP-0002 admission/leases/PATH; CIP-0004 recommendation/migration; CIP-0006 design/migration](../CIP-0002-project-context-in-managed-launches.md#recommendation) | M-CIP2 |
++| Tool admission | [tool-admission.puml](tool-admission.puml) | [Operator decision, option B, recommendation/security; shared D-PATH](../CIP-0007-manager-provisioned-cli-tools.md#recommendation) | M-CIP2 |
++| Audit transport | [audit-transport.puml](audit-transport.puml) | [Recommendation §§1–7](../CIP-0005-audit-backends-and-cli-secret-transport.md#recommendation) | M-CIP2 |
++
++Audit: [B4 M-CIP1/M-CIP2](https://github.com/relux-works/curator/blob/48789217/.research/261010_platform-docs-audit.md#b4-missing-or-insufficient-module-diagrams--exact-proposed-files). The current CIPs and [shared disposition](../platform-contract-disposition.md) include later owner decisions; the pinned [contract table](https://github.com/relux-works/curator/blob/177cb554/.research/261010_platform-contract-table.md) supplies the baseline. No render, test, build or native qualification was run by this documentation author; handoff owns configured CR validation.
+diff --git a/cips/diagrams/audit-transport.puml b/cips/diagrams/audit-transport.puml
+new file mode 100644
+index 0000000000000000000000000000000000000000..146098b44a16a93e47859b970846dfc8ed2e8ab6
+--- /dev/null
++++ b/cips/diagrams/audit-transport.puml
+@@ -0,0 +1,97 @@
++@startuml audit-transport
++title Audit transport - CLI secret input accepted first; backend/cache contracts proposed; current null backend is static-only
++actor "Operator" as O
++participant "Curator CLI / manager\noperator UID; policy/process/decision owner" as M
++participant "Opened private token handle\noperator-owned file; transient, non-inheritable" as F
++participant "Shared agents-management launch layer\nnative argv/settings owner" as L
++participant "Selected analyzer child\nmanager-launched identity; direct-child policy" as A
++database "Manager-owned private state\nfrozen snapshot, bounded workdir/output\nverdict cache and registry trust/high-water" as S
++participant "Registry HTTP service\nsigned record publication owner" as R
++
++== Registry publishing secret input; no backend credential propagation ==
++O -> M: audit --publish record --registry URL; optional token-file path (never token value)
++break legacy --token / -token, repeated file option or wrong-subcommand file input
++  M --> O: usage refusal before config/read/launch/network; do not echo raw argv/value
++end
++alt explicit token file
++  M -> F: no-follow, nonblocking open; validate opened type/identity/privacy on same handle
++  break link/reparse point, nonregular object, unsafe ACL/privacy or indeterminate read
++    M --> O: publication error; no CURATOR_REGISTRY_TOKEN fallback
++  end
++  F --> M: bounded bytes (65536 raw cap; read at most 65537); remove at most one LF/CRLF
++  M -> F: close before publication; handle never inherited by child
++else no file option
++  M -> M: use CURATOR_REGISTRY_TOKEN; same grammar/cap; no newline removal
++end
++break missing/empty/oversize/non-ASCII/invalid bearer grammar
++  M --> O: source/category only; no contents/headers in diagnostic
++end
++M -> R: HTTP Bearer publication + signed record; token stays outside argv/config/cache/plans
++R --> M: publication result; failure reported, no backend/source fallback
++
++== Audit analysis proposal; independent from publish-token input ==
++O -> M: selected audit policy + frozen subject; profile operations strict
++M -> S: obtain exact snapshot/current revocation/policy; local static canary before cache authorization
++break failed/partial snapshot/cache read, indeterminate identity or static canary failure
++  M --> O: block both modes; no absence-triggered fallback / empty success
++end
++alt null backend
++  M --> O: deterministic findings; static-only coverage; no analyzer child
++else selected descriptor
++  M -> M: validate selected descriptor, executable, bounds and cloud policy
++  alt unavailable before canary starts
++    M --> O: strict blocks; advisory warns incomplete; no successful backend cache
++  else malformed descriptor or unsafe launch plan
++    M --> O: error in both modes; no child
++  else selected backend admitted
++    M -> M: cloud requires allow_cloud and public classification of every contributing identity
++    break egress disallowed / redaction incomplete or residual supported secret shape
++      M --> O: block both modes; no subject bytes sent, no cloud canary if cloud disabled
++    end
++    M -> S: inspect eligible successful cache identity; current gates still apply
++    alt eligible cache hit
++      S --> M: bounded cached findings/coverage and exact adapter/source identity
++      M --> O: cached status, not executed in this operation
++    else absent or old-version ineligible cache
++      M -> L: native audit-purpose plan (Codex/Claude); command kind uses admitted absolute argv
++      L --> M: sole native flag/settings construction; unsupported controls refuse
++      M -> M: fresh non-nil child env: base/per-kind allowlist; deny *_TOKEN, *_KEY, SSH_AUTH_SOCK, GIT_*
++      break required env forbidden / native auth and context suppression unqualified
++        M --> O: unsupported; no widening, credential copy or shell fallback
++      end
++      M -> A: bounded synthetic canary via same runner/adapter/environment, private workdir, stdin
++      A --> M: structured canary response
++      break started canary timeout/nonzero/malformed or wrong/missing expected findings
++        M --> O: block both modes; no extraction/cache pass
++      end
++      break request exceeds cap after wrapping/redaction
++        M --> O: strict blocks; advisory warns incomplete; no extraction/cache pass
++      end
++      M -> A: whole frozen source as bounded stdin; never checkout execution or source/auth argv
++      A --> M: bounded response/stdout (1 MiB), diagnostic stderr (64 KiB), validated identity/findings
++      alt timeout/nonzero/malformed/oversize/bad identity
++        M -> A: terminate owned tree, drain and reap within deadline
++        M --> O: strict blocks; advisory warns incomplete; retain deterministic findings
++      else valid bounded findings
++        M -> M: manager deterministic verifier decides verifiability; model claim is not authority
++        M -> S: bounded atomic cache write unless dry-run
++        alt cache persistence fails
++          M --> O: valid in-memory result + cache-write diagnostic; no persistence claim
++        else cache persisted or dry-run skipped write
++          M --> O: decision + backend/adapter/model/cache status + measured coverage; unknown when unmeasured
++        end
++      end
++    end
++  end
++end
++note over M,S
++  Canary, egress, revocation and unsafe configuration cannot be waived by pins/fail_on=off.
++  Dry-run persists no verdict/pin/response/prompt/auth copy. Git transport has separate auth policy.
++  Analyzer saved login is explicitly provisioned; no token passed from registry publication.
++  Direct-child environment filtering is not a sandbox or descendant/native-store secrecy claim.
++  New backend/cache versions and native qualification unspecified in spec CIP-0005 Open questions.
++  [[../CIP-0005-audit-backends-and-cli-secret-transport.md#1-registry-token-sources CIP-0005 token input]]
++  [[../CIP-0005-audit-backends-and-cli-secret-transport.md#recommendation CIP-0005 backend/canary/cache]]
++  [[../CIP-0005-audit-backends-and-cli-secret-transport.md#6-failure-and-coverage-semantics CIP-0005 refusal semantics]]
++end note
++@enduml
+diff --git a/cips/diagrams/configuration-publication.puml b/cips/diagrams/configuration-publication.puml
+new file mode 100644
+index 0000000000000000000000000000000000000000..0158997a83862c2d827f48dd11c76e2dda88a7d2
+--- /dev/null
++++ b/cips/diagrams/configuration-publication.puml
+@@ -0,0 +1,104 @@
++@startuml configuration-publication
++title Configuration publication - CIP-0002 Draft v4; CIP-0006 narrow acceptance / v4 pending; CIP-0004 accepted no-source-v1 target
++actor "Operator / granted agent\napproval within ceiling" as O
++participant "Curator manager\noperator UID; protected authority" as M
++database "Manager-owned records/store\nregistration, approval, composition, lease\nprofile_settings, prior-key values, journal, marker" as S
++participant "Shared launch construction\ncaller-side curator-run + agents-management; caller UID" as L
++participant "Destination executor\nexecution UID bound by launch; agent-account curator-run for broker\nSH2 swarma-session-runner later; native child launched from plan" as H
++participant "Generated interactive hook\nuser shell process" as SH
++database "Hook cache\nmanager-owned generation bytes/options\nloaded snapshot belongs to shell" as C
++
++== CIP-0002 project-context proposal; no adopted home/transform grammar ==
++O -> M: register / inspect / preview / approve selected snapshot digest
++M -> M: bounded untrusted inventory; canonical registered CWD; no execution/imported authority
++break unreadable/malformed input, self-minted approval, ceiling violation or unsupported required semantics
++  M --> O: refuse; no fragment or child
++end
++M -> S: protected snapshot + approval; compose project over selected profile lock
++M -> M: identical pins dedupe; whole-skill replacement; unique command/MCP owners
++break incompatible requirements, ambiguous owner, revoked approval or unproved native discovery exclusion
++  M --> O: refuse composition / strict capability
++end
++M -> S: preparation: inspect composition and existing session leases before publication
++alt changed composition with live lease
++  S --> M: project_view_busy: wait or refuse; never switch files beneath session
++else live or indeterminate session after crash/detach
++  S --> M: retain lease/home/artifacts; recover process/session identity before collection
++else idle admitted view
++  M -> S: acquire lease before collection; revalidate; publish generated surfaces under transaction
++  M -> L: metadata-only context/lease + typed command transform (v4 proposal)
++  L -> H: immutable composed plan; destination admits child environment
++  H -> H: D-PATH: protected tool prefix; admitted base order; one protected dispatcher
++  note right of H
++    Deduplicate by identity; preserve existing dispatcher position in base,
++    otherwise append. No repository .agents/bin; no recreation of excluded PATH.
++    Bind context/transform/resolved PATH into effective plan digest.
++  end note
++  break unsupported consumer, absent/excluded PATH, changed destination context or unreadable state
++    H --> L: refuse before child; resume must reproduce pinned effective plan
++  end
++end
++note over M,S
++  Stable checkout x profile x environment home is recommended, still open.
++  Pure preview starts no child and acquires no durable launch lease.
++  Lease transfers to actual tracked session/runner before caller exit; descendants/detach retain it.
++end note
++
++== CIP-0006 machine declaration and per-home application are separate ==
++O -> M: full closed profile_settings record/map; explicit global/project scope and false/empty values
++M -> M: strict decode and adapter/scope checks before atomic config write
++break malformed/unsupported input or wrong project binding
++  M --> O: refuse; no declaration/home mutation
++end
++M -> S: atomically publish declaration; home may intentionally remain stale
++O -> M: env resolve --repair; takeover consent when acquiring a conflicting key
++M -> S: read managed base + owned-key projection + prior values under lock/journal
++break failed parse/read, owned drift without repair, no takeover or concurrent file change
++  M --> O: refuse; never use an empty base or replace unrelated keys
++end
++M -> M: plan complete candidate; keep unrelated keys, presence and source scope
++M -> M: MCP absent inherits; denied wins; disabled remains explicit even with no positives
++alt pinned adapter proves negative suppression
++  M -> S: publish exact managed keys + marker/effective digest; journal recovery on failed mutation
++  M -> L: v4 metadata + explicit MCP policy/channel
++  L -> H: Claude canonical empty set + strict flag; Codex qualified per-name suppression
++else source class / Codex encoding unsupported
++  M --> O: mcp_policy_unenforceable; no permissive fragment/launch
++end
++O -> M: unset/release owned keys
++alt current key equals last managed value
++  M -> S: restore saved prior value/absence; preserve unrelated provider edits
++else key changed
++  M --> O: provider_settings_release_conflict; preserve current data
++end
++note over M,S
++  Per-home journal recovery; outer importer compensates failed multi-profile rollout.
++  No all-homes atomicity. Exact new schema bounds and rollback record encoding
++  unspecified in spec CIP-0006 Specification changes; v1-v3 remain frozen.
++end note
++
++== CIP-0004 interactive activation; independent from project admission ==
++O -> M: refresh/install existing managed hook cache; retain include_global option
++M -> C: canonical no-source-v1 bytes + proposed generation metadata
++alt unknown/custom/unreadable or partial cache
++  M --> O: legacy/unknown/non-current; explicit regeneration; no inferred live-shell update
++else user reloads or starts fresh shell
++  C -> SH: load trusted generated hook
++  SH -> SH: enter/switch/leave: restore owned prior PATH snapshot; clear old root/state
++  SH -> SH: metadata-only nearest .agents discovery; no env/Skillfile/approval reads
++  alt invalid/inaccessible/indeterminate discovery or unrepresentable path
++    SH -> SH: disable affected activation scope; no fallback to another project
++  else valid discovered scope
++    SH -> SH: literal assignments: inherited PATH -> optional global -> optional project
++  end
++  SH -> SH: CURATOR_AUTO_ENV=0: clear project; retain only enabled global; never source files
++end
++note over SH,C
++  Shell snapshot is transient. Cached bytes/options persist; legacy approvals give no authority.
++  Loaded old functions require reload/restart; live state unknown unless observed.
++  [[../CIP-0002-project-context-in-managed-launches.md#recommendation CIP-0002 admission/leases/PATH]]
++  [[../CIP-0006-legacy-provider-settings-and-mcp-opt-outs.md#design CIP-0006 ownership/MCP]]
++  [[../CIP-0004-shell-hook-without-sourcing-and-path-append.md#recommendation CIP-0004 activation]]
++  [[../CIP-0004-shell-hook-without-sourcing-and-path-append.md#compatibility-and-migration CIP-0004 cache migration]]
++end note
++@enduml
+diff --git a/cips/diagrams/credential-source-lifecycle.puml b/cips/diagrams/credential-source-lifecycle.puml
+new file mode 100644
+index 0000000000000000000000000000000000000000..85fa066b2feff1cb1df61cc5ad10e2eca3a5d2b7
+--- /dev/null
++++ b/cips/diagrams/credential-source-lifecycle.puml
+@@ -0,0 +1,65 @@
++@startuml credential-source-lifecycle
++title Credential source lifecycle - current per-home; source-policy v1/v2 targets; broker slices 0/1; SH2 and donor later
++state "Resolve source metadata\nCaller-side Curator / curator-run\nuser-owned configuration" as Resolve
++state "Migration inspect -> plan -> apply\nCurator manager; preserve credential bytes\nmarker/config revisions pending" as Migrate
++state "Refused\nno other source, native login or mode fallback" as Refused
++state "Per-home native source\nHarness owns native login/store/refresh\nisolation is a separate axis" as Native
++state "Explicit API-key helper\nprotected curator-run bridge executes admitted helper\nClaude owns helper cache" as Helper
++state "Qualified helper delivery\nprotected bridge returns bounded API key through private helper pipe\nsettings contain opaque reference only" as HelperDelivery
++state "Node enrollment\nhuman supplies intentionally minted material\nCurator stores secret; never exports native login" as Enroll
++state "Node available\nOS-user-owned metadata + 0600 secret / 0700 directory\nmacOS/Linux first file backend" as Node
++state "Broker enrollment / binding\nswarma-credential-broker service UID owns store\nCodex: fresh broker-owned vendor enrollment" as Broker
++state "Final executor validation\nagent-account curator-run first broker consumer\nnode: qualified final executor; donor supervisor later" as Validate
++state "Qualified exec delivery\nClaude: CLAUDE_CODE_OAUTH_TOKEN\nCodex slice 1: external token + account ID to app-server" as Inject
++state "Known expired / auth failure\nno Claude setup-token refresh\nreport typed error; preserve uncertainty" as Expired
++state "Human re-enroll / restart\nprovider-side revocation is a separate human action" as Recover
++state "Local node revoked\nCurator deletes stored item, marks node, stops owner" as Revoked
++[*] --> Resolve
++Resolve --> Native : explicit per-home or truly absent entry in source-policy v1
++Resolve --> Refused : missing entry in source-policy v2; failed/partial/unreadable state
++Resolve --> Migrate : explicit adoption / mode change / v2 migration
++Migrate --> Native : record explicit per-home for existing logged-in homes
++Migrate --> Refused : metadata/lock/link conflict; preserve both stores
++Migrate --> Resolve : approved non-secret configuration applied
++Resolve --> Helper : explicit helper selection; API-key lane only
++Resolve --> Enroll : explicit node selected, enrollment requested by human
++Enroll --> Node : protected input; enrolled_at is not issued_at; expires_at may be unknown
++Enroll --> Refused : forbidden native-login extraction / invalid source
++Resolve --> Node : explicit node reference
++Resolve --> Broker : explicit broker account; slice 0 Claude, slice 1 Codex
++Node --> Validate : current generation; known expiry checked, unknown stays unknown
++Broker --> Validate : caller plan -> dispatcher service -> root launcher -> agent executor
++Helper --> Refused : unauthorized helper, conflicting settings, bad/oversize output or timeout
++Helper --> HelperDelivery : validated authorized helper; suppress raw stderr; bounded private output
++HelperDelivery --> Helper : issuer rotation; new launch/cache retry; restart for immediate cutover
++Native --> Native : same home; harness refresh or interactive re-login
++Node --> Expired : known-expired metadata
++Node --> Refused : absent node / unreadable or malformed store; never native fallback
++Validate --> Refused : unsupported required extension/capability; wrong peer/account/profile/channel;
++Validate --> Refused : changed binding/policy/executable; competing source; unqualified effective source/children
++Validate --> Refused : broker unavailable / revoked grant or account / retired generation
++Validate --> Inject : recheck destination binding; node protected lookup or broker-authorized lease
++Inject --> Expired : Claude expiry/auth failure: no refresh or native fallback
++Inject --> Inject : Codex slice 1: one broker auth owner refreshes; lease.renew within response deadline
++Inject --> Refused : Codex renewal fails/deadline missed: turn fails; no fallback login
++Expired --> Recover : human mints new token; atomic store replacement
++Recover --> Node : restart affected sessions; already running child keeps old token until restart
++Node --> Revoked : explicit local node revoke
++Revoked --> Enroll : explicit new enrollment; local deletion is not vendor revocation
++note right of Validate
++  Caller-side curator-run composes; swarma-dispatcher admits/provisions/tracks;
++  root swarma-user-launcher passes immutable plan; agent-account curator-run
++  verifies/executes only, no profile resolution and no network except broker.
++  SH2 swarma-session-runner shares launch library; donor executor later qualified.
++  Broker owns accounts/bindings/leases; one Codex auth owner owns refresh.
++  Plans/fragments/receipts contain metadata only; harness can read injected token.
++end note
++note bottom of Enroll
++  [[../CIP-0003-claude-managed-home-credential-modes.md#compatibility-and-migration CIP-0003 migration]]
++  [[../CIP-0010-credentials-setup-token-and-inherited-auth.md#recommendation CIP-0010 C1-C6]]
++  [[../CIP-0011-credential-broker-and-agent-users.md#2-launch-plan-extension-and-the-protected-binding CIP-0011 binding]]
++  Shared-file is replaced by node; Linux linked-file remains legacy, refresh safety unqualified.
++  Source-policy v1/v2 are not broker wire versions. v4/capability publication and qualification pending.
++  Detailed local node failure-state schema unspecified in spec CIP-0010 C1/C4.
++end note
++@enduml
+diff --git a/cips/diagrams/donor-first-deployment.puml b/cips/diagrams/donor-first-deployment.puml
+index 13b0b13d753a33c958dfd9ebe4c056601831ecd5..8784ed9b1fa6ac7c25551fe40c076b7b266e4980 100644
+--- a/cips/diagrams/donor-first-deployment.puml
++++ b/cips/diagrams/donor-first-deployment.puml
+@@ -1,5 +1,4 @@
+ @startuml donor-first-deployment
+-!theme plain
+ title Remote worker on a donor machine, first deployment (revision 4; variants A/B/C, B disabled until separate provisioner spec exists): one invitation, one command, nothing to configure; B has two OS identities; A/C share the donor UID; three role-separated keys stay on the donor; the posture is locked by the donor (the machine's owner)
+ 
+ actor "Donor (the machine's owner)" as ADM
+@@ -11,6 +10,7 @@ database "DNS (DNSSEC, default)\nTXT _swarma, TXT _swarma-ssh-ca, TLSA\n(validat
+ participant "Join point\n(our host, HTTPS: challenge, cert, collect)" as JP
+ actor "Operator (our side)\nor orchestrator with onboard grant" as OP
+ participant "Trust registry + key keeper\n(our host)" as T
++participant "swarma-dispatcher (service UID)\nroot swarma-user-manager helper\nproject workplace provisioning" as D
+ 
+ == 1. invitation ==
+ OP -> ADM: swarma-bridge invitation/1 {invitation_id, join point, root fingerprint,\nSSH host CA fingerprint, TLS pin, declared trust mode, project, role, expires, one-use random code}\nthrough the channel the donor found us by: marketplace deal thread, e-mail, our site\n(the code is a short-lived bootstrap secret; without an invitation: init <domain>, an open application)
+@@ -27,7 +27,14 @@ else B (one administrator request, future path)
+     C --> ADM: B disabled; choose an admitted variant
+   end
+   C -> PH: provision B-owned accounts/homes/egress/sandbox/system service\n(exact closed operation format pending; no user-manager donor operation)
+-  PH --> C: journaled result; rollback on failure (required contract)
++  alt provisioning succeeds
++    PH --> C: journaled result
++  else failed or interrupted provisioning
++    PH -> PH: undo journaled steps in reverse order; never keep a relaxed rule
++    break provisioning failure
++      PH --> C: exact failed step; no launch
++    end
++  end
+ end
+ C -> B: three separate keys: K_sig, K_enc (X25519), K_ssh;\nA/C qualified Secure Enclave Macs: P-256 signing/SSH, non-exportable; files elsewhere;\nB: Ed25519 signing/SSH in bridge-owned 0600 files, no Keychain
+ B -> B: enrolment certificate {K_sig, K_enc, K_ssh, name, role, variant, invitation_id when invited, expires}\nself-signed by K_sig; fingerprint = SHA-256(certificate)
+@@ -51,6 +58,9 @@ alt invited
+ else open application (no invitation code)
+   JP -> JP: signature, challenge, expiry; bounded operator queue\n(binding/retry schema pending)
+ end
++break invalid signature/challenge/expiry, invitation limit, different-key replay or queue cap
++  JP --> C: refused; no admission/package
++end
+ JP -> JP: rate limit
+ JP -> OP: pending enrolment: fingerprint F, name, role
+ OP -> OP: check the enrolment: the key in the donor's signed marketplace card when there is one,\notherwise invitation binding or open application (no voice check)
+@@ -59,12 +69,15 @@ alt rejected
+   JP --> C: refused
+ else admitted
+   OP -> T: pin K_sig, K_enc, K_ssh; root-signed admission "K admitted with role R";\ngrants: post to worker thread, read own mailbox, no delegation, expiry
+-  OP -> T: provision workplace for K (dispatcher, grant user.create): OS user,\nTrustedUserCAKeys + KRL: short user certificates for K_ssh (principal = workplace user),\nprotected absolute ForceCommand swarma-rb-exec,\nsshd Match: no forwarding, no PTY, no user rc/env; egress by UID
++  OP -> D: provision workplace for K (dispatcher, grant user.create): OS user,\nTrustedUserCAKeys + KRL: short user certificates for K_ssh (principal = workplace user),\nprotected absolute ForceCommand swarma-rb-exec,\nsshd Match: no forwarding, no PTY, no user rc/env; egress by UID
+   OP -> OP: swarma-bridge credential-package/1 {root pubkey, operator cert (root-signed), host,\nSSH host CA key, short user certificate/principal, variant, binding digest, qualified tuple, policy generation, expiry}\nAEAD to K_enc (X25519 + HKDF + ChaCha20-Poly1305), AAD = transcript digest, signed by the operator cert
+   OP -> JP: package ready for this enrolment (reference schema pending)
+   C -> JP: POST /join/challenge (collection phase) -> second server challenge\nPOST /join/collect {enrolment reference, sig_K_sig(second challenge)} (schema pending)
+   JP --> C: package
+   C -> B: decrypt with K_enc; verify operator cert against the pinned root;\nverify package signature and AAD
++  break invalid package signature, chain, AAD, host-CA cross-check, tuple or expiry
++    C --> ADM: refused; no activation; package error format pending
++  end
+   C -> B: write LOCKED machine config: tool_posture=lockdown, permissions=remote-auto (pair),\npolicy_generation, mcp_package_allowlist=[canonical source of swarma-remote-tools],\npassable_env_names=[], qualified tuple, binding, sandbox revision
+   C -> U: install the relay declaration into profile remote-worker (absolute command path)
+   C --> ADM: registered; waiting for tasks (status, stop, leave, purge available)
+@@ -72,4 +85,18 @@ end
+ 
+ note over C, JP: Invitation, transcript, package and join API/error schemas PENDING: protocol/remote-worker.md\nOpen-domain init has no code; operator admission and challenge proof remain required.
+ 
++note over C, T
++  Phase: Draft donor target after one-host MVP slice 0; A first, B disabled, C fallback.
++  Curator init runs as human donor UID. Bridge-role UID: A/C donor; B bridge account.
++  Harness-role UID: A/C donor; B worker account. B provisioner is privileged and separate.
++  Bridge role owns three keys, locked config/binding/tuple/generation, audit and cursors;
++  harness role owns managed home/scratch. Join point owns challenges, invitation tombstones,
++  pending queue and stored packages; registry/keeper owns public pins/admission/grants/CA.
++  Project dispatcher service provisions workplace through root account helper;
++  workplace UID runs jobs, root owns sshd CA/KRL/forced-command policy.
++  Exact join/keeper service UIDs and state filenames unspecified in spec CIP-0009 D4/D9/D12.
++  [[../CIP-0009-donor-side-deployment-and-bridge.md#recommendation CIP-0009 D0-D4/D9/D10/D12]]
++  [[../../protocol/remote-worker.md#publication-status Pending join formats]]
++end note
++
+ @enduml
+diff --git a/cips/diagrams/donor-layout.puml b/cips/diagrams/donor-layout.puml
+new file mode 100644
+index 0000000000000000000000000000000000000000..c735fbba44f67f788f29a2114ef0149002f9bab7
+--- /dev/null
++++ b/cips/diagrams/donor-layout.puml
+@@ -0,0 +1,55 @@
++@startuml donor-layout
++title Donor state layout - Draft target; A/C donor-owned state root; B platform root / separate provisioner pending and disabled
++left to right direction
++node "Donor machine\nA/C: donor UID; B: root-provisioned separate UIDs" as D {
++  folder "Variant root (D0)\nA/C donor-owned; B system-owned" as Root {
++    artifact "libexec / lib / releases/<release>\npinned executable/runtime bytes\nA/C donor-owned; B root-owned read-only" as Binaries
++    artifact "etc / locked configuration\nbinding, tuple, policy generation, sandbox revision\nA/C donor-owned; C harness write denied\nB bridge-role configuration files" as Config
++    folder "services/swarma-bridge-<project>\nA/C donor UID; B bridge UID home" as BridgeHome {
++      artifact "Three role-separated keys\nA/C Secure Enclave signing/SSH on qualified Macs\n0600 files elsewhere; K_enc X25519\nB 0600 Ed25519 signing/SSH; no Keychain" as Keys
++      artifact "Bridge-owned audit, budgets, lifecycle marks\ndurable cursors/dedup and queued results\ncredential source metadata/store (CIP-0010)" as State
++      artifact "Pinned root/operator chain, host CA trust\n@cert-authority; short user certificate\nvariant, tuple, generation, binding" as Trust
++    }
++    folder "workers/worker-<project>\nA/C donor UID; B harness UID home" as WorkerHome {
++      artifact "Managed home + scratch\nprovider native state by admitted credential source\nharness logs retained where required" as Home
++    }
++    folder "run\nlocal authenticated relay socket\nB peer UID checked; C sandbox allows socket" as Socket
++  }
++  component "Bridge service / supervisor\nA/C user service; B system daemon\nowns SSH client, signer, admission" as Bridge
++  component "Harness + stdio relay\nB harness UID; A/C donor UID\nrelay no keys/network" as Harness
++  component "Provider proxy\nB bridge UID or system service; C qualified proxy\nA absent" as Proxy
++  component "B privileged provisioner / kernel boundary\naccounts, egress, sandbox, service journal\nseparate spec/name/schema pending" as Provisioner
++}
++node "Project host" as P {
++  artifact "Root-controlled sshd policy\nTrustedUserCAKeys + user-certificate KRL\nprotected absolute forced command; no PTY/forward/rc/env" as SSHPolicy
++  artifact "Project registry / keeper-owned trust\nadmission, public worker keys, grants/revocations\nseparate host CA and user CA authorities" as Registry
++  artifact "Project bridge / workplace executor-owned state\nmailbox/cursors, op_key result cache, permitted archive\ncarrier credential stays project-side" as Mailbox
++}
++Bridge --> Keys : sign / decrypt / SSH; private keys never sent
++Bridge --> State : persist before acknowledgments / termination
++Bridge --> Trust : validate CA/name/validity/KRL on each connect
++Bridge --> Config : validate current generation / binding before exec/resume
++Bridge --> Binaries : absolute paths; verify digest; changed/unreadable/shadowed -> refuse
++Bridge --> Harness : consume caller-composed qualified plan
++Harness --> Home : B/C managed home + scratch writable
++Harness --> Socket : only admitted local relay
++Socket --> Bridge
++Harness --> Proxy : B/C provider path only
++Bridge --> SSHPolicy : one donor-originated SSH; expired/revoked/wrong principal -> refuse
++SSHPolicy --> Mailbox : workplace UID jobs; project bridge mailbox
++Registry --> SSHPolicy : user certificates/KRL; retirement stops renewal and closes sessions
++Provisioner --> Root : B journaled provision/remove only allocated artifacts; failure -> reverse rollback
++note bottom of BridgeHome
++  State/keys unreadable to B harness UID and C sandbox.
++  A shares UID: no OS confidentiality/integrity/egress guarantee.
++  Exact key/state/audit/cursor file names, socket basename, schema and retention
++  unspecified in spec CIP-0009 D0/D1/D5; folders above are the named D0 layout.
++end note
++note bottom of WorkerHome
++  Stop keeps bridge/keys; leave keeps keys/config; purge removes only owned artifacts,
++  retains donor-visible audit, preserves A/C donor account. Offline revoke outcome unknown.
++  [[../CIP-0009-donor-side-deployment-and-bridge.md#recommendation CIP-0009 D0-D3/D5/D7/D12]]
++  [[../../protocol/remote-worker.md#trust-and-ssh CA trust]]
++  [[../../protocol/remote-worker.md#tools-mailbox-and-lifecycle Lifecycle/ownership]]
++end note
++@enduml
+diff --git a/cips/diagrams/donor-lifecycle.puml b/cips/diagrams/donor-lifecycle.puml
+new file mode 100644
+index 0000000000000000000000000000000000000000..4eb650540c8ce2b0f71dd8c9c09440ab7cebe8cb
+--- /dev/null
++++ b/cips/diagrams/donor-lifecycle.puml
+@@ -0,0 +1,63 @@
++@startuml donor-lifecycle
++title Donor lifecycle - Draft target A first / B disabled / C fallback; four independent descriptive axes, no closed state schema
++state "Donor installation\nowner: donor / bridge role; B separate provisioner pending" as Installation {
++  state "Present\nvariant-owned service, config, keys, home" as Present
++  state "Purged\nlocal owned artifacts removed; donor audit retained" as Purged
++  Present --> Purged : human purge: stop owned processes; A/C preserve donor account;
++  Present --> Purged : B removal requires separate specified provisioner; B currently disabled
++}
++state "Donor execution\nowner: bridge-role supervisor\nA/C donor UID; B bridge UID" as Execution {
++  state "Active\nqualified lockdown + remote-auto; current generation" as Active
++  state "Stopped\npersisted stop mark; bridge and keys kept" as Stopped
++  state "Left\nchannel closed; keys/config kept" as Left
++  state "Refused run / rejoin outcome\nprior persistent execution state retained\nno fallback posture or identity" as Refused
++  Active --> Stopped : human stop: persist first, terminate only owned harness/descendants
++  Active --> Left : human leave: request retirement when reachable; close channel
++  Stopped --> Left : human leave; retain identity
++  Stopped --> Active : human run; admission, credentials and exact qualification remain valid
++  Stopped --> Refused : absent/invalid admission, credential, tuple or current policy
++  Left --> Stopped : human init --rejoin; new invitation/package and newly admitted workplace; wait for run
++  Left --> Refused : revoked identity / invalid admission or qualification
++}
++state "Project workplace\nowner: project operator + dispatcher/helper + project bridge\nhelper root boundary; workplace UID executes jobs" as Workplace {
++  state "Admitted workplace" as Admitted
++  state "Suspended\ngrants paused; sessions closed; workplace kept" as Suspended
++  state "Retirement in progress\nrevocation persisted before termination/restart" as Retiring
++  state "Retired\narchive permitted noncredential artifacts; account/egress released" as Retired
++  Admitted --> Suspended : operator suspend
++  Admitted --> Retiring : operator retire; stop user-cert renewal, user KRL, close sessions
++  Suspended --> Retiring : operator retire
++  Retiring --> Retired : kill jobs/descendants; verify process absence before release
++}
++state "Worker signing identity / three pinned keys\nowner: operator-authorized trust registry / key keeper\nprivate keys remain on donor" as Identity {
++  state "Pinned\nretirement and leave preserve identity" as Pinned
++  state "Revoked\nold frames/envelopes refused" as Revoked
++  Pinned --> Revoked : separate operator-authorized root-signed revoke of K_sig, K_enc, K_ssh
++}
++note right of Installation
++  Purge may happen offline; remote retirement/revocation then UNKNOWN.
++  No transition from local purge to project retirement or identity revoke.
++  A removes user service/artifacts; C also removes sandbox artifacts.
++  B allocated accounts/egress/sandbox/system service: removal spec pending.
++end note
++note right of Execution
++  Named run/rejoin arrows describe validated return, not automatic restart.
++  Project cannot prevent donor stop/leave/purge.
++  Exact execution bookkeeping after project channel loss
++  unspecified in spec CIP-0009 D7; D5 pauses new turns.
++end note
++note right of Workplace
++  Failure to prove process absence cannot authorize account release.
++  Retirement forward-recovery states/record encoding
++  unspecified in spec CIP-0009 D7; no invented retry state machine.
++  Project suspension resume grammar unspecified in spec CIP-0009 D7.
++end note
++note right of Identity
++  Revoke stops renewal, updates user KRL and closes established sessions.
++  Certificate revocation alone does not stop an existing connection.
++  Return after revoke requires new keys through new enrollment.
++  Dispatcher one-shot identity exception never applies to donor identity.
++  [[../CIP-0009-donor-side-deployment-and-bridge.md#recommendation CIP-0009 D7/D12]]
++  [[../../protocol/remote-worker.md#tools-mailbox-and-lifecycle Lifecycle contract]]
++end note
++@enduml
+diff --git a/cips/diagrams/donor-side.dsl b/cips/diagrams/donor-side.dsl
+index 8db1966b7b00a408608cff0e1c5022e4c8315fcc..9972b021c18a4a8564c84a96eae67827095a3327 100644
+--- a/cips/diagrams/donor-side.dsl
++++ b/cips/diagrams/donor-side.dsl
+@@ -1,11 +1,16 @@
+ // C4 (Structurizr DSL) fragment for CIP-0009 (revision 4: B boundary shown; A/C differences in source notes; B disabled until separate provisioner contract exists): the donor machine and the bridge to our host.
++// Defining sections: ../CIP-0009-donor-side-deployment-and-bridge.md#recommendation (D0-D12); ../../protocol/remote-worker.md#publication-status.
++// Phase: Draft donor target after one-host slice 0; no current deployment/qualification claim.
++// Refusal/recovery: unknown tuple/posture/generation or failed trust refuses; failed B provisioning reverses journal; channel loss pauses/catches up without repeating effects.
++// State owners: donor bridge role owns keys/config/audit/cursors/budgets; harness role owns managed home/scratch; join point owns queue/challenges/tombstones/packages; project registry owns public pins/grants/revocations, project bridge owns mailbox/carrier, executor owns job leases/op_key cache.
++// Exact service UIDs, state files/retention and recovery record schemas unspecified in CIP-0009 D4/D5/D7/D9.
+ // Style follows relux-works/swarm-platform-architecture diagrams/c4 (hierarchical identifiers, one container per process).
+ // Variant B: two OS identities on the donor (untrusted harness, trusted bridge); the relay holds no keys and no network;
+ // A/C: donor UID user service; A qualified lockdown only, no OS boundary or proxy; C sandbox without UID split.
+ // A/C keys: qualified Secure Enclave P-256 signing/SSH on supported Macs, files elsewhere; B Ed25519 0600, no Keychain.
+ // Invitation/transcript/package, join API/error, channel/backend and donor provisioner formats: pending protocol/remote-worker.md.
+ // the bridge signs outbound envelopes with the worker's key; the harness reaches only the relay socket and the provider proxy.
+-workspace "Remote worker on a donor machine" "CIP-0008/0009: lockdown harness, trusted bridge identity, minimal remote-tools relay, one SSH connection towards the project host" {
++workspace "Remote worker on a donor machine" "Draft donor target after slice 0: CIP-0009 Recommendation D0-D12; B disabled pending separate provisioner; A/C substitutions in source notes and PlantUML variant view" {
+   !identifiers hierarchical
+ 
+   model {
+@@ -13,7 +18,7 @@ workspace "Remote worker on a donor machine" "CIP-0008/0009: lockdown harness, t
+     operator = person "Project operator" "Reviews enrolment, issues admission, grants and packages; no voice comparison"
+ 
+     donor = softwareSystem "Donor machine" "A machine we do not own, lending a harness subscription" {
+-      curator = container "curator (donor install)" "Go CLI" "init/status/stop/run/leave/purge; consumes the composed lockdown plan; writes the locked machine config (bridge-owned)"
++      curator = container "curator (donor install)" "Go CLI" "human donor UID for init/leave/purge; bridge role for run/status/stop; consumes the composed lockdown plan; writes the locked machine config (bridge-owned)"
+       helper = container "Separate donor provisioner (B only; pending)" "Separate binary and privileges; not swarma-user-manager" "Short spec, closed schema, rules and removal pending; B disabled; allocated identifiers, journal/rollback required"
+       harnessUser = container "Harness identity worker-<project>" "OS user, home 0700, quotas, Seatbelt/Landlock read boundary" "the UNTRUSTED side: managed home and scratch dir only"
+       bridgeUser = container "Bridge identity swarma-bridge-<project>" "OS user, system service (launchd daemon / systemd)" "the TRUSTED side: keys, locked config, audit, lifecycle state"
+@@ -28,11 +33,11 @@ workspace "Remote worker on a donor machine" "CIP-0008/0009: lockdown harness, t
+     }
+ 
+     project = softwareSystem "Project host" "Our host" {
+-      joinPoint = container "Join point" "HTTPS, three verbs: challenge, cert, collect" "atomic invitation consumption, tombstones, rate limits; never commands"
+-      sshd = container "sshd + swarma-rb-exec" "Root-controlled Match, TrustedUserCAKeys + KRL + workplace principal; protected absolute forced command" "speaks swarma-rb/1; executes under swarma-workplace-exec/1"
++      joinPoint = container "Join point (service UID unspecified in D9)" "HTTPS, three verbs: challenge, cert, collect" "atomic invitation consumption, tombstones, rate limits; never commands"
++      sshd = container "sshd + swarma-rb-exec" "Root-controlled Match, TrustedUserCAKeys + KRL + workplace principal; protected absolute forced command" "root sshd / workplace UID executor; swarma-rb/1 and swarma-workplace-exec/1 are pending design labels, owner/formats unresolved"
+       workplace = container "Remote workplace (OS-user backend)" "one OS user per worker; policy: tools, write scope, network, limits, env_allow" "where execution/file tools run; audit; cleanup; mailbox control plane goes to project bridge"
+-      bridge = container "Bridge (M3)" "broker, mailbox, trust gate" "admits messages; verifies the worker's signature; carries bytes unchanged under a distinct carrier account"
+-      registry = container "Trust registry + key keeper" "pins K_sig, K_enc, K_ssh; grants; root-signed admission and revocations" "operator certificates chained to the root"
++      bridge = container "Bridge (M3; service UID unspecified in D5)" "broker, mailbox, trust gate" "admits messages; verifies the worker's signature; carries bytes unchanged under a distinct carrier account"
++      registry = container "Trust registry + key keeper (service UID unspecified in D4/D12)" "pins K_sig, K_enc, K_ssh; grants; root-signed admission and revocations" "operator certificates chained to the root"
+       dns = container "DNS zone (DNSSEC default)" "TXT _swarma, TXT _swarma-ssh-ca, TLSA" "Per-environment root/host-CA/TLS trust; validated in client; declared no-DNSSEC invitation uses pins, never fallback on failure"
+     }
+ 
+@@ -43,14 +48,14 @@ workspace "Remote worker on a donor machine" "CIP-0008/0009: lockdown harness, t
+     donor.curator -> donor.keys "generate K_sig, K_enc, K_ssh (bridge identity); decrypt the package"
+     donor.curator -> project.dns "DNSSEC branch only: local validation, DoH transport; failed reads/mismatch refuse; pins must agree"
+     donor.curator -> project.joinPoint "challenge; cert (signed swarma-bridge join/1 transcript + code when invited); collect (HTTPS: Web PKI + DNSSEC/TLSA or declared invitation pins; schemas pending)"
+-    donor.supervisor -> donor.harness "launch as the harness identity under the lockdown plan; next admitted turn"
++    donor.supervisor -> donor.harness "validate tuple/current generation/binding; refuse unknown or changed input; launch as harness identity under composed plan; next admitted turn"
+     donor.harness -> donor.relay "MCP stdio: tools/call"
+     donor.relay -> donor.socket "forward (peer credentials checked)"
+     donor.socket -> donor.bridgeCore "authenticated local RPC"
+     donor.harness -> donor.proxy "model API over the proxy only"
+     donor.proxy -> provider "HTTPS"
+     donor.bridgeCore -> donor.keys "sign envelopes with K_sig; SSH with K_ssh"
+-    donor.bridgeCore -> project.sshd "one SSH connection; swarma-rb/1 frames (bounded CBOR, op_key idempotency)"
++    donor.bridgeCore -> project.sshd "one SSH connection; trust failure refuses; channel loss pauses new turns; reconnect catches up/cached result or unknown_result, no repeated effect"
+     project.sshd -> project.workplace "exec / file ops as the workplace user; process-group lease"
+     project.sshd -> project.bridge "mailbox.read / mailbox.post (worker-signed bytes) / mailbox.notify (advisory)"
+     operator -> project.joinPoint "check the enrolment against signed card, invitation binding or open application; release package"
+@@ -59,11 +64,11 @@ workspace "Remote worker on a donor machine" "CIP-0008/0009: lockdown harness, t
+   }
+ 
+   views {
+-    container donor "DonorContainers" "Variant B (disabled until provisioner spec/qualification): the untrusted harness identity (harness, relay), the trusted bridge identity (supervisor, SSH client, signer, keys, audit), the proxy and the kernel boundary" {
++    container donor "DonorContainers" "Draft target, variant B (disabled until provisioner spec/qualification): the untrusted harness identity (harness, relay), the trusted bridge identity (supervisor, SSH client, signer, keys, audit), the proxy and the kernel boundary" {
+       include *
+       autolayout lr
+     }
+-    container project "ProjectSideContainers" "Our host: join point, sshd with the forced executor, the OS-user workplace, the bridge, the registry and DNS" {
++    container project "ProjectSideContainers" "Draft project target: join point, sshd with the forced executor, the OS-user workplace, the bridge, the registry and DNS" {
+       include *
+       autolayout lr
+     }
+diff --git a/cips/diagrams/donor-side.puml b/cips/diagrams/donor-side.puml
+new file mode 100644
+index 0000000000000000000000000000000000000000..4db3dfea8dda0390977a6deba633d4e8dc38e718
+--- /dev/null
++++ b/cips/diagrams/donor-side.puml
+@@ -0,0 +1,61 @@
++@startuml donor-side
++title Donor and project components - Draft target after one-host slice 0; B disabled; A/C role substitutions shown
++left to right direction
++actor "Human donor" as Donor
++actor "Project operator" as Operator
++node "Donor machine\nB: separate bridge and harness UIDs\nA/C: donor UID, user service" as D {
++  component "Curator init\nhuman donor UID; consent/provision request" as Init
++  component "Separate donor provisioner\nprivileged B only; pending short spec/removal\nnot swarma-user-manager" as Prov
++  component "Bridge service\nswarma-bridge + supervisor role\nB bridge UID; A/C donor UID\nconsumes caller-composed plan" as Bridge
++  component "Harness\nB worker UID + sandbox\nC donor UID + sandbox; A donor UID only" as Harness
++  component "swarma-remote-tools\nstdio relay, harness identity\nno keys / no network" as Relay
++  component "Provider proxy\nB bridge UID or system service\nC qualified proxy; A absent" as Proxy
++  database "Bridge-role-owned persistent state\nkeys/config/binding/tuple/generation\naudit, cursors, budgets, queued results" as DS
++  artifact "Managed home / scratch\nharness-role state; variant-owned releases\nB releases root-owned" as HS
++}
++node "Project host" as P {
++  component "Join point\nservice identity unspecified in spec D9\nTLS challenge/cert/collect; no signing key" as Join
++  component "swarma-dispatcher\nservice UID; project workplace provisioning\nroot swarma-user-manager account helper" as Disp
++  component "sshd (root) + forced swarma-rb-exec\nworkplace UID; OS-user backend" as Exec
++  component "Project bridge (M3)\nservice identity unspecified in spec D5\nmailbox/admission/carrier authority" as PB
++  component "Trust registry / key keeper\nservice identity unspecified in spec D4/D12\nroot/operator chain; host and separate user CA" as Keeper
++  database "Join-point-owned pending applications\nchallenges/invitation consumption/tombstones\noperator-signed encrypted packages" as JS
++  database "Project-owned persistent state\npublic worker keys/grants/revocations, KRL\nmailbox/cursors, execution result cache, archives\ncarrier credentials never in donor package" as PS
++}
++cloud "Model provider" as API
++cloud "DNSSEC zone\nenvironment root/host-CA/TLS records" as DNS
++Donor --> Init : only human init; policy heuristics
++Init --> Prov : B absent spec/qualification -> refuse; future journal/rollback
++Init --> DNS : local validation; DoH transport; mismatch/failure -> refuse
++Init --> Join : Web PKI + DNSSEC default or declared no-DNSSEC invitation pins
++Join --> JS : bounded queue; same-key retry recovers; other-key replay refuses
++Operator --> Keeper : admission / grants / separate signed identity revoke
++Operator --> Join : approve/reject; release encrypted signed package
++Keeper --> PS
++Disp --> PS : workplace lifecycle; no donor provisioning authority
++Init --> Bridge : validated package; pin root/operator/CA, tuple and generation
++Bridge --> DS
++Bridge --> Harness : qualification/current policy/binding checks before exact exec
++Harness --> HS
++Harness --> Relay : effective tools = relay maximum intersect workplace policy
++Relay --> Bridge : authenticated local socket; wrong peer/tool -> refuse
++Harness --> Proxy : B/C model calls only
++Proxy --> API : qualified host allowlist
++Harness --> API : A direct path; no OS egress guarantee
++Bridge --> Exec : one donor-originated SSH; certificates/CA/name/validity/KRL checked
++Exec --> PS : policy/leased jobs; cached result or unknown_result after reconnect
++Exec --> PB : mailbox control plane; tools only if granted
++PB --> PS : durable mailbox; signatures/grants/freshness; exact-byte carrier delivery
++note bottom of D
++  Channel drops -> pause new turns; current deadline; channel_down; durable output queue.
++  Reconnect validates trust and catches up cursors; never repeat an uncertain effect.
++  B disabled until separate provisioner exists. C enforces sandbox without UID split.
++  A has no OS confinement; all variants require lockdown + remote-auto and exact tuple.
++end note
++note bottom of P
++  Transport/backend object ownership and closed formats unspecified in spec publication register.
++  [[../CIP-0009-donor-side-deployment-and-bridge.md#recommendation CIP-0009 D0-D12]]
++  [[../../protocol/remote-worker.md#publication-status Pending formats/owners]]
++  [[../../protocol/remote-worker.md#tools-mailbox-and-lifecycle Recovery/lifecycle]]
++end note
++@enduml
+diff --git a/cips/diagrams/donor-variants.puml b/cips/diagrams/donor-variants.puml
+new file mode 100644
+index 0000000000000000000000000000000000000000..8e13df9529b27c3e207e90410c2ce67ed56585d9
+--- /dev/null
++++ b/cips/diagrams/donor-variants.puml
+@@ -0,0 +1,68 @@
++@startuml donor-variants
++title Donor deployment variants - Draft target: slice 0 one-host MVP precedes donor; A first, B disabled, C sandbox fallback
++left to right direction
++actor "Human donor\nonly init authority; TTY/typed consent\nis a policy heuristic" as O
++node "A - first milestone\nno administrator rights; donor UID" as A {
++  component "Curator init / bridge service\nsupervisor, SSH client, signer, admission\nuser service while logged in" as AB
++  component "Qualified harness + stdio relay\ndonor UID; no local tool offered\nrelay has no keys/network" as AH
++  artifact "Donor-owned state\nkeys, locked config, audit, cursors, budgets\nmanaged home/scratch; release binaries" as AS
++}
++node "B - future, disabled until separate provisioner spec/qualification\none administrator request" as B {
++  component "Separate donor provisioner\nprivileged binary/name/schema pending\nnot swarma-user-manager" as BP
++  component "Bridge service\nbridge UID; system daemon survives logout\nsupervisor, SSH client, signer, admission" as BB
++  component "Harness + stdio relay\nworker UID; mandatory kernel read sandbox\nper-UID egress; peer-checked relay socket" as BH
++  component "Provider proxy\nbridge UID or system service\nqualified provider host allowlist" as BX
++  artifact "Bridge-owned 0600 keys/state\nlocked config, audit, cursors, budgets\nworker-owned home/scratch; root-owned releases" as BS
++}
++node "C - no administrator rights\ndonor UID; sandbox fallback" as C {
++  component "Curator init / bridge user service\nsupervisor, SSH client, signer, admission" as CB
++  component "Qualified harness + relay\ndonor UID inside sandbox\nhome/scratch writable; runtime read/execute" as CH
++  component "Provider proxy\nqualified local proxy; identity role as D1\nno UID split" as CX
++  artifact "Donor-owned state/releases\nbridge state outside harness sandbox\nlocked config outside writable set" as CS
++}
++node "Project host target\nproject workplace UID; root-controlled sshd policy" as P {
++  component "sshd + protected forced executor\nOS-user workplace; project bridge" as PB
++  artifact "Project-owned state\nmailbox/cache, admission/grants, user KRL\ncarrier credential stays here" as PS
++}
++cloud "Qualified model provider" as API
++O --> AB : choose A; consent / stop / leave / purge
++O --> BP : B requires specified and qualified boundary
++O --> CB : choose C when rights declined/unavailable
++AB --> AH : consumes caller-composed lockdown + remote-auto plan
++BB --> BH : consumes plan; launch as worker UID
++CB --> CH : consumes plan; apply qualified sandbox
++AB --> AS : owns/persists; verifies executable digests
++BB --> BS : bridge keys/state; journaled B provisioning/removal
++CB --> CS : owns/persists; verifies executable digests
++AH --> AB : stdio relay -> local bridge socket
++BH --> BB : relay socket; authenticated peer UID
++CH --> CB : relay socket; sandbox-only local access
++AH --> API : direct provider path; no OS egress guarantee
++BH --> BX : only provider proxy; all other egress denied
++CH --> CX : proxy + relay only; other IPC/Keychain denied
++BX --> API
++CX --> API
++AB --> PB : donor-originated SSH only
++BB --> PB : donor-originated SSH; bridge egress SSH/join only
++CB --> PB : donor-originated SSH only
++PB --> PS
++note bottom of A
++  A has no UID split, sandbox, proxy or OS integrity/confidentiality/egress guarantee.
++  A/C: qualified Secure Enclave Macs use non-exportable P-256 signing/SSH;
++  0600 files elsewhere. K_enc is separate X25519. B: Ed25519 signing/SSH
++  in bridge-owned 0600 files, no Keychain. Algorithms/storage bound to tuple.
++end note
++note bottom of B
++  B absent spec/rules/removal/qualification -> refuse; no substitute helper operation.
++  Provisioning failure -> journal undo in reverse order; never retain relaxed rules.
++  Every variant: unsupported tuple, changed/unreadable executable, wrong posture
++  or policy generation -> refuse; human fixes/requalifies before run.
++end note
++note bottom of C
++  Platform-specific sandbox must be qualified; unknown coverage refuses.
++  A availability after B/C qualification unspecified in spec CIP-0009 question 7.
++  [[../CIP-0009-donor-side-deployment-and-bridge.md#recommendation CIP-0009 D0-D3]]
++  [[../CIP-0008-remote-worker-launch-mode.md#recommendation CIP-0008 R9]]
++  [[../../protocol/remote-worker.md#deployment-and-launch-boundary Donor boundary/publication limits]]
++end note
++@enduml
+diff --git a/cips/diagrams/join-handshake.puml b/cips/diagrams/join-handshake.puml
+index 8169877462f5047351cd34a9609b96cbfd90dbb7..9e8d86f1e05a965d6ce7eb11dbbf7e9b39da8ec7 100644
+--- a/cips/diagrams/join-handshake.puml
++++ b/cips/diagrams/join-handshake.puml
+@@ -1,5 +1,4 @@
+ @startuml join-handshake
+-!theme plain
+ title Join handshake (revision 4): a server challenge, a signed canonical transcript, atomic invitation consumption; anchors: the Web PKI, DNSSEC validated in the client (default), and the invitation's pins (fallback for an environment without a DNSSEC domain)
+ 
+ participant "Human-run init / donor bridge role\n(A/C: donor UID; B: bridge UID)" as C
+@@ -7,6 +6,7 @@ database "DNS: system resolver,\nDNS-over-HTTPS as the fallback\n(signatures val
+ participant "Join point\n(our host)" as JP
+ actor "Operator" as OP
+ participant "Registry / key keeper" as T
++participant "swarma-dispatcher (service UID)\nroot swarma-user-manager helper\nproject workplace provisioning" as D
+ 
+ note over C, T
+   Anchors before first contact:
+@@ -40,10 +40,17 @@ else open application (no code)
+   JP -> JP: signature/challenge/expiry; operator queue; exact binding/retry schema pending
+ end
+ JP -> JP: per-address/per-invitation/queue limits
++break invalid signature/challenge/expiry, wrong-key retry, invitation limits or full queue
++  JP --> C: refuse; no package
++end
+ JP -> OP: show {enrolment reference (schema pending), fingerprint, name, role}
+ OP -> OP: check against the donor's signed marketplace card when there is one,\notherwise invitation binding or open application; no voice check
++break operator rejects application
++  OP -> JP: reject
++  JP --> C: refused
++end
+ OP -> T: pin K_sig, K_enc, K_ssh; root-signed admission; grants (scope, expiry)
+-OP -> T: dispatcher provisions project workplace; issue short user certificate for its principal\n(project-side account boundary; separate from donor provisioner)
++OP -> D: provision project workplace; issue short user certificate for its principal\n(project-side account boundary; separate from donor provisioner)
+ OP -> OP: package with host CA + short user certificate/principal, variant/tuple and binding; no carrier credential; AEAD to K_enc with AAD = H(transcript); signed by the operator certificate (root-signed, scope onboard)
+ OP -> JP: release package for this enrolment (reference schema pending)
+ C -> JP: POST /join/challenge (collection phase, second challenge; pending schema)
+@@ -51,6 +58,10 @@ C -> JP: POST /join/collect {enrolment reference, sig_K_sig(second challenge)}
+ JP --> C: package
+ C -> C: decrypt with K_enc; verify operator cert chain to the pinned root;\nverify package signature; check AAD; pin our SSH host CA key from the package\nAND cross-check it against DNS (or the invitation)
+ 
++break invalid package chain/signature/AAD or host-CA mismatch
++  C -> C: refuse package activation; no trust fallback
++end
++
+ note over C, T
+   All invitation/transcript/package and join API/error schemas PENDING (protocol/remote-worker.md).
+   Open-domain application has no code; exact identifiers/retry binding pending; operator admission required.
+@@ -63,4 +74,18 @@ note over C, T
+   Certificates: host about one year, user about one day (policy examples); bridge renews user certificate.
+   Key storage/algorithm admission follows D0; B disabled until separate provisioner contract exists.
+ end note
++note over C, T
++  Phase: Draft donor target, A first after slice 0; B disabled pending separate provisioner.
++  Curator init: human donor UID; bridge role: A/C donor UID or future B bridge UID.
++  Join point and registry/keeper service UIDs unspecified in spec CIP-0009 D4/D9/D12.
++  Join point owns challenges, queue, atomic invitation tombstones and stored packages;
++  registry/keeper owns public key pins/admission/grants and CA authority;
++  donor bridge owns private keys and protected package/config/CA trust state.
++  Host root owns sshd CA/KRL policy; workplace UID never controls SSH authorization.
++  Invalid/replayed/wrong-key proof, expired challenge/invitation or queue cap -> refuse.
++  Same-key invited retry recovers same pending enrollment; collection retry format pending.
++  [[../CIP-0009-donor-side-deployment-and-bridge.md#recommendation CIP-0009 D4/D6/D9/D12]]
++  [[../../protocol/remote-worker.md#trust-and-ssh Selected trust and CAs]]
++end note
++
+ @enduml
+diff --git a/cips/diagrams/remote-worker-retire.puml b/cips/diagrams/remote-worker-retire.puml
+index b73380cac2628ace7440b01153044e2752757b1e..f5048457282a422cae62535fa634e9979bea2939 100644
+--- a/cips/diagrams/remote-worker-retire.puml
++++ b/cips/diagrams/remote-worker-retire.puml
+@@ -1,5 +1,4 @@
+ @startuml remote-worker-retire
+-!theme plain
+ title Lifecycle of a remote worker (revision 4; variant-aware cleanup and independent state axes): stop, leave and purge on the donor; suspend, retire and revoke on our side; the identity stays pinned unless revoked
+ 
+ actor "Operator (our side)" as OP
+@@ -34,7 +33,11 @@ OP -> T: suspend: grants paused
+ OP -> BR: suspend: close sessions; keep workplace
+ OP -> D: retire workplace
+ D -> BR: persist channel/grant revocation; stop renewal; user-certificate KRL; close sessions
+-D -> D: kill every job and its descendants (process group / cgroup); verify no process of the workplace UID remains;\narchive permitted noncredential artifacts only; release account and egress rules
++D -> D: kill every job and its descendants (process group / cgroup); verify no process of the workplace UID remains;\narchive permitted noncredential artifacts only after process absence
++break process absence not established / cleanup failure
++  D -> D: do not release remaining account/egress; recovery format unspecified in spec D7
++end
++D -> D: proven process absence -> release account and egress rules
+ BR -> BR: next frame or envelope from this worker refused (retired); mailbox kept durable
+ note right of BR: the donor's connection drops; its bridge reports "retired by project" and pauses
+ OP -> T: revoke (only on compromise or departure): root-signed revocation of K_sig, K_enc, K_ssh
+@@ -58,4 +61,18 @@ else B (future path, disabled while provisioner contract pending)
+   PH --> C: removal result
+ end
+ C --> ADM: variant-owned artifacts removed; printed revocation result or unknown when unreachable
++note over OP, PH
++  Phase: Draft donor target after one-host slice 0; A first, B disabled, C fallback.
++  Donor Curator human commands run as donor UID; bridge service owns lifecycle marks,
++  keys/config/audit (A/C donor UID; B bridge UID); harness owns home/scratch.
++  Project dispatcher service owns tracking, root user-manager owns account lifecycle;
++  root sshd owns user KRL; project bridge owns channel/mailbox state;
++  registry/keeper owns signed identity revocations. Their exact UIDs/storage formats
++  unspecified in spec CIP-0009 D7/D12. Stop terminates only owned harness descendants.
++  Cleanup cannot release workplace before proven process absence; forward-recovery
++  states unspecified in spec CIP-0009 D7. Local purge never proves remote revocation.
++  [[../CIP-0009-donor-side-deployment-and-bridge.md#recommendation CIP-0009 D7/D12]]
++  [[../../protocol/remote-worker.md#tools-mailbox-and-lifecycle Four independent axes]]
++end note
++
+ @enduml
+diff --git a/cips/diagrams/remote-worker-turn.puml b/cips/diagrams/remote-worker-turn.puml
+index d2a2279bdd480f75c3e989ec6611fa11143200ec..74e3a17fc005d40d62b35109d0960a67c6f8ec51 100644
+--- a/cips/diagrams/remote-worker-turn.puml
++++ b/cips/diagrams/remote-worker-turn.puml
+@@ -1,5 +1,4 @@
+ @startuml remote-worker-turn
+-!theme plain
+ title Remote worker turn (revision 4; B boundary shown, disabled until separate provisioner spec/qualification): the harness has no local tools; the relay (harness identity) forwards to the bridge service (bridge identity), which carries every tool call and the mailbox over ONE SSH connection from the donor to our host; our host never connects back
+ 
+ box "Donor machine: harness identity (sandboxed, egress = proxy only)" #WhiteSmoke
+@@ -26,6 +25,9 @@ end note
+ == standing connection ==
+ SUP -> RB: ssh workplace-user@host with K_ssh + short user-CA certificate;\nhost certificate checked on EVERY connection: pinned host CA, host name, validity, KRL (no TOFU)
+ note over SUP, RB: Bridge renews short user certificate; expiry/revocation refuses; retire stops renewal and closes sessions.
++break failed host trust / expired or revoked user certificate / wrong workplace principal
++  SUP -> SUP: refuse connection; no TOFU or alternate trust source
++end
+ RB --> SUP: hello {versions:[1]} / swarma-rb/1 channel open (bounded CBOR frames, flow credits)
+ SUP -> RB: policy.get
+ RB --> SUP: workplace policy {tools, write scope, network, limits, env_allow} -> effective tool set
+@@ -33,6 +35,9 @@ note right of RB: Match block: root-controlled TrustedUserCAKeys + KRL + workpla
+ 
+ == launch ==
+ SUP -> SUP: obtain the composed plan from the construction site (agents-management);\ncheck expect_pin, tool_posture=lockdown, permissions=remote-auto, policy generation, qualified tuple;\nvalidate the expanded launch against the generated policy; resolve credential_binding/1
++break unqualified/changed/unreadable executable, wrong pin/posture/permissions/generation or credential binding
++  SUP -> SUP: refuse before exec; no alternate harness/source
++end
+ SUP -> H: consume composed plan, launch exact qualified build;\nB: harness UID + sandbox + per-UID egress; C: donor UID + sandbox;\nA: donor UID, no OS confinement, direct provider path; credential per launch (CIP-0010)
+ H -> MCP: MCP initialize; tools/list = effective set (policy intersection)
+ 
+@@ -46,6 +51,9 @@ RB -> BR: read
+ BR --> RB: items + verification records
+ RB --> SUP: frames
+ SUP -> SUP: DONOR-SIDE ADMISSION: verification record present, target binding = this worker,\nunexpired, not fenced/revoked, delivery mode allowed; dedup by message_id; persist; cursor++
++break absent/invalid verification, wrong binding, expired/fenced/revoked item or disallowed delivery mode
++  SUP -> SUP: refuse input; do not apply a turn
++end
+ SUP -> H: next turn through the session-input adapter: "validated message <id>" + snapshot
+ SUP -> RB: mailbox.applied {message_id} (application receipt, distinct from the transport reply)
+ 
+@@ -54,6 +62,10 @@ loop each tool call
+   H -> MCP: tools/call bash {cmd, cwd, timeout}
+   MCP -> SUP: forward over the relay socket (peer credentials checked)
+   SUP -> SUP: audit line {tool, args_sha256, bytes, at}; budget counters (trusted side)
++  break tool outside effective policy or wrong local peer
++    SUP --> MCP: error result; audit refusal
++    MCP --> H: unavailable tool
++  end
+   SUP -> RB: frame exec {id, op_key, cmd, cwd, env (env_allow only), timeout_s <= policy, max_output_bytes <= policy, lease_s}
+   RB -> WP: run as the workplace user in its own process group with a lease; audit {who, what, when, policy id}
+   WP --> RB: stdout/stderr frames (seq), exit
+@@ -77,4 +89,17 @@ SUP -> SUP: build the FINAL envelope (canonical bytes; audience/thread from the
+ SUP -> RB: frame mailbox.post {op_key, envelope_bytes, signature}
+ RB -> BR: verify K_sig signature, grant, freshness; admit
+ BR -> O: carry the bytes UNCHANGED under the project bridge's carrier account for the worker (first slice) (distinct authority, audited) -> outcome proposal
++note over H, O
++  Phase: Draft donor target after slice 0; A first, B disabled, C qualified fallback.
++  B proxy identity is bridge UID or a system service; A provider path is direct, no proxy.
++  Bridge-role supervisor owns audit/budgets/cursors/dedup and durable queued results;
++  harness role owns home/scratch; project bridge owns mailbox and project carrier credential;
++  workplace executor owns job leases and op_key cache; root sshd owns CA/KRL/forced command.
++  Exact service UIDs for project bridge, filenames and cache persistence format
++  unspecified in spec CIP-0009 D5. rb/1 and workplace-exec/1 are pending design shorthand.
++  [[../CIP-0008-remote-worker-launch-mode.md#recommendation CIP-0008 R3/R5/R9]]
++  [[../CIP-0009-donor-side-deployment-and-bridge.md#recommendation CIP-0009 D0-D5/D12]]
++  [[../../protocol/remote-worker.md#tools-mailbox-and-lifecycle Delivery and reconnect]]
++end note
++
+ @enduml
+diff --git a/cips/diagrams/tool-admission.puml b/cips/diagrams/tool-admission.puml
+new file mode 100644
+index 0000000000000000000000000000000000000000..52f208e8b11cb66e2c2b9c7ab8fe68bdffb62b68
+--- /dev/null
++++ b/cips/diagrams/tool-admission.puml
+@@ -0,0 +1,67 @@
++@startuml tool-admission
++title Tool admission - accepted option B / proposed record grammar; D-PATH decided; option C deferred
++actor "Operator\nsystem/fleet policy authority" as O
++participant "Curator manager\noperator UID; resolver/provisioner" as M
++participant "Enabled signed tool registries\neach registry operator owns dedicated rotating keys" as R
++database "Manager-owned protected state\ntrust bundle/config, URL high-water\nlocks, sealed store, launch alias directory" as S
++participant "Caller-side curator-run + agents-management\ncaller UID; sole semantic composer" as L
++participant "Destination executor\nadmitted execution UID bound by plan\nagent-account curator-run for broker; SH2 runner later" as E
++participant "Harness or declared script worker\nchild identity from admitted plan" as H
++O -> S: configure registry order, pinned key sets/freshness; separate release trust bundle
++note over O,S: No compiled-in trust keys. Publisher/service and bundle delivery unspecified in spec CIP-0007 Open questions.
++O -> M: install/resolve/refresh or lock replay
++M -> M: read logical dependency id / alias / constraint / platform as untrusted data
++M -> M: admit declaration: no author URL/checksum/signature; deny override wins (proposed)
++break invalid identity, alias/version collision or policy denial
++  M --> O: structured refusal; no fetch from author or fallback
++end
++M -> R: phase 1: scan every enabled trusted registry for candidate revocations
++R --> M: signed snapshots/records/revocations
++M -> S: verify current keys/freshness and persisted URL rollback high-water
++note right of M: Malformed/unmatched/unverifiable records ignored with warning; not trusted permits.
++break unreachable trusted registry / incomplete revocation evidence / rollback or authorization failure
++  M --> O: fail closed; name affected registry/tools; no availability-preferring B mode
++end
++alt verified revocation in any enabled registry covers artifact or record
++  M --> O: veto before positive selection; allow override cannot waive it
++else no verified matching revocation after full scan
++  alt replay existing lock
++    M -> S: exact locked version/platform/hash/registry; recheck current authorization
++    break removed signing key, stale record or no longer authorized artifact
++      M --> O: refuse replay even when store bytes/hash exist
++    end
++  else resolve / explicit refresh
++    M -> R: phase 2: first configured layer with verified non-revoked satisfying record
++    R --> M: exact selected version/platform URL, format, map, hash
++    M -> M: highest satisfying version; refresh never downgrades without explicit approval (proposed)
++    break unknown/unsigned identity or no satisfying verified record
++      M --> O: refuse; add trusted registry; no C mirror/system probe fallback
++    end
++  end
++  M -> M: provision manager-owned sealed files; verify exact artifact bytes
++  M -> S: record exact lock and store identity; expose provisioned alias in protected launch bin
++  note right of S: Store/publication failure recovery details unspecified in spec CIP-0007; no invented transaction order.
++  M -> L: protected tool directory + admitted command context
++  L -> E: immutable composed plan; destination applies its admitted typed transform
++  E -> E: after destination child-environment admission: tools first, base order, dispatcher
++  note right of E
++    Deduplicate by identity; preserve existing dispatcher position, otherwise append.
++    Bind resolved PATH/context into immutable plan digest; repository .agents/bin excluded.
++  end note
++  alt PATH absent/excluded or admission malformed/unreadable
++    E --> O: refuse command capability; never recreate excluded PATH
++  else managed harness launch
++    E -> H: exact provisioned aliases by accepted launch exposure; no system-wide install
++  else enforced script-worker-v1
++    E -> H: only resolved interpreter + declared exec names; discard inherited PATH
++    note right of H: Tool dependency never widens enforced PATH; alias must also be declared exec.
++  end
++end
++note over M,E
++  Option B has no PATH version probes or system-tool reuse; those remain option C.
++  [[../CIP-0007-manager-provisioned-cli-tools.md#operator-decision-2026-10-10 CIP-0007 acceptance conditions]]
++  [[../CIP-0007-manager-provisioned-cli-tools.md#recommendation CIP-0007 scan/selection/replay]]
++  [[../CIP-0007-manager-provisioned-cli-tools.md#security-considerations CIP-0007 authorization/keys]]
++  [[../platform-contract-disposition.md#managed-and-interactive-path D-PATH]]
++end note
++@enduml
+diff --git a/cips/platform-contract-disposition.md b/cips/platform-contract-disposition.md
+index 1f3f93e6c44e26abbd64d252483482a358d1908b..b5d88a270a8a0977a635c02b2fe6570f2d4e0e3c 100644
+--- a/cips/platform-contract-disposition.md
++++ b/cips/platform-contract-disposition.md
+@@ -2,7 +2,7 @@
+ 
+ ## Authority and status
+ 
+-This is the shared R-CS2 disposition for CIP-0002 to CIP-0007, CIP-0010 and CIP-0011, dated 2026-10-11. Canonical values come from the [platform contract table](https://github.com/relux-works/curator/blob/177cb554/.research/261010_platform-contract-table.md); coverage comes from [audit R-CS2, D1 and C4](https://github.com/relux-works/curator/blob/48789217/.research/261010_platform-docs-audit.md). The later owner decisions supplied in the task precondition `owner-decisions-20261010-audit.md` override the table only where stated: D-EXECUTOR resolves N6/P1/C9, D-PATH resolves X1, D-WIRE-NAMES replaces W2's historical domain retention and qualifies W3/I4 naming; the other decisions retain their own scopes.
++This is the shared R-CS2 disposition for CIP-0002 to CIP-0007, CIP-0010 and CIP-0011, dated 2026-10-11. Canonical values come from the [platform contract table](https://github.com/relux-works/curator/blob/177cb554/.research/261010_platform-contract-table.md); coverage comes from [audit R-CS2, D1 and C4](https://github.com/relux-works/curator/blob/48789217/.research/261010_platform-docs-audit.md). The later owner decisions of 2026-10-10 and 2026-10-11 (D-GOALS through D-RESUME) override the table only where stated: D-EXECUTOR resolves N6/P1/C9, D-PATH resolves X1, D-WIRE-NAMES replaces W2's historical domain retention and qualifies W3/I4 naming; the other decisions retain their own scopes.
+ 
+ **Decided** means accepted direction. **Specified** means a module's pinned design. **Open** means an owner choice remains; a recommendation does not resolve it. **Superseded** text is design history. None of these labels, or an Accepted CIP header, establishes schema publication, implementation or runtime qualification. Current-state probes at older pins remain historical; no test, build, login or renderer result is claimed here.
+ 
+@@ -12,7 +12,7 @@ This is the shared R-CS2 disposition for CIP-0002 to CIP-0007, CIP-0010 and CIP-
+ 
+ 1. The protected tool directory of this launch (CIP-0007).
+ 2. The admitted base PATH of this user, in its existing order.
+-3. One protected manager dispatcher directory, through which project commands run only after checks (CIP-0002).
++3. One protected manager dispatcher directory, through which project commands run only after checks (CIP-0002). Deduplicate by identity; preserve its existing position when already present in the admitted base PATH, otherwise append it. The protected tool prefix remains first; the dispatcher retains its position among admitted base entries.
+ 
+ Repository `.agents/bin` is never executed in a managed launch. The resolved PATH is recorded in the launch plan and covered by its digest. Excluded/absent PATH must not be recreated; malformed/unreadable admission state refuses command capability. Direct and tracked launches must bind the same context, destination transformation and resolved PATH; caller PATH literals do not replace destination admission. The exact coordinated fragment/transform grammar remains pending. The reserved `path_prepend` field at the historical launcher pin does not implement this recipe.
+ 
+@@ -80,10 +80,10 @@ This is the single coordination table for these CIPs. A named candidate is a res
+ | CLI secret transport and audit backend/cache descriptors | CIP-0005 → CLI/Manager audit and registry §9.1 | Transport first accepted; closed descriptor/cache versions and vectors pending | No headless broker capability implied |
+ | Tool declaration, lock and registry records/trust | CIP-0007 → core §4, registry §§1–5, skillfile-sources §3, manager | Option B accepted; declaration/record/schema revisions pending | Keys in system/fleet config and separate bundle; service/distribution questions below |
+ | Broker grant / revocation signed domains | `swarma-credential-broker` spec §§6.1–6.4 | `swarma-credential-broker grant/1`, `swarma-credential-broker revocation/1` (D-WIRE-NAMES) | General `grant/1` role/action grammar needs a separately versioned adapter |
+-| Broker peer-authenticated frames | Broker spec §13 | `swarma-credential-broker broker/1` by D-WIRE-NAMES, hello versions `[1]`; replaces unprefixed `broker/1` | Transport identity, not a broker request-signature domain |
+-| Dispatcher command / socket and signed domains | `swarma-dispatcher` spec §§3.3, 4.5, 8 | `swarma-dispatcher dispatch-op/1`, `swarma-dispatcher dispatch/1`; `swarma-dispatcher request/1`, `swarma-dispatcher effect/1` | D-WIRE-NAMES applies to command/socket labels; signature/effect domains already repository-prefixed |
+-| Dispatcher allocation / execution records | Dispatcher spec §§4.3–4.4 | `swarma-dispatcher agent/1`, `swarma-dispatcher run/1` by D-WIRE-NAMES | `agent_id`, dispatcher `run_id`, execution claim `execution_id` and board IDs remain distinct |
+-| User-manager helper / launcher requests | `swarma-user-manager` spec §§2–3, 7 | `swarma-user-manager helper-op/1`, `swarma-user-manager launch-op/1`, `v:1` (D-WIRE-NAMES) | Configured sudo caller/role policy in v0/v1; grants refused until v2; no signed-request grammar invented |
++| Broker peer-authenticated frames | Broker spec §13 | `swarma-credential-broker broker/1` by D-WIRE-NAMES, hello versions `[1]`; replaces unprefixed `broker/1` | Transport identity, not a broker request-signature domain; frame name **derived by rule, pending matching module vectors** |
++| Dispatcher command / socket and signed domains | `swarma-dispatcher` spec §§3.3, 4.5, 8 | `swarma-dispatcher dispatch-op/1`, `swarma-dispatcher dispatch/1`; `swarma-dispatcher request/1`, `swarma-dispatcher effect/1` | D-WIRE-NAMES applies to command/socket labels; signature/effect domains already repository-prefixed; command/socket names **derived by rule, pending matching module vectors** |
++| Dispatcher allocation / execution records | Dispatcher spec §§4.3–4.4 | `swarma-dispatcher agent/1`, `swarma-dispatcher run/1` by D-WIRE-NAMES | `agent_id`, dispatcher `run_id`, execution claim `execution_id` and board IDs remain distinct; record names **derived by rule, pending matching module vectors** |
++| User-manager helper / launcher requests | `swarma-user-manager` spec §§2–3, 7 | `swarma-user-manager helper-op/1`, `swarma-user-manager launch-op/1`, `v:1` (D-WIRE-NAMES) | Configured sudo caller/role policy in v0/v1; grants refused until v2; no signed-request grammar invented; request names **derived by rule, pending matching module vectors** |
+ | User-manager v2 signed request | User-manager §9 with dispatcher/grant owners | Domain/object/version/canonical bytes open (W3) | Choose component-specific format or versioned shared adapter before activation |
+ | Launch ticket and host role | Joint dispatcher §12, user-manager extension, session-host §§3.3–3.4 | Object/version/signature bytes and role schema open (I4); eventual issuer namespace `swarma-dispatcher` per D-WIRE-NAMES | Jointly version and activate, or leave SH2 backend disabled |
+ 
