@@ -1,10 +1,10 @@
 # TASK-261012-13lcu6: tag-launcher-with-hosted-handoff
 
 ## Description
-Prepare a launcher release (after v0.2.0) that ships --hosted/--native/--untracked and the session-launch-plan 1.0.0 handoff, gated on the task-board receiver (task-board session launch-plan) existing.
+Option 2a (Ivan decision 2026-10-12, hosted folded into swarma, owner ivan-curator): the next curator-run release must not present --hosted as working. --hosted keeps failing closed with the existing refusal (session_host_missing; no new code). README, CHANGELOG and --help state hosted launch is unavailable until the swarma path ships.
 
 ## Scope
 (define task scope)
 
 ## Acceptance Criteria
-CHANGELOG Unreleased moved to a version; tag signed; hosted path verified against a real receiver or explicitly marked receiver-pending
+Release notes, README and --help say hosted is unavailable; --hosted refuses with an existing closed code; no refusal code invented; signed tag
