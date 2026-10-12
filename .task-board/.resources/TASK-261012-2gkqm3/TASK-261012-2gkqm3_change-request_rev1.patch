@@ -1,0 +1,670 @@
+diff --git a/cips/CIP-0009-donor-side-deployment-and-bridge.md b/cips/CIP-0009-donor-side-deployment-and-bridge.md
+index 20329b00e63bd6612339d28c0c6a2a2bc0bcb1c6..18722cd804e553cba82b2625cdb93453d86a9e39 100644
+--- a/cips/CIP-0009-donor-side-deployment-and-bridge.md
++++ b/cips/CIP-0009-donor-side-deployment-and-bridge.md
+@@ -1,6 +1,6 @@
+ # CIP-0009: Donor-side deployment and the worker-to-project bridge
+ 
+-- **Status:** Draft (revision 4, contract audit R-CS1 and the owner decisions of 2026-10-10/11; no implementation or qualification claimed)
++- **Status:** Draft (revision 5, accepted review findings of 2026-10-12; no implementation or qualification claimed)
+ - **Owner:** project orchestrator; decision: project operator and donor owner for the bridge contract
+ - **Created:** 2026-10-08
+ - **Related:** owner brief 2026-10-08; [CIP-0008](CIP-0008-remote-worker-launch-mode.md) (the lockdown posture); [CIP-0010](CIP-0010-credentials-setup-token-and-inherited-auth.md); [CIP-0007](CIP-0007-manager-provisioned-cli-tools.md) (provisioned binaries); [Decision 0009](../decisions/0009-first-party-module-roots.md); environments [§2.2](../protocol/environments.md#22-mcp-declaration-packages); VISION v1.3 (relux-works/swarm-platform-architecture) §0, LCH §7–§8, ADM, the sequences `external-agent-onboarding`, `remote-workplace-attach`, `remote-worker-start`, `mailbox-delivery`, `keeper-sign`; wiki `session-host/architecture.ru.md` §7.2, §7.4, §7.5, §7.9, §7.10; relux-works/remote-workplace protocol v2.1 (RWP); relux-works/remote-worker-harness (`rwh`)
+@@ -17,6 +17,10 @@
+ | Phase | Draft target: A first, B disabled pending separate provisioner, C sandbox fallback; closed wire formats pending. |
+ | Normative links and proposed landing | [Remote-worker publication register](../protocol/remote-worker.md#publication-status), [MCP boundary §2.2](../protocol/environments.md#22-mcp-declaration-packages), [Decision 0009](../decisions/0009-first-party-module-roots.md); amendments: [Specification changes](#specification-changes). |
+ 
++## Revision 5: accepted review findings (2026-10-12)
++
++F-7 separates durable remote effect claims and authenticated freshness admission from the ten-minute output cache; recovery stays closed until claim reconciliation. F-1 replaces workplace-home retention with deletion and a narrow service-generated metadata export. Pending formats and qualification remain unpublished.
++
+ ## Revision 4: contract reconciliation
+ 
+ The contract table at `relux-works/curator` revision `177cb554` and the recorded owner decisions govern this revision. D-DONOR-PROVISIONING selects a separate donor-side binary and privilege boundary; B stays disabled until its short spec, rules and removal contract exist. D-WIRE-NAMES requires versioned wire identifiers of the form `swarma-<component> <object>/<n>`; pending formats are registered in [the remote-worker protocol](../protocol/remote-worker.md#publication-status). These are documentation decisions, not qualification evidence.
+@@ -35,7 +39,7 @@ The contract table at `relux-works/curator` revision `177cb554` and the recorded
+ - **F12:** the MCP declaration pin covers declaration content only; the executed binaries are pinned and verified separately by absolute path from a protected root; the allowlist entry is a canonical source identity; installation is an explicit operator-owned provisioning contract (D3).
+ - **F13:** the bootstrap has a versioned, domain-separated transcript, a server challenge, atomic invitation consumption with replay tombstones, cryptographically random codes with attempt limits, separate keys per role, standard authenticated encryption, a root-validated operator chain, and an explicit DNS validation model; the current trust branches are Web PKI with locally validated DNSSEC by default, or invitation pins for an explicitly declared no-DNSSEC environment, with no human second channel. Nothing downgrades on failure (D4, D6).
+ - **F14:** SSH authorization lives outside the workplace user's write authority, the forced command is an absolute protected path, unneeded SSH features are disabled in the qualified server policy, host certificates are checked against the pinned host CA, host name, validity and KRL on every reconnect with no trust-on-first-use, and B requires a separately specified donor provisioner with a closed schema, allocated identifiers and safe paths (D2, D4, D5).
+-- **F15:** the pending channel protocol (design label `swarma-rb/1`) requires bounded frames, canonical encoding, version negotiation, connection-scoped ids, idempotency keys with a result cache for uncertain results after reconnect, server-authoritative caps, method authorization, ownership rules for `cancel` and `stdin`, backpressure, and job lifetime ownership with leases and proven descendant cleanup (D5).
++- **F15:** the pending channel protocol (design label `swarma-rb/1`) requires bounded frames, canonical encoding, version negotiation, connection-scoped ids, durable effect claims with bounded authenticated admission and a separate result cache, server-authoritative caps, method authorization, ownership rules for `cancel` and `stdin`, backpressure, and job lifetime ownership with leases and proven descendant cleanup (D5).
+ - **F16:** the first backend is named (the OS-user workplace of VISION v1.3) and its pending standalone contract (design label `swarma-workplace-exec/1`) lists the guarantees it must give; RWP's container conformance is not borrowed; the effective tool set is the intersection with the workplace policy; mailbox methods are control plane, not tools by default (D3, D5).
+ - **F17:** `stop`, `leave`, `purge` on the donor and `suspend`, `retire`, `revoke` on our side are separate transitions with defined ordering; the identity is preserved unless revoked; the donor is told the revocation outcome (D7).
+ - **F18:** the project bridge never signs as the donor-held worker key: the **donor-side bridge signs the final envelope bytes** with the worker's signing key; our side verifies, admits and carries the bytes unchanged under a distinct, audited carrier authority (D5).
+@@ -157,20 +161,23 @@ The following field lists describe required content, not published closed schema
+ The [remote-worker turn sequence](diagrams/remote-worker-turn.puml) shows process identities, state owners and channel-loss recovery for this contract.
+ 
+ - *Connection (F14):* the bridge opens **one SSH connection from donor to project host** using `K_ssh` and its short user-CA certificate. On every connection/reconnect it verifies the host certificate against the pinned host CA (`@cert-authority`), host name, validity and KRL; no trust-on-first-use. Root-controlled sshd policy admits the workplace principal through `TrustedUserCAKeys` and user-certificate revocation checks, sets `PermitUserRC no`, `PermitUserEnvironment no`, `AllowAgentForwarding no`, `AllowTcpForwarding no`, `X11Forwarding no`, `PermitTTY no`, and a `ForceCommand` by protected absolute path. The workplace user cannot change this policy or the CA/KRL material. The project host never connects back or sends commands into the donor machine; reconnect with backoff is donor-owned.
+-- *Framing `swarma-rb/1` (F15; design label, closed protocol/wire ownership pending in [the publication register](../protocol/remote-worker.md#publication-status)):* one multiplexed channel over the SSH session. A frame is a 4-byte big-endian length (bounded **before** allocation; maximum 1 MiB) followed by deterministic CBOR with canonical field types, no duplicate keys and byte strings for binary data. The first frames are `hello` with version negotiation (`versions: [1]`; an unknown version refuses and closes). Every request carries a connection-scoped monotonic `id` and a client-chosen `op_key` (UUID) that makes side effects idempotent: the server keeps a result cache per binding keyed by `op_key` for ten minutes, so a reconnect after an `exec` or a `mailbox.post` whose reply was lost returns the cached result or `unknown_result` and never replays the effect. Requests: `exec {cmd, cwd, env: {names from the policy's env_allow only}, timeout_s, max_output_bytes, lease_s}`, `cancel {target_id}`, `stdin {target_id, bytes}`, `file.read`, `file.write`, `patch.apply`, `mailbox.read {from_cursor}`, `mailbox.post {envelope_bytes, signature}`, `mailbox.applied {message_id}`; replies `stdout|stderr {seq, bytes}`, `exit {code}`, `error {code}`, `result`, server-initiated `mailbox.notify {message_id, cursor}` (advisory) and `policy.changed`. **Server policy is authoritative:** a caller may lower `timeout_s`, `max_output_bytes` or `lease_s`, never raise them above the workplace policy; `cancel` and `stdin` apply only to a live job owned by the same binding; each method is authorized against the policy; a window of outstanding frames and `flow` credits give backpressure; `env` names outside `env_allow` refuse.
++- *Framing `swarma-rb/1` (F15; design label, closed protocol/wire ownership pending in [the publication register](../protocol/remote-worker.md#publication-status)):* one multiplexed channel over the SSH session. A frame is a 4-byte big-endian length (bounded **before** allocation; maximum 1 MiB) followed by deterministic CBOR with canonical field types, no duplicate keys and byte strings for binary data. The first frames are `hello` with version negotiation (`versions: [1]`; an unknown version refuses and closes). Every request carries a connection-scoped monotonic `id` and a client-chosen `op_key` (UUID). Connection IDs correlate frames; durable effect claims and authenticated admission below govern replay safety. The server caches output for ten minutes per binding generation and operation identity, separately from the durable claim. A lost reply can recover retained output; cache absence never authorizes mutation. Requests: `exec {cmd, cwd, env: {names from the policy's env_allow only}, timeout_s, max_output_bytes, lease_s}`, `cancel {target_id}`, `stdin {target_id, bytes}`, `file.read`, `file.write`, `patch.apply`, `mailbox.read {from_cursor}`, `mailbox.post {envelope_bytes, signature}`, `mailbox.applied {message_id}`; replies `stdout|stderr {seq, bytes}`, `exit {code}`, `error {code}`, `result`, server-initiated `mailbox.notify {message_id, cursor}` (advisory) and `policy.changed`. **Server policy is authoritative:** a caller may lower `timeout_s`, `max_output_bytes` or `lease_s`, never raise them above the workplace policy; `cancel` and `stdin` apply only to a live job owned by the same binding; each method is authorized against the policy; a window of outstanding frames and `flow` credits give backpressure; `env` names outside `env_allow` refuse.
++- *Remote effect claims (F-7):* at the existing workplace effect owner, durably claim the binding-generation-scoped operation identity, operation and canonical-argument digest before any mutation, including `exec`, file writes and patches. A retry preserves its original identity, arguments and admission window. Reuse with mismatching operation or arguments refuses. A known claim without a conclusive result stays `pending` or `unknown_result`; it is never automatically re-executed, including after output expires. Signed mailbox admission has its own durable claims and does not establish claims for arbitrary tool methods.
++- *Freshness and recovery (F-7):* authenticate new-versus-retry admission under a bounded sequence or epoch floor. A genuinely new operation must satisfy the current admission window; unseen expired identities refuse, and a retry cannot obtain a new window because output expired. Advance durable admission floors before discarding claims, and discard only when the corresponding identities can never be admitted again. Indefinite bindings must not require unbounded claim storage. Recovery reconciles claims and floors before opening admission; missing, restored, unreadable or contradictory claim/floor evidence keeps the binding closed. A new identity is an explicit new-effect decision, never automatic retry repair.
++- *Effect observation (R-OBS):* reuse the receiver-owned states `recorded` (recorded result plus current target state), `pending`, `rolled_back`, `not_recorded`, `unavailable` and `contradictory` where applicable. Only complete authoritative evidence yields `not_recorded`; expired/missing/unreadable evidence is `unavailable`, never absence. Observation is authenticated to the original caller principal or operators and serialized with the receiver journal using the original effect identity, operation and canonical-argument digest. `rolled_back` or `not_recorded` never authorizes an automatic new effect. The remote observation encoding remains unpublished; this adds no service and promises no exactly-once completion.
+ - *Job lifetime:* every `exec` runs in its own process group (Linux: also a transient cgroup) with a server-side lease; the lease expiring, a `cancel`, or the transport dropping after a grace period kills the group and verifies that no process of the workplace UID descends from the job; descendant cleanup on transport loss is a test vector, not an assumption.
+ - *Backend contract `swarma-workplace-exec/1` (F16; design label, standalone contract/wire ownership pending):* the first backend is the **OS-user workplace** of VISION v1.3 (one OS user per worker on our host, egress per UID). The contract names what every backend must give: an execution API with the caps above, a per-worker policy (tools, write scope, network mode, limits, `env_allow`) whose identity is recorded in each audit line, tool-set intersection, audit on our side (who, what, when, exit), output review and export of changes as reviewed patches, and cleanup of everything the job created. The RWP container backend maps to this contract through an adapter **after** its own qualification; a direct executor is never labelled an RWP-conformant workplace.
+ - *Audit, both sides:* our executor logs who, what, when, policy identity and exit; the donor's bridge logs tool name, argument hash and sizes (never arguments or environment), owned by the bridge role, so the donor can see what left their machine. B/C prevent harness edits through UID/sandbox confinement; A shares the donor UID and makes no OS integrity claim against a compromised harness process.
+ - *Signing (F18):* the worker's signing key `K_sig` never leaves the donor's bridge identity. For an outbound message the donor bridge builds the **final** envelope (canonical bytes with the audience and thread declared in the task record it answers; no projection after signing), signs it with `K_sig`, and sends `mailbox.post {envelope_bytes, signature}`. Our bridge verifies the signature against the pinned key, checks grants and freshness (ADM), admits, and carries the bytes **unchanged** into the carrier under its own carrier account for that worker; the carrier authentication is a distinct authority, recorded as such in the schema and the audit, never presented as a worker signature.
+-- *Delivery (F19):* the orchestrator posts a signed task message to the worker's mailbox (a snapshot of one element; no board access). Our bridge admits it (signature, grant, decision guard, fence) and sends an advisory `mailbox.notify`. The donor bridge pulls `mailbox.read {from_cursor}` and performs its **own admission**: the verification record is present, the target binding is this worker, the message is unexpired and not fenced or revoked, the delivery mode is allowed. An admitted **task turn** is handed to the harness through the supervisor's session-input adapter; ordinary data is readable through the `mailbox_read` tool when the policy grants it. Both sides keep durable high-water cursors; a cursor advances only after the item is persisted; after a reconnect the donor bridge catches up from its cursor and deduplicates by `message_id`; `mailbox.applied {message_id}` is the application receipt, distinct from the transport reply. Pending outbound posts are queued durably on the donor with stable `op_key`s and flushed after reconnect.
++- *Delivery (F19):* the orchestrator posts a signed task message to the worker's mailbox (a snapshot of one element; no board access). Our bridge admits it (signature, grant, decision guard, fence) and sends an advisory `mailbox.notify`. The donor bridge pulls `mailbox.read {from_cursor}` and performs its **own admission**: the verification record is present, the target binding is this worker, the message is unexpired and not fenced or revoked, the delivery mode is allowed. An admitted **task turn** is handed to the harness through the supervisor's session-input adapter; ordinary data is readable through the `mailbox_read` tool when the policy grants it. Both sides keep durable high-water cursors; a cursor advances only after the item is persisted; after a reconnect the donor bridge catches up from its cursor and deduplicates by `message_id`; `mailbox.applied {message_id}` is the application receipt, distinct from the transport reply. Pending outbound posts are queued durably on the donor with stable `op_key`s, their original arguments and admission windows, and reconciled on reconnect before any admitted retry.
+ - *Disconnected behaviour:* while the SSH channel is down, the project mailbox stays durable and the donor bridge pauses the turn loop (no new turns); a running turn continues until its deadline, its tool calls fail with the retryable `channel_down`, and its result post is queued; after `disconnect_grace` the supervisor parks the session and reports `channel_down` in `status`. Never, in any state, does the donor receive a credential for the project's carrier server. A donor who holds a carrier account of their own, as a person (a member of the project's organisation, or a freelancer on a marketplace server joining through federation), keeps it; the worker's messages still carry the worker's signature (D11; later phase).
+ - *What the worker sees:* its managed home, the task snapshot, its admitted mailbox view. *What it never sees:* our board, the carrier, carrier credentials, the bridge's keys and state, other homes and the network beyond the proxy in B/C. In A, no OS isolation protects these resources from a compromised harness process: the guard is qualified lockdown with no local tools, not a separate UID, sandbox or egress policy.
+ 
+-**D6. MITM, replay and identity (F13).** Web PKI plus the selected D4 trust branch protect first contact: locally validated DNSSEC by default, invitation pins only for a declared no-DNSSEC environment; when both exist they must agree. No validation failure downgrades. A one-use invitation code (when invited) and server-challenge-bound signed transcript prove possession. Afterwards the registry pins the three worker keys; the donor pins the root, operator chain and host CA; SSH uses host and short user certificates (D12). Packages bind their transcript with authenticated encryption; envelopes use exact bytes, freshness and replay rules. Invitation tombstones, connection-scoped IDs and `op_key` caches bound replays. Worker compromise requires operator/root-signed revocation, user-certificate/KRL enforcement, stopped renewal and closure of established sessions (D7); donor identities do not inherit the dispatcher one-shot automatic identity-revocation exception (D-IDENTITY). Host-key compromise is handled by KRL and a replacement host certificate under the same CA; adding/replacing such a host does not change DNS. CA rotation overlaps old/new public keys in DNS and authenticated policy/package updates. Operator-certificate rotation is root-authorized; expired or revoked chains refuse.
++**D6. MITM, replay and identity (F13).** Web PKI plus the selected D4 trust branch protect first contact: locally validated DNSSEC by default, invitation pins only for a declared no-DNSSEC environment; when both exist they must agree. No validation failure downgrades. A one-use invitation code (when invited) and server-challenge-bound signed transcript prove possession. Afterwards the registry pins the three worker keys; the donor pins the root, operator chain and host CA; SSH uses host and short user certificates (D12). Packages bind their transcript with authenticated encryption; envelopes use exact bytes, freshness and replay rules. Invitation tombstones bound enrolment replay. Remote effects require durable binding-generation-scoped identity/digest claims and authenticated new-versus-retry admission with durable floors (D5); connection-scoped IDs and the ten-minute output cache do not prove an effect absent or authorize a retry mutation. Worker compromise requires operator/root-signed revocation, user-certificate/KRL enforcement, stopped renewal and closure of established sessions (D7); donor identities do not inherit the dispatcher one-shot automatic identity-revocation exception (D-IDENTITY). Host-key compromise is handled by KRL and a replacement host certificate under the same CA; adding/replacing such a host does not change DNS. CA rotation overlaps old/new public keys in DNS and authenticated policy/package updates. Operator-certificate rotation is root-authorized; expired or revoked chains refuse.
+ 
+ **D7. Lifecycle: stop, leave, purge; suspend, retire, revoke** ([retirement sequence](diagrams/remote-worker-retire.puml), [independent state axes](diagrams/donor-lifecycle.puml); F17). Track independent axes: donor installation (present / purged), donor execution (active / stopped / left), project workplace (admitted / suspended / retired), and signing identity (pinned / revoked). These are descriptive states, not a published closed state schema. Purge can occur offline and does not prove project retirement or revocation; retirement preserves the donor identity unless the operator separately revokes it.
+ - *Donor side.* `stop`: persist the stopped mark, terminate this worker's harness and descendants, keep bridge service and keys; `run` resumes only if project admission, credentials and qualification remain valid. `leave`: request project retirement when reachable, close the channel and keep keys/configuration; `init --rejoin` returns the pinned identity to a new workplace/package unless revoked. `purge --confirm`: stop owned processes and remove keys, locked configuration and managed home. A removes its user service and owned installation artifacts; C also removes its sandbox artifacts; B requires the separate donor provisioner to remove only its allocated accounts, egress, sandbox and system service. No shared donor account is removed in A/C. Print the project-reported revocation result, or "channel unreachable; the project side must revoke separately". Local purge is independent of remote consent.
+-- *Project side.* `suspend`: pause grants and close sessions, keep workplace. `retire`: persist grant/channel revocation, stop certificate renewal, revoke outstanding user certificates through KRL, close established sessions, kill jobs and descendants, verify process absence, archive permitted noncredential artifacts and release account/egress state. The identity stays pinned. `revoke`: operator-authorized root-signed revocation of all three worker keys, after which frames and envelopes refuse; a return needs new enrolment keys. This is a separate identity operation, never a consequence inferred from donor purge or account retirement.
++- *Project side.* `suspend`: pause grants and close sessions, keep workplace. `retire`: persist grant/channel revocation, stop certificate renewal, revoke outstanding user certificates through KRL, close established sessions, kill jobs and descendants, verify process absence, perform declared-key cleanup, delete the workplace home and release account/egress state. Only service-generated metadata in a closed schema may be exported, without agent-controlled strings, names, links or bodies. Keeping a home requires a separate explicit operator operation that states its confidentiality is not guaranteed; git/accepted outputs retain their separate confidentiality policy. The identity stays pinned. `revoke`: operator-authorized root-signed revocation of all three worker keys, after which frames and envelopes refuse; a return needs new enrolment keys. This is a separate identity operation, never a consequence inferred from donor purge or account retirement.
+ - Ordering: stop and revocation marks are persisted before any service restart can race them; certificate revocation or expiry never substitutes for closing established sessions.
+ 
+ **D8. Donor control surface.** `curator remote-worker status` (posture, tuple, policy generation, project, connection state, last tool call, budget used, audit path), `stop`, `run`, `leave`, `purge`, `audit tail`, and the locked configuration the donor owns. B/C enforce the harness boundary through UID/sandbox; A relies on qualified lockdown and has no OS isolation from a compromised harness. Project operators cannot prevent local stop, leave or purge.
+@@ -197,7 +204,7 @@ The [remote-worker turn sequence](diagrams/remote-worker-turn.puml) shows proces
+ - **Network:** B/C confine the harness to the provider proxy and relay socket; B uses per-UID egress, C its sandbox. A reaches the provider directly and has no OS egress control. The bridge initiates the SSH/join connections; no network listener is exposed on the donor.
+ - **Secrets:** worker keys stay in the donor bridge role (D0 storage by variant); A shares the donor UID and makes no OS confidentiality claim against a compromised harness. The provider credential enters the harness per launch (CIP-0010); carrier credentials stay on the project side. Invitation codes are short-lived bootstrap secrets; no secret enters argv or a plan.
+ - **Supply chain:** the binaries on the donor machine come from the toolchain release with checksums and attestations (R55 discipline), installed into the variant-owned executable root of D0 and verified at every launch. B uses a root-owned directory; C denies harness writes through its sandbox; A checks digests without an OS write boundary against a compromised harness. CIP-0007 governs anything else the donor installs.
+-- **Replay and freshness:** invitation tombstones, server challenges, connection-scoped ids, `op_key` caches, and signed envelopes with `issued_at`, `expires_at` and nonces.
++- **Replay and freshness:** invitation tombstones and server challenges protect join; signed envelopes retain their freshness checks. Durable binding-generation-scoped effect identity/digest claims precede remote mutation; authenticated new-versus-retry admission, durable sequence/epoch floors and closed recovery bound replay and claim storage. The ten-minute result cache holds output only. Cache expiry, reconnect and receiver restart never permit automatic repetition of a known effect; unavailable evidence keeps admission closed.
+ - **Donor provisioning:** separate binary and privileges under D-DONOR-PROVISIONING; spec, rules, removal and closed schema pending. B activation stays disabled. Required properties include allocated identifiers, fixed templates, no-follow paths, journal/rollback and negative vectors for substitution, arbitrary removal and injection; these are requirements, not existing user-manager operations.
+ 
+ ## Compatibility and migration
+@@ -210,7 +217,7 @@ The [remote-worker turn sequence](diagrams/remote-worker-turn.puml) shows proces
+ 
+ - A new Curator command group `remote-worker` (`init`, `status`, `stop`, `run`, `leave`, `purge`, `audit`) and variant-aware manager donor configuration. B provisioning is a separate donor-side component with a short spec, rules and removal; its binary name and schema are pending, and it must not extend `swarma-user-manager` operations.
+ - `swarma-remote-tools` (relay) and `swarma-bridge` (service) as first-party module roots (Decision 0009); the relay as an MCP declaration package with an absolute `command`; the maximum tool list and the intersection rule.
+-- The `swarma-rb/1` design label: framed protocol and D-WIRE-NAMES owner/name **pending**, tracked in the publication register; standalone protocol document (framing, encoding, negotiation, ids and `op_key`, methods, caps, authorization, leases, cursors, receipts, error codes).
++- The `swarma-rb/1` design label: framed protocol and D-WIRE-NAMES owner/name **pending**, tracked in the publication register; standalone protocol document (framing, encoding, negotiation, ids and `op_key`, durable identity/digest claims, authenticated admission windows/floors, claim retention/recovery and R-OBS observations, methods, caps, authorization, leases, cursors, receipts, error codes).
+ - The `swarma-workplace-exec/1` design label: standalone backend contract and D-WIRE-NAMES owner/name **pending**, tracked in the publication register.
+ - The deployment variants A, B and C as a member of the enrolment and of the qualified tuple (D0).
+ - [Remote-worker protocol](../protocol/remote-worker.md): publication register for the invitation, join transcript and credential package (`swarma-bridge invitation/1`, `swarma-bridge join/1`, `swarma-bridge credential-package/1`), each closed schema **pending**; join API/error/request/response schemas also **pending**. DNS conventions are `TXT _swarma.<domain>`, `TXT _swarma-ssh-ca.<domain>`, join `TLSA`, with local DNSSEC validation/DoH by default and the declared invitation fallback. No raw-host-key recipe is retained.
+@@ -232,11 +239,12 @@ The [remote-worker turn sequence](diagrams/remote-worker-turn.puml) shows proces
+ 
+ - Handshake negatives: wrong/reused code, expired invitation, wrong challenge, foreign signing key, replayed `cert`, different collection key, wrong/expired/revoked operator chain, wrong encryption key, associated-data mismatch, attempt limit exceeded; same-key retry recovers the same enrolment. Trust vectors cover DNSSEC with system DNS and DoH, pin agreement, mismatch, bogus/failed/malformed/indeterminate DNS refusing without fallback, an explicitly declared no-DNSSEC invitation succeeding only with valid pins and Web PKI, an open-domain application refusing without DNSSEC, and environment records unchanged by worker/host additions.
+ - Connection negatives: wrong CA, wrong host principal, expired/revoked host certificate, unknown worker key, expired/revoked user certificate or wrong workplace principal on first/reconnected sessions; workplace code attempting to alter root-controlled CA/KRL/forced-command policy refuses; no forwarding, PTY, user rc/environment or second concurrent connection. Cover renewal failure and overlapping host-CA rotation; certificate revocation also closes established sessions.
+-- Protocol negatives: version rejection, truncated and oversized frames, duplicate ids, stale `cancel`, `stdin` to a finished job, caps above policy, `env` outside `env_allow`, unauthorized method, reconnect after an effect (cached result or `unknown_result`, never a replay), descendants after transport loss (none survive).
++- Protocol negatives: version rejection, truncated and oversized frames, duplicate ids, stale `cancel`, `stdin` to a finished job, caps above policy, `env` outside `env_allow`, unauthorized method, reconnect after an effect (same durable claim and original window; retained output or `pending` / `unknown_result`, never automatic re-execution), descendants after transport loss (none survive).
+ - Variants and provisioning: A asks for no administrator rights and claims no UID/sandbox/egress boundary; C uses the donor UID with a qualified sandbox; B is refused until the separate donor provisioner is specified/qualified, asks once and uses no Keychain. B/C refuse out-of-scope reads/egress and a non-provider proxy destination. B socket peer checks reject foreign UIDs; provisioner vectors reject symlink substitution, arbitrary-account removal, injection and collisions, and prove rollback after interrupted provisioning. A/C purge must preserve the donor account and unrelated processes/data. Key algorithms/storage are checked against the selected variant and tuple.
+ - Tool set: `tools/list` equals the intersection of the six with the policy; a `tools/call` of another name is an error result and an audit line; a read-only policy offers `read_file` only.
+ - Signing and delivery: an envelope altered after signing refuses; a valid carrier credential without a worker signature cannot post; a message with a foreign target binding or past its expiry is refused by the donor bridge; cursors survive a restart; a duplicate `message_id` is applied once; `mailbox.applied` is distinct from the transport reply.
+-- Lifecycle: stop persists before restart and leaves no owned harness descendant while bridge/keys remain; leave keeps identity for rejoin; purge removes only variant-owned artifacts and reports remote revocation as unknown when unreachable. Project retire stops renewal, revokes certificates/KRL, closes sessions and removes jobs/account/egress after process absence, while preserving signing identity; separate operator revoke rejects old keys. Exercise offline purge, suspended/revoked rejoin refusal and host-CA overlap. These are future qualification vectors, not tests run by this documentation change.
++- Remote claim qualification (F-7), through real tool admission/reconnect/recovery: lost replies for `exec`, `file.write`, `patch.apply` and mailbox posts; disconnect beyond ten minutes and expired output; known claims with pending/unknown results; mismatching operation/arguments; genuinely new identities within the window versus unseen stale identities below the floor; retries preserving the original window rather than acquiring a fresh one; cross-binding/generation reuse; concurrent duplicate admission; receiver crashes before claim, after durable claim but before mutation, during mutation and after result persistence before acknowledgement. Exercise floor advancement/claim deletion ordering, rollback/restored/lost/unreadable claim evidence and interrupted reconciliation: admission remains closed until authoritative reconciliation. Verify every applicable R-OBS state, observation access control and that `rolled_back`, `not_recorded`, `unavailable` and cache misses never trigger an automatic new effect.
++- Lifecycle: stop persists before restart and leaves no owned harness descendant while bridge/keys remain; leave keeps identity for rejoin; purge removes only variant-owned artifacts and reports remote revocation as unknown when unreachable. Project retire stops renewal, revokes certificates/KRL, closes sessions and performs declared-key cleanup and deletes the home before releasing account/egress after process absence; only closed-schema service metadata is exported, with agent-controlled content rejected, and separate explicit home retention warns that confidentiality is not guaranteed, while preserving signing identity; separate operator revoke rejects old keys. Exercise offline purge, suspended/revoked rejoin refusal and host-CA overlap. These are future qualification vectors, not tests run by this documentation change.
+ 
+ ## Operator decisions and open questions
+ 
+@@ -251,3 +259,4 @@ The [remote-worker turn sequence](diagrams/remote-worker-turn.puml) shows proces
+ 9. **Worker SSH certificates.** Decided 2026-10-10: the user CA with short certificates (D12).
+ 10. **Donor provisioner ownership.** Decided 2026-10-11 (D-DONOR-PROVISIONING): separate donor-side component, separate binary and privileges; shared UID/path libraries permitted. B disabled until its short spec, rules and removal exist.
+ 11. **Wire ownership still pending for transport/backend.** D-WIRE-NAMES fixes the naming rule; the publication register carries the remaining component-ownership question and options. No legacy design label is claimed as a frozen wire format.
++12. **Remote claims/admission publication (F-7).** Would need canonical argument bytes/digest rules, binding-generation identity encoding, authenticated new-versus-retry distinction, selected sequence/epoch floor and bounds, durable floor/claim deletion ordering, recovery reconciliation and R-OBS response encoding with exact refusal codes and negative vectors. No new field, code or duration is allocated here.
+diff --git a/cips/CIP-0011-credential-broker-and-agent-users.md b/cips/CIP-0011-credential-broker-and-agent-users.md
+index f8e5255a6e98c5aecb1bf9d46fc4a7359ecb37c6..34dc26e5cd7c6baad5a16e513fa670ef4f0cc608 100644
+--- a/cips/CIP-0011-credential-broker-and-agent-users.md
++++ b/cips/CIP-0011-credential-broker-and-agent-users.md
+@@ -1,6 +1,6 @@
+ # CIP-0011: Credential broker leases and agent OS users
+ 
+-- **Status:** Draft (revision 3)
++- **Status:** Draft (revision 4)
+ - **Owner:** orchestrator; decision: operator
+ - **Created:** 2026-10-09
+ - **Related:** [CIP-0010](CIP-0010-credentials-setup-token-and-inherited-auth.md) (credential sources, protected credential binding C3.4, executor capability, CIP-0003 disposition); [CIP-0008](CIP-0008-remote-worker-launch-mode.md), [CIP-0009](CIP-0009-donor-side-deployment-and-bridge.md); [Decision 0013](../decisions/0013-execution-ownership-and-launch-plans.md) (launch plans); [Decision 0017](../decisions/0017-environment-credential-modes.md) (credential modes); environments §7.4, §10.3, §12.1–§12.2; relux-works/swarma-credential-broker `spec/broker.md` (draft v0.3); relux-works/swarma-user-manager `spec/helper.md` (draft v0.3, with the launcher and `exec.stop`); relux-works/swarma-dispatcher `spec/dispatcher.md` (draft v0.2); relux-works/curator-network-profiles (binding records)
+@@ -14,13 +14,17 @@
+ | Boundary | Caller composes; dispatcher provisions/tracks; agent-account executor verifies/executes and talks only to broker; capability is not authorization. |
+ | Authority owner | Broker service owns accounts/bindings/leases/auth owner; dispatcher service owns run records; root helper owns accounts; executor owns injection. |
+ | Inputs → outputs | Caller-composed plan/digest, signed caller grant, generation and protected binding → approved account/execution, lease/injection and metadata receipt or refusal. |
+-| Phase | Slice 0 Claude / helper v0 and dispatcher v0 target; dispatcher v1 socket, Codex slice 1, enforced networking/helper v1 slice 2; SH2/donor later. |
++| Phase | Slice 0 Claude / helper v0 and dispatcher Unix-socket service; Codex slice 1 with replacement-safe single refresh writer, enforced networking/helper v1 slice 2; SH2/donor later. |
+ | Normative links and proposed landing | [Decision 0013](../decisions/0013-execution-ownership-and-launch-plans.md), [Decision 0021 amendment](../decisions/0021-sessions-enter-through-curator-run.md#amendment-v1--agent-account-one-shot-execution-2026-10-11), [Environments §7.4](../protocol/environments.md#74-credential-passthrough-provisioning-seeds-and-isolation); [module owner/version table with pinned broker/dispatcher/helper specifications](platform-contract-disposition.md#schema-owner-and-version-table); amendments: [Specification changes](#specification-changes). |
+ 
+-## Operative disposition (2026-10-11)
++## Revision 4: accepted review findings (2026-10-12)
++
++F-5 selects the dispatcher Unix-socket service from the first slice. F-3 keeps orchestrator caller delegation requester-signed and separate from key registration; F-8 adds the broker-owned `revocation.check` admission verdict. F-11 makes single vendor-refresh ownership across replacement a slice-1 activation condition. F-1 requires home deletion at ordinary retirement; F-4 keeps physical starts with the dispatcher using `host_start` and a durable host admission permit. Formats and qualification gates remain open; the CIP stays Draft.
++
++## Operative disposition (2026-10-12)
+ 
+ - **Decided:** The dispatcher is a separate module. D-EXECUTOR selects agent-account curator-run first: caller composes, executor verifies and executes without profile resolution and with no network except the broker; it shares a launch library with swarma-session-runner. Board and session host call the dispatcher. D-WIRE-NAMES governs platform identifiers.
+-- **Open:** The executor intake release/grammar, general-grant adapter/registry, helper v2 signature grammar and joint launch-ticket/host-role activation remain pending; the shared contract states owner options. Codex is slice 1 with qualification; networking is slice 2.
++- **Open:** The executor intake release/grammar, general-grant adapter/registry, helper v2 signature grammar and joint `host_start`/host admission permit publication remain pending; the shared contract states owner options. Codex is slice 1 with qualification; networking is slice 2.
+ - **Superseded:** Commands playing dispatcher, board-spawn-first and the first-consumer recommendation question are superseded by the separate dispatcher decision and D-EXECUTOR. Acceptance of a direction does not publish a schema or attest a running cross-user launch.
+ 
+ [Cross-CIP contract, schema owners and versions](platform-contract-disposition.md) records the canonical values and owner decisions. Acceptance records design disposition; schema publication, implementation and runtime qualification are separate. Current-state observations and companion probes below are historical at their stated pins, not rerun evidence.
+@@ -31,7 +35,7 @@ An architecture review on 2026-10-09 kept the direction and found gaps that this
+ 
+ ## Revision 3
+ 
+-The owner decided (2026-10-09) to build the dispatcher as its own platform module, relux-works/swarma-dispatcher, instead of folding its work into Curator. `curator agent-user` becomes a client of the dispatcher: the dispatcher, running under its own service account, owns the run records, the grant checks, the capacity gates, provisioning through the helper and the broker, the start through the launcher, and reconciliation. Its v0 is a command run under that account; its v1 is a daemon with a socket for orchestrators and the session host, on the same core.
++The owner decided (2026-10-09) to build the dispatcher as its own platform module, relux-works/swarma-dispatcher, instead of folding its work into Curator. `curator agent-user` becomes a client of the dispatcher: the dispatcher, running under its own service account, owns the run records, the grant checks, the capacity gates, provisioning through the helper and the broker, the start through the launcher, and reconciliation. From the first protected-launch slice it is a Unix-socket service, using the broker's connection and framing rules. Queueing, events, long waits and advanced integrations follow behind capability gates on the same transport.
+ 
+ ## Summary
+ 
+@@ -75,11 +79,12 @@ CIP-0010's single auth owner for Codex personal plans is implemented inside the
+ - enrolment is a ceremony run by the broker under its own user (the vendor's device login into a fresh broker-owned home); no existing login is imported and no keyring item is exported;
+ - launches use **only** `codex app-server` with external tokens: the lease carries the access token and the ChatGPT account id; a 401 is answered through `lease.renew` within the app-server's response deadline, or the turn fails without any fallback login;
+ - launches never hold `auth.json`. `codex exec` is not served in broker mode; serving it would need an explicit amendment of CIP-0010's no-copy decision with operator consent, contents, lifetime and cleanup rules;
++- **Slice-1 activation condition (F-11):** at most one live vendor refresh writer per account across broker replacement. Persist attempt intent before launching the approved vendor executable, retain qualified attempt/process identity, and close replacement refresh until the prior writer lifecycle is resolved. Qualify existing service-manager containment and kill-and-confirm behavior on both supported platforms; the account lock alone does not contain surviving vendor children. Resolve the prior attempt and reload the durable vendor home before deciding whether another refresh is safe. Confirmed writer absence does not prove an ambiguous external rotation failed. Unknown writer/store/prior-outcome evidence keeps the account unavailable or requires re-enrolment; no extra service or vendor exchange implementation is introduced.
+ - each supported Codex release is qualified before the broker leases for it (`lease_harness_unqualified` otherwise). The mechanism is proven live on Codex 0.155.1; the supported release must be re-qualified first.
+ 
+ ### 4. Agent OS accounts: the dispatcher and `curator agent-user`
+ 
+-relux-works/swarma-dispatcher does the dispatcher's work from the platform design (architecture §7.1): it accepts a launch request, authenticates the caller by its OS account, checks the caller's grant and the machine's capacity, provisions the agent (helper `user.create`, a leaf grant for `agent:<generation>` narrowed to the request and the caller's grant, broker `bind`), starts the executor under the agent account through the helper's launcher, tracks the execution in a durable record with caller-scoped root request correlation and distinct per-effect idempotency IDs, cleans up (unbind, retire), and reconciles after crashes. It runs under its own unprivileged service account, which is the only account configured as a dispatcher in the helper and the broker.
++relux-works/swarma-dispatcher does the dispatcher's work from the platform design (architecture §7.1): it accepts a launch request, authenticates the caller by its OS account, checks the caller's grant and the machine's capacity, provisions the agent (helper `user.create`, a broker lease leaf for `agent:<generation>` narrowed to the request under the dispatcher's lease chain, broker `bind` retaining the independent caller authorization chain), starts the executor under the agent account through the helper's launcher, tracks the execution in a durable record with caller-scoped root request correlation and distinct per-effect idempotency IDs, cleans up (unbind, retire), and reconciles after crashes. It runs under its own unprivileged service account, which is the only account configured as a dispatcher in the helper and the broker.
+ 
+ Curator's commands are its clients:
+ 
+@@ -94,9 +99,14 @@ curator agent-user list
+ 
+ - Caller-side `curator-run` composes the plan (compose-only) and passes it to the dispatcher as opaque bytes with its digest; the dispatcher never reads fragments or credentials.
+ - D-EXECUTOR: agent-account `curator-run` only verifies and executes that caller-composed plan. It does not compose or resolve profiles, and it has no network except the broker. It shares one launch library with `swarma-session-runner`; a minimal separate executor binary remains a later option.
+-- In the dispatcher's v0, the client runs the dispatcher command under the dispatcher's account through one sudoers rule; in v1 it talks to the dispatcher's socket. The commands and their results do not change between the two.
++- The client talks to the dispatcher Unix socket from slice 0, using the broker's protected connection/framing rules, fresh peer principal/generation checks, server-UID verification and caller request signatures. Admission opens only after durable-effect/receipt recovery and process-absence reconciliation publish readiness. An absent/unready service refuses. Initial admission refuses temporary capacity closure; queueing, events, long waits and advanced integrations follow behind capability gates on the same transport. Only dispatcher-to-root helper/launcher sudo rules remain in this path; descriptor inheritance/passing restrictions remain mandatory.
+ - A caller administers only the agents it provisioned, and can never obtain for an agent more than its own grant allows. Its requests are signed with a key associated with its OS account, and the broker keeps the caller's authorization as a dependency of every binding: revoking the caller's grant cuts its agents' new leases and renewals at once (owner decision 2026-10-10). Arbitrary `sudo -u` is never used instead of the launcher.
+-- Platform paths and accounts follow the root `/opt/swarma` (agent accounts `worker-<label>` with homes in `/opt/swarma/workers/`, services in `/opt/swarma/services/`); retired homes are archived under the helper's retention policy.
++- **Orchestrator delegation (R-DELEG/F-3):** requester C signs the caller delegation for new orchestrator O, narrowed from C's own grant, after O's public key is registered under its generation. The dispatcher verifies and records the delegation and never signs it. `register_key` does not activate caller authority: O has no spawn authority until a valid delegation is installed. Preflight remaining depth and chain length; activation rechecks requester, signature, validity window and current revocation. Descendants carry C in their ordinary caller chain. Recursive orchestrator provisioning stays refused until the narrow pre-key registration exception, permitted principal, proof of possession, replay/rotation rules and bootstrap are published and qualified. Direct workers and operator-enrolled orchestrators form slice 0. Already delivered provider tokens retain their documented lifetime.
++- **Admission revocation verdict (R-VERDICT/F-8):** the broker accepts `revocation.check` in `broker/1` from configured dispatchers for the exact chain or chains and context `prepare`, `dequeue` or `start`. It returns `not_revoked`, `revoked` or `unavailable`, plus its revocation sequence at the check. The dispatcher refuses on `revoked` or `unavailable` before new effects and rechecks at each admission point; stale verdicts never authorize a future start. A fenced restore returns `unavailable`. This is point-in-time evidence, never a grant or permit; broker bind, lease and renewal still check current revocation independently. No dispatcher revocation database or broker-private directory access is added.
++- **Session-host start (R-START/F-4):** only the dispatcher performs privileged execution starts. `host_start` in `dispatch-op/1` is restricted to the configured session-host service principal and carries `(logical_session_id, execution_id, controller_epoch, op_id)`, referring to a durable host admission permit bound to those four values. Admission creates the permit; a fence change withdraws it or sends it to reconciliation. The dispatcher uses its existing claim/effect/root-receipt path to start the approved agent-side runner. Cancellation before the call prevents it; an ambiguous call resolves the same effect/receipt and stops the execution if required, never launching twice. The runner opens a fresh authenticated host channel; current-epoch registration and readiness precede delivery. Host failure keeps the claim and delivery fence closed until reconciliation. Joint publication/qualification still gates this backend.
++- Platform paths and accounts follow the root `/opt/swarma` (agent accounts `worker-<label>` with homes in `/opt/swarma/workers/`, services in `/opt/swarma/services/`). Ordinary retirement quiesces, performs declared-key cleanup and deletes the home, retaining journaled recovery, confirmed process absence and unknown/failure handling. Only service-generated metadata in a closed schema is exported, without agent-controlled strings, names, links or bodies. Keeping a home is a separate explicit operator operation stating that its confidentiality is not guaranteed; git/accepted outputs have their own policy. D-IDENTITY is unchanged: standing identity is preserved and one-shot identity revocation remains separate.
++
++Later binary/schema upgrades use the fenced operator maintenance transaction (R-MAINT): close admission, inventory executions, stop selected executions through the dispatcher and `exec.stop` with explicit operator authority, then require confirmed process absence and reconciliation before migration or binary swap. The maintenance deadline bounds the attempt, never a standing lifetime; unknown/refused stops defer maintenance. Standing allocations/identities remain, with no live adoption or automatic expiry; a restart needs fresh authority.
+ 
+ ### 5. `curator broker`
+ 
+@@ -119,11 +129,11 @@ A broker account may require a network profile. Curator's launch already resolve
+ ## Implementation plan
+ 
+ 1. **Formats** in swarma-credential-broker: grants, revocations and socket frames frozen with canonical and negative vectors; the verifier with its mutant suite.
+-2. **Slice 0: one protected Claude launch.** Helper v0 with the launcher; broker slice 0 (file store, local grants and revocations, bind, lease, release, the `env` channel, audit); dispatcher v0 (requests, run records, grants, capacity, provisioning, start, cleanup, reconciliation); the first broker client in agent-account `curator-run` (D-EXECUTOR; narrow execution only). The caller-side manager publishes the `broker:` source, plan extension, `curator broker`, `curator agent-user` dispatcher-client commands and `env status` lines; those management operations are not part of the agent-account executor mode. Acceptance on hosted runners through `curator agent-user` and the dispatcher, with exactly the deployed sudoers rules.
+-3. **Slice 1: Codex** external tokens, the enrolment ceremony and the auth owner, qualified on the supported release.
++2. **Slice 0: one protected Claude launch.** Helper v0 with the launcher; broker slice 0 (file store, local grants and revocations, `revocation.check`, bind, lease, release, the `env` channel, audit); dispatcher Unix-socket service (requests, run records, grants, capacity, provisioning, start, cleanup, reconciliation); the first broker client in agent-account `curator-run` (D-EXECUTOR; narrow execution only). The caller-side manager publishes the `broker:` source, plan extension, `curator broker`, `curator agent-user` dispatcher-client commands and `env status` lines; those management operations are not part of the agent-account executor mode. Slice 0 admits direct workers and operator-enrolled orchestrators; recursive orchestrator provisioning remains refused until its bootstrap is published and qualified. Acceptance on hosted runners through `curator agent-user` and the ready dispatcher socket, with exactly the deployed dispatcher-to-root helper/launcher sudoers rules and broker connection/framing protections. Service absence/unreadiness and temporary capacity closure refuse.
++3. **Slice 1: Codex** external tokens, the enrolment ceremony and the auth owner, qualified on the supported release. Activation requires the account-scoped single vendor-refresh writer invariant across daemon replacement, durable attempt/process evidence, qualified containment/kill-and-confirm ordering and prior-outcome/store reconciliation; unknown external rotation is unavailable or requires re-enrolment.
+ 4. **Slice 2: enforced networking** with helper v1 and applied state.
+ 
+-Keeper migration, a shared registry, roles and wildcards in grants, concurrency bounds, Muse (researched in parallel), parent access to child homes and donor deployment come later and do not block these slices.
++Keeper migration, a shared registry, roles and wildcards in grants, advanced concurrency policy, Muse (researched in parallel), parent access to child homes and donor deployment come later and do not block these slices.
+ 
+ ## Test plan
+ 
+@@ -131,7 +141,14 @@ Hosted runners only; no account, launcher or firewall test runs on a developer's
+ 
+ - Production entry: `curator agent-user create` and `run` through the dispatcher, then a tracked launch under the agent account receives a lease and runs Claude; the token is in the harness process environment only and in no file, argv, log or covered child process.
+ - Negatives: no binding; a retired generation; a recycled UID or a repeated label; another dispatcher's agent; wrong profile; wrong harness; expired grant; revoked grant; unreadable revocation state; revoked account; broker unreachable; executor without `credential-injection/1`; conflicting inherited credential; unqualified harness release; a broker connection inherited across the launcher (it must not reach the executor); unapproved executor digest.
++- Dispatcher service (slice 0): wrong peer/server UID, stale caller generation, unsigned/mismatching request, inherited/passed protected descriptors, absent/unready service and temporary capacity closure refuse before new effects; interrupted recovery never opens admission. Test the same socket transport when later queue/events/long waits capability gates are enabled.
++- Delegation (F-3): C differs from dispatcher D; valid requester-signed O delegation preserves C in descendant W's chain; wrong issuer, insufficient depth/chain budget, pre-key registration replay/rotation and key registration without delegation refuse spawn authority. Revoking C before O activation and after O creates W refuses new admission/leases/renewals without claiming already delivered token invalidation. Recursive provisioning refuses before bootstrap qualification.
++- Revocation verdict (F-8): revocation before prepare/dequeue/start, unavailable broker, stale point-in-time verdict and fenced restore refuse new effects; final bind/lease/renewal rechecks still refuse revocation after an earlier `not_revoked` verdict.
++- Session-host qualification (F-4, later backend): unauthorized host principal, mismatched permit tuple, fence change and pre-call cancellation prevent starts; lost reply/ambiguous call resolves the same effect/receipt without a duplicate launch. Host failure retains the closed delivery fence, and no delivery occurs before fresh channel authentication, current-epoch registration and readiness.
++- Retirement (F-1): verified process absence and declared-key cleanup precede home deletion; interrupted deletion retains journaled recovery and unknown evidence never proves absence. Export rejects agent-controlled strings, names, links and bodies; explicit operator home retention states its confidentiality is not guaranteed.
+ - Codex (slice 1): eight concurrent launches near expiry cause one refresh; a 401 renews within the deadline and the turn continues; a slow or failed renewal fails the turn without a fallback login.
++- Operator maintenance (R-MAINT, later upgrades): selected standing executions stop only with explicit operator authority; confirmed absence and reconciliation precede migration/binary swap. Unknown/refused stop defers the bounded attempt without expiring standing lifetimes; restart requires fresh authority.
++- Vendor-refresh replacement (F-11, slice 1): daemon death during refresh with a surviving child; replacement contention; external rotation followed by crash before durable store/result; interrupted containment cleanup; unavailable process/store/prior-outcome evidence. Verify at most one live writer, durable-home reload before another refresh decision and no blind retry on ambiguous rotation, even after confirmed child absence.
+ - No material in plans, fragments, receipts, logs, `env status` or covered child processes (a scan of all artifacts).
+ 
+ ## Open questions for the operator
+@@ -139,3 +156,5 @@ Hosted runners only; no account, launcher or firewall test runs on a developer's
+ 1. Resolved (owner, 2026-10-09): the dispatcher is its own module and `curator agent-user` is its client.
+ 2. **First consumer — decided, 2026-10-11 (D-EXECUTOR).** `curator-run` under the agent account gets the first broker client. Board spawn and session host call the dispatcher, which launches through `curator-run`; neither embeds a client. The earlier approval question is superseded. Intake schema/version publication and qualification remain R-LR1 work.
+ 3. **Grant registry — OPEN (D-R6).** Retain broker-local envelopes/state for the first slice, or publish a separately versioned shared registry/verifier adapter for general platform grants. General `grant/1` role/action grammar is not the broker's closed envelope; no adapter or registry activation is claimed.
++4. **Shared contract publication.** Would need requester-signed delegation activation and the pre-key registration/proof-of-possession/replay/rotation contract with depth/chain preflight; `revocation.check` exact chain/context/sequence encodings and refusal codes; `host_start` authentication, permit durability/fencing and receipt/recovery ordering. The shared names and verdict values above are fixed; no additional wire fields or refusal codes are allocated here.
++5. **Slice-1 replacement qualification.** Would need per-platform containment/kill-and-confirm lifecycle, durable attempt/process identity, vendor-home recovery and ambiguous external-rotation resolution for the supported vendor release. An account lock and confirmed child absence alone are insufficient.
+diff --git a/cips/diagrams/credential-source-lifecycle.puml b/cips/diagrams/credential-source-lifecycle.puml
+index 85fa066b2feff1cb1df61cc5ad10e2eca3a5d2b7..7ee1e8881fc6de39a7f20317258c6e3597c22723 100644
+--- a/cips/diagrams/credential-source-lifecycle.puml
++++ b/cips/diagrams/credential-source-lifecycle.puml
+@@ -1,4 +1,5 @@
+ @startuml credential-source-lifecycle
++' Revision 2026-10-12: accepted review findings; Draft semantics, no renderer/qualification evidence.
+ title Credential source lifecycle - current per-home; source-policy v1/v2 targets; broker slices 0/1; SH2 and donor later
+ state "Resolve source metadata\nCaller-side Curator / curator-run\nuser-owned configuration" as Resolve
+ state "Migration inspect -> plan -> apply\nCurator manager; preserve credential bytes\nmarker/config revisions pending" as Migrate
+@@ -28,7 +29,8 @@ Enroll --> Refused : forbidden native-login extraction / invalid source
+ Resolve --> Node : explicit node reference
+ Resolve --> Broker : explicit broker account; slice 0 Claude, slice 1 Codex
+ Node --> Validate : current generation; known expiry checked, unknown stays unknown
+-Broker --> Validate : caller plan -> dispatcher service -> root launcher -> agent executor
++Broker --> Validate : caller plan -> ready dispatcher socket -> current revocation.check -> root launcher -> agent executor
++Broker --> Refused : dispatcher absent/unready; revocation.check revoked/unavailable; restore fenced
+ Helper --> Refused : unauthorized helper, conflicting settings, bad/oversize output or timeout
+ Helper --> HelperDelivery : validated authorized helper; suppress raw stderr; bounded private output
+ HelperDelivery --> Helper : issuer rotation; new launch/cache retry; restart for immediate cutover
+@@ -40,7 +42,8 @@ Validate --> Refused : changed binding/policy/executable; competing source; unqu
+ Validate --> Refused : broker unavailable / revoked grant or account / retired generation
+ Validate --> Inject : recheck destination binding; node protected lookup or broker-authorized lease
+ Inject --> Expired : Claude expiry/auth failure: no refresh or native fallback
+-Inject --> Inject : Codex slice 1: one broker auth owner refreshes; lease.renew within response deadline
++Inject --> Inject : Codex slice 1: one live refresh writer across replacement; qualified prior-attempt/store recovery
++Inject --> Refused : unknown writer/store/external rotation; no blind retry after child absence
+ Inject --> Refused : Codex renewal fails/deadline missed: turn fails; no fallback login
+ Expired --> Recover : human mints new token; atomic store replacement
+ Recover --> Node : restart affected sessions; already running child keeps old token until restart
+@@ -48,10 +51,23 @@ Node --> Revoked : explicit local node revoke
+ Revoked --> Enroll : explicit new enrollment; local deletion is not vendor revocation
+ note right of Validate
+   Caller-side curator-run composes; swarma-dispatcher admits/provisions/tracks;
++  Unix-socket service from slice 0 uses broker connection/framing protections;
++  fresh signed caller/generation checks; recovery/readiness precede admission.
++  Requester signs orchestrator delegation after generation-bound key registration;
++  dispatcher verifies/records, never signs; registration alone gives no spawn authority.
++  Recursive provisioning stays refused until bootstrap publication/qualification.
++  revocation.check is point-in-time evidence; final bind/lease/renewal checks remain.
+   root swarma-user-launcher passes immutable plan; agent-account curator-run
+   verifies/executes only, no profile resolution and no network except broker.
+   SH2 swarma-session-runner shares launch library; donor executor later qualified.
+-  Broker owns accounts/bindings/leases; one Codex auth owner owns refresh.
++  Broker owns accounts/bindings/leases; Codex slice 1 requires qualified containment,
++  kill-and-confirm, durable intent/process evidence and home reload across replacement.
++  Unknown external rotation requires unavailability/re-enrolment, no fallback.
++  Later host_start uses durable tuple-bound host admission permit; dispatcher starts
++  through claim/effect/root receipt; fresh channel/current epoch/readiness before delivery.
++  Retirement: quiesce, declared-key cleanup, home deletion; export closed-schema
++  service metadata only, without agent-controlled strings/names/links/bodies.
++  Separate explicit operator home retention states confidentiality is not guaranteed.
+   Plans/fragments/receipts contain metadata only; harness can read injected token.
+ end note
+ note bottom of Enroll
+diff --git a/cips/diagrams/donor-layout.puml b/cips/diagrams/donor-layout.puml
+index c735fbba44f67f788f29a2114ef0149002f9bab7..917f9a6547ba7f44214cb1fc1b9889c78439e1ae 100644
+--- a/cips/diagrams/donor-layout.puml
++++ b/cips/diagrams/donor-layout.puml
+@@ -1,4 +1,5 @@
+ @startuml donor-layout
++' Revision 2026-10-12: accepted review findings; Draft semantics, no renderer/qualification evidence.
+ title Donor state layout - Draft target; A/C donor-owned state root; B platform root / separate provisioner pending and disabled
+ left to right direction
+ node "Donor machine\nA/C: donor UID; B: root-provisioned separate UIDs" as D {
+@@ -23,7 +24,7 @@ node "Donor machine\nA/C: donor UID; B: root-provisioned separate UIDs" as D {
+ node "Project host" as P {
+   artifact "Root-controlled sshd policy\nTrustedUserCAKeys + user-certificate KRL\nprotected absolute forced command; no PTY/forward/rc/env" as SSHPolicy
+   artifact "Project registry / keeper-owned trust\nadmission, public worker keys, grants/revocations\nseparate host CA and user CA authorities" as Registry
+-  artifact "Project bridge / workplace executor-owned state\nmailbox/cursors, op_key result cache, permitted archive\ncarrier credential stays project-side" as Mailbox
++  artifact "Project bridge / workplace executor-owned state\nmailbox/cursors; durable identity/digest claims + admission floors\nseparate ten-minute output cache; closed-schema service metadata\ncarrier credential stays project-side" as Mailbox
+ }
+ Bridge --> Keys : sign / decrypt / SSH; private keys never sent
+ Bridge --> State : persist before acknowledgments / termination
+@@ -42,6 +43,11 @@ Provisioner --> Root : B journaled provision/remove only allocated artifacts; fa
+ note bottom of BridgeHome
+   State/keys unreadable to B harness UID and C sandbox.
+   A shares UID: no OS confidentiality/integrity/egress guarantee.
++  Project claims persist before mutation; floors advance before claims may be discarded.
++  Recovery reconciles claim/floor evidence before admission; unknown keeps binding closed.
++  Project retirement deletes home after process absence and declared-key cleanup;
++  export only closed-schema service metadata with no agent-controlled content.
++  Separate explicit home retention states confidentiality is not guaranteed.
+   Exact key/state/audit/cursor file names, socket basename, schema and retention
+   unspecified in spec CIP-0009 D0/D1/D5; folders above are the named D0 layout.
+ end note
+diff --git a/cips/diagrams/donor-lifecycle.puml b/cips/diagrams/donor-lifecycle.puml
+index 4eb650540c8ce2b0f71dd8c9c09440ab7cebe8cb..6bbe8a842e26ae0ba610fdc62f4a61c6547ed264 100644
+--- a/cips/diagrams/donor-lifecycle.puml
++++ b/cips/diagrams/donor-lifecycle.puml
+@@ -1,4 +1,5 @@
+ @startuml donor-lifecycle
++' Revision 2026-10-12: accepted review findings; Draft semantics, no renderer/qualification evidence.
+ title Donor lifecycle - Draft target A first / B disabled / C fallback; four independent descriptive axes, no closed state schema
+ state "Donor installation\nowner: donor / bridge role; B separate provisioner pending" as Installation {
+   state "Present\nvariant-owned service, config, keys, home" as Present
+@@ -23,7 +24,7 @@ state "Project workplace\nowner: project operator + dispatcher/helper + project
+   state "Admitted workplace" as Admitted
+   state "Suspended\ngrants paused; sessions closed; workplace kept" as Suspended
+   state "Retirement in progress\nrevocation persisted before termination/restart" as Retiring
+-  state "Retired\narchive permitted noncredential artifacts; account/egress released" as Retired
++  state "Retired\nquiesce + declared-key cleanup; delete home; account/egress released" as Retired
+   Admitted --> Suspended : operator suspend
+   Admitted --> Retiring : operator retire; stop user-cert renewal, user KRL, close sessions
+   Suspended --> Retiring : operator retire
+@@ -54,6 +55,9 @@ note right of Workplace
+ end note
+ note right of Identity
+   Revoke stops renewal, updates user KRL and closes established sessions.
++  Only service-generated closed-schema metadata is exported at retirement,
++  with no agent-controlled strings, names, links or bodies. Separate explicit
++  operator home retention states confidentiality is not guaranteed.
+   Certificate revocation alone does not stop an existing connection.
+   Return after revoke requires new keys through new enrollment.
+   Dispatcher one-shot identity exception never applies to donor identity.
+diff --git a/cips/diagrams/donor-side.dsl b/cips/diagrams/donor-side.dsl
+index 9972b021c18a4a8564c84a96eae67827095a3327..42e6da81f6e382f2240d78a762400290c766e82e 100644
+--- a/cips/diagrams/donor-side.dsl
++++ b/cips/diagrams/donor-side.dsl
+@@ -1,8 +1,9 @@
+-// C4 (Structurizr DSL) fragment for CIP-0009 (revision 4: B boundary shown; A/C differences in source notes; B disabled until separate provisioner contract exists): the donor machine and the bridge to our host.
++// C4 (Structurizr DSL) fragment for CIP-0009 (revision 5, accepted review findings 2026-10-12: B boundary shown; A/C differences in source notes; B disabled until separate provisioner contract exists): the donor machine and the bridge to our host.
+ // Defining sections: ../CIP-0009-donor-side-deployment-and-bridge.md#recommendation (D0-D12); ../../protocol/remote-worker.md#publication-status.
+ // Phase: Draft donor target after one-host slice 0; no current deployment/qualification claim.
+ // Refusal/recovery: unknown tuple/posture/generation or failed trust refuses; failed B provisioning reverses journal; channel loss pauses/catches up without repeating effects.
+-// State owners: donor bridge role owns keys/config/audit/cursors/budgets; harness role owns managed home/scratch; join point owns queue/challenges/tombstones/packages; project registry owns public pins/grants/revocations, project bridge owns mailbox/carrier, executor owns job leases/op_key cache.
++// State owners: donor bridge role owns keys/config/audit/cursors/budgets; harness role owns managed home/scratch; join point owns queue/challenges/tombstones/packages; project registry owns public pins/grants/revocations, project bridge owns mailbox/carrier, executor owns job leases, durable binding-generation identity/digest claims and admission floors; ten-minute output cache is separate. Claims are discarded only after identities are permanently inadmissible; recovery reconciles before admission.
++// Separate explicit operator home retention states confidentiality is not guaranteed; git/accepted outputs retain their own policy.
+ // Exact service UIDs, state files/retention and recovery record schemas unspecified in CIP-0009 D4/D5/D7/D9.
+ // Style follows relux-works/swarm-platform-architecture diagrams/c4 (hierarchical identifiers, one container per process).
+ // Variant B: two OS identities on the donor (untrusted harness, trusted bridge); the relay holds no keys and no network;
+@@ -35,7 +36,7 @@ workspace "Remote worker on a donor machine" "Draft donor target after slice 0:
+     project = softwareSystem "Project host" "Our host" {
+       joinPoint = container "Join point (service UID unspecified in D9)" "HTTPS, three verbs: challenge, cert, collect" "atomic invitation consumption, tombstones, rate limits; never commands"
+       sshd = container "sshd + swarma-rb-exec" "Root-controlled Match, TrustedUserCAKeys + KRL + workplace principal; protected absolute forced command" "root sshd / workplace UID executor; swarma-rb/1 and swarma-workplace-exec/1 are pending design labels, owner/formats unresolved"
+-      workplace = container "Remote workplace (OS-user backend)" "one OS user per worker; policy: tools, write scope, network, limits, env_allow" "where execution/file tools run; audit; cleanup; mailbox control plane goes to project bridge"
++      workplace = container "Remote workplace (OS-user backend)" "one OS user per worker; policy: tools, write scope, network, limits, env_allow" "durable identity/digest claim before execution/file mutation; audit; cleanup; mailbox control plane goes to project bridge; retirement deletes home after absence/key cleanup, exports only closed-schema service metadata without agent content"
+       bridge = container "Bridge (M3; service UID unspecified in D5)" "broker, mailbox, trust gate" "admits messages; verifies the worker's signature; carries bytes unchanged under a distinct carrier account"
+       registry = container "Trust registry + key keeper (service UID unspecified in D4/D12)" "pins K_sig, K_enc, K_ssh; grants; root-signed admission and revocations" "operator certificates chained to the root"
+       dns = container "DNS zone (DNSSEC default)" "TXT _swarma, TXT _swarma-ssh-ca, TLSA" "Per-environment root/host-CA/TLS trust; validated in client; declared no-DNSSEC invitation uses pins, never fallback on failure"
+@@ -55,8 +56,8 @@ workspace "Remote worker on a donor machine" "Draft donor target after slice 0:
+     donor.harness -> donor.proxy "model API over the proxy only"
+     donor.proxy -> provider "HTTPS"
+     donor.bridgeCore -> donor.keys "sign envelopes with K_sig; SSH with K_ssh"
+-    donor.bridgeCore -> project.sshd "one SSH connection; trust failure refuses; channel loss pauses new turns; reconnect catches up/cached result or unknown_result, no repeated effect"
+-    project.sshd -> project.workplace "exec / file ops as the workplace user; process-group lease"
++    donor.bridgeCore -> project.sshd "one SSH connection; trust failure refuses; channel loss pauses new turns; reconnect reconciles same durable claim and original admission window; retained result or pending/unknown_result, never automatic re-execution"
++    project.sshd -> project.workplace "authenticated bounded new-versus-retry admission; claim identity/digest before exec/file effects; process-group lease"
+     project.sshd -> project.bridge "mailbox.read / mailbox.post (worker-signed bytes) / mailbox.notify (advisory)"
+     operator -> project.joinPoint "check the enrolment against signed card, invitation binding or open application; release package"
+     operator -> project.registry "pin keys; root-signed admission; grants"
+diff --git a/cips/diagrams/donor-side.puml b/cips/diagrams/donor-side.puml
+index 4db3dfea8dda0390977a6deba633d4e8dc38e718..aa2307c875fe54c5f3e11c6c5f6150b1829caed4 100644
+--- a/cips/diagrams/donor-side.puml
++++ b/cips/diagrams/donor-side.puml
+@@ -1,4 +1,5 @@
+ @startuml donor-side
++' Revision 2026-10-12: accepted review findings; Draft semantics, no renderer/qualification evidence.
+ title Donor and project components - Draft target after one-host slice 0; B disabled; A/C role substitutions shown
+ left to right direction
+ actor "Human donor" as Donor
+@@ -20,7 +21,7 @@ node "Project host" as P {
+   component "Project bridge (M3)\nservice identity unspecified in spec D5\nmailbox/admission/carrier authority" as PB
+   component "Trust registry / key keeper\nservice identity unspecified in spec D4/D12\nroot/operator chain; host and separate user CA" as Keeper
+   database "Join-point-owned pending applications\nchallenges/invitation consumption/tombstones\noperator-signed encrypted packages" as JS
+-  database "Project-owned persistent state\npublic worker keys/grants/revocations, KRL\nmailbox/cursors, execution result cache, archives\ncarrier credentials never in donor package" as PS
++  database "Project-owned persistent state\npublic worker keys/grants/revocations, KRL\nmailbox/cursors; durable effect claims + admission floors\nten-minute output cache; closed-schema service metadata\ncarrier credentials never in donor package" as PS
+ }
+ cloud "Model provider" as API
+ cloud "DNSSEC zone\nenvironment root/host-CA/TLS records" as DNS
+@@ -43,11 +44,15 @@ Harness --> Proxy : B/C model calls only
+ Proxy --> API : qualified host allowlist
+ Harness --> API : A direct path; no OS egress guarantee
+ Bridge --> Exec : one donor-originated SSH; certificates/CA/name/validity/KRL checked
+-Exec --> PS : policy/leased jobs; cached result or unknown_result after reconnect
++Exec --> PS : policy/leased jobs; claim identity/digest before mutation;\nreconcile same effect on reconnect; output cache separate
+ Exec --> PB : mailbox control plane; tools only if granted
+ PB --> PS : durable mailbox; signatures/grants/freshness; exact-byte carrier delivery
+ note bottom of D
+   Channel drops -> pause new turns; current deadline; channel_down; durable output queue.
++  Recovery reconciles claims/floors before admission; missing/restored evidence keeps binding closed.
++  Discard claims only when identities permanently inadmissible; floor persisted first.
++  Retirement: confirmed absence, declared-key cleanup, home deletion; export has no agent content.
++  Separate explicit home retention states confidentiality is not guaranteed.
+   Reconnect validates trust and catches up cursors; never repeat an uncertain effect.
+   B disabled until separate provisioner exists. C enforces sandbox without UID split.
+   A has no OS confinement; all variants require lockdown + remote-auto and exact tuple.
+diff --git a/cips/diagrams/donor-variants.puml b/cips/diagrams/donor-variants.puml
+index 8e13df9529b27c3e207e90410c2ce67ed56585d9..31712c39901ca52bf7c6263f9c7ed2a69c7fc27f 100644
+--- a/cips/diagrams/donor-variants.puml
++++ b/cips/diagrams/donor-variants.puml
+@@ -1,4 +1,5 @@
+ @startuml donor-variants
++' Revision 2026-10-12: durable claims/floors separate from cached output; Draft, no qualification evidence.
+ title Donor deployment variants - Draft target: slice 0 one-host MVP precedes donor; A first, B disabled, C sandbox fallback
+ left to right direction
+ actor "Human donor\nonly init authority; TTY/typed consent\nis a policy heuristic" as O
+@@ -22,7 +23,7 @@ node "C - no administrator rights\ndonor UID; sandbox fallback" as C {
+ }
+ node "Project host target\nproject workplace UID; root-controlled sshd policy" as P {
+   component "sshd + protected forced executor\nOS-user workplace; project bridge" as PB
+-  artifact "Project-owned state\nmailbox/cache, admission/grants, user KRL\ncarrier credential stays here" as PS
++  artifact "Project-owned state\nmailbox; durable effect claims + admission floors\nseparate ten-minute output cache; grants, user KRL\ncarrier credential stays here" as PS
+ }
+ cloud "Qualified model provider" as API
+ O --> AB : choose A; consent / stop / leave / purge
+diff --git a/cips/diagrams/remote-worker-retire.puml b/cips/diagrams/remote-worker-retire.puml
+index f5048457282a422cae62535fa634e9979bea2939..f07e06472d19865743402c2b666609d18f94f846 100644
+--- a/cips/diagrams/remote-worker-retire.puml
++++ b/cips/diagrams/remote-worker-retire.puml
+@@ -1,5 +1,6 @@
+ @startuml remote-worker-retire
+-title Lifecycle of a remote worker (revision 4; variant-aware cleanup and independent state axes): stop, leave and purge on the donor; suspend, retire and revoke on our side; the identity stays pinned unless revoked
++' Revision 2026-10-12: accepted review findings; Draft semantics, no renderer/qualification evidence.
++title Lifecycle of a remote worker (revision 5; variant-aware cleanup and independent state axes): stop, leave and purge on the donor; suspend, retire and revoke on our side; the identity stays pinned unless revoked
+ 
+ actor "Operator (our side)" as OP
+ participant "Registry / key keeper" as T
+@@ -33,11 +34,15 @@ OP -> T: suspend: grants paused
+ OP -> BR: suspend: close sessions; keep workplace
+ OP -> D: retire workplace
+ D -> BR: persist channel/grant revocation; stop renewal; user-certificate KRL; close sessions
+-D -> D: kill every job and its descendants (process group / cgroup); verify no process of the workplace UID remains;\narchive permitted noncredential artifacts only after process absence
+-break process absence not established / cleanup failure
+-  D -> D: do not release remaining account/egress; recovery format unspecified in spec D7
++D -> D: kill every job and descendants (process group / cgroup); verify no workplace-UID process remains
++break process absence not established
++  D -> D: retain account/egress; reconcile unknown evidence; do not delete home
+ end
+-D -> D: proven process absence -> release account and egress rules
++D -> D: journal declared-key cleanup, then delete workplace home;\nexport service-generated closed-schema metadata only (no agent-controlled strings/names/links/bodies)
++break key cleanup / home deletion / metadata validation failure
++  D -> D: do not release remaining account/egress; journaled recovery; exact format unpublished
++end
++D -> D: confirmed absence + key cleanup + home deletion -> release account and egress rules
+ BR -> BR: next frame or envelope from this worker refused (retired); mailbox kept durable
+ note right of BR: the donor's connection drops; its bridge reports "retired by project" and pauses
+ OP -> T: revoke (only on compromise or departure): root-signed revocation of K_sig, K_enc, K_ssh
+@@ -65,6 +70,8 @@ note over OP, PH
+   Phase: Draft donor target after one-host slice 0; A first, B disabled, C fallback.
+   Donor Curator human commands run as donor UID; bridge service owns lifecycle marks,
+   keys/config/audit (A/C donor UID; B bridge UID); harness owns home/scratch.
++  Separate explicit operator home retention states confidentiality is not guaranteed.
++  Git/accepted outputs have a separate confidentiality policy.
+   Project dispatcher service owns tracking, root user-manager owns account lifecycle;
+   root sshd owns user KRL; project bridge owns channel/mailbox state;
+   registry/keeper owns signed identity revocations. Their exact UIDs/storage formats
+diff --git a/cips/diagrams/remote-worker-turn.puml b/cips/diagrams/remote-worker-turn.puml
+index 74e3a17fc005d40d62b35109d0960a67c6f8ec51..3be7b0bb318d5ee3adeaec42bc9de4a82d7feaba 100644
+--- a/cips/diagrams/remote-worker-turn.puml
++++ b/cips/diagrams/remote-worker-turn.puml
+@@ -1,5 +1,6 @@
+ @startuml remote-worker-turn
+-title Remote worker turn (revision 4; B boundary shown, disabled until separate provisioner spec/qualification): the harness has no local tools; the relay (harness identity) forwards to the bridge service (bridge identity), which carries every tool call and the mailbox over ONE SSH connection from the donor to our host; our host never connects back
++' Revision 2026-10-12: accepted review findings; Draft semantics, no renderer/qualification evidence.
++title Remote worker turn (revision 5; B boundary shown, disabled until separate provisioner spec/qualification): the harness has no local tools; the relay (harness identity) forwards to the bridge service (bridge identity), which carries every tool call and the mailbox over ONE SSH connection from the donor to our host; our host never connects back
+ 
+ box "Donor machine: harness identity (sandboxed, egress = proxy only)" #WhiteSmoke
+   participant "Harness\n(Claude / Codex / Muse, lockdown plan)" as H
+@@ -28,6 +29,10 @@ note over SUP, RB: Bridge renews short user certificate; expiry/revocation refus
+ break failed host trust / expired or revoked user certificate / wrong workplace principal
+   SUP -> SUP: refuse connection; no TOFU or alternate trust source
+ end
++RB -> WP: reconcile durable claims and admission floors before opening admission
++break missing / restored / unreadable / contradictory claim or floor evidence
++  RB -> RB: keep binding admission closed
++end
+ RB --> SUP: hello {versions:[1]} / swarma-rb/1 channel open (bounded CBOR frames, flow credits)
+ SUP -> RB: policy.get
+ RB --> SUP: workplace policy {tools, write scope, network, limits, env_allow} -> effective tool set
+@@ -67,9 +72,20 @@ loop each tool call
+     MCP --> H: unavailable tool
+   end
+   SUP -> RB: frame exec {id, op_key, cmd, cwd, env (env_allow only), timeout_s <= policy, max_output_bytes <= policy, lease_s}
+-  RB -> WP: run as the workplace user in its own process group with a lease; audit {who, what, when, policy id}
+-  WP --> RB: stdout/stderr frames (seq), exit
+-  RB --> SUP: frames (result cached by op_key for 10 min)
++  RB -> WP: authenticate new-versus-retry admission; binding-generation identity, operation, argument digest
++  break operation/argument mismatch or unseen expired identity below sequence/epoch floor
++    WP --> RB: refuse without mutation (exact codes unpublished)
++    RB --> SUP: refusal
++  end
++  alt existing durable claim
++    WP -> WP: reconcile/observe same effect; never automatically re-execute
++    WP --> RB: retained recorded result or pending / unknown_result
++  else genuinely new operation admitted in current bounded window
++    WP -> WP: durably claim identity + operation + canonical-argument digest BEFORE mutation
++    WP -> WP: run as workplace user in leased process group; persist result; audit
++    WP --> RB: stdout/stderr frames (seq), exit
++  end
++  RB --> SUP: frames (output cached separately for 10 min; cache miss never authorizes mutation)
+   SUP --> MCP: result
+   MCP --> H: tool result
+ end
+@@ -79,23 +95,37 @@ alt the model requests a built-in tool (Bash, Edit, WebFetch ...)
+ end
+ alt SSH channel drops mid-turn
+   SUP -> SUP: pause the turn loop; running turn continues to its deadline;\ntool calls fail with channel_down (retryable); result post queued durably with its op_key
+-  SUP -> RB: reconnect with backoff; host certificate/CA/validity/KRL rechecked; catch up from the durable cursor;\nreplay-safe: cached result or unknown_result, never a second effect
++  SUP -> RB: reconnect with backoff; host certificate/CA/validity/KRL rechecked; catch up from the durable cursor;\nretry keeps original identity/arguments/admission window; reconcile same durable claim;\nretained result or pending / unknown_result, never automatic re-execution
+ end
+ 
+ == result ==
+ H -> MCP: tools/call mailbox_post {binding, text} (offered only when the policy grants it)
+ MCP -> SUP: forward
+ SUP -> SUP: build the FINAL envelope (canonical bytes; audience/thread from the task record);\nsign with K_sig (D0 variant-specific storage; never sent to the project)
+-SUP -> RB: frame mailbox.post {op_key, envelope_bytes, signature}
+-RB -> BR: verify K_sig signature, grant, freshness; admit
+-BR -> O: carry the bytes UNCHANGED under the project bridge's carrier account for the worker (first slice) (distinct authority, audited) -> outcome proposal
++SUP -> RB: frame mailbox.post {op_key, envelope_bytes, signature}; original admission window on retry
++RB -> WP: authenticate admission; durable binding-generation identity/argument claim before effect
++break conflicting arguments / expired new admission / unresolved existing claim
++  WP --> SUP: refuse or pending / unknown_result; no automatic post
++end
++alt existing conclusive remote post claim
++  WP --> RB: retained result or unknown_result if output unavailable; no second post
++  RB --> SUP: same-effect outcome
++else genuinely new post admitted and claimed before effect
++  WP -> BR: verify K_sig signature, grant, freshness; durable mailbox admission claim
++  BR -> O: carry final bytes UNCHANGED under project carrier authority (first slice, audited) -> outcome proposal
++end
+ note over H, O
+   Phase: Draft donor target after slice 0; A first, B disabled, C qualified fallback.
+   B proxy identity is bridge UID or a system service; A provider path is direct, no proxy.
+   Bridge-role supervisor owns audit/budgets/cursors/dedup and durable queued results;
+   harness role owns home/scratch; project bridge owns mailbox and project carrier credential;
+-  workplace executor owns job leases and op_key cache; root sshd owns CA/KRL/forced command.
+-  Exact service UIDs for project bridge, filenames and cache persistence format
++  workplace executor owns job leases, durable identity/digest claims and admission floors; root sshd owns CA/KRL/forced command.
++  Claims discarded only after identities are permanently inadmissible; persist floor first.
++  R-OBS where applicable: recorded (result/current state), pending, rolled_back,
++  not_recorded (authoritative), unavailable (missing/expired/unreadable), contradictory.
++  Original caller/operators observe under receiver journal serialization; absence never retries.
++  Ten-minute output retention is independent of claim retention; no new service.
++  Exact service UIDs for project bridge, filenames and claim/floor/cache encoding
+   unspecified in spec CIP-0009 D5. rb/1 and workplace-exec/1 are pending design shorthand.
+   [[../CIP-0008-remote-worker-launch-mode.md#recommendation CIP-0008 R3/R5/R9]]
+   [[../CIP-0009-donor-side-deployment-and-bridge.md#recommendation CIP-0009 D0-D5/D12]]
+diff --git a/cips/platform-contract-disposition.md b/cips/platform-contract-disposition.md
+index b5d88a270a8a0977a635c02b2fe6570f2d4e0e3c..9395d43c11ffbba78b803dd3638dd5b35361a5ac 100644
+--- a/cips/platform-contract-disposition.md
++++ b/cips/platform-contract-disposition.md
+@@ -1,5 +1,9 @@
+ # Cross-CIP platform contract disposition
+ 
++## Revision 2: accepted review findings (2026-10-12)
++
++F-1 requires ordinary home deletion with a narrow service-generated metadata export. F-4 keeps starts dispatcher-owned through `host_start` and a durable host admission permit; F-5 selects one dispatcher service transport from slice 0. R-DELEG, R-VERDICT and R-OBS fix the delegation, revocation and observation names below; F-11 gates slice-1 refresh ownership across replacement. These decisions override older pinned design passages; matching module publication and qualification remain required.
++
+ ## Authority and status
+ 
+ This is the shared R-CS2 disposition for CIP-0002 to CIP-0007, CIP-0010 and CIP-0011, dated 2026-10-11. Canonical values come from the [platform contract table](https://github.com/relux-works/curator/blob/177cb554/.research/261010_platform-contract-table.md); coverage comes from [audit R-CS2, D1 and C4](https://github.com/relux-works/curator/blob/48789217/.research/261010_platform-docs-audit.md). The later owner decisions of 2026-10-10 and 2026-10-11 (D-GOALS through D-RESUME) override the table only where stated: D-EXECUTOR resolves N6/P1/C9, D-PATH resolves X1, D-WIRE-NAMES replaces W2's historical domain retention and qualifies W3/I4 naming; the other decisions retain their own scopes.
+@@ -27,9 +31,9 @@ Enforced script-worker commands retain the core declared-interpreter/exec PATH c
+ | Phase | Request/composition owner | Launch and credential owner | Publication/qualification limit |
+ |---|---|---|---|
+ | Human direct / interactive hosting | Caller-side `curator-run`; the existing shared launch construction site owns harness flags | Existing direct/hosting contract | Preserved separately from the Swarma one-shot amendment |
+-| Broker slice 0, one protected Claude launch | Board, session host or other caller asks `swarma-dispatcher` with a caller-composed plan | Dispatcher admits/provisions/tracks; root `swarma-user-launcher` passes the immutable plan to approved agent-account `curator-run`; that executor leases and injects | First consumer decided; versioned intake, required-understanding checks and supported-release qualification pending R-LR1 |
+-| Later Codex / enforced networking | Same dispatcher boundary | Codex single broker auth owner and external-token lane in slice 1; helper v1 applied network state in slice 2 | Codex adoption/qualification question remains open; no current support inferred |
+-| SH2 session runner / donor integration | Session host requests dispatcher; donor has its separately specified supervisor | Agent-side `swarma-session-runner` owns PTY/app-server and lease renewal in the SH2 target; donor supervisor is a later qualified executor | Shared library is accepted; joint host-role/ticket activation and donor qualification remain separate |
++| Broker slice 0, one protected Claude launch | Board, session host or other caller asks `swarma-dispatcher` with a caller-composed plan | Dispatcher admits/provisions/tracks; root `swarma-user-launcher` passes the immutable plan to approved agent-account `curator-run`; that executor leases and injects | Unix-socket dispatcher service from slice 0 using broker connection/framing rules; direct workers and operator-enrolled orchestrators first; versioned intake, required-understanding checks and supported-release qualification pending R-LR1 |
++| Later Codex / enforced networking | Same dispatcher boundary | Codex single broker auth owner and external-token lane in slice 1; helper v1 applied network state in slice 2 | Slice-1 activation requires one live vendor-refresh writer per account across replacement, prior-attempt/store reconciliation and supported-release qualification; no current support inferred |
++| SH2 session runner / donor integration | Session host requests dispatcher; donor has its separately specified supervisor | Agent-side `swarma-session-runner` owns PTY/app-server and lease renewal in the SH2 target; donor supervisor is a later qualified executor | Shared library is accepted; joint `host_start`/host admission permit publication and donor qualification remain separate |
+ 
+ Board runner and session host do not embed the first broker client. Dispatcher is its own module; `curator agent-user` is a client, never a temporary dispatcher substitute. [Decision 0021 amendment v1](../decisions/0021-sessions-enter-through-curator-run.md#amendment-v1--agent-account-one-shot-execution-2026-10-11) records the narrow amendment. The illustrative `exec --plan-fd N` entry is not published CLI syntax. The helper's specified plan FD3 transport does not settle the executor command grammar or release version.
+ 
+@@ -44,7 +48,7 @@ The first node and broker secret stores are 0600 files inside owner-only 0700 di
+ | Native per-home | Provider-native local channel/store under admitted isolation | Retained v1 default; enrollment never permits native-login copying/export |
+ | Claude enrolled setup-token via node/broker | `CLAUDE_CODE_OAUTH_TOKEN` in harness environment at exec; no launch credential file or native fallback | First protected provider launch, broker slice 0; no refresh; re-enroll/restart on expiry/auth failure |
+ | Claude API-key helper | Qualified protected helper pipe | Separate API-key lane retained from CIP-0003; no subscription equivalence or mode fallback |
+-| Codex personal node/broker | External access token plus account ID into a per-session app-server; no launch `auth.json` or broker-mode `codex exec` | One auth owner per account, broker slice 1; supported-release qualification and C4 owner adoption choice still open |
++| Codex personal node/broker | External access token plus account ID into a per-session app-server; no launch `auth.json` or broker-mode `codex exec` | At most one live refresh writer per account across broker replacement, broker slice 1; prior-attempt/store reconciliation and supported-release qualification and C4 owner adoption choice still open |
+ | Codex Business/Enterprise explicit token | `CODEX_ACCESS_TOKEN` | Specified later lane, outside first release; no broker refresh |
+ | Muse API key | Explicitly selected `META_API_KEY` or supported `exec --api-key-stdin` | Separate API-key lane; exact executor/harness admission required |
+ | Gemini/agy/qwen API key | Explicit provider API-key environment channel | Per-harness admission required; no automatic channel substitution |
+@@ -58,7 +62,7 @@ The first node and broker secret stores are 0600 files inside owner-only 0700 di
+ 
+ Broker grant and revocation domains are now `swarma-credential-broker grant/1` and `swarma-credential-broker revocation/1`, replacing historical `curator-broker …/1`. Each domain is followed by newline and CCJ-1 body; grant IDs hash the same preimage. Dispatcher mutating signatures remain `swarma-dispatcher request/1`, newline and CCJ-1 request without `auth`. The broker peer-authenticated transport does not thereby gain a signed request format.
+ 
+-The rule also prefixes the existing user-manager request kinds and dispatcher/broker transport and record identifiers in the table below. It does not invent a user-manager v2 signature domain, launch-ticket object/version, canonical bytes or host-role schema where none has been published. Curator credential extension/capability labels remain the separate Curator-owned contracts; general platform grants are not interchangeable with broker envelopes.
++The rule also prefixes the existing user-manager request kinds and dispatcher/broker transport and record identifiers in the table below. It does not invent a user-manager v2 signature domain, `host_start`/host admission permit encodings or canonical bytes where none has been published. Curator credential extension/capability labels remain the separate Curator-owned contracts; general platform grants are not interchangeable with broker envelopes.
+ 
+ ## Schema owner and version table
+ 
+@@ -81,11 +85,14 @@ This is the single coordination table for these CIPs. A named candidate is a res
+ | Tool declaration, lock and registry records/trust | CIP-0007 → core §4, registry §§1–5, skillfile-sources §3, manager | Option B accepted; declaration/record/schema revisions pending | Keys in system/fleet config and separate bundle; service/distribution questions below |
+ | Broker grant / revocation signed domains | `swarma-credential-broker` spec §§6.1–6.4 | `swarma-credential-broker grant/1`, `swarma-credential-broker revocation/1` (D-WIRE-NAMES) | General `grant/1` role/action grammar needs a separately versioned adapter |
+ | Broker peer-authenticated frames | Broker spec §13 | `swarma-credential-broker broker/1` by D-WIRE-NAMES, hello versions `[1]`; replaces unprefixed `broker/1` | Transport identity, not a broker request-signature domain; frame name **derived by rule, pending matching module vectors** |
+-| Dispatcher command / socket and signed domains | `swarma-dispatcher` spec §§3.3, 4.5, 8 | `swarma-dispatcher dispatch-op/1`, `swarma-dispatcher dispatch/1`; `swarma-dispatcher request/1`, `swarma-dispatcher effect/1` | D-WIRE-NAMES applies to command/socket labels; signature/effect domains already repository-prefixed; command/socket names **derived by rule, pending matching module vectors** |
++| Dispatcher service operations / socket and signed domains | `swarma-dispatcher` spec §§3.3, 4.5, 8 | `swarma-dispatcher dispatch-op/1`, `swarma-dispatcher dispatch/1`; `swarma-dispatcher request/1`, `swarma-dispatcher effect/1` | D-WIRE-NAMES applies to operation/socket labels; signature/effect domains already repository-prefixed; operation/socket names **derived by rule, pending matching module vectors** |
+ | Dispatcher allocation / execution records | Dispatcher spec §§4.3–4.4 | `swarma-dispatcher agent/1`, `swarma-dispatcher run/1` by D-WIRE-NAMES | `agent_id`, dispatcher `run_id`, execution claim `execution_id` and board IDs remain distinct; record names **derived by rule, pending matching module vectors** |
+ | User-manager helper / launcher requests | `swarma-user-manager` spec §§2–3, 7 | `swarma-user-manager helper-op/1`, `swarma-user-manager launch-op/1`, `v:1` (D-WIRE-NAMES) | Configured sudo caller/role policy in v0/v1; grants refused until v2; no signed-request grammar invented; request names **derived by rule, pending matching module vectors** |
+ | User-manager v2 signed request | User-manager §9 with dispatcher/grant owners | Domain/object/version/canonical bytes open (W3) | Choose component-specific format or versioned shared adapter before activation |
+-| Launch ticket and host role | Joint dispatcher §12, user-manager extension, session-host §§3.3–3.4 | Object/version/signature bytes and role schema open (I4); eventual issuer namespace `swarma-dispatcher` per D-WIRE-NAMES | Jointly version and activate, or leave SH2 backend disabled |
++| Host start / admission permit (R-START) | Dispatcher §12 and session-host §§3.3–3.4; existing user-manager launch boundary | `host_start` in `dispatch-op/1` for configured session-host service principal; `(logical_session_id, execution_id, controller_epoch, op_id)` bound to durable host admission permit | Dispatcher alone invokes privileged starts via claim/effect/root receipt; fence changes withdraw/reconcile permit; fresh runner channel, current-epoch registration and readiness before delivery; exact encodings and recovery qualification pending |
++| Effect observation (R-OBS) | User-manager `helper-op/1` and broker `broker/1`; remote semantics in CIP-0009 D5 | `effect.observe`: original `request_id`, operation, canonical-argument digest; `recorded`, `pending`, `rolled_back`, `not_recorded`, `unavailable`, `contradictory` | Original caller principal/operators; receiver-journal serialization; `recorded` carries result/current target state; only authoritative evidence proves `not_recorded`; expired/missing evidence is `unavailable`; no automatic create from absence/rollback |
++| Revocation verdict (R-VERDICT) | Broker `broker/1`; dispatcher admission | `revocation.check`: exact chain(s), context `prepare`, `dequeue`, `start`; `not_revoked`, `revoked`, `unavailable` and broker revocation sequence | Configured dispatchers only; point-in-time evidence; stale verdict never authorizes a future start; restoring state is `unavailable`; refuse on revoked/unavailable, retain final bind/lease/renewal checks |
++| Orchestrator caller delegation (R-DELEG) | Dispatcher bootstrap and broker chain verifier; CIP-0011 §4 | Requester signs after generation-bound `register_key`; dispatcher verifies/records, never signs | Registration alone gives no spawn authority; depth/chain preflight and activation rechecks; recursive provisioning refused until bootstrap publication/qualification |
+ 
+ ## Open owner questions and related decision boundaries
+ 
+@@ -98,8 +105,10 @@ This is the single coordination table for these CIPs. A named candidate is a res
+ | Remaining launch intake publication (N6/P1) | Launcher R-LR1 with dispatcher/user-manager owners | D-EXECUTOR resolves the executor model. Publish the narrow versioned intake/verification/receipts and qualified release before activation, or defer activation; do not reopen the chosen first consumer. |
+ | Shared grant adapter / registry (W2/W4; CIP-0011 D-R6) | Broker / platform trust owners | Retain broker-local envelopes/state, or publish a versioned general-grant/keeper adapter and registry with explicit key/role mapping. Caller keys, broker software root and keeper identity keys remain separate. |
+ | Helper v2 signed bytes (W3) | User-manager / platform trust owners | Explicit component-specific signed format, or versioned shared adapter. D-WIRE-NAMES fixes the naming rule only, not unpublished grammar. |
+-| Launch ticket/host-role activation (I4) | Dispatcher, user-manager and session-host jointly | Jointly version and activate, or leave SH2 backend disabled. Ticket generation, execution ID, ticket epoch and controller epoch remain distinct. |
+-| Retire `keep` request (P7) | User-manager owner / operator | Admit operator-only `keep` and align the closed schema, or remove it from policy and retain archive/delete. Dispatcher/installer authority is not expanded. |
++| Host start / permit publication (R-START) | Dispatcher and session-host with user-manager launch owner | Would need authenticated `host_start` encodings, durable permit/fence transaction and same-effect/receipt recovery ordering; joint qualification before enabling the backend. Account generation, execution ID and controller epoch remain distinct. |
++| Explicit home retention publication (F-1) | User-manager owner / operator | Ordinary retirement quiesces, performs declared-key cleanup and deletes the home. Only service-generated closed-schema metadata without agent-controlled strings, names, links or bodies is exported. Keeping a home is a separate explicit operator operation stating confidentiality is not guaranteed; would need its closed request schema. Dispatcher/installer authority is not expanded; git/accepted outputs retain their separate policy. |
++| Admission and delegation encodings (R-VERDICT/R-DELEG) | Broker and dispatcher | Would need exact `revocation.check` chain/context/sequence encodings and refusal codes, requester-signed delegation activation and pre-key registration proof-of-possession/replay/rotation rules. Shared names/values fixed; no new fields/codes allocated here. |
++| Vendor-refresh replacement (F-11) | Broker / service lifecycle owner | Would need qualified per-platform containment/kill-and-confirm, durable attempt/process evidence, prior-outcome reconciliation and durable-home reload; unknown writer/store/external rotation keeps account unavailable or requires re-enrolment. This gates slice 1. |
+ | Release scheduling / reauthentication (CIP-0010) | CIP and harness owners / operator | Schedule slice 0 in the proposed release window or defer; re-enroll/restart after setup-token failure, with no automatic fallback. Supported-release recovery evidence remains qualification work. |
+ 
+ D-GOALS keeps session host board-free and goal-free: only the initiating caller or optional board/orchestrator authors goals now, with no agent-account goal capability on the host socket. This keeps authorship with the initiating authority while the separate agent namespace/bounds await SH2+ design. A later item chooses self-goals in a separate namespace or continued caller/board-only authorship; no strict coupling to task-board, goals or the orchestrator toolchain is permitted.
+diff --git a/protocol/remote-worker.md b/protocol/remote-worker.md
+index f196e2cfeb17e9ff5c219eb3b909f7defb978a58..2e4d0cc12daaf1732c1538e695073d0cc52d7ba2 100644
+--- a/protocol/remote-worker.md
++++ b/protocol/remote-worker.md
+@@ -1,7 +1,11 @@
+ # Remote worker on a donor machine
+ 
+-- **Status:** Draft contract reconciliation for R-CS1; no implemented capability or qualification asserted.
+-- **Authority:** [CIP-0009](../cips/CIP-0009-donor-side-deployment-and-bridge.md), the platform contract table at `relux-works/curator` revision `177cb554` (D1–D5), and the recorded owner decisions of 2026-10-10/11. D-DONOR-PROVISIONING supersedes the open helper-extension choice; D-WIRE-NAMES sets wire naming.
++- **Status:** Draft revision 2, accepted review findings of 2026-10-12; no implemented capability or qualification asserted.
++- **Authority:** [CIP-0009](../cips/CIP-0009-donor-side-deployment-and-bridge.md), the platform contract table at `relux-works/curator` revision `177cb554` (D1–D5), and the recorded owner decisions of 2026-10-10/11/12. D-DONOR-PROVISIONING supersedes the open helper-extension choice; D-WIRE-NAMES sets wire naming.
++
++## Revision 2: accepted review findings (2026-10-12)
++
++F-7 separates durable remote effect claims from cached output and requires bounded authenticated freshness admission and closed recovery. F-1 replaces ordinary workplace-home retention with deletion and a restricted metadata export. No wire publication or qualification is claimed.
+ 
+ This document publishes the common contract and the status of its missing formats. The field lists in CIP-0009 are design requirements, not closed schemas. A pending format cannot be treated as an interoperable API or permission to activate its feature.
+ 
+@@ -15,7 +19,7 @@ Versioned platform wire identifiers carry the owning repository name: `swarma-<c
+ | `swarma-bridge join/1` | CIP-0009 D4 | **PENDING closed schema and signature preimage.** Deterministic CBOR, challenge-bound proof of possession, three separate keys, algorithms, variant/tuple and invitation/open-application binding. Open-application identifiers and retry binding are not frozen. |
+ | `swarma-bridge credential-package/1` | CIP-0009 D4/D12 | **PENDING closed schema.** Root, operator chain, host CA, short user certificate/workplace principal, binding, tuple, variant, generation and expiry; authenticated encryption and transcript associated data; no carrier credential. Exact serialized envelope and algorithm negotiation remain unpublished. |
+ | Join API: `challenge`, `cert`, `collect` | CIP-0009 D4/D9 | **PENDING request/response/error schemas.** Routes are proposed as `POST /join/challenge`, `/join/cert`, `/join/collect`. Invited/open application, polling, second challenge, collection retry/replay and rejection payloads require closed formats; no additional join verb is implied. |
+-| Remote Bash framing (design shorthand `swarma-rb/1`) | CIP-0009 D5 | **PENDING standalone framed protocol and wire owner.** Bounds, deterministic CBOR, negotiation, request IDs, `op_key`, result cache, caps, method authorization, leases, flow credits, cursors, receipts and errors must be frozen together. |
++| Remote Bash framing (design shorthand `swarma-rb/1`) | CIP-0009 D5 | **PENDING standalone framed protocol and wire owner.** Bounds, deterministic CBOR, negotiation, request IDs, `op_key`, durable binding-generation identity/digest claims, authenticated admission windows/floors, retention/recovery, R-OBS observations, separate ten-minute output cache, caps, method authorization, leases, flow credits, cursors, receipts and errors must be frozen together. |
+ | Workplace execution (design shorthand `swarma-workplace-exec/1`) | CIP-0009 D5 | **PENDING standalone backend contract and wire owner.** OS-user backend first; policy/audit/output review/descendant cleanup requirements do not establish container conformance. |
+ | Donor provisioning/removal | CIP-0009 D1/D2; D-DONOR-PROVISIONING | **PENDING separate short spec, rules, removal and closed schema; B disabled.** Separate donor-side binary and privileges; sharing UID/path libraries is allowed. No donor operation exists in `swarma-user-manager`'s closed schema. Binary naming is not decided here. |
+ 
+@@ -45,10 +49,20 @@ D9 owner-approved policy values are 10 requests/minute and 100/day per source ad
+ 
+ ## Tools, mailbox and lifecycle
+ 
+-The effective tool set is the relay maximum intersected with workplace policy. Mailbox operations are control plane and appear as tools only when granted. Donor admission checks verification records, binding, expiry, fences/revocations and delivery mode before a session-input adapter receives a turn. Cursors advance after persistence; message IDs deduplicate; the application receipt is separate from transport acknowledgement. A dropped channel pauses new turns; a current turn reaches its deadline, calls fail `channel_down`, and outbound results queue durably. Reconnect checks SSH certificates and uses cached results or `unknown_result`, never a repeated effect.
++The effective tool set is the relay maximum intersected with workplace policy. Mailbox operations are control plane and appear as tools only when granted. Donor admission checks verification records, binding, expiry, fences/revocations and delivery mode before a session-input adapter receives a turn. Cursors advance after persistence; message IDs deduplicate; the application receipt is separate from transport acknowledgement. A dropped channel pauses new turns; a current turn reaches its deadline, calls fail `channel_down`, and outbound results queue durably. Reconnect checks SSH certificates and reconciles the original durable effect identity, argument digest and admission window. The ten-minute output cache is separate from replay evidence; its expiry never authorizes repetition.
++
++### Remote effect claims and recovery (F-7)
++
++At the existing workplace effect owner, durably claim each binding-generation-scoped operation identity, operation and canonical-argument digest before mutation. This covers tool effects such as `exec`, `file.write` and `patch.apply`; signed mailbox claims do not automatically cover them. Same-identity retries retain the original arguments and admission window; operation/argument mismatches refuse. A known claim without a conclusive result stays `pending` or `unknown_result`, never automatically re-executed. Cached output lasts ten minutes and may be returned while retained; a cache miss proves no absence.
++
++Authenticate new-versus-retry admission with a bounded sequence or epoch floor. New work must fall within the current admission window; an unseen expired identity refuses. Output expiry does not grant a retry a fresh window. Persist floor advancement before discarding claims, and discard claims only after their identities can never be admitted again. Indefinite bindings must allow bounded claim storage without losing replay safety. A new identity requires an explicit new-effect decision.
++
++Reconcile durable claims and admission floors before recovery opens admission. Lost, restored, unreadable or contradictory evidence keeps the binding closed. Reuse R-OBS states where applicable: `recorded` with recorded result and current target state, `pending`, `rolled_back`, `not_recorded`, `unavailable`, `contradictory`. Only complete authoritative evidence establishes `not_recorded`; missing/expired/unreadable evidence is `unavailable`. Reads are authenticated to the original caller principal or operators, scoped to the original effect identity, operation and argument digest, and serialized with the receiver journal. Observing absence or rollback never authorizes an automatic new effect. No service or exactly-once completion guarantee is added.
++
++**Open publication entry — remote claims/admission:** would need canonical argument bytes/digest rules, binding-generation identity encoding, authenticated new-versus-retry encoding, selected bounded sequence/epoch floor, durable claim/floor retention and recovery order, R-OBS response encoding, exact refusal codes and negative vectors. These remain part of the unpublished channel/backend formats. No new wire field, code or policy duration is specified. Qualification would need lost reply/long disconnect/cache expiry, mismatching arguments, new versus stale admission, concurrent retries, receiver crashes around claim/mutation/result persistence, claim-store rollback/loss and interrupted reconciliation; see the CIP-0009 test plan.
+ 
+ The donor bridge signs final envelope bytes with `K_sig`. The project verifies signature/grants/freshness and carries those bytes unchanged under a distinct audited carrier authority in the first slice. No project carrier credential enters the donor package. Later organisation accounts and allowlisted freelancer federation are a separate rollout phase.
+ 
+-Track donor installation, donor execution, project workplace and signing identity separately (CIP-0009 D7). Local stop persists before termination and keeps bridge/keys; leave keeps identity for a new admitted workplace; purge removes only variant-owned artifacts and can happen offline. A/C never remove the donor account. B cleanup belongs to its pending separate provisioner. Project suspend/retire/revoke are independent: retirement closes sessions and jobs, revokes channel/grants/user certificates, archives permitted artifacts and releases the workplace after process absence; the donor identity remains pinned. Only a separate operator-authorized signed revocation revokes that identity; the one-shot dispatcher exception does not apply. Offline purge reports remote revocation as unknown.
++Track donor installation, donor execution, project workplace and signing identity separately (CIP-0009 D7). Local stop persists before termination and keeps bridge/keys; leave keeps identity for a new admitted workplace; purge removes only variant-owned artifacts and can happen offline. A/C never remove the donor account. B cleanup belongs to its pending separate provisioner. Project suspend/retire/revoke are independent: retirement closes sessions and jobs, revokes channel/grants/user certificates, after confirmed process absence, performs declared-key cleanup, deletes the workplace home and releases the account; only service-generated closed-schema metadata without agent-controlled strings, names, links or bodies is exported. Keeping a home is a separate explicit operator operation stating that confidentiality is not guaranteed; git/accepted outputs retain their separate policy. After ordinary retirement, the donor identity remains pinned. Only a separate operator-authorized signed revocation revokes that identity; the one-shot dispatcher exception does not apply. Offline purge reports remote revocation as unknown.
+ 
+ The [CIP-0009 test plan](../cips/CIP-0009-donor-side-deployment-and-bridge.md#test-plan) is future qualification work. This documentation publication claims no test, build, renderer or provider qualification result.
