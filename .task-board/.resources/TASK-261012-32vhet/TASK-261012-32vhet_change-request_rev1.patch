@@ -1,0 +1,508 @@
+diff --git a/README.md b/README.md
+index 9b6ca733b8022ffe2dd58f6a181e095634074a48..d3f8a56af728b6bded7043c4844ccca5322a445d 100644
+--- a/README.md
++++ b/README.md
+@@ -87,9 +87,21 @@ release; Muse subscriptions remain an open channel/priority question.
+ Explicit API-key channels and native per-home authentication stay separate.
+ The first broker store is files 0600 in owner-only 0700 directories.
+ 
+-Cancellation/max-runtime stop uses helper `exec.stop` through the dispatcher:
+-verify owned generation/execution and receipt/process identity, SIGTERM then
+-SIGKILL, and confirm absence including escaped descendants. Caller/sudo
++Cross-account workspace materialization requires a standalone repository
++with private `.git`, common directory, refs, index, configuration and hooks.
++Never inherit a source `.git` backlink, executable local configuration or
++credential helpers. Copy/reflink optimisations preserve that rule; optional
++object sharing is immutable and read-only to agents. Linked worktrees remain
++allowed only within one account, including the existing board workflow.
++Source/result transfer ownership and authorisation across private homes stay
++open in SPEC §10.5; shared-object provenance/access/retention need publication.
++
++Cancellation/max-runtime stop uses helper `exec.stop` through the dispatcher,
++referencing the user manager's single termination scope (§§4.4/4.7): verify
++owned generation/current execution and receipt identity, signal every process
++of the UID (TERM, grace, KILL), stop its service domain where present, and
++confirm account-wide absence over a quiet period. Completed stops replay
++without signalling; an old receipt cannot stop a successor. Caller/sudo
+ exit is not a stop receipt. Unknown evidence permits neither capacity release
+ nor replacement. Start receipts identify a start attempt, not readiness;
+ consumed-plan evidence binds digest, qualified executor and policy generation
+@@ -102,14 +114,33 @@ does not define this mode. Published typed refusals include
+ `lease_harness_unqualified`, `renew_timeout` and `processes_remain`. Refusals
+ are terminal and never launch a weaker alternative.
+ 
++The user manager's spec §7 owns the process **fate table** (R-FATE), next
++to R-FD3: kill domains, stop/crash/restart fate, promised survival, affected
++executions and the fence against writers from a replaced daemon. SPEC §10.4
++references it; `setsid` and UID changes are not survival promises.
++R-TIME requires an authenticated or operator-controlled installer time source,
++durable dispatcher/broker time watermarks, expiry at `max(now, watermark)`
++and `not_before` at `min(now, watermark)`. Untrusted time never advances
++the watermark; reset is an explicit operator act. Clock steps can only
++narrow authority. Expiry-driven home deletion and binding removal also need
++real boot-inclusive monotonic elapsed time of at least the lifetime.
++
+ D-WIRE-NAMES selects `swarma-<component> <object>/<n>` for versioned wire
+ identifiers, including broker grant/revocation signed domains; it invents no
+ unpublished helper signature grammar. SPEC §§10.2/10.5 describe the
+-`host_start` operation in `dispatch-op/1` and its durable host admission
+-permit bound to `(logical_session_id, execution_id, controller_epoch, op_id)`.
+-The host requests the start; the dispatcher uses its existing claim, effect
+-and root-receipt path, resolves ambiguous calls without a second launch,
+-and stops if required. The runner opens a fresh authenticated host channel;
++`host_start` and `host_stop` operations in `dispatch-op/1`. The durable
++**host admission permit** is session-scoped for one `logical_session_id`.
++The owner's admitted start can explicitly authorise successor executions
++through **session lifecycle authorisation** (member format unpublished).
++Every physical start retains its own `(execution_id, controller_epoch, op_id)`
++claim, fence and receipt interlock. Successor `host_start` requires that
++authorisation and previous-claim confirmed absence; it is idempotent per
++`(logical_session_id, op_id)`. The host requests the start; only the dispatcher
++performs it and resolves ambiguous calls without a second launch.
++Only the configured session-host principal may request `host_stop`, only
++under its permit: journaled E-stop (`exec.stop`, confirmed absence), recorded
++as host-requested, distinct from owner `cancel`, with no start authority.
++The runner opens a fresh authenticated host channel;
+ current-epoch registration and readiness precede delivery. Joint transport,
+ permit, fence/cancel/crash and receipt publication still gate the SH2 backend.
+ Helper v2 signature publication also remains open. D-GOALS keeps optional
+@@ -533,10 +564,10 @@ make check      # all of the above
+ ```
+ 
+ CI (`.github/workflows/ci.yml`) runs the same targets on `ubuntu-latest`
+-and `macos-latest` with the toolchain from `go.mod`. The optional `Test (rose-air)` job runs `make check` on
+-`[self-hosted, macOS, ARM64]` only when the repository variable
+-`ROSE_AIR_RUNNER` is exactly `true`. Enable it after registering a matching
+-runner. Goldens run as part of `make test` and `make race`. There are no
++and `macos-latest` with the toolchain from `go.mod`. An optional self-hosted
++job runs `make check` on `[self-hosted, macOS, ARM64]` when its repository
++opt-in is enabled; the workflow defines that setting. Enable it after
++registering a matching runner. Goldens run as part of `make test` and `make race`. There are no
+ release or tag jobs. Windows is not in this launcher's hosted matrix;
+ platform execution evidence must come from the corresponding runner.
+ 
+diff --git a/SPEC.md b/SPEC.md
+index 9588077c07b86ec27562bc0507a377da072e7014..65d464291193ab2b9a9dc01f91c2ac278c537482 100644
+--- a/SPEC.md
++++ b/SPEC.md
+@@ -3,6 +3,13 @@
+ **Specification version:** `0.5.0-draft`
+ **Status:** in-repository draft (see [Versioning](#8-versioning))
+ 
++- 2026-10-12, 0.5.0-draft documentation revision (§§10.2, 10.4–10.5,
++  README and figures): apply private cross-account Git administration
++  (F-16), the single termination scope (F-13), the user manager's fate
++  table (R-FATE), session-scoped host admission and `host_stop` (R-SESSION),
++  and the accepted time rules (R-TIME). Source/result transfer ownership
++  and unpublished formats remain open; no implementation is claimed.
++
+ - 2026-10-12, 0.5.0-draft documentation revision (§§10.1–10.5, README
+   and figures): apply the accepted descriptor-lifecycle reference (R-FD3),
+   dispatcher-only privileged starts (R-START), initial Unix-socket service
+@@ -1722,7 +1729,8 @@ The owner decisions of 2026-10-10/11/12 override its open choices only as
+ stated here: D-EXECUTOR (executor/consumer), D-PATH (managed PATH),
+ D-WIRE-NAMES (wire naming), D-GOALS, D-IDENTITY,
+ D-DONOR-PROVISIONING and D-RESUME, plus the accepted 2026-10-12
+-retirement, dispatcher-only start and initial service-transport decisions.
++retirement, dispatcher-only start, initial service-transport, private
++cross-account repository, session-lifecycle authorisation and time decisions.
+ The other open choices stay open.
+ This section specifies obligations for a future implementation, not
+ current capability or runtime evidence.
+@@ -1827,6 +1835,23 @@ precede admission; an absent or unready service refuses with no command
+ fallback. Queueing, events, long waits and advanced integrations come later
+ on the same transport behind capability gates.
+ 
++**Workspace materialization across accounts (F-16).** A child in another
++isolated account MUST get a standalone repository under its own home,
++materialized from the admitted repository identity, exact base and approved
++content. Its writable Git administration MUST be private: `.git`, common
++directory, refs, index, configuration and hooks. Local configuration and
++hooks MUST be freshly defined for that repository; materialization MUST NOT
++inherit a source `.git` backlink, executable local configuration or
++credential helpers. Copy/reflink optimisations MUST preserve this boundary;
++mutable hard-linked Git administration cannot satisfy it. Linked worktrees
++remain allowed only within one account, including the existing board
++workflow; workflow isolation does not establish account isolation.
++Optional object sharing MUST be immutable, read-only to agents and limited
++to authorised source objects, with published provenance, access and retention
++rules. Source/result transfer across private homes remains an open ownership
++and authorisation question (§10.5); it does not authorise weaker home
++permissions, recursive privileged chown or a new privileged workspace service.
++
+ Only `swarma-dispatcher` invokes the privileged launcher for execution
+ starts. It checks the caller's authority, grants and capacity,
+ provisions the account and broker binding, claims the execution, invokes
+@@ -1848,10 +1873,18 @@ arbitrary `sudo -u` substitutes for this boundary.
+ The session host requests a start via `host_start` in `dispatch-op/1`,
+ allowed only to its configured service principal. It carries
+ `(logical_session_id, execution_id, controller_epoch, op_id)` and refers to
+-a **host admission permit**: a durable dispatcher record bound to those four
+-values, created when a start with the session-host executor is admitted.
++a session-scoped **host admission permit**: a durable dispatcher record
++for one `logical_session_id`, created at the owner's admitted start.
++That start's **session lifecycle authorisation** can explicitly authorise
++successor executions for that logical session; its member format is
++unpublished (R-SESSION). Each physical start still has its own
++`(execution_id, controller_epoch, op_id)` claim, fence and receipt interlock.
++Successor `host_start` is admissible only under that authorisation,
++is idempotent per `(logical_session_id, op_id)`, and requires the previous
++claim to be confirmed absent first.
+ The host prepares durable session intent and a closed delivery fence; a
+-fence change withdraws the permit or sends it to reconciliation. The
++fence change prevents a stale physical start or sends it to reconciliation,
++without widening the session lifecycle authorisation. The
+ dispatcher starts the approved agent-side runner through its existing
+ claim, effect and root-receipt path. Cancellation before the call prevents
+ the call. After an ambiguous call the dispatcher resolves the same effect
+@@ -1864,6 +1897,12 @@ Controller-only re-adoption preserves the execution ID; actual replacement
+ uses a new one, and the fresh runner's native session-lock check remains.
+ This target host path remains disabled pending joint publication (§10.5).
+ 
++The configured session-host principal may also call `host_stop` in
++`dispatch-op/1`, only for an execution under its host admission permit.
++It follows the dispatcher's journaled E-stop path (`exec.stop`, confirmed
++absence), is recorded as host-requested and is distinct from owner `cancel`.
++It confers no start authority; physical starts remain dispatcher-only.
++
+ `curator-run` executes under the agent UID. It verifies the immutable plan
+ and destination binding, uses only qualified credential injection, and
+ executes the admitted harness. It MUST NOT self-admit, create/bind accounts,
+@@ -1949,11 +1988,33 @@ provider lane is enabled by D-EXECUTOR's first-consumer decision.
+ ### 10.4 Signals, stop, receipts and cleanup
+ 
+ The dispatcher service owns the execution's lifetime and supervision from
+-the first slice. Caller terminal closure or caller death is not a confirmed
+-stop. Cancellation and max-runtime stop go through helper `exec.stop` for the owned generation
+-and execution, with start-receipt/process identity verification, SIGTERM
+-then SIGKILL, returning a termination receipt only after absence is
+-confirmed (including escaped descendants). No signal relay through sudo,
++the first slice. The user manager's spec §7 owns the single process
++**fate table** (R-FATE), beside R-FD3: service-manager/kill domains, fate on
++service stop/crash/restart, backend survival promises, journaled stop or
++`lost` observation, and the executions affected by a service swap. §10
++references that table rather than inferring survival from `setsid`, UID
++changes or service-manager defaults. Its fence against writers left over
++from a replaced daemon applies to every supervisor write; no live supervisor
++adoption is authorised. Platform services and service managers end executions
++only through `exec.stop`, retirement or an operator emergency stop; OS
++failures remain possible and are recorded as `lost`. Published unit
++configurations and per-platform qualification are required for fate claims.
++
++Caller terminal closure or caller death is not a confirmed stop.
++Cancellation, max-runtime stop and permitted `host_stop` go through helper
++`exec.stop` for the owned generation and execution. The user manager's
++§§4.4 and 4.7 and `diagrams/launch.puml` own the **single termination scope**
++shared by stop and retirement (F-13): while one execution per generation
++holds, signal every process of that UID with SIGTERM, grace period and
++SIGKILL, stop the per-user service domain where present, and confirm
++account-wide absence over a quiet period, including escaped descendants.
++The receipt/process identity check remains the authority check, not a
++process-set or wall-clock start-time filter. Account-wide signalling requires
++the requested execution to be the generation's latest receipt; a completed
++stop replays its recorded result without signalling, and an old receipt
++never authorises stopping a successor. A termination receipt requires that
++confirmed absence. Persistence denial and the idle zero-process rule remain
++user-manager qualification obligations. No signal relay through sudo,
+ PID-only authority or direct session-host signalling substitutes for it.
+ Unknown/contradictory evidence permits neither claim release nor replacement.
+ The interactive terminal forwarding/stop/continue rules remain unchanged.
+@@ -1977,6 +2038,18 @@ alternative ordinary retirement path. Code and results retain their separate
+ git/acceptance policy, which does not prove secret-free content. The executor
+ owns neither retirement nor identity revocation.
+ 
++**Time and expiry-driven destruction (R-TIME, F-21).** The platform installer
++requires an authenticated or operator-controlled time source (for example
++NTS). The dispatcher and broker each keep a durable time **watermark**:
++expiry is checked at `max(now, watermark)` and `not_before` at
++`min(now, watermark)`. The watermark never advances on untrusted time;
++resetting it is an explicit operator act. Clock steps can only narrow
++authority. Expiry-driven home deletion and binding removal additionally
++require real, boot-inclusive monotonic elapsed time of at least the
++lifetime. The component owners publish and qualify these rules; this
++executor does not substitute its wall clock for them. Explicit stops and
++operator retirements retain their separate authority.
++
+ **Open publication question — retirement export:** a metadata export would
+ need the user manager's closed schema and provenance checks published;
+ arbitrary agent-controlled content, names, links and bodies cannot enter it.
+@@ -2034,11 +2107,22 @@ so no migration is needed (D-WIRE-NAMES); older pinned spellings are historical.
+ component-specific request signature/version/canonical-byte format or a
+ versioned shared adapter. The host backend would need joint publication
+ and qualification of `host_start`, its authenticated transport, durable
+-host admission permit, fence/cancel/crash ordering and same-effect
++session-scoped host admission permit, session lifecycle authorisation
++member format, `host_stop`, successor absence/idempotency and per-start
++claim/fence/receipt interlocks, fence/cancel/crash ordering and same-effect
+ root-receipt reconciliation. Until then the SH2 backend stays disabled.
+ Naming alone activates neither helper grants nor a host start capability;
+ only the dispatcher performs privileged starts.
+ 
++**Open publication question — source/result transfer across homes (F-16):**
++workspace-capable cross-account launches would need an explicit transfer
++owner and authorisation for admitted source and accepted results through
++the existing approved repository/artifact path. Optional immutable object
++sharing would need published provenance, authorised-object access and
++retention rules. Neither private Git administration nor an admitted base
++proves checked-out code or accepted results secret-free. This question stays
++open; no transfer protocol, wire fields or refusal codes are assigned here.
++
+ D-DONOR-PROVISIONING assigns donor provisioning to a separately specified
+ small component with its own binary/privileges/removal; shared UID/path
+ libraries do not transfer user-manager authority. Variant B remains
+diff --git a/diagrams/README.md b/diagrams/README.md
+index 0db53cb4a98c652c3f2eed0fe765c43e496dda93..de559f805c4435e605c4bd3c9e9e390b20f47a43 100644
+--- a/diagrams/README.md
++++ b/diagrams/README.md
+@@ -27,7 +27,19 @@ privileged descriptor lifecycle (R-FD3); the target panels reference it.
+ The executor receives caller-owned 0–2 and read-only FD3 only. Joint
+ publication of bounded staging gates activation. Only the dispatcher calls
+ the privileged launcher; the target host requests `host_start` with a
+-durable host admission permit, pending joint publication and qualification.
++session-scoped host admission permit for one `logical_session_id`.
++Session lifecycle authorisation may permit successors; each physical start
++keeps its own claim/fence/receipt interlock, and the previous claim must be
++confirmed absent first. `host_stop` uses journaled E-stop, confers no start
++authority and stays distinct from owner `cancel`. Joint publication and
++qualification remain required.
++Cross-account workspaces are standalone repositories with private Git
++administration; linked worktrees stay within one account. Source/result
++transfer ownership remains open (§10.5). The user manager owns the single
++termination scope (§§4.4/4.7) and process fate table (§7, R-FATE), including
++the replaced-daemon writer fence. R-TIME gates expiry-driven home deletion
++and binding removal on boot-inclusive monotonic elapsed lifetime as well
++as expiry; the dispatcher/broker own their durable time watermarks.
+ Ordinary retirement deletes the home after quiesce and declared-key cleanup;
+ export is restricted to service-generated closed-schema metadata without
+ agent-controlled data. Separate operator home retention does not guarantee
+diff --git a/diagrams/artifact-layout.puml b/diagrams/artifact-layout.puml
+index 8812541923fade62d9a4c01afd49637c50ee07f1..a37ef8502ca2841efbfce5e46d9d92d319006d01 100644
+--- a/diagrams/artifact-layout.puml
++++ b/diagrams/artifact-layout.puml
+@@ -51,10 +51,13 @@ package "CURRENT interactive API - SPEC 0.5.0-draft" {
+ package "TARGET one-shot - NOT IMPLEMENTED; dispatcher v0 local headless" {
+   artifact "Caller-owned immutable composed plan\nprofile pin / approved harness identity / effective env / PATH\nprotected tools -> admitted base PATH -> protected dispatcher\nno repository .agents/bin; digest covers resolved PATH" as immutable
+   folder "Dispatcher-owned persistent execution state\nUnix-socket service from first slice" as dispatchstate {
+-    artifact "Host admission permit\nlogical_session_id / execution_id / controller_epoch / op_id\ndurable dispatcher record; fence change withdraws / reconciles" as hostpermit
++    artifact "Host admission permit\nsession-scoped: one logical_session_id\nsession lifecycle authorisation member unpublished" as hostpermit
+     artifact "Claims / run and effect IDs\nrequest / agent / execution IDs remain distinct\nper-operation retry reuses its own effect ID" as claims
+     artifact "Outcome / helper termination evidence\nnot inferred from caller / sudo exit" as outcome
+   }
++  folder "Agent-owned cross-account workspace" as workspace {
++    artifact "Standalone repository at admitted exact base\nprivate .git / common directory / refs / index / config / hooks\nfresh local configuration and hooks" as repository
++  }
+   folder "Root user-manager / launcher-owned state" as rootstate {
+     artifact "Generation ledger\nroot-owned 0644, root-owned directory\nactive (uid,generation); no secrets" as ledger
+     artifact "Approved executor / active owned home checks" as approved
+@@ -73,7 +76,7 @@ package "TARGET one-shot - NOT IMPLEMENTED; dispatcher v0 local headless" {
+   artifact "Execution-scoped leased material\nqualified channel only\nnever plan / argv / files / logs / receipts" as material
+   component "Admitted harness\nagent-side process\nSlice 0 Claude token env channel" as harness
+   artifact "Consumed-plan / credential evidence\ndigest + qualified executor + policy generation\nno secrets; wire / storage unpublished" as consumed
+-  hostpermit --> claims : host_start uses existing claim / effect / root-receipt path
++  hostpermit --> claims : host_start: per-start (execution_id, controller_epoch, op_id) interlock\nsuccessor needs authorisation / prior absence; idempotent (logical_session_id, op_id)
+   immutable --> request : dispatcher admits smallest applicable bound before provisioning
+   request --> root : closed privileged request on stdin
+   ledger --> root : active generation / ownership checks
+@@ -106,8 +109,13 @@ package "TARGET one-shot - NOT IMPLEMENTED; dispatcher v0 local headless" {
+   end note
+   note bottom of dispatchstate
+     [[../SPEC.md#104-signals-stop-receipts-and-cleanup SPEC 10.4]]:
+-    owned helper exec.stop verifies receipt identity; TERM then KILL;
+-    confirmed descendant absence required before claim release / replacement.
++    owned helper exec.stop verifies latest receipt identity; replayed stop never signals;
++    user-manager spec 4.4 / 4.7 single scope: all UID processes, TERM / grace / KILL;
++    stop per-user service domain where present; account-wide quiet absence before claim release / replacement.
++    Old receipt cannot stop successor; receipt time does not filter the process set.
++    Process fate table / replaced-daemon writer fence: user-manager spec 7 (R-FATE).
++    host_stop under permit: configured host only, journaled E-stop / confirmed absence;
++    host-requested, distinct from owner cancel; no start authority.
+     Dispatcher unbinds then retires, each effect confirmed separately.
+     Separate one-shot identity revocation only after retirement;
+     standing identity revocation is operator-only.
+@@ -115,6 +123,19 @@ package "TARGET one-shot - NOT IMPLEMENTED; dispatcher v0 local headless" {
+     Only service-generated closed-schema metadata export; no agent-controlled data.
+     Separate operator home retention carries no confidentiality guarantee.
+     Executor owns neither retirement nor identity revocation.
++    R-TIME: authenticated / operator-controlled installer time source; durable dispatcher / broker watermark.
++    Expiry max(now, watermark); not_before min(now, watermark); no untrusted advance; operator reset.
++    Expiry-driven home / binding destruction also requires boot-inclusive monotonic elapsed lifetime.
++  end note
++  note right of workspace
++    [[../SPEC.md#102-caller-dispatcher-privileged-launcher-and-executor SPEC 10.2]] / [[../SPEC.md#105-typed-refusals-exit-status-and-activation-questions SPEC 10.5]].
++    No inherited .git backlink, executable local configuration or credential helpers.
++    Copy / reflink preserves private writable Git administration; no mutable hard-linked metadata.
++    Linked worktrees only within one account, including existing board workflow.
++    Optional shared objects: immutable, read-only to agents, authorised source objects only.
++    Transfer owner / authorisation and object provenance / access / retention remain open.
++    No weakened home permissions / recursive privileged chown / new privileged workspace service.
++    Admitted base and accepted results do not prove secret-free content.
+   end note
+   note bottom of executor
+     [[../SPEC.md#101-immutable-input-descriptor-transport-and-limits SPEC 10.1]] / [[../SPEC.md#102-caller-dispatcher-privileged-launcher-and-executor SPEC 10.2]] / [[../SPEC.md#105-typed-refusals-exit-status-and-activation-questions SPEC 10.5]].
+@@ -125,7 +146,7 @@ package "TARGET one-shot - NOT IMPLEMENTED; dispatcher v0 local headless" {
+     Post-exec receipt transport and renewal / release ownership: unspecified in spec 10.4.
+     Numeric refusal exits / signal encoding: unspecified in spec 10.5.
+     Unknown process evidence is not success or permission to release capacity.
+-    Agent home lifecycle: dispatcher via helper; materialization detail unspecified in spec 10.2.
++    Agent home lifecycle: dispatcher via helper; private Git materialization in spec 10.2; transfer owner open in 10.5.
+     SH2 host_start / permit publication, helper signatures and donor B remain open.
+     No long-session state / resume / remote capability added by this diagram.
+   end note
+diff --git a/diagrams/components.puml b/diagrams/components.puml
+index a4487d8d3d8a81f86ee787c0fc244fd629635846..51d3e651c40b46c8941402e88e0dc58b1e43ca19 100644
+--- a/diagrams/components.puml
++++ b/diagrams/components.puml
+@@ -71,7 +71,7 @@ package "TARGET one-shot - dispatcher v0 local headless; NOT IMPLEMENTED" {
+   component "Session host\nservice principal; closed delivery fence" as targethost
+   component "swarma-session-runner\nagent-side approved executor" as targetrunner
+   caller --> dispatcher : Unix-socket client; composed plan; authority / size gates
+-  targethost --> dispatcher : host_start in dispatch-op/1; durable host admission permit
++  targethost --> dispatcher : host_start / host_stop in dispatch-op/1; session-scoped host admission permit
+   privileged --> targetrunner : approved agent-side runner
+   targetrunner --> targethost : fresh authenticated channel; epoch registration / readiness before delivery
+   targetrunner --> shared : required target library
+@@ -100,8 +100,21 @@ package "TARGET one-shot - dispatcher v0 local headless; NOT IMPLEMENTED" {
+     Export only service-generated closed-schema metadata; no agent-controlled data.
+     Caller-owned 0-2 and read-only FD3 only; no service / broker / root handle.
+     FD3 mechanism joint publication required (SPEC 10.1; user-manager spec 7 / launch figure).
+-    Host permit bound to logical_session_id / execution_id / controller_epoch / op_id.
+-    Fence changes withdraw / reconcile; ambiguous calls resolve same effect / receipt, no second launch.
++    Host admission permit: one logical_session_id; session lifecycle authorisation member unpublished.
++    Successor host_start requires authorisation and previous-claim absence; idempotent per (logical_session_id, op_id).
++    Each physical start: (execution_id, controller_epoch, op_id) claim / fence / receipt interlock.
++    Fence changes prevent stale start / reconcile; ambiguous calls resolve same effect / receipt, no second launch.
++    host_stop: configured host principal, execution under permit, journaled E-stop / exec.stop / confirmed absence.
++    Recorded as host-requested; distinct from owner cancel; no start authority.
++    Single stop / retirement scope: user-manager spec 4.4 / 4.7; all UID processes / service domain / quiet absence.
++    Process fate table: user-manager spec 7 (R-FATE); replaced-daemon writer fence; no live supervisor adoption.
++    Cross-account workspace: standalone repository; private .git / common directory / refs / index / config / hooks.
++    No inherited .git backlink / executable local config / credential helpers; copy / reflink preserves rule.
++    Linked worktrees only within one account; optional shared objects immutable / read-only.
++    Source / result transfer owner and shared-object provenance / access / retention remain open (SPEC 10.5).
++    R-TIME: authenticated / operator-controlled installer time source; durable dispatcher / broker watermark.
++    Expiry max(now, watermark); not_before min(now, watermark); no untrusted advance; operator reset.
++    Expiry-driven home / binding destruction also requires boot-inclusive monotonic elapsed lifetime.
+     Service unavailable / unready refuses; queue / events / long waits later on same transport.
+     Dispatcher / broker service UID: unspecified in spec 10.2-10.3.
+   end note
+diff --git a/diagrams/launch-paths.puml b/diagrams/launch-paths.puml
+index 580e2733e03fc1c6561e8caa1156440116fc8cfd..2a1cce593744d95b416ef05b64d0450a241d5eb4 100644
+--- a/diagrams/launch-paths.puml
++++ b/diagrams/launch-paths.puml
+@@ -123,7 +123,7 @@ else admitted request
+   end
+   opt cancellation / max-runtime stop
+     dispatcher -> helper : exec.stop for owned generation / execution
+-    helper -> helper : verify receipt / process identity; SIGTERM then SIGKILL\ncheck escaped descendants too
++    helper -> helper : verify latest receipt authority; completed stop replays without signals\nuser-manager spec 4.4 / 4.7 single stop / retirement scope\nall UID processes: TERM / grace / KILL; stop per-user service domain\naccount-wide quiet absence, escaped descendants included
+     alt absence confirmed
+       helper --> dispatcher : termination receipt
+     else processes remain / evidence unknown
+@@ -135,12 +135,14 @@ else admitted request
+     dispatcher -> dispatcher : unbind THEN retire, each confirmed separately\nquiesce / declared-key cleanup then home deletion\nseparate revocation only for registered one-shot identity after retirement
+   end
+ end
+-== TARGET session-host start: DISABLED until joint publication / qualification ==
++== TARGET session-host lifecycle: DISABLED until joint publication / qualification ==
++caller -> dispatcher : owner-admitted start; session lifecycle authorisation may permit successors\nmember format unpublished
++dispatcher -> dispatcher : durable session-scoped host admission permit for one logical_session_id
+ targethost -> targethost : durable session intent; closed delivery fence
+ targethost -> dispatcher : host_start in dispatch-op/1\nlogical_session_id / execution_id / controller_epoch / op_id
+-dispatcher -> dispatcher : configured session-host principal only\nadmission creates durable host admission permit bound to those values
++dispatcher -> dispatcher : configured session-host principal only; execution under permit\nsuccessor requires lifecycle authorisation / previous-claim confirmed absence\nidempotent per (logical_session_id, op_id)\nper-physical-start (execution_id, controller_epoch, op_id) claim / fence / receipt
+ alt cancellation / fence change before physical call
+-  dispatcher -> dispatcher : prevent call; withdraw permit or reconcile
++  dispatcher -> dispatcher : prevent stale call or reconcile; no authority widening
+ else admitted start
+   dispatcher -> root : approved runner via existing claim / effect / root-receipt path
+   alt ambiguous physical call
+@@ -150,9 +152,15 @@ else admitted start
+     targetrunner -> targethost : fresh authenticated channel\ncurrent-epoch registration and readiness before delivery
+   end
+ end
++opt permitted host-requested stop
++  targethost -> dispatcher : host_stop in dispatch-op/1; execution under permit
++  dispatcher -> dispatcher : configured host principal only; journaled E-stop\nhost-requested, distinct from owner cancel; no start authority
++  dispatcher -> helper : exec.stop; same single termination scope
++  helper --> dispatcher : confirmed account-wide absence or processes_remain / unknown
++end
+ note over targethost,dispatcher
+   Host failure retains claim and closed fence until reconciliation.
+-  Transport, permit and fence/cancel/crash ordering need joint publication (SPEC 10.5).
++  Transport, session permit / authorisation, host_stop and fence/cancel/crash ordering need joint publication (SPEC 10.5).
+   Controller-only re-adoption keeps execution_id; replacement uses a new one.
+   Fresh runner checks the native session lock; only dispatcher invokes root.
+ end note
+@@ -167,7 +175,14 @@ note over caller,helper
+   Start receipt is not readiness. Exit is not proof of process absence / cleanup.
+   Broker owns persistent binding / credential store; root launcher owns atomic start receipt.
+   Dispatcher owns durable claims, outcomes and supervision: Unix-socket service from first slice.
++  Process fate table / replaced-daemon writer fence: user-manager spec 7 (R-FATE); no live supervisor adoption.
++  Cross-account workspace: standalone repository; private .git / common directory / refs / index / config / hooks.
++  No inherited .git backlink / executable local config / credential helpers; copy / reflink preserves rule.
++  Linked worktrees only within one account; optional shared objects immutable / read-only; transfer owner open (SPEC 10.5).
++  R-TIME: authenticated / operator-controlled installer time source; durable dispatcher / broker watermark.
++  Expiry max(now, watermark); not_before min(now, watermark); no untrusted advance; operator reset.
++  Expiry-driven home / binding destruction also requires boot-inclusive monotonic elapsed lifetime.
+   Exact intake envelope / invocation, consumed-plan receipt, numeric exits and signal encoding: unspecified in spec 10.1 / 10.4 / 10.5.
+-  No interactive FD3/FD4 reuse; no board dependency; SH2 host_start / donor B remain disabled pending publication.
++  No interactive FD3/FD4 reuse; no board dependency; SH2 host lifecycle / donor B remain disabled pending publication.
+ end note
+ @enduml
+diff --git a/diagrams/launch-states.puml b/diagrams/launch-states.puml
+index 30b2df4433d62af82b788e3eaa67f1d40be12330..ecddc7feab8bfd5694414ccf6af97f3f733699b5 100644
+--- a/diagrams/launch-states.puml
++++ b/diagrams/launch-states.puml
+@@ -67,8 +67,8 @@ state "TARGET one-shot - NOT IMPLEMENTED; dispatcher v0 local headless" as Targe
+   state "Selected-source qualification / lease\nagent executor; broker checks peer / grants" as Lease
+   state "Recheck binding / execute harness\nagent UID; execution-scoped credential" as Harness
+   state "Execution outcome evidence\ndispatcher / supervisor owns record" as Outcome
+-  state "Owned exec.stop\nroot user-manager helper\nreceipt identity; TERM then KILL" as Stop
+-  state "Absence confirmed\nincluding escaped descendants" as Absent
++  state "Owned exec.stop\nroot user-manager helper\nlatest receipt authority; all UID processes / service domain\nTERM / grace / KILL; recorded stop replays without signals" as Stop
++  state "Account-wide absence confirmed\nquiet period; escaped descendants included" as Absent
+   state "Unknown / contradictory process evidence\nno claim release / replacement" as Unknown
+   state "Unbind then retire / delete home\nquiesce / declared-key cleanup; confirmed effects" as Cleanup
+   state "Target refusal\nnon-success, typed metadata; no fallback" as TargetRefusal
+@@ -88,7 +88,7 @@ state "TARGET one-shot - NOT IMPLEMENTED; dispatcher v0 local headless" as Targe
+   Lease --> Harness : source policy admits; qualified broker lease if selected
+   Harness --> TargetRefusal : recheck / renewal or authentication failure
+   Harness --> Outcome : required evidence; exact transport unpublished
+-  Harness --> Stop : dispatcher cancellation / max runtime
++  Harness --> Stop : dispatcher cancellation / max runtime / permitted host_stop
+   Outcome --> Stop : when owned stop needed; exit alone is not absence
+   Outcome --> Unknown : evidence unknown / contradictory
+   Stop --> Unknown : processes_remain / no confirmed termination receipt
+@@ -108,17 +108,29 @@ note right of Target
+   numeric refusal exits and signal encoding: unspecified in spec 10.4-10.5.
+   Claude setup-token expiry / auth failure: re-enroll and restart; no refresh.
+   Later Codex renewal: 8 s timeout fails turn, no late response / login fallback.
+-  Unix-socket service from first slice; SH2 host_start / permit needs publication;
++  Unix-socket service from first slice; SH2 host_start / host_stop / permit needs publication;
+   Service unavailable / unready refuses; queue / events / long waits later on same transport.
+   FD3 mechanism, intake / digest / framing / read deadline: publication gates in SPEC 10.1.
+   User-manager spec 7 / diagrams/launch.puml owns lifecycle; no internal handles in executor.
+   Prefer completely staged bounded immutable bytes; pipe needs capacity / feeder / deadline / cleanup.
+-  SH2 host_start: durable permit bound to logical_session_id / execution_id / controller_epoch / op_id.
+-  Only dispatcher invokes root; fence changes withdraw / reconcile permit.
++  SH2 host admission permit: session-scoped for one logical_session_id.
++  Session lifecycle authorisation member unpublished; successors require authorisation / previous-claim absence.
++  host_start idempotent per (logical_session_id, op_id); each physical start keeps its own claim / fence / receipt.
++  Physical interlock: (execution_id, controller_epoch, op_id); only dispatcher invokes root.
++  Fence changes prevent stale start / reconcile; host_stop under permit uses journaled E-stop / confirmed absence.
++  host_stop: configured host principal only, host-requested, distinct from owner cancel; no start authority.
+   Ambiguous start resolves same effect / receipt, no second launch; stop if required.
+   Runner authenticates fresh host channel; epoch registration / readiness before delivery.
+   Retirement exports only service-generated closed-schema metadata, no agent-controlled data.
+   Separate operator home retention has no confidentiality guarantee.
++  Single stop / retirement termination scope: user-manager spec 4.4 / 4.7; old receipt cannot stop successor.
++  Process fate table / replaced-daemon writer fence: user-manager spec 7 (R-FATE); no live supervisor adoption.
++  Cross-account workspace: standalone repository with private .git / common directory / refs / index / config / hooks.
++  No inherited .git backlink / executable local config / credential helpers; copy / reflink preserves rule.
++  Linked worktrees within one account only; optional shared objects immutable / read-only; transfer owner open (SPEC 10.5).
++  R-TIME: authenticated / operator-controlled installer time source; durable dispatcher / broker watermark.
++  Expiry max(now, watermark); not_before min(now, watermark); no untrusted advance; operator reset.
++  Expiry-driven home / binding destruction also requires boot-inclusive monotonic elapsed lifetime.
+   no remote / native resume / seeded continuity in dispatcher v0.
+ end note
+ @enduml
