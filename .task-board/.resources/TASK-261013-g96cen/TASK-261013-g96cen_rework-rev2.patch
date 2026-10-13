@@ -1,0 +1,313 @@
+--- revision1/cips/CIP-0003-claude-managed-home-credential-modes.md
++++ revision2/cips/CIP-0003-claude-managed-home-credential-modes.md
+@@ -17,10 +17,14 @@
+ | Phase | Accepted narrowed; source-policy v1 defaults per-home, v2 requires explicit entries; coordinated v4 pending. |
+ | Normative links and proposed landing | [Environments §7.4](../protocol/environments.md#74-credential-passthrough-provisioning-seeds-and-isolation), [Decision 0017](../decisions/0017-environment-credential-modes.md); operative replacement: [CIP-0010 C6](CIP-0010-credentials-setup-token-and-inherited-auth.md#recommendation); landing: [Historical specification changes](#historical-specification-changes-apply-cip-0010-c6). |
+ 
++## Revision: accepted architecture-review findings (2026-10-13)
++
++Muse subscription priority is decided; the proposed channel and open qualification remain separate from admission.
++
+ ## Operative disposition (2026-10-11)
+ 
+ - **Decided:** Accepted, narrowed by CIP-0010 C6 (2026-10-10). Source-policy v1 keeps per-home when no entry exists; source-policy v2 requires an explicit entry and migrates existing logins to explicit per-home. Token becomes node-sourced; helper remains an API-key lane. The first node store is a protected 0600 file on macOS and Linux.
+-- **Open:** The coordinated v4 grammar and supported-release qualification remain publication/implementation work. Personal-plan Codex adoption and Muse subscription support remain owner questions in CIP-0010 and the shared contract.
++- **Open:** The coordinated v4 grammar and supported-release qualification remain publication/implementation work. Personal-plan Codex adoption remains an owner question in CIP-0010 and the shared contract. Muse subscription priority is decided on 2026-10-13; channel (b) with fallback (c) is proposed; qualification remains open ([CIP-0010 question 4](CIP-0010-credentials-setup-token-and-inherited-auth.md#open-questions-for-the-operator)).
+ - **Superseded:** The earlier default, Keychain-first token leaf, shared-file adoption and general acceptance/Q7 questions below are historical, superseded by CIP-0010 C1/C3/C6 and Revision 2.2. Native per-home Keychain evidence remains historical evidence; it is not the node backend.
+ 
+ [Cross-CIP contract, schema owners and versions](platform-contract-disposition.md) records the canonical values and owner decisions. Acceptance records design disposition; schema publication, implementation and runtime qualification are separate. Current-state observations and companion probes below are historical at their stated pins, not rerun evidence.
+--- revision1/cips/CIP-0009-donor-side-deployment-and-bridge.md
++++ revision2/cips/CIP-0009-donor-side-deployment-and-bridge.md
+@@ -200,7 +200,7 @@
+ 7. **Rework.** A changes-requested verdict records findings on the board. The next round's admitted base is C, a commit of ours. A remote worker receives a signed task letter; its donor-side session continues, but the workplace is materialized afresh from C, and the old round is removed only after complete-content export custody is recorded or an explicit operator waiver is applied. An export refusal produces no C: bounded repair continues the same workspace, or, after authorized disposition, a new round uses the last admitted base; it never fabricates a candidate from a refusal. A local worker gets a new run from C with findings in the task snapshot. The next export yields C2 on C. Questions use ordinary letters/outcomes.
+ 8. **Integration.** The accepted exact head integrates by signed fast-forward (K1/K3). A moved base uses the board's ordinary base refresh and re-review.
+ 
+-**Export outcomes and repair.** Recorded export, deterministic policy refusal, interrupted/unknown export, and authorized discard are distinct. A refusal is immutable terminal evidence and retains the obligation; interruption, OOM, I/O error, unavailable storage or ambiguous identity remains pending/unknown under the original effect and identical canonical arguments. Completed-effect replay returns its retained result without rerunning it. Re-observation uses a new linked effect: disagreement in recorded/refused outcome class or a recorded change-set digest is contradictory; refusal diagnostics are not compared while walk order is unpublished.
++**Export outcomes and repair.** Recorded export, deterministic policy refusal, interrupted/unknown export, and authorized discard are distinct. A refusal is immutable terminal evidence and retains the obligation; interruption, OOM, I/O error, unavailable storage or ambiguous identity remains pending/unknown under the original effect and identical canonical arguments. Completed-effect replay returns its retained result without rerunning it. Re-observation uses a new linked effect: for the same unchanged quiesced tree, disagreement in recorded/refused outcome class or a recorded change-set digest is contradictory; this comparison does not span an admitted repair. Refusal diagnostics are not compared while walk order is unpublished.
+ 
+ The original caller may separately admit a repair turn on the same workspace only under valid current work authority, within a plan-fixed per-round repair budget. This is forward work, never cleanup-only consent after expiry. Holds, revocation, compromise, ALLSTOP and fenced restore never reopen implicitly. Preserve valid edits and the original refused effect; every repair/re-export has linked distinct execution/effect evidence. The workspace write fence and SSH ingress fence stay closed through quiescence/export and reopen only for an admitted repair turn; repeat account-wide stop, confirmed absence and a complete export. Send only refusal class and the known offending path to the caller/worker as a letter or snapshot, never a partial change set. Budget exhaustion retains the obligation; the per-act widening operator waiver requires authentication and exact-content confirmation. Standing automatic discard is an optional owner policy, unchosen and off.
+ 
+--- revision1/cips/CIP-0010-credentials-setup-token-and-inherited-auth.md
++++ revision2/cips/CIP-0010-credentials-setup-token-and-inherited-auth.md
+@@ -28,7 +28,7 @@
+ ## Operative disposition (2026-10-11)
+ 
+ - **Decided:** Revision 2.1 and Revision 2.2 decide the first file backend and source-policy v1/v2; CIP-0003 is adopted narrowed. D-EXECUTOR (2026-10-11) makes curator-run under the agent account the first broker consumer. Board and session host request the dispatcher; neither embeds the first broker client.
+-- **Open:** Personal-plan Codex adoption/qualification, Muse subscription channel and release scheduling retain the explicit options below. Credential extension, binding and capability names describe pending contracts, not qualified runtime adoption.
++- **Open:** Personal-plan Codex adoption/qualification and release scheduling retain the explicit options below. Muse subscription priority is decided on 2026-10-13; channel (b) with fallback (c) is proposed; qualification remains open (see question 4). Credential extension, binding and capability names describe pending contracts, not qualified runtime adoption.
+ - **Superseded:** Keychain-first node storage, the CIP-0003 acceptance/default questions and board-spawn-first client sequencing are superseded by Revision 2.1, Revision 2.2/C6 and D-EXECUTOR respectively.
+ 
+ [Cross-CIP contract, schema owners and versions](platform-contract-disposition.md) records the canonical values and owner decisions. Acceptance records design disposition; schema publication, implementation and runtime qualification are separate. Current-state observations and companion probes below are historical at their stated pins, not rerun evidence.
+@@ -176,7 +176,7 @@
+ 0. **Slice 0:** `credential_binding/1` over a peer-authenticated Unix socket across two OS users on one host; one chain proven with refusals (wrong peer, wrong account, expired). Size M.
+ 1. Spec text and the decision record. Size S–M.
+ 2. curator: nodes, `credential_source`, the Codex auth owner (from `rwh`), `env credential` commands, status and events, marker members. Size M.
+-3. **First broker consumer (D-EXECUTOR):** `curator-run` under the agent account, in its narrow one-shot mode, verifies and executes the caller-composed immutable plan and implements the protected binding/qualification gate. Board spawn and session host request the dispatcher, which launches through `curator-run`; neither embeds a broker client. Shared launch library with `swarma-session-runner`; donor supervisor integration is later and independently qualified. The intake release/grammar belongs to R-LR1 and Decision 0021's amendment. Size M each.
++3. **First broker consumer (D-EXECUTOR):** `curator-run` under the agent account, in its narrow one-shot mode, verifies and executes the caller-composed immutable plan and implements the protected binding/qualification gate. Board spawn and session host request the dispatcher, which launches through `curator-run`; neither embeds a broker client. Shared launch library with `swarma-session-runner`; donor supervisor integration is later and independently qualified. The intake release/grammar belongs to the [launcher intake lane](../decisions/0021-sessions-enter-through-curator-run.md#amendment-v1--agent-account-one-shot-execution-2026-10-11) (Decision 0021 amendment; launcher SPEC §10). Size M each.
+ 4. Authorized qualification lab (future work, not run on this host): step 2 (effective source: no Keychain read with the environment token), steps 3–4 for Claude (revocation signal, `--resume` with a new token), the Codex owner race test (eight callers, one refresh) at 0.159.0. Size S of operator time.
+ 5. Muse: `META_API_KEY` pass-through (TASK-261007-hjwgiz) then node kind `meta-api-key`. Size S.
+ 
+--- revision1/cips/CIP-0011-credential-broker-and-agent-users.md
++++ revision2/cips/CIP-0011-credential-broker-and-agent-users.md
+@@ -16,6 +16,10 @@
+ | Inputs → outputs | Caller-composed plan/digest, signed caller grant, generation and protected binding → approved account/execution, lease/injection and metadata receipt or refusal. |
+ | Phase | Slice 0 Claude / helper v0 and dispatcher Unix-socket service; Codex slice 1 with replacement-safe single refresh writer, enforced networking/helper v1 slice 2; SH2/donor later. |
+ | Normative links and proposed landing | [Decision 0013](../decisions/0013-execution-ownership-and-launch-plans.md), [Decision 0021 amendment](../decisions/0021-sessions-enter-through-curator-run.md#amendment-v1--agent-account-one-shot-execution-2026-10-11), [Environments §7.4](../protocol/environments.md#74-credential-passthrough-provisioning-seeds-and-isolation); [module owner/version table with pinned broker/dispatcher/helper specifications](platform-contract-disposition.md#schema-owner-and-version-table); amendments: [Specification changes](#specification-changes). |
++
++## Revision 7: accepted architecture-review findings (2026-10-13)
++
++The first-consumer intake gate links to its launcher owner; publication and qualification remain open.
+ 
+ ## Revision 6: operator custody, accepted F-23 with owner amendment (2026-10-12)
+ 
+@@ -198,7 +202,7 @@
+ ## Open questions for the operator
+ 
+ 1. Resolved (owner, 2026-10-09): the dispatcher is its own module and `curator agent-user` is its client.
+-2. **First consumer — decided, 2026-10-11 (D-EXECUTOR).** `curator-run` under the agent account gets the first broker client. Board spawn and session host call the dispatcher, which launches through `curator-run`; neither embeds a client. The earlier approval question is superseded. Intake schema/version publication and qualification remain R-LR1 work.
++2. **First consumer — decided, 2026-10-11 (D-EXECUTOR).** `curator-run` under the agent account gets the first broker client. Board spawn and session host call the dispatcher, which launches through `curator-run`; neither embeds a client. The earlier approval question is superseded. Intake schema/version publication and qualification remain with the [launcher intake lane](../decisions/0021-sessions-enter-through-curator-run.md#amendment-v1--agent-account-one-shot-execution-2026-10-11) (Decision 0021 amendment; launcher SPEC §10).
+ 3. **Grant registry — OPEN (D-R6).** Retain broker-local envelopes/state for the first slice, or publish a separately versioned shared registry/verifier adapter for general platform grants. General `grant/1` role/action grammar is not the broker's closed envelope; no adapter or registry activation is claimed.
+ 4. **Shared contract publication.** Would need requester-signed delegation activation and the pre-key registration/proof-of-possession/replay/rotation contract with depth/chain preflight; `revocation.check` exact chain/context/sequence encodings and refusal codes; `host_start`/`host_stop` authentication, unpublished session lifecycle authorisation member, session-scoped host admission permit durability/withdrawal, ordinary anchored/cumulative restart budget, reboot requester, and each physical claim/fence/receipt/recovery interlock. The shared names and verdict values above are fixed; no additional wire fields or refusal codes are allocated here.
+ 5. **Slice-1 replacement qualification.** Would need per-platform containment/kill-and-confirm lifecycle, durable attempt/process identity, vendor-home recovery and ambiguous external-rotation resolution for the supported vendor release. An account lock and confirmed child absence alone are insufficient.
+--- revision1/cips/diagrams/donor-layout.puml
++++ revision2/cips/diagrams/donor-layout.puml
+@@ -81,7 +81,7 @@
+   Provider-search or MCP opt-in requires trusted-circle operator admission + qualification.
+ end note
+ note bottom of Mailbox
+-  Dispatcher: B archive/manifest/exec profile/write scope; immutable-B mode/content manifest verified before work and recomputed at import; fresh materialization each round.
++  Dispatcher: B archive/manifest/exec profile/write scope; immutable-B mode/content manifest verified before work and recomputed at import; fresh materialization each round except an admitted repair round.
+   Child Git history unused; bounded export under child UID after account-wide absence/fence.
+   Board: resource -> signed C -> exact trusted review -> signed rework letter from C.
+   All candidate code execution: R-VERIFY, another machine, no secrets.
+--- revision1/cips/diagrams/donor-lifecycle.puml
++++ revision2/cips/diagrams/donor-lifecycle.puml
+@@ -85,7 +85,7 @@
+   R-WATCH read-only least-privileged per-UID sampler; hard threshold narrows one account;
+   phone alerts, no unjournaled kill. Formats/thresholds unpublished.
+   Standing workplace allowed; loop at donor only. Trusted standing surfaces digest checked.
+-  R-TRANSFER each round: fresh B/C materialization, fence/absence/export, exact board review.
++  R-TRANSFER each round: fresh B/C materialization except an admitted repair round; fence/absence/export, exact board review.
+   Cleanup export precedes retiring; distinct execution evidence and bounded original-admission consent.
+   Ordinary expiry only; holds need separate authority. Result + all blobs verified durable outside deletion.
+   Refusal/unknown retains obligation; current-authority bounded repair or per-act waiver; standing discard off.
+--- revision1/cips/diagrams/remote-worker-transfer.puml
++++ revision2/cips/diagrams/remote-worker-transfer.puml
+@@ -61,7 +61,8 @@
+   Four outcomes: recorded export, policy refusal, interrupted/unknown, authorized discard.
+   Permission denial of known source entry needs published typed classification; infrastructure denial stays failure.
+   No chmod/privilege increase. Terminal replay returns retained result; linked re-observation only.
+-  Contradiction compares recorded/refused class or recorded digest, not walk-dependent diagnostics.
++  For the same unchanged quiesced tree, contradiction compares recorded/refused class or recorded digest,
++  not walk-dependent diagnostics; this comparison does not span an admitted repair.
+   Standing automatic discard is unchosen/off; expiry grants cleanup collection, never repair.
+ end note
+ break authorized discard instead of recorded export
+--- revision1/cips/platform-contract-disposition.md
++++ revision2/cips/platform-contract-disposition.md
+@@ -70,7 +70,7 @@
+ 
+ ## Wire naming rule
+ 
+-**D-WIRE-NAMES, scoped to owner-published identifier categories:** Repository-qualified signing domains use `swarma-<component> <object>/<n>`; wire kind discriminators retain their individually registered owner spelling, transport/schema labels retain their owner-published short forms, and provisional design labels confer no admission. Nothing has shipped; no migration is required. This is an explicit owner rename before shipping, not an inference from executable renaming. Owning module documents and canonical/verifier vectors must publish the same bytes before activation.
++**D-WIRE-NAMES, scoped to owner-published identifier categories:** This paragraph quotes the scope sentence from [dispatcher §3.3](https://github.com/relux-works/swarma-dispatcher/blob/781a9dcf5a67393cd713d506cd7b89e59a45dcd3/spec/dispatcher.md#33-caller-keys-and-request-signatures): Repository-qualified signing domains use `swarma-<component> <object>/<n>`; wire kind discriminators retain their individually registered owner spelling, transport/schema labels retain their owner-published short forms, and provisional design labels confer no admission. The typed owner-linked index lives in wiki `naming.md`, [Shared index: rules and wire names](https://github.com/relux-works/wiki/blob/main/naming.md#shared-index-rules-and-wire-names); this is an owner-scope quotation, not a new owner decision. Nothing has shipped; no migration is required. This is an explicit owner rename before shipping, not an inference from executable renaming. Owning module documents and canonical/verifier vectors must publish the same bytes before activation.
+ 
+ Broker grant and revocation domains are now `swarma-credential-broker grant/1` and `swarma-credential-broker revocation/1`, replacing historical `curator-broker …/1`. Each domain is followed by newline and CCJ-1 body; grant IDs hash the same preimage. Dispatcher mutating signatures remain `swarma-dispatcher request/1`, newline and CCJ-1 request without `auth`. The broker peer-authenticated transport does not thereby gain a signed request format.
+ 
+--- revision1/decisions/0010-agent-environment-profiles.md
++++ revision2/decisions/0010-agent-environment-profiles.md
+@@ -1,8 +1,4 @@
+ # Decision 0010: agent environment profiles and global context management
+-
+-## Revision: accepted architecture-review findings (2026-10-13)
+-
+-Bare numbered references are qualified as the agents-management profile-composition/interactive-launch decision; they do not refer to either local build decision numbered 0005. No behavior changes.
+ 
+ ## Status
+ 
+@@ -155,7 +151,7 @@
+ `path` — an operator-local profile directory installed by absolute or
+ project-relative path instead of a URL, snapshotted and keyed by the §8
+ content hash of its state. `path` is the vehicle for first-run onboarding
+-imports (agents-management Decision 5 (profile composition and interactive launch)) and for authoring profiles before they have a
++imports (Decision 5) and for authoring profiles before they have a
+ repository; it is delivered with the onboarding import story, not in
+ revision 1. [Erratum 2026-09-05, item 2]
+ 
+@@ -208,7 +204,7 @@
+   for `claude_code` (documented up to five hops), the `instructions` file
+   list in `opencode.json` for `opencode`. Module files land under a managed
+   subdirectory beside the root file, every entry ledgered, grouped per
+-  source profile under agents-management Decision 5 composition so two composed profiles
++  source profile under Decision 5 composition so two composed profiles
+   carrying the same module filename cannot collide; the exact naming and
+   layout rule is normative-phase work bound to the referenced-form
+   determinism vectors (open question 6). A team that already maintains a
+@@ -230,7 +226,7 @@
+ deterministic HTML comment that markdown renderers do not display:
+ generated-by Curator (project URL), the profile identity and effective
+ commit (or state hash for a `local` profile), the composition chain when
+-agents-management Decision 5 composition is active, the declared precedence, and the notice
++Decision 5 composition is active, the declared precedence, and the notice
+ that direct edits are unsupported and will be detected as drift — update
+ the profile repository, or the managed context it composes, instead. The
+ header contains no timestamp, machine path, or operator identity, so the
+@@ -238,7 +234,7 @@
+ 
+ Materialized root context is deterministic: the header, then the applicable
+ modules in manifest order, joined by exactly one empty line (a single
+-additional LF between parts), with no other transformation. Under agents-management Decision 5
++additional LF between parts), with no other transformation. Under Decision 5
+ composition, each composed profile's modules form a titled chapter — a
+ readable separator line and a heading naming the source profile — so a
+ reader and the agent can always tell which profile a passage came from.
+@@ -372,7 +368,7 @@
+ - **`linked`** — in-place materialization into the environment's native
+   default home (`~/.claude`, `~/.codex`, …) as symlinks into the profile
+   store. This is today's global-scope skill mechanism extended to root
+-  context. Only the current profile (agents-management Decision 5) is materialized in-place.
++  context. Only the current profile (Decision 5) is materialized in-place.
+ - **`copied`** — in-place materialization as plain files with recorded
+   content hashes, for surfaces or targets where symlinks are unreliable:
+   secondary fixed-home targets (the Xcode CodingAssistant homes of Decision
+@@ -407,7 +403,7 @@
+ rule extends unchanged: Curator removes or replaces only entries its
+ preceding ledger owns and MUST fail rather than overwrite an unmanaged file.
+ A pre-existing unmanaged `~/.claude/CLAUDE.md` is never clobbered by an
+-ordinary operation; first-run onboarding (agents-management Decision 5) is the supported path
++ordinary operation; first-run onboarding (Decision 5) is the supported path
+ that turns such files into managed state with an explicit backup, and the
+ takeover flag remains the manual equivalent.
+ 
+@@ -673,7 +669,7 @@
+ materialized commit, content-hash currency, drift, missing surfaces,
+ unregistered adapters, any declared shadowing path that exists (Decision
+ 3), the active composition chain per activation, every scope whose current
+-profile differs from the machine default (agents-management Decision 5 scoped switching), and
++profile differs from the machine default (Decision 5 scoped switching), and
+ secondary-target probe results, with the existing exit-code discipline
+ (`--check` non-zero on any non-current row). Both are read-only and follow
+ the manager §10 status discipline: recompute and report, never mutate.
+@@ -768,7 +764,7 @@
+   materialization is what makes the default path managed.
+ - **In-place-only (no managed homes).** Switching becomes globally racy —
+   every concurrent session on the machine flips context at once, which is
+-  exactly the failure the operator warning in agents-management Decision 5 exists for — and
++  exactly the failure the operator warning in Decision 5 exists for — and
+   per-profile session-state isolation is lost. Both modes are required; each
+   covers the other's blind side.
+ - **Symlink-only in-place materialization.** Fixed-home embedded
+@@ -862,7 +858,7 @@
+   and never copied between homes by default; `isolated` mode exists
+   precisely so account separation does not degenerate into credential
+   copying.
+-- The switch warning in agents-management Decision 5 is a real hazard, not ceremony: a live
++- The switch warning in Decision 5 is a real hazard, not ceremony: a live
+   session under the old profile can still write trust records and state into
+   in-place homes. The launcher path avoids the race entirely, which is why
+   the warning recommends it.
+--- revision1/decisions/0013-execution-ownership-and-launch-plans.md
++++ revision2/decisions/0013-execution-ownership-and-launch-plans.md
+@@ -1,8 +1,4 @@
+ # Decision 0013: execution ownership and launch plans
+-
+-## Revision: accepted architecture-review findings (2026-10-13)
+-
+-Bare numbered references are qualified as the agents-management profile-composition/interactive-launch decision; they do not refer to either local build decision numbered 0005. No behavior changes.
+ 
+ ## Status
+ 
+@@ -25,7 +21,7 @@
+ 
+ Acceptance authorizes four separately tracked changes: the
+ `curator-agent-launcher` specification at `0.2.0-draft` (Decision 6); the
+-`LaunchModeInteractive` addition to `agents-management` (agents-management Decision 5 (profile composition and interactive launch)); a
++`LaunchModeInteractive` addition to `agents-management` (Decision 5); a
+ revision of `agent-session-manager-spec` pull request #1
+ (`draft/curator-environment-integration`, head `d7075e1`) carrying the
+ `ax` changes of Decisions 3, 4, and 7 — that PR is delivered to the `ax`
+@@ -99,7 +95,7 @@
+   primitives, and the fragment gains the `mcp` section (path, `env_names`
+   union, channel descriptor).
+ - **`agents-management` builds an interactive plan value.** The launcher
+-  requests `LaunchModeInteractive` (agents-management Decision 5) through `BuildPlan` and
++  requests `LaunchModeInteractive` (Decision 5) through `BuildPlan` and
+   receives a `Plan` — `Binary`, `Argv`, `Env`, `Stdin`, `WorkDir`
+   (`pkg/agentic/plan.go`) — that starts no process.
+ - **`curator-run` composes exactly one launch plan** from the interactive
+@@ -321,7 +317,7 @@
+ `--profile standard|yolo` remains `ax`'s (ax §2.4): the plugin's profile
+ mapping is the only source of a permission-bypass or unrestricted-mode
+ spelling in the final argv. A caller plan MUST NOT carry one; the composer
+-never emits one (agents-management Decision 5 forbids it in the interactive plan, and native
++never emits one (Decision 5 forbids it in the interactive plan, and native
+ arguments after `--` are the operator's own typing). A `caller_launch_plan`
+ plugin MUST refuse, before process creation, any caller-supplied element —
+ in `argv` or in `argv_suffix` — that equals a flag of its own ax §7.7
+@@ -377,7 +373,7 @@
+ payload (`utf-8` when the bytes are valid UTF-8, else `base64url`); `Attached`
+ false is `null` — the "no stdin" versus "empty attached stream" distinction
+ `StdinPayload` exists to make (`pkg/agentic/system.go`) is preserved as
+-"terminal" versus "present with zero bytes". Under agents-management Decision 5, interactive
++"terminal" versus "present with zero bytes". Under Decision 5, interactive
+ mode attaches stdin only for a system whose effort transport is stdin. At
+ `91bf945` the only such system is `qwen` (`EffortTransportStdin`,
+ `pkg/agentic/systems/qwen/qwen.go`; its stdin is the two-frame stream-json
+@@ -596,7 +592,7 @@
+ 
+ #### 6.5 Non-goals restated
+ 
+-The launcher still never spells a provider flag of its own (agents-management Decision 5),
++The launcher still never spells a provider flag of its own (Decision 5),
+ still never rebuilds the plan (launcher §1) — appending channel flags and
+ native arguments to a plan value is composition, not rebuilding — and still
+ imports nothing but `agents-management`. The MCP channel is applied by the
+--- revision1/decisions/0019-fragment-consumers-and-one-construction-site.md
++++ revision2/decisions/0019-fragment-consumers-and-one-construction-site.md
+@@ -2,7 +2,7 @@
+ 
+ ## Revision: accepted architecture-review findings (2026-10-13)
+ 
+-Bare numbered references are qualified as the agents-management profile-composition/interactive-launch decision; they do not refer to either local build decision numbered 0005. No behavior changes.
++The interactive-plan references explicitly name Decision 0013 Decision 5, that document's §5; they do not refer to either historical Decision 0005. No behavior changes.
+ 
+ ## Status
+ 
+@@ -29,7 +29,7 @@
+ resolves the launch environment fragment, `agents-management` builds an
+ interactive plan value, `curator-run` composes exactly one launch plan
+ from that plan, the fragment's channels and the native arguments, and
+-`ax` records and launches. agents-management Decision 5 (profile composition and interactive launch) keeps the interactive plan free of
++`ax` records and launches. Decision 0013 Decision 5 keeps the interactive plan free of
+ channel flags: `BuildPlan` refuses a non-empty `Composition` in
+ `LaunchModeInteractive`, because "two components spelling MCP flags is
+ the M2 class of defect". Decision 6.3 has the launcher append the
+@@ -115,7 +115,7 @@
+   fragment consumers". `agents-management` learns the fragment's channel
+   descriptor vocabulary, never how a fragment is resolved, locked or
+   discovered.
+-- agents-management Decision 5: `LaunchModeInteractive` accepts the typed context member.
++- Decision 0013 Decision 5: `LaunchModeInteractive` accepts the typed context member.
+   The raw `Composition` prefix stays refused in that mode; the typed
+   member is the only way a channel reaches the plan.
+ - Decisions 6.3 and 6.5: the launcher appends only the native arguments
+--- revision1/decisions/0021-sessions-enter-through-curator-run.md
++++ revision2/decisions/0021-sessions-enter-through-curator-run.md
+@@ -1,4 +1,8 @@
+ # Decision 0021: sessions enter through curator run and are hosted through the ax contract
++
++## Revision: accepted architecture-review findings (2026-10-13)
++
++The naming-rule cross-reference distinguishes owner-published identifier categories; it grants no activation.
+ 
+ ## Status
+ 
+@@ -261,7 +265,7 @@
+    supplies no evidence that this later channel is qualified.
+ 
+ D-WIRE-NAMES resolves the naming rule: versioned platform wire identifiers
+-carry the repository name, `swarma-<component> <object>/<n>`. Nothing has
++carry the repository name, `swarma-<component> <object>/<n>`. This sentence is scoped by the [disposition's D-WIRE-NAMES scope sentence](../cips/platform-contract-disposition.md#wire-naming-rule), which distinguishes signing domains, wire kind discriminators, transport/schema labels and provisional design labels. Nothing has
+ shipped, so no migration is needed. That rule does not publish W3's
+ canonical signed bytes or I4's closed schema; neither open gate is
+ silently enabled by a name. These follow-on questions do not reopen

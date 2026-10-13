@@ -1,0 +1,7 @@
+# TASK-261013-g96cen — revision-2 handoff recovery
+
+All seven requested revision-2 fixes were already present and were independently checked. No tracked source edits were necessary in this successor run. The original automatic gate failed (exit 1) because it scanned the temporary incomplete revision-1 snapshot. That scratch copy is now preserved outside the repository.
+
+Direct source-only checks: whitespace exit 0; documentation checker exit 0 (21/21 documents, 153/153 targets, 10/10 PlantUML structures); repository validator exit 0 (73 schemas, 1294 vector files); scope comparison exit 0 (12/12 permitted rework paths, remaining snapshot bytes unchanged). Manual regression Decision5ReferencesResolveToOwningSection covers 16/16 body sites; the narrowing counterexample retaining the nine incorrect 0010 attributions is rejected by the owning-section inspection. No executable regression suite or mutant execution is claimed.
+
+The handoff suite policy conflicts with the task instruction: after docs validation it runs Python tests, go vet and Go test compilation. No suite bypass or project-policy change is authorized. The current no-tests/no-builds brief prevents retrying that gate without an explicit exception or an orchestrator-owned docs-only policy. Configure source-only validation (recommended) or explicitly authorize the existing automated gate. Tests/builds, rendering and runtime qualification remain unrun in this successor. Retained candidate is uncommitted; no LOGBOOK.md or board storage files were written directly.
