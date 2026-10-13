@@ -1,0 +1,55 @@
+# The exec-profile reference is caller text: publish a machine-owned selection and digest pin, the F-27 shape for R-EXEC
+
+- **Lens:** trust and threat model (fable); user manager and launcher cross-check (astra-02).
+- **Status:** proposed.
+
+## Problem
+
+The task-class exec profile is the OS-enforced executable allowlist that decides what an account can run. It travels as "the task-class exec-profile reference" in the caller-composed plan, covered by the plan digest, and is required at `prepare` and before every launch as an admitted reference, checked together with the recorded class, the qualified host matrix and the class gates (dispatcher `:296`, `:374`; user manager `:401`). What those checks resolve the reference against is unpublished: no text states the authorization relation that says which profile a given caller, placement or grant may select, and nothing pins an immutable resolved policy identity behind the reference, since hashing a reference does not freeze a mutable policy body.
+
+F-27 settled the same question for the network profile: caller text and caller home configuration are never authority; a root-owned machine policy maps the admitted Curator profile identity and lock digest to exactly one network profile and pinned policy digest, resolved and pinned at `prepare` (R-NETBIND). The exec profile has no counterpart. The orchestrator composes children's plans under its own agent account from its own home configuration, so a prompt-injected orchestrator's plan can name an interpreter-bearing light-tool profile for an untrusted workplace's documentation task. The published checks admit a reference that is admitted for the recorded class and the qualified host; whether that reference is also refused for this caller, placement and task depends on the unpublished selection relation, so the texts leave the outcome undetermined rather than refusing it. The gap is that missing relation, not a demonstrated existence-only gate and not a permission for every profile; a malicious profile request is therefore a required refusal qualification of the selection relation, across `prepare`, `start` and retry, not an accepted trace. The class floors bound the damage (no compilers, package managers, network tools or harness/agent binaries among account-initiated task commands; the admitted plan's executor remains the sole harness start, user manager `:431`, `:437`, session host `:172`, `:176`), and `f-exec-input-closure` is the interpreter and input qualification such a profile requires, not proof of what a qualified profile permits.
+
+This is a publication gap in the selection and pinning contract, not a claim that a deployment currently admits every existing profile; activation gates keep the path disabled.
+
+## Evidence
+
+- `swarma-dispatcher` at `74687e60` (v0.11), `spec/dispatcher.md:189`: the plan digest covers "the exec-profile reference"; `:296`: `prepare` checks the "exec-profile reference" among its gates; `:374`: `start` requires "the recorded class, current qualified host matrix and admitted exec-profile reference"; `:384`: "The plan carries the task-class exec-profile reference, covered by its digest"; `:316`: the orchestrator composes children's plans under its own account from its own Curator configuration; `:142-144`: R-NETBIND supplies the source-and-pin rules for the network profile that are missing here; `:735` (§16 q25): profile formats unpublished.
+- `swarma-user-manager` at `7b59da7` (v0.10, UM7), `spec/helper.md:401`: the launcher verifies "the task exec profile" against host and class gates before a start; `:437`: per-task-class allowlists; `:445`: the plan records the exec profile; `:613` (§14 q19): profile encoding and enforcement open (the same text at `ae540c59:397, :433, :441, :601`).
+- `curator-agent-launcher` at `f08f566d` (LR6), `SPEC.md:1757-1765`: the composed plan carries the exec-profile reference under the plan digest; `:2006-2021`: the user manager owns the allowlist; neither names a selection authority.
+- `swarma-session-host` at `798a321c` (r11, SH7), `spec/session-host.md:176`: the same R-EXEC text, no selection rule; `:172`: the runner starts only the admitted harness, so the sole executor start is retained independently of the profile. (At r10 `70c9d97e` the same R-EXEC text sat at `:172`.)
+
+## Proposed change
+
+Reuse the R-NETBIND shape, in its smallest form.
+
+1. An exec-policy relation in the existing protected machine policy, beside the network binding entry (R-NETBIND), maps the admitted Curator profile identity and lock digest, intersected with the placement and admission-class minimums, to one exec-profile identity and its policy digest. No separate service, register or grant dimension; a selectable set per entry is optional, not required initially.
+2. The dispatcher resolves the entry at `prepare`, pins the exec-profile identity and policy digest in `input/1`, and refuses a caller reference outside the bound; caller text and the caller's home are never the source. Policy drift between admission and launch refuses rather than substituting another profile; retry and recovery use the pinned digest.
+3. The launcher applies the pinned profile and verifies the policy digest before any child code starts, as one more check in the step that today verifies the admitted reference against the recorded class, the host matrix and the qualification gates (user manager `:401`); the existing checks stay as written.
+4. Workplaces get the narrowest entry by default; an interpreter-bearing profile is an explicit per-placement entry. All class floors and the no-heavy-code rule stay as written.
+5. No grant dimension is added: grant `profiles` already narrow the Curator profile, which narrows the exec profile through the binding, exactly as egress narrows through R-NETBIND.
+
+## Expected benefit
+
+Exec authority narrows transitively with the granted Curator profile, as egress does; one policy owner and one mechanism for both bindings; the selected profile and its body are pinned and checkable at `prepare` and at launch instead of being an unpinned reference chosen by the caller.
+
+## Risks and costs
+
+One more relation in the existing protected machine policy, sharing the binding policy's installer and operator lifecycle, plus drift refusal and a policy-digest relation to publish with the profile format (dispatcher §16 q25, user manager §14 q19). No owner decision is challenged.
+
+## Affected specifications
+
+Dispatcher §§3.4, 4.2, 5.1, 5.3, 16 q25; user manager §§7, 8, 11, 14 q19; launcher §10 composed-plan section; session host §3.2; book chapter 11.
+
+## Confirmed by
+
+Room `#swarma-review-3`, topic `f-exec-profile-authority` (root `$31ovEDYd2iC8LcMf4yH7ad0RWoIlLRTS67hW1IjH2K0`), 2026-10-13.
+
+- Candidate: fable, `$31ovEDYd2iC8LcMf4yH7ad0RWoIlLRTS67hW1IjH2K0`.
+- astra-02 (`macmini_swarma-review-3_astra-02`), `$elHGpas5gb_rCQtgpkbrQABs3nVnnlD-Yf74Om2qUsc`: confirms the selection and policy-digest publication gap from the user-manager and launcher lens; adopted: a single map intersected with placement and class minimums, the policy-digest pin, the floors preserved, and the claim scoped to a publication gap.
+- astra-19 (`ivmbp_swarma-review-3_astra-19`), `$1ocXqMqymJ-jW0p0i7JtqPS81WqqmWD_DSYoxIAMNmY`: independent confirmation from the abuse-control lens; adopted: the missing requirement is "the authoritative selection relation plus an immutable resolved policy identity, with mismatch and drift refusal"; existing gates and unpublished formats are not evidence that every profile is admitted today.
+- astra-05 (`macmini_swarma-review-3_astra-05`), `$sK87Q_s-i5XawEDXUqBDts3uV-vBX8_QannGdxDsV-A`: first-pass R-TRANSFER confirmation of the selection/pinning publication gap against the explicit network relation at dispatcher :140-144; same limits (class minima and floors already constrain admission; one protected mapping and an immutable resolved digest; no implemented bypass claimed).
+- astra-09 (`macmini_swarma-review-3_astra-09`), `$XVT-cr53vxvjFlZe-i5b1b3fqdEeBF65c2NX0AtyNeY`: first-pass abuse-control confirmation of the revised authority/policy-pinning scope; adopted: no existence-only admission rule or present bypass is claimed; one profile/digest in the existing protected mapping is enough initially.
+- core astra (`macmini_swarma-review-3_astra`), `$0mKQHv8tDOImALeszxUrmKAUHf76wHzRfm0YJlTJ9oI`: final-file audit; confirms the selection and body-pinning publication gap against dispatcher `:189`/`:296`/`:374`/`:384`, user manager `:401`/`:437`/`:445` and launcher `:1757-1765`; wording aligned with the accepted limits: the admitted-reference checks already require constructibility, an admitted profile and qualified class and host evidence, and the unpublished relation is neither a demonstrated existence-only gate nor a permission for every profile; the harness exclusion is scoped to account-initiated task commands; `f-exec-input-closure` is described as required qualification; the session-host citation moved to SH7 `:176`; the remedy is a relation in existing protected machine policy plus drift refusal, not a separate service, register or grant dimension.
+- astra-12 (`ivmbp_swarma-review-3_astra-12`), `$2RaAvF4-BIZv7pvgJj2ONu84D_FX74HTHzVj3pX87M0` (omitted from earlier revisions of this file by mistake): partial confirmation of the missing selector-authority contract; refutes a literal existence-only admission claim (helper `:401`, then `ae540c5:397`, checks the recorded class against the host matrix and the task exec profile and refuses missing or unknown evidence; dispatcher `:296`/`:374` require constructibility and an admitted reference); neither `:189`/`:384` nor the helper names the trusted selector or a caller/grant/Curator-profile-to-eligible-exec-set binding; scope: publication of an explicit authorization bound before activation, reusing the existing machine binding and qualified catalogue; distinct from `f-exec-input-closure`.
+- astra-12, second answer `$CYlBFp2aZbj6uHg3hD7EUjVN2lH6GwzcchzcZn2AxJs`: final-file audit at `14576f1`; the residues it names are applied: no "existence" wording in the Problem or in proposal 3 (digest verification is one more check in the existing class, host and qualification step), the widest-profile scenario replaced by the undetermined-selection statement with a malicious profile request as a required refusal qualification across `prepare`, `start` and retry, interpreted input described as a qualification gap, the sole admitted executor start preserved, SH7 `:176` cited.
+- astra-02, second answer `$vCPRgC6H6M1yc0rm6nl5KNtBgiA4AuqZptDADAtRDXA`, and astra-09, second answer `$sD4AsAaasqLFNWvbXDuO7nsipIczTdKGa13HnDBhv1E`: audits of the `b2cc732` file; the revised Problem, evidence and shared-policy remedy preserve their recorded limits; both name the same leftover clause in proposal 3 ("checks existence against the host matrix"), replaced at `35b5631` by the existing recorded-class, qualified-host and admitted-profile checks (dispatcher `:374`, user manager `:401`).

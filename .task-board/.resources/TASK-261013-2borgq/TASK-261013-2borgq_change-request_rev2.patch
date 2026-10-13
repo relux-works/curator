@@ -1,0 +1,988 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 50cb9c51ec51c070f0c8c285c1b0fe997ef8ea40..da6278b38717153b89c972d58f3593b01b7f0103 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,6 +1,8 @@
+ # Changelog
+ 
+-## 0.3.0 (pending tag)
++## Unreleased
++
++## 0.3.0 — 2026-10-13
+ 
+ ### Changed
+ 
+diff --git a/README.md b/README.md
+index 046cd411a236da63c62d45c894cdce727ee59d9a..6e58bfde7e2ca036edcb3e9d8bab99f78ea91f3b 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ `curator-run` composes Curator's managed environment, agents-management's
+ admitted interactive plan, and optional ax tracking. The contract is
+-[SPEC 0.5.0-draft](SPEC.md).
++[SPEC 0.5.1-draft](SPEC.md).
+ 
+ ## Front doors
+ 
+@@ -58,8 +58,12 @@ manager dispatcher directory for checked project commands. Repository
+ `.agents/bin` never executes in a managed launch. The caller records PATH
+ under the plan digest; the executor uses the verified value. R-EXEC places
+ qualified light-check wrappers with fixed subcommand allowlists in that
+-protected dispatcher directory; heavy entry points are not exposed. The
+-user manager owns the OS-enforced executable allowlist; PATH alone is not
++protected dispatcher directory; heavy entry points are not exposed.
++Qualification covers the full invocation and transitive code/configuration
++inputs, with worker scripts, imports, plugins, environment/startup injection
++and direct/indirect shared-tool bypass refused. A tool that cannot prove
++inert worker inputs goes to R-VERIFY. The user manager owns the OS-enforced
++executable allowlist; PATH alone is not
+ an enforcement boundary. Builds, tests and worker-code execution belong
+ only to R-VERIFY runners on another machine, isolated and without secrets;
+ `agent-headless-build` is withdrawn. This claims no
+@@ -90,7 +94,8 @@ external tokens into a per-session app-server, no launch `auth.json` or
+ broker-mode `codex exec`. The execution-side executor/runner owns renewal;
+ the broker alone refreshes. Default renewal deadline: 8 s; timeout fails
+ the turn with no late answer/fallback. Enterprise tokens are outside first
+-release; Muse subscriptions remain an open channel/priority question.
++release; Muse subscription qualification is prioritised (2026-10-13),
++with broker channel (b) / fallback (c) proposed and qualification open.
+ Explicit API-key channels and native per-home authentication stay separate.
+ The first broker store is files 0600 in owner-only 0700 directories.
+ 
+@@ -101,17 +106,24 @@ the dispatcher relays/journals its digest and holds no repository. Approved
+ private Git administration, fresh config, no hooks/remotes/credential helpers.
+ No cross-account linked worktree is allowed; within-account board worktrees
+ remain. The composed plan covers B, manifest digest, write scope, exec-profile
+-reference and read-only task-resource materialization by digest. Exact fields
++identity/body digest pinned by protected machine policy and read-only
++task-resource materialization by digest. The manifest covers path, Git kind/mode
++and content identity from immutable B; materialization verifies every archive
++entry before work, and import independently recomputes it from repository B.
++Exact fields
+ and formats are unpublished with the intake contract (SPEC §10.1).
+ 
+ The worker's Git history never enters the platform. After the round ends and
+ account-wide absence is confirmed (plus a workplace write fence), approved
+ `swarma-workspace-export` runs as the child UID with fixed environment and
+-no network. It compares the manifest and emits only a capped change set;
++no network. It compares both kind/mode and content identity with the immutable
++manifest, preserving mode-only edits, regular↔symlink transitions and deletion
++prior modes, and emits only a capped change set;
+ unsafe paths, collisions, special files and exceeded caps refuse the whole
+ export. The dispatcher journals digests and returns it only to the original
+-caller as `swarma-dispatcher workspace-result/1` (design label, unpublished
+-schema/retention). The board accepts data as a resource; the orchestrator
++caller as `swarma-dispatcher workspace-result/1` (draft result fields published
++by the dispatcher; transport/retention and activation still gated). The board accepts data as a resource;
++the orchestrator
+ performs deterministic import, candidate, review and integration through the
+ board's change-request machinery. Code becomes a repository-signed candidate
+ C in our repository and a trusted non-producing reviewer reviews exactly C.
+@@ -375,12 +387,11 @@ made from this host's tests.
+ Install the tagged release with the Go toolchain specified by `go.mod`:
+ 
+ ```bash
+-go install github.com/relux-works/curator-agent-launcher/cmd/curator-run@v0.2.0
++go install github.com/relux-works/curator-agent-launcher/cmd/curator-run@v0.3.0
+ curator-run --version
+ ```
+ 
+-The v0.3.0 candidate (pending tag) reports `0.3.0` (specification `0.5.1-draft`).
+-The install command above names the published v0.2.0; the v0.3.0 tag is pending.
++The v0.3.0 release reports `0.3.0` (specification `0.5.1-draft`).
+ Compatible with curator v0.15.0-rc.3 or later, once published.
+ Ensure `$(go env GOPATH)/bin` is on `PATH`, or set `GOBIN` to a dedicated
+ trusted operator-owned directory on `PATH`. Do **not** install into Curator's
+diff --git a/SPEC.md b/SPEC.md
+index 1761f3e171ee19038646de7837e9ace413c27bdf..39833a9a17a2d6ce712329caffafb34c6921320d 100644
+--- a/SPEC.md
++++ b/SPEC.md
+@@ -3,7 +3,15 @@
+ **Specification version:** `0.5.1-draft`
+ **Status:** in-repository draft (see [Versioning](#8-versioning))
+ 
+-- 2026-10-13, 0.5.1-draft: launcher v0.3.0 (pending tag) pins
++- 2026-10-13, 0.5.1-draft documentation revision: apply accepted
++  architecture-review findings (2026-10-13) in §§10.1–10.5, README and
++  figures: mode-aware base binding, protected exec-profile selection and
++  full-invocation qualification, owner-linked format references and the
++  Muse priority/channel/qualification split. Align release references and
++  hosted-unavailable figures with v0.3.0. No implementation, qualification
++  or activation is claimed.
++
++- 2026-10-13, 0.5.1-draft: launcher v0.3.0 pins
+   agents-management v0.5.62 for attested Muse builds, `muse-wonder` and
+   fragment v3; hosted launch is unavailable until the swarma dispatcher
+   path ships (§§3, 4.2, 4.8–4.9, 7–8).
+@@ -459,7 +467,7 @@ commit `a2a6e9f377f62a5872d99ecdfff0d1690e385f2a`: system `pi-native`
+ provides native interactive Pi plans for managed homes. This mapping does
+ not require a Go import. The published v0.5.11 tag (tag object
+ `0ea486e46765ecf12fff7c2ac526e12da02e95ed`) introduced that support;
+-this revision pins v0.5.48. §4.3 registers the real native-Pi plugin.
++this revision pins v0.5.62. §4.3 registers the real native-Pi plugin.
+ 
+ An env-id outside this table that Curator nevertheless resolves is
+ `env_unsupported`: the launcher refuses rather than guessing a system or
+@@ -649,7 +657,7 @@ different pair.
+ 
+ The launcher obtains the plan through
+ `vendorplugin.BuildLaunchWithEnvironment(ctx, registry, request, agentic.LaunchModeInteractive)`,
+-the entry point verified at `agents-management` tag `v0.5.48`.
++the entry point consumed from the pinned `agents-management` tag `v0.5.62`.
+ `BuildLaunchWithEnvironment` resolves the runtime and vendor model row, admits the model
+ and effort word against that row, and calls `agentic.BuildPlan` with the
+ resulting `LaunchRequest`. The launcher MUST NOT bypass that admission
+@@ -688,7 +696,7 @@ by calling `BuildPlan` with a bare model id or reconstructing the row's
+ 
+ The mode is requested **by name**, `agentic.LaunchModeInteractive`
+ (Decision 0013 D5). `LaunchRequest.PermissionMode` carries the resolved
+-mode. In agents-management v0.5.48, `LaunchRequest.ToolRelease` and
++mode. In the pinned agents-management v0.5.62, `LaunchRequest.ToolRelease` and
+ `LaunchRequest.NativeArgs` bind the request to the release-specific
+ `permission-grammar-v1`; agents-management owns the permission mapping,
+ argv grammar, and capability table. The launcher passes the request and
+@@ -1761,7 +1769,7 @@ first-consumer role; it resolves the platform table's P1/N6 and C9 choices.
+ Decision 0021 and the launcher must publish the amendment and its supported
+ release/wire versions before activation;
+ this document does not claim that upstream publication has happened.
+-The executable's existing specification version remains `0.5.0-draft`;
++The executable's existing specification version remains `0.5.1-draft`;
+ it does not advertise implementation of this target revision.
+ 
+ The baseline is the [platform contract table at 177cb554](https://github.com/relux-works/curator/blob/177cb554/.research/261010_platform-contract-table.md),
+@@ -1791,10 +1799,26 @@ launch or credential authority and is not evidence that execution occurred.
+ 
+ **Composed plan (R-TRANSFER, R-EXEC, R-NET-TOOL).** The plan MUST carry
+ its workspace section: admitted exact base commit B of the caller's
+-repository, B's file-manifest digest (path to blob id), and the task's
+-**write scope**. It MUST also carry the exec-profile reference. The plan
+-digest covers all of these, plus the digests of task resources and their
+-read-only materialization next to the workspace. Resources are data, never
++repository, B's canonical file-manifest digest, and the task's **write
++scope**. Each manifest entry maps a path to its supported Git kind/mode
++and content identity, derived from B's immutable repository objects, never
++from a working checkout. A symlink's blob identifies its exact link-text
++bytes; no alternate manifest representation is introduced.
++
++The plan MUST also carry the exec-profile identity and policy digest resolved
++and pinned by the dispatcher at `prepare`. The existing protected machine
++policy, beside R-NETBIND, maps the admitted Curator profile identity and lock
++digest, intersected with placement and admission-class minimums, to one
++exec-profile identity and policy digest. Caller text and the caller's home
++are never selection authority; a caller reference outside that bound MUST
++refuse. Workplaces get the narrowest entry by default; an interpreter-bearing
++profile requires an explicit per-placement entry. No separate service,
++register or grant dimension is added: grant `profiles` narrow the Curator
++profile and therefore its bound exec profile. The dispatcher pins the
++resolved identity and body digest in `input/1`; start, retry and recovery
++use that pin. Policy drift MUST refuse, never substitute another profile.
++The plan digest covers these bindings, plus the digests of task resources and
++their read-only materialization next to the workspace. Resources are data, never
+ instructions. Exact workspace, exec-profile and resource fields, the
+ canonical base archive and resource caps/formats are unpublished and owned
+ with the intake contract; this section does not assign wire members.
+@@ -1895,8 +1919,13 @@ board. The caller supplies a bounded canonical archive of admitted exact
+ base B's tree with the start request; the dispatcher relays it and journals
+ its digest, holding no repository. The approved executor (design label
+ `swarma-workspace-materialize`) runs as the child UID before work. It writes
+-a standalone repository in the private home, with freshly written local
+-configuration, no hooks, no remotes and no credential helpers. Its `.git`,
++a standalone repository in the private home. Before work, it MUST verify
++all archive entries against the admitted canonical manifest by path,
++kind/mode and content identity; any mismatch, missing or extra entry MUST
++refuse. Each rework round repeats this check against its newly admitted
++base. The archive digest alone does not establish archive-to-manifest
++agreement. The repository has freshly written local configuration, no hooks,
++no remotes and no credential helpers. Its `.git`,
+ common directory, refs and index are private; no source `.git` backlink or
+ mutable hard-linked Git administration is inherited. Copy/reflink must
+ preserve that boundary. Linked worktrees remain within one account only,
+@@ -1918,9 +1947,14 @@ confirms account-wide process absence through the user manager's stop scope
+ refuses further tool calls into that workspace. Only then does approved
+ executor `swarma-workspace-export` (design label) run as the child UID, with
+ a fixed environment and no network. It walks without following links,
+-skips every `.git` component and compares file hashes with the admitted
+-manifest. The change set contains added/modified regular files (content and
+-executable bit), symlinks as link text and deleted paths. It caps file count,
++skips every `.git` component and compares both kind/mode and content
++identity with the immutable admitted manifest, without using worker Git
++metadata. Only entries equal in both are unchanged. Mode-only edits and
++regular-file↔symlink transitions, including equal-blob transitions, export
++as `modify`; deletions report the manifest's prior mode. The change set
++contains added/modified regular files (content and executable bit), symlinks
++as link text and deleted paths. The existing result field set is unchanged.
++It caps file count,
+ per-file and total bytes, with a separate binary cap; values are unpublished.
+ Special files, a path with a `.git` component however spelled, case-fold or
+ Unicode-normalisation collisions, gitlinks/submodules, root escapes or an
+@@ -1929,14 +1963,25 @@ administration never admits it into the result.
+ 
+ The dispatcher journals the digests and returns the result only to the
+ original caller principal, the requester of the run. The result kind's design
+-label is `swarma-dispatcher workspace-result/1`; schema and retention remain
+-unpublished. The board accepts it only as a resource. Import, candidate,
++label is `swarma-dispatcher workspace-result/1`; its draft result fields
++are defined by the dispatcher §5.2.1 and schema referenced in §10.5. Draft
++result bytes do not publish the complete transport or lifecycle: intake,
++blob delivery, retention and activation remain gates. The board accepts it only as a
++resource. Import, candidate,
+ review and integration are board change-request machinery executed by the
+ orchestrator, never agent-account work. RWP v2.1 §§8/10 gates apply; export
+ uses the approved child-UID executor rather than reading a container volume.
+ 
+-The board's deterministic import (command unpublished) builds the tree on B
+-in a scratch index, with hooks disabled and no attribute filters or drivers.
++The board's deterministic import (command unpublished) MUST independently
++recompute the canonical manifest from the caller repository's immutable B,
++using the same canonical encoding as admission, never a manifest supplied
++by the orchestrator-composed plan. This is a bounded tree pass, not equality
++of two supplied strings. It MUST refuse unless the recomputed digest equals
++the result's `manifest_digest` and the result's `base_commit` equals B;
++existing result-to-admission checks remain required. It then builds the tree
++on B in a scratch index, with hooks disabled and no attribute filters or
++drivers. These checks establish base consistency; they do not prove who
++made an edit or replace exact-C review.
+ It hard-refuses `.git` components, out-of-write-scope paths and `.task-board/`
+ changes. Review-required flagged paths are `.github/**`, `.gitlab-ci.yml`,
+ `.circleci/**`, `.gitattributes`, `.gitmodules`, `.githooks/**`, `.husky/**`,
+@@ -1973,8 +2018,11 @@ use distinct effect IDs, with retries reusing their own effect ID.
+ 
+ `swarma-user-launcher` is the root transition, not the agent executor.
+ Through its no-argument sudo entry it verifies active owned generation,
+-agent home, approved executor path and digest; follows the user manager's
+-descriptor lifecycle (§10.1) and resets the environment; writes the atomic
++agent home, approved executor path and digest. Before any child code starts,
++it MUST apply the pinned exec profile and verify its policy body digest,
++alongside the existing recorded-class, qualified-host-matrix and admission/
++qualification checks; missing, mismatched or drifted evidence refuses.
++It follows the user manager's descriptor lifecycle (§10.1) and resets the environment; writes the atomic
+ start receipt **before** clearing groups, setting GID/UID and executing the verified `curator-run`. A pre-existing
+ execution receipt refuses a second start. No general command runner or
+ arbitrary `sudo -u` substitutes for this boundary.
+@@ -2041,7 +2089,9 @@ claims no current PATH implementation.
+ **Exec profile (R-EXEC).** The protected manager dispatcher directory
+ (D-PATH) carries qualified light-check wrappers with fixed subcommand
+ allowlists when light and heavy actions share an executable. Heavy entry
+-points are not exposed; qualification proves the heavy form refuses.
++points are not exposed; qualification proves that the actual invocation
++boundary refuses direct and indirect access to the heavy form. Root ownership
++of a wrapper or a fixed subcommand alone does not establish that boundary.
+ The user manager owns the OS-enforced per-task-class executable allowlist:
+ Linux makes all paths non-executable except the allowlist in the execution
+ unit; macOS restricts process execution in the sandbox profile. PATH alone
+@@ -2055,6 +2105,26 @@ the harness; no account starts its own agent loop or environment.
+ `agent-headless-build` is withdrawn for agent accounts. Building, testing,
+ generators and all execution of worker code belong only to R-VERIFY (§10.6).
+ 
++Qualification MUST cover the complete admitted invocation: executable,
++entrypoint and arguments, environment, and every transitive input interpreted
++as code or configuration. Inert inspection of candidate bytes stays local;
++candidate-supplied executable behavior does not. Protected fixed entrypoints
++and configuration, constrained environment and disabled or pinned code-loading
++mechanisms MUST prevent worker inputs from selecting or supplying executable
++behavior. Executable allowlists, non-executable writable areas and resource
++ceilings do not prove input inertness.
++
++The real task-tool path MUST exercise negative cases for readable worker
++scripts, inline evaluation, imported modules, project plugins/executable
++configuration, startup/environment injection and indirect shared-tool
++invocation, with positive controls for genuinely inert light checks. A tool
++that cannot demonstrate this boundary MUST be refused in the local profile
++and its operation sent to R-VERIFY. Qualification also MUST refuse an
++out-of-bound caller profile request and policy-body substitution/drift at
++prepare, start and retry. Tool/release-specific language profiles and the
++verification contract remain publication work (§10.5); no new privileged
++wrapper service is selected.
++
+ **Provider proxy and web tools (R-NET-TOOL).** A managed platform launch
+ sets proxy variables only for its bound provider proxy, with vendor names
+ in the allowlist and no other egress. It never admits `direct` or
+@@ -2143,18 +2213,21 @@ is claimed. First store: broker-owned files 0600 in owner-only directories
+ | Codex personal | Later slice: one broker auth owner, fresh broker enrollment, external access token/account ID into a per-session app-server; no launch `auth.json`, shared credential file, copy or broker-mode `codex exec`. |
+ | Codex Business/Enterprise token | `CODEX_ACCESS_TOKEN`, no broker refresh; outside first release. |
+ | API key | Explicit source and qualified provider env or supported stdin channel; no automatic substitution. Muse API-key support remains distinct from subscription research. |
+-| Muse subscription | Reserved source/refresh/channel; no subscription parity or supported channel claimed. |
++| Muse subscription | Priority decided 2026-10-13: prioritise qualification. Broker §10.2 proposes channel (b), a single minting owner leasing the minted provider API key, never OAuth tokens, with fallback (c). Qualification remains open; no subscription parity or supported channel claimed. |
+ 
+ The execution-side executor/runner owns lease renewal; only the broker auth
+ owner refreshes rotating Codex accounts. The default renewal deadline is
+ 8 seconds; timeout fails the turn, with no late response or native-login
+ fallback. Claude setup-token has no refresh.
+ 
+-**Open owner questions (table C4/C7):** adopt Codex personal's single-owner
+-lane with named supported-release qualification evidence, or defer it;
+-prioritise Muse subscription qualification and choose a channel from
+-evidence, or defer it while retaining the separate API-key lane. Neither
+-provider lane is enabled by D-EXECUTOR's first-consumer decision.
++**Open owner question (table C4):** adopt Codex personal's single-owner
++lane with named supported-release qualification evidence, or defer it.
++**Muse qualification (table C7):** priority is decided; the channel is
++proposed and qualification remains open under the broker §§10.2/18.5
++reference in §10.5. Refresh, rotation, lifetime and billing semantics remain
++unknown; fallback (c)'s protocol remains unpublished. The separate API-key
++lane stays separate. Neither provider lane is enabled by D-EXECUTOR's
++first-consumer decision.
+ 
+ ### 10.4 Signals, stop, receipts and cleanup
+ 
+@@ -2251,7 +2324,7 @@ are existing platform/CIP refusals, not a newly shipped launcher registry.
+ 
+ | Boundary | Refusal conditions / published names |
+ |---|---|
+-| Dispatcher intake | `payload_too_large`; `unsupported_combination` for interactive transport, native resume, seeded continuity or remote targets in v0. |
++| Dispatcher intake | `payload_too_large`; `unsupported_combination` for interactive transport, native resume, seeded continuity or remote targets in Slice 0. |
+ | Privileged launch | `generation_not_active`, `target_not_owned`, `executor_not_approved`, `executable_digest_mismatch`, `execution_already_started`, `privilege_drop_failed`. |
+ | Credential intake | Required extension/capability must be understood; unreachable broker: `credential_broker_unavailable`; conflicting sources: `credential_source_conflict`. Unpublished intake/version/digest codes remain a schema publication question (§10.1). |
+ | Broker identity/authority | `principal_ledger_mismatch`, `lease_unbound`, `lease_not_authorised`, `lease_caller_revoked`, `revocation_state_unavailable`; revoked/expired chain is refused, never treated as missing. |
+@@ -2268,15 +2341,33 @@ with the receipt transport. This section assigns neither invented values
+ nor the interactive §6 mapping to the new mode. In all options, a refusal
+ must be non-success and receipt/read failure must not be reported as success.
+ 
+-D-WIRE-NAMES fixes new versioned wire identifiers to the repository name:
+-`swarma-<component> <object>/<n>`. Broker signed domains become
+-`swarma-credential-broker grant/1` and
+-`swarma-credential-broker revocation/1`; dispatcher request domain is
+-`swarma-dispatcher request/1`. The existing `broker/1` transport token is
+-not a signed request domain. User-manager request kinds
+-must follow the rule on publication; object names, signature grammar and
+-canonical bytes are not supplied by the naming decision. Nothing has shipped,
+-so no migration is needed (D-WIRE-NAMES); older pinned spellings are historical.
++D-WIRE-NAMES and format disposition belong to the shared naming/contract
++owners. The owner-linked index below distinguishes signing domains from
++transport/schema labels and provisional design labels; a signed-domain
++prefix does not rename a transport or schema token. Retain the owning
++modules' short labels, including `broker/1`, `dispatch-op/1`, `helper-op/1`
++and `launch-op/1`. Shared clarification of the naming rule's scope remains
++open; this consumer does not derive new spellings, signature grammar or
++canonical bytes. Removed launch tickets remain removed, not pending formats.
++
++**Owner-linked format reference index.** Stable IDs here are the existing
++format/rule names; these rows point to exact owner revisions, not a second
++status register. Decision disposition, draft/schema publication and
++implementation/qualification are separate states determined at the owners.
++The local prerequisites below remain necessary regardless of draft bytes.
++
++| Format/rule reference | Authoritative owner sections |
++|---|---|
++| `swarma-dispatcher workspace-result/1`, R-TRANSFER | [Dispatcher §5.2.1 and §16 question 22](https://github.com/relux-works/swarma-dispatcher/blob/74687e600e04817fa6e7a2e8904a9f7a3c83a1d8/spec/dispatcher.md#521-draft-swarma-dispatcher-workspace-result1), with its [draft result schema](https://github.com/relux-works/swarma-dispatcher/blob/74687e600e04817fa6e7a2e8904a9f7a3c83a1d8/schemas/workspace-result-1.schema.json) |
++| `input/1`, `dispatch-op/1`, `agent/1`, `run/1`, `dispatch-result/1`, `swarma-dispatcher request/1`, `swarma-dispatcher team/1`, R-SESSION | [Dispatcher §§4–5, 8, 16](https://github.com/relux-works/swarma-dispatcher/blob/74687e600e04817fa6e7a2e8904a9f7a3c83a1d8/spec/dispatcher.md) |
++| `helper-op/1`, `launch-op/1`, `swarma-user-manager helper-result/1`, R-FD3, R-EXEC | [User manager §§2–3, 7–8, 11–12, 14](https://github.com/relux-works/swarma-user-manager/blob/7b59da740037865dd42936982e5a069ea05eab53/spec/helper.md) |
++| `broker/1`, `credential_binding/1`, `credential-injection/1`, `swarma-credential-broker grant/1`, `swarma-credential-broker revocation/1`, C7 | [Broker §§6, 8, 10.2, 13, 18.5](https://github.com/relux-works/swarma-credential-broker/blob/df8c7385456e9588392900e000738d419ffee2ec/spec/broker.md) |
++| D-WIRE-NAMES and cross-module disposition | [Platform contract disposition, wire naming and open questions](https://github.com/relux-works/curator-spec/blob/a01542857678108a77d5e1b1f051989b00384f1d/cips/platform-contract-disposition.md#wire-naming-rule); its derived spellings need shared-owner reconciliation, not consumer renames |
++
++Joint publication would need a shared owner-linked index and mechanical
++docs reference/status checks; neither exists as an implemented gate in this
++module. Such a check must reject operative pending-ticket references while
++allowing historical or negative mentions.
+ 
+ **Open publication questions (table W3/I4):** helper v2 would need a
+ component-specific request signature/version/canonical-byte format or a
+@@ -2293,14 +2384,21 @@ only the dispatcher performs privileged starts.
+ settles source/result ownership and closes the dispatcher's open question 22
+ and user manager's open question 15 except for unpublished formats. Activation
+ would need the canonical base archive, exact plan workspace/exec-profile and
+-read-only resource fields, resource/export caps, workspace-result schema and
+-retention, deterministic import command and candidate trailer grammar.
++read-only resource fields, resource/export caps, blob delivery/retention,
++deterministic import command and candidate trailer grammar, under the owner
++references above. The canonical manifest encoding and the exporter's immutable
++access to it must be published with archive/intake. Qualification must reject
++content/mode archive mismatches, missing/extra paths, dirty-checkout archives
++and stale rework bases at materialization or import, and preserve mode-only
++modifications, equal-blob regular↔symlink transitions and deletion of every
++supported prior mode. Draft result fields are not a complete transfer contract.
+ Optional immutable object sharing would need published provenance,
+ authorised-object access and retention. An admitted base or accepted result
+ does not prove secret-free content. R-STANDING would need harness-surface
+ digest coverage and the drift refusal code; R-EXEC would need qualified
+-wrappers/OS profiles; R-NET-TOOL would need opt-in records, harness search
+-configuration and qualified tuples. No fields, codes or values are assigned
++wrappers/OS profiles, the protected selection relation and policy-body pin,
++full-invocation/transitive-input qualification and future language/tool
++profiles; R-NET-TOOL would need opt-in records, harness search configuration and qualified tuples. No fields, codes or values are assigned
+ here.
+ 
+ D-DONOR-PROVISIONING assigns donor provisioning to a separately specified
+@@ -2315,7 +2413,7 @@ qualification row; different major/0.x minor refuses. Harness failure is
+ `resume-failed`, with the caller deciding the next action, no automatic
+ fallback and no portable seed on that path. Known vendor semver exceptions
+ belong in per-harness notes. This decision does not enable native resume
+-in dispatcher v0 or add session/resume state to this one-shot executor.
++in dispatcher Slice 0 or add session/resume state to this one-shot executor.
+ 
+ ### 10.6 Admission and verification ownership (wave-5 references)
+ 
+diff --git a/cmd/curator-run/main_test.go b/cmd/curator-run/main_test.go
+index 10e5952a6c87f99bb380e54d4e047efea294c254..565b7f7c5af0c7fad60a1caf635620e2a0704825 100644
+--- a/cmd/curator-run/main_test.go
++++ b/cmd/curator-run/main_test.go
+@@ -412,10 +412,10 @@ func TestReleaseVersionPinned(t *testing.T) {
+ 	}{
+ 		{path: "../../SPEC.md", content: specVersion},
+ 		{path: "../../README.md", content: specVersion},
+-		{path: "../../README.md", content: "github.com/relux-works/curator-agent-launcher/cmd/curator-run@v0.2.0"},
+-		{path: "../../README.md", content: "The v0.3.0 candidate (pending tag) reports `0.3.0` (specification `0.5.1-draft`)."},
++		{path: "../../README.md", content: "github.com/relux-works/curator-agent-launcher/cmd/curator-run@v0.3.0"},
++		{path: "../../README.md", content: "The v0.3.0 release reports `0.3.0` (specification `0.5.1-draft`)."},
+ 		{path: "../../README.md", content: "curator v0.15.0-rc.3 or later, once published"},
+-		{path: "../../CHANGELOG.md", content: "## 0.3.0 (pending tag)"},
++		{path: "../../CHANGELOG.md", content: "## 0.3.0 — 2026-10-13"},
+ 	} {
+ 		data, err := os.ReadFile(check.path)
+ 		if err != nil {
+diff --git a/diagrams/README.md b/diagrams/README.md
+index d1abbcb8809974621db61825038691a25a057183..836ba32dd04045cdc99e1d2ece29bd0b462f8bdc 100644
+--- a/diagrams/README.md
++++ b/diagrams/README.md
+@@ -1,10 +1,13 @@
+ # Launcher figures
+ 
+ These PlantUML sources illustrate the [launcher specification](../SPEC.md).
+-Each figure separates the current interactive API (direct and ax launches,
+-plus hosted Phase 1: Claude with terminal stdin only) from the target
+-agent-account one-shot mode (§10). The target is **not implemented**;
+-dispatcher v0 is a Unix-socket service from the first slice and admits
++Revision: accepted architecture-review findings (2026-10-13), plus v0.3.0
++release alignment. No implementation, qualification or activation is claimed.
++
++Each figure separates the current interactive API (direct and ax launches;
++hosted launch unavailable in v0.3.0 until the swarma dispatcher path ships)
++from the target agent-account one-shot mode (§10). The target is **not implemented**;
++dispatcher Slice 0 is a Unix-socket service from the first slice and admits
+ local headless work only; queueing, events and long waits come later on the
+ same transport. Unpublished FD3 staging, intake, receipt and host admission
+ formats remain open
+@@ -12,10 +15,10 @@ questions in [§§10.1–10.6](../SPEC.md#101-immutable-input-descriptor-transpo
+ 
+ | Figure | Defining spec sections | Phase |
+ |---|---|---|
+-| [Components and process authority](components.puml) | [§1.1](../SPEC.md#11-front-doors-and-execution-authority), [§2](../SPEC.md#2-discovery-and-naming), [§4](../SPEC.md#4-composition-algorithm), [§§4.6–4.9](../SPEC.md#46-hand-off-and-exec), [§§10.1–10.6](../SPEC.md#102-caller-dispatcher-privileged-launcher-and-executor) | Current interactive; hosted Phase 1; target one-shot (dispatcher v0). |
+-| [Launch routes and one-shot path](launch-paths.puml) | [§4](../SPEC.md#4-composition-algorithm), [§4.6](../SPEC.md#46-hand-off-and-exec), [§§4.8–4.9](../SPEC.md#48-host-selection), [§6](../SPEC.md#6-errors-and-diagnostics), [§§10.1–10.6](../SPEC.md#101-immutable-input-descriptor-transport-and-limits) | Current interactive; hosted Phase 1; target one-shot (dispatcher v0). |
+-| [Invocation states, refusal and recovery](launch-states.puml) | [§1](../SPEC.md#1-scope-and-non-goals), [§4](../SPEC.md#4-composition-algorithm), [§4.6](../SPEC.md#46-hand-off-and-exec), [§4.9](../SPEC.md#49-hosted-payload-and-receiver-handoff), [§6](../SPEC.md#6-errors-and-diagnostics), [§§10.1–10.6](../SPEC.md#101-immutable-input-descriptor-transport-and-limits) | Current interactive; hosted Phase 1; target one-shot (dispatcher v0). |
+-| [Artifact ownership, transport and cleanup](artifact-layout.puml) | [§4.1](../SPEC.md#41-obtain-the-fragment-context-plane), [§§4.4b–4.7](../SPEC.md#44b-resolve-the-network-profile-network-plane), [§4.9](../SPEC.md#49-hosted-payload-and-receiver-handoff), [§9](../SPEC.md#9-open-items), [§§10.1–10.6](../SPEC.md#101-immutable-input-descriptor-transport-and-limits) | Current interactive; hosted Phase 1; target one-shot (dispatcher v0). |
++| [Components and process authority](components.puml) | [§1.1](../SPEC.md#11-front-doors-and-execution-authority), [§2](../SPEC.md#2-discovery-and-naming), [§4](../SPEC.md#4-composition-algorithm), [§§4.6–4.9](../SPEC.md#46-hand-off-and-exec), [§§10.1–10.6](../SPEC.md#102-caller-dispatcher-privileged-launcher-and-executor) | Current interactive; hosted unavailable; target one-shot (dispatcher Slice 0). |
++| [Launch routes and one-shot path](launch-paths.puml) | [§4](../SPEC.md#4-composition-algorithm), [§4.6](../SPEC.md#46-hand-off-and-exec), [§§4.8–4.9](../SPEC.md#48-host-selection), [§6](../SPEC.md#6-errors-and-diagnostics), [§§10.1–10.6](../SPEC.md#101-immutable-input-descriptor-transport-and-limits) | Current interactive; hosted unavailable; target one-shot (dispatcher Slice 0). |
++| [Invocation states, refusal and recovery](launch-states.puml) | [§1](../SPEC.md#1-scope-and-non-goals), [§4](../SPEC.md#4-composition-algorithm), [§4.6](../SPEC.md#46-hand-off-and-exec), [§4.9](../SPEC.md#49-hosted-payload-and-receiver-handoff), [§6](../SPEC.md#6-errors-and-diagnostics), [§§10.1–10.6](../SPEC.md#101-immutable-input-descriptor-transport-and-limits) | Current interactive; hosted unavailable; target one-shot (dispatcher Slice 0). |
++| [Artifact ownership, transport and cleanup](artifact-layout.puml) | [§4.1](../SPEC.md#41-obtain-the-fragment-context-plane), [§§4.4b–4.7](../SPEC.md#44b-resolve-the-network-profile-network-plane), [§4.9](../SPEC.md#49-hosted-payload-and-receiver-handoff), [§9](../SPEC.md#9-open-items), [§§10.1–10.6](../SPEC.md#101-immutable-input-descriptor-transport-and-limits) | Current interactive; hosted unavailable; target one-shot (dispatcher Slice 0). |
+ 
+ The specification defines the contracts; the figures also link back to the
+ relevant sections. Persistent state belongs to the named owning components.
+@@ -47,8 +50,16 @@ before home deletion. Separate retirement metadata export remains restricted
+ to service-generated closed-schema metadata without agent-controlled data.
+ Separate operator home retention does not guarantee confidentiality.
+ 
+-All target panels carry the wave-5 plan, exec-profile, resource, surface-drift
+-and web opt-in obligations (SPEC §§10.1–10.2). The sequence and state figures
++All target panels carry the plan, exec-profile, resource, surface-drift
++and web opt-in obligations (SPEC §§10.1–10.2). They show protected-machine
++exec selection and immutable identity/body pinning, full-invocation and
++transitive-input qualification, and the mode-aware manifest from immutable B.
++Materialization checks archive-to-manifest equality; export compares mode
++and content; board import independently recomputes the manifest from B.
++Result fields are the dispatcher's draft (§10.5 owner-linked index), while
++transport/lifecycle and qualification remain gated. Current panels show
++`session_host_missing` (exit 1) before any hosted handoff, even with task-board
++on PATH; earlier validation refusals and native/ax routes remain. The sequence and state figures
+ show materialization before work and export after account-wide absence,
+ before retirement. SPEC §10.6 references admission/abuse-control owners;
+ these sources claim neither enforcement nor rendered qualification.
+diff --git a/diagrams/artifact-layout.puml b/diagrams/artifact-layout.puml
+index 438acc949de25eb8e33a861022da02b0ec10ab21..bed5ca808845a35ab3b71c7306722d7b52416c0e 100644
+--- a/diagrams/artifact-layout.puml
++++ b/diagrams/artifact-layout.puml
+@@ -2,7 +2,7 @@
+ title Artifact ownership, transport and cleanup boundaries
+ skinparam componentStyle rectangle
+ 
+-package "CURRENT interactive API - SPEC 0.5.0-draft" {
++package "CURRENT interactive API - SPEC 0.5.1-draft" {
+   folder "Launcher config - persistent\ncontract owner: curator-run\nfile identity: configuration-directory owner" as config {
+     artifact "defaults.json\nmodel / effort / permissions / host\noperator first unless machine lock" as defaults
+     artifact "ax.json\ntracking switch\nmachine first" as axconfig
+@@ -15,15 +15,13 @@ package "CURRENT interactive API - SPEC 0.5.0-draft" {
+     artifact "Closed fragment v1 / v2 / v3\nCCJ-1 digest; profile pin\nreserved path_prepend remains non-operative" as fragment
+     artifact "Admitted / composed plan value\nBinary / Argv / Env / Stdin / WorkDir\nno persisted launcher session record" as plan
+     artifact "ax request - generated stdin bytes\nargv suffix, owned literals, lookup names\nencoded stdin, Curator extensions\nNOT full inherited environment" as axpayload
+-    artifact "Hosted 1.0.0 payload - private stdin\nfull env / cwd / binary / argv / home\ncontent digest / exec guard / restart / resume metadata\n1 MiB object limit" as hostedpayload
+     artifact "Optional native network snapshot\nprivate read-only evaluated executable\nprocess owner stages and executes same bytes" as snapshot
+   }
+   component "curator env resolve --repair\ncaller-side subprocess" as curator
+   component "Native provider child\ncaller-side identity" as native
+   component "ax start subprocess\ndestination UID unspecified in spec 4.6" as ax
+   database "ax Session Record\nax-owned persistent extensions / session" as record
+-  component "task-board receiver subprocess\ndestination UID unspecified in spec 4.9" as receiver
+-  artifact "Hosted FD3 = controlling terminal\nHosted FD4 = bounded status pipe\nlauncher copies close-on-exec; receiver ingress clear\nreceiver sets close-on-exec before descendants" as hostfds
++  artifact "Hosted unavailable in v0.3.0\nsession_host_missing (exit 1)\nuntil swarma dispatcher path ships" as receiver
+   config --> launcher : validated reads; unsafe / failed read refuses, never absence
+   profile --> curator : resolve selected profile / pin
+   curator --> home : repair ownership; launcher never writes
+@@ -34,21 +32,19 @@ package "CURRENT interactive API - SPEC 0.5.0-draft" {
+   plan --> axpayload : literals-only transport
+   axpayload --> ax : stdin is request, not child stdin
+   ax --> record : copied extensions; destination manages session / resume
+-  plan --> hostedpayload : same in-hand admitted plan only
+-  hostedpayload --> receiver : private stdin
+-  hostfds --> receiver : separate terminal / refusal transport
++  plan --> receiver : earlier validation retained; receiver lookup refuses\nno hosted payload / terminal / status-descriptor handoff
+   snapshot --> native : optional admitted direct network scope
+   note bottom of launcher
+     [[../SPEC.md#47-the-launchers-configuration-file-family SPEC 4.7]] / [[../SPEC.md#41-obtain-the-fragment-context-plane SPEC 4.1]] / [[../SPEC.md#45-compose-the-launch SPEC 4.5]] / [[../SPEC.md#46-hand-off-and-exec SPEC 4.6]] / [[../SPEC.md#49-hosted-payload-and-receiver-handoff SPEC 4.9]].
+     Missing / unreadable Codex layer refuses; retry starts a new Curator repair.
+     Payload / config / channel failure never silently drops metadata or tracking.
+     Invocation buffers / descriptors are not persistent session state.
+-    Exact native snapshot removal / hosted durable layout: unspecified in spec 4.4b / 4.9.
++    Exact native snapshot removal: unspecified in spec 4.4b; hosted handoff unavailable (SPEC 4.9).
+     Tracked destination environment filtering remains open (SPEC 9).
+   end note
+ }
+ 
+-package "TARGET one-shot - NOT IMPLEMENTED; dispatcher v0 local headless" {
++package "TARGET one-shot - NOT IMPLEMENTED; dispatcher Slice 0 local headless" {
+   artifact "Caller-owned immutable composed plan\nprofile pin / approved harness identity / effective env / PATH\nprotected tools -> admitted base PATH -> protected dispatcher\nno repository .agents/bin; digest covers PATH / workspace / exec profile / resources" as immutable
+   folder "Dispatcher-owned persistent execution state\nUnix-socket service from first slice" as dispatchstate {
+     artifact "Host admission permit\nsession-scoped: one logical_session_id\nsession lifecycle authorisation member unpublished" as hostpermit
+@@ -58,14 +54,14 @@ package "TARGET one-shot - NOT IMPLEMENTED; dispatcher v0 local headless" {
+   artifact "Admitted base B tree archive\ncaller supplies; dispatcher relays / journals digest\narchive format unpublished" as basearchive
+   component "swarma-workspace-materialize\napproved executor, child UID\ndispatcher workspace contract" as materialize
+   component "swarma-workspace-export\napproved executor, child UID\nfixed environment / no network; only after confirmed absence" as export
+-  artifact "swarma-dispatcher workspace-result/1\nchange set only; design label\nschema / caps / retention unpublished" as result
+-  component "Board change-request machinery\norchestrator: deterministic import / exact C review\nrework from C / signed fast-forward integration" as changes
++  artifact "swarma-dispatcher workspace-result/1\nchange set only; dispatcher draft fields\ntransport / caps / retention and activation gated" as result
++  component "Board change-request machinery\nrecompute manifest from repository B; check result base_commit / manifest_digest\ndeterministic import / exact C review / rework / signed fast-forward" as changes
+   folder "Agent-owned cross-account workspace" as workspace {
+     artifact "Standalone repository at admitted exact base\nprivate .git / common directory / refs / index / fresh config; no hooks\nfresh local configuration; no hooks / remotes / credential helpers" as repository
+   }
+   folder "Root user-manager / launcher-owned state" as rootstate {
+     artifact "Generation ledger\nroot-owned 0644, root-owned directory\nactive (uid,generation); no secrets" as ledger
+-    artifact "Approved executor / active owned home checks" as approved
++    artifact "Approved executor / active owned home checks\nprotected machine exec-policy identity / body digest pin\nclass / qualified host / admission checks" as approved
+     artifact "Atomic start receipt BEFORE UID drop\nexecution_id / epoch / pid / start_time / boot_id / session_id\nattempt identity, not readiness" as startreceipt
+   }
+   component "swarma-user-launcher\nroot process; no-argument sudo entry" as root
+@@ -82,17 +78,17 @@ package "TARGET one-shot - NOT IMPLEMENTED; dispatcher v0 local headless" {
+   component "Admitted harness\nagent-side process\nSlice 0 Claude token env channel" as harness
+   artifact "Consumed-plan / credential evidence\ndigest + qualified executor + policy generation\nno secrets; wire / storage unpublished" as consumed
+   hostpermit --> claims : host_start: per-start (execution_id, controller_epoch, op_id) interlock\nsuccessor needs authorisation / prior absence; idempotent (logical_session_id, op_id)
+-  basearchive --> materialize : dispatcher workspace contract; before work
++  basearchive --> materialize : exact path / kind-mode / content against immutable manifest\nmissing / extra / mismatch refuses before work
+   materialize --> repository : fresh standalone repository; no hooks / remotes
+-  immutable --> materialize : admitted B / manifest / write scope / exec profile
++  immutable --> materialize : admitted B / mode-aware manifest / write scope / exec-policy pin
+   outcome --> export : account-wide absence; workplace write fence
+   repository --> export : walk without following links; ignore worker Git history
+-  export --> result : bounded manifest-relative change set; whole-export refusals
++  export --> result : compare mode AND content; mode-only / file-symlink modify\ndeletions prior mode; bounded whole-export refusals
+   result --> changes : dispatcher journals digests; original caller only; board accepts resource
+   immutable --> request : dispatcher admits smallest applicable bound before provisioning
+   request --> root : closed privileged request on stdin
+   ledger --> root : active generation / ownership checks
+-  approved --> root : executor path / digest / home checks
++  approved --> root : executor / home checks; apply pinned exec profile\nverify policy body digest before any child code; drift refuses
+   root --> startreceipt : atomic write; existing receipt refuses second start
+   root --> planfd : user-manager lifecycle; bounded plan staging
+   planfd --> executor : after clear groups / GID / UID drop; no alternate intake
+@@ -117,7 +113,7 @@ package "TARGET one-shot - NOT IMPLEMENTED; dispatcher v0 local headless" {
+     v2 requires explicit source; read failure never means absence.
+     Later Codex: external token to per-session app-server,
+     no launch auth.json / broker-mode codex exec; qualification pending.
+-    Muse subscription reserved; API-key lane separate.
++    Muse priority decided; channel proposed; qualification open; API-key lane separate.
+   end note
+   note bottom of dispatchstate
+     [[../SPEC.md#104-signals-stop-receipts-and-cleanup SPEC 10.4]]:
+@@ -167,14 +163,23 @@ package "TARGET one-shot - NOT IMPLEMENTED; dispatcher v0 local headless" {
+   end note
+ }
+ note right of immutable
+-  Wave-5 launch obligations - SPEC 10.1-10.2 / 10.6
+-  R-TRANSFER: plan digest covers B / manifest digest / write scope / exec-profile reference.
++  Launch obligations - SPEC 10.1-10.2 / 10.5-10.6
++  R-TRANSFER: plan digest covers B / mode-aware manifest digest / write scope / pinned exec-profile identity and body digest.
++  Manifest from immutable B: path / Git kind-mode / content identity; archive exact-match before work.
++  Export compares mode and content: mode-only / equal-blob file-symlink modify; deletion prior mode.
++  Board import recomputes canonical manifest from repository B, never plan; base_commit / manifest_digest must match.
++  R-EXEC selection: protected machine policy beside R-NETBIND; profile-lock / placement / class bound.
++  Dispatcher pins at prepare; launch / retry / recovery use pin; out-of-bound request or drift refuses.
++  Launcher verifies policy body digest before any child code; existing class / host / qualification checks remain.
+   R-NET-TOOL: read-only task resources covered by digest; bound provider proxy only.
+   No web by default; plan disables provider-side search, invisible to network rules.
+   Only operator-granted trusted-circle opt-in: qualified server search or platform Unix-socket web service.
+   R-STANDING: verify settings / hooks / MCP / instructions by digest before exec, or root-owned surfaces.
+   Drift refuses (code unpublished); repair is explicit re-materialization.
+-  R-EXEC: D-PATH protected light-check wrappers / fixed subcommands; no heavy entry points.
++  R-EXEC: qualify full invocation / env / transitive interpreted code-config inputs; inert inspection only.
++  Protected entrypoints / config, disabled or pinned code loading; executable allowlist alone is insufficient.
++  Negative scripts / inline eval / imports / plugins / startup-env injection / direct-indirect heavy bypass; inert positive controls.
++  D-PATH wrapper ownership / fixed subcommand alone is insufficient; unprovable local tool goes to R-VERIFY.
+   User manager owns OS exec allowlist; R-VERIFY builds / tests / code execution on another machine.
+   R-UNTRUSTED refused in Slice 0 / user-manager v0; workplace zero egress / donor-side loop.
+   Admission: R-CEILINGS / R-WATCH / R-ALLSTOP / R-RANGE-DENY / R-SOCKETS / R-SHARED (SPEC 10.6).
+diff --git a/diagrams/components.puml b/diagrams/components.puml
+index 81f3b4bf6234c1f15c5aada2399248f8e8cd77dd..f8ff02293a7c47f6ae38bc7557da100b427ee615 100644
+--- a/diagrams/components.puml
++++ b/diagrams/components.puml
+@@ -2,7 +2,7 @@
+ title Launcher components and process authority
+ skinparam componentStyle rectangle
+ 
+-package "CURRENT interactive API - SPEC 0.5.0-draft" {
++package "CURRENT interactive API - SPEC 0.5.1-draft" {
+   actor "Operator / invoking caller" as operator
+   component "curator umbrella\ncaller-side process" as umbrella
+   component "curator env resolve --repair\ncaller-side subprocess\ncontext / home repair owner" as curator
+@@ -13,11 +13,11 @@ package "CURRENT interactive API - SPEC 0.5.0-draft" {
+     component "Network selection\nin-process network / adapter libraries\noptional direct scope only" as network
+     component "Composition / late checks\nno provider argv rebuilding" as compose
+     component "Direct child executor\nwait / terminal restoration\nsignal forwarding, stop/continue" as executor
+-    component "ax document / hosted payload exporter" as exporter
++    component "ax document exporter" as exporter
+   }
+   component "Native provider child\ncaller-side identity" as child
+   component "ax start subprocess\nprocess / terminal / session owner" as ax
+-  component "task-board session launch-plan\nprivate receiver subprocess\nterminal / deadlines / completion owner" as receiver
++  component "Hosted launch unavailable in v0.3.0\nsession_host_missing (exit 1)\nuntil swarma dispatcher path ships" as receiver
+   database "Managed profile / home\npersistent: Curator owns\nlauncher never writes" as home
+   database "Session Record\npersistent: ax owns" as record
+   operator --> umbrella : curator run ...
+@@ -35,7 +35,7 @@ package "CURRENT interactive API - SPEC 0.5.0-draft" {
+   compose --> exporter : destination contract
+   exporter --> ax : launch-plan on stdin
+   ax --> record : records Curator extensions
+-  exporter --> receiver : payload stdin + terminal FD3 / status FD4
++  compose --> receiver : receiver lookup refuses; no handoff / child
+   note right of config
+     [[../SPEC.md#2-discovery-and-naming SPEC 2]]: trust roots belong to Curator;
+     revision A warns, revision B refuses outside roots.
+@@ -50,16 +50,16 @@ package "CURRENT interactive API - SPEC 0.5.0-draft" {
+     Deliberate retry re-runs Curator repair; no automatic downgrade.
+   end note
+   note bottom of receiver
+-    Hosted Phase 1: Claude only, terminal stdin only (SPEC 4.8-4.9).
++    Hosted launch unavailable until the swarma dispatcher path ships (SPEC 4.8-4.9).
+     Native paths do not probe a receiver.
+-    ax and hosted destination process UID / hosted durable-state layout:
+-    unspecified in spec 4.6 / 4.9; no launcher session state.
++    Earlier hosted validation gates remain; task-board on PATH does not enable hosting.
++    Native paths keep direct / ax behavior; no launcher session state.
+     Direct child status propagates; signal exit 128 + signal.
+     [[../README.md#environment-and-transport README Environment and transport]].
+   end note
+ }
+ 
+-package "TARGET one-shot - dispatcher v0 local headless; NOT IMPLEMENTED" {
++package "TARGET one-shot - dispatcher Slice 0 local headless; NOT IMPLEMENTED" {
+   component "Caller process\nresolves / composes immutable plan" as caller
+   component "swarma-dispatcher\nUnix-socket service from first slice\nrecovery / readiness before admission" as dispatcher
+   component "swarma-user-launcher\nroot, no-argument sudo entry\napproved executor / generation checks" as privileged
+@@ -72,9 +72,9 @@ package "TARGET one-shot - dispatcher v0 local headless; NOT IMPLEMENTED" {
+   component "swarma-session-runner\nagent-side approved executor" as targetrunner
+   component "Workspace materialize / export\napproved executors under child UID\ndispatcher workspace contract (R-TRANSFER)" as workspaceexec
+   component "Board change requests\norchestrator imports / exact C review / integrates" as changes
+-  dispatcher --> workspaceexec : materialize before work; export after confirmed absence
++  dispatcher --> workspaceexec : archive-to-mode-aware-manifest check before work; export after confirmed absence
+   workspaceexec --> dispatcher : change set only; no worker Git history / push
+-  dispatcher --> changes : result only to original caller; board accepts resource
++  dispatcher --> changes : draft result only to original caller; board resource\nimport recomputes manifest from repository B
+   caller --> dispatcher : Unix-socket client; composed plan; authority / size gates
+   targethost --> dispatcher : host_start / host_stop in dispatch-op/1; session-scoped host admission permit
+   privileged --> targetrunner : approved agent-side runner
+@@ -93,7 +93,7 @@ package "TARGET one-shot - dispatcher v0 local headless; NOT IMPLEMENTED" {
+     Broker via declared Unix socket; local trusted harness uses bound provider proxy only.
+     First broker consumer: one protected Claude launch, Slice 0.
+     Board runner / session host ask dispatcher; no embedded broker client.
+-    No interactive / remote / resume / seeded path in dispatcher v0.
++    No interactive / remote / resume / seeded path in dispatcher Slice 0.
+   end note
+   note bottom of dispatcher
+     [[../SPEC.md#104-signals-stop-receipts-and-cleanup SPEC 10.4]]:
+@@ -130,19 +130,28 @@ package "TARGET one-shot - dispatcher v0 local headless; NOT IMPLEMENTED" {
+     Binding, grants, ledger, source conflicts or unqualified channel refuse.
+     Claude expiry / auth failure: re-enroll and restart, no refresh/fallback.
+     Exact post-exec evidence / renewal owner transport: unspecified in spec 10.4.
+-    Codex personal is later / qualification-dependent; Muse subscription reserved.
++    Codex personal later / qualification-dependent; Muse priority decided, channel proposed, qualification open.
+     SH2 host_start / permit qualification and helper signatures remain open.
+   end note
+ }
+ note left of agent
+-  Wave-5 launch obligations - SPEC 10.1-10.2 / 10.6
+-  R-TRANSFER: plan digest covers B / manifest digest / write scope / exec-profile reference.
++  Launch obligations - SPEC 10.1-10.2 / 10.5-10.6
++  R-TRANSFER: plan digest covers B / mode-aware manifest digest / write scope / pinned exec-profile identity and body digest.
++  Manifest from immutable B: path / Git kind-mode / content identity; archive exact-match before work.
++  Export compares mode and content: mode-only / equal-blob file-symlink modify; deletion prior mode.
++  Board import recomputes canonical manifest from repository B, never plan; base_commit / manifest_digest must match.
++  R-EXEC selection: protected machine policy beside R-NETBIND; profile-lock / placement / class bound.
++  Dispatcher pins at prepare; launch / retry / recovery use pin; out-of-bound request or drift refuses.
++  Launcher verifies policy body digest before any child code; existing class / host / qualification checks remain.
+   R-NET-TOOL: read-only task resources covered by digest; bound provider proxy only.
+   No web by default; plan disables provider-side search, invisible to network rules.
+   Only operator-granted trusted-circle opt-in: qualified server search or platform Unix-socket web service.
+   R-STANDING: verify settings / hooks / MCP / instructions by digest before exec, or root-owned surfaces.
+   Drift refuses (code unpublished); repair is explicit re-materialization.
+-  R-EXEC: D-PATH protected light-check wrappers / fixed subcommands; no heavy entry points.
++  R-EXEC: qualify full invocation / env / transitive interpreted code-config inputs; inert inspection only.
++  Protected entrypoints / config, disabled or pinned code loading; executable allowlist alone is insufficient.
++  Negative scripts / inline eval / imports / plugins / startup-env injection / direct-indirect heavy bypass; inert positive controls.
++  D-PATH wrapper ownership / fixed subcommand alone is insufficient; unprovable local tool goes to R-VERIFY.
+   User manager owns OS exec allowlist; R-VERIFY builds / tests / code execution on another machine.
+   R-UNTRUSTED refused in Slice 0 / user-manager v0; workplace zero egress / donor-side loop.
+   Admission: R-CEILINGS / R-WATCH / R-ALLSTOP / R-RANGE-DENY / R-SOCKETS / R-SHARED (SPEC 10.6).
+diff --git a/diagrams/launch-paths.puml b/diagrams/launch-paths.puml
+index da38c8725384faa0cb5d44c948cf0f4f0a649644..3a7cc77e0128573b34a86e0d9a7477d09040eeb2 100644
+--- a/diagrams/launch-paths.puml
++++ b/diagrams/launch-paths.puml
+@@ -6,7 +6,6 @@ participant "curator env resolve\ncaller-side subprocess" as curator
+ participant "agents-management\nin-process library" as spawn
+ participant "Native provider\ncaller-side child" as native
+ participant "ax start\nsubprocess / session owner" as ax
+-participant "task-board receiver\nsubprocess / terminal owner" as receiver
+ participant "swarma-dispatcher\nservice UID unspecified" as dispatcher
+ participant "swarma-user-launcher\nroot" as root
+ participant "curator-run exec\nagent UID worker-<label>" as agent
+@@ -18,7 +17,7 @@ participant "Workspace executors\napproved child UID / dispatcher workspace cont
+ participant "Board change requests\norchestrator" as changes
+ participant "swarma-session-runner\napproved agent-side executor" as targetrunner
+ 
+-== CURRENT interactive API: SPEC 0.5.0-draft ==
++== CURRENT interactive API: SPEC 0.5.1-draft ==
+ caller -> launcher : curator-run <env-id> ...
+ launcher -> launcher : machine-first ax.json read before argv validation\nnormalize / validate argv
+ alt invalid config or usage
+@@ -40,16 +39,13 @@ else accepted invocation
+     alt provider-limit / network / composition refused
+       launcher --> caller : plan_refused / plan_provider_limited / network refusal\nno retry, weaker posture or model substitution
+     else composed launch
+-      alt hosted Phase 1 - Claude, terminal stdin only
+-        launcher -> launcher : project payload + digest; bounds and metadata checks
+-        alt payload / receiver availability refused
+-          launcher --> caller : launch_plan_invalid / session_host_missing; no native fallback
+-        else receiver available
+-          launcher -> receiver : session launch-plan --plan -\nprivate stdin payload; terminal FD3; status FD4
+-          receiver -> receiver : set FD3/FD4 close-on-exec before child spawn\nown terminal, deadlines, process completion
+-          receiver --> launcher : bounded FD4 refusal records / receiver exit
+-          launcher -> launcher : valid refusal -> registry exit\nmalformed frame -> protocol_error (6)\nclean truncated stream -> unavailable (1)\nno record -> receiver exit unchanged
+-          launcher --> caller : classified result; waits as for native exec
++      alt hosted selected - unavailable in v0.3.0
++        launcher -> launcher : project payload + digest; earlier bounds / metadata checks remain
++        alt payload invalid
++          launcher --> caller : launch_plan_invalid; no handoff
++        else payload admitted
++          launcher -> launcher : production receiver lookup refuses\nincluding when task-board is on PATH
++          launcher --> caller : session_host_missing (exit 1); no handoff / native fallback\nuntil swarma dispatcher path ships
+         end
+       else native route (direct or ax)
+         launcher -> launcher : immediately before launch: binary check, Codex MCP stat,\nprompt probe / PrepareLaunch; first failure refuses
+@@ -75,28 +71,29 @@ else accepted invocation
+     end
+   end
+ end
+-note over launcher,receiver
++note over launcher
+   [[../SPEC.md#4-composition-algorithm SPEC 4]] / [[../SPEC.md#46-hand-off-and-exec SPEC 4.6]] / [[../SPEC.md#49-hosted-payload-and-receiver-handoff SPEC 4.9]] / [[../SPEC.md#6-errors-and-diagnostics SPEC 6]].
+   Launcher owns only invocation state. Direct wait / terminal behavior:
+   [[../README.md#environment-and-transport README Environment and transport]].
+-  ax / hosted destination UID and hosted state layout: unspecified in spec 4.6 / 4.9.
++  Hosted has no receiver / descriptor handoff in v0.3.0; native paths keep direct / ax behavior.
+   Missing Codex layer: deliberate new invocation lets Curator repair; launcher never repairs it.
+ end note
+ 
+-== TARGET one-shot: NOT IMPLEMENTED; dispatcher v0 local headless only ==
+-caller -> caller : resolve / compose immutable plan; select source; digest PATH / profile / harness / B / manifest / write scope / exec profile / resources
++== TARGET one-shot: NOT IMPLEMENTED; dispatcher Slice 0 local headless only ==
++caller -> caller : resolve / compose plan; select credential source; digest PATH / profile / harness / B / manifest / write scope / resources\nexec identity / body digest come from protected dispatcher prepare, not caller selection
+ caller -> dispatcher : Unix-socket client; composed plan; no secret material
+-alt size / authority / grants / capacity or v0 combination refused
++alt size / authority / grants / capacity or Slice 0 combination refused
+   dispatcher --> caller : terminal refusal before provisioning
+ else admitted request
++  dispatcher -> dispatcher : prepare: resolve protected exec-policy relation; refuse caller outside bound\npin identity / body digest in input/1; start / retry / recovery refuse policy drift
+   dispatcher -> dispatcher : provision account / broker binding; claim execution\ndistinct effect IDs; retries reuse each operation's ID
+   dispatcher -> workspaceexec : swarma-workspace-materialize before work\nrelay admitted base archive; journal digest; no dispatcher repository
+-  workspaceexec -> workspaceexec : standalone repo / fresh config / no hooks or remotes\nread-only resources; no account downloads
++  workspaceexec -> workspaceexec : verify archive paths / kind-mode / content against immutable B manifest\nmissing / extra / mismatch refuses before work\nstandalone repo / fresh config / no hooks or remotes; read-only resources
+   dispatcher -> root : closed privileged stdin request; approved executor
+-  alt generation / ownership / executor digest / duplicate receipt refused
++  alt generation / ownership / executor digest / exec-policy drift or qualification / duplicate receipt refused
+     root --> dispatcher : typed refusal; no second start
+   else privileged checks admit
+-    root -> root : user-manager spec 7 / diagrams/launch.puml owns lifecycle\nbounded staging; atomic receipt before privilege drop
++    root -> root : apply pinned exec profile / verify body digest before child code\nclass / qualified host / admission checks remain\nuser-manager lifecycle; bounded staging; atomic receipt before UID drop
+     root -> agent : execute approved curator-run under agent UID\ncaller-owned 0-2 and read-only FD3; no internal handles
+     agent -> agent : bounded read once; verify admitted digest and values\nresolve protected credential_binding locally\ncheck harness surfaces by digest or root-owned surfaces\nprovider proxy only; provider-side search off without trusted-circle opt-in
+     alt bad intake / unknown contract / digest / drift / source or binding refused
+@@ -138,11 +135,13 @@ else admitted request
+   opt workspace round ended and account-wide absence confirmed
+     dispatcher -> dispatcher : workplace write fence where applicable; further round tool calls refused
+     dispatcher -> workspaceexec : swarma-workspace-export; fixed environment / no network
+-    workspaceexec -> workspaceexec : no link following / skip Git administration; manifest-relative change set\ncaps / unsafe paths / collisions / special files refuse whole export
++    workspaceexec -> workspaceexec : no link following / skip Git administration; compare mode AND content\nmode-only / equal-blob file-symlink modify; deletion prior mode\ncaps / unsafe paths / collisions / special files refuse whole export
+     alt export recorded
+-      workspaceexec --> dispatcher : change set / digests; schema unpublished
++      workspaceexec --> dispatcher : change set / digests; dispatcher draft result fields (SPEC 10.5)
+       dispatcher --> caller : workspace-result/1 design label; original caller principal only
+-      caller -> changes : board accepts resource; deterministic import on B -> signed C
++      caller -> changes : board accepts resource; deterministic import requested
++      changes -> changes : bounded canonical-manifest recomputation from repository immutable B, never plan\nrefuse if base_commit != B or manifest_digest differs; retain admission checks
++      changes -> changes : scratch-index B plus mode-aware change set -> signed C\nhooks / filters / drivers disabled
+       changes -> changes : trusted non-producing reviewer reviews exactly C\nflagged hunks acknowledged; code runs only in R-VERIFY
+       changes -> changes : findings -> rework on C; accepted exact head -> signed fast-forward\nmoved base -> refresh / re-review
+     else export refused / unknown
+@@ -205,14 +204,23 @@ note over caller,helper
+   No interactive FD3/FD4 reuse; no board dependency; SH2 host lifecycle / donor B remain disabled pending publication.
+ end note
+ note over caller,helper
+-  Wave-5 launch obligations - SPEC 10.1-10.2 / 10.6
+-  R-TRANSFER: plan digest covers B / manifest digest / write scope / exec-profile reference.
++  Launch obligations - SPEC 10.1-10.2 / 10.5-10.6
++  R-TRANSFER: plan digest covers B / mode-aware manifest digest / write scope / pinned exec-profile identity and body digest.
++  Manifest from immutable B: path / Git kind-mode / content identity; archive exact-match before work.
++  Export compares mode and content: mode-only / equal-blob file-symlink modify; deletion prior mode.
++  Board import recomputes canonical manifest from repository B, never plan; base_commit / manifest_digest must match.
++  R-EXEC selection: protected machine policy beside R-NETBIND; profile-lock / placement / class bound.
++  Dispatcher pins at prepare; launch / retry / recovery use pin; out-of-bound request or drift refuses.
++  Launcher verifies policy body digest before any child code; existing class / host / qualification checks remain.
+   R-NET-TOOL: read-only task resources covered by digest; bound provider proxy only.
+   No web by default; plan disables provider-side search, invisible to network rules.
+   Only operator-granted trusted-circle opt-in: qualified server search or platform Unix-socket web service.
+   R-STANDING: verify settings / hooks / MCP / instructions by digest before exec, or root-owned surfaces.
+   Drift refuses (code unpublished); repair is explicit re-materialization.
+-  R-EXEC: D-PATH protected light-check wrappers / fixed subcommands; no heavy entry points.
++  R-EXEC: qualify full invocation / env / transitive interpreted code-config inputs; inert inspection only.
++  Protected entrypoints / config, disabled or pinned code loading; executable allowlist alone is insufficient.
++  Negative scripts / inline eval / imports / plugins / startup-env injection / direct-indirect heavy bypass; inert positive controls.
++  D-PATH wrapper ownership / fixed subcommand alone is insufficient; unprovable local tool goes to R-VERIFY.
+   User manager owns OS exec allowlist; R-VERIFY builds / tests / code execution on another machine.
+   R-UNTRUSTED refused in Slice 0 / user-manager v0; workplace zero egress / donor-side loop.
+   Admission: R-CEILINGS / R-WATCH / R-ALLSTOP / R-RANGE-DENY / R-SOCKETS / R-SHARED (SPEC 10.6).
+diff --git a/diagrams/launch-states.puml b/diagrams/launch-states.puml
+index 899d3469824ff437c2440675d5490e7d4fb2d8f3..8590d75dffce367d8e3b114937068ba0bb7bd30b 100644
+--- a/diagrams/launch-states.puml
++++ b/diagrams/launch-states.puml
+@@ -1,7 +1,7 @@
+ @startuml
+ title Invocation states, refusal and recovery (not session records)
+ 
+-state "CURRENT interactive API - SPEC 0.5.0-draft" as Current {
++state "CURRENT interactive API - SPEC 0.5.1-draft" as Current {
+   state "Read / validate config\ncurator-run, caller identity" as Config
+   state "Normalize / validate argv" as Args
+   state "Resolve / repair\nCurator subprocess, caller-side" as Resolve
+@@ -13,9 +13,9 @@ state "CURRENT interactive API - SPEC 0.5.0-draft" as Current {
+   state "Direct execution / wait\ncurator-run owns child / terminal restoration" as Execute
+   state "ax handoff\nax start subprocess" as Ax
+   state "Accepted ax handoff\nax owns process / terminal / Session Record" as Accepted
+-  state "Hosted receiver / wait\ntask-board owns terminal / deadlines / completion" as Hosted
++  state "Hosted unavailable in v0.3.0\nreceiver lookup refuses before handoff" as Hosted
+   state "Refused\nterminal invocation; no weaker launch" as Refused
+-  state "Exited\nchild status or classified receiver result" as Exited
++  state "Exited\nchild status" as Exited
+   [*] --> Config
+   Config --> Args : valid config; enabled / disabled / absent ax routes explicitly
+   Config --> Refused : unreadable / malformed / unsafe file
+@@ -31,7 +31,7 @@ state "CURRENT interactive API - SPEC 0.5.0-draft" as Current {
+   Network --> Compose : serviceable verdict; optional network admitted
+   Network --> Refused : failed / unknown verdict; limited provider; network refusal
+   Compose --> Late : native (direct or ax)
+-  Compose --> Hosted : valid hosted payload / transport
++  Compose --> Hosted : hosted selected; payload valid
+   Compose --> Refused : payload / stdin / composition invalid
+   Late --> Refused : first binary / MCP / prompt failure
+   Late --> Execute : direct route
+@@ -39,8 +39,7 @@ state "CURRENT interactive API - SPEC 0.5.0-draft" as Current {
+   Execute --> Exited : waits; forwards signals / stop-continue\nrestores terminal; exit or 128 + signal
+   Ax --> Refused : cannot start / rejects / nonzero; no direct fallback
+   Ax --> Accepted : accepted handoff; launch work ends
+-  Hosted --> Refused : missing receiver / valid refusal / protocol or transport loss
+-  Hosted --> Exited : no refusal record; receiver exit unchanged
++  Hosted --> Refused : session_host_missing (exit 1), even with task-board on PATH\nuntil swarma dispatcher path ships; no native fallback
+   Refused --> [*]
+   Exited --> [*]
+   Accepted --> [*]
+@@ -50,14 +49,14 @@ note right of Current
+   States are per-invocation descriptions, not a persisted launcher FSM.
+   Current launcher owns no leases, checkpoints, resume records or session memory.
+   Config is launcher-owned; homes / profiles are Curator-owned;
+-  ax owns its Session Record. Hosted durable layout / destination UID:
+-  unspecified in spec 4.9. Direct terminal / wait behavior:
++  ax owns its Session Record. Hosted has no receiver handoff in v0.3.0.
++  Earlier hosted validation gates remain. Direct terminal / wait behavior:
+   [[../README.md#environment-and-transport README Environment and transport]].
+   Refusal has no outgoing retry transition: operator deliberately starts a new invocation.
+   New resolve --repair can restore a missing MCP layer; launcher never repairs it.
+ end note
+ 
+-state "TARGET one-shot - NOT IMPLEMENTED; dispatcher v0 local headless" as Target {
++state "TARGET one-shot - NOT IMPLEMENTED; dispatcher Slice 0 local headless" as Target {
+   state "Caller composes immutable plan\ncaller-side identity" as CallerPlan
+   state "Dispatcher intake / admission\nservice UID unspecified in spec 10.2" as Intake
+   state "Provision / bind / claim\ndispatcher owns durable execution state" as Provision
+@@ -72,21 +71,21 @@ state "TARGET one-shot - NOT IMPLEMENTED; dispatcher v0 local headless" as Targe
+   state "Account-wide absence confirmed\nquiet period; escaped descendants included" as Absent
+   state "Unknown / contradictory process evidence\nno claim release / replacement" as Unknown
+   state "Export manifest-relative change set\napproved child UID; fixed env / no network\nworkspace write-fenced where applicable" as Export
+-  state "Export recorded / result resource\noriginal caller only; board imports / reviews exact C / integrates" as Exported
++  state "Export recorded / draft result resource\noriginal caller only; board independently checks B / manifest\nimports mode-aware change set / reviews exact C / integrates" as Exported
+   state "Export obligation retained\nno home deletion; explicit operator waiver possible" as ExportHeld
+   state "Unbind then retire / delete home\nquiesce / declared-key cleanup; confirmed effects" as Cleanup
+   state "Target refusal\nnon-success, typed metadata; no fallback" as TargetRefusal
+   state "Account retired\noptional separate registered one-shot revocation" as Retired
+   [*] --> CallerPlan
+   CallerPlan --> Intake : already composed immutable plan, no secrets
+-  Intake --> TargetRefusal : size / authority / capacity / unsupported v0 shape
+-  Intake --> Provision : admitted; smallest path bound before provisioning
++  Intake --> TargetRefusal : size / authority / capacity / unsupported Slice 0 shape\nexec-policy caller reference outside protected bound
++  Intake --> Provision : prepare pins protected exec identity / body digest\nadmitted; smallest path bound before provisioning
+   Provision --> Materialize : workspace-capable allocation
+-  Materialize --> RootCheck : materialized; owned claim / approved executor
++  Materialize --> RootCheck : archive path / kind-mode / content matches manifest\nno missing / extra entries; owned claim / approved executor
+   Materialize --> TargetRefusal : invalid archive / materialization failure
+   Provision --> RootCheck : non-workspace allocation only
+-  RootCheck --> TargetRefusal : inactive / unowned / unapproved / digest / duplicate receipt
+-  RootCheck --> Drop : write receipt BEFORE privilege drop
++  RootCheck --> TargetRefusal : inactive / unowned / unapproved / digest / duplicate receipt\nexec-policy drift / class-host qualification mismatch
++  RootCheck --> Drop : apply pinned exec profile / verify body digest before child code\nwrite receipt BEFORE privilege drop
+   Drop --> TargetRefusal : privilege_drop_failed
+   Drop --> Verify : agent-side executor reads bounded plan once
+   Verify --> TargetRefusal : missing / bad / unknown intake or digest / binding / surface drift
+@@ -101,7 +100,7 @@ state "TARGET one-shot - NOT IMPLEMENTED; dispatcher v0 local headless" as Targe
+   Stop --> Unknown : processes_remain / no confirmed termination receipt
+   Stop --> Absent : verified termination receipt
+   Absent --> Export : workspace round ended; write fence where applicable
+-  Export --> Exported : whole export admitted; digests journaled
++  Export --> Exported : compare mode AND content; mode-only / type changes included\ndeletions carry prior mode; whole export admitted; digests journaled
+   Export --> ExportHeld : unsafe paths / collisions / special files / cap / unknown
+   Exported --> Cleanup : export recorded; confirmed cleanup effects only
+   ExportHeld --> Cleanup : explicit operator act waives export; confirmed effects only
+@@ -144,17 +143,26 @@ note right of Target
+   R-TIME: authenticated / operator-controlled installer time source; durable dispatcher / broker watermark.
+   Expiry max(now, watermark); not_before min(now, watermark); no untrusted advance; operator reset.
+   Expiry-driven home / binding destruction also requires boot-inclusive monotonic elapsed lifetime.
+-  no remote / native resume / seeded continuity in dispatcher v0.
++  no remote / native resume / seeded continuity in dispatcher Slice 0.
+ end note
+ note right of Verify
+-  Wave-5 launch obligations - SPEC 10.1-10.2 / 10.6
+-  R-TRANSFER: plan digest covers B / manifest digest / write scope / exec-profile reference.
++  Launch obligations - SPEC 10.1-10.2 / 10.5-10.6
++  R-TRANSFER: plan digest covers B / mode-aware manifest digest / write scope / pinned exec-profile identity and body digest.
++  Manifest from immutable B: path / Git kind-mode / content identity; archive exact-match before work.
++  Export compares mode and content: mode-only / equal-blob file-symlink modify; deletion prior mode.
++  Board import recomputes canonical manifest from repository B, never plan; base_commit / manifest_digest must match.
++  R-EXEC selection: protected machine policy beside R-NETBIND; profile-lock / placement / class bound.
++  Dispatcher pins at prepare; launch / retry / recovery use pin; out-of-bound request or drift refuses.
++  Launcher verifies policy body digest before any child code; existing class / host / qualification checks remain.
+   R-NET-TOOL: read-only task resources covered by digest; bound provider proxy only.
+   No web by default; plan disables provider-side search, invisible to network rules.
+   Only operator-granted trusted-circle opt-in: qualified server search or platform Unix-socket web service.
+   R-STANDING: verify settings / hooks / MCP / instructions by digest before exec, or root-owned surfaces.
+   Drift refuses (code unpublished); repair is explicit re-materialization.
+-  R-EXEC: D-PATH protected light-check wrappers / fixed subcommands; no heavy entry points.
++  R-EXEC: qualify full invocation / env / transitive interpreted code-config inputs; inert inspection only.
++  Protected entrypoints / config, disabled or pinned code loading; executable allowlist alone is insufficient.
++  Negative scripts / inline eval / imports / plugins / startup-env injection / direct-indirect heavy bypass; inert positive controls.
++  D-PATH wrapper ownership / fixed subcommand alone is insufficient; unprovable local tool goes to R-VERIFY.
+   User manager owns OS exec allowlist; R-VERIFY builds / tests / code execution on another machine.
+   R-UNTRUSTED refused in Slice 0 / user-manager v0; workplace zero egress / donor-side loop.
+   Admission: R-CEILINGS / R-WATCH / R-ALLSTOP / R-RANGE-DENY / R-SOCKETS / R-SHARED (SPEC 10.6).
