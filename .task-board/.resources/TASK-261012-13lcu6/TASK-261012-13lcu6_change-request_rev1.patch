@@ -1,0 +1,1141 @@
+diff --git a/.scripts/hosted-mutants.sh b/.scripts/hosted-mutants.sh
+index 23161b6e9dda13b8473e8ff1fe1b48aa3b225d93..19e02c6893cc2bdf2a963ade541a47efa53d5bc4 100755
+--- a/.scripts/hosted-mutants.sh
++++ b/.scripts/hosted-mutants.sh
+@@ -9,7 +9,7 @@
+ # matches no source (the production text drifted) is reported as
+ # NOT_APPLIED by name on stderr and in the summary, and a mutant the suite
+ # survives is SURVIVED; either makes the script exit non-zero.
+-# internal/mutantguard runs the required mutants (M-H1, M-H2, M-H3) through
++# internal/mutantguard runs the required mutants (M-H1, M-H2, M-H3, M-H22) through
+ # this script in a scratch copy of the tree on every `go test ./...`.
+ #
+ # usage: .scripts/hosted-mutants.sh [evidence-dir]
+@@ -29,18 +29,21 @@ DEFAULTS=internal/defaults/defaults.go
+ PERM=internal/execution/permission.go
+ PAYLOAD=internal/hosted/payload.go
+ STATUSF=internal/hosted/status.go
++TRANSPORT=internal/hosted/transport.go
+ cp "$CLI" "$out/cli.go.orig"
+ cp "$MAIN" "$out/main.go.orig"
+ cp "$DEFAULTS" "$out/defaults.go.orig"
+ cp "$PERM" "$out/permission.go.orig"
+ cp "$PAYLOAD" "$out/payload.go.orig"
+ cp "$STATUSF" "$out/status.go.orig"
+-restore() { cp "$out/cli.go.orig" "$CLI"; cp "$out/main.go.orig" "$MAIN"; cp "$out/defaults.go.orig" "$DEFAULTS"; cp "$out/permission.go.orig" "$PERM"; cp "$out/payload.go.orig" "$PAYLOAD"; cp "$out/status.go.orig" "$STATUSF"; }
++cp "$TRANSPORT" "$out/transport.go.orig"
++restore() { cp "$out/cli.go.orig" "$CLI"; cp "$out/main.go.orig" "$MAIN"; cp "$out/defaults.go.orig" "$DEFAULTS"; cp "$out/permission.go.orig" "$PERM"; cp "$out/payload.go.orig" "$PAYLOAD"; cp "$out/status.go.orig" "$STATUSF"; cp "$out/transport.go.orig" "$TRANSPORT"; }
+ trap restore EXIT
+ 
+ # Fields separated by "@@": id, file, expected failing test, from, to.
+ # from/to are literal text; the first occurrence is replaced.
+ mutants=(
++  'M-H22@@transport@@TestHostedUnavailableThroughRun/flag/native@@return "", errors.New("hosted launch is unavailable until the swarma dispatcher path ships")@@if path, err := exec.LookPath("task-board"); err == nil { return path, nil }; return "", errors.New("hosted launch is unavailable until the swarma dispatcher path ships")'
+   'M-H1@@defaults@@TestResolveHostPrecedence/locked-ignores-operator@@lockedHost := f.machine.locked && named@@lockedHost := f.machine.locked && named && false'
+   'M-H2@@main@@TestHostedRefusalsBeforeContact/receiver-missing@@return hosted.Transport{Lookup: deps.receiverLookup, Terminal: deps.receiverTerminal, PreopenedTerminal: preopenedTTY}.Run(wire, stdout, stderr)@@code := hosted.Transport{Lookup: deps.receiverLookup, Terminal: deps.receiverTerminal, PreopenedTerminal: preopenedTTY}.Run(wire, stdout, stderr); if code != diagnostics.ExitOperational { return code }; return runNative(inv, frag, target, value, decision, inspection, stdout, stderr, deps, boundary, at)'
+   'M-H3@@main@@TestNativePerformsZeroReceiverLookup@@var nativePolicy *execution.EffectiveNativePolicy@@var nativePolicy *execution.EffectiveNativePolicy; if deps.receiverLookup != nil { _, _ = deps.receiverLookup() }'
+@@ -74,7 +77,7 @@ for m in "${mutants[@]}"; do
+   test="${rest%%@@*}"; rest="${rest#*@@}"
+   from="${rest%%@@*}"; to="${rest#*@@}"
+   restore
+-  file="$MAIN"; [ "$which" = cli ] && file="$CLI"; [ "$which" = defaults ] && file="$DEFAULTS"; [ "$which" = perm ] && file="$PERM"; [ "$which" = payload ] && file="$PAYLOAD"; [ "$which" = status ] && file="$STATUSF"
++  file="$MAIN"; [ "$which" = cli ] && file="$CLI"; [ "$which" = defaults ] && file="$DEFAULTS"; [ "$which" = perm ] && file="$PERM"; [ "$which" = payload ] && file="$PAYLOAD"; [ "$which" = status ] && file="$STATUSF"; [ "$which" = transport ] && file="$TRANSPORT"
+   FROM="$from" TO="$to" python3 -c '
+ import os, sys
+ p = sys.argv[1]; src = open(p).read()
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 661ab41650e7804473a537268900ceadbefcfbd6..50cb9c51ec51c070f0c8c285c1b0fe997ef8ea40 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,78 +1,41 @@
+ # Changelog
+ 
+-## Unreleased
++## 0.3.0 (pending tag)
+ 
+-### Added
++### Changed
+ 
+-- Direct `curator run --network <profile>`: resolve and validate the
+-  explicit selection through `curator-network-profiles v0.2.1` after
+-  plan admission, probe the proxy once within a bounded preflight, and
+-  apply the patch last in composition to the direct child environment.
+-  A named `kind = "direct"` profile clears inherited proxy variables
+-  and sets nothing, skipping every probe step. Managed launches print
+-  a `curator-run: network: …` provenance line carrying the binding
+-  Record once composition succeeds. Support is the STRICT network
+-  policy: an explicit allowlist of verified (adapter, harness, build,
+-  entrypoint) tuples, matched at the actual admitted entrypoint, which
+-  holds exactly one verified tuple —
+-  `(generic-env-v1, claude-code, 2.1.287, exec)` — the one-shot
+-  `claude -p` shape. Every other `--network` launch refuses with
+-  `network_scope_unsupported`, including interactive launches, which
+-  the pinned verification expressly excludes. Tracked launches
+-  refuse the same way. See SPEC §4.4b and §6.
+-- Host selection and the hosted session-launch handoff
+-  (TASK-261004-38ba6c). `curator-run` accepts `--hosted`, `--native`,
+-  and `--untracked` in one host request slot, `resume [SES-HANDLE]`
+-  and `--resume <id>` selectors, and the existing `--network <profile>`.
+-  `curator-run-defaults-v3` adds the per-environment `host` member
+-  (v1 and v2 stay accepted); machine lock, flag, operator default,
+-  and the implicit native default resolve per the SPEC §4.8 table.
+-  Explicit `--hosted` builds the same plan once and hands the
+-  versioned `session-launch-plan` 1.0.0 payload with its content
+-  digest to the `task-board` receiver over the private fd3/fd4
+-  transport instead of exec'ing; machine hosted defaults refuse
+-  `session_host_default_not_ready` until upgrade-without-hangup while
+-  operator hosted defaults are admitted (Q-D1a = yes, 2026-10-05),
+-  a `--hosted --network` selection refuses `network_scope_unsupported`
+-  (exit 16; the native `--network` path above is unchanged),
+-  and non-Claude environments refuse
+-  `session_host_provider_unsupported`. Hosted permission resolution
+-  follows the configured flag/profile/global ladder with the `yolo`
+-  built-in default on every stdio shape, and hosted `yolo` builds and
+-  exports with `execution_profile` `yolo` (Q-D3, 2026-10-05, literal:
+-  headless signals never change the default; Decisions 0018/0013
+-  amendments pending). Phase 1 admits
+-  Claude only. No flag and no default stays native with no
+-  session-host probe. A piped launcher stdin refuses before the plan
+-  build; an attached plan stdin refuses after it. The fd4 status
+-  channel accepts only closed refusal envelopes (135-member registry,
+-  literal messages, D0/D1/D2 details) and normalizes anything else to
+-  `session_host_protocol_error` with empty details; truncated frames
+-  refuse `session_host_unavailable` unless a malformed frame already
+-  poisoned the channel, which stays `session_host_protocol_error`. A
+-  missing or invalid terminal descriptor refuses
+-  `session_host_terminal_required` before the plan build with zero
+-  receiver lookup, and the launcher marks and validates both fd3/fd4
+-  descriptors before contact. At most 64 lookup names project.
+-  Hosted diagnostics never copy native argument values (conflict names
+-  the channel, unknown policy mode reports the fixed sentinel). The
+-  payload carries the native session name and remote-control intent
+-  read from the module's typed `Plan.Session` of the same plan (RC
+-  indices carried only while the composed argv equals the plan argv,
+-  no provider-flag parsing);
+-  an authored tail naming two different sessions refuses
+-  `plan_refused` from the module before any receiver contact.
++- Pin `github.com/relux-works/skill-agents-management v0.5.62`.
++  Muse interactive launches admit any well-formed build attested by the
++  selected binary, including 1.4.6, with no release table. The optional
++  frozen-copy tuple stays supported; without it the binary resolves on the
++  handed PATH. Admit the `muse-wonder` alias and Curator launch fragment v3;
++  the module lineup now defaults Muse to `muse-wonder-1.0-contributor`
++  with `xhigh` effort.
++  Preserve the probed `ToolRelease` claim and refuse a mismatch with the
++  binary's attestation. Muse yolo requires bounded help evidence from the
++  selected binary; native contributes no posture override.
++- Hosted launch is unavailable until the swarma dispatcher path ships.
++  Production `--hosted` receiver lookup fails closed with the existing
++  `session_host_missing` (exit 1), before any handoff, even with `task-board`
++  on PATH. Earlier validation refusals remain in force; machine and operator
++  hosted defaults cannot start a hosted launch. `--native` and `--untracked`
++  retain native execution and the explicit ax bypass.
+ 
+-### Changed
++### Added
+ 
+-- Pin `github.com/relux-works/skill-agents-management v0.5.53` for the
+-  resume typed-intent API, the closed `claude-restart` template, the
+-  pinned hosted schemas, `Plan.ExportSeal`, and the typed
+-  `Plan.Session`. Claude plans carry the module's unconditional
+-  `--disallowedTools=AskUserQuestion` denial after the prompt channel;
+-  update direct and tracked Claude goldens. Hosted Codex argv and
+-  environment are unchanged; the launcher registers no local-model
+-  vendor, so no fixture needs `model_catalog_json`.
++- Direct `curator run --network <profile>` as already landed, through
++  `curator-network-profiles v0.3.1`: explicit catalog/selection validation,
++  bounded proxy preflight, final child-environment patch and provenance.
++  A named `kind = "direct"` profile clears inherited proxies and skips
++  probing. The default optimistic policy admits known vendor builds as unqualified,
++  subject to fail-closed known-bad policy and the independent child-scope
++  ceiling (generic adapter, Claude print). `strict` and sensitive-egress
++  profiles require independent qualification; the qualification allowlist
++  remains empty in this release. `pinned:<sha256>` also requires that exact
++  binary but does not qualify it. Muse network tuples remain outside the
++  child-scope ceiling; interactive, tracked and hosted network launches
++  remain unsupported.
++  See SPEC §4.4b and §6.
+ 
+ ## 0.2.0 — 2026-10-02
+ 
+diff --git a/README.md b/README.md
+index d3f8a56af728b6bded7043c4844ccca5322a445d..9b4e1ccbc06df99831131ad7cd4b324a0db5454e 100644
+--- a/README.md
++++ b/README.md
+@@ -182,13 +182,22 @@ The executable supports `claude_code` (alias `claude`), `codex_cli`
+ 
+ Muse has a registered `muse` system/provider mapping and accepts
+ `launch-env-fragment-v3` with four XDG parents under one managed home,
+-preserving inherited `HOME`. The pinned agents-management v0.5.53 plugin
+-declares interactive mode, probes the installed release, and maps native/yolo
+-permissions for its verified releases (1.4.1 and 1.4.2). `curator-run muse` builds
++preserving inherited `HOME`. The pinned agents-management v0.5.62 plugin
++declares interactive mode and admits any well-formed build attested by the
++selected binary, including 1.4.6, with no release table. The frozen-copy tuple
++is optional; without it `muse` resolves on the handed PATH. `muse-wonder`
++resolves to `muse-wonder-1.0-contributor` with module-owned effort rules.
++`curator-run muse` builds
+ an interactive plan with XDG overrides and inherited `HOME`; it supplies no
+ context carrier because Muse v3 declares no prompt or MCP channels. Reserved
+ members remain non-operative. Native adds no
+-posture flag and yolo adds exactly one `--yolo`. Unlisted releases fail closed.
++posture flag; yolo adds exactly one `--yolo` only after bounded binary help
++evidence declares it. Malformed build evidence and a probed release claim
++that differs from the binary attestation fail closed. For example:
++
++```sh
++curator run muse --profile P --model muse-wonder
++```
+ 
+ The launch pipeline follows these steps:
+ 
+@@ -205,7 +214,8 @@ The launch pipeline follows these steps:
+    lineup. Resolve permission mode by flag, Curator profile setting, launcher
+    global default, then the built-in default. The mode is passed to
+    `LaunchRequest.PermissionMode`; emit model/effort origins and the module's
+-   release-bound permission mapping before admission.
++   release-bound permission mapping before admission. Muse yolo reports
++   `mapped=module-attested` only after the builder admits its help evidence.
+    Pi uses the ordered convention `pi-anthropic`, `pi-openai`, `pi-google`; vendor
+    scores are never compared. Explicit models bind their own runtime.
+ 4. Resolve the host from the `--hosted`/`--native`/`--untracked` flag and
+@@ -213,12 +223,13 @@ The launch pipeline follows these steps:
+    then native. A hosted flag or default with `ax` enabled refuses
+    `host_configuration_conflict`; a machine hosted default refuses
+    `session_host_default_not_ready` until upgrade-without-hangup, while an
+-   operator hosted default is the operator's own opt-in (Q-D1a = yes); any
++   operator hosted default resolves the request but cannot start a host; any
+    `--hosted --network` selection refuses `network_scope_unsupported` (exit
+    16; native `--network` is the direct path below). No flag and no
+    default stays native with no session-host probe. Hosted launches resolve
+    permissions through the configured ladder with silence defaulting as on
+-   the native path and yolo admitted (Q-D3), admit Claude only in Phase 1,
++   the native path and yolo admitted by the builder (Q-D3), with the dormant
++   contract limited to Claude in Phase 1,
+    and elevate resume selectors through the module typed-intent grammar.
+ 5. Call `vendorplugin.BuildLaunchWithEnvironment` in `LaunchModeInteractive`
+    with `LaunchRequest.ToolRelease` and `LaunchRequest.NativeArgs` for the
+@@ -240,13 +251,15 @@ The launch pipeline follows these steps:
+    session-launch-plan payload. Immediately before either native launch, call
+    `systemprompt.PrepareLaunch`, check the provider binary,
+    and check the Codex MCP layer. Emit prompt/discovery warnings. A late refusal
+-   starts neither provider nor ax. A hosted launch hands the versioned payload
+-   with its content digest to the `task-board` receiver over the private
+-   terminal/status transport instead of exec'ing; a missing receiver refuses
+-   `session_host_missing`, never a native fallback.
++   starts neither provider nor ax. Hosted launch is unavailable until the
++   swarma dispatcher path ships.
++   Production receiver lookup fails closed with `session_host_missing`
++   (exit 1), before any handoff, even with `task-board` on PATH; there is
++   no native fallback. Existing injected-receiver tests cover the dormant
++   payload contract and do not demonstrate a working hosted launch.
+ 
+ The permission interface is implemented against upstream
+-`skill-agents-management v0.5.53` (F-M1). It owns
++`skill-agents-management v0.5.62` (F-M1). It owns
+ `LaunchRequest.PermissionMode`, the release-bound mapping, versioned native
+ argument classification, stored-policy inspection, and the capability table.
+ Claude Code and Codex CLI use `permission-grammar-v2`; Pi uses
+@@ -309,7 +322,8 @@ go install github.com/relux-works/curator-agent-launcher/cmd/curator-run@v0.2.0
+ curator-run --version
+ ```
+ 
+-The v0.2.0 release reports `0.2.0` (specification `0.5.0-draft`).
++The v0.3.0 candidate (pending tag) reports `0.3.0` (specification `0.5.1-draft`).
++The install command above names the published v0.2.0; the v0.3.0 tag is pending.
+ Compatible with curator v0.15.0-rc.3 or later, once published.
+ Ensure `$(go env GOPATH)/bin` is on `PATH`, or set `GOBIN` to a dedicated
+ trusted operator-owned directory on `PATH`. Do **not** install into Curator's
+@@ -347,7 +361,7 @@ scope. Resolution always requests repair.
+ 
+ | Option | Meaning |
+ |---|---|
+-| `--hosted`, `--native`, `--untracked` | One host request slot; `--untracked` equals `--native`; repeats and combinations refuse |
++| `--hosted`, `--native`, `--untracked` | Hosted launch is unavailable until the swarma dispatcher path ships; production lookup refuses `session_host_missing` before handoff. One host request slot; `--untracked` equals `--native`; repeats and combinations refuse |
+ | `resume [SES-HANDLE]`, `--resume <id>` | Hosted-only resume selectors; usage errors in native mode |
+ | `--profile <name>` | Curator profile, forwarded to environment resolution |
+ | `--system-prompt <append\|replace>` | Explicit prompt-channel opt-in; unavailable semantics refuse the launch |
+@@ -520,7 +534,10 @@ alias launch names the session `claude_code-…` or `codex_cli-…`. An explicit
+ `--native` or `--untracked` flag bypasses `ax` on any machine (with
+ `--ax-profile` a usage error, since the profile would be discarded); a
+ configured native default keeps the existing `ax` behavior. A hosted flag or
+-default with `ax` enabled refuses `host_configuration_conflict`.
++default with `ax` enabled refuses `host_configuration_conflict`. Hosted launch
++is unavailable until the swarma dispatcher path ships: production receiver
++lookup refuses `session_host_missing` before any handoff, and machine/operator
++hosted defaults cannot start a host.
+ A failed handoff never starts a direct child. Repository tests use **fake ax
+ only**; they do not demonstrate an installed ax integration.
+ 
+@@ -531,7 +548,7 @@ on stderr. Foreign Curator/provider/ax output is forwarded unchanged.
+ 
+ | Result / diagnostic codes | Exit |
+ |---|---|
+-| Help/version, successful direct execution, ax handoff, or hosted handoff | 0 |
++| Help/version, successful direct execution, or ax handoff | 0 |
+ | `usage` (invalid arguments, locked-member override, host-request repeat, native resume selectors, or visible `yolo` under Curator's force-native lock) | 2 |
+ | `host_configuration_conflict`, `session_resume_invalid`, `launch_plan_invalid` | 2 |
+ | `resolve_invocation_failed`, `resolve_environment_unknown`, `resolve_profile_unknown`, `resolve_repair_failed`, `resolve_lock_unavailable`, `resolve_fragment_invalid` | 1 |
+@@ -581,7 +598,7 @@ platform execution evidence must come from the corresponding runner.
+ | production pipeline mutants | narrow the three late checks and ax mode selection at `run(...)`; restore exact candidate bytes | `python3 .scripts/pipeline-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv`; 9 named narrowing probes |
+ | CLI goldens | frozen accepted/rejected §3 shapes | `go test ./internal/cli -run TestGolden -update` to regenerate, then review the diff | `internal/cli/testdata/cases.golden` |
+ | `.scripts/hosted-mutants.sh` | narrowing-mutant harness for the §4.8/§4.9 hosted gates (precedence, fallback, probe-on-native, defaults gate, network gate, status contract, payload limits, session projection); fails closed: a mutant whose anchor matches no source is reported `NOT_APPLIED` by name and exits non-zero | `.scripts/hosted-mutants.sh [evidence-dir]` (optional `MUTANTS_ONLY=M-H1,M-H2`, `MUTANT_PKGS`, `MUTANT_RUN` for bounded batches) | per-mutant logs and `summary.tsv` (default `.temp/hosted-mutants/`); the source tree is restored on exit |
+-| `internal/mutantguard` | committed check that runs the required hosted mutants M-H1, M-H2 and M-H3 through the harness in a scratch copy of the tree and requires each to be applied and killed | `go test ./internal/mutantguard` | scratch copy under the test temp dir; the working tree is never mutated |
++| `internal/mutantguard` | committed check that runs the required hosted mutants M-H1, M-H2, M-H3 and M-H22 through the harness in a scratch copy of the tree and requires each to be applied and killed | `go test ./internal/mutantguard` | scratch copy under the test temp dir; the working tree is never mutated |
+ | `.scripts/cli-mutants.sh` | narrowing-mutant harness for the §3 gates: each mutant weakens one gate to admit one rejected shape and the named test must fail | `.scripts/cli-mutants.sh [evidence-dir]` | per-mutant logs and `summary.tsv` under the evidence dir (default `.temp/cli-mutants/`); the source tree is restored on exit |
+ | `.scripts/fragment-mutants.sh` | narrowing-mutant harness for the §4.1 gates (argv, exit mapping, stderr transport, reader rules, schema closure, CCJ-1 emission, entry-point wiring); the behavioral suite runs against every mutant | `.scripts/fragment-mutants.sh [evidence-dir]` (optional `FRAGMENT_MUTANT_IDS="M27 M28" FRAGMENT_TEST_PATTERN="TestExecutableUnicodePathBoundary|TestConformanceCorpus"` for focused rework) | `mutants.log` under the evidence dir (default `.temp/fragment-mutants/`); sources are restored from byte copies on exit |
+ | `.scripts/mapping-mutants.py` | §4.2 narrowing probes with named production-entry failures; restores candidate bytes after each mutation | `python3 .scripts/mapping-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/mapping-mutants/`) |
+diff --git a/SPEC.md b/SPEC.md
+index 65d464291193ab2b9a9dc01f91c2ac278c537482..749ed5086019cdbc54272fa4b0f90c13854520ad 100644
+--- a/SPEC.md
++++ b/SPEC.md
+@@ -1,8 +1,13 @@
+ # Curator Agent Launcher — Specification
+ 
+-**Specification version:** `0.5.0-draft`
++**Specification version:** `0.5.1-draft`
+ **Status:** in-repository draft (see [Versioning](#8-versioning))
+ 
++- 2026-10-13, 0.5.1-draft: launcher v0.3.0 (pending tag) pins
++  agents-management v0.5.62 for attested Muse builds, `muse-wonder` and
++  fragment v3; hosted launch is unavailable until the swarma dispatcher
++  path ships (§§3, 4.2, 4.8–4.9, 7–8).
++
+ - 2026-10-12, 0.5.0-draft documentation revision (§§10.2, 10.4–10.5,
+   README and figures): apply private cross-account Git administration
+   (F-16), the single termination scope (F-13), the user manager's fate
+@@ -210,7 +215,7 @@ change, not a flag addition.
+ | `--permissions <native\|yolo>` | spawn | Permission mode resolved by §4.3. The launcher passes the selected mode to `LaunchRequest.PermissionMode` for `LaunchModeInteractive`; agents-management owns the mapping. |
+ | `--yolo` | spawn | Exact alias of `--permissions yolo`, shipped in the same increment and occupying the same precedence level. Supplying both forms is a repeated permission request and a `usage` error. |
+ | `-d`, `--danger` | — | Rejected before `--` as `usage`; neither spelling is an alias. After `--`, arguments remain opaque native arguments under the normal boundary rule. |
+-| `--hosted`, `--native`, `--untracked` | session | The one host request slot (§4.8). `--hosted` runs on the managed session host; `--native` and its exact synonym `--untracked` run natively. A repeat or a combination is a `usage` error; permissions stay independent of the spelling. |
++| `--hosted`, `--native`, `--untracked` | session | The one host request slot (§4.8). `--hosted` is unavailable until the swarma dispatcher path ships; production receiver lookup refuses `session_host_missing` before any handoff; `--native` and its exact synonym `--untracked` run natively. A repeat or a combination is a `usage` error; permissions stay independent of the spelling. |
+ | `resume [SES-HANDLE]`, `--resume <id>` | session | Hosted-only resume selectors (§4.8). `resume` selects the latest session, `resume SES-HANDLE` a handle, `--resume <id>` a provider identity. Handle and identity shape belong to the spawn plane's typed-intent grammar; in native mode any selector is a `usage` error. |
+ | `--name <session-name>` | session | Tracked mode only (§4.6): the `ax` session name, replacing the default `<env-id>-<utc-stamp>`. MUST satisfy the `ax` §2.1 grammar `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`; a longer or ill-formed value is a `usage` error naming `--name`, never a silent truncation. On an untracked machine the flag is accepted and has no effect. |
+ | `--ax-profile <standard\|yolo>` | session | Tracked mode only (§4.6): the `ax` execution profile, forwarded as `ax start --profile <value>`. Absent, no `--profile` is passed and `ax`'s own default applies. This flag is the **only** way `--profile yolo` reaches `ax` from a launcher-mediated launch (Decision 0013 D6.4); the launcher never derives it from the fragment, the plan, or the native arguments. On an untracked machine the flag is a `usage` error: an execution profile is `ax`'s concept, and a value that would be silently discarded is a value the operator was misled about. |
+@@ -458,11 +463,18 @@ are filled — the launcher does not exec untracked what it could not hand
+ off tracked.
+ 
+ The Muse row follows the binding 2026-10-01 task decision. Mapping does
+-not attest launch-mode support. The pinned agents-management v0.5.48
+-plugin declares interactive mode, implements ToolReleaseProber, and supplies
+-release-pinned native/yolo permissions for Muse 1.4.1 and 1.4.2. The launcher
+-probes the installed release before permission mapping and refuses unlisted
+-releases. Interactive plans preserve inherited HOME and overlay only the four
++not attest launch-mode support. The pinned agents-management v0.5.62
++plugin declares interactive mode and implements ToolReleaseProber. It admits
++any well-formed build the selected binary attests, including Muse 1.4.6;
++there is no release table. The frozen-copy tuple is optional, and without it
++`muse` resolves on the handed PATH. The launcher passes the probed ToolRelease
++claim unchanged; the module refuses a mismatch with the binary attestation.
++Native adds no posture override; yolo requires the module's bounded help
++evidence from the selected binary. Its no-evidence mapping query cannot
++admit yolo; only the real builder's evidence-backed mapping does so, after
++which the launcher reports `mapped=module-attested`. The `muse-wonder` alias
++resolves to `muse-wonder-1.0-contributor` under the module's effort rules.
++Interactive plans preserve inherited HOME and overlay only the four
+ fragment XDG parents. Its declaration-owned
+ model rows are the module's system-only launch authority, without a
+ resolved vendor; defaults consumes those rows as BuildLaunch does.
+@@ -714,14 +726,18 @@ After admission and before composition, the launcher resolves the
+ explicit `--network` selection through `curator-network-profiles`
+ v0.3.1 (§7). Without `--network` this step is absent: no catalog is
+ read, nothing probes, and the launch composes exactly as before —
+-with one authorized exception: the agents-management v0.5.45+
++with the enumerated module-owned differences: agents-management v0.5.45+
+ module appends its unconditional `--disallowedTools=AskUserQuestion`
+ denial to the direct Claude argv (direct and tracked shapes) and to
+-the §4.4 admission argv pin. Everything else in an unmanaged launch
+-is byte-identical to baseline fbcdbaf0; the committed
++the §4.4 admission argv pin. The v0.5.62 lineup changes Muse fallback
++from `muse-spark-1.3-contributor` / `max` to
++`muse-wonder-1.0-contributor` / `xhigh`. Everything else in an unmanaged
++launch is byte-identical to baseline fbcdbaf0; the committed
+ `TestUnmanagedGoldensMatchBaselineFbcdbaf0` pins that parity by
+ comparing the shipped goldens against baseline copies and allowing
+-exactly that one added line. With `--network`, the order is closed:
++exactly the Claude added line and the two Muse fallback value changes
++(alongside the stated permission-source normalization). With `--network`,
++the order is closed:
+ 
+ 1. A blank selection refuses as `network_profile_invalid` without any
+    I/O.
+@@ -1189,6 +1205,15 @@ their schemas stay.
+ 
+ ### 4.8 Host selection
+ 
++Hosted launch is unavailable in v0.3.0 until the swarma dispatcher path ships.
++Production receiver lookup MUST fail closed with the existing
++`session_host_missing` (exit 1), before any handoff, even if `task-board` is
++on PATH. Earlier validation refusals below still apply. Machine and operator
++hosted defaults MUST NOT start a hosted launch; native execution, `--native`,
++`--untracked`, and direct `--network` retain their behavior. The hosted
++composition and payload rules below specify the dormant contract exercised
++with injected receivers; they are not evidence of an available public host.
++
+ After normalization and configuration validation, and before permissions
+ and the plan build, the launcher resolves the host: native execution, or
+ the managed session host of §4.9. The host flag (§3) is the explicit
+@@ -1226,7 +1251,7 @@ The defaults gate follows: a resolved machine hosted default refuses
+ upgrade-without-hangup (Decision 0021 section 7 amendment pending). An
+ operator hosted default is the operator's own opt-in and passes the
+ gate (operator decision Q-D1a, 2026-10-05, = yes), as does an explicit
+-`--hosted` flag. Next, a
++`--hosted` flag. Neither passes production receiver lookup in this release. Next, a
+ hosted launch with a `--network` selection refuses
+ `network_scope_unsupported` (exit 16, the hosted policy mapping) before
+ permissions, the plan build, or any probe: the receiver cannot enforce a
+@@ -1258,6 +1283,10 @@ provider flags itself.
+ 
+ ### 4.9 Hosted payload and receiver handoff
+ 
++This is the dormant payload contract. Production lookup refuses
++`session_host_missing` before any receiver handoff until the swarma dispatcher
++path ships (§4.8); test receivers do not establish hosted availability.
++
+ Figures: [hosted handoff sequence](diagrams/launch-paths.puml) and
+ [private payload and descriptor layout](diagrams/artifact-layout.puml).
+ 
+@@ -1545,7 +1574,7 @@ receiving registry, which recognizes codes the launcher never emits.
+ | system prompt | `sysprompt_channel_unavailable`, `sysprompt_file_unreadable` | §5.2: opt-in given but the fragment carries no non-`file` channel with the requested semantics; §5.1: a registry-declared file-kind channel's file exists but cannot be read (or is not a regular file) at the pre-exec probe — an absent managed-home file is not this diagnostic and says nothing about other native sources |
+ | network | `network_profile_unknown`, `network_profile_denied`, `network_scope_unsupported`, `network_configuration_conflict`, `network_proxy_unreachable`, `network_proxy_auth_failed`, `network_profile_invalid`, `network_file_unreadable` | §4.4b: the explicit network selection could not be honored — an unknown profile name; a denied one (outside the host allowed set, or unconfirmed at the current digest); an unsupported launch shape (tracked mode, a refused adapter Decision or unsupported child scope — including any launch without a print selection — an unmapped launch mode, or an enforced assurance request); a proxy-family name in a composed overlay or an uncovered engine host under a proxy profile; an unreachable proxy (TCP, CONNECT, or TLS step, or a malformed endpoint; a `kind = "direct"` profile skips every probe step); a proxy demanding authentication; a malformed catalog or profile; or a catalog or ledger that cannot be located, read, or parsed — every one terminal, with no fallback to an unmanaged launch; a hosted launch with `--network` refuses `network_scope_unsupported` with exit 16 (§4.8) while every native network refusal exits 1 |
+ | host | `host_configuration_conflict` | §4.8: a hosted flag or default with the `ax` integration enabled — exit 2, before the defaults gate, with no fallback to either side |
+-| session host | `session_host_missing`, `session_host_unavailable`, `session_host_provider_unsupported`, `session_host_protocol_unsupported`, `session_host_scope_unsupported`, `session_host_execution_profile_unsupported`, `session_host_terminal_required`, `session_host_stdin_unsupported`, `session_host_default_not_ready` | §4.8, §4.9: the receiver is not on PATH or cannot start (exit 1); the status channel is corrupt (exit 1); a non-Claude environment seeks the Phase 1 host (exit 6); the receiver reports an unsupported protocol, scope, or execution profile (exit 6, receiver-mapped); no controlling terminal is available or the descriptor fails validation, checked before the plan build with zero lookup (exit 6); stdin is attached (exit 6); a machine hosted default awaits upgrade-without-hangup while an operator hosted default is admitted (Q-D1a = yes, exit 16) |
++| session host | `session_host_missing`, `session_host_unavailable`, `session_host_provider_unsupported`, `session_host_protocol_unsupported`, `session_host_scope_unsupported`, `session_host_execution_profile_unsupported`, `session_host_terminal_required`, `session_host_stdin_unsupported`, `session_host_default_not_ready` | §4.8, §4.9: hosted launch is unavailable until the swarma dispatcher path ships; production receiver lookup refuses `session_host_missing` before any handoff (exit 1), even with `task-board` on PATH; the status channel is corrupt (exit 1); a non-Claude environment seeks the Phase 1 host (exit 6); the receiver reports an unsupported protocol, scope, or execution profile (exit 6, receiver-mapped); no controlling terminal is available or the descriptor fails validation, checked before the plan build with zero lookup (exit 6); stdin is attached (exit 6); a machine hosted default awaits upgrade-without-hangup while an operator hosted default resolves but still refuses production receiver lookup (machine gate exit 16) |
+ | resume | `session_resume_invalid` | §4.8: conflicting, ambiguous, or malformed resume selectors from the wrapper or the native tail, as elevated by the module typed-intent grammar — exit 2, before the plan build |
+ | launch plan | `launch_plan_invalid` | §4.9: the composed plan cannot be projected into the closed payload shape — non-absolute paths, literal/env mismatches, missing lookup names, an inadmissible guard, a restart mismatch, or a wire-limit violation; no value in the detail — exit 2, before contact |
+ | policy | `secret_policy_violation`, `policy_refused` | §4.9: the receiver reports a secret-policy violation or a refused policy — exit 16, receiver-mapped, with field and reason only |
+@@ -1565,7 +1594,7 @@ invocation, and the operator retries deliberately.
+ ## 7. Pinned dependencies
+ 
+ The launcher pins
+-`github.com/relux-works/skill-agents-management v0.5.53`, which carries
++`github.com/relux-works/skill-agents-management v0.5.62`, which carries
+ `LaunchModeInteractive`, `LaunchRequest.PermissionMode`,
+ `LaunchRequest.ToolRelease`, `LaunchRequest.NativeArgs`, the
+ `permission-grammar-v1` token, `ErrPermissionModeUnverifiedRelease`,
+@@ -1573,7 +1602,11 @@ the `ElevateResumeIntent` typed-intent API, the closed `claude-restart`
+ template export and transformation check, the pinned hosted schemas,
+ `Plan.ExportSeal`, and the typed `Plan.Session` (native name and RC
+ intent with argv indices).
+-The module owns the release-bound permission mapping, grammar, and
++The module also admits attested well-formed Muse builds without a release
++table, the optional frozen-copy tuple, `muse-wonder`, fragment v3, and bounded
++help-evidence-backed Muse yolo. ToolRelease is a claim cross-checked by the
++sealer, never caller-minted admission evidence.
++The module owns the permission mapping, grammar, and
+ capability table; this SPEC deliberately contains no provider permission
+ flag spelling. The pinned module's plans-as-values contract, argv
+ parity goldens, frozen admitted-pair digests, per-model effort rules,
+@@ -1590,8 +1623,10 @@ supports.
+ 
+ ## 8. Versioning
+ 
++The launcher v0.3.0 candidate reports `0.3.0`; its tag is pending.
++
+ - This specification is versioned semantically; the current version is
+-  **`0.5.0-draft`**. Draft versions may change incompatibly between
++  **`0.5.1-draft`**. Draft versions may change incompatibly between
+   commits; the `-draft` suffix is the signal that nothing downstream may
+   pin them.
+ - The `curator-run` binary reports both its build version and the
+diff --git a/cmd/curator-run/baseline_parity_test.go b/cmd/curator-run/baseline_parity_test.go
+index 68982d9eac2464737d7ae5d7e0d2095d423a6da6..672a3742e29c879a2426dd07f68ce290157964f7 100644
+--- a/cmd/curator-run/baseline_parity_test.go
++++ b/cmd/curator-run/baseline_parity_test.go
+@@ -8,7 +8,7 @@ import (
+ 	"testing"
+ )
+ 
+-// authorizedUnmanagedDelta is the single unmanaged-launch difference
++// authorizedUnmanagedDelta is the Claude unmanaged-launch difference
+ // this revision carries against baseline fbcdbaf0: the
+ // agents-management v0.5.45+ module appends its unconditional Claude
+ // denial after the prompt channel of the direct argv. The line below is
+@@ -43,8 +43,9 @@ func normalizeAuthorizedPermissionsLine(t *testing.T, name string, current []byt
+ // unmanaged launch shape the suite goldens — six direct/tracked
+ // pipeline shapes plus three Muse shapes, all launched WITHOUT
+ // --network — matches baseline fbcdbaf0, except the two Claude goldens,
+-// which carry exactly the one authorized denial line above and nothing
+-// else. Baseline bytes live in testdata/baseline-fbcdbaf0/, extracted
++// which carry exactly the one authorized denial line above; Muse carries
++// exactly the v0.5.62 lineup change from Spark/max to Wonder/xhigh.
++// Baseline bytes live in testdata/baseline-fbcdbaf0/, extracted
+ // with `git show fbcdbaf0:cmd/curator-run/testdata/<name>.golden`
+ // (provenance hashes in the task results); they are the pin, not a
+ // second copy of the live fixtures.
+@@ -72,8 +73,19 @@ func TestUnmanagedGoldensMatchBaselineFbcdbaf0(t *testing.T) {
+ 		if strings.HasSuffix(name, "-false") && (strings.HasPrefix(name, "pipeline-codex_cli") || strings.HasPrefix(name, "pipeline-pi")) {
+ 			current = normalizeAuthorizedPermissionsLine(t, name, current)
+ 		}
++		if strings.HasPrefix(name, "pipeline-muse-") {
++			for _, delta := range [][2]string{
++				{`"muse-wonder-1.0-contributor"`, `"muse-spark-1.3-contributor"`},
++				{`"xhigh"`, `"max"`},
++			} {
++				if n := bytes.Count(current, []byte(delta[0])); n != 1 {
++					t.Fatalf("%s: carries authorized lineup value %s %d times, want exactly once", name, delta[0], n)
++				}
++				current = bytes.Replace(current, []byte(delta[0]), []byte(delta[1]), 1)
++			}
++		}
+ 		if !bytes.Equal(current, base) {
+-			t.Fatalf("%s: unmanaged golden differs from baseline fbcdbaf0 (%d bytes vs %d); only the Claude denial line is authorized",
++			t.Fatalf("%s: unmanaged golden differs from baseline fbcdbaf0 (%d bytes vs %d) after the exact authorized deltas",
+ 				name, len(current), len(base))
+ 		}
+ 	}
+diff --git a/cmd/curator-run/construction_contract_test.go b/cmd/curator-run/construction_contract_test.go
+index 2fa3d52b6ad704e2b1f8772dbaee429a25d45757..7bf28e034282d02ade23a8be01e4e9f565d85db6 100644
+--- a/cmd/curator-run/construction_contract_test.go
++++ b/cmd/curator-run/construction_contract_test.go
+@@ -35,7 +35,7 @@ func TestConstructionDependencyReleasePin(t *testing.T) {
+ 	if err := json.Unmarshal(out, &module); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if module.Version != "v0.5.53" || module.Replace != nil {
+-		t.Fatalf("release module must be v0.5.53 without replacement: version=%s replaced=%v", module.Version, module.Replace != nil)
++	if module.Version != "v0.5.62" || module.Replace != nil {
++		t.Fatalf("release module must be v0.5.62 without replacement: version=%s replaced=%v", module.Version, module.Replace != nil)
+ 	}
+ }
+diff --git a/cmd/curator-run/hosted_test.go b/cmd/curator-run/hosted_test.go
+index abc7b0549977370eb4e3b2a6e2f765aef57e0023..2aac5685fb5681d5c1432b0ea33c688469148dbf 100644
+--- a/cmd/curator-run/hosted_test.go
++++ b/cmd/curator-run/hosted_test.go
+@@ -156,7 +156,7 @@ func TestHostedRefusalsBeforeContact(t *testing.T) {
+ 			wantCode: 2, wantLine: "curator-run: host_configuration_conflict: hosted execution conflicts with the enabled ax integration on this machine",
+ 		},
+ 		// Q-D1a (2026-10-05) = yes: an operator hosted default is
+-		// admitted (TestOperatorHostedDefaultAdmitted). Only machine
++		// resolved (TestOperatorHostedDefaultResolvesWithInjectedReceiver). Only machine
+ 		// hosted defaults stay gated, locked or not.
+ 		{
+ 			name: "machine-hosted-default-not-ready", env: "claude_code",
+@@ -373,7 +373,7 @@ func TestHostedRefusalsBeforeContact(t *testing.T) {
+ // completes the hosted handoff — the payload reaches the receiver and
+ // the launch exits 0 — while a machine hosted default still refuses
+ // (TestHostedRefusalsBeforeContact/machine-hosted-default-not-ready).
+-func TestOperatorHostedDefaultAdmitted(t *testing.T) {
++func TestOperatorHostedDefaultResolvesWithInjectedReceiver(t *testing.T) {
+ 	h := newHostedHarness(t, "claude_code", false)
+ 	writeDefaults(t, h.fix.deps.defaults.Operator, `{"schema":"curator-run-defaults-v3","defaults":{"claude_code":{"host":"hosted"}}}`)
+ 	code, _, stderr := h.run(t, []string{"claude_code", "--model", "claude-opus-5", "--effort", "medium", "--permissions", "native"})
+@@ -1504,3 +1504,49 @@ func TestHostedConflictingNativeSessionNamesRefuse(t *testing.T) {
+ 		}
+ 	}
+ }
++
++// Production call sites: run -> launch -> runHosted -> Transport.Run ->
++// LookupReceiver. A task-board executable on PATH is not a swarma dispatcher.
++// All three ways to select hosted must refuse without a receiver or provider
++// start. Existing injected-receiver tests cover the dormant payload contract.
++func TestHostedUnavailableThroughRun(t *testing.T) {
++	for _, selection := range []string{"flag", "operator", "machine", "locked-machine"} {
++		for _, mode := range []string{"native", "yolo"} {
++			t.Run(selection+"/"+mode, func(t *testing.T) {
++				h := newHostedHarness(t, "claude_code", false)
++				h.fix.usePermissionsFragment(t, "native", false, "default")
++				h.fix.deps.receiverLookup = nil // Use the public production boundary.
++				receiver, err := os.ReadFile(hostedReceiver)
++				if err != nil {
++					t.Fatal(err)
++				}
++				// Keep the receiver PATH directory separate from provider-limit
++				// state: LayoutAt uses a task-board directory under the fixture.
++				writeFixture(t, filepath.Join(h.captureDir, "task-board"), receiver, 0700)
++				t.Setenv("PATH", h.captureDir)
++				args := []string{"claude_code", "--model", "claude-opus-5", "--effort", "medium", "--permissions", mode}
++				wantCode, wantDiagnostic := 1, "session_host_missing"
++				switch selection {
++				case "flag":
++					args = append(args, "--hosted")
++				case "operator":
++					writeDefaults(t, h.fix.deps.defaults.Operator, `{"schema":"curator-run-defaults-v3","defaults":{"claude_code":{"host":"hosted"}}}`)
++				case "machine":
++					writeDefaults(t, h.fix.deps.defaults.Machine, `{"schema":"curator-run-defaults-v3","defaults":{"claude_code":{"host":"hosted"}}}`)
++					wantCode, wantDiagnostic = 16, "session_host_default_not_ready"
++				case "locked-machine":
++					writeDefaults(t, h.fix.deps.defaults.Machine, `{"schema":"curator-run-defaults-v3","locked":true,"defaults":{"claude_code":{"host":"hosted"}}}`)
++					wantCode, wantDiagnostic = 16, "session_host_default_not_ready"
++				}
++				code, out, stderr := h.run(t, args)
++				if code != wantCode || out != "" || !strings.Contains(stderr, "curator-run: "+wantDiagnostic+":") {
++					t.Fatalf("hosted selection escaped refusal: exit=%d stdout=%q stderr=%q", code, out, stderr)
++				}
++				h.fix.assertNoChild(t)
++				if _, err := os.Stat(filepath.Join(h.captureDir, "argv.json")); !os.IsNotExist(err) {
++					t.Fatalf("receiver started or capture unreadable: %v", err)
++				}
++			})
++		}
++	}
++}
+diff --git a/cmd/curator-run/main.go b/cmd/curator-run/main.go
+index 285f84f36acf0fd64eb96ae21660b5f9a628c4f6..898aa58cd56ce4bf73fd0b7e147afdc8d2bcee94 100644
+--- a/cmd/curator-run/main.go
++++ b/cmd/curator-run/main.go
+@@ -11,6 +11,7 @@ import (
+ 	"time"
+ 
+ 	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	museSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/muse"
+ 	"github.com/relux-works/skill-agents-management/pkg/providerlimits"
+ 	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
+ 
+@@ -34,10 +35,10 @@ import (
+ 
+ const (
+ 	name        = cli.Name
+-	specVersion = "0.5.0-draft"
++	specVersion = "0.5.1-draft"
+ 	// buildVersion is the launcher's own version; the specification
+ 	// version is reported beside it (SPEC §8).
+-	buildVersion = "0.2.0"
++	buildVersion = "0.3.0"
+ )
+ 
+ func main() {
+@@ -476,6 +477,12 @@ func launch(ctx context.Context, inv cli.Invocation, frag *fragment.Fragment, ta
+ 	if isHosted && admitted.Plan.Stdin.Attached {
+ 		return emitFailure(stderr, diagnostics.CodeSessionHostStdinUnsupported, errors.New("session_host_stdin_unsupported: hosted launches in Phase 1 do not support attached stdin"))
+ 	}
++	// Muse's no-evidence mapping deliberately refuses yolo queries. Only the
++	// admitted plan can establish the selected binary's bounded help evidence;
++	// report that authority without guessing or parsing a provider flag.
++	if !inv.Tracked && decision.Mode == agentic.PermissionModeYolo && system.ID() == "muse" {
++		fmt.Fprintf(stderr, "curator-run: permissions=%s source=%s mapped=module-attested\n", decision.Mode, decision.Source)
++	}
+ 	// SPEC §4.4b: resolve and validate the explicit network selection
+ 	// after admission and before composition, reading the catalog with
+ 	// the operator's original parentEnv. The support check runs at the
+@@ -705,6 +712,12 @@ func resolvePermission(ctx context.Context, inv cli.Invocation, frag *fragment.F
+ 		toolRelease, probeErr = agentic.ProbeToolRelease(ctx, system, parentEnv)
+ 	}
+ 	permissionMapping, mappingErr := agentic.Default.PermissionMapping(agentic.SystemID(target.System), toolRelease, decision.Mode)
++	deferredMapping := errors.Is(mappingErr, museSystem.ErrMuseHelpEvidenceRequired)
++	if deferredMapping {
++		// v0.5.62 requires live help evidence for Muse yolo. BuildLaunch owns
++		// that probe and refusal; a no-evidence query is not an admission.
++		mappingErr = nil
++	}
+ 	if mappingErr != nil {
+ 		if errors.Is(mappingErr, agentic.ErrPermissionModeUnsupported) {
+ 			return execution.PermissionDecision{}, "", nil, &execution.PermissionError{Code: diagnostics.CodePermissionModeUnsupported, Detail: mappingErr.Error()}
+@@ -720,7 +733,7 @@ func resolvePermission(ctx context.Context, inv cli.Invocation, frag *fragment.F
+ 	if decision.Mode == agentic.PermissionModeYolo && probeErr != nil {
+ 		return execution.PermissionDecision{}, "", nil, fmt.Errorf("%s: tool release was not established: %v: %w", diagnostics.CodePlanRefused, probeErr, agentic.ErrPermissionModeUnverifiedRelease)
+ 	}
+-	if !inv.Tracked {
++	if !inv.Tracked && !deferredMapping {
+ 		mapped := permissionMapping.Flag
+ 		if mapped == "" {
+ 			mapped = "none"
+diff --git a/cmd/curator-run/main_test.go b/cmd/curator-run/main_test.go
+index 30cc7825b01fbe3ba4bb8b57f20b78858da3c735..10e5952a6c87f99bb380e54d4e047efea294c254 100644
+--- a/cmd/curator-run/main_test.go
++++ b/cmd/curator-run/main_test.go
+@@ -397,8 +397,8 @@ func TestRunProductionResolverAgainstFakeCurator(t *testing.T) {
+ // version drifts from the changelog and install documentation.
+ func TestReleaseVersionPinned(t *testing.T) {
+ 	const (
+-		wantBuild = "0.2.0"
+-		wantSpec  = "0.5.0-draft"
++		wantBuild = "0.3.0"
++		wantSpec  = "0.5.1-draft"
+ 	)
+ 	if buildVersion != wantBuild {
+ 		t.Fatalf("buildVersion = %q, want %q", buildVersion, wantBuild)
+@@ -413,9 +413,9 @@ func TestReleaseVersionPinned(t *testing.T) {
+ 		{path: "../../SPEC.md", content: specVersion},
+ 		{path: "../../README.md", content: specVersion},
+ 		{path: "../../README.md", content: "github.com/relux-works/curator-agent-launcher/cmd/curator-run@v0.2.0"},
+-		{path: "../../README.md", content: "The v0.2.0 release reports `0.2.0` (specification `0.5.0-draft`)."},
++		{path: "../../README.md", content: "The v0.3.0 candidate (pending tag) reports `0.3.0` (specification `0.5.1-draft`)."},
+ 		{path: "../../README.md", content: "curator v0.15.0-rc.3 or later, once published"},
+-		{path: "../../CHANGELOG.md", content: "## 0.2.0 — 2026-10-02"},
++		{path: "../../CHANGELOG.md", content: "## 0.3.0 (pending tag)"},
+ 	} {
+ 		data, err := os.ReadFile(check.path)
+ 		if err != nil {
+diff --git a/cmd/curator-run/muse_test.go b/cmd/curator-run/muse_test.go
+index 9e6418c2e9dd2ef695bc1a89397cbc63117858bb..9503ffeb0add796572d427f408dc83aae68add33 100644
+--- a/cmd/curator-run/muse_test.go
++++ b/cmd/curator-run/muse_test.go
+@@ -44,7 +44,8 @@ func museFixture(t *testing.T) (*pipelineFixture, *fragment.Fragment) {
+ 	writeFixture(t, curator, helper, 0700)
+ 	f.binary = filepath.Join(f.dir, "muse")
+ 	writeFixture(t, f.binary, helper, 0700)
+-	writeFixture(t, filepath.Join(f.dir, "muse-version"), []byte("Muse Code 1.4.2 (1.4.2-R4684.1)\n"), 0600)
++	writeFixture(t, filepath.Join(f.dir, "muse-version"), []byte("Muse Code 1.4.6 (1.4.6-R5000.1)\n"), 0600)
++	writeFixture(t, filepath.Join(f.dir, "muse-help"), []byte("Options:\n  --yolo  Bypass approvals and sandbox\n"), 0600)
+ 	t.Setenv("CURATOR_TEST_FRAGMENT", fragmentPath)
+ 	t.Setenv("CURATOR_TEST_RESOLVE_ARGV", filepath.Join(f.dir, "resolve-argv"))
+ 	f.deps.resolver = fragment.NewWithRunner(curator, fragment.ExecRunner{})
+@@ -80,7 +81,7 @@ func TestMuseV3InteractiveThroughRun(t *testing.T) {
+ 			if err != nil || string(argv) != "env\nresolve\nmuse\n--repair\n--format\njson" {
+ 				t.Fatalf("resolve argv=%q err=%v", argv, err)
+ 			}
+-			if f.request.Runtime != "muse" || f.request.Model != "muse-spark-1.3-contributor" || f.request.Effort != "max" || f.request.Home != frag.Home() || f.request.ToolRelease != "1.4.2" || f.request.PermissionMode != tc.mode || !reflect.DeepEqual(f.request.Env, f.deps.environ()) {
++			if f.request.Runtime != "muse" || f.request.Model != "muse-wonder-1.0-contributor" || f.request.Effort != "xhigh" || f.request.Home != frag.Home() || f.request.ToolRelease != "1.4.6" || f.request.PermissionMode != tc.mode || !reflect.DeepEqual(f.request.Env, f.deps.environ()) {
+ 				t.Fatalf("wrong Muse request: %+v", f.request)
+ 			}
+ 			wantArgv := museArgv(f.dir, tc.mode)
+@@ -97,7 +98,7 @@ func TestMuseV3InteractiveThroughRun(t *testing.T) {
+ 			assertMuseEnv(t, child.Env, f.dir, frag)
+ 			mapped := "none"
+ 			if tc.mode == agentic.PermissionModeYolo {
+-				mapped = "--yolo"
++				mapped = "module-attested"
+ 			}
+ 			if !strings.Contains(string(stderr), "curator-run: permissions="+string(tc.mode)+" source=flag mapped="+mapped+"\n") {
+ 				t.Fatalf("permission diagnostic: %s", stderr)
+@@ -108,7 +109,7 @@ func TestMuseV3InteractiveThroughRun(t *testing.T) {
+ }
+ 
+ func museArgv(workdir string, mode agentic.PermissionMode) []string {
+-	args := []string{"--model", "muse-spark-1.3-contributor", "--reasoning-effort", "max", "--workspace", workdir}
++	args := []string{"--model", "muse-wonder-1.0-contributor", "--reasoning-effort", "xhigh", "--workspace", workdir}
+ 	if mode == agentic.PermissionModeYolo {
+ 		args = append(args, "--yolo")
+ 	}
+@@ -127,7 +128,7 @@ func TestMuseV3PlanBuildInteractive(t *testing.T) {
+ 				reads++
+ 				return vendorplugin.Availability{State: vendorplugin.AvailabilityHealthy}, nil
+ 			}
+-			req := plan.Request{Runtime: "muse", Model: "muse-spark-1.3-contributor", Effort: "max", PermissionMode: mode, ToolRelease: "1.4.2", Home: frag.Home(), WorkDir: f.dir, Env: f.deps.environ()}
++			req := plan.Request{Runtime: "muse", Model: "muse-wonder-1.0-contributor", Effort: "xhigh", PermissionMode: mode, ToolRelease: "1.4.6", Home: frag.Home(), WorkDir: f.dir, Env: f.deps.environ()}
+ 			built, err := plan.Build(context.Background(), deps, req)
+ 			if err != nil || reads != 1 || built.Plan.Binary != f.binary || !reflect.DeepEqual(built.Plan.Argv, museArgv(f.dir, mode)) {
+ 				t.Fatalf("interactive plan=%+v err=%v reads=%d", built.Plan, err, reads)
+@@ -172,21 +173,20 @@ func TestMuseV3CompositionPreservesHOME(t *testing.T) {
+ 	}
+ }
+ 
+-func TestMuseV3UnlistedReleaseRefusedThroughRun(t *testing.T) {
+-	// v0.5.48 muse/policy.go lists 1.4.1 and 1.4.2; 1.4.0 is unlisted.
++func TestMuseV3MalformedReleaseRefusedThroughRun(t *testing.T) {
+ 	for _, mode := range []string{"native", "yolo"} {
+-		for _, release := range []string{"1.4.0", "9.9.9", ""} {
+-			t.Run(mode+"/release="+release, func(t *testing.T) {
++		for _, version := range []string{"", "garbage\n", "Muse Code 1.4.6 (1.4.5-R5000.1)\n"} {
++			t.Run(mode+"/version="+version, func(t *testing.T) {
+ 				f, _ := museFixture(t)
+ 				f.args = []string{"muse", "--permissions", mode}
+-				version := ""
+-				if release != "" {
+-					version = "Muse Code " + release + " (" + release + "-R1.1)\n"
+-				}
+ 				writeFixture(t, filepath.Join(f.dir, "muse-version"), []byte(version), 0600)
+ 				code, out, stderr := f.run()
+-				if code != 1 || len(out) != 0 || f.builds != 0 || f.verdicts != 0 || !strings.Contains(string(stderr), "permission_mode_unsupported:") || !strings.Contains(string(stderr), agentic.ErrPermissionModeUnverifiedRelease.Error()) {
+-					t.Fatalf("unlisted release admitted: exit=%d builds=%d verdicts=%d stdout=%s stderr=%s", code, f.builds, f.verdicts, out, stderr)
++				wantBuilds := 0
++				if mode == "native" {
++					wantBuilds = 1
++				} // Native still requires a sealed, attested plan.
++				if code != 1 || len(out) != 0 || f.builds != wantBuilds || f.verdicts != 0 || !strings.Contains(string(stderr), "plan_refused:") || !strings.Contains(string(stderr), agentic.ErrToolReleaseUndetected.Error()) {
++					t.Fatalf("malformed release admitted: exit=%d builds=%d verdicts=%d stdout=%s stderr=%s", code, f.builds, f.verdicts, out, stderr)
+ 				}
+ 				f.assertNoChild(t)
+ 			})
+@@ -194,6 +194,76 @@ func TestMuseV3UnlistedReleaseRefusedThroughRun(t *testing.T) {
+ 	}
+ }
+ 
++// run -> resolvePermission probes a claim; the real module builder must
++// compare it with the selected binary's later attestation, for both postures.
++func TestMuseV3ReleaseMismatchRefusedThroughRun(t *testing.T) {
++	for _, mode := range []string{"native", "yolo"} {
++		t.Run(mode, func(t *testing.T) {
++			f, _ := museFixture(t)
++			original := f.deps.build
++			f.deps.build = func(ctx context.Context, r *vendorplugin.Registry, req vendorplugin.SpawnRequest, launchMode agentic.LaunchMode) (agentic.PlanWithEnvironment, error) {
++				if req.ToolRelease != "1.4.6" {
++					t.Fatalf("probe claim lost: %q", req.ToolRelease)
++				}
++				writeFixture(t, filepath.Join(f.dir, "muse-version"), []byte("Muse Code 1.4.7 (1.4.7-R5001.1)\n"), 0600)
++				return original(ctx, r, req, launchMode)
++			}
++			f.args = []string{"muse", "--permissions", mode}
++			code, out, stderr := f.run()
++			if code != 1 || len(out) != 0 || f.builds != 1 || f.verdicts != 0 || !strings.Contains(string(stderr), "caller tool release does not match the attested release") {
++				t.Fatalf("mismatch admitted: exit=%d builds=%d verdicts=%d stderr=%s", code, f.builds, f.verdicts, stderr)
++			}
++			f.assertNoChild(t)
++		})
++	}
++}
++
++func TestMuseV3YoloRequiresHelpEvidenceThroughRun(t *testing.T) {
++	for _, help := range []string{"", "Example: muse --yolo\n", "  --yolo-extra  Not the bypass flag\n"} {
++		t.Run(help, func(t *testing.T) {
++			f, _ := museFixture(t)
++			writeFixture(t, filepath.Join(f.dir, "muse-help"), []byte(help), 0600)
++			f.args = []string{"muse", "--permissions", "yolo"}
++			code, out, stderr := f.run()
++			wantDiagnostic := "permission_mode_unsupported:"
++			if help == "" {
++				wantDiagnostic = "plan_refused:"
++			}
++			if code != 1 || len(out) != 0 || f.builds != 1 || f.verdicts != 0 || !strings.Contains(string(stderr), wantDiagnostic) {
++				t.Fatalf("unproven yolo admitted: exit=%d builds=%d verdicts=%d stderr=%s", code, f.builds, f.verdicts, stderr)
++			}
++			f.assertNoChild(t)
++		})
++	}
++}
++
++func TestMuseV3NovelBuildAndWonderThroughRun(t *testing.T) {
++	for _, release := range []string{"1.4.6", "9.9.9"} {
++		for _, mode := range []string{"native", "yolo"} {
++			t.Run(release+"/"+mode, func(t *testing.T) {
++				f, _ := museFixture(t)
++				writeFixture(t, filepath.Join(f.dir, "muse-version"), []byte("Muse Code "+release+" ("+release+"-R5000.1)\n"), 0600)
++				f.args = []string{"muse", "--profile", "test-profile", "--model", "muse-wonder", "--permissions", mode}
++				code, out, stderr := f.run()
++				if code != 0 || f.builds != 1 || f.verdicts != 1 || f.request.Model != "muse-wonder" || f.request.Effort != "xhigh" || f.request.ToolRelease != release || f.plan.ToolRelease != release {
++					t.Fatalf("wonder admission: exit=%d request=%+v stderr=%s", code, f.request, stderr)
++				}
++				var child childCapture
++				if err := json.Unmarshal(out, &child); err != nil {
++					t.Fatal(err)
++				}
++				if !containsArg(child.Argv, "muse-wonder-1.0-contributor") {
++					t.Fatalf("alias not forwarded canonically: %q", child.Argv)
++				}
++				argv, err := os.ReadFile(filepath.Join(f.dir, "resolve-argv"))
++				if err != nil || !strings.Contains(string(argv), "--profile\ntest-profile") {
++					t.Fatalf("profile not forwarded: %q %v", argv, err)
++				}
++			})
++		}
++	}
++}
++
+ // Production call site: run -> cli.Parse, before any fragment/env-specific
+ // stage. An unknown --permissions value must refuse with usage even when
+ // the operand is the muse environment; nothing may resolve or launch.
+diff --git a/cmd/curator-run/testdata/help.golden b/cmd/curator-run/testdata/help.golden
+index 4548a837e1bab99b56ff531be64de33afcfff472..2c24aa0465bfecf41ba93cc22770c8de18f2b701 100644
+--- a/cmd/curator-run/testdata/help.golden
++++ b/cmd/curator-run/testdata/help.golden
+@@ -1,4 +1,4 @@
+-curator-run 0.2.0 (specification 0.5.0-draft)
++curator-run 0.3.0 (specification 0.5.1-draft)
+ 
+ usage: curator-run <env-id> [--hosted | --native | --untracked]
+                    [resume [SES-HANDLE]] [--resume <id>]
+@@ -16,7 +16,7 @@ Launcher flags are recognized only before "--". Everything after "--" is
+ forwarded to the tool verbatim, in order, uninspected.
+ 
+ options:
+-  --hosted                          run on the managed session host
++  --hosted                          unavailable until the swarma dispatcher path ships
+   --native, --untracked             run natively; the two spellings are equal
+   resume [SES-HANDLE]               hosted resume selector (latest or handle)
+   --resume <id>                     hosted resume selector (provider identity)
+@@ -35,7 +35,7 @@ options:
+   --help, -h                        print this usage text and exit 0
+   --version                         print the launcher name and version, exit 0
+ 
+-Environments: claude_code (alias claude), codex_cli (alias codex), pi.
++Environments: claude_code (alias claude), codex_cli (alias codex), pi, muse.
+ opencode is currently unsupported. Aliases normalize to the canonical id
+ before validation or lookup; outputs carry the canonical id only.
+ Omitting --profile uses Curator's current profile; resolution always repairs.
+@@ -65,6 +65,10 @@ Host: --hosted, --native and --untracked share one host request: a repeat
+ or a combination refuses. No flag and no configured default means native
+ with no session-host probe. An explicit --native or --untracked on an
+ ax-configured machine bypasses ax; a configured native default does not.
++Hosted launch is unavailable until the swarma dispatcher path ships.
++Production receiver lookup fails closed with session_host_missing (exit 1),
++before any handoff, even if task-board is on PATH. Earlier validation and
++machine-default refusals still apply; operator defaults cannot start a host.
+ resume selectors and --resume are hosted-only; in native mode they refuse.
+ --hosted with --network refuses network_scope_unsupported (exit 16).
+ 
+diff --git a/cmd/curator-run/testdata/pipeline-muse-native.golden b/cmd/curator-run/testdata/pipeline-muse-native.golden
+index b44b670406ccd8448dda9c5041b100263144902f..efe3cb6bab9392fc2921289a7ec6060e36f78b26 100644
+--- a/cmd/curator-run/testdata/pipeline-muse-native.golden
++++ b/cmd/curator-run/testdata/pipeline-muse-native.golden
+@@ -1,9 +1,9 @@
+ {
+   "Argv": [
+     "--model",
+-    "muse-spark-1.3-contributor",
++    "muse-wonder-1.0-contributor",
+     "--reasoning-effort",
+-    "max",
++    "xhigh",
+     "--workspace",
+     "<ROOT>"
+   ],
+diff --git a/cmd/curator-run/testdata/pipeline-muse-yolo-alias.golden b/cmd/curator-run/testdata/pipeline-muse-yolo-alias.golden
+index 0c9e0d8133b9930da7e70da4cf6bf73e25c24e70..c9c7f3d4224a3a77b0a44e7dfc04a084cce0cb50 100644
+--- a/cmd/curator-run/testdata/pipeline-muse-yolo-alias.golden
++++ b/cmd/curator-run/testdata/pipeline-muse-yolo-alias.golden
+@@ -1,9 +1,9 @@
+ {
+   "Argv": [
+     "--model",
+-    "muse-spark-1.3-contributor",
++    "muse-wonder-1.0-contributor",
+     "--reasoning-effort",
+-    "max",
++    "xhigh",
+     "--workspace",
+     "<ROOT>",
+     "--yolo"
+diff --git a/cmd/curator-run/testdata/pipeline-muse-yolo.golden b/cmd/curator-run/testdata/pipeline-muse-yolo.golden
+index 0c9e0d8133b9930da7e70da4cf6bf73e25c24e70..c9c7f3d4224a3a77b0a44e7dfc04a084cce0cb50 100644
+--- a/cmd/curator-run/testdata/pipeline-muse-yolo.golden
++++ b/cmd/curator-run/testdata/pipeline-muse-yolo.golden
+@@ -1,9 +1,9 @@
+ {
+   "Argv": [
+     "--model",
+-    "muse-spark-1.3-contributor",
++    "muse-wonder-1.0-contributor",
+     "--reasoning-effort",
+-    "max",
++    "xhigh",
+     "--workspace",
+     "<ROOT>",
+     "--yolo"
+diff --git a/cmd/curator-run/testdata/provider/main.go b/cmd/curator-run/testdata/provider/main.go
+index 9d9ea6b1b2c9021d107f2a4ecd5c9a25376f26f3..001609404a663d9d6d6839de782650f32b16507a 100644
+--- a/cmd/curator-run/testdata/provider/main.go
++++ b/cmd/curator-run/testdata/provider/main.go
+@@ -42,6 +42,14 @@ func main() {
+ 		fmt.Fprintln(os.Stdout, os.Getenv("CURATOR_TEST_RELEASE"))
+ 		return
+ 	}
++	if filepath.Base(os.Args[0]) == "muse" && len(os.Args) == 2 && os.Args[1] == "--help" {
++		data, err := os.ReadFile(filepath.Join(filepath.Dir(os.Args[0]), "muse-help"))
++		if err != nil {
++			os.Exit(1)
++		}
++		os.Stdout.Write(data)
++		return
++	}
+ 	_ = os.WriteFile("started", []byte("started"), 0600)
+ 	data, _ := io.ReadAll(os.Stdin)
+ 	cwd, _ := os.Getwd()
+diff --git a/go.mod b/go.mod
+index a6944cb88cee42d1b49b1ec53d43dccb152446bc..f160197cc98b539c5497d9d2e15dc8f8f0d1c014 100644
+--- a/go.mod
++++ b/go.mod
+@@ -3,7 +3,7 @@ module github.com/relux-works/curator-agent-launcher
+ go 1.25.5
+ 
+ require (
+-	github.com/relux-works/skill-agents-management v0.5.53
++	github.com/relux-works/skill-agents-management v0.5.62
+ 	golang.org/x/sys v0.47.0
+ )
+ 
+diff --git a/go.sum b/go.sum
+index 673b1590da58c4e7f1f67e893e408a966fe8116a..46712a1a17353913297b3ad9a82555e969ad6354 100644
+--- a/go.sum
++++ b/go.sum
+@@ -2,7 +2,7 @@ github.com/pelletier/go-toml/v2 v2.4.3 h1:GTRvJQutkOSftxIFD5xw9aepkYNuPWmVJpffdD
+ github.com/pelletier/go-toml/v2 v2.4.3/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8t9Stt+h56mCY=
+ github.com/relux-works/curator-network-profiles v0.3.1 h1:ERyAQNyvswAaDImOs91HQgBs3IUPSH61YyB+JzeaSO0=
+ github.com/relux-works/curator-network-profiles v0.3.1/go.mod h1:KlPpVwgH45EtLFWodP1ofqWc+amLHGuftUVoZ1rsWhg=
+-github.com/relux-works/skill-agents-management v0.5.53 h1:htkCmcRKle4+pSxpTD7MfELg+DlkuEAXTY9bMZic2Fk=
+-github.com/relux-works/skill-agents-management v0.5.53/go.mod h1:GzykgRxR/59WB+VXfqHGlmJ+kLR09DZJmApaKCScctw=
++github.com/relux-works/skill-agents-management v0.5.62 h1:mOzkIQBaJZwMnxaA4o1qb7Ys9hK2bnmjpHdEOY1wtak=
++github.com/relux-works/skill-agents-management v0.5.62/go.mod h1:GzykgRxR/59WB+VXfqHGlmJ+kLR09DZJmApaKCScctw=
+ golang.org/x/sys v0.47.0 h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+ golang.org/x/sys v0.47.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
+diff --git a/internal/cli/cli.go b/internal/cli/cli.go
+index 6ad3954709efc95dd1da3daf8467af06f6d317f6..b11f5bcf70c1a1be1dbddbe68c0af8751614b9e8 100644
+--- a/internal/cli/cli.go
++++ b/internal/cli/cli.go
+@@ -44,7 +44,7 @@ Launcher flags are recognized only before "--". Everything after "--" is
+ forwarded to the tool verbatim, in order, uninspected.
+ 
+ options:
+-  --hosted                          run on the managed session host
++  --hosted                          unavailable until the swarma dispatcher path ships
+   --native, --untracked             run natively; the two spellings are equal
+   resume [SES-HANDLE]               hosted resume selector (latest or handle)
+   --resume <id>                     hosted resume selector (provider identity)
+@@ -63,7 +63,7 @@ options:
+   --help, -h                        print this usage text and exit 0
+   --version                         print the launcher name and version, exit 0
+ 
+-Environments: claude_code (alias claude), codex_cli (alias codex), pi.
++Environments: claude_code (alias claude), codex_cli (alias codex), pi, muse.
+ opencode is currently unsupported. Aliases normalize to the canonical id
+ before validation or lookup; outputs carry the canonical id only.
+ Omitting --profile uses Curator's current profile; resolution always repairs.
+@@ -93,6 +93,10 @@ Host: --hosted, --native and --untracked share one host request: a repeat
+ or a combination refuses. No flag and no configured default means native
+ with no session-host probe. An explicit --native or --untracked on an
+ ax-configured machine bypasses ax; a configured native default does not.
++Hosted launch is unavailable until the swarma dispatcher path ships.
++Production receiver lookup fails closed with session_host_missing (exit 1),
++before any handoff, even if task-board is on PATH. Earlier validation and
++machine-default refusals still apply; operator defaults cannot start a host.
+ resume selectors and --resume are hosted-only; in native mode they refuse.
+ --hosted with --network refuses network_scope_unsupported (exit 16).
+ 
+diff --git a/internal/defaults/muse_test.go b/internal/defaults/muse_test.go
+index 0707a56a60fc538f1dd08f41189cec51fd7ddbe6..d50b145cb53665b52bc3861be6cf9d7d5480e3ec 100644
+--- a/internal/defaults/muse_test.go
++++ b/internal/defaults/muse_test.go
+@@ -23,8 +23,8 @@ func TestMuseDefaultsUseDeclarationOwnedModels(t *testing.T) {
+ 	if got.Runtime != "muse" {
+ 		t.Fatalf("runtime=%q", got.Runtime)
+ 	}
+-	lineupOrigin(t, got.Model, "muse-spark-1.3-contributor")
+-	lineupOrigin(t, got.Effort, "max")
++	lineupOrigin(t, got.Model, "muse-wonder-1.0-contributor")
++	lineupOrigin(t, got.Effort, "xhigh")
+ 	// This is launch-only authority, not evidence of a resolved vendor.
+ 	if _, err := reg.ResolveRuntime("muse"); !errors.Is(err, vendorplugin.ErrRuntimeVendorUnresolved) {
+ 		t.Fatalf("vendor bound changed: %v", err)
+diff --git a/internal/hosted/hosted.go b/internal/hosted/hosted.go
+index a3a37b4a1524003fc47818d99444a3c5c272cd2f..440ca42666e3c0a249644522453db9117242ed52 100644
+--- a/internal/hosted/hosted.go
++++ b/internal/hosted/hosted.go
+@@ -38,9 +38,9 @@ const (
+ 
+ // Producer identity of the pinned agents-management module. ModuleVersion is
+ // pinned to the go.mod require by TestProducerMatchesBuild; ModuleCommit is
+-// the peeled commit of the v0.5.53 tag, resolved by git ls-remote at pin
++// the peeled commit of the v0.5.62 tag, resolved at pin
+ // time (Go exposes no dependency commit at runtime).
+ const (
+-	ProducerModuleVersion = "0.5.53"
+-	ProducerModuleCommit  = "f07bbf3259679c45af13e2d665dd37bb76126ec5"
++	ProducerModuleVersion = "0.5.62"
++	ProducerModuleCommit  = "fcdc31740396c168285ae4999f84d946e064f01c"
+ )
+diff --git a/internal/hosted/payload_test.go b/internal/hosted/payload_test.go
+index 113e46c0dff8f63b2cc7c95eafbef42a07f86ec6..00bba6624c99b751de7c856fa5236a506415895f 100644
+--- a/internal/hosted/payload_test.go
++++ b/internal/hosted/payload_test.go
+@@ -125,7 +125,7 @@ func TestBuildPayloadValid(t *testing.T) {
+ 		t.Fatal("wire bytes are not the canonical form")
+ 	}
+ 	producer := payload["producer"].(map[string]any)
+-	if producer["module_version"] != "0.5.53" || producer["module_commit"] != hosted.ProducerModuleCommit {
++	if producer["module_version"] != "0.5.62" || producer["module_commit"] != hosted.ProducerModuleCommit {
+ 		t.Fatalf("producer = %v", producer)
+ 	}
+ 	process := payload["process"].(map[string]any)
+diff --git a/internal/hosted/transport.go b/internal/hosted/transport.go
+index 97b4596b788378105191c0e7f50f145d4f1b323f..37ba5b88d2428ca7e5d2ed640eae3a265aad44f8 100644
+--- a/internal/hosted/transport.go
++++ b/internal/hosted/transport.go
+@@ -36,9 +36,12 @@ type Transport struct {
+ 	PreopenedTerminal *os.File
+ }
+ 
+-// LookupReceiver resolves the receiver binary on PATH.
++// LookupReceiver fails closed until the swarma dispatcher path ships.
++// A task-board binary on PATH does not implement the retired receiver CLI.
++// Injected Transport boundaries exercise the payload contract independently;
++// public launches always use this unavailable production boundary.
+ func LookupReceiver() (string, error) {
+-	return exec.LookPath("task-board")
++	return "", errors.New("hosted launch is unavailable until the swarma dispatcher path ships")
+ }
+ 
+ // OpenTerminal opens the controlling terminal read/write for fd3.
+@@ -90,6 +93,9 @@ func (t Transport) Run(payload []byte, stdout, stderr io.Writer) int {
+ 	}
+ 	receiver, err := lookup()
+ 	if err != nil || receiver == "" {
++		if t.PreopenedTerminal != nil {
++			t.PreopenedTerminal.Close()
++		}
+ 		_ = diagnostics.Emit(stderr, CodeSessionHostMissing, "the task-board receiver is not available on PATH")
+ 		return diagnostics.ExitForCode(CodeSessionHostMissing)
+ 	}
+diff --git a/internal/hosted/transport_test.go b/internal/hosted/transport_test.go
+index 24e1dc419b354790b62945f284f49419c1a972e5..559881ae30e45ee34e8c85a48d2eeb32a10616f6 100644
+--- a/internal/hosted/transport_test.go
++++ b/internal/hosted/transport_test.go
+@@ -3,6 +3,8 @@ package hosted_test
+ import (
+ 	"bytes"
+ 	"encoding/json"
++	"errors"
++	"fmt"
+ 	"os"
+ 	"path/filepath"
+ 	"reflect"
+@@ -561,3 +563,44 @@ type fakeErr string
+ func (e fakeErr) Error() string { return string(e) }
+ 
+ const errFakeLookup = fakeErr("fake failure")
++
++// Production Run must refuse before opening a terminal or executing a PATH
++// binary, and must close an already transferred terminal on the same refusal.
++func TestProductionTransportUnavailable(t *testing.T) {
++	dir := t.TempDir()
++	binary, err := os.ReadFile(testReceiver)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "task-board"), binary, 0700); err != nil {
++		t.Fatal(err)
++	}
++	t.Setenv("PATH", dir)
++	t.Setenv("RECEIVER_CAPTURE_DIR", dir)
++	for _, preopened := range []bool{false, true} {
++		t.Run(fmt.Sprint(preopened), func(t *testing.T) {
++			terminalCalls := 0
++			transport := hosted.Transport{Terminal: func() (*os.File, error) { terminalCalls++; return nil, errors.New("must not open terminal") }}
++			if preopened {
++				tty, err := os.CreateTemp(dir, "terminal")
++				if err != nil {
++					t.Fatal(err)
++				}
++				transport.PreopenedTerminal = tty
++			}
++			var stdout, stderr bytes.Buffer
++			code := transport.Run([]byte(`{"schema":"probe"}`), &stdout, &stderr)
++			if code != 1 || terminalCalls != 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "session_host_missing:") {
++				t.Fatalf("exit=%d terminal=%d stdout=%q stderr=%q", code, terminalCalls, stdout.String(), stderr.String())
++			}
++			if preopened {
++				if _, err := transport.PreopenedTerminal.Stat(); !errors.Is(err, os.ErrClosed) {
++					t.Fatalf("transferred terminal not closed: %v", err)
++				}
++			}
++			if _, err := os.Stat(filepath.Join(dir, "argv.json")); !os.IsNotExist(err) {
++				t.Fatalf("receiver started or capture unreadable: %v", err)
++			}
++		})
++	}
++}
+diff --git a/internal/mutantguard/mutantguard_test.go b/internal/mutantguard/mutantguard_test.go
+index 5e0ee132c4f22d9e17602535d9f5fdb6a66530bc..aedd33db408f07eb73baaef50bba017b2c73ccdb 100644
+--- a/internal/mutantguard/mutantguard_test.go
++++ b/internal/mutantguard/mutantguard_test.go
+@@ -33,6 +33,7 @@ var required = []struct {
+ 	{"M-H1", "./internal/defaults", "^TestResolveHostPrecedence$"},
+ 	{"M-H2", "./cmd/curator-run", "^TestHostedRefusalsBeforeContact$"},
+ 	{"M-H3", "./cmd/curator-run", "^TestNativePerformsZeroReceiverLookup$"},
++	{"M-H22", "./cmd/curator-run", "^TestHostedUnavailableThroughRun$"},
+ }
+ 
+ func repoRoot(t *testing.T) string {
+diff --git a/scripts/remote-gate.sh b/scripts/remote-gate.sh
+index a3a0776a46ffb80de9527596f6a135a4bad9df3f..b4cc0d3a8a6647f22465e6cc7b8ea8273ec64e61 100755
+--- a/scripts/remote-gate.sh
++++ b/scripts/remote-gate.sh
+@@ -42,7 +42,7 @@ tree=$(GIT_INDEX_FILE="$tmpindex" git write-tree)
+ if [ "$tree" = "$(git rev-parse "$head^{tree}")" ]; then
+   commit=$head
+ else
+-  commit=$(printf 'remote gate snapshot of %s\n\nworking tree of %s on top of %s\n' "$name" "$root" "$head" \
++  commit=$(printf 'remote gate snapshot of %s\n\nworking tree on top of %s\n' "$name" "$head" \
+     | GIT_COMMITTER_NAME="remote-gate" GIT_COMMITTER_EMAIL="remote-gate@localhost" \
+       GIT_AUTHOR_NAME="remote-gate" GIT_AUTHOR_EMAIL="remote-gate@localhost" \
+       git -c commit.gpgsign=false commit-tree "$tree" -p "$head")
