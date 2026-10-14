@@ -210,7 +210,7 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
 
 `--preserve-lock` requires `--repair`. It refuses before locking or writing when repair would change the lock hash, including v1-to-v2 identity migration. Rerun without `--preserve-lock` to migrate explicitly. Otherwise repair preserves the lock bytes; a changed lock detected after acquisition refuses with `environment_repair_failed`. Current homes still resolve without a repair lock.
 
-A managed home either shares your native login or logs in by itself. Claude Code on macOS always logs in by itself, so every profile you use with it needs one login in its home before the first launch or spawn. See [Logging in to managed homes](docs/environment-config.md#logging-in-to-managed-homes).
+> **Important:** a managed home either shares your native login or logs in by itself. Claude Code on macOS always logs in by itself, so every profile you use with it needs one login in its home before the first launch or spawn; otherwise the launch stops with "Not logged in". See [Logging in to managed homes](docs/environment-config.md#logging-in-to-managed-homes).
 
 </details>
 
