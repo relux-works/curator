@@ -123,14 +123,15 @@ Keychain, and the two stores do not see each other (observed on Claude Code
 
 | Session the login runs in | Login stored in | Visible to launches from |
 |---|---|---|
-| A terminal in the logged-in desktop session | the home's Keychain item `Claude Code-credentials-<hash>` | desktop sessions only |
-| ssh, or a background session where `security show-keychain-info` exits 36 (Keychain not available) | `<home>/.credentials.json`, mode 0600 | any session of that user |
+| A session that can use the login Keychain: the desktop session and everything started from it, including tmux servers and daemons it launched | the home's Keychain item `Claude Code-credentials-<hash>` | sessions that can use the Keychain |
+| A session that cannot: ssh, and anything started from an ssh session; `security show-keychain-info` exits 36 there | `<home>/.credentials.json`, mode 0600 | any session of that user |
 | An OS user with no login Keychain | nothing: the login fails with "Couldn't save your login" | none |
 
 A home logged in from a desktop terminal reports "Not logged in" to a launch
-from ssh or a background service, and the other way round. Spawned agents
-usually run in background sessions, so log their homes in from ssh or from the
-same background session. An OS user without a login Keychain cannot log in
+from an ssh session, and the other way round. A daemon keeps the Keychain
+access of the session that started it, so log a home in from the same kind of
+session as the launcher that will use it; `security show-keychain-info` tells
+the two apart. An OS user without a login Keychain cannot log in
 this way at all; such launches need a token supplied in the environment
 (`CLAUDE_CODE_OAUTH_TOKEN`, from `claude setup-token`), which writes nothing
 to the home or the Keychain.
