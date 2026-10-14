@@ -14,6 +14,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/pathboundary"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -70,6 +71,22 @@ func (m *identityMigration) publish(op *operation) error {
 	}
 	if err := op.engine.Commit(op.lock, plan.TransactionID); err != nil {
 		return fmt.Errorf("publish profile identity migration: %w", err)
+	}
+	// Match ordinary profile-record publication: a copied entry inherits its
+	// live parent's DACL on Windows, regardless of its Unix permission bits.
+	for _, path := range paths {
+		if m.targets[path] == "" {
+			continue
+		}
+		info, err := os.Lstat(path)
+		if err != nil {
+			return err
+		}
+		if info.Mode().IsRegular() {
+			if err := privatedir.ProtectFile(path); err != nil {
+				return fmt.Errorf("protect migrated profile record %s: %w", path, err)
+			}
+		}
 	}
 	return nil
 }

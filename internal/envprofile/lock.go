@@ -35,6 +35,12 @@ type operation struct {
 // stage (see the switch.go package doc for why); they stay direct writes
 // under the held lock.
 func beginOperation(home string, options ...transaction.Option) (*operation, error) {
+	return beginOperationValidated(home, nil, options...)
+}
+
+// beginOperationValidated checks read-only inputs under the lock before journal
+// recovery can write. Other operations retain the ordinary recovery path.
+func beginOperationValidated(home string, validate func() error, options ...transaction.Option) (*operation, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
 	defer cancel()
 	manager, err := managerlock.New(home)
@@ -44,6 +50,12 @@ func beginOperation(home string, options ...transaction.Option) (*operation, err
 	lock, err := manager.AcquireHomeOnly(ctx, false)
 	if err != nil {
 		return nil, fmt.Errorf("%s: acquire the manager-home mutation lock: %v", DiagLockUnavailable, err)
+	}
+	if validate != nil {
+		if err := validate(); err != nil {
+			_ = lock.Close()
+			return nil, err
+		}
 	}
 	engine, err := transaction.New(home, options...)
 	if err != nil {

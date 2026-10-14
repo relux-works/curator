@@ -200,13 +200,15 @@ curator profile use <name> [--env <env-id>]  # linked switch with backups and ma
 curator profile update [<name>|--all]  # re-resolve; blocking findings keep the old lock
 curator profile remove <name> [--purge]  # refuse while current in any scope
 curator profile sync    # re-materialize current profiles across adapters
-curator env resolve <env-id> [--profile <name>] [--repair] [--format json|env|shell]
+curator env resolve <env-id> [--profile <name>] [--repair [--preserve-lock] [--dry-run]] [--takeover] [--format json|env|shell]
 curator env status [--check] [--json]  # profile x environment x surface matrix
 curator env unmanage [--restore-backups] [--env <env-id>]
 curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
 # <env-id> accepts claude and codex as aliases of claude_code and codex_cli;
 # outputs, markers, fragments, and config keep the canonical id.
 ```
+
+`--preserve-lock` requires `--repair`. It refuses before locking or writing when repair would change the lock hash, including v1-to-v2 identity migration. Rerun without `--preserve-lock` to migrate explicitly. Otherwise repair preserves the lock bytes; a changed lock detected after acquisition refuses with `environment_repair_failed`. Current homes still resolve without a repair lock.
 
 </details>
 
@@ -300,7 +302,7 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
-Use `go build ./...` to compile and `go vet ./...` for static validation. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate leaves the working tree and index unchanged. Go tests use temporary homes.
+Use `go build ./...` to compile and `go vet ./...` for static validation. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate leaves the working tree and index unchanged. Go tests use temporary homes. Run `go test ./internal/envprofile/... ./cmd/curator/...` for focused environment validation. The preserve-lock vector family is pinned in `internal/envprofile/testdata/environments-repair-preserve-lock.json`; `CURATOR_PRESERVE_LOCK_VECTORS=/path/to/vectors.json go test ./internal/envprofile -run TestRepairPreserveLockVectors` runs its upstream counterpart.
 
 Managed Muse homes materialize monolithic root context at `config/muse/AGENTS.md`; `referenced` is refused. A profile without a context declaration writes no root file. Curator resolves the environment fragment; its external Muse `exec` consumer must add `--no-foreign-personal-context` exactly when the root target is materialized (environments §10.2). The v3 fragment has no argv member. `env status` records the remaining discovery, `serve`, and workspace-precedence bounds.
 

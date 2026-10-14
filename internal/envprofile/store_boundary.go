@@ -283,7 +283,7 @@ func rebuildUntrustedStoreEntry(req *ResolveRequest, expectedLockHash string, fa
 	if member.Commit == "" {
 		return fmt.Errorf("%s: %w; this state pin has no revalidatable Git snapshot", DiagRepairFailed, failure)
 	}
-	op, err := beginOperation(req.Home, req.transactionOptions...)
+	op, err := req.beginRepairOperation()
 	if err != nil {
 		return fmt.Errorf("%s: %v", DiagRepairFailed, err)
 	}

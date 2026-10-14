@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envprofile"
+	"github.com/relux-works/curator/internal/hashing"
 )
 
 // These tests drive the production run() entry point for the env rows and
@@ -736,5 +738,113 @@ func TestEnvStatusEffectivePassableList(t *testing.T) {
 	}
 	if !strings.Contains(stdout, `s4_profile: s4-warn, passable_env_names: ["A_B"]`) {
 		t.Fatalf("status postures no effective list:\n%s", stdout)
+	}
+}
+
+// Production run() must reject the grammar before even resolving a missing profile.
+func TestEnvResolvePreserveLockRequiresRepair(t *testing.T) {
+	source, _ := profileHome(t)
+	code, stdout, stderr := runProfile(t, source, "env", "resolve", "pi", "--profile", "missing", "--preserve-lock")
+	if code != exitUsage || stdout != "" || !strings.HasSuffix(stderr, "curator: env resolve --preserve-lock requires --repair\n") {
+		t.Fatalf("usage = %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	if _, err := os.Stat(filepath.Join(source.cfg.Home(), "state", "locks")); !os.IsNotExist(err) {
+		t.Fatalf("usage acquired lock: %v", err)
+	}
+}
+
+func TestEnvResolvePreserveLockRepairBindsUnchangedLock(t *testing.T) {
+	source, _ := profileHome(t)
+	writeNativeCredentials(t)
+	pkg := t.TempDir()
+	writeContextPackage(t, pkg, "sample", "1.0.0", "hello\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+		t.Fatal(stderr)
+	}
+	path := filepath.Join(envprofile.ProfileDir(source.cfg.Home(), "sample"), "lock.json")
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair", "--preserve-lock")
+	if code != exitOK || stdout == "" {
+		t.Fatalf("repair = %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("CLI preserve repair changed lock bytes")
+	}
+}
+
+func TestEnvResolvePreserveLockRefusesCurrentV1AndPlainRepairMigrates(t *testing.T) {
+	prior := hashing.EnableV2Writers
+	hashing.EnableV2Writers = false
+	t.Cleanup(func() { hashing.EnableV2Writers = prior })
+	source, _ := profileHome(t)
+	// Keep optional provider discovery and version probes inside this fixture.
+	bin := statusProviderPath(t, "")
+	goRoot, err := exec.Command("go", "env", "GOROOT").Output()
+	if err != nil {
+		t.Fatalf("locate fixture Go toolchain: %v", err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+filepath.Join(strings.TrimSpace(string(goRoot)), "bin"))
+	writeNativeCredentials(t)
+	prepareNativeMuse(t)
+	pkg := t.TempDir()
+	writeContextPackage(t, pkg, "sample", "1.0.0", "hello\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+		t.Fatal(stderr)
+	}
+	if code, _, stderr := runProfile(t, source, "env", "resolve", "pi", "--repair"); code != exitOK {
+		t.Fatal(stderr)
+	}
+	provisionRegisteredEnvironments(t, source, "sample", "default")
+	path := filepath.Join(envprofile.ProfileDir(source.cfg.Home(), "sample"), "lock.json")
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hashing.EnableV2Writers = true
+	code, stdout, stderr := runProfile(t, source, "env", "resolve", "pi", "--repair", "--preserve-lock")
+	command := "curator env resolve pi --profile sample --repair"
+	if code != exitFail || stdout != "" || !strings.Contains(stderr, envprofile.DiagRepairNeedsLockMigration) || !strings.HasSuffix(stderr, command+"\n") {
+		t.Fatalf("refusal = %d, %q, %q", code, stdout, stderr)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil || string(before) != string(after) {
+		t.Fatal("refusal changed lock")
+	}
+	code, stdout, _ = runProfile(t, source, "env", "status", "--check", "--json")
+	// Every required home is current, so v1 framing alone must not fail --check.
+	var status envprofile.Status
+	if err := json.Unmarshal([]byte(stdout), &status); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, row := range status.Homes {
+		if row.Profile == "sample" && row.Environment == "pi" {
+			found = true
+			if !row.Current {
+				t.Fatalf("v1 pi currency unexpectedly stale: %v", row.Findings)
+			}
+		}
+	}
+	if code != exitOK || !found {
+		t.Fatalf("v1 status check = %d, pi present = %v", code, found)
+	}
+	after, err = os.ReadFile(path)
+	if err != nil || string(before) != string(after) {
+		t.Fatal("status changed lock")
+	}
+	code, stdout, stderr = runProfile(t, source, "env", "resolve", "pi", "--repair")
+	if code != exitOK || stdout == "" {
+		t.Fatalf("plain migration = %d, %q, %q", code, stdout, stderr)
+	}
+	after, err = os.ReadFile(path)
+	if err != nil || string(before) == string(after) {
+		t.Fatal("plain repair did not migrate lock")
 	}
 }

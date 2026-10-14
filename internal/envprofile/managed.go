@@ -46,12 +46,13 @@ import (
 // Diagnostics for managed homes and resolution (environments §7.7, §8.5,
 // §9.7, §10.4).
 const (
-	DiagHomeStale       = "environment_home_stale"
-	DiagRepairFailed    = "environment_repair_failed"
-	DiagForeignManager  = "environment_foreign_manager_detected"
-	DiagForeignSuspect  = "environment_foreign_manager_suspected"
-	DiagProfileUnknown  = "profile_unknown"
-	DiagReservedCommand = "environment_reserved_command_name"
+	DiagHomeStale                = "environment_home_stale"
+	DiagRepairNeedsLockMigration = "environment_repair_needs_lock_migration"
+	DiagRepairFailed             = "environment_repair_failed"
+	DiagForeignManager           = "environment_foreign_manager_detected"
+	DiagForeignSuspect           = "environment_foreign_manager_suspected"
+	DiagProfileUnknown           = "profile_unknown"
+	DiagReservedCommand          = "environment_reserved_command_name"
 )
 
 // EnvRootName is the manager-owned environments root below the manager
@@ -85,6 +86,8 @@ type ResolveRequest struct {
 	LaunchDir string
 	Machine   envregistry.MachineConfig
 	Repair    bool
+	// PreserveLock refuses repair that changes the effective profile pin.
+	PreserveLock bool
 	// DryRun reports store rebuilds that a repair would perform without
 	// publishing them. It is meaningful only together with Repair.
 	DryRun bool
@@ -117,6 +120,9 @@ type ResolveRequest struct {
 	readRegularFile      func(string) (stateread.File, error)
 	boundaryOwnerLookup  pathboundary.OwnerLookup
 	storeRepairAttempted bool
+	preserveLockHash     string
+	// beforeRepairLock is a race-injection seam; production leaves it nil.
+	beforeRepairLock func()
 }
 
 // ResolveResult is the outcome: exactly one of Document and StaleErr is
@@ -2562,6 +2568,9 @@ func currentProfileFor(home, envID, named string) (string, error) {
 // reasons); under repair the home is provisioned or repaired from the
 // store under the mutation lock and the fragment is emitted.
 func Resolve(req ResolveRequest) (*ResolveResult, error) {
+	if req.PreserveLock && !req.Repair {
+		return nil, fmt.Errorf("usage: env resolve --preserve-lock requires --repair")
+	}
 	policy := req.Policy
 	policy.PassableEnvNames = req.Machine.PassableEnvNames
 	policy.PassableEnvNamesSet = req.Machine.PassableEnvNamesSet
@@ -2591,6 +2600,16 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 	source, lock, hash, err := loadResolveInputsWithOwner(req.Home, profile, req.readRegularFile, req.boundaryOwnerLookup)
 	if err != nil {
 		return nil, err
+	}
+	if req.PreserveLock {
+		if req.preserveLockHash == "" {
+			req.preserveLockHash = hash
+		} else if hash != req.preserveLockHash {
+			return nil, fmt.Errorf("%s: profile lock changed during preserve-lock repair", DiagRepairFailed)
+		}
+		if repairWouldChangeLockHash(lock) {
+			return nil, fmt.Errorf("%s: repair would change the lock hash; rerun without --preserve-lock: curator env resolve %s --profile %s --repair", DiagRepairNeedsLockMigration, req.EnvID, profile)
+		}
 	}
 	if !roots.store {
 		return nil, boundaryDiagnostic("profile store root", "boundary", fmt.Errorf("root %s is absent", contextstore.Root(req.Home)))
@@ -2650,7 +2669,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 		}
 		return nil, failure
 	}
-	if req.Repair && !req.DryRun && hashing.WriteVersion() == hashing.VersionV2 && lock.ContentHashVersion() == hashing.VersionV1 {
+	if req.Repair && !req.DryRun && repairWouldChangeLockHash(lock) {
 		return repairUnderLock(&req, adapter, source)
 	}
 	verdict := verifyHome(&req, adapter, source, lock, hash)
@@ -2680,6 +2699,42 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 	return repairUnderLock(&req, adapter, source)
 }
 
+// repairWouldChangeLockHash is the preflight predicate for every lock-changing
+// repair step. Identity migration is currently the only such step.
+func repairWouldChangeLockHash(lock *contextlock.Lock) bool {
+	return hashing.WriteVersion() == hashing.VersionV2 && lock.ContentHashVersion() == hashing.VersionV1
+}
+
+func (req *ResolveRequest) validatePreservedLock() error {
+	if !req.PreserveLock {
+		return nil
+	}
+	_, _, hash, err := loadResolveInputsWithOwner(req.Home, req.Profile, req.readRegularFile, req.boundaryOwnerLookup)
+	if err != nil {
+		return fmt.Errorf("%s: revalidate preserved lock: %w", DiagRepairFailed, err)
+	}
+	if hash != req.preserveLockHash {
+		return fmt.Errorf("%s: profile lock changed before repair-lock acquisition", DiagRepairFailed)
+	}
+	return nil
+}
+
+func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
+	if req.beforeRepairLock != nil {
+		req.beforeRepairLock()
+	}
+	op, err := beginOperationValidated(req.Home, req.validatePreservedLock, req.transactionOptions...)
+	if err != nil {
+		return nil, err
+	}
+	// Recovery may itself have published a replacement lock.
+	if err := req.validatePreservedLock(); err != nil {
+		_ = op.close()
+		return nil, err
+	}
+	return op, nil
+}
+
 // repairUnderLock takes the mutation lock with the bounded wait and a
 // distinct lock-acquisition diagnostic, provisions or repairs the home
 // from the store entries the lock names as one transaction, then emits
@@ -2687,7 +2742,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 // repair restores managed bytes from the store and never adopts candidate
 // bytes found in the home.
 func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source Source) (*ResolveResult, error) {
-	op, err := beginOperation(req.Home, req.transactionOptions...)
+	op, err := req.beginRepairOperation()
 	if err != nil {
 		return nil, err
 	}
@@ -2699,7 +2754,7 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	if err != nil {
 		return nil, err
 	}
-	if hashing.WriteVersion() == hashing.VersionV2 && lock.ContentHashVersion() == hashing.VersionV1 {
+	if repairWouldChangeLockHash(lock) {
 		migration, err := prepareIdentityMigration(req, []string{req.Profile}, nil)
 		if err != nil {
 			return nil, err
