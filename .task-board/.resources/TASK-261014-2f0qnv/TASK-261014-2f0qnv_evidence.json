@@ -1,0 +1,518 @@
+{
+  "candidate_identity": {
+    "base": "84cf54b94670ae9881f91b1c147feb4b75afddee",
+    "snapshot": "6706a888fdcc4777fa92b8a809cab0554940f2ee",
+    "files": {
+      "README.md": "d3d4fc221a79df2ef7c7d961f9323fc98c1ac6acd5e2123d36547012da9156eb",
+      "cmd/curator/env.go": "c3b1288284d66e4296997161840ad4dc31284cd8d764643f0e48d34c0a5f0ecd",
+      "cmd/curator/env_test.go": "2f5f8f64522d099555de8115be33503895afe72b1b4041a101ab529fd7994d2d",
+      "cmd/curator/firstrun_ux_test.go": "fd25763826ba283677e6e11f99f4d9e69fe48013655cdbe642d6a8bbb36a4aac",
+      "internal/envprofile/identity_migration.go": "40e360bed61b21bca6850c06755f9fca7b67ccf099ac7b59d765114746a29378",
+      "internal/envprofile/lock.go": "1e9169a77ddc73164cef1c064648d04bf9265ad8618f28a6d2dfa586d5bdae05",
+      "internal/envprofile/managed.go": "0e6d067f5e848be4ee36d181e49e66e979950ea6293de8b5b6eadef8f6c5941b",
+      "internal/envprofile/preserve_lock_test.go": "1316f8cd336d8d22b4cc8c14ef639b4b937952dbd7d841aa0ae9bf979f779b0a",
+      "internal/envprofile/store_boundary.go": "0e3815b726c7d7c5641005add28069f09a5846220c9c39fcfccbd4567021d0ca",
+      "internal/envprofile/testdata/environments-repair-preserve-lock.json": "758da5aa73accd7e1127992a621f416c37570c0b919ef44cbb7c72bd53e9a466"
+    }
+  },
+  "coverage_ratio": "10 of 10 AC/vector rows driven",
+  "mutants": [
+    {
+      "mutant": "M1-pi-migration-exemption",
+      "command": [
+        "go",
+        "test",
+        "./internal/envprofile",
+        "-run",
+        "^TestRepairPreserveLockVectors/v1-v2-",
+        "-count=1",
+        "-v"
+      ],
+      "exit_code": 1,
+      "failing_tests": [
+        "TestRepairPreserveLockVectors",
+        "TestRepairPreserveLockVectors/v1-v2-stale-preserve-lock-refused",
+        "TestRepairPreserveLockVectors/v1-v2-unprovisioned-preserve-lock-refused",
+        "TestRepairPreserveLockVectors/v1-v2-current-preserve-lock-refused"
+      ],
+      "survivor": false
+    },
+    {
+      "mutant": "M2-refusal-after-lock",
+      "command": [
+        "go",
+        "test",
+        "./internal/envprofile",
+        "-run",
+        "^TestPreserveLockMigrationRefusalPrecedesBusyLock$",
+        "-count=1",
+        "-v"
+      ],
+      "exit_code": 1,
+      "failing_tests": [
+        "TestPreserveLockMigrationRefusalPrecedesBusyLock",
+        "TestPreserveLockMigrationRefusalPrecedesBusyLock/stale",
+        "TestPreserveLockMigrationRefusalPrecedesBusyLock/unprovisioned",
+        "TestPreserveLockMigrationRefusalPrecedesBusyLock/current"
+      ],
+      "survivor": false
+    },
+    {
+      "mutant": "M3-same-version-race-exemption",
+      "command": [
+        "go",
+        "test",
+        "./internal/envprofile",
+        "-run",
+        "^TestRepairPreserveLockVectors/v2-lock-changed|^TestPreserveLockRaceRefusesBeforeJournalRecovery$",
+        "-count=1",
+        "-v"
+      ],
+      "exit_code": 1,
+      "failing_tests": [
+        "TestRepairPreserveLockVectors",
+        "TestRepairPreserveLockVectors/v2-lock-changed-before-repair-lock-refused",
+        "TestPreserveLockRaceRefusesBeforeJournalRecovery"
+      ],
+      "survivor": false
+    },
+    {
+      "mutant": "M4-named-profile-usage-exemption",
+      "command": [
+        "go",
+        "test",
+        "./cmd/curator",
+        "-run",
+        "^TestEnvResolvePreserveLockRequiresRepair$",
+        "-count=1",
+        "-v"
+      ],
+      "exit_code": 1,
+      "failing_tests": [
+        "TestEnvResolvePreserveLockRequiresRepair"
+      ],
+      "survivor": false
+    },
+    {
+      "mutant": "M5-current-preserve-lock-acquires",
+      "command": [
+        "go",
+        "test",
+        "./internal/envprofile",
+        "-run",
+        "^TestRepairPreserveLockVectors/v2-current-",
+        "-count=1",
+        "-v"
+      ],
+      "exit_code": 1,
+      "failing_tests": [
+        "TestRepairPreserveLockVectors",
+        "TestRepairPreserveLockVectors/v2-current-preserve-lock-lock-free"
+      ],
+      "survivor": false
+    },
+    {
+      "mutant": "M6-current-plain-repair-skips-migration",
+      "command": [
+        "go",
+        "test",
+        "./internal/envprofile",
+        "-run",
+        "^TestRepairPreserveLockVectors/v1-v2-plain-",
+        "-count=1",
+        "-v"
+      ],
+      "exit_code": 1,
+      "failing_tests": [
+        "TestRepairPreserveLockVectors",
+        "TestRepairPreserveLockVectors/v1-v2-plain-repair-migrates-identity"
+      ],
+      "survivor": false
+    },
+    {
+      "mutant": "M7-api-usage-profile-exemption",
+      "command": [
+        "go",
+        "test",
+        "./internal/envprofile",
+        "-run",
+        "^TestRepairPreserveLockVectors/preserve-lock-without-repair-",
+        "-count=1",
+        "-v"
+      ],
+      "exit_code": 1,
+      "failing_tests": [
+        "TestRepairPreserveLockVectors",
+        "TestRepairPreserveLockVectors/preserve-lock-without-repair-usage"
+      ],
+      "survivor": false
+    },
+    {
+      "mutant": "M8-fragment-pin-misbound-token-retained",
+      "command": [
+        "go",
+        "test",
+        "./internal/envprofile",
+        "-run",
+        "^TestRepairPreserveLockVectors/v2-stale-",
+        "-count=1",
+        "-v"
+      ],
+      "exit_code": 1,
+      "failing_tests": [
+        "TestRepairPreserveLockVectors",
+        "TestRepairPreserveLockVectors/v2-stale-preserve-lock-repairs"
+      ],
+      "survivor": false
+    },
+    {
+      "mutant": "M9-pi-validation-before-acquisition",
+      "command": [
+        "go",
+        "test",
+        "./internal/envprofile",
+        "-run",
+        "^TestPreserveLockRevalidationHoldsRepairLock$",
+        "-count=1",
+        "-v"
+      ],
+      "exit_code": 1,
+      "failing_tests": [
+        "TestPreserveLockRevalidationHoldsRepairLock"
+      ],
+      "survivor": false
+    },
+    {
+      "mutant": "M10-migrated-lock-permissions-reopened",
+      "command": [
+        "go",
+        "test",
+        "./internal/envprofile",
+        "-run",
+        "^TestPlainRepairMigrationKeepsLockPrivate$",
+        "-count=1",
+        "-v"
+      ],
+      "exit_code": 1,
+      "failing_tests": [
+        "TestPlainRepairMigrationKeepsLockPrivate"
+      ],
+      "survivor": false
+    }
+  ],
+  "hosted_gate": {
+    "run": 38544107344,
+    "head": "6706a888fdcc4777fa92b8a809cab0554940f2ee",
+    "url": "https://github.com/relux-works/curator/actions/runs/38544107344",
+    "status": "completed",
+    "conclusion": "success",
+    "command_exit": 0,
+    "successful_jobs": [
+      "Gate self-test (windows-latest)",
+      "Lint",
+      "Go 1.25.5 driver (macos-latest)",
+      "Race (macos-latest)",
+      "Naming gate",
+      "Test (macos-latest)",
+      "Race (ubuntu-latest)",
+      "Go 1.26.0 driver (ubuntu-latest)",
+      "Interop conformance gate",
+      "Go 1.27.1 driver (ubuntu-latest)",
+      "Gate self-test (macos-latest)",
+      "Test (windows-latest)",
+      "Test (ubuntu-latest)",
+      "Gate self-test (ubuntu-latest)",
+      "Go 1.26.0 driver (windows-latest)",
+      "Go 1.25.5 driver (windows-latest)",
+      "Go 1.25.5 driver (ubuntu-latest)",
+      "Go 1.26.0 driver (macos-latest)",
+      "Go 1.27.1 driver (macos-latest)",
+      "Go 1.27.1 driver (windows-latest)"
+    ],
+    "configured_skipped_jobs": 2
+  },
+  "ubuntu": {
+    "run": 38544107344,
+    "candidate": "6706a888fdcc4777fa92b8a809cab0554940f2ee",
+    "artifact": "test-evidence-ubuntu-latest",
+    "vectors_passed": [
+      "TestRepairPreserveLockVectors/v1-v2-stale-preserve-lock-refused",
+      "TestRepairPreserveLockVectors/v1-v2-unprovisioned-preserve-lock-refused",
+      "TestRepairPreserveLockVectors/v1-v2-current-preserve-lock-refused",
+      "TestRepairPreserveLockVectors/v2-stale-preserve-lock-repairs",
+      "TestRepairPreserveLockVectors/v2-unprovisioned-preserve-lock-repairs",
+      "TestRepairPreserveLockVectors/preserve-lock-without-repair-usage",
+      "TestRepairPreserveLockVectors/v2-current-preserve-lock-lock-free",
+      "TestRepairPreserveLockVectors/v1-v2-plain-repair-migrates-identity",
+      "TestRepairPreserveLockVectors/v2-lock-changed-before-repair-lock-refused",
+      "TestRepairPreserveLockVectors/v1-current-status-read-only"
+    ],
+    "additional_tests_passed": [
+      "TestPreserveLockRaceRefusesBeforeJournalRecovery",
+      "TestPreserveLockRefusesBeforeStoreRebuild",
+      "TestPreserveLockMigrationRefusalPrecedesBusyLock",
+      "TestEnvResolvePreserveLockRequiresRepair",
+      "TestEnvResolvePreserveLockRepairBindsUnchangedLock",
+      "TestEnvResolvePreserveLockRefusesCurrentV1AndPlainRepairMigrates",
+      "TestGlobalInitEnvResolveSubcommandHelpPreservesFlagSet",
+      "TestEnvStatusRegistryBoundaryPostureAndCheck",
+      "TestPreserveLockRevalidationHoldsRepairLock",
+      "TestPlainRepairMigrationKeepsLockPrivate"
+    ]
+  },
+  "windows": {
+    "run": 38544107344,
+    "candidate": "6706a888fdcc4777fa92b8a809cab0554940f2ee",
+    "artifact": "test-evidence-windows-latest",
+    "vectors_passed": [
+      "TestRepairPreserveLockVectors/v1-v2-stale-preserve-lock-refused",
+      "TestRepairPreserveLockVectors/v1-v2-unprovisioned-preserve-lock-refused",
+      "TestRepairPreserveLockVectors/v1-v2-current-preserve-lock-refused",
+      "TestRepairPreserveLockVectors/v2-stale-preserve-lock-repairs",
+      "TestRepairPreserveLockVectors/v2-unprovisioned-preserve-lock-repairs",
+      "TestRepairPreserveLockVectors/preserve-lock-without-repair-usage",
+      "TestRepairPreserveLockVectors/v2-current-preserve-lock-lock-free",
+      "TestRepairPreserveLockVectors/v1-v2-plain-repair-migrates-identity",
+      "TestRepairPreserveLockVectors/v2-lock-changed-before-repair-lock-refused",
+      "TestRepairPreserveLockVectors/v1-current-status-read-only"
+    ],
+    "additional_tests_passed": [
+      "TestPreserveLockRaceRefusesBeforeJournalRecovery",
+      "TestPreserveLockRefusesBeforeStoreRebuild",
+      "TestPreserveLockMigrationRefusalPrecedesBusyLock",
+      "TestEnvResolvePreserveLockRequiresRepair",
+      "TestEnvResolvePreserveLockRepairBindsUnchangedLock",
+      "TestEnvResolvePreserveLockRefusesCurrentV1AndPlainRepairMigrates",
+      "TestGlobalInitEnvResolveSubcommandHelpPreservesFlagSet",
+      "TestEnvStatusRegistryBoundaryPostureAndCheck",
+      "TestPreserveLockRevalidationHoldsRepairLock",
+      "TestPlainRepairMigrationKeepsLockPrivate"
+    ]
+  },
+  "local_commands": {
+    "go build ./...": 0,
+    "go vet ./...": 0,
+    "focused environment suite": 0,
+    "focused CLI suite": 0,
+    "git diff --check": 0,
+    "gofmt output": "empty"
+  },
+  "recovery": {
+    "source_unchanged": true,
+    "candidate_tree": "265d93f4093227dfa6e1a05ea49c72dbb5a3551e",
+    "previous_handoff_gate": {
+      "run": 38551230578,
+      "exit_code": 1,
+      "failed_test": "TestCompiledProjectRepairsCorruptCompiledState/install",
+      "cause": "unknown"
+    },
+    "local_exit_codes": {
+      "build": 0,
+      "vet": 0,
+      "env_vectors": 0,
+      "compiled_inherited_path": 1,
+      "compiled_controlled_path": 0,
+      "cli_controlled_path": 0,
+      "diff_check": 0,
+      "gofmt": 0
+    },
+    "prior_mutants_reused": 10,
+    "trunk_distance": 6
+  },
+  "second_successor": {
+    "source_unchanged": true,
+    "candidate_tree": "265d93f4093227dfa6e1a05ea49c72dbb5a3551e",
+    "rev2_hosted_failure": {
+      "run": 38557397441,
+      "exit_code": 1,
+      "failed_test": "internal/buildrepo.TestResolvedTransportTotalDeadlineBoundsSlowFetch",
+      "elapsed_seconds": 15.7576585,
+      "bound_seconds": 7.5,
+      "external_cause_established": false
+    },
+    "personally_run": {
+      "go build ./...": 0,
+      "go vet ./...": 0,
+      "focused preserve-lock environment tests": 0,
+      "focused preserve-lock CLI and help tests": 0,
+      "git diff --check": 0,
+      "gofmt -l changed Go files": 0
+    },
+    "log_sha256": {
+      "successor-build-01.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "successor-vet-01.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "successor-env-01.log": "997842325ac19269425be38cf5104dd747e9882fdbd0a66cc4253027310f3621",
+      "successor-cli-01.log": "1defc548c7fb507c877387b71d102443aa04d877ca2a74b2309adf35dbd538a1",
+      "successor-diff-check-02.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "successor-gofmt-02.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "prior_mutants_reused": 10,
+    "gate": {
+      "run": 38563918010,
+      "head": "5dc7bdfca400f1ca3ebf98cc1ef3f6e1a64ce56e",
+      "tree": "265d93f4093227dfa6e1a05ea49c72dbb5a3551e",
+      "url": "https://github.com/relux-works/curator/actions/runs/38563918010",
+      "status": "completed",
+      "conclusion": "success",
+      "command": "sh scripts/remote-gate.sh",
+      "command_exit": 0,
+      "successful_jobs": [
+        "Race (ubuntu-latest)",
+        "Gate self-test (windows-latest)",
+        "Lint",
+        "Test (windows-latest)",
+        "Race (macos-latest)",
+        "Test (macos-latest)",
+        "Interop conformance gate",
+        "Go 1.27.1 driver (ubuntu-latest)",
+        "Gate self-test (ubuntu-latest)",
+        "Gate self-test (macos-latest)",
+        "Go 1.25.5 driver (windows-latest)",
+        "Test (ubuntu-latest)",
+        "Naming gate",
+        "Go 1.26.0 driver (windows-latest)",
+        "Go 1.27.1 driver (windows-latest)",
+        "Go 1.25.5 driver (ubuntu-latest)",
+        "Go 1.25.5 driver (macos-latest)",
+        "Go 1.27.1 driver (macos-latest)",
+        "Go 1.26.0 driver (ubuntu-latest)",
+        "Go 1.26.0 driver (macos-latest)"
+      ],
+      "configured_skipped_jobs": 2
+    },
+    "ubuntu": {
+      "run": 38563918010,
+      "snapshot": "5dc7bdfca400f1ca3ebf98cc1ef3f6e1a64ce56e",
+      "artifact": "test-evidence-ubuntu-latest",
+      "vectors_passed": [
+        "TestRepairPreserveLockVectors/v1-v2-stale-preserve-lock-refused",
+        "TestRepairPreserveLockVectors/v1-v2-unprovisioned-preserve-lock-refused",
+        "TestRepairPreserveLockVectors/v1-v2-current-preserve-lock-refused",
+        "TestRepairPreserveLockVectors/v2-stale-preserve-lock-repairs",
+        "TestRepairPreserveLockVectors/v2-unprovisioned-preserve-lock-repairs",
+        "TestRepairPreserveLockVectors/preserve-lock-without-repair-usage",
+        "TestRepairPreserveLockVectors/v2-current-preserve-lock-lock-free",
+        "TestRepairPreserveLockVectors/v1-v2-plain-repair-migrates-identity",
+        "TestRepairPreserveLockVectors/v2-lock-changed-before-repair-lock-refused",
+        "TestRepairPreserveLockVectors/v1-current-status-read-only"
+      ],
+      "additional_tests_passed": [
+        "TestPreserveLockRaceRefusesBeforeJournalRecovery",
+        "TestPreserveLockRefusesBeforeStoreRebuild",
+        "TestPreserveLockMigrationRefusalPrecedesBusyLock",
+        "TestPreserveLockRevalidationHoldsRepairLock",
+        "TestPlainRepairMigrationKeepsLockPrivate",
+        "TestEnvResolvePreserveLockRequiresRepair",
+        "TestEnvResolvePreserveLockRepairBindsUnchangedLock",
+        "TestEnvResolvePreserveLockRefusesCurrentV1AndPlainRepairMigrates",
+        "TestGlobalInitEnvResolveSubcommandHelpPreservesFlagSet",
+        "TestEnvStatusRegistryBoundaryPostureAndCheck"
+      ],
+      "failing_cases": []
+    },
+    "validation_outcome": {
+      "name": "TASK-261014-2f0qnv_validation.log",
+      "sha256": "4566f83644061baff2cfaa569e6dd58c4a842e54b6b9105f780891b02ee25e6e"
+    },
+    "spec_identity": {
+      "assigned_revision": "6648e18",
+      "protocol_environments_sha256": "05801f34851986293133766ff975c8678cb7546c5e920699b18bf13150a0c294",
+      "profiles_manager_sha256": "d0e8d8590045ebc550ad84bf054f8a0d19dbb53752fc565f094ae0075ef01dcd",
+      "repair_sections_match_inspected_local_prose": true,
+      "unrelated_local_prose_differences": true,
+      "spec_vector_disagreement": false
+    },
+    "windows": {
+      "run": 38563918010,
+      "artifact": "test-evidence-windows-latest",
+      "vectors_passed": [
+        "TestRepairPreserveLockVectors/preserve-lock-without-repair-usage",
+        "TestRepairPreserveLockVectors/v1-current-status-read-only",
+        "TestRepairPreserveLockVectors/v1-v2-current-preserve-lock-refused",
+        "TestRepairPreserveLockVectors/v1-v2-plain-repair-migrates-identity",
+        "TestRepairPreserveLockVectors/v1-v2-stale-preserve-lock-refused",
+        "TestRepairPreserveLockVectors/v1-v2-unprovisioned-preserve-lock-refused",
+        "TestRepairPreserveLockVectors/v2-current-preserve-lock-lock-free",
+        "TestRepairPreserveLockVectors/v2-lock-changed-before-repair-lock-refused",
+        "TestRepairPreserveLockVectors/v2-stale-preserve-lock-repairs",
+        "TestRepairPreserveLockVectors/v2-unprovisioned-preserve-lock-repairs"
+      ],
+      "additional_tests_passed": [
+        "TestPreserveLockRaceRefusesBeforeJournalRecovery",
+        "TestPreserveLockRefusesBeforeStoreRebuild",
+        "TestPreserveLockMigrationRefusalPrecedesBusyLock",
+        "TestPreserveLockRevalidationHoldsRepairLock",
+        "TestPlainRepairMigrationKeepsLockPrivate",
+        "TestEnvResolvePreserveLockRequiresRepair",
+        "TestEnvResolvePreserveLockRepairBindsUnchangedLock",
+        "TestEnvResolvePreserveLockRefusesCurrentV1AndPlainRepairMigrates",
+        "TestGlobalInitEnvResolveSubcommandHelpPreservesFlagSet",
+        "TestEnvStatusRegistryBoundaryPostureAndCheck"
+      ]
+    },
+    "macos_race": {
+      "run": 38563918010,
+      "artifact": "race-evidence-macos-latest",
+      "vectors_passed": [
+        "TestRepairPreserveLockVectors/preserve-lock-without-repair-usage",
+        "TestRepairPreserveLockVectors/v1-current-status-read-only",
+        "TestRepairPreserveLockVectors/v1-v2-current-preserve-lock-refused",
+        "TestRepairPreserveLockVectors/v1-v2-plain-repair-migrates-identity",
+        "TestRepairPreserveLockVectors/v1-v2-stale-preserve-lock-refused",
+        "TestRepairPreserveLockVectors/v1-v2-unprovisioned-preserve-lock-refused",
+        "TestRepairPreserveLockVectors/v2-current-preserve-lock-lock-free",
+        "TestRepairPreserveLockVectors/v2-lock-changed-before-repair-lock-refused",
+        "TestRepairPreserveLockVectors/v2-stale-preserve-lock-repairs",
+        "TestRepairPreserveLockVectors/v2-unprovisioned-preserve-lock-repairs"
+      ],
+      "additional_tests_passed": [
+        "TestPreserveLockRaceRefusesBeforeJournalRecovery",
+        "TestPreserveLockRefusesBeforeStoreRebuild",
+        "TestPreserveLockMigrationRefusalPrecedesBusyLock",
+        "TestPreserveLockRevalidationHoldsRepairLock",
+        "TestPlainRepairMigrationKeepsLockPrivate",
+        "TestEnvResolvePreserveLockRequiresRepair",
+        "TestEnvResolvePreserveLockRepairBindsUnchangedLock",
+        "TestEnvResolvePreserveLockRefusesCurrentV1AndPlainRepairMigrates",
+        "TestGlobalInitEnvResolveSubcommandHelpPreservesFlagSet",
+        "TestEnvStatusRegistryBoundaryPostureAndCheck"
+      ],
+      "prior_failed_deadline_test_passed": true
+    },
+    "remote_gate_log_sha256": "6c79e65c18a7aac7d63489561460d611d687ecc10fa753ac3c97ae8d9d2b26c8",
+    "source_identity_verified_at_handoff": true
+  },
+  "latest_hosted_gate": {
+    "run": 38563918010,
+    "head": "5dc7bdfca400f1ca3ebf98cc1ef3f6e1a64ce56e",
+    "tree": "265d93f4093227dfa6e1a05ea49c72dbb5a3551e",
+    "url": "https://github.com/relux-works/curator/actions/runs/38563918010",
+    "status": "completed",
+    "conclusion": "success",
+    "command": "sh scripts/remote-gate.sh",
+    "command_exit": 0,
+    "successful_jobs": [
+      "Race (ubuntu-latest)",
+      "Gate self-test (windows-latest)",
+      "Lint",
+      "Test (windows-latest)",
+      "Race (macos-latest)",
+      "Test (macos-latest)",
+      "Interop conformance gate",
+      "Go 1.27.1 driver (ubuntu-latest)",
+      "Gate self-test (ubuntu-latest)",
+      "Gate self-test (macos-latest)",
+      "Go 1.25.5 driver (windows-latest)",
+      "Test (ubuntu-latest)",
+      "Naming gate",
+      "Go 1.26.0 driver (windows-latest)",
+      "Go 1.27.1 driver (windows-latest)",
+      "Go 1.25.5 driver (ubuntu-latest)",
+      "Go 1.25.5 driver (macos-latest)",
+      "Go 1.27.1 driver (macos-latest)",
+      "Go 1.26.0 driver (ubuntu-latest)",
+      "Go 1.26.0 driver (macos-latest)"
+    ],
+    "configured_skipped_jobs": 2
+  }
+}

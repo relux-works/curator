@@ -1,0 +1,1621 @@
+diff --git a/README.md b/README.md
+index 96d5f23c8452ffd9d876ce84d6850243e3c41173..5f2c6e0e96bcf22dfd7ab91478bf6eac805c9a6a 100644
+--- a/README.md
++++ b/README.md
+@@ -200,7 +200,7 @@ curator profile use <name> [--env <env-id>]  # linked switch with backups and ma
+ curator profile update [<name>|--all]  # re-resolve; blocking findings keep the old lock
+ curator profile remove <name> [--purge]  # refuse while current in any scope
+ curator profile sync    # re-materialize current profiles across adapters
+-curator env resolve <env-id> [--profile <name>] [--repair] [--format json|env|shell]
++curator env resolve <env-id> [--profile <name>] [--repair [--preserve-lock] [--dry-run]] [--takeover] [--format json|env|shell]
+ curator env status [--check] [--json]  # profile x environment x surface matrix
+ curator env unmanage [--restore-backups] [--env <env-id>]
+ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
+@@ -208,6 +208,8 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
+ # outputs, markers, fragments, and config keep the canonical id.
+ ```
+ 
++`--preserve-lock` requires `--repair`. It refuses before locking or writing when repair would change the lock hash, including v1-to-v2 identity migration. Rerun without `--preserve-lock` to migrate explicitly. Otherwise repair preserves the lock bytes; a changed lock detected after acquisition refuses with `environment_repair_failed`. Current homes still resolve without a repair lock.
++
+ </details>
+ 
+ <details>
+@@ -300,7 +302,7 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run
+ 
+ ### Tools
+ 
+-Use `go build ./...` to compile and `go vet ./...` for static validation. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate leaves the working tree and index unchanged. Go tests use temporary homes.
++Use `go build ./...` to compile and `go vet ./...` for static validation. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate leaves the working tree and index unchanged. Go tests use temporary homes. Run `go test ./internal/envprofile/... ./cmd/curator/...` for focused environment validation. The preserve-lock vector family is pinned in `internal/envprofile/testdata/environments-repair-preserve-lock.json`; `CURATOR_PRESERVE_LOCK_VECTORS=/path/to/vectors.json go test ./internal/envprofile -run TestRepairPreserveLockVectors` runs its upstream counterpart.
+ 
+ Managed Muse homes materialize monolithic root context at `config/muse/AGENTS.md`; `referenced` is refused. A profile without a context declaration writes no root file. Curator resolves the environment fragment; its external Muse `exec` consumer must add `--no-foreign-personal-context` exactly when the root target is materialized (environments §10.2). The v3 fragment has no argv member. `env status` records the remaining discovery, `serve`, and workspace-precedence bounds.
+ 
+diff --git a/cmd/curator/env.go b/cmd/curator/env.go
+index e9c87a5594c24072df53bad8005b01c532291ea2..ebd2ae178d865ae22420a67f357ed1f3cee24f9b 100644
+--- a/cmd/curator/env.go
++++ b/cmd/curator/env.go
+@@ -125,12 +125,13 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
+ 	flags := c.newFlagSet("env resolve")
+ 	profile := flags.String("profile", "", "profile name (default: the current profile)")
+ 	repair := flags.Bool("repair", false, "provision or repair the managed home under the mutation lock")
++	preserveLock := flags.Bool("preserve-lock", false, "refuse repair that would change the lock hash (requires --repair)")
+ 	dryRun := flags.Bool("dry-run", false, "report store rebuilds without modifying state (requires --repair)")
+ 	takeover := flags.Bool("takeover", false, "take over the unmanaged files the repair would write (only with --repair)")
+ 	format := flags.String("format", "json", "fragment format: json | env | shell")
+ 	positional, err := parseInterspersed(flags, args)
+ 	if err != nil || len(positional) != 1 {
+-		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve <env-id> [--profile <name>] [--repair [--dry-run]] [--takeover] [--format json|env|shell]")
++		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve <env-id> [--profile <name>] [--repair [--preserve-lock] [--dry-run]] [--takeover] [--format json|env|shell]")
+ 		_, _ = fmt.Fprintln(c.stderr, envAliasUsage)
+ 		return exitUsage
+ 	}
+@@ -140,6 +141,10 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve --takeover applies only with --repair")
+ 		return exitUsage
+ 	}
++	if *preserveLock && !*repair {
++		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve --preserve-lock requires --repair")
++		return exitUsage
++	}
+ 	if *dryRun && !*repair {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve --dry-run requires --repair")
+ 		return exitUsage
+@@ -156,15 +161,16 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
+ 	policy := envprofile.PolicyFromConfig(cfg)
+ 	policy.Takeover = *takeover
+ 	result, err := envprofile.Resolve(envprofile.ResolveRequest{
+-		Home:      cfg.Home(),
+-		Profile:   *profile,
+-		EnvID:     envregistry.NormalizeEnvID(positional[0]),
+-		LaunchDir: launchDir,
+-		Machine:   machineFromConfig(cfg),
+-		Repair:    *repair,
+-		DryRun:    *dryRun,
+-		Format:    *format,
+-		Policy:    policy,
++		Home:         cfg.Home(),
++		Profile:      *profile,
++		EnvID:        envregistry.NormalizeEnvID(positional[0]),
++		LaunchDir:    launchDir,
++		Machine:      machineFromConfig(cfg),
++		Repair:       *repair,
++		PreserveLock: *preserveLock,
++		DryRun:       *dryRun,
++		Format:       *format,
++		Policy:       policy,
+ 	})
+ 	if result != nil {
+ 		for _, warning := range result.Warnings {
+diff --git a/cmd/curator/env_test.go b/cmd/curator/env_test.go
+index 25739c06c7baf674477bebd61d13faf6a40e73ef..b67c3595fc718ffc2f0daf983852e3bcb39da145 100644
+--- a/cmd/curator/env_test.go
++++ b/cmd/curator/env_test.go
+@@ -5,6 +5,7 @@ import (
+ 	"encoding/hex"
+ 	"encoding/json"
+ 	"os"
++	"os/exec"
+ 	"path/filepath"
+ 	"runtime"
+ 	"strings"
+@@ -14,6 +15,7 @@ import (
+ 	"github.com/relux-works/curator/internal/contextlock"
+ 	"github.com/relux-works/curator/internal/contextstore"
+ 	"github.com/relux-works/curator/internal/envprofile"
++	"github.com/relux-works/curator/internal/hashing"
+ )
+ 
+ // These tests drive the production run() entry point for the env rows and
+@@ -738,3 +740,111 @@ func TestEnvStatusEffectivePassableList(t *testing.T) {
+ 		t.Fatalf("status postures no effective list:\n%s", stdout)
+ 	}
+ }
++
++// Production run() must reject the grammar before even resolving a missing profile.
++func TestEnvResolvePreserveLockRequiresRepair(t *testing.T) {
++	source, _ := profileHome(t)
++	code, stdout, stderr := runProfile(t, source, "env", "resolve", "pi", "--profile", "missing", "--preserve-lock")
++	if code != exitUsage || stdout != "" || !strings.HasSuffix(stderr, "curator: env resolve --preserve-lock requires --repair\n") {
++		t.Fatalf("usage = %d, stdout %q, stderr %q", code, stdout, stderr)
++	}
++	if _, err := os.Stat(filepath.Join(source.cfg.Home(), "state", "locks")); !os.IsNotExist(err) {
++		t.Fatalf("usage acquired lock: %v", err)
++	}
++}
++
++func TestEnvResolvePreserveLockRepairBindsUnchangedLock(t *testing.T) {
++	source, _ := profileHome(t)
++	writeNativeCredentials(t)
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "sample", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++		t.Fatal(stderr)
++	}
++	path := filepath.Join(envprofile.ProfileDir(source.cfg.Home(), "sample"), "lock.json")
++	before, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	code, stdout, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair", "--preserve-lock")
++	if code != exitOK || stdout == "" {
++		t.Fatalf("repair = %d, stdout %q, stderr %q", code, stdout, stderr)
++	}
++	after, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(before) != string(after) {
++		t.Fatal("CLI preserve repair changed lock bytes")
++	}
++}
++
++func TestEnvResolvePreserveLockRefusesCurrentV1AndPlainRepairMigrates(t *testing.T) {
++	prior := hashing.EnableV2Writers
++	hashing.EnableV2Writers = false
++	t.Cleanup(func() { hashing.EnableV2Writers = prior })
++	source, _ := profileHome(t)
++	// Keep optional provider discovery and version probes inside this fixture.
++	bin := statusProviderPath(t, "")
++	goRoot, err := exec.Command("go", "env", "GOROOT").Output()
++	if err != nil {
++		t.Fatalf("locate fixture Go toolchain: %v", err)
++	}
++	t.Setenv("PATH", bin+string(os.PathListSeparator)+filepath.Join(strings.TrimSpace(string(goRoot)), "bin"))
++	writeNativeCredentials(t)
++	prepareNativeMuse(t)
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "sample", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++		t.Fatal(stderr)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "pi", "--repair"); code != exitOK {
++		t.Fatal(stderr)
++	}
++	provisionRegisteredEnvironments(t, source, "sample", "default")
++	path := filepath.Join(envprofile.ProfileDir(source.cfg.Home(), "sample"), "lock.json")
++	before, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	hashing.EnableV2Writers = true
++	code, stdout, stderr := runProfile(t, source, "env", "resolve", "pi", "--repair", "--preserve-lock")
++	command := "curator env resolve pi --profile sample --repair"
++	if code != exitFail || stdout != "" || !strings.Contains(stderr, envprofile.DiagRepairNeedsLockMigration) || !strings.HasSuffix(stderr, command+"\n") {
++		t.Fatalf("refusal = %d, %q, %q", code, stdout, stderr)
++	}
++	after, err := os.ReadFile(path)
++	if err != nil || string(before) != string(after) {
++		t.Fatal("refusal changed lock")
++	}
++	code, stdout, _ = runProfile(t, source, "env", "status", "--check", "--json")
++	// Every required home is current, so v1 framing alone must not fail --check.
++	var status envprofile.Status
++	if err := json.Unmarshal([]byte(stdout), &status); err != nil {
++		t.Fatal(err)
++	}
++	found := false
++	for _, row := range status.Homes {
++		if row.Profile == "sample" && row.Environment == "pi" {
++			found = true
++			if !row.Current {
++				t.Fatalf("v1 pi currency unexpectedly stale: %v", row.Findings)
++			}
++		}
++	}
++	if code != exitOK || !found {
++		t.Fatalf("v1 status check = %d, pi present = %v", code, found)
++	}
++	after, err = os.ReadFile(path)
++	if err != nil || string(before) != string(after) {
++		t.Fatal("status changed lock")
++	}
++	code, stdout, stderr = runProfile(t, source, "env", "resolve", "pi", "--repair")
++	if code != exitOK || stdout == "" {
++		t.Fatalf("plain migration = %d, %q, %q", code, stdout, stderr)
++	}
++	after, err = os.ReadFile(path)
++	if err != nil || string(before) == string(after) {
++		t.Fatal("plain repair did not migrate lock")
++	}
++}
+diff --git a/cmd/curator/firstrun_ux_test.go b/cmd/curator/firstrun_ux_test.go
+index f86a0a02b3756aefea57e2744e837a177bcd1c8b..285e23c12d1b661866c462821ff6f69b166cd66d 100644
+--- a/cmd/curator/firstrun_ux_test.go
++++ b/cmd/curator/firstrun_ux_test.go
+@@ -106,7 +106,7 @@ func TestGlobalInitEnvResolveSubcommandHelpPreservesFlagSet(t *testing.T) {
+ 		args  []string
+ 		usage string
+ 	}{
+-		{"env resolve", []string{"env", "resolve", "--help"}, "Usage of env resolve:\n  -dry-run\n    \treport store rebuilds without modifying state (requires --repair)\n  -format string\n    \tfragment format: json | env | shell (default \"json\")\n  -profile string\n    \tprofile name (default: the current profile)\n  -repair\n    \tprovision or repair the managed home under the mutation lock\n  -takeover\n    \ttake over the unmanaged files the repair would write (only with --repair)\ncurator: env resolve <env-id> [--profile <name>] [--repair [--dry-run]] [--takeover] [--format json|env|shell]\n" + envAliasUsage + "\n"},
++		{"env resolve", []string{"env", "resolve", "--help"}, "Usage of env resolve:\n  -dry-run\n    \treport store rebuilds without modifying state (requires --repair)\n  -format string\n    \tfragment format: json | env | shell (default \"json\")\n  -preserve-lock\n    \trefuse repair that would change the lock hash (requires --repair)\n  -profile string\n    \tprofile name (default: the current profile)\n  -repair\n    \tprovision or repair the managed home under the mutation lock\n  -takeover\n    \ttake over the unmanaged files the repair would write (only with --repair)\ncurator: env resolve <env-id> [--profile <name>] [--repair [--preserve-lock] [--dry-run]] [--takeover] [--format json|env|shell]\n" + envAliasUsage + "\n"},
+ 		{"global add", []string{"global", "add", "--help"}, "Usage of global add:\n  -branch string\n    \tgit branch\n  -git string\n    \tgit clone URL\n  -revision string\n    \tgit revision\n  -source string\n    \tsource directory under skills_root\n  -tag string\n    \tgit tag\n"},
+ 	} {
+ 		t.Run(row.name, func(t *testing.T) {
+diff --git a/internal/envprofile/identity_migration.go b/internal/envprofile/identity_migration.go
+index 18a807a8439134b1914e7de7c10de7986965835c..fc817fc2fb8079a335ec5d49a6d03e82ca2b92ad 100644
+--- a/internal/envprofile/identity_migration.go
++++ b/internal/envprofile/identity_migration.go
+@@ -14,6 +14,7 @@ import (
+ 	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/hashing"
+ 	"github.com/relux-works/curator/internal/pathboundary"
++	"github.com/relux-works/curator/internal/privatedir"
+ 	"github.com/relux-works/curator/internal/transaction"
+ )
+ 
+@@ -71,6 +72,22 @@ func (m *identityMigration) publish(op *operation) error {
+ 	if err := op.engine.Commit(op.lock, plan.TransactionID); err != nil {
+ 		return fmt.Errorf("publish profile identity migration: %w", err)
+ 	}
++	// Match ordinary profile-record publication: a copied entry inherits its
++	// live parent's DACL on Windows, regardless of its Unix permission bits.
++	for _, path := range paths {
++		if m.targets[path] == "" {
++			continue
++		}
++		info, err := os.Lstat(path)
++		if err != nil {
++			return err
++		}
++		if info.Mode().IsRegular() {
++			if err := privatedir.ProtectFile(path); err != nil {
++				return fmt.Errorf("protect migrated profile record %s: %w", path, err)
++			}
++		}
++	}
+ 	return nil
+ }
+ 
+diff --git a/internal/envprofile/lock.go b/internal/envprofile/lock.go
+index 09cd95f19415f94f410aa5880d0f6ac4b4f7d7f3..93a80398dce5894630163385d57ea7be13b901c0 100644
+--- a/internal/envprofile/lock.go
++++ b/internal/envprofile/lock.go
+@@ -35,6 +35,12 @@ type operation struct {
+ // stage (see the switch.go package doc for why); they stay direct writes
+ // under the held lock.
+ func beginOperation(home string, options ...transaction.Option) (*operation, error) {
++	return beginOperationValidated(home, nil, options...)
++}
++
++// beginOperationValidated checks read-only inputs under the lock before journal
++// recovery can write. Other operations retain the ordinary recovery path.
++func beginOperationValidated(home string, validate func() error, options ...transaction.Option) (*operation, error) {
+ 	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
+ 	defer cancel()
+ 	manager, err := managerlock.New(home)
+@@ -45,6 +51,12 @@ func beginOperation(home string, options ...transaction.Option) (*operation, err
+ 	if err != nil {
+ 		return nil, fmt.Errorf("%s: acquire the manager-home mutation lock: %v", DiagLockUnavailable, err)
+ 	}
++	if validate != nil {
++		if err := validate(); err != nil {
++			_ = lock.Close()
++			return nil, err
++		}
++	}
+ 	engine, err := transaction.New(home, options...)
+ 	if err != nil {
+ 		_ = lock.Close()
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index ebda767f692d994deb03e84ea32b8204c80db2d8..d76954b473adfcf86ecdb16e6ecb6310f8c74ed8 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -46,12 +46,13 @@ import (
+ // Diagnostics for managed homes and resolution (environments §7.7, §8.5,
+ // §9.7, §10.4).
+ const (
+-	DiagHomeStale       = "environment_home_stale"
+-	DiagRepairFailed    = "environment_repair_failed"
+-	DiagForeignManager  = "environment_foreign_manager_detected"
+-	DiagForeignSuspect  = "environment_foreign_manager_suspected"
+-	DiagProfileUnknown  = "profile_unknown"
+-	DiagReservedCommand = "environment_reserved_command_name"
++	DiagHomeStale                = "environment_home_stale"
++	DiagRepairNeedsLockMigration = "environment_repair_needs_lock_migration"
++	DiagRepairFailed             = "environment_repair_failed"
++	DiagForeignManager           = "environment_foreign_manager_detected"
++	DiagForeignSuspect           = "environment_foreign_manager_suspected"
++	DiagProfileUnknown           = "profile_unknown"
++	DiagReservedCommand          = "environment_reserved_command_name"
+ )
+ 
+ // EnvRootName is the manager-owned environments root below the manager
+@@ -85,6 +86,8 @@ type ResolveRequest struct {
+ 	LaunchDir string
+ 	Machine   envregistry.MachineConfig
+ 	Repair    bool
++	// PreserveLock refuses repair that changes the effective profile pin.
++	PreserveLock bool
+ 	// DryRun reports store rebuilds that a repair would perform without
+ 	// publishing them. It is meaningful only together with Repair.
+ 	DryRun bool
+@@ -117,6 +120,9 @@ type ResolveRequest struct {
+ 	readRegularFile      func(string) (stateread.File, error)
+ 	boundaryOwnerLookup  pathboundary.OwnerLookup
+ 	storeRepairAttempted bool
++	preserveLockHash     string
++	// beforeRepairLock is a race-injection seam; production leaves it nil.
++	beforeRepairLock func()
+ }
+ 
+ // ResolveResult is the outcome: exactly one of Document and StaleErr is
+@@ -2562,6 +2568,9 @@ func currentProfileFor(home, envID, named string) (string, error) {
+ // reasons); under repair the home is provisioned or repaired from the
+ // store under the mutation lock and the fragment is emitted.
+ func Resolve(req ResolveRequest) (*ResolveResult, error) {
++	if req.PreserveLock && !req.Repair {
++		return nil, fmt.Errorf("usage: env resolve --preserve-lock requires --repair")
++	}
+ 	policy := req.Policy
+ 	policy.PassableEnvNames = req.Machine.PassableEnvNames
+ 	policy.PassableEnvNamesSet = req.Machine.PassableEnvNamesSet
+@@ -2592,6 +2601,16 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	if req.PreserveLock {
++		if req.preserveLockHash == "" {
++			req.preserveLockHash = hash
++		} else if hash != req.preserveLockHash {
++			return nil, fmt.Errorf("%s: profile lock changed during preserve-lock repair", DiagRepairFailed)
++		}
++		if repairWouldChangeLockHash(lock) {
++			return nil, fmt.Errorf("%s: repair would change the lock hash; rerun without --preserve-lock: curator env resolve %s --profile %s --repair", DiagRepairNeedsLockMigration, req.EnvID, profile)
++		}
++	}
+ 	if !roots.store {
+ 		return nil, boundaryDiagnostic("profile store root", "boundary", fmt.Errorf("root %s is absent", contextstore.Root(req.Home)))
+ 	}
+@@ -2650,7 +2669,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 		}
+ 		return nil, failure
+ 	}
+-	if req.Repair && !req.DryRun && hashing.WriteVersion() == hashing.VersionV2 && lock.ContentHashVersion() == hashing.VersionV1 {
++	if req.Repair && !req.DryRun && repairWouldChangeLockHash(lock) {
+ 		return repairUnderLock(&req, adapter, source)
+ 	}
+ 	verdict := verifyHome(&req, adapter, source, lock, hash)
+@@ -2680,6 +2699,42 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 	return repairUnderLock(&req, adapter, source)
+ }
+ 
++// repairWouldChangeLockHash is the preflight predicate for every lock-changing
++// repair step. Identity migration is currently the only such step.
++func repairWouldChangeLockHash(lock *contextlock.Lock) bool {
++	return hashing.WriteVersion() == hashing.VersionV2 && lock.ContentHashVersion() == hashing.VersionV1
++}
++
++func (req *ResolveRequest) validatePreservedLock() error {
++	if !req.PreserveLock {
++		return nil
++	}
++	_, _, hash, err := loadResolveInputsWithOwner(req.Home, req.Profile, req.readRegularFile, req.boundaryOwnerLookup)
++	if err != nil {
++		return fmt.Errorf("%s: revalidate preserved lock: %w", DiagRepairFailed, err)
++	}
++	if hash != req.preserveLockHash {
++		return fmt.Errorf("%s: profile lock changed before repair-lock acquisition", DiagRepairFailed)
++	}
++	return nil
++}
++
++func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
++	if req.beforeRepairLock != nil {
++		req.beforeRepairLock()
++	}
++	op, err := beginOperationValidated(req.Home, req.validatePreservedLock, req.transactionOptions...)
++	if err != nil {
++		return nil, err
++	}
++	// Recovery may itself have published a replacement lock.
++	if err := req.validatePreservedLock(); err != nil {
++		_ = op.close()
++		return nil, err
++	}
++	return op, nil
++}
++
+ // repairUnderLock takes the mutation lock with the bounded wait and a
+ // distinct lock-acquisition diagnostic, provisions or repairs the home
+ // from the store entries the lock names as one transaction, then emits
+@@ -2687,7 +2742,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ // repair restores managed bytes from the store and never adopts candidate
+ // bytes found in the home.
+ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source Source) (*ResolveResult, error) {
+-	op, err := beginOperation(req.Home, req.transactionOptions...)
++	op, err := req.beginRepairOperation()
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -2699,7 +2754,7 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	if hashing.WriteVersion() == hashing.VersionV2 && lock.ContentHashVersion() == hashing.VersionV1 {
++	if repairWouldChangeLockHash(lock) {
+ 		migration, err := prepareIdentityMigration(req, []string{req.Profile}, nil)
+ 		if err != nil {
+ 			return nil, err
+diff --git a/internal/envprofile/preserve_lock_test.go b/internal/envprofile/preserve_lock_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..fa58bcc3d78d23a47e277b032ba86c318406edb7
+--- /dev/null
++++ b/internal/envprofile/preserve_lock_test.go
+@@ -0,0 +1,491 @@
++package envprofile
++
++import (
++	"bytes"
++	"context"
++	"encoding/json"
++	"errors"
++	"io/fs"
++	"os"
++	"path/filepath"
++	"reflect"
++	"slices"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/managerlock"
++	"github.com/relux-works/curator/internal/privatedir"
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++type preserveLockVector struct {
++	Name  string   `json:"name"`
++	Argv  []string `json:"argv"`
++	Input struct {
++		HomeState       string `json:"home_state"`
++		LockFixture     string `json:"lock_fixture"`
++		LockReplacement string `json:"lock_replacement_before_repair_lock"`
++		Held            bool   `json:"repair_lock_held_by_other_operation"`
++	} `json:"input"`
++	Expected struct {
++		Diagnostic string   `json:"diagnostic"`
++		Fragment   bool     `json:"fragment_emitted"`
++		Unchanged  bool     `json:"lock_bytes_unchanged"`
++		Acquired   bool     `json:"repair_lock_acquired"`
++		Writes     []string `json:"writes"`
++	} `json:"expected"`
++}
++
++// This family is published outside the pinned conformance/v1 corpus. Keep its
++// exact 6648e18 vectors locally so hosted CI drives them without moving that pin.
++// CURATOR_PRESERVE_LOCK_VECTORS optionally selects the upstream family directly.
++func TestRepairPreserveLockVectors(t *testing.T) {
++	path := os.Getenv("CURATOR_PRESERVE_LOCK_VECTORS")
++	if path == "" {
++		path = "testdata/environments-repair-preserve-lock.json"
++	}
++	raw, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var vectors struct {
++		Cases []preserveLockVector `json:"cases"`
++	}
++	if err := json.Unmarshal(raw, &vectors); err != nil {
++		t.Fatal(err)
++	}
++	if len(vectors.Cases) != 10 {
++		t.Fatalf("vector count = %d, want 10", len(vectors.Cases))
++	}
++	selected := 0
++	for _, tc := range vectors.Cases {
++		t.Run(tc.Name, func(t *testing.T) {
++			selected++
++			drivePreserveLockVector(t, tc)
++		})
++	}
++	t.Logf("%d of %d vector subtests selected; production sites: Resolve/StatusOf; CLI grammar: TestEnvResolvePreserveLockRequiresRepair", selected, len(vectors.Cases))
++}
++
++func preserveLockFixture(t *testing.T, version, state string) *managedFixture {
++	t.Helper()
++	if version == "v1" {
++		enableV1WritersForTest(t)
++	} else {
++		enableV2WritersForTest(t)
++	}
++	fx := writeManagedFixture(t, "example-profile")
++	seedLiveNativeCredentials(t, fx)
++	if state != "unprovisioned" {
++		provision(t, fx, "pi", fx.request("pi").Machine)
++		if state == "stale" {
++			marker := readManagedMarker(t, fx, "pi")
++			path := marker.Surfaces[envmarker.SurfaceRootContext].Paths[0]
++			if err := os.Remove(filepath.Join(ManagedHomeDir(fx.home, fx.profile, "pi"), filepath.FromSlash(path))); err != nil {
++				t.Fatal(err)
++			}
++		}
++	}
++	hashing.EnableV2Writers = true
++	return fx
++}
++
++// Snapshot the entire temporary home, including directory modes, symlink
++// destinations, stores, staging and journals. No lock/journal allowlist.
++func preserveSnapshot(t *testing.T, home string) map[string]string {
++	t.Helper()
++	result := map[string]string{}
++	err := filepath.WalkDir(home, func(path string, entry fs.DirEntry, err error) error {
++		if err != nil {
++			return err
++		}
++		info, err := entry.Info()
++		if err != nil {
++			return err
++		}
++		value := info.Mode().String()
++		if entry.Type()&os.ModeSymlink != 0 {
++			target, err := os.Readlink(path)
++			if err != nil {
++				return err
++			}
++			value += target
++		} else if info.Mode().IsRegular() {
++			raw, err := os.ReadFile(path)
++			if err != nil {
++				return err
++			}
++			value += string(raw)
++		}
++		rel, err := filepath.Rel(home, path)
++		if err != nil {
++			return err
++		}
++		result[rel] = value
++		return nil
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	return result
++}
++
++func drivePreserveLockVector(t *testing.T, tc preserveLockVector) {
++	t.Helper()
++	fx := preserveLockFixture(t, tc.Input.LockFixture, tc.Input.HomeState)
++	if len(tc.Argv) > 1 && tc.Argv[1] == "status" {
++		hashing.EnableV2Writers = false
++		for _, id := range []string{"claude_code", "codex_cli", "opencode"} {
++			provision(t, fx, id, fx.request(id).Machine)
++		}
++		hashing.EnableV2Writers = true
++	}
++	req := fx.request("pi")
++	req.Repair = slices.Contains(tc.Argv, "--repair")
++	req.PreserveLock = slices.Contains(tc.Argv, "--preserve-lock")
++
++	if !tc.Expected.Unchanged {
++		// Candidate source bytes differ from the pinned snapshot. Migration
++		// must retain the snapshot rather than resolve this candidate again.
++		source, err := readSource(fx.home, fx.profile)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(source.Path, "context", "a.md"), []byte("unselected candidate source\n"), 0600); err != nil {
++			t.Fatal(err)
++		}
++	}
++	before := preserveSnapshot(t, fx.home)
++	oldBytes, err := os.ReadFile(lockPath(fx.home, fx.profile))
++	if err != nil {
++		t.Fatal(err)
++	}
++	oldLock, oldHash, err := contextlock.Read(lockPath(fx.home, fx.profile))
++	if err != nil {
++		t.Fatal(err)
++	}
++	oldSnapshots := map[string]map[string]string{}
++	for _, member := range oldLock.Members {
++		oldSnapshots[member.Kind+"/"+member.Name] = preserveSnapshot(t, contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey()))
++	}
++	attempted := false
++	req.beforeRepairLock = func() {
++		attempted = true
++		if tc.Input.LockReplacement != "" {
++			lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++			if err != nil {
++				t.Fatal(err)
++			}
++			lock.Members[0].Weight++ // Same framing and closure; a different lock hash.
++			if _, err := contextlock.Write(lockPath(fx.home, fx.profile), lock); err != nil {
++				t.Fatal(err)
++			}
++			before = preserveSnapshot(t, fx.home)
++			oldBytes, err = os.ReadFile(lockPath(fx.home, fx.profile))
++			if err != nil {
++				t.Fatal(err)
++			}
++		}
++	}
++	var held *managerlock.HomeLock
++	if tc.Input.Held {
++		manager, err := managerlock.New(fx.home)
++		if err != nil {
++			t.Fatal(err)
++		}
++		held, err = manager.AcquireHomeOnly(t.Context(), false)
++		if err != nil {
++			t.Fatal(err)
++		}
++		t.Cleanup(func() { _ = held.Close() })
++		old := lockTimeout
++		lockTimeout = 0
++		t.Cleanup(func() { lockTimeout = old })
++	}
++	if len(tc.Argv) > 1 && tc.Argv[1] == "status" {
++		status, err := StatusOf(statusRequest(fx))
++		if err != nil {
++			t.Fatal(err)
++		}
++		if status.NonCurrent {
++			t.Fatal("current v1 matrix unexpectedly fails --check")
++		}
++		found := false
++		for _, row := range status.Homes {
++			if row.Profile == fx.profile && row.Environment == "pi" {
++				found = true
++				if !row.Current {
++					t.Fatalf("v1 currency = %+v", row)
++				}
++			}
++		}
++		if !found {
++			t.Fatal("missing pi currency row")
++		}
++	} else {
++		result, err := Resolve(req)
++		if tc.Expected.Diagnostic != "" {
++			if err == nil || !strings.Contains(err.Error(), tc.Expected.Diagnostic) {
++				t.Fatalf("diagnostic = %v, want %s", err, tc.Expected.Diagnostic)
++			}
++			if result != nil && len(result.Document) > 0 {
++				t.Fatal("refusal emitted fragment")
++			}
++			if tc.Expected.Diagnostic == DiagRepairNeedsLockMigration {
++				command := "curator env resolve pi --profile example-profile --repair"
++				if !strings.HasSuffix(err.Error(), command) {
++					t.Fatalf("operator command: %v", err)
++				}
++			}
++		} else {
++			if err != nil {
++				t.Fatal(err)
++			}
++			if result == nil || len(result.Document) == 0 {
++				t.Fatal("missing fragment")
++			}
++			_, hash, err := contextlock.Read(lockPath(fx.home, fx.profile))
++			if err != nil {
++				t.Fatal(err)
++			}
++			var fragment struct {
++				Profile struct {
++					LockSHA256 string `json:"lock_sha256"`
++				} `json:"profile"`
++			}
++			if err := json.Unmarshal(result.Document, &fragment); err != nil {
++				t.Fatal(err)
++			}
++			if fragment.Profile.LockSHA256 != hashing.Normalize(hash) {
++				t.Fatalf("fragment profile.lock_sha256 = %s, want %s", fragment.Profile.LockSHA256, hashing.Normalize(hash))
++			}
++			if !tc.Expected.Unchanged && hash == oldHash {
++				t.Fatal("plain repair skipped identity migration")
++			}
++		}
++	}
++	// Windows forbids reading the held lock entry. Keep the complete snapshot
++	// comparison on either side of acquisition; omit no files.
++	if held != nil {
++		if err := held.Close(); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if !tc.Expected.Unchanged {
++		newLock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++		if err != nil {
++			t.Fatal(err)
++		}
++		if newLock.ContentHashVersion() != hashing.VersionV2 || newLock.Root != oldLock.Root || len(newLock.Members) != len(oldLock.Members) {
++			t.Fatal("migration changed closure or failed to select v2")
++		}
++		for i, member := range newLock.Members {
++			old := oldLock.Members[i]
++			if !reflect.DeepEqual(oldSnapshots[member.Kind+"/"+member.Name], preserveSnapshot(t, contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey()))) {
++				t.Fatal("migration changed snapshot bytes")
++			}
++			member.StateHash = old.StateHash
++			if !reflect.DeepEqual(old, member) {
++				t.Fatal("migration re-resolved closure, versions, sources or commits")
++			}
++		}
++	}
++	if attempted != tc.Expected.Acquired {
++		t.Fatalf("repair lock attempted = %v, want %v", attempted, tc.Expected.Acquired)
++	}
++	newBytes, err := os.ReadFile(lockPath(fx.home, fx.profile))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if bytes.Equal(oldBytes, newBytes) != tc.Expected.Unchanged {
++		t.Fatal("lock-byte invariant violated")
++	}
++	if len(tc.Expected.Writes) == 0 && !reflect.DeepEqual(before, preserveSnapshot(t, fx.home)) {
++		t.Fatal("read-only/refusal path wrote manager state")
++	}
++}
++
++func TestPreserveLockRefusesBeforeStoreRebuild(t *testing.T) {
++	for _, failure := range []string{"pin", "boundary"} {
++		t.Run(failure, func(t *testing.T) {
++			fx := preserveLockFixture(t, "v1", "current")
++			lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++			if err != nil {
++				t.Fatal(err)
++			}
++			member, _ := lock.Find(contextlock.KindMCP, "figma-devmode")
++			entry := contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey())
++			if failure == "pin" {
++				if err := os.WriteFile(filepath.Join(entry, "unused", "pin-only.txt"), []byte("untrusted\n"), 0600); err != nil {
++					t.Fatal(err)
++				}
++			} else {
++				if err := os.Chmod(entry, 0777); err != nil {
++					t.Fatal(err)
++				}
++			}
++			before := preserveSnapshot(t, fx.home)
++			req := fx.request("pi")
++			req.Repair = true
++			req.PreserveLock = true
++			req.beforeRepairLock = func() { t.Fatal("migration refusal attempted repair lock") }
++			result, err := Resolve(req)
++			if err == nil || !strings.Contains(err.Error(), DiagRepairNeedsLockMigration) || result != nil {
++				t.Fatalf("Resolve = %v, %v", result, err)
++			}
++			if !reflect.DeepEqual(before, preserveSnapshot(t, fx.home)) {
++				t.Fatal("refusal wrote/rebuilt store")
++			}
++		})
++	}
++}
++
++func TestPreserveLockRaceRefusesBeforeJournalRecovery(t *testing.T) {
++	fx := preserveLockFixture(t, "v2", "stale")
++	req := fx.request("pi")
++	req.Repair = true
++	req.PreserveLock = true
++	journal := filepath.Join(fx.home, "state", "transactions", "v1", "broken.json")
++	if err := os.MkdirAll(filepath.Dir(journal), 0700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(journal, []byte("malformed"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	var before map[string]string
++	req.beforeRepairLock = func() {
++		lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++		if err != nil {
++			t.Fatal(err)
++		}
++		lock.Members[0].Weight++
++		if _, err := contextlock.Write(lockPath(fx.home, fx.profile), lock); err != nil {
++			t.Fatal(err)
++		}
++		before = preserveSnapshot(t, fx.home)
++	}
++	result, err := Resolve(req)
++	if err == nil || !strings.Contains(err.Error(), DiagRepairFailed+": profile lock changed before repair-lock acquisition") || result != nil {
++		t.Fatalf("Resolve = %v, %v", result, err)
++	}
++	if !reflect.DeepEqual(before, preserveSnapshot(t, fx.home)) {
++		t.Fatal("race refusal wrote state")
++	}
++}
++
++// A busy real lock defeats a refusal moved after beginOperation, even if that
++// acquisition bypasses the request's test seam and leaves stable lock bytes.
++func TestPreserveLockMigrationRefusalPrecedesBusyLock(t *testing.T) {
++	for _, state := range []string{"stale", "unprovisioned", "current"} {
++		t.Run(state, func(t *testing.T) {
++			fx := preserveLockFixture(t, "v1", state)
++			manager, err := managerlock.New(fx.home)
++			if err != nil {
++				t.Fatal(err)
++			}
++			// The external holder's lock entry is fixture state, including for an
++			// unprovisioned home. Create it before the read-only baseline.
++			prepared, err := manager.AcquireHomeOnly(t.Context(), false)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if err := prepared.Close(); err != nil {
++				t.Fatal(err)
++			}
++			before := preserveSnapshot(t, fx.home)
++			held, err := manager.AcquireHomeOnly(t.Context(), false)
++			if err != nil {
++				t.Fatal(err)
++			}
++			t.Cleanup(func() { _ = held.Close() })
++			previous := lockTimeout
++			lockTimeout = 0
++			t.Cleanup(func() { lockTimeout = previous })
++			req := fx.request("pi")
++			req.Repair = true
++			req.PreserveLock = true
++			result, err := Resolve(req)
++			if err == nil || !strings.Contains(err.Error(), DiagRepairNeedsLockMigration) || result != nil {
++				t.Fatalf("migration refusal = %v, %v", result, err)
++			}
++			if err := held.Close(); err != nil {
++				t.Fatal(err)
++			}
++			if !reflect.DeepEqual(before, preserveSnapshot(t, fx.home)) {
++				t.Fatal("migration refusal wrote state")
++			}
++		})
++	}
++}
++
++// Observe the real held lock during the raced-lock read, rather than treating
++// the pre-acquisition injection hook as evidence of acquisition.
++func TestPreserveLockRevalidationHoldsRepairLock(t *testing.T) {
++	fx := preserveLockFixture(t, "v2", "stale")
++	req := fx.request("pi")
++	req.Repair, req.PreserveLock = true, true
++	reads, observedHeld := 0, false
++	req.readRegularFile = func(path string) (stateread.File, error) {
++		if path == lockPath(fx.home, fx.profile) {
++			reads++
++			if reads == 2 {
++				manager, err := managerlock.New(fx.home)
++				if err != nil {
++					t.Fatal(err)
++				}
++				ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
++				defer cancel()
++				competing, err := manager.AcquireHomeOnly(ctx, false)
++				if err == nil {
++					_ = competing.Close()
++					t.Fatal("preserved-lock revalidation ran before repair-lock acquisition")
++				}
++				if !errors.Is(err, context.DeadlineExceeded) {
++					t.Fatalf("competing lock: %v", err)
++				}
++				observedHeld = true
++			}
++		}
++		return stateread.ReadRegularFile(path)
++	}
++	var before map[string]string
++	req.beforeRepairLock = func() {
++		lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
++		if err != nil {
++			t.Fatal(err)
++		}
++		lock.Members[0].Weight++
++		if _, err := contextlock.Write(lockPath(fx.home, fx.profile), lock); err != nil {
++			t.Fatal(err)
++		}
++		before = preserveSnapshot(t, fx.home)
++	}
++	result, err := Resolve(req)
++	if err == nil || !strings.Contains(err.Error(), DiagRepairFailed) || result != nil {
++		t.Fatalf("Resolve = %v, %v", result, err)
++	}
++	if !observedHeld {
++		t.Fatal("preserved lock was not reread under the repair lock")
++	}
++	if !reflect.DeepEqual(before, preserveSnapshot(t, fx.home)) {
++		t.Fatal("race refusal wrote state")
++	}
++}
++
++func TestPlainRepairMigrationKeepsLockPrivate(t *testing.T) {
++	fx := preserveLockFixture(t, "v1", "current")
++	req := fx.request("pi")
++	req.Repair = true
++	result, err := Resolve(req)
++	if err != nil || result == nil || len(result.Document) == 0 {
++		t.Fatalf("plain migration: %v, %v", result, err)
++	}
++	if err := privatedir.ValidateFile(lockPath(fx.home, fx.profile)); err != nil {
++		t.Fatalf("migrated lock lost its private boundary: %v", err)
++	}
++}
+diff --git a/internal/envprofile/store_boundary.go b/internal/envprofile/store_boundary.go
+index 1ca8d60b1748ac7d6084f2540996db73824841b7..ef1ca8991eadb75063f50629784178938fdae1eb 100644
+--- a/internal/envprofile/store_boundary.go
++++ b/internal/envprofile/store_boundary.go
+@@ -283,7 +283,7 @@ func rebuildUntrustedStoreEntry(req *ResolveRequest, expectedLockHash string, fa
+ 	if member.Commit == "" {
+ 		return fmt.Errorf("%s: %w; this state pin has no revalidatable Git snapshot", DiagRepairFailed, failure)
+ 	}
+-	op, err := beginOperation(req.Home, req.transactionOptions...)
++	op, err := req.beginRepairOperation()
+ 	if err != nil {
+ 		return fmt.Errorf("%s: %v", DiagRepairFailed, err)
+ 	}
+diff --git a/internal/envprofile/testdata/environments-repair-preserve-lock.json b/internal/envprofile/testdata/environments-repair-preserve-lock.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..82b13a277847d68bab58d564953da9399a075490
+--- /dev/null
++++ b/internal/envprofile/testdata/environments-repair-preserve-lock.json
+@@ -0,0 +1,668 @@
++{
++  "capability": "agent-environments",
++  "capability_revision": 1,
++  "cases": [
++    {
++      "argv": [
++        "env",
++        "resolve",
++        "pi",
++        "--profile",
++        "example-profile",
++        "--repair",
++        "--preserve-lock",
++        "--format",
++        "json"
++      ],
++      "expected": {
++        "closure_reresolved": false,
++        "diagnostic": "environment_repair_needs_lock_migration",
++        "fragment_emitted": false,
++        "fragment_profile_lock_sha256": null,
++        "lock_bytes_unchanged": true,
++        "lock_sha256_after": "sha256:209de96f3a5e37505262d6e5d5440a1cf4606898731153ddd101b5253a59e7f8",
++        "lock_sha256_before": "sha256:209de96f3a5e37505262d6e5d5440a1cf4606898731153ddd101b5253a59e7f8",
++        "operator_commands": [
++          "curator env resolve pi --profile example-profile --repair"
++        ],
++        "repair_lock_acquired": false,
++        "writes": []
++      },
++      "forbidden_observations": [
++        {
++          "mutation": "refuse-only-after-lock-acquisition",
++          "observation": {
++            "repair_lock_acquired": true
++          }
++        },
++        {
++          "mutation": "protect-only-lock-file",
++          "observation": {
++            "writes": [
++              "operation-staging"
++            ]
++          }
++        },
++        {
++          "mutation": "emit-fragment-on-migration-refusal",
++          "observation": {
++            "fragment_emitted": true
++          }
++        },
++        {
++          "mutation": "recovery-guidance-only-for-stale-homes",
++          "observation": {
++            "operator_commands": [
++              "curator env resolve pi --profile example-profile --repair --preserve-lock"
++            ]
++          }
++        }
++      ],
++      "input": {
++        "home_state": "stale",
++        "lock_fixture": "v1",
++        "repair_lock_held_by_other_operation": false,
++        "writer_hash_version": 2
++      },
++      "name": "v1-v2-stale-preserve-lock-refused"
++    },
++    {
++      "argv": [
++        "env",
++        "resolve",
++        "pi",
++        "--profile",
++        "example-profile",
++        "--repair",
++        "--preserve-lock",
++        "--format",
++        "json"
++      ],
++      "expected": {
++        "closure_reresolved": false,
++        "diagnostic": "environment_repair_needs_lock_migration",
++        "fragment_emitted": false,
++        "fragment_profile_lock_sha256": null,
++        "lock_bytes_unchanged": true,
++        "lock_sha256_after": "sha256:209de96f3a5e37505262d6e5d5440a1cf4606898731153ddd101b5253a59e7f8",
++        "lock_sha256_before": "sha256:209de96f3a5e37505262d6e5d5440a1cf4606898731153ddd101b5253a59e7f8",
++        "operator_commands": [
++          "curator env resolve pi --profile example-profile --repair"
++        ],
++        "repair_lock_acquired": false,
++        "writes": []
++      },
++      "forbidden_observations": [
++        {
++          "mutation": "refuse-only-for-stale-home",
++          "observation": {
++            "fragment_emitted": true
++          }
++        },
++        {
++          "mutation": "refuse-only-after-lock-acquisition",
++          "observation": {
++            "repair_lock_acquired": true
++          }
++        },
++        {
++          "mutation": "protect-only-lock-file",
++          "observation": {
++            "writes": [
++              "operation-staging"
++            ]
++          }
++        },
++        {
++          "mutation": "emit-fragment-on-migration-refusal",
++          "observation": {
++            "fragment_emitted": true
++          }
++        },
++        {
++          "mutation": "recovery-guidance-only-for-stale-homes",
++          "observation": {
++            "operator_commands": [
++              "curator env resolve pi --profile example-profile --repair --preserve-lock"
++            ]
++          }
++        }
++      ],
++      "input": {
++        "home_state": "unprovisioned",
++        "lock_fixture": "v1",
++        "repair_lock_held_by_other_operation": false,
++        "writer_hash_version": 2
++      },
++      "name": "v1-v2-unprovisioned-preserve-lock-refused"
++    },
++    {
++      "argv": [
++        "env",
++        "resolve",
++        "pi",
++        "--profile",
++        "example-profile",
++        "--repair",
++        "--preserve-lock",
++        "--format",
++        "json"
++      ],
++      "expected": {
++        "closure_reresolved": false,
++        "diagnostic": "environment_repair_needs_lock_migration",
++        "fragment_emitted": false,
++        "fragment_profile_lock_sha256": null,
++        "lock_bytes_unchanged": true,
++        "lock_sha256_after": "sha256:209de96f3a5e37505262d6e5d5440a1cf4606898731153ddd101b5253a59e7f8",
++        "lock_sha256_before": "sha256:209de96f3a5e37505262d6e5d5440a1cf4606898731153ddd101b5253a59e7f8",
++        "operator_commands": [
++          "curator env resolve pi --profile example-profile --repair"
++        ],
++        "repair_lock_acquired": false,
++        "writes": []
++      },
++      "forbidden_observations": [
++        {
++          "mutation": "refuse-only-for-stale-home",
++          "observation": {
++            "fragment_emitted": true
++          }
++        },
++        {
++          "mutation": "refuse-only-after-lock-acquisition",
++          "observation": {
++            "repair_lock_acquired": true
++          }
++        },
++        {
++          "mutation": "protect-only-lock-file",
++          "observation": {
++            "writes": [
++              "operation-staging"
++            ]
++          }
++        },
++        {
++          "mutation": "emit-fragment-on-migration-refusal",
++          "observation": {
++            "fragment_emitted": true
++          }
++        },
++        {
++          "mutation": "recovery-guidance-only-for-stale-homes",
++          "observation": {
++            "operator_commands": [
++              "curator env resolve pi --profile example-profile --repair --preserve-lock"
++            ]
++          }
++        }
++      ],
++      "input": {
++        "home_state": "current",
++        "lock_fixture": "v1",
++        "repair_lock_held_by_other_operation": false,
++        "writer_hash_version": 2
++      },
++      "name": "v1-v2-current-preserve-lock-refused"
++    },
++    {
++      "argv": [
++        "env",
++        "resolve",
++        "pi",
++        "--profile",
++        "example-profile",
++        "--repair",
++        "--preserve-lock",
++        "--format",
++        "json"
++      ],
++      "expected": {
++        "closure_reresolved": false,
++        "diagnostic": null,
++        "fragment_emitted": true,
++        "fragment_profile_lock_sha256": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++        "lock_bytes_unchanged": true,
++        "lock_sha256_after": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++        "lock_sha256_before": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++        "repair_lock_acquired": true,
++        "writes": [
++          "managed-surfaces",
++          "marker"
++        ]
++      },
++      "forbidden_observations": [
++        {
++          "mutation": "preserve-only-hash-version",
++          "observation": {
++            "lock_bytes_unchanged": false,
++            "lock_sha256_after": "sha256:209de96f3a5e37505262d6e5d5440a1cf4606898731153ddd101b5253a59e7f8"
++          }
++        },
++        {
++          "mutation": "emit-old-pin-after-lock-rewrite",
++          "observation": {
++            "fragment_profile_lock_sha256": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++            "lock_sha256_after": "sha256:209de96f3a5e37505262d6e5d5440a1cf4606898731153ddd101b5253a59e7f8"
++          }
++        }
++      ],
++      "input": {
++        "home_state": "stale",
++        "lock_fixture": "v2",
++        "repair_lock_held_by_other_operation": false,
++        "writer_hash_version": 2
++      },
++      "name": "v2-stale-preserve-lock-repairs"
++    },
++    {
++      "argv": [
++        "env",
++        "resolve",
++        "pi",
++        "--profile",
++        "example-profile",
++        "--repair",
++        "--preserve-lock",
++        "--format",
++        "json"
++      ],
++      "expected": {
++        "closure_reresolved": false,
++        "diagnostic": null,
++        "fragment_emitted": true,
++        "fragment_profile_lock_sha256": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++        "lock_bytes_unchanged": true,
++        "lock_sha256_after": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++        "lock_sha256_before": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++        "repair_lock_acquired": true,
++        "writes": [
++          "managed-surfaces",
++          "marker"
++        ]
++      },
++      "forbidden_observations": [
++        {
++          "mutation": "preserve-only-hash-version",
++          "observation": {
++            "lock_bytes_unchanged": false,
++            "lock_sha256_after": "sha256:209de96f3a5e37505262d6e5d5440a1cf4606898731153ddd101b5253a59e7f8"
++          }
++        },
++        {
++          "mutation": "emit-old-pin-after-lock-rewrite",
++          "observation": {
++            "fragment_profile_lock_sha256": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++            "lock_sha256_after": "sha256:209de96f3a5e37505262d6e5d5440a1cf4606898731153ddd101b5253a59e7f8"
++          }
++        }
++      ],
++      "input": {
++        "home_state": "unprovisioned",
++        "lock_fixture": "v2",
++        "repair_lock_held_by_other_operation": false,
++        "writer_hash_version": 2
++      },
++      "name": "v2-unprovisioned-preserve-lock-repairs"
++    },
++    {
++      "argv": [
++        "env",
++        "resolve",
++        "pi",
++        "--profile",
++        "example-profile",
++        "--preserve-lock",
++        "--format",
++        "json"
++      ],
++      "expected": {
++        "closure_reresolved": false,
++        "diagnostic": "usage",
++        "fragment_emitted": false,
++        "fragment_profile_lock_sha256": null,
++        "lock_bytes_unchanged": true,
++        "lock_sha256_after": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++        "lock_sha256_before": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++        "repair_lock_acquired": false,
++        "writes": []
++      },
++      "forbidden_observations": [
++        {
++          "mutation": "accept-preserve-lock-without-repair",
++          "observation": {
++            "diagnostic": null,
++            "fragment_emitted": true
++          }
++        }
++      ],
++      "input": {
++        "home_state": "stale",
++        "lock_fixture": "v2",
++        "repair_lock_held_by_other_operation": false,
++        "writer_hash_version": 2
++      },
++      "name": "preserve-lock-without-repair-usage"
++    },
++    {
++      "argv": [
++        "env",
++        "resolve",
++        "pi",
++        "--profile",
++        "example-profile",
++        "--repair",
++        "--preserve-lock",
++        "--format",
++        "json"
++      ],
++      "expected": {
++        "closure_reresolved": false,
++        "diagnostic": null,
++        "fragment_emitted": true,
++        "fragment_profile_lock_sha256": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++        "lock_bytes_unchanged": true,
++        "lock_sha256_after": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++        "lock_sha256_before": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++        "repair_lock_acquired": false,
++        "writes": []
++      },
++      "forbidden_observations": [
++        {
++          "mutation": "lock-even-current-home",
++          "observation": {
++            "repair_lock_acquired": true
++          }
++        },
++        {
++          "mutation": "wait-on-busy-lock-even-current-home",
++          "observation": {
++            "diagnostic": "environment_lock_unavailable",
++            "fragment_emitted": false
++          }
++        },
++        {
++          "mutation": "rewrite-marker-even-current-home",
++          "observation": {
++            "writes": [
++              "marker"
++            ]
++          }
++        }
++      ],
++      "input": {
++        "home_state": "current",
++        "lock_fixture": "v2",
++        "repair_lock_held_by_other_operation": true,
++        "writer_hash_version": 2
++      },
++      "name": "v2-current-preserve-lock-lock-free"
++    },
++    {
++      "argv": [
++        "env",
++        "resolve",
++        "pi",
++        "--profile",
++        "example-profile",
++        "--repair",
++        "--format",
++        "json"
++      ],
++      "expected": {
++        "closure_reresolved": false,
++        "diagnostic": null,
++        "fragment_emitted": true,
++        "fragment_profile_lock_sha256": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++        "lock_bytes_unchanged": false,
++        "lock_sha256_after": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++        "lock_sha256_before": "sha256:209de96f3a5e37505262d6e5d5440a1cf4606898731153ddd101b5253a59e7f8",
++        "repair_lock_acquired": true,
++        "selected_closure_unchanged": true,
++        "snapshot_bytes_unchanged": true,
++        "writes": [
++          "v2-store-entries",
++          "profile-lock",
++          "managed-surfaces",
++          "marker"
++        ]
++      },
++      "forbidden_observations": [
++        {
++          "mutation": "plain-repair-skips-identity-migration",
++          "observation": {
++            "lock_sha256_after": "sha256:209de96f3a5e37505262d6e5d5440a1cf4606898731153ddd101b5253a59e7f8"
++          }
++        },
++        {
++          "mutation": "migrate-by-reresolving-closure",
++          "observation": {
++            "closure_reresolved": true
++          }
++        }
++      ],
++      "input": {
++        "home_state": "current",
++        "lock_fixture": "v1",
++        "repair_lock_held_by_other_operation": false,
++        "writer_hash_version": 2
++      },
++      "name": "v1-v2-plain-repair-migrates-identity"
++    },
++    {
++      "argv": [
++        "env",
++        "resolve",
++        "pi",
++        "--profile",
++        "example-profile",
++        "--repair",
++        "--preserve-lock",
++        "--format",
++        "json"
++      ],
++      "expected": {
++        "closure_reresolved": false,
++        "diagnostic": "environment_repair_failed",
++        "fragment_emitted": false,
++        "fragment_profile_lock_sha256": null,
++        "lock_bytes_unchanged": true,
++        "lock_sha256_after": "sha256:80cc8d12c555130f965ddba7db5627790436dc1121dc8419f7a4376d3aa83a3b",
++        "lock_sha256_before": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++        "repair_lock_acquired": true,
++        "writes": []
++      },
++      "forbidden_observations": [
++        {
++          "mutation": "revalidate-only-hash-version",
++          "observation": {
++            "diagnostic": null,
++            "fragment_emitted": true,
++            "fragment_profile_lock_sha256": "sha256:80cc8d12c555130f965ddba7db5627790436dc1121dc8419f7a4376d3aa83a3b",
++            "writes": [
++              "managed-surfaces",
++              "marker"
++            ]
++          }
++        },
++        {
++          "mutation": "reject-lock-change-after-surface-write",
++          "observation": {
++            "writes": [
++              "managed-surfaces"
++            ]
++          }
++        },
++        {
++          "mutation": "emit-old-pin-after-concurrent-lock-change",
++          "observation": {
++            "fragment_emitted": true,
++            "fragment_profile_lock_sha256": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607"
++          }
++        }
++      ],
++      "input": {
++        "home_state": "stale",
++        "lock_fixture": "v2",
++        "lock_replacement_before_repair_lock": "v2-concurrent",
++        "repair_lock_held_by_other_operation": false,
++        "writer_hash_version": 2
++      },
++      "name": "v2-lock-changed-before-repair-lock-refused"
++    },
++    {
++      "argv": [
++        "env",
++        "status",
++        "--check",
++        "--json"
++      ],
++      "expected": {
++        "closure_reresolved": false,
++        "diagnostic": null,
++        "exit_code": 0,
++        "fragment_emitted": false,
++        "fragment_profile_lock_sha256": null,
++        "lock_bytes_unchanged": true,
++        "lock_sha256_after": "sha256:209de96f3a5e37505262d6e5d5440a1cf4606898731153ddd101b5253a59e7f8",
++        "lock_sha256_before": "sha256:209de96f3a5e37505262d6e5d5440a1cf4606898731153ddd101b5253a59e7f8",
++        "repair_lock_acquired": false,
++        "status_home_currency": "current",
++        "writes": []
++      },
++      "forbidden_observations": [
++        {
++          "mutation": "status-currency-requires-writer-framing",
++          "observation": {
++            "exit_code": 1,
++            "status_home_currency": "stale"
++          }
++        },
++        {
++          "mutation": "status-read-only-except-identity-repair",
++          "observation": {
++            "lock_bytes_unchanged": false,
++            "lock_sha256_after": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++            "writes": [
++              "profile-lock",
++              "marker"
++            ]
++          }
++        },
++        {
++          "mutation": "status-lock-free-except-v1-lock",
++          "observation": {
++            "repair_lock_acquired": true
++          }
++        }
++      ],
++      "input": {
++        "home_state": "current",
++        "lock_fixture": "v1",
++        "repair_lock_held_by_other_operation": true,
++        "writer_hash_version": 2
++      },
++      "name": "v1-current-status-read-only"
++    }
++  ],
++  "execution_contract": {
++    "current": "Provision a home matching the fixture lock, marker, generated surfaces, and configuration.",
++    "forbidden_observations": "Each partial observation overrides the named case expected result and MUST be rejected as nonconforming.",
++    "lock_replacement_before_repair_lock": "After the invocation reads its fixture lock and passes the read-only pre-check, another operation publishes the named replacement lock and its verified store snapshot before repair-lock acquisition. Observe only writes by the tested invocation. lock_bytes_unchanged means the tested invocation did not rewrite either lock; the before/after hashes include the concurrent publication. Both locks use framing version 2.",
++    "repair_lock_acquired": "Observe acquisition attempts as well as successful acquisitions; false requires no attempt.",
++    "stale": "Provision a matching home, then change a recorded managed surface without changing the fixture lock.",
++    "status": "Register only the fixture profile and environment, with all other status rows current. Drive env status --check --json under a v2 writer; compare the selected home currency and command exit code. Do not repair or rewrite the v1 lock. No launch fragment is emitted by status.",
++    "unprovisioned": "Leave the managed home absent; the fixture lock and verified store exist.",
++    "usage": "The fixture exists but argv validation must fail before profile resolution.",
++    "writes": "Observe every write including temporary staging, store publication, journals, locks, home surfaces, and markers. Successful repair writes list logical publication classes, not an exhaustive filesystem trace. Refusal and current-home empty lists require zero writes."
++  },
++  "fixtures": {
++    "concurrent_snapshot_files_utf8": {
++      "agent-context.json": "{\"context\":{\"modules\":[]},\"name\":\"example-context\",\"schema_version\":1,\"version\":\"1.0.1\"}\n"
++    },
++    "concurrent_snapshot_state_sha256": "119506393823fd5e251be4fcfc2e38e96b27c2da9879bfe7fa95ec89ad0164b4",
++    "locks": {
++      "v1": {
++        "ccj1_utf8": "{\"members\":[{\"kind\":\"context\",\"name\":\"example-context\",\"overlay\":false,\"required_by\":[],\"state_sha256\":\"5ad74ca0ba475c503434120a27d343e982e0f6c06252f4b8f3d9c138539592d0\",\"version\":\"1.0.0\",\"weight\":0}],\"root\":\"example-context\",\"schema_version\":1}",
++        "lock_sha256": "sha256:209de96f3a5e37505262d6e5d5440a1cf4606898731153ddd101b5253a59e7f8",
++        "object": {
++          "members": [
++            {
++              "kind": "context",
++              "name": "example-context",
++              "overlay": false,
++              "required_by": [],
++              "state_sha256": "5ad74ca0ba475c503434120a27d343e982e0f6c06252f4b8f3d9c138539592d0",
++              "version": "1.0.0",
++              "weight": 0
++            }
++          ],
++          "root": "example-context",
++          "schema_version": 1
++        }
++      },
++      "v2": {
++        "ccj1_utf8": "{\"hash_version\":2,\"members\":[{\"kind\":\"context\",\"name\":\"example-context\",\"overlay\":false,\"required_by\":[],\"state_sha256\":\"651c49afe7873d25873382af1ee5dc8656451bfaf2cb0d77d908ae461a448fa3\",\"version\":\"1.0.0\",\"weight\":0}],\"root\":\"example-context\",\"schema_version\":2}",
++        "lock_sha256": "sha256:03b6a058123cfb43c862abb722c2b656da37de7d8797690e7ce29249e6c74607",
++        "object": {
++          "hash_version": 2,
++          "members": [
++            {
++              "kind": "context",
++              "name": "example-context",
++              "overlay": false,
++              "required_by": [],
++              "state_sha256": "651c49afe7873d25873382af1ee5dc8656451bfaf2cb0d77d908ae461a448fa3",
++              "version": "1.0.0",
++              "weight": 0
++            }
++          ],
++          "root": "example-context",
++          "schema_version": 2
++        }
++      },
++      "v2-concurrent": {
++        "ccj1_utf8": "{\"hash_version\":2,\"members\":[{\"kind\":\"context\",\"name\":\"example-context\",\"overlay\":false,\"required_by\":[],\"state_sha256\":\"119506393823fd5e251be4fcfc2e38e96b27c2da9879bfe7fa95ec89ad0164b4\",\"version\":\"1.0.1\",\"weight\":0}],\"root\":\"example-context\",\"schema_version\":2}",
++        "lock_sha256": "sha256:80cc8d12c555130f965ddba7db5627790436dc1121dc8419f7a4376d3aa83a3b",
++        "object": {
++          "hash_version": 2,
++          "members": [
++            {
++              "kind": "context",
++              "name": "example-context",
++              "overlay": false,
++              "required_by": [],
++              "state_sha256": "119506393823fd5e251be4fcfc2e38e96b27c2da9879bfe7fa95ec89ad0164b4",
++              "version": "1.0.1",
++              "weight": 0
++            }
++          ],
++          "root": "example-context",
++          "schema_version": 2
++        }
++      }
++    },
++    "profile_name": "example-profile",
++    "snapshot_files_utf8": {
++      "agent-context.json": "{\"context\":{\"modules\":[]},\"name\":\"example-context\",\"schema_version\":1,\"version\":\"1.0.0\"}\n"
++    },
++    "snapshot_state_sha256": {
++      "1": "5ad74ca0ba475c503434120a27d343e982e0f6c06252f4b8f3d9c138539592d0",
++      "2": "651c49afe7873d25873382af1ee5dc8656451bfaf2cb0d77d908ae461a448fa3"
++    },
++    "source_kind": "path"
++  },
++  "normative_section": "protocol/environments.md \u00a710.1",
++  "preconditions": {
++    "credential_migration_required": false,
++    "environment": "pi",
++    "form": "monolithic",
++    "isolation": "shared",
++    "protected_boundaries": "verified",
++    "seed_reads": "absent",
++    "snapshot_contains_nul": false,
++    "store_pins": "verified",
++    "unmanaged_conflicts": false
++  }
++}
