@@ -1,0 +1,3244 @@
+{
+  "task": "TASK-261014-4xkh3q",
+  "candidate": "599cf6b128a73f79c1d675fddbb3b6f03ce83986",
+  "run_id": 38489868868,
+  "run_url": "https://github.com/relux-works/curator/actions/runs/38489868868",
+  "remote_gate_real_exit": 0,
+  "local_build_real_exit": 0,
+  "local_vet_real_exit": 0,
+  "ac_coverage": "7 of 8; exec argv is an external ownership bound under brief point 4",
+  "jobs": [
+    {
+      "name": "Lint",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612261778"
+    },
+    {
+      "name": "Naming gate",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262049"
+    },
+    {
+      "name": "Gate self-test (ubuntu-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262063"
+    },
+    {
+      "name": "Go 1.25.5 driver (ubuntu-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262130"
+    },
+    {
+      "name": "Interop conformance gate",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262134"
+    },
+    {
+      "name": "Go 1.26.0 driver (ubuntu-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262137"
+    },
+    {
+      "name": "Test (macos-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262144"
+    },
+    {
+      "name": "Go 1.27.1 driver (macos-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262147"
+    },
+    {
+      "name": "Gate self-test (windows-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262155"
+    },
+    {
+      "name": "Go 1.25.5 driver (windows-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262169"
+    },
+    {
+      "name": "Go 1.27.1 driver (ubuntu-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262173"
+    },
+    {
+      "name": "Test (windows-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262177"
+    },
+    {
+      "name": "Go 1.26.0 driver (macos-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262178"
+    },
+    {
+      "name": "Race (ubuntu-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262182"
+    },
+    {
+      "name": "Race (macos-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262201"
+    },
+    {
+      "name": "Go 1.26.0 driver (windows-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262211"
+    },
+    {
+      "name": "Go 1.25.5 driver (macos-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262222"
+    },
+    {
+      "name": "Test (ubuntu-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262250"
+    },
+    {
+      "name": "Go 1.27.1 driver (windows-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262267"
+    },
+    {
+      "name": "Gate self-test (macos-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612262306"
+    },
+    {
+      "name": "Candidate suite (${{ matrix.os }})",
+      "conclusion": "skipped",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612263163"
+    },
+    {
+      "name": "Test (rose-air)",
+      "conclusion": "skipped",
+      "url": "https://github.com/relux-works/curator/actions/runs/38489868868/job/115612263268"
+    }
+  ],
+  "lanes": [
+    {
+      "lane": "test-ubuntu",
+      "failures": 0,
+      "passed_tests": [
+        {
+          "Package": "github.com/relux-works/curator/internal/conformancecoverage",
+          "Test": "TestMuseCandidateHistoricalHashV2GapRowsHaveTheAssignedOwner",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/conformancecoverage",
+          "Test": "TestMuseCandidateHistoricalHashV2FamiliesAreKnownGapsWhenPublished",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/conformancecoverage",
+          "Test": "TestMuseCandidateHistoricalHashV2VectorsAreKnownGapsWhenPublished",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/valid",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/missing-data",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/wrong-parent",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/HOME",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/channel",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envregistry",
+          "Test": "TestRegistryClosed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envregistry",
+          "Test": "TestMuseHasNoAdmittedRootContextForm",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/live-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/live-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/write-through-refresh-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/write-through-refresh-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/missing-link-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/missing-link-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/temp-rename-fork-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/temp-rename-fork-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/retargeted-link-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/retargeted-link-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/dangling-target-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/dangling-target-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/metadata-unreadable-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/metadata-unreadable-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/target-unreadable-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/target-unreadable-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseForkRefusedRegression",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/outside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/outside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/inside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/inside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/outside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/outside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/inside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/inside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseDirectoriesAndIsolation",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/empty-directory",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/nonempty-directory",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/relative-link",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/target-directory",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/readlink-error",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/missing-link-missing-target",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/config-parent-link",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseGlobalReconciliationUsesExplicitProvisioning",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/absent",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/marker-unreadable",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/backup-unreadable",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/marker-malformed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedRegistryLayout",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/monolithic",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/zero-applicable",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/no-context",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/referenced-refused",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextDrift/changed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextDrift/removed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextDrift",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextStatus",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/configured-form-ignored",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/referenced-fallback",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/no-context-admitted",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/wrong-target",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/wrong-bytes",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/changed-root-admitted",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/removed-root-admitted",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIFragmentAndFakeLaunch",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseProfileSeedSecretAndCredentialRefusals/secret",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseProfileSeedSecretAndCredentialRefusals/auth",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseProfileSeedSecretAndCredentialRefusals",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-permissions-yolo-unlocked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-permissions-native-locked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-permissions-native-silent.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-absent.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-unknown-mode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-yolo-locked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-yolo-silent.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-locked-profile-source.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-global-unlocked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-unknown-source.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-unknown-field.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-missing-mode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-claude_code.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-claude_code.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-codex_cli.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-codex_cli.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-opencode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-opencode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-pi.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-pi.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_CONFIG_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_CONFIG_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_DATA_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_DATA_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_STATE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_STATE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_CACHE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_CACHE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-HOME-added.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-HOME-substitution.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-unverified-system-prompt.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-unverified-mcp.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-v2-token.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-unknown-environment.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIAuthParentBoundary/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIAuthParentBoundary/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIAuthParentBoundary",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestAuthoritativeDryRunCasesMutateNothingPersistent",
+          "Action": "pass"
+        }
+      ],
+      "mutants": [
+        {
+          "mutant": "configured-form-ignored",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/referenced-refused"
+        },
+        {
+          "mutant": "referenced-fallback",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/referenced-refused"
+        },
+        {
+          "mutant": "no-context-admitted",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/no-context"
+        },
+        {
+          "mutant": "wrong-target",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/monolithic"
+        },
+        {
+          "mutant": "wrong-bytes",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/zero-applicable"
+        },
+        {
+          "mutant": "changed-root-admitted",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextDrift/changed"
+        },
+        {
+          "mutant": "removed-root-admitted",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextDrift/removed"
+        }
+      ],
+      "artifact_name": "test-evidence-ubuntu-latest"
+    },
+    {
+      "lane": "test-macos",
+      "failures": 0,
+      "passed_tests": [
+        {
+          "Package": "github.com/relux-works/curator/internal/conformancecoverage",
+          "Test": "TestMuseCandidateHistoricalHashV2GapRowsHaveTheAssignedOwner",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/conformancecoverage",
+          "Test": "TestMuseCandidateHistoricalHashV2FamiliesAreKnownGapsWhenPublished",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/conformancecoverage",
+          "Test": "TestMuseCandidateHistoricalHashV2VectorsAreKnownGapsWhenPublished",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/valid",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/missing-data",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/wrong-parent",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/HOME",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/channel",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/live-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/live-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/write-through-refresh-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/write-through-refresh-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/missing-link-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envregistry",
+          "Test": "TestRegistryClosed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envregistry",
+          "Test": "TestMuseHasNoAdmittedRootContextForm",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/missing-link-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/temp-rename-fork-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/temp-rename-fork-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/retargeted-link-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/retargeted-link-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/dangling-target-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/dangling-target-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/metadata-unreadable-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/metadata-unreadable-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/target-unreadable-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/target-unreadable-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseForkRefusedRegression",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/outside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/outside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/inside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/inside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/outside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/outside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/inside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/inside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseDirectoriesAndIsolation",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/empty-directory",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/nonempty-directory",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/relative-link",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/target-directory",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/readlink-error",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/missing-link-missing-target",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/config-parent-link",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseGlobalReconciliationUsesExplicitProvisioning",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/absent",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/marker-unreadable",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/backup-unreadable",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/marker-malformed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedRegistryLayout",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/monolithic",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/zero-applicable",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/no-context",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/referenced-refused",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextDrift/changed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextDrift/removed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextDrift",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextStatus",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/configured-form-ignored",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/referenced-fallback",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/no-context-admitted",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/wrong-target",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/wrong-bytes",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/changed-root-admitted",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/removed-root-admitted",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIFragmentAndFakeLaunch",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseProfileSeedSecretAndCredentialRefusals/secret",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseProfileSeedSecretAndCredentialRefusals/auth",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseProfileSeedSecretAndCredentialRefusals",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-permissions-yolo-unlocked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-permissions-native-locked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-permissions-native-silent.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-absent.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-unknown-mode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-yolo-locked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-yolo-silent.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-locked-profile-source.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-global-unlocked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-unknown-source.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-unknown-field.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-missing-mode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-claude_code.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-claude_code.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-codex_cli.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-codex_cli.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-opencode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-opencode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-pi.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-pi.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_CONFIG_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_CONFIG_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_DATA_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_DATA_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_STATE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_STATE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_CACHE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_CACHE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-HOME-added.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-HOME-substitution.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-unverified-system-prompt.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-unverified-mcp.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-v2-token.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-unknown-environment.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIAuthParentBoundary/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIAuthParentBoundary/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIAuthParentBoundary",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestAuthoritativeDryRunCasesMutateNothingPersistent",
+          "Action": "pass"
+        }
+      ],
+      "mutants": [
+        {
+          "mutant": "configured-form-ignored",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/referenced-refused"
+        },
+        {
+          "mutant": "referenced-fallback",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/referenced-refused"
+        },
+        {
+          "mutant": "no-context-admitted",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/no-context"
+        },
+        {
+          "mutant": "wrong-target",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/monolithic"
+        },
+        {
+          "mutant": "wrong-bytes",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/zero-applicable"
+        },
+        {
+          "mutant": "changed-root-admitted",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextDrift/changed"
+        },
+        {
+          "mutant": "removed-root-admitted",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextDrift/removed"
+        }
+      ],
+      "artifact_name": "test-evidence-macos-latest"
+    },
+    {
+      "lane": "test-windows",
+      "failures": 0,
+      "passed_tests": [
+        {
+          "Package": "github.com/relux-works/curator/internal/conformancecoverage",
+          "Test": "TestMuseCandidateHistoricalHashV2GapRowsHaveTheAssignedOwner",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/conformancecoverage",
+          "Test": "TestMuseCandidateHistoricalHashV2FamiliesAreKnownGapsWhenPublished",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/conformancecoverage",
+          "Test": "TestMuseCandidateHistoricalHashV2VectorsAreKnownGapsWhenPublished",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/valid",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/missing-data",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/wrong-parent",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/HOME",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/channel",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envregistry",
+          "Test": "TestRegistryClosed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envregistry",
+          "Test": "TestMuseHasNoAdmittedRootContextForm",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/monolithic",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/zero-applicable",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/no-context",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/referenced-refused",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextDrift/changed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextDrift/removed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextDrift",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextStatus",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/configured-form-ignored",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/live-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/live-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/write-through-refresh-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/write-through-refresh-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/referenced-fallback",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/missing-link-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/missing-link-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/temp-rename-fork-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/temp-rename-fork-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/retargeted-link-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/retargeted-link-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/dangling-target-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/no-context-admitted",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/dangling-target-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/metadata-unreadable-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/metadata-unreadable-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/target-unreadable-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/target-unreadable-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/wrong-target",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseForkRefusedRegression",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/outside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/outside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/inside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/inside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/outside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/outside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/inside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/wrong-bytes",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/inside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseDirectoriesAndIsolation",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/empty-directory",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/nonempty-directory",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/relative-link",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/target-directory",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/changed-root-admitted",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/readlink-error",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/missing-link-missing-target",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/config-parent-link",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseGlobalReconciliationUsesExplicitProvisioning",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/absent",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/marker-unreadable",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/backup-unreadable",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/marker-malformed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedRegistryLayout",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/removed-root-admitted",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIFragmentAndFakeLaunch",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseProfileSeedSecretAndCredentialRefusals/secret",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseProfileSeedSecretAndCredentialRefusals/auth",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseProfileSeedSecretAndCredentialRefusals",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-permissions-yolo-unlocked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestAuthoritativeDryRunCasesMutateNothingPersistent",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-permissions-native-locked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-permissions-native-silent.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-absent.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-unknown-mode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-yolo-locked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-yolo-silent.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-locked-profile-source.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-global-unlocked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-unknown-source.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-unknown-field.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-missing-mode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-claude_code.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-claude_code.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-codex_cli.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-codex_cli.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-opencode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-opencode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-pi.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-pi.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_CONFIG_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_CONFIG_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_DATA_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_DATA_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_STATE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_STATE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_CACHE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_CACHE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-HOME-added.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-HOME-substitution.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-unverified-system-prompt.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-unverified-mcp.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-v2-token.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-unknown-environment.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIAuthParentBoundary/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIAuthParentBoundary/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIAuthParentBoundary",
+          "Action": "pass"
+        }
+      ],
+      "mutants": [
+        {
+          "mutant": "configured-form-ignored",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/referenced-refused"
+        },
+        {
+          "mutant": "referenced-fallback",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/referenced-refused"
+        },
+        {
+          "mutant": "no-context-admitted",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/no-context"
+        },
+        {
+          "mutant": "wrong-target",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/monolithic"
+        },
+        {
+          "mutant": "wrong-bytes",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/zero-applicable"
+        },
+        {
+          "mutant": "changed-root-admitted",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextDrift/changed"
+        },
+        {
+          "mutant": "removed-root-admitted",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextDrift/removed"
+        }
+      ],
+      "artifact_name": "test-evidence-windows-latest"
+    },
+    {
+      "lane": "race-ubuntu",
+      "failures": 0,
+      "passed_tests": [
+        {
+          "Package": "github.com/relux-works/curator/internal/conformancecoverage",
+          "Test": "TestMuseCandidateHistoricalHashV2GapRowsHaveTheAssignedOwner",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/conformancecoverage",
+          "Test": "TestMuseCandidateHistoricalHashV2FamiliesAreKnownGapsWhenPublished",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/conformancecoverage",
+          "Test": "TestMuseCandidateHistoricalHashV2VectorsAreKnownGapsWhenPublished",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/monolithic",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/zero-applicable",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/no-context",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/referenced-refused",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextDrift/changed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextDrift/removed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextDrift",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextStatus",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/valid",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/missing-data",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/wrong-parent",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/HOME",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/channel",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/configured-form-ignored",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/referenced-fallback",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/no-context-admitted",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/wrong-target",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/wrong-bytes",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/changed-root-admitted",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/removed-root-admitted",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIFragmentAndFakeLaunch",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseProfileSeedSecretAndCredentialRefusals/secret",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseProfileSeedSecretAndCredentialRefusals/auth",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseProfileSeedSecretAndCredentialRefusals",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-permissions-yolo-unlocked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-permissions-native-locked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-permissions-native-silent.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-absent.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-unknown-mode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-yolo-locked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-yolo-silent.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-locked-profile-source.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-global-unlocked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-unknown-source.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-unknown-field.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-missing-mode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-claude_code.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-claude_code.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-codex_cli.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-codex_cli.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-opencode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-opencode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-pi.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-pi.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_CONFIG_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_CONFIG_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_DATA_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_DATA_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_STATE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_STATE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_CACHE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_CACHE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-HOME-added.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-HOME-substitution.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-unverified-system-prompt.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-unverified-mcp.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-v2-token.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-unknown-environment.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIAuthParentBoundary/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIAuthParentBoundary/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIAuthParentBoundary",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envregistry",
+          "Test": "TestRegistryClosed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envregistry",
+          "Test": "TestMuseHasNoAdmittedRootContextForm",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/live-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/live-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/write-through-refresh-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/write-through-refresh-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/missing-link-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/missing-link-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/temp-rename-fork-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/temp-rename-fork-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/retargeted-link-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/retargeted-link-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/dangling-target-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/dangling-target-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/metadata-unreadable-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/metadata-unreadable-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/target-unreadable-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/target-unreadable-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseForkRefusedRegression",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/outside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/outside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/inside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/inside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/outside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/outside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/inside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/inside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseDirectoriesAndIsolation",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/empty-directory",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/nonempty-directory",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/relative-link",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/target-directory",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/readlink-error",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/missing-link-missing-target",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/config-parent-link",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseGlobalReconciliationUsesExplicitProvisioning",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/absent",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/marker-unreadable",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/backup-unreadable",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/marker-malformed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedRegistryLayout",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestAuthoritativeDryRunCasesMutateNothingPersistent",
+          "Action": "pass"
+        }
+      ],
+      "mutants": [
+        {
+          "mutant": "configured-form-ignored",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/referenced-refused"
+        },
+        {
+          "mutant": "referenced-fallback",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/referenced-refused"
+        },
+        {
+          "mutant": "no-context-admitted",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/no-context"
+        },
+        {
+          "mutant": "wrong-target",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/monolithic"
+        },
+        {
+          "mutant": "wrong-bytes",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/zero-applicable"
+        },
+        {
+          "mutant": "changed-root-admitted",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextDrift/changed"
+        },
+        {
+          "mutant": "removed-root-admitted",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextDrift/removed"
+        }
+      ],
+      "artifact_name": "race-evidence-ubuntu-latest"
+    },
+    {
+      "lane": "race-macos",
+      "failures": 0,
+      "passed_tests": [
+        {
+          "Package": "github.com/relux-works/curator/internal/conformancecoverage",
+          "Test": "TestMuseCandidateHistoricalHashV2GapRowsHaveTheAssignedOwner",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/conformancecoverage",
+          "Test": "TestMuseCandidateHistoricalHashV2FamiliesAreKnownGapsWhenPublished",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/conformancecoverage",
+          "Test": "TestMuseCandidateHistoricalHashV2VectorsAreKnownGapsWhenPublished",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/monolithic",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/zero-applicable",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/no-context",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors/referenced-refused",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextVectors",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextDrift/changed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextDrift/removed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextDrift",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextStatus",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/configured-form-ignored",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/referenced-fallback",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/no-context-admitted",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/wrong-target",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/wrong-bytes",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/changed-root-admitted",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants/removed-root-admitted",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseRootContextNarrowingMutants",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIFragmentAndFakeLaunch",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseProfileSeedSecretAndCredentialRefusals/secret",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseProfileSeedSecretAndCredentialRefusals/auth",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseProfileSeedSecretAndCredentialRefusals",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-permissions-yolo-unlocked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-permissions-native-locked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-permissions-native-silent.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-absent.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-unknown-mode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-yolo-locked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-yolo-silent.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-locked-profile-source.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-global-unlocked.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-unknown-source.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-unknown-field.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-permissions-missing-mode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-claude_code.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-claude_code.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-codex_cli.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-codex_cli.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-opencode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-opencode.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/valid-pi.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-extra-parent-pi.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_CONFIG_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_CONFIG_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_DATA_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_DATA_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_STATE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_STATE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-missing-XDG_CACHE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-wrong-parent-XDG_CACHE_HOME.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-HOME-added.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-HOME-substitution.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-unverified-system-prompt.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-unverified-mcp.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-v2-token.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases/invalid-unknown-environment.json",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseFragmentV3PublishedCases",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIAuthParentBoundary/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIAuthParentBoundary/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/cmd/curator",
+          "Test": "TestMuseCLIAuthParentBoundary",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/valid",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/missing-data",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/wrong-parent",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/HOME",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary/channel",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envfragment",
+          "Test": "TestMuseFragmentBoundary",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envregistry",
+          "Test": "TestRegistryClosed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envregistry",
+          "Test": "TestMuseHasNoAdmittedRootContextForm",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/live-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/live-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/write-through-refresh-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/write-through-refresh-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/missing-link-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/missing-link-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/temp-rename-fork-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/temp-rename-fork-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/retargeted-link-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/retargeted-link-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/dangling-target-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/dangling-target-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/metadata-unreadable-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/metadata-unreadable-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/target-unreadable-resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates/target-unreadable-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedLinkStates",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseForkRefusedRegression",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/outside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/outside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/inside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/inside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/outside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/outside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/inside/resolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve/config/muse/inside/resolve-repair",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthParentBoundaryAtResolve",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseDirectoriesAndIsolation",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/empty-directory",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/nonempty-directory",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/relative-link",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/target-directory",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/readlink-error",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/missing-link-missing-target",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates/config-parent-link",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseAuthRepairAdditionalStates",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseGlobalReconciliationUsesExplicitProvisioning",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/absent",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/marker-unreadable",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/backup-unreadable",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning/marker-malformed",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMuseStatusOptionalProvisioning",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/envprofile",
+          "Test": "TestMusePublishedRegistryLayout",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/relux-works/curator/internal/install",
+          "Test": "TestAuthoritativeDryRunCasesMutateNothingPersistent",
+          "Action": "pass"
+        }
+      ],
+      "mutants": [
+        {
+          "mutant": "configured-form-ignored",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/referenced-refused"
+        },
+        {
+          "mutant": "referenced-fallback",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/referenced-refused"
+        },
+        {
+          "mutant": "no-context-admitted",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/no-context"
+        },
+        {
+          "mutant": "wrong-target",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/monolithic"
+        },
+        {
+          "mutant": "wrong-bytes",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextVectors/zero-applicable"
+        },
+        {
+          "mutant": "changed-root-admitted",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextDrift/changed"
+        },
+        {
+          "mutant": "removed-root-admitted",
+          "real_exit": 1,
+          "killed_by": "TestMuseRootContextDrift/removed"
+        }
+      ],
+      "artifact_name": "race-evidence-macos-latest"
+    }
+  ]
+}

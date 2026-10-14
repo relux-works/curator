@@ -1,0 +1,190 @@
+[
+  {
+    "lane": "test-evidence-macos-latest",
+    "sha256": "dbf4ee62b41c417c7c1ac005f6b9992c5e8c72ef94cf578bf969951c47913616",
+    "tests": {
+      "TestMuseHasNoAdmittedRootContextForm": "pass",
+      "TestMuseRootContextVectors/monolithic": "pass",
+      "TestMuseRootContextVectors/zero-applicable": "pass",
+      "TestMuseRootContextVectors/no-context": "pass",
+      "TestMuseRootContextVectors/referenced-refused": "pass",
+      "TestMuseRootContextVectors": "pass",
+      "TestMuseRootContextDrift/changed": "pass",
+      "TestMuseRootContextDrift/removed": "pass",
+      "TestMuseRootContextDrift": "pass",
+      "TestMuseRootContextStatus": "pass",
+      "TestMuseRootContextNarrowingMutants/configured-form-ignored": "pass",
+      "TestMuseRootContextNarrowingMutants/referenced-fallback": "pass",
+      "TestMuseRootContextNarrowingMutants/no-context-admitted": "pass",
+      "TestMuseRootContextNarrowingMutants/wrong-target": "pass",
+      "TestMuseRootContextNarrowingMutants/wrong-bytes": "pass",
+      "TestMuseRootContextNarrowingMutants/changed-root-admitted": "pass",
+      "TestMuseRootContextNarrowingMutants/removed-root-admitted": "pass",
+      "TestMuseRootContextNarrowingMutants": "pass"
+    },
+    "kills": [
+      "muse_root_context_test.go:282: configured-form-ignored: expected-red go test exit 1; killed by TestMuseRootContextVectors/referenced-refused",
+      "muse_root_context_test.go:282: referenced-fallback: expected-red go test exit 1; killed by TestMuseRootContextVectors/referenced-refused",
+      "muse_root_context_test.go:282: no-context-admitted: expected-red go test exit 1; killed by TestMuseRootContextVectors/no-context",
+      "muse_root_context_test.go:282: wrong-target: expected-red go test exit 1; killed by TestMuseRootContextVectors/monolithic",
+      "muse_root_context_test.go:282: wrong-bytes: expected-red go test exit 1; killed by TestMuseRootContextVectors/zero-applicable",
+      "muse_root_context_test.go:282: changed-root-admitted: expected-red go test exit 1; killed by TestMuseRootContextDrift/changed",
+      "muse_root_context_test.go:282: removed-root-admitted: expected-red go test exit 1; killed by TestMuseRootContextDrift/removed"
+    ],
+    "cli_package_terminal": "pass",
+    "non_json_lines": []
+  },
+  {
+    "lane": "test-evidence-ubuntu-latest",
+    "sha256": "280f3019c794e1e86c4381e1a97b2480b7dfc16e62f811a24dbdab409c7a8346",
+    "tests": {
+      "TestMuseHasNoAdmittedRootContextForm": "pass",
+      "TestMuseRootContextVectors/monolithic": "pass",
+      "TestMuseRootContextVectors/zero-applicable": "pass",
+      "TestMuseRootContextVectors/no-context": "pass",
+      "TestMuseRootContextVectors/referenced-refused": "pass",
+      "TestMuseRootContextVectors": "pass",
+      "TestMuseRootContextDrift/changed": "pass",
+      "TestMuseRootContextDrift/removed": "pass",
+      "TestMuseRootContextDrift": "pass",
+      "TestMuseRootContextStatus": "pass",
+      "TestMuseRootContextNarrowingMutants/configured-form-ignored": "pass",
+      "TestMuseRootContextNarrowingMutants/referenced-fallback": "pass",
+      "TestMuseRootContextNarrowingMutants/no-context-admitted": "pass",
+      "TestMuseRootContextNarrowingMutants/wrong-target": "pass",
+      "TestMuseRootContextNarrowingMutants/wrong-bytes": "pass",
+      "TestMuseRootContextNarrowingMutants/changed-root-admitted": "pass",
+      "TestMuseRootContextNarrowingMutants/removed-root-admitted": "pass",
+      "TestMuseRootContextNarrowingMutants": "pass"
+    },
+    "kills": [
+      "muse_root_context_test.go:282: configured-form-ignored: expected-red go test exit 1; killed by TestMuseRootContextVectors/referenced-refused",
+      "muse_root_context_test.go:282: referenced-fallback: expected-red go test exit 1; killed by TestMuseRootContextVectors/referenced-refused",
+      "muse_root_context_test.go:282: no-context-admitted: expected-red go test exit 1; killed by TestMuseRootContextVectors/no-context",
+      "muse_root_context_test.go:282: wrong-target: expected-red go test exit 1; killed by TestMuseRootContextVectors/monolithic",
+      "muse_root_context_test.go:282: wrong-bytes: expected-red go test exit 1; killed by TestMuseRootContextVectors/zero-applicable",
+      "muse_root_context_test.go:282: changed-root-admitted: expected-red go test exit 1; killed by TestMuseRootContextDrift/changed",
+      "muse_root_context_test.go:282: removed-root-admitted: expected-red go test exit 1; killed by TestMuseRootContextDrift/removed"
+    ],
+    "cli_package_terminal": "pass",
+    "non_json_lines": []
+  },
+  {
+    "lane": "test-evidence-windows-latest",
+    "sha256": "ee70422e11830676084b44e71a67bae3cb4a940bd39d08bc602a4680930e3b5b",
+    "tests": {
+      "TestMuseHasNoAdmittedRootContextForm": "pass",
+      "TestMuseRootContextVectors/monolithic": "pass",
+      "TestMuseRootContextVectors/zero-applicable": "pass",
+      "TestMuseRootContextVectors/no-context": "pass",
+      "TestMuseRootContextVectors/referenced-refused": "pass",
+      "TestMuseRootContextVectors": "pass",
+      "TestMuseRootContextDrift/changed": "pass",
+      "TestMuseRootContextDrift/removed": "pass",
+      "TestMuseRootContextDrift": "pass",
+      "TestMuseRootContextStatus": "pass",
+      "TestMuseRootContextNarrowingMutants/configured-form-ignored": "pass",
+      "TestMuseRootContextNarrowingMutants/referenced-fallback": "pass",
+      "TestMuseRootContextNarrowingMutants/no-context-admitted": "pass",
+      "TestMuseRootContextNarrowingMutants/wrong-target": "pass",
+      "TestMuseRootContextNarrowingMutants/wrong-bytes": "pass",
+      "TestMuseRootContextNarrowingMutants/changed-root-admitted": "pass",
+      "TestMuseRootContextNarrowingMutants/removed-root-admitted": "pass",
+      "TestMuseRootContextNarrowingMutants": "pass"
+    },
+    "kills": [
+      "muse_root_context_test.go:282: configured-form-ignored: expected-red go test exit 1; killed by TestMuseRootContextVectors/referenced-refused",
+      "muse_root_context_test.go:282: referenced-fallback: expected-red go test exit 1; killed by TestMuseRootContextVectors/referenced-refused",
+      "muse_root_context_test.go:282: no-context-admitted: expected-red go test exit 1; killed by TestMuseRootContextVectors/no-context",
+      "muse_root_context_test.go:282: wrong-target: expected-red go test exit 1; killed by TestMuseRootContextVectors/monolithic",
+      "muse_root_context_test.go:282: wrong-bytes: expected-red go test exit 1; killed by TestMuseRootContextVectors/zero-applicable",
+      "muse_root_context_test.go:282: changed-root-admitted: expected-red go test exit 1; killed by TestMuseRootContextDrift/changed",
+      "muse_root_context_test.go:282: removed-root-admitted: expected-red go test exit 1; killed by TestMuseRootContextDrift/removed"
+    ],
+    "cli_package_terminal": "pass",
+    "non_json_lines": []
+  },
+  {
+    "lane": "race-evidence-macos-latest",
+    "sha256": "eecd711199b9c9a495ca4e8ec7a05383dbe21976d3325840fdd223076fed704e",
+    "tests": {
+      "TestMuseRootContextVectors/monolithic": "pass",
+      "TestMuseRootContextVectors/zero-applicable": "pass",
+      "TestMuseRootContextVectors/no-context": "pass",
+      "TestMuseRootContextVectors/referenced-refused": "pass",
+      "TestMuseRootContextVectors": "pass",
+      "TestMuseRootContextDrift/changed": "pass",
+      "TestMuseRootContextDrift/removed": "pass",
+      "TestMuseRootContextDrift": "pass",
+      "TestMuseRootContextStatus": "pass",
+      "TestMuseRootContextNarrowingMutants/configured-form-ignored": "pass",
+      "TestMuseRootContextNarrowingMutants/referenced-fallback": "pass",
+      "TestMuseRootContextNarrowingMutants/no-context-admitted": "pass",
+      "TestMuseRootContextNarrowingMutants/wrong-target": "pass",
+      "TestMuseRootContextNarrowingMutants/wrong-bytes": "pass",
+      "TestMuseRootContextNarrowingMutants/changed-root-admitted": "pass",
+      "TestMuseRootContextNarrowingMutants/removed-root-admitted": "pass",
+      "TestMuseRootContextNarrowingMutants": "pass",
+      "TestMuseHasNoAdmittedRootContextForm": "pass"
+    },
+    "kills": [
+      "muse_root_context_test.go:282: configured-form-ignored: expected-red go test exit 1; killed by TestMuseRootContextVectors/referenced-refused",
+      "muse_root_context_test.go:282: referenced-fallback: expected-red go test exit 1; killed by TestMuseRootContextVectors/referenced-refused",
+      "muse_root_context_test.go:282: no-context-admitted: expected-red go test exit 1; killed by TestMuseRootContextVectors/no-context",
+      "muse_root_context_test.go:282: wrong-target: expected-red go test exit 1; killed by TestMuseRootContextVectors/monolithic",
+      "muse_root_context_test.go:282: wrong-bytes: expected-red go test exit 1; killed by TestMuseRootContextVectors/zero-applicable",
+      "muse_root_context_test.go:282: changed-root-admitted: expected-red go test exit 1; killed by TestMuseRootContextDrift/changed",
+      "muse_root_context_test.go:282: removed-root-admitted: expected-red go test exit 1; killed by TestMuseRootContextDrift/removed"
+    ],
+    "cli_package_terminal": "pass",
+    "non_json_lines": []
+  },
+  {
+    "lane": "race-evidence-ubuntu-latest",
+    "sha256": "6cc265e49f8f345b762dea95e53d75f3e47254fe4da00f8fce4a8d884419592f",
+    "tests": {
+      "TestMuseRootContextVectors/monolithic": "pass",
+      "TestMuseRootContextVectors/zero-applicable": "pass",
+      "TestMuseRootContextVectors/no-context": "pass",
+      "TestMuseRootContextVectors/referenced-refused": "pass",
+      "TestMuseRootContextVectors": "pass",
+      "TestMuseRootContextDrift/changed": "pass",
+      "TestMuseRootContextDrift/removed": "pass",
+      "TestMuseRootContextDrift": "pass",
+      "TestMuseRootContextStatus": "pass",
+      "TestMuseRootContextNarrowingMutants/configured-form-ignored": "pass",
+      "TestMuseRootContextNarrowingMutants/referenced-fallback": "pass",
+      "TestMuseRootContextNarrowingMutants/no-context-admitted": "pass",
+      "TestMuseRootContextNarrowingMutants/wrong-target": "pass",
+      "TestMuseRootContextNarrowingMutants/wrong-bytes": "pass",
+      "TestMuseRootContextNarrowingMutants/changed-root-admitted": "pass",
+      "TestMuseRootContextNarrowingMutants/removed-root-admitted": "pass",
+      "TestMuseRootContextNarrowingMutants": "pass",
+      "TestMuseHasNoAdmittedRootContextForm": "pass"
+    },
+    "kills": [
+      "muse_root_context_test.go:282: configured-form-ignored: expected-red go test exit 1; killed by TestMuseRootContextVectors/referenced-refused",
+      "muse_root_context_test.go:282: referenced-fallback: expected-red go test exit 1; killed by TestMuseRootContextVectors/referenced-refused",
+      "muse_root_context_test.go:282: no-context-admitted: expected-red go test exit 1; killed by TestMuseRootContextVectors/no-context",
+      "muse_root_context_test.go:282: wrong-target: expected-red go test exit 1; killed by TestMuseRootContextVectors/monolithic",
+      "muse_root_context_test.go:282: wrong-bytes: expected-red go test exit 1; killed by TestMuseRootContextVectors/zero-applicable",
+      "muse_root_context_test.go:282: changed-root-admitted: expected-red go test exit 1; killed by TestMuseRootContextDrift/changed",
+      "muse_root_context_test.go:282: removed-root-admitted: expected-red go test exit 1; killed by TestMuseRootContextDrift/removed"
+    ],
+    "cli_package_terminal": "pass",
+    "non_json_lines": [
+      {
+        "line": 1,
+        "text": "go: downloading github.com/dlclark/regexp2 v1.11.0"
+      },
+      {
+        "line": 2,
+        "text": "go: downloading github.com/santhosh-tekuri/jsonschema/v6 v6.0.3"
+      },
+      {
+        "line": 3,
+        "text": "go: downloading github.com/relux-works/skill-go-testing-tools/tuitestkit v0.1.1"
+      }
+    ]
+  }
+]
