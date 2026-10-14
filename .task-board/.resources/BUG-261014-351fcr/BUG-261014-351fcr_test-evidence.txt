@@ -1,0 +1,124 @@
+BUG-261014-351fcr — local migration regression and mutant evidence
+Expected-red mutant exit code 1 is a failure, never a passing gate.
+
+Evidence: focused-regression-02.log
+Real exit code: 0
+SHA-256: 5b7189058a62371755be1d5c0308f36e10095c849661bc7ae04e8d26ce90c29a
+
+=== RUN   TestMigratedGlobalSkillBinaryWriteVersion
+=== RUN   TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-and-binary/v2
+=== RUN   TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-and-binary/v1
+=== RUN   TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-only/v2
+=== RUN   TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-only/v1
+=== RUN   TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/binary-only/v2
+=== RUN   TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/binary-only/v1
+=== RUN   TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-and-binary/v2
+=== RUN   TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-and-binary/v1
+=== RUN   TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-only/v2
+=== RUN   TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-only/v1
+=== RUN   TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/binary-only/v2
+=== RUN   TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/binary-only/v1
+--- PASS: TestMigratedGlobalSkillBinaryWriteVersion (3.81s)
+    --- PASS: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-and-binary/v2 (0.42s)
+    --- PASS: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-and-binary/v1 (0.25s)
+    --- PASS: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-only/v2 (0.37s)
+    --- PASS: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-only/v1 (0.25s)
+    --- PASS: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/binary-only/v2 (0.39s)
+    --- PASS: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/binary-only/v1 (0.25s)
+    --- PASS: TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-and-binary/v2 (0.39s)
+    --- PASS: TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-and-binary/v1 (0.24s)
+    --- PASS: TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-only/v2 (0.37s)
+    --- PASS: TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-only/v1 (0.23s)
+    --- PASS: TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/binary-only/v2 (0.38s)
+    --- PASS: TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/binary-only/v1 (0.28s)
+=== RUN   TestMigratedGlobalSkillNetworkUndeclaredFollowUp
+    global_migration_hash_version_test.go:189: follow-up refusal: profile_source_invalid: migrated global skill "binary-skill" audit blocked: audit blocked: binary-skill: high audit.capability.network-undeclared - contacts downloads.example.com, which no capabilities.network entry covers (file: scripts/fetch.sh)
+--- PASS: TestMigratedGlobalSkillNetworkUndeclaredFollowUp (0.38s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	4.656s
+
+Evidence: mutant-direct-v1-01.log
+Real exit code: 1
+SHA-256: ccc0acce4cd3980569ed4a6e3210af3623c2ae608f588612fc68c0c65a7b45b9
+
+--- FAIL: TestMigratedGlobalSkillBinaryWriteVersion (2.92s)
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-and-binary/v2 (0.25s)
+        global_migration_hash_version_test.go:124: v2 migration: profile_source_invalid: migrated global skill "binary-skill" carries a blocking finding (opaque-file) in .task-board/attachments/attachment.gz
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-only/v2 (0.23s)
+        global_migration_hash_version_test.go:124: v2 migration: profile_source_invalid: migrated global skill "binary-skill" carries a blocking finding (opaque-file) in .task-board/attachments/attachment.gz
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/binary-only/v2 (0.25s)
+        global_migration_hash_version_test.go:124: v2 migration: profile_source_invalid: migrated global skill "binary-skill" carries a blocking finding (opaque-file) in .task-board/attachments/small.bin
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-and-binary/v2 (0.23s)
+        global_migration_hash_version_test.go:124: v2 migration: profile_source_invalid: migrated global skill "binary-skill" carries a blocking finding (opaque-file) in assets/deep/attachment.gz
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-only/v2 (0.25s)
+        global_migration_hash_version_test.go:124: v2 migration: profile_source_invalid: migrated global skill "binary-skill" carries a blocking finding (opaque-file) in assets/deep/attachment.gz
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/binary-only/v2 (0.28s)
+        global_migration_hash_version_test.go:124: v2 migration: profile_source_invalid: migrated global skill "binary-skill" carries a blocking finding (opaque-file) in assets/deep/small.bin
+FAIL
+FAIL	github.com/relux-works/curator/internal/envprofile	3.373s
+FAIL
+
+Evidence: mutant-resolved-v1-01.log
+Real exit code: 1
+SHA-256: 0a24ca2cc5340099287f18a21b23246864cc2ae4b3dd060cdfc8161fc55c7b6c
+
+--- FAIL: TestMigratedGlobalSkillBinaryWriteVersion (2.79s)
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-and-binary/v2 (0.24s)
+        global_migration_hash_version_test.go:124: v2 migration: profile_source_invalid: migrated global skill "binary-skill" audit blocked: audit.opaque.nul-byte: regular file contains a NUL byte and is treated as opaque (files: .task-board/attachments/attachment.gz, .task-board/attachments/small.bin)
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-only/v2 (0.23s)
+        global_migration_hash_version_test.go:124: v2 migration: profile_source_invalid: migrated global skill "binary-skill" audit blocked: audit.opaque.nul-byte: regular file contains a NUL byte and is treated as opaque (files: .task-board/attachments/attachment.gz)
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/binary-only/v2 (0.24s)
+        global_migration_hash_version_test.go:124: v2 migration: profile_source_invalid: migrated global skill "binary-skill" audit blocked: audit.opaque.nul-byte: regular file contains a NUL byte and is treated as opaque (files: .task-board/attachments/small.bin)
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-and-binary/v2 (0.23s)
+        global_migration_hash_version_test.go:124: v2 migration: profile_source_invalid: migrated global skill "binary-skill" audit blocked: audit.opaque.nul-byte: regular file contains a NUL byte and is treated as opaque (files: assets/deep/attachment.gz, assets/deep/small.bin)
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-only/v2 (0.23s)
+        global_migration_hash_version_test.go:124: v2 migration: profile_source_invalid: migrated global skill "binary-skill" audit blocked: audit.opaque.nul-byte: regular file contains a NUL byte and is treated as opaque (files: assets/deep/attachment.gz)
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/binary-only/v2 (0.23s)
+        global_migration_hash_version_test.go:124: v2 migration: profile_source_invalid: migrated global skill "binary-skill" audit blocked: audit.opaque.nul-byte: regular file contains a NUL byte and is treated as opaque (files: assets/deep/small.bin)
+FAIL
+FAIL	github.com/relux-works/curator/internal/envprofile	3.136s
+FAIL
+
+Evidence: mutant-board-exemption-01.log
+Real exit code: 1
+SHA-256: 98ea3254270e7573220100e57dc47cf30b65feecf25d22b54bdb02982bf72f70
+
+--- FAIL: TestMigratedGlobalSkillBinaryWriteVersion (4.20s)
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-and-binary/v1 (0.40s)
+        global_migration_hash_version_test.go:118: v1 migration = <nil>, want profile_source_invalid with opaque-file in .task-board/attachments
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-only/v1 (0.42s)
+        global_migration_hash_version_test.go:118: v1 migration = <nil>, want profile_source_invalid with opaque-file in .task-board/attachments
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/binary-only/v1 (0.38s)
+        global_migration_hash_version_test.go:118: v1 migration = <nil>, want profile_source_invalid with opaque-file in .task-board/attachments
+FAIL
+FAIL	github.com/relux-works/curator/internal/envprofile	4.551s
+FAIL
+
+Evidence: mutant-board-file-01.log
+Real exit code: 1
+SHA-256: 4814d3bf58020ef7a234188964d3d6b287d0dcf7355364f189671b9d9c8d439d
+
+--- FAIL: TestMigratedGlobalSkillBinaryWriteVersion (3.94s)
+    --- FAIL: TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-only/v1 (0.38s)
+        global_migration_hash_version_test.go:118: v1 migration = <nil>, want profile_source_invalid with opaque-file in .task-board/attachments
+FAIL
+FAIL	github.com/relux-works/curator/internal/envprofile	4.427s
+FAIL
+
+Evidence: mutant-network-host-01.log
+Real exit code: 1
+SHA-256: d913bcf0d8019d85eda68c0d0249f4f62c4e4cdd1f8a72a24958b1f06f5a3cdd
+
+--- FAIL: TestMigratedGlobalSkillNetworkUndeclaredFollowUp (0.37s)
+    global_migration_hash_version_test.go:181: migration = <nil>, want strict network-undeclared finding
+FAIL
+FAIL	github.com/relux-works/curator/internal/envprofile	0.710s
+FAIL
+
+Full package command: go test ./internal/envprofile/... -count=1 -v
+Real exit code: 0
+Log SHA-256: 3ff0f9c8fd17553e4f89a5b9749259e8ff96cb878034b4455366d3cd6f37fc51
+Terminal output:
+--- PASS: TestResolveRenderedDocumentReplacesStoreSymlinkWithoutFollowing (0.37s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	214.281s
