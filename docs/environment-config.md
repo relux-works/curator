@@ -78,6 +78,45 @@ does not write launcher configuration.
   "environments": {"permissions": {}}
 }
 ```
+## Logging in to managed homes
+
+Curator never copies, stores, or reads login tokens. A managed home gets its
+login in one of two ways, chosen per profile × environment with
+`curator env config set isolation.<profile>.<env-id> shared|isolated`:
+
+- **`shared`**: the home reuses your native login through a link that Curator
+  re-checks on every resolve. You log in once, natively.
+- **`isolated`**: the home has no link and logs in by itself. You log in once
+  **per home**, that is once per profile × environment, and every later launch
+  into that home, including spawned agents, reuses that login.
+
+| Environment | Default | `shared` | `isolated` |
+|---|---|---|---|
+| `claude_code` on macOS | `isolated` | refused with `environment_shared_unsupported`: Claude Code keys its Keychain item to `CLAUDE_CONFIG_DIR`, so there is nothing to link without copying tokens | one login per home |
+| `claude_code` on Linux | `shared` | `.credentials.json` links to the native file | one login per home |
+| `codex_cli` | `shared` | `auth.json` links to the native file under `file` storage (the default when `cli_auth_credentials_store` is absent); under `keyring` or `auto` the login is ambient | admitted only under `file` storage; otherwise `environment_isolated_unsupported` |
+| `pi` | `shared` | `auth.json` links to the native `~/.pi/agent/auth.json` | one login per home |
+| `muse` | `shared` | `config/muse/auth.json` links to the native file | refused with `environment_isolated_unsupported` until a fresh-login probe verifies it |
+| `opencode` | `shared` (ambient) | its login lives outside the swapped config home, so nothing is linked | not applicable: refused, since the login is outside the home |
+
+For `codex_cli`, sharing follows the storage selected by your **native**
+`config.toml`. A managed `config.toml` that selects differently changes
+nothing, and Curator never rewrites either file to align them.
+
+**Claude Code on macOS needs one login per home.** A new or never-used home is
+not logged in, and a launch into it, interactive or spawned, stops with
+Claude Code's "Not logged in" message. Log in once before the first spawn:
+
+```bash
+eval "$(curator env resolve claude_code --profile <name> --format shell)"
+claude    # then run /login
+```
+
+`--format shell` prints the `CLAUDE_CONFIG_DIR` export for that home. The
+login stays in that home's Keychain item, so later launches need nothing more.
+Each profile has its own home, so each profile you use with Claude Code needs
+its own login.
+
 ## Managed-home credential records
 
 Managed-home `.agent-environment.json` markers use schema 2 for new
