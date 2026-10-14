@@ -109,13 +109,31 @@ Claude Code's "Not logged in" message. Log in once before the first spawn:
 
 ```bash
 eval "$(curator env resolve claude_code --profile <name> --format shell)"
-claude    # then run /login
+claude auth login
 ```
 
-`--format shell` prints the `CLAUDE_CONFIG_DIR` export for that home. The
-login stays in that home's Keychain item, so later launches need nothing more.
-Each profile has its own home, so each profile you use with Claude Code needs
-its own login.
+`--format shell` prints the `CLAUDE_CONFIG_DIR` export for that home. Each
+profile has its own home, so each profile you use with Claude Code needs its
+own login.
+
+**Log in from the same kind of session the launches will run in.** Where
+Claude Code stores the login depends on whether the session can use the login
+Keychain, and the two stores do not see each other (observed on Claude Code
+2.1.299, macOS 15):
+
+| Session the login runs in | Login stored in | Visible to launches from |
+|---|---|---|
+| A terminal in the logged-in desktop session | the home's Keychain item `Claude Code-credentials-<hash>` | desktop sessions only |
+| ssh, or a background session where `security show-keychain-info` exits 36 (Keychain not available) | `<home>/.credentials.json`, mode 0600 | any session of that user |
+| An OS user with no login Keychain | nothing: the login fails with "Couldn't save your login" | none |
+
+A home logged in from a desktop terminal reports "Not logged in" to a launch
+from ssh or a background service, and the other way round. Spawned agents
+usually run in background sessions, so log their homes in from ssh or from the
+same background session. An OS user without a login Keychain cannot log in
+this way at all; such launches need a token supplied in the environment
+(`CLAUDE_CODE_OAUTH_TOKEN`, from `claude setup-token`), which writes nothing
+to the home or the Keychain.
 
 ## Managed-home credential records
 
