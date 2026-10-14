@@ -262,7 +262,10 @@ func TestMuseDirectoriesAndIsolation(t *testing.T) {
 		}
 	}
 	marker := readManagedMarker(t, fx, envregistry.Muse)
-	for _, surface := range []string{"root-context", "system-prompt", "mcp"} {
+	if surface, ok := marker.Surfaces[envmarker.SurfaceRootContext]; !ok || surface.Form != envregistry.FormMonolithic || len(surface.Paths) != 1 || surface.Paths[0] != "config/muse/AGENTS.md" {
+		t.Fatalf("admitted Muse root-context missing: %+v", surface)
+	}
+	for _, surface := range []string{"system-prompt", "mcp"} {
 		if _, ok := marker.Surfaces[surface]; ok {
 			t.Fatalf("unverified surface %s emitted", surface)
 		}
@@ -461,7 +464,10 @@ func TestMusePublishedRegistryLayout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if vector.Registry.ReplaceHOME || vector.Registry.RootTarget != nil || vector.Registry.RootVerified || vector.Registry.SkillsVerified || adapter.RootTarget != "" || adapter.SkillsDir != vector.Registry.Skills || adapter.VerifiedRelease != vector.Registry.Version || vector.Registry.Refresh != "unverified" || vector.Registry.Gap != "foreign-personal-context" {
+	// This published family predates the eb1f08c root-context admission.
+	// Preserve its layout/auth evidence; its null target and 1.4.1 release
+	// are historical bounds, exercised by the new root-context vectors instead.
+	if vector.Registry.ReplaceHOME || vector.Registry.RootTarget != nil || vector.Registry.RootVerified || vector.Registry.SkillsVerified || adapter.SkillsDir != vector.Registry.Skills || vector.Registry.Version != "1.4.1-R4503.1" || vector.Registry.Refresh != "unverified" || vector.Registry.Gap != "foreign-personal-context" {
 		t.Fatalf("registry evidence bounds do not match: %+v", vector.Registry)
 	}
 	fx, _, native := museFixture(t)

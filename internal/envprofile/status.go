@@ -339,7 +339,7 @@ func StatusOf(req StatusRequest) (*Status, error) {
 		Revision:   shippedCodexSeedRevision,
 		Provenance: "shipped",
 	}}
-	status.Notes = append(status.Notes, "Muse: foreign-personal-context isolation gap; root context, skills discovery, refresh semantics, and state/cache internal layouts are unverified")
+	status.Notes = append(status.Notes, "Muse: monolithic root context delivered at config/muse/AGENTS.md (verified on 1.4.7); managed exec requires --no-foreign-personal-context when the target is materialized; serve cannot exclude foreign personal context (foreign-personal-context isolation gap); workspace AGENTS.md prevailed in observed conflicts; model-visible foreign removal, skills discovery, system-prompt discovery, refresh semantics, and state/cache internal layouts remain unverified")
 	status.Notes = append(status.Notes, "opencode skills come from the machine-current profile, split-brain by construction (§7.1)")
 	if req.Policy.SecurityPosture == config.SecurityPostureHardened && len(req.Policy.AllowedSources) == 0 {
 		status.NonCurrent = true

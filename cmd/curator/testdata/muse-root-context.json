@@ -1,0 +1,10 @@
+{
+  "spec": "curator-spec eb1f08c environments §§5.2, 7.1, 7.2, 13",
+  "cases": [
+    {"name": "monolithic", "context": {"modules": [{"path": "a.md"}]}, "written": true, "body": "hello\n"},
+    {"name": "zero-applicable", "context": {"modules": [{"path": "a.md", "environments": ["codex_cli"]}]}, "written": true, "body": ""},
+    {"name": "no-context", "written": false, "body": ""},
+    {"name": "referenced-refused", "context": {"modules": [{"path": "a.md"}]}, "form": "referenced", "written": false, "diagnostic": "environment_form_unsupported"}
+  ],
+  "bounds": ["Muse exec argv is composed by external consumers; §10.2 flag vectors belong to those consumers."]
+}

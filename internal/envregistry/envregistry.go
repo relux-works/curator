@@ -184,7 +184,7 @@ type Adapter struct {
 	HomeVariables [][2]string
 	// ParentVar is true where EnvVar names a parent of the home.
 	ParentVar bool
-	// RootTarget is the root-context file name in the home.
+	// RootTarget is the home-relative portable path of the root-context file.
 	RootTarget string
 	// SkillsDir is the skills directory name in the home; empty where the
 	// adapter uses the machine-global native surface (opencode,
@@ -231,11 +231,15 @@ var Registry = []Adapter{
 	{
 		ID: Muse, EnvVar: "XDG_CONFIG_HOME",
 		HomeVariables:   [][2]string{{"XDG_CONFIG_HOME", "config"}, {"XDG_DATA_HOME", "data"}, {"XDG_STATE_HOME", "state"}, {"XDG_CACHE_HOME", "cache"}},
+		RootTarget:      "config/muse/AGENTS.md",
+		Forms:           []string{FormMonolithic},
+		DefaultForm:     FormMonolithic,
 		SkillsDir:       "data/muse/skills",
 		Passthrough:     map[string][]Passthrough{"default": {{Path: "config/muse/auth.json", Strategy: StrategyFileLink, FileLinkTarget: "auth.json"}}},
 		Seeds:           []string{"config/muse/settings.json", "config/muse/trust.json"},
-		VerifiedRelease: "1.4.1-R4503.1", Probe: []string{"muse", "--version"},
-		CredentialScope: "xdg-config; refresh unverified", GlobalContextCap: "unverified",
+		VerifiedRelease: "1.4.7", Probe: []string{"muse", "--version"},
+		SizeAdvisoryBytes: 32768,
+		CredentialScope:   "xdg-config; refresh unverified", GlobalContextCap: "32768 advisory; no measured cap",
 	},
 	{
 		ID:          ClaudeCode,

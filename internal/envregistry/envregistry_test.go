@@ -24,7 +24,7 @@ func TestRegistryClosed(t *testing.T) {
 			t.Fatalf("duplicate adapter %s", adapter.ID)
 		}
 		seen[adapter.ID] = true
-		if adapter.EnvVar == "" || (adapter.RootTarget == "" && adapter.ID != Muse) {
+		if adapter.EnvVar == "" || adapter.RootTarget == "" {
 			t.Fatalf("adapter %s names no home variable or root target", adapter.ID)
 		}
 	}
@@ -292,11 +292,17 @@ func TestShadowAcknowledgment(t *testing.T) {
 }
 
 func TestMuseHasNoAdmittedRootContextForm(t *testing.T) {
+	// Keep the original regression name; the later admission permits only monolithic.
 	adapter := mustAdapter(t, Muse)
-	if adapter.RootTarget != "" || len(adapter.Forms) != 0 {
-		t.Fatalf("unverified Muse root context admitted: %+v", adapter)
+	if adapter.RootTarget != "config/muse/AGENTS.md" || len(adapter.Forms) != 1 || adapter.Forms[0] != FormMonolithic || adapter.DefaultForm != FormMonolithic || adapter.VerifiedRelease != "1.4.7" || adapter.SizeAdvisoryBytes != 32768 {
+		t.Fatalf("Muse root-context admission differs from §7: %+v", adapter)
 	}
-	for _, form := range []string{FormMonolithic, FormReferenced} {
+	for _, form := range []string{"", FormMonolithic} {
+		if got, err := adapter.ResolveForm(form); err != nil || got != FormMonolithic {
+			t.Fatalf("form %q: %q %v", form, got, err)
+		}
+	}
+	for _, form := range []string{FormReferenced, "unknown"} {
 		if _, err := adapter.ResolveForm(form); err == nil || !strings.Contains(err.Error(), DiagFormUnsupported) {
 			t.Fatalf("form %s admitted: %v", form, err)
 		}
