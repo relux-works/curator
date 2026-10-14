@@ -4,6 +4,26 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+## v0.15.0-rc.6 — 2026-10-14
+
+### Added
+
+- `env resolve --repair --preserve-lock` repairs a managed home without
+  changing its lock. On a v1 (legacy content hash) lock it refuses with
+  `environment_repair_needs_lock_migration` before taking the repair lock,
+  rebuilding any store entry, or writing anything, and names the plain
+  `--repair` command that performs the identity migration; a lock that
+  changes between the check and lock acquisition refuses with
+  `environment_repair_failed` (curator-spec 6648e18).
+- Muse managed homes now receive the monolithic root context at
+  `config/muse/AGENTS.md`, verified against Muse 1.4.7; the referenced form
+  is refused, the file carries the generation header, and `env status`
+  records the remaining verification bounds.
+- Mutating profile operations with the takeover option warn with
+  `environment_foreign_manager_suspected` when a known dotfile manager's
+  state directory is present (chezmoi, home-manager, yadm, stow, dotbot);
+  the warning is best-effort and never blocks the operation.
+
 ### Fixed
 
 - A credential helper answer larger than the 64-KiB bound is now refused
@@ -29,6 +49,9 @@ All notable implementation changes are recorded here.
   hexadecimal characters with an optional `sha256:` prefix) and refuses
   anything else before touching pin state, so a malformed value can no
   longer write trust records outside the audit directory.
+- A migrated legacy global skill is now audited under the hash version the
+  migration writes, so a tracked binary file no longer blocks the
+  migration as an opaque-file finding.
 
 ## v0.15.0-rc.5 — 2026-10-08
 
