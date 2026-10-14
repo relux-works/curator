@@ -2029,7 +2029,7 @@ func migrateGlobalSkills(home string, policy Policy) ([]contextlock.Member, erro
 		if err != nil {
 			return nil, err
 		}
-		if report, err := contextaudit.DetectAtVersion(entry, "commit "+resolved.Commit, hashing.VersionV1, policy.SecretWaivers); err != nil {
+		if report, err := contextaudit.DetectAtVersion(entry, "commit "+resolved.Commit, hashing.WriteVersion(), policy.SecretWaivers); err != nil {
 			return nil, err
 		} else if report.Blocking() {
 			finding, _ := report.FirstBlocking()
@@ -2037,7 +2037,7 @@ func migrateGlobalSkills(home string, policy Policy) ([]contextlock.Member, erro
 		}
 		migrated := contextresolve.Resolved{
 			Kind: contextlock.KindSkill, Name: decl.Name, Source: identity,
-			Commit: resolved.Commit,
+			Commit: resolved.Commit, HashVersion: hashing.WriteVersion(),
 		}
 		if _, err := strictAuditMember(home, manager, migrated, entry, policy); err != nil {
 			return nil, fmt.Errorf("%s: migrated global skill %q %v", DiagSourceInvalid, decl.Name, err)
