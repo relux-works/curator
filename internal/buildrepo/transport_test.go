@@ -680,8 +680,8 @@ exec %s "$@"
 		t.Fatal(err)
 	}
 	realTool.Executable = wrapper
-	realTool.AskPass = "/usr/bin/false"
-	realTool.SSHWrapper = "/usr/bin/false"
+	realTool.AskPass = regularFalseStub(t)
+	realTool.SSHWrapper = regularFalseStub(t)
 	return realTool, logPath
 }
 

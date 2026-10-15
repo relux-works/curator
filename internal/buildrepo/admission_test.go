@@ -725,6 +725,46 @@ func realGitTool(t *testing.T) GitTool {
 	return GitTool{Executable: git, ExecPath: execPath, AllowedVersions: []string{allowed}}
 }
 
+func regularFalseStub(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "false-stub")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestGitToolRejectsSymlinkedBrokers(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("controlled broker symlink fixture is exercised on unix runners")
+	}
+	tool := realGitTool(t)
+	stub := regularFalseStub(t)
+	tool.AskPass = stub
+	tool.SSHWrapper = stub
+	if err := ValidateGitTool(context.Background(), tool); err != nil {
+		t.Fatalf("regular broker stub refused: %v", err)
+	}
+	link := filepath.Join(t.TempDir(), "broker-link")
+	if err := os.Symlink(stub, link); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"credential broker", "SSH wrapper"} {
+		t.Run(name, func(t *testing.T) {
+			symlinkTool := tool
+			if name == "credential broker" {
+				symlinkTool.AskPass = link
+			} else {
+				symlinkTool.SSHWrapper = link
+			}
+			err := ValidateGitTool(context.Background(), symlinkTool)
+			if ErrorCode(err) != CodeIdentityInvalid || !strings.Contains(err.Error(), name+" is not an admitted absolute regular file") {
+				t.Fatalf("symlinked %s error = %v, want %s refusal", name, err, CodeIdentityInvalid)
+			}
+		})
+	}
+}
+
 func fakeHTTPGitTool(t *testing.T, repository string) (GitTool, string) {
 	return fakeHTTPGitToolWithFetchHook(t, repository, "")
 }
@@ -770,7 +810,7 @@ exec %s "$@"
 		t.Fatal(err)
 	}
 	realTool.Executable = wrapper
-	realTool.AskPass = "/usr/bin/false"
+	realTool.AskPass = regularFalseStub(t)
 	return realTool, logPath
 }
 
