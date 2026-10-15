@@ -76,7 +76,12 @@ jobs:
   # offline vendored builds replay twice with cold caches on macOS/Windows.
   go-family-qualification:
     name: Go ${{ matrix.go }} driver (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    # Linux entries run on the repository's self-hosted Linux runners when the
+    # LINUX_SELF_HOSTED repository variable is true, for pushes, dispatches and
+    # same-repository pull requests. A pull request from a fork always stays on
+    # the hosted image, whatever the variable says. See
+    # docs/self-hosted-runner-setup.md.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -138,7 +143,12 @@ jobs:
   # ---------------------------------------------------------------------------
   test:
     name: Test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    # Linux entries run on the repository's self-hosted Linux runners when the
+    # LINUX_SELF_HOSTED repository variable is true, for pushes, dispatches and
+    # same-repository pull requests. A pull request from a fork always stays on
+    # the hosted image, whatever the variable says. See
+    # docs/self-hosted-runner-setup.md.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -501,7 +511,12 @@ jobs:
 
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    # Linux entries run on the repository's self-hosted Linux runners when the
+    # LINUX_SELF_HOSTED repository variable is true, for pushes, dispatches and
+    # same-repository pull requests. A pull request from a fork always stays on
+    # the hosted image, whatever the variable says. See
+    # docs/self-hosted-runner-setup.md.
+    runs-on: ${{ (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -545,7 +560,12 @@ jobs:
   # behave identically under Git Bash on Windows.
   gate-selftest:
     name: Gate self-test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    # Linux entries run on the repository's self-hosted Linux runners when the
+    # LINUX_SELF_HOSTED repository variable is true, for pushes, dispatches and
+    # same-repository pull requests. A pull request from a fork always stays on
+    # the hosted image, whatever the variable says. See
+    # docs/self-hosted-runner-setup.md.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -559,7 +579,12 @@ jobs:
 
   interop:
     name: Interop conformance gate
-    runs-on: ubuntu-latest
+    # Linux entries run on the repository's self-hosted Linux runners when the
+    # LINUX_SELF_HOSTED repository variable is true, for pushes, dispatches and
+    # same-repository pull requests. A pull request from a fork always stays on
+    # the hosted image, whatever the variable says. See
+    # docs/self-hosted-runner-setup.md.
+    runs-on: ${{ (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -587,7 +612,12 @@ jobs:
 
   naming-gate:
     name: Naming gate
-    runs-on: ubuntu-latest
+    # Linux entries run on the repository's self-hosted Linux runners when the
+    # LINUX_SELF_HOSTED repository variable is true, for pushes, dispatches and
+    # same-repository pull requests. A pull request from a fork always stays on
+    # the hosted image, whatever the variable says. See
+    # docs/self-hosted-runner-setup.md.
+    runs-on: ${{ (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:

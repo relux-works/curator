@@ -860,6 +860,35 @@ else
 	ok 'the self-test rejects an unpinned self-hosted runs-on'
 fi
 
+# Every runs-on that can reach the self-hosted Linux label must keep fork pull
+# requests on the hosted image: the guard compares the pull request head
+# repository with this repository.
+linux_self_hosted_guarded() {
+	awk '
+		/^    runs-on:/ && /relux-linux/ {
+			total++
+			if (index($0, "github.event.pull_request.head.repo.full_name == github.repository") > 0 && index($0, "vars.LINUX_SELF_HOSTED") > 0) guarded++
+		}
+		END { exit !(total > 0 && total == guarded) }
+	' "$1"
+}
+
+if linux_self_hosted_guarded "$WORKFLOW"; then
+	ok 'every self-hosted Linux runs-on keeps fork pull requests on hosted runners'
+else
+	bad 'every self-hosted Linux runs-on keeps fork pull requests on hosted runners' \
+		"observed: $(grep -c 'relux-linux' "$WORKFLOW") runs-on lines name relux-linux"
+fi
+perl -0pe 's/ \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository//' \
+	"$WORKFLOW" >"$WORK/linux-unguarded.yml"
+if cmp -s "$WORKFLOW" "$WORK/linux-unguarded.yml"; then
+	bad 'the self-test rejects a self-hosted Linux runs-on without the fork guard' 'could not produce the unguarded mutant'
+elif linux_self_hosted_guarded "$WORK/linux-unguarded.yml"; then
+	bad 'the self-test rejects a self-hosted Linux runs-on without the fork guard' 'the unguarded runs-on remained admitted'
+else
+	ok 'the self-test rejects a self-hosted Linux runs-on without the fork guard'
+fi
+
 GATE_DEFAULT_TIMEOUT="$(awk -F ':-' '/^GO_TEST_TIMEOUT=/{value=$2; sub(/}.*/, "", value); print value; exit}' "$HERE/test-gate.sh")"
 if [ "$GATE_DEFAULT_TIMEOUT" = '60m' ]; then
 	ok 'test-gate.sh defaults to the 60m per-package budget'

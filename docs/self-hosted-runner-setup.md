@@ -69,3 +69,39 @@ No maintenance: toolchain versions are pinned in the repository
 (`rust-toolchain.toml`, `PNPM_PIN`) and each lane verifies its pin against
 the Go constant (`rust-pin-guard.sh`, `pnpm-pin-guard.sh`) before anything
 installs.
+
+## Linux runners (`relux-linux`)
+
+The Linux entries of `Test`, `Go family qualification`, `Gate self-test`, `Lint`,
+`Interop conformance gate` and `Naming gate` can run on the repository's
+self-hosted Linux runners (labels `self-hosted, relux-linux, curator`). Check
+names do not change: a routed job is still `Test (ubuntu-latest)`.
+
+Routing is decided per run:
+
+- the repository variable `LINUX_SELF_HOSTED` must be `true`; otherwise every
+  job stays on the hosted image;
+- pushes, manual dispatches and pull requests whose head branch lives in this
+  repository go to `relux-linux`;
+- a pull request from a fork always runs on the hosted image. The guard sits
+  in every routed `runs-on` expression, and `gate-selftest.sh` fails if any
+  `runs-on` naming `relux-linux` loses it. Never route `pull_request_target`
+  or fork-triggered work to the self-hosted label, and keep the repository
+  setting that requires approval before fork workflows run for all external
+  contributors.
+
+`Race` stays on the hosted image: `go test -race` needs cgo and a C compiler.
+
+One-time prerequisites on each Linux runner host (the runner account itself
+needs no sudo and no Docker):
+
+- a C toolchain (`gcc`, `cc`, `make`; on Debian or Ubuntu the
+  `build-essential` package): the Rust lanes link with `cc`, and moving `Race`
+  later needs it too;
+- `rustup` for the runner account, installed per rustup.rs under that
+  account's `~/.cargo/bin`; `install-rust-toolchain.sh` resolves it there;
+- `git`, `python3`, `tar`, `xz`, `curl`, `zip` and `unzip`;
+- outbound HTTPS to GitHub and the Go, Node and Rust distribution hosts.
+  Toolchains still come from the pinned `setup-*` actions and the pinned
+  installers, so the toolchain-identity rules hold on these runners as on
+  hosted ones.
