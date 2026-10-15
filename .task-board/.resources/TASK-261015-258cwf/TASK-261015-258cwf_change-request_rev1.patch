@@ -1,0 +1,414 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 08591c4dce7c8bd064582f5cd480291b179c12f6..6ba60d4b7a791a4723178a953fbb44286b1b9c2d 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,11 @@ All notable implementation changes are recorded here.
+ 
+ ## Unreleased
+ 
++### Added
++
++- `env config show` reports effective permissions posture per installed profile;
++  `show permissions` reports the current profile using fragment lock semantics.
++
+ ## v0.15.0-rc.6 — 2026-10-14
+ 
+ ### Added
+diff --git a/README.md b/README.md
+index 14ae8bb702162c38a241eb8a98db2fa3a3c943e9..8981f5f1e8a5a450191bd3631019cea8d11884b0 100644
+--- a/README.md
++++ b/README.md
+@@ -304,7 +304,7 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run
+ 
+ ### Tools
+ 
+-Use `go build ./...` to compile and `go vet ./...` for static validation. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate leaves the working tree and index unchanged. Go tests use temporary homes. Run `go test ./internal/envprofile/... ./cmd/curator/...` for focused environment validation. The preserve-lock vector family is pinned in `internal/envprofile/testdata/environments-repair-preserve-lock.json`; `CURATOR_PRESERVE_LOCK_VECTORS=/path/to/vectors.json go test ./internal/envprofile -run TestRepairPreserveLockVectors` runs its upstream counterpart.
++Use `go build ./...` to compile and `go vet ./...` for static validation. Run `make lint` (golangci-lint) for repository lint; store local validation logs under `.temp/`. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate leaves the working tree and index unchanged. Go tests use temporary homes. Run `go test ./internal/envprofile/... ./cmd/curator/...` for focused environment validation. The preserve-lock vector family is pinned in `internal/envprofile/testdata/environments-repair-preserve-lock.json`; `CURATOR_PRESERVE_LOCK_VECTORS=/path/to/vectors.json go test ./internal/envprofile -run TestRepairPreserveLockVectors` runs its upstream counterpart.
+ 
+ Managed Muse homes materialize monolithic root context at `config/muse/AGENTS.md`; `referenced` is refused. A profile without a context declaration writes no root file. Curator resolves the environment fragment; its external Muse `exec` consumer must add `--no-foreign-personal-context` exactly when the root target is materialized (environments §10.2). The v3 fragment has no argv member. `env status` records the remaining discovery, `serve`, and workspace-precedence bounds.
+ 
+diff --git a/cmd/curator/envconfig.go b/cmd/curator/envconfig.go
+index 83d2ecc1a206eeddbf902e6818e70fcd1fe72d49..825b8eefab7d98645c348d6c3c0607ce5731b666 100644
+--- a/cmd/curator/envconfig.go
++++ b/cmd/curator/envconfig.go
+@@ -6,6 +6,7 @@ import (
+ 	"strings"
+ 
+ 	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/envprofile"
+ )
+ 
+ // cmdEnvConfig implements `env config show|set|unset` (cli/curator.md): it
+@@ -40,8 +41,26 @@ func (c cli) cmdEnvConfigShow(cfg *config.Config, args []string) int {
+ 	rendered := cfg.EffectiveJSON()
+ 	env, _ := rendered["environments"].(map[string]any)
+ 	if len(args) == 0 {
++		permissions, err := envprofile.InstalledPermissions(cfg.Home(), machineFromConfig(cfg))
++		if err != nil {
++			_, _ = fmt.Fprintln(c.stderr, "curator: permissions posture unreadable:", err)
++			return exitFail
++		}
++		env["permissions_posture"] = permissions
+ 		return c.printJSON(env)
+ 	}
++	if args[0] == "permissions" {
++		profile, err := envprofile.Current(cfg.Home())
++		if err != nil {
++			_, _ = fmt.Fprintln(c.stderr, "curator: permissions posture unreadable:", err)
++			return exitFail
++		}
++		if profile == "" {
++			_, _ = fmt.Fprintln(c.stderr, "curator: permissions posture unavailable: no current profile")
++			return exitFail
++		}
++		return c.printJSON(envprofile.PermissionsForProfile(machineFromConfig(cfg), profile))
++	}
+ 	segments, err := config.SplitEnvKnob(args[0])
+ 	if err != nil {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+diff --git a/cmd/curator/envconfig_permissions_test.go b/cmd/curator/envconfig_permissions_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..baf1983c15efd60cae2949afb586941d703105f8
+--- /dev/null
++++ b/cmd/curator/envconfig_permissions_test.go
+@@ -0,0 +1,159 @@
++package main
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++)
++
++func TestEnvConfigShowPermissionsAtProductionEntry(t *testing.T) {
++	for _, locked := range []bool{false, true} {
++		name := "profile"
++		if locked {
++			name = "global"
++		}
++		t.Run(name, func(t *testing.T) {
++			source, _ := profileHome(t)
++			machine := `{"schema_version":2,"security_posture":"permissive","skills_root":"x","projects":{},"environments":{"permissions":{"acme":"yolo","uninstalled":"yolo"}}}`
++			if err := os.WriteFile(source.path, []byte(machine), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			system := filepath.Join(t.TempDir(), "system.json")
++			contents := `{"schema_version":2}`
++			if locked {
++				contents = `{"schema_version":2,"locked":["environments.permissions"],"environments":{"permissions":{}}}`
++			}
++			if err := os.WriteFile(system, []byte(contents), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			t.Setenv("CURATOR_SYSTEM_CONFIG", system)
++			for _, profile := range []string{"acme", "other"} {
++				pkg := t.TempDir()
++				writeContextPackage(t, pkg, profile, "1.0.0", "hello\n")
++				if code, _, stderr := runFileConfigProfile(t, source.path, "profile", "install", pkg); code != exitOK {
++					t.Fatalf("install = %d: %s", code, stderr)
++				}
++			}
++			code, stdout, stderr := runFileConfigProfile(t, source.path, "env", "config", "show")
++			if code != exitOK {
++				t.Fatalf("show = %d: %s", code, stderr)
++			}
++			var full map[string]json.RawMessage
++			if err := json.Unmarshal([]byte(stdout), &full); err != nil {
++				t.Fatal(err)
++			}
++			var postures map[string]map[string]any
++			if err := json.Unmarshal(full["permissions_posture"], &postures); err != nil {
++				t.Fatal(err)
++			}
++			if len(postures) != 3 || postures["default"] == nil || postures["acme"] == nil || postures["other"] == nil || postures["uninstalled"] != nil {
++				t.Fatalf("installed profiles = %v", postures)
++			}
++			for profile, got := range postures {
++				mode, source := "native", "default"
++				if profile == "acme" {
++					mode, source = "yolo", "profile"
++				}
++				if locked {
++					mode, source = "native", "global"
++				}
++				want := map[string]any{"mode": mode, "locked": locked, "source": source}
++				if !reflect.DeepEqual(got, want) {
++					t.Fatalf("%s posture = %v, want %v", profile, got, want)
++				}
++			}
++			// The existing permissions map keeps its original JSON shape.
++			var raw map[string]string
++			if err := json.Unmarshal(full["permissions"], &raw); err != nil {
++				t.Fatal(err)
++			}
++			if !locked && raw["acme"] != "yolo" {
++				t.Fatalf("raw permissions changed: %v", raw)
++			}
++			code, stdout, stderr = runFileConfigProfile(t, source.path, "env", "config", "show", "permissions")
++			if code != exitOK {
++				t.Fatalf("single show = %d: %s", code, stderr)
++			}
++			var single map[string]any
++			if err := json.Unmarshal([]byte(stdout), &single); err != nil {
++				t.Fatal(err)
++			}
++			if !reflect.DeepEqual(single, postures["acme"]) {
++				t.Fatalf("current posture = %v, want %v", single, postures["acme"])
++			}
++		})
++	}
++}
++
++func TestEnvConfigShowPermissionsRejectsUnreadableConfig(t *testing.T) {
++	source, _ := profileHome(t)
++	if err := os.WriteFile(source.path, []byte(`{"schema_version":2,"security_posture":"permissive","skills_root":"x","projects":{}}`), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++	if code, _, stderr := runFileConfigProfile(t, source.path, "profile", "install", pkg); code != exitOK {
++		t.Fatalf("install = %d: %s", code, stderr)
++	}
++	for _, broken := range []string{"machine", "system"} {
++		t.Run(broken, func(t *testing.T) {
++			machine := source.path
++			system := filepath.Join(t.TempDir(), "system.json")
++			if err := os.WriteFile(system, []byte(`{"schema_version":2}`), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			if broken == "system" {
++				system = t.TempDir()
++			} else {
++				machine = t.TempDir()
++			}
++			t.Setenv("CURATOR_SYSTEM_CONFIG", system)
++			for _, args := range [][]string{{"env", "config", "show"}, {"env", "config", "show", "permissions"}} {
++				code, stdout, stderr := runFileConfigProfile(t, machine, args...)
++				if code != exitFail || stdout != "" || stderr == "" {
++					t.Fatalf("unreadable config = %d, stdout=%q stderr=%q", code, stdout, stderr)
++				}
++			}
++		})
++	}
++}
++
++func TestEnvConfigShowPermissionsRejectsUnreadableInventoryAndCurrent(t *testing.T) {
++	source, home := profileHome(t)
++	// A regular file where a directory is required gives a portable read failure.
++	if err := os.WriteFile(filepath.Join(home, "profiles"), []byte("unreadable inventory"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	for _, args := range [][]string{{"env", "config", "show"}, {"env", "config", "show", "permissions"}} {
++		code, stdout, stderr := runProfile(t, source, args...)
++		if code != exitFail || stdout != "" || !strings.Contains(stderr, "permissions posture unreadable") {
++			t.Fatalf("unreadable posture = %d, stdout=%q stderr=%q", code, stdout, stderr)
++		}
++	}
++}
++
++func TestEnvConfigShowPermissionsWithoutProfiles(t *testing.T) {
++	source, home := profileHome(t)
++	code, stdout, stderr := runProfile(t, source, "env", "config", "show")
++	if code != exitOK {
++		t.Fatalf("empty show = %d: %s", code, stderr)
++	}
++	var full map[string]json.RawMessage
++	if err := json.Unmarshal([]byte(stdout), &full); err != nil {
++		t.Fatal(err)
++	}
++	if string(full["permissions_posture"]) != "{}" {
++		t.Fatalf("empty posture = %s", full["permissions_posture"])
++	}
++	if _, err := os.Stat(filepath.Join(home, "profiles")); !os.IsNotExist(err) {
++		t.Fatalf("show changed profile state: %v", err)
++	}
++	code, stdout, stderr = runProfile(t, source, "env", "config", "show", "permissions")
++	if code != exitFail || stdout != "" || !strings.Contains(stderr, "no current profile") {
++		t.Fatalf("missing current = %d stdout=%q stderr=%q", code, stdout, stderr)
++	}
++}
+diff --git a/docs/cli.md b/docs/cli.md
+index 1ed15df9cb609f73e58d8270ea8f22888e42f53c..117a52f617a66edca4a97e75d3a2acef54565f1b 100644
+--- a/docs/cli.md
++++ b/docs/cli.md
+@@ -1117,6 +1117,41 @@ The command displays interactive status dashboards for project skills.
+ 
+ ## Operator configuration
+ 
++### curator env config show
++
++```bash
++curator env config show
++curator env config show permissions
++```
++
++Both forms print JSON, including for interactive use; there is no separate
++`--json` flag. The full form retains the existing environments knobs and
++adds `permissions_posture`, keyed by installed profile name:
++
++```json
++{
++  "permissions_posture": {
++    "interactive": {"mode": "yolo", "locked": false, "source": "profile"},
++    "restricted": {"mode": "native", "locked": false, "source": "default"}
++  }
++}
++```
++
++A global permissions lock applies to every installed profile. The existing `permissions` map retains
++its configured mode strings; `permissions_posture` uses the same resolver
++as the fragment's `permissions` member. An absent profile entry reports
++`{"mode":"native","locked":false,"source":"default"}`. A system lock
++reports `{"mode":"native","locked":true,"source":"global"}`, even for
++a profile absent from the system map.
++
++`show permissions` prints just that object for the machine's current
++profile. Without a current profile it exits 1 with an unavailable diagnostic.
++Unreadable or malformed configuration exits 1 with a diagnostic and no
++posture output. Failed profile-inventory or current-pointer reads also
++exit 1 and report the posture as unreadable; they never imply an unlocked
++policy. Reading posture neither provisions a runtime home nor needs an
++adapter for the caller's runtime.
++
+ ### curator config show
+ 
+ Synopsis:
+diff --git a/docs/environment-config.md b/docs/environment-config.md
+index 1b43f7bae3b01f1b125150ca5cc8b5dcb64c6ca5..e189b80b2297153f0873c82d8ed0aee3ef952ad3 100644
+--- a/docs/environment-config.md
++++ b/docs/environment-config.md
+@@ -62,6 +62,15 @@ closed `permissions` member. A configured profile entry is emitted with
+ `mode: "native"`, `source: "default"`, and `locked: false`; that native mode
+ is a silence placeholder, not an explicit profile override.
+ 
++`curator env config show` adds a `permissions_posture` object keyed by
++installed profile, alongside the unchanged configured `permissions` map.
++`curator env config show permissions` prints the effective `{mode, locked,
++source}` object for the machine's current profile. Both forms use JSON and
++the fragment's permission resolver, without requiring a runtime adapter.
++Configuration or profile-state read failures exit non-zero with a diagnostic
++and no posture output, never an unlocked fallback; a missing current profile
++makes the single-knob form unavailable. See [CLI usage](cli.md#curator-env-config-show).
++
+ A system configuration may lock `environments.permissions` only toward
+ `native`. The system file's map replaces the machine map whole, and a
+ differing machine value produces the manager §1 warning naming the system
+diff --git a/internal/envfragment/envfragment.go b/internal/envfragment/envfragment.go
+index b3e458f41908a1b47b1a8abb42e6a87b6612c529..bc20a9d27413bb0d0cc407ed184732c84dff7ae9 100644
+--- a/internal/envfragment/envfragment.go
++++ b/internal/envfragment/envfragment.go
+@@ -26,9 +26,9 @@ const Version = "launch-env-fragment-v2"
+ // Permissions is the resolved per-profile permission policy carried by
+ // launch-env-fragment-v2 (environments §10.2).
+ type Permissions struct {
+-	Mode   string
+-	Locked bool
+-	Source string
++	Mode   string `json:"mode"`
++	Locked bool   `json:"locked"`
++	Source string `json:"source"`
+ }
+ 
+ // SystemPrompt carries the inert §5.5 file path and the adapter's §7.3
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index d76954b473adfcf86ecdb16e6ecb6310f8c74ed8..d99cceb823933999f4fc0fb0a7c5fcc94811ad78 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -2426,13 +2426,7 @@ func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *ve
+ 			fragment.Env[variable[0]] = filepath.Join(plan.parent, variable[1])
+ 		}
+ 	}
+-	if req.Machine.PermissionsLocked {
+-		fragment.Permissions = envfragment.Permissions{Mode: "native", Locked: true, Source: "global"}
+-	} else if mode, configured := req.Machine.Permissions[req.Profile]; configured {
+-		fragment.Permissions = envfragment.Permissions{Mode: mode, Source: "profile"}
+-	} else {
+-		fragment.Permissions = envfragment.Permissions{Mode: "native", Source: "default"}
+-	}
++	fragment.Permissions = PermissionsForProfile(req.Machine, req.Profile)
+ 	if _, ok := plan.marker.Surfaces[envmarker.SurfaceSystemPrompt]; ok {
+ 		fragment.SystemPrompt = &envfragment.SystemPrompt{
+ 			Path:     filepath.Join(plan.homeDir, ".agent-context", "system-prompt.md"),
+diff --git a/internal/envprofile/permissions.go b/internal/envprofile/permissions.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..91b1ce8660020b7520bc7446cd72564aa8c402d9
+--- /dev/null
++++ b/internal/envprofile/permissions.go
+@@ -0,0 +1,32 @@
++package envprofile
++
++import (
++	"github.com/relux-works/curator/internal/envfragment"
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++// PermissionsForProfile resolves the fragment permission policy (§10.2).
++// A global lock forces native even for a profile absent from the system map.
++func PermissionsForProfile(machine envregistry.MachineConfig, profile string) envfragment.Permissions {
++	if machine.PermissionsLocked {
++		return envfragment.Permissions{Mode: "native", Locked: true, Source: "global"}
++	}
++	if mode, configured := machine.Permissions[profile]; configured {
++		return envfragment.Permissions{Mode: mode, Source: "profile"}
++	}
++	return envfragment.Permissions{Mode: "native", Source: "default"}
++}
++
++// InstalledPermissions reports fragment permissions without provisioning homes
++// or requiring a runtime adapter. Failed inventory reads remain errors.
++func InstalledPermissions(home string, machine envregistry.MachineConfig) (map[string]envfragment.Permissions, error) {
++	profiles, err := installedProfiles(home)
++	if err != nil {
++		return nil, err
++	}
++	result := make(map[string]envfragment.Permissions, len(profiles))
++	for _, profile := range profiles {
++		result[profile] = PermissionsForProfile(machine, profile)
++	}
++	return result, nil
++}
+diff --git a/internal/envprofile/permissions_test.go b/internal/envprofile/permissions_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..26a51bb8b2f94f2b5d5d9ab6b3533eefe1b0c596
+--- /dev/null
++++ b/internal/envprofile/permissions_test.go
+@@ -0,0 +1,35 @@
++package envprofile
++
++import (
++	"testing"
++
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++func TestPermissionsForProfileProperties(t *testing.T) {
++	for _, locked := range []bool{false, true} {
++		for _, mode := range []string{"", "native", "yolo"} {
++			machine := envregistry.DefaultMachineConfig()
++			machine.PermissionsLocked = locked
++			if mode != "" {
++				machine.Permissions["configured"] = mode
++			}
++			for _, profile := range []string{"configured", "absent"} {
++				got := PermissionsForProfile(machine, profile)
++				if got.Locked != (got.Source == "global") || got.Locked != locked {
++					t.Fatalf("lock/source invariant: %+v", got)
++				}
++				wantMode, wantSource := "native", "default"
++				if mode != "" && profile == "configured" {
++					wantMode, wantSource = mode, "profile"
++				}
++				if locked {
++					wantMode, wantSource = "native", "global"
++				}
++				if got.Mode != wantMode || got.Source != wantSource {
++					t.Fatalf("locked=%t mode=%q profile=%q: %+v, want %s/%s", locked, mode, profile, got, wantMode, wantSource)
++				}
++			}
++		}
++	}
++}
