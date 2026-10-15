@@ -1,0 +1,75 @@
+diff --git a/internal/buildrepo/admission_test.go b/internal/buildrepo/admission_test.go
+index efb1aff63b9bd3b36bf7a2e4201f8c95aae41420..c4627fda0e9922e489cb82538506ac5b431b5a8e 100644
+--- a/internal/buildrepo/admission_test.go
++++ b/internal/buildrepo/admission_test.go
+@@ -725,6 +725,46 @@ func realGitTool(t *testing.T) GitTool {
+ 	return GitTool{Executable: git, ExecPath: execPath, AllowedVersions: []string{allowed}}
+ }
+ 
++func regularFalseStub(t *testing.T) string {
++	t.Helper()
++	path := filepath.Join(t.TempDir(), "false-stub")
++	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	return path
++}
++
++func TestGitToolRejectsSymlinkedBrokers(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("controlled broker symlink is a Unix regression fixture")
++	}
++	tool := realGitTool(t)
++	stub := regularFalseStub(t)
++	tool.AskPass = stub
++	tool.SSHWrapper = stub
++	if err := ValidateGitTool(context.Background(), tool); err != nil {
++		t.Fatalf("regular broker stub refused: %v", err)
++	}
++	link := filepath.Join(t.TempDir(), "broker-link")
++	if err := os.Symlink(stub, link); err != nil {
++		t.Fatal(err)
++	}
++	for _, name := range []string{"credential broker", "SSH wrapper"} {
++		t.Run(name, func(t *testing.T) {
++			symlinkTool := tool
++			if name == "credential broker" {
++				symlinkTool.AskPass = link
++			} else {
++				symlinkTool.SSHWrapper = link
++			}
++			err := ValidateGitTool(context.Background(), symlinkTool)
++			if ErrorCode(err) != CodeIdentityInvalid || !strings.Contains(err.Error(), name+" is not an admitted absolute regular file") {
++				t.Fatalf("symlinked %s error = %v, want %s refusal", name, err, CodeIdentityInvalid)
++			}
++		})
++	}
++}
++
+ func fakeHTTPGitTool(t *testing.T, repository string) (GitTool, string) {
+ 	return fakeHTTPGitToolWithFetchHook(t, repository, "")
+ }
+@@ -770,7 +810,7 @@ exec %s "$@"
+ 		t.Fatal(err)
+ 	}
+ 	realTool.Executable = wrapper
+-	realTool.AskPass = "/usr/bin/false"
++	realTool.AskPass = regularFalseStub(t)
+ 	return realTool, logPath
+ }
+ 
+diff --git a/internal/buildrepo/transport_test.go b/internal/buildrepo/transport_test.go
+index e1bca1a04560f1a0a7b4028bea4c94f2ae6b8fe1..2174f42c91d6c19d96202c7eceeb2c5c3a00f307 100644
+--- a/internal/buildrepo/transport_test.go
++++ b/internal/buildrepo/transport_test.go
+@@ -680,8 +680,8 @@ exec %s "$@"
+ 		t.Fatal(err)
+ 	}
+ 	realTool.Executable = wrapper
+-	realTool.AskPass = "/usr/bin/false"
+-	realTool.SSHWrapper = "/usr/bin/false"
++	realTool.AskPass = regularFalseStub(t)
++	realTool.SSHWrapper = regularFalseStub(t)
+ 	return realTool, logPath
+ }
+ 
