@@ -1117,6 +1117,41 @@ The command displays interactive status dashboards for project skills.
 
 ## Operator configuration
 
+### curator env config show
+
+```bash
+curator env config show
+curator env config show permissions
+```
+
+Both forms print JSON, including for interactive use; there is no separate
+`--json` flag. The full form retains the existing environments knobs and
+adds `permissions_posture`, keyed by installed profile name:
+
+```json
+{
+  "permissions_posture": {
+    "interactive": {"mode": "yolo", "locked": false, "source": "profile"},
+    "restricted": {"mode": "native", "locked": false, "source": "default"}
+  }
+}
+```
+
+A global permissions lock applies to every installed profile. The existing `permissions` map retains
+its configured mode strings; `permissions_posture` uses the same resolver
+as the fragment's `permissions` member. An absent profile entry reports
+`{"mode":"native","locked":false,"source":"default"}`. A system lock
+reports `{"mode":"native","locked":true,"source":"global"}`, even for
+a profile absent from the system map.
+
+`show permissions` prints just that object for the machine's current
+profile. Without a current profile it exits 1 with an unavailable diagnostic.
+Unreadable or malformed configuration exits 1 with a diagnostic and no
+posture output. Failed profile-inventory or current-pointer reads also
+exit 1 and report the posture as unreadable; they never imply an unlocked
+policy. Reading posture neither provisions a runtime home nor needs an
+adapter for the caller's runtime.
+
 ### curator config show
 
 Synopsis:

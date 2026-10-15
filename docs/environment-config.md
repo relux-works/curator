@@ -62,6 +62,15 @@ closed `permissions` member. A configured profile entry is emitted with
 `mode: "native"`, `source: "default"`, and `locked: false`; that native mode
 is a silence placeholder, not an explicit profile override.
 
+`curator env config show` adds a `permissions_posture` object keyed by
+installed profile, alongside the unchanged configured `permissions` map.
+`curator env config show permissions` prints the effective `{mode, locked,
+source}` object for the machine's current profile. Both forms use JSON and
+the fragment's permission resolver, without requiring a runtime adapter.
+Configuration or profile-state read failures exit non-zero with a diagnostic
+and no posture output, never an unlocked fallback; a missing current profile
+makes the single-knob form unavailable. See [CLI usage](cli.md#curator-env-config-show).
+
 A system configuration may lock `environments.permissions` only toward
 `native`. The system file's map replaces the machine map whole, and a
 differing machine value produces the manager §1 warning naming the system

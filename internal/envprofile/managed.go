@@ -2426,13 +2426,7 @@ func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *ve
 			fragment.Env[variable[0]] = filepath.Join(plan.parent, variable[1])
 		}
 	}
-	if req.Machine.PermissionsLocked {
-		fragment.Permissions = envfragment.Permissions{Mode: "native", Locked: true, Source: "global"}
-	} else if mode, configured := req.Machine.Permissions[req.Profile]; configured {
-		fragment.Permissions = envfragment.Permissions{Mode: mode, Source: "profile"}
-	} else {
-		fragment.Permissions = envfragment.Permissions{Mode: "native", Source: "default"}
-	}
+	fragment.Permissions = PermissionsForProfile(req.Machine, req.Profile)
 	if _, ok := plan.marker.Surfaces[envmarker.SurfaceSystemPrompt]; ok {
 		fragment.SystemPrompt = &envfragment.SystemPrompt{
 			Path:     filepath.Join(plan.homeDir, ".agent-context", "system-prompt.md"),

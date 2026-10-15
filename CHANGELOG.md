@@ -4,6 +4,11 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+### Added
+
+- `env config show` reports effective permissions posture per installed profile;
+  `show permissions` reports the current profile using fragment lock semantics.
+
 ## v0.15.0-rc.6 — 2026-10-14
 
 ### Added

@@ -26,9 +26,9 @@ const Version = "launch-env-fragment-v2"
 // Permissions is the resolved per-profile permission policy carried by
 // launch-env-fragment-v2 (environments §10.2).
 type Permissions struct {
-	Mode   string
-	Locked bool
-	Source string
+	Mode   string `json:"mode"`
+	Locked bool   `json:"locked"`
+	Source string `json:"source"`
 }
 
 // SystemPrompt carries the inert §5.5 file path and the adapter's §7.3

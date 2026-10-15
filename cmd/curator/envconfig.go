@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/envprofile"
 )
 
 // cmdEnvConfig implements `env config show|set|unset` (cli/curator.md): it
@@ -40,7 +41,25 @@ func (c cli) cmdEnvConfigShow(cfg *config.Config, args []string) int {
 	rendered := cfg.EffectiveJSON()
 	env, _ := rendered["environments"].(map[string]any)
 	if len(args) == 0 {
+		permissions, err := envprofile.InstalledPermissions(cfg.Home(), machineFromConfig(cfg))
+		if err != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator: permissions posture unreadable:", err)
+			return exitFail
+		}
+		env["permissions_posture"] = permissions
 		return c.printJSON(env)
+	}
+	if args[0] == "permissions" {
+		profile, err := envprofile.Current(cfg.Home())
+		if err != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator: permissions posture unreadable:", err)
+			return exitFail
+		}
+		if profile == "" {
+			_, _ = fmt.Fprintln(c.stderr, "curator: permissions posture unavailable: no current profile")
+			return exitFail
+		}
+		return c.printJSON(envprofile.PermissionsForProfile(machineFromConfig(cfg), profile))
 	}
 	segments, err := config.SplitEnvKnob(args[0])
 	if err != nil {
