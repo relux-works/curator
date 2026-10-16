@@ -1,0 +1,550 @@
+diff --git a/README.md b/README.md
+index 8981f5f1e8a5a450191bd3631019cea8d11884b0..f6cc1e52146e474b9660c6bb7792f1f036371b4e 100644
+--- a/README.md
++++ b/README.md
+@@ -210,10 +210,12 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
+ 
+ `--preserve-lock` requires `--repair`. It refuses before locking or writing when repair would change the lock hash, including v1-to-v2 identity migration. Rerun without `--preserve-lock` to migrate explicitly. Otherwise repair preserves the lock bytes; a changed lock detected after acquisition refuses with `environment_repair_failed`. Current homes still resolve without a repair lock.
+ 
+-> **Important:** a managed home either shares your native login or logs in by itself. Claude Code on macOS always logs in by itself, so every profile you use with it needs one login in its home before the first launch or spawn; otherwise the launch stops with "Not logged in". See [Logging in to managed homes](docs/environment-config.md#logging-in-to-managed-homes).
+-
+ </details>
+ 
++> **Important:** a managed home either shares your native login or logs in by itself. Claude Code on macOS always logs in by itself, so every profile you use with it needs one login in its home before the first launch or spawn; otherwise the launch stops with "Not logged in". See [Logging in to managed homes](docs/environment-config.md#logging-in-to-managed-homes).
++>
++> [Agent logins](docs/agent-logins.md) explains Claude Code, Codex CLI and Muse storage and session requirements. The **rc.7** machine selector defaults to `native`: `curator env config set credential_store.<profile>.<env-id> <value>` accepts `native`, `file`, or `keychain`. This selector is unavailable on the current baseline.
++
+ <details>
+ <summary>Hybrid scope</summary>
+ 
+@@ -306,6 +308,10 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run
+ 
+ Use `go build ./...` to compile and `go vet ./...` for static validation. Run `make lint` (golangci-lint) for repository lint; store local validation logs under `.temp/`. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate leaves the working tree and index unchanged. Go tests use temporary homes. Run `go test ./internal/envprofile/... ./cmd/curator/...` for focused environment validation. The preserve-lock vector family is pinned in `internal/envprofile/testdata/environments-repair-preserve-lock.json`; `CURATOR_PRESERVE_LOCK_VECTORS=/path/to/vectors.json go test ./internal/envprofile -run TestRepairPreserveLockVectors` runs its upstream counterpart.
+ 
++PlantUML renders the agent-login diagrams. Run `plantuml -tsvg -nometadata diagrams/plantuml/agent-login-*.puml` to write SVG files beside their sources. The [agent login reference](docs/agent-logins.md) embeds these outputs.
++
++Lychee checks Markdown links. Run `lychee --offline --include-fragments --no-progress README.md docs/environment-config.md docs/agent-logins.md` for local targets and anchors, then `lychee --no-progress --timeout 30 docs/agent-logins.md` for the reference's external links. Store logs under `.temp/`. Run `git diff --check` for whitespace validation.
++
+ Managed Muse homes materialize monolithic root context at `config/muse/AGENTS.md`; `referenced` is refused. A profile without a context declaration writes no root file. Curator resolves the environment fragment; its external Muse `exec` consumer must add `--no-foreign-personal-context` exactly when the root target is materialized (environments §10.2). The v3 fragment has no argv member. `env status` records the remaining discovery, `serve`, and workspace-precedence bounds.
+ 
+ ## Contributing
+diff --git a/diagrams/plantuml/agent-login-homes.puml b/diagrams/plantuml/agent-login-homes.puml
+new file mode 100644
+index 0000000000000000000000000000000000000000..c12db8ef43b0c6d0c7f51718ed7426cc35d07e4f
+--- /dev/null
++++ b/diagrams/plantuml/agent-login-homes.puml
+@@ -0,0 +1,26 @@
++@startuml
++!theme plain
++left to right direction
++title File-backed login layout: shared and isolated
++folder "Native home" {
++  file "Native credential file\n(tool-owned)" as Native
++}
++folder "Managed home: shared" {
++  file "Declared credential path\n(symlink)" as Shared
++}
++folder "Managed home: isolated" {
++  file "Own credential file\n(tool-owned login)" as Isolated
++}
++Shared --> Native : verified link
++note bottom of Isolated
++  No link to native credentials.
++  macOS Claude instead uses its
++  per-home Keychain identity
++  or session-qualified file fallback.
++end note
++note bottom of Shared
++  Current defaults: see environment-config.md.
++  Muse file admission changes in rc.7.
++  macOS Claude shared is refused.
++end note
++@enduml
+diff --git a/diagrams/plantuml/agent-login-homes.svg b/diagrams/plantuml/agent-login-homes.svg
+new file mode 100644
+index 0000000000000000000000000000000000000000..47c61e5d5037856bccbd3775db3cd4df909d7d50
+--- /dev/null
++++ b/diagrams/plantuml/agent-login-homes.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" data-diagram-type="DESCRIPTION" height="468px" preserveAspectRatio="none" style="width:668px;height:468px;background:#FFFFFF;" version="1.1" viewBox="0 0 668 468" width="668px" zoomAndPan="magnify"><?plantuml 1.2026.6?><defs/><g><g class="title" data-source-line="3"><text fill="#000000" font-family="Verdana" font-size="22" font-weight="700" lengthAdjust="spacing" textLength="555.2744" x="55.8328" y="37.1182">File-backed login layout: shared and isolated</text></g><!--cluster Native home--><g class="cluster" data-qualified-name="Native home" data-source-line="4" id="ent0001"><path d="M459.65,132.4373 L559.8941,132.4373 A3.75,3.75 0 0 1 562.3941,134.9373 L569.3941,155.452 L651.44,155.452 A2.5,2.5 0 0 1 653.94,157.952 L653.94,235.9373 A2.5,2.5 0 0 1 651.44,238.4373 L459.65,238.4373 A2.5,2.5 0 0 1 457.15,235.9373 L457.15,134.9373 A2.5,2.5 0 0 1 459.65,132.4373" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><line style="stroke:#000000;stroke-width:1;" x1="457.15" x2="569.3941" y1="155.452" y2="155.452"/><text fill="#000000" font-family="Verdana" font-size="14" font-weight="700" lengthAdjust="spacing" textLength="99.2441" x="461.15" y="148.5125">Native home</text></g><!--cluster Managed home: shared--><g class="cluster" data-qualified-name="Managed home. shared" data-source-line="7" id="ent0003"><path d="M62.47,132.4373 L246.8645,132.4373 A3.75,3.75 0 0 1 249.3645,134.9373 L256.3645,155.452 L281.67,155.452 A2.5,2.5 0 0 1 284.17,157.952 L284.17,235.9373 A2.5,2.5 0 0 1 281.67,238.4373 L62.47,238.4373 A2.5,2.5 0 0 1 59.97,235.9373 L59.97,134.9373 A2.5,2.5 0 0 1 62.47,132.4373" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><line style="stroke:#000000;stroke-width:1;" x1="59.97" x2="256.3645" y1="155.452" y2="155.452"/><text fill="#000000" font-family="Verdana" font-size="14" font-weight="700" lengthAdjust="spacing" textLength="183.3945" x="63.97" y="148.5125">Managed home: shared</text></g><!--cluster Managed home: isolated--><g class="cluster" data-qualified-name="Managed home. isolated" data-source-line="10" id="ent0005"><path d="M71.07,347.4373 L264.0915,347.4373 A3.75,3.75 0 0 1 266.5915,349.9373 L273.5915,370.452 L274.07,370.452 A2.5,2.5 0 0 1 276.57,372.952 L276.57,450.9373 A2.5,2.5 0 0 1 274.07,453.4373 L71.07,453.4373 A2.5,2.5 0 0 1 68.57,450.9373 L68.57,349.9373 A2.5,2.5 0 0 1 71.07,347.4373" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><line style="stroke:#000000;stroke-width:1;" x1="68.57" x2="273.5915" y1="370.452" y2="370.452"/><text fill="#000000" font-family="Verdana" font-size="14" font-weight="700" lengthAdjust="spacing" textLength="192.0215" x="72.57" y="363.5125">Managed home: isolated</text></g><!--entity Native--><g class="entity" data-qualified-name="Native home.Native" data-source-line="5" id="ent0002"><path d="M473.15,170.9273 L473.15,219.9566 A2.5,2.5 0 0 0 475.65,222.4566 L635.442,222.4566 A2.5,2.5 0 0 0 637.942,219.9566 L637.942,178.4273 L627.942,168.4273 L475.65,168.4273 A2.5,2.5 0 0 0 473.15,170.9273" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><path d="M627.942,168.4273 L627.942,175.9273 A2.5,2.5 0 0 0 630.442,178.4273 L637.942,178.4273" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="14" lengthAdjust="spacing" textLength="144.792" x="483.15" y="192.5025">Native credential file</text><text fill="#000000" font-family="Verdana" font-size="14" lengthAdjust="spacing" textLength="91.3008" x="483.15" y="209.5171">(tool-owned)</text></g><!--entity Shared--><g class="entity" data-qualified-name="Managed home. shared.Shared" data-source-line="8" id="ent0004"><path d="M75.97,170.9273 L75.97,219.9566 A2.5,2.5 0 0 0 78.47,222.4566 L265.6673,222.4566 A2.5,2.5 0 0 0 268.1673,219.9566 L268.1673,178.4273 L258.1673,168.4273 L78.47,168.4273 A2.5,2.5 0 0 0 75.97,170.9273" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><path d="M258.1673,168.4273 L258.1673,175.9273 A2.5,2.5 0 0 0 260.6673,178.4273 L268.1673,178.4273" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="14" lengthAdjust="spacing" textLength="172.1973" x="85.97" y="192.5025">Declared credential path</text><text fill="#000000" font-family="Verdana" font-size="14" lengthAdjust="spacing" textLength="66.7393" x="85.97" y="209.5171">(symlink)</text></g><!--entity Isolated--><g class="entity" data-qualified-name="Managed home. isolated.Isolated" data-source-line="11" id="ent0006"><path d="M96.44,385.9273 L96.44,434.9566 A2.5,2.5 0 0 0 98.94,437.4566 L245.2037,437.4566 A2.5,2.5 0 0 0 247.7037,434.9566 L247.7037,393.4273 L237.7037,383.4273 L98.94,383.4273 A2.5,2.5 0 0 0 96.44,385.9273" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><path d="M237.7037,383.4273 L237.7037,390.9273 A2.5,2.5 0 0 0 240.2037,393.4273 L247.7037,393.4273" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="14" lengthAdjust="spacing" textLength="131.2637" x="106.44" y="407.5025">Own credential file</text><text fill="#000000" font-family="Verdana" font-size="14" lengthAdjust="spacing" textLength="129.9854" x="106.44" y="424.5171">(tool-owned login)</text></g><g class="entity" data-qualified-name="GMN8" data-source-line="15" id="ent0009"><path d="M56.52,257.8373 L56.52,331.0346 A0,0 0 0 0 56.52,331.0346 L168.07,331.0346 L172.07,383.2473 L176.07,331.0346 L287.6338,331.0346 A0,0 0 0 0 287.6338,331.0346 L287.6338,267.8373 L277.6338,257.8373 L56.52,257.8373 A0,0 0 0 0 56.52,257.8373" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><path d="M277.6338,257.8373 L277.6338,267.8373 L287.6338,267.8373 L277.6338,257.8373" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="187.8271" x="62.52" y="275.9071">No link to native credentials.</text><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="201.4683" x="62.52" y="291.7064">macOS Claude instead uses its</text><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="181.1304" x="62.52" y="307.5058">per-home Keychain identity</text><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="210.1138" x="62.52" y="323.3051">or session-qualified file fallback.</text></g><g class="entity" data-qualified-name="GMN11" data-source-line="21" id="ent0012"><path d="M11,58.7373 L11,116.1353 A0,0 0 0 0 11,116.1353 L168.07,116.1353 L172.07,168.0173 L176.07,116.1353 L333.1455,116.1353 A0,0 0 0 0 333.1455,116.1353 L333.1455,68.7373 L323.1455,58.7373 L11,58.7373 A0,0 0 0 0 11,58.7373" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><path d="M323.1455,58.7373 L323.1455,68.7373 L333.1455,68.7373 L323.1455,58.7373" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="301.1455" x="17" y="76.8071">Current defaults: see environment-config.md.</text><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="236.8374" x="17" y="92.6064">Muse file admission changes in rc.7.</text><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="217.1216" x="17" y="108.4058">macOS Claude shared is refused.</text></g><!--link Shared to Native--><g class="link" data-entity-1="ent0004" data-entity-2="ent0002" data-link-type="dependency" data-source-line="13" id="lnk7"><path d="M268.35,195.4373 C331.24,195.4373 407.79,195.4373 467.75,195.4373" fill="none" id="Shared-to-Native" style="stroke:#000000;stroke-width:1;"/><polygon fill="#000000" points="472.75,195.4373,463.75,191.4373,467.75,195.4373,463.75,199.4373,472.75,195.4373" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="76.1592" x="364.15" y="192.5071">verified link</text></g></g></svg>
+\ No newline at end of file
+diff --git a/diagrams/plantuml/agent-login-prepare.puml b/diagrams/plantuml/agent-login-prepare.puml
+new file mode 100644
+index 0000000000000000000000000000000000000000..57e670463a972b6141785c3a548c447af53ee993
+--- /dev/null
++++ b/diagrams/plantuml/agent-login-prepare.puml
+@@ -0,0 +1,38 @@
++@startuml
++!theme plain
++title Profile preparation (rc.7 contract)
++start
++if (Interactive terminal?) then (yes)
++  :Install only if absent;
++  :Enumerate every participant;
++  :Resolve / repair through existing gates;
++  :Read metadata in caller session;
++  if (Absent, supported, isolated, home-owned?) then (yes)
++    :Run native login with matching home/store;
++    note right
++      Child owns terminal and browser I/O.
++      Curator captures no credential output.
++      Cancellation stops further ceremonies.
++    end note
++  else (no)
++    :Skip login;
++    note right
++      Present needs no login.
++      Unknown or shared/external absence
++      receives guidance.
++    end note
++  endif
++  :Recompute every readiness row;
++else (no)
++  :Read existing participants and metadata only;
++  :No install, repair, activation, or login;
++endif
++:Report currency, login, source, store/backend,
++caller session, and next action;
++if (Every participant current and present?) then (yes)
++  :Exit 0;
++else (no)
++  :Nonzero; unknown never satisfies readiness;
++endif
++stop
++@enduml
+diff --git a/diagrams/plantuml/agent-login-prepare.svg b/diagrams/plantuml/agent-login-prepare.svg
+new file mode 100644
+index 0000000000000000000000000000000000000000..6337db9d918f863a353c6ed39310d33357b4912b
+--- /dev/null
++++ b/diagrams/plantuml/agent-login-prepare.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" data-diagram-type="ACTIVITY" height="800px" preserveAspectRatio="none" style="width:1298px;height:800px;background:#FFFFFF;" version="1.1" viewBox="0 0 1298 800" width="1298px" zoomAndPan="magnify"><?plantuml 1.2026.6?><defs/><g><g class="title" data-source-line="2"><text fill="#000000" font-family="Verdana" font-size="22" font-weight="700" lengthAdjust="spacing" textLength="422.3398" x="437.2878" y="37.1182">Profile preparation (rc.7 contract)</text></g><ellipse cx="762.8018" cy="67.7373" fill="#FFFFFF" rx="10" ry="10" style="stroke:#000000;stroke-width:1;"/><polygon fill="#FFFFFF" points="704.9631,97.7373,820.6404,97.7373,832.6404,109.7373,820.6404,121.7373,704.9631,121.7373,692.9631,109.7373,704.9631,97.7373" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="115.6772" x="704.9631" y="114.1121">Interactive terminal?</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="18.7935" x="674.1697" y="107.4277">yes</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="13.6372" x="832.6404" y="107.4277">no</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="143.2637" x="326.9106" y="131.7373"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="123.2637" x="336.9106" y="153.8018">Install only if absent</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="192.2363" x="302.4243" y="186.3213"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="172.2363" x="312.4243" y="208.3857">Enumerate every participant</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="255.5703" x="270.7573" y="240.9053"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="235.5703" x="280.7573" y="262.9697">Resolve / repair through existing gates</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="211.7012" x="292.6919" y="295.4893"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="191.7012" x="302.6919" y="317.5537">Read metadata in caller session</text><polygon fill="#FFFFFF" points="279.6479,350.0732,517.437,350.0732,529.437,362.0732,517.437,374.0732,279.6479,374.0732,267.6479,362.0732,279.6479,350.0732" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="237.7891" x="279.6479" y="366.448">Absent, supported, isolated, home-owned?</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="18.7935" x="248.8545" y="359.7637">yes</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="13.6372" x="529.437" y="359.7637">no</text><path d="M312.5684,384.0732 L312.5684,408.7722 L292.5684,412.7722 L312.5684,416.7722 L312.5684,441.4712 A0,0 0 0 0 312.5684,441.4712 L585.6846,441.4712 A0,0 0 0 0 585.6846,441.4712 L585.6846,394.0732 L575.6846,384.0732 L312.5684,384.0732 A0,0 0 0 0 312.5684,384.0732" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><path d="M575.6846,384.0732 L575.6846,394.0732 L585.6846,394.0732 L575.6846,384.0732" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="245.8574" x="318.5684" y="402.1431">Child owns terminal and browser I/O.</text><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="251.3291" x="318.5684" y="417.9424">Curator captures no credential output.</text><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="252.1162" x="318.5684" y="433.7417">Cancellation stops further ceremonies.</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="281.5684" x="11" y="395.4802"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="261.5684" x="21" y="417.5447">Run native login with matching home/store</text><path d="M694.917,384.0732 L694.917,408.7722 L674.917,412.7722 L694.917,416.7722 L694.917,441.4712 A0,0 0 0 0 694.917,441.4712 L960.2065,441.4712 A0,0 0 0 0 960.2065,441.4712 L960.2065,394.0732 L950.2065,384.0732 L694.917,384.0732 A0,0 0 0 0 694.917,384.0732" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><path d="M950.2065,384.0732 L950.2065,394.0732 L960.2065,394.0732 L950.2065,384.0732" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="153.4927" x="700.917" y="402.1431">Present needs no login.</text><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="244.2896" x="700.917" y="417.9424">Unknown or shared/external absence</text><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="121.4307" x="700.917" y="433.7417">receives guidance.</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="79.2324" x="595.6846" y="395.4802"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="59.2324" x="605.6846" y="417.5447">Skip login</text><polygon fill="#FFFFFF" points="398.5425,447.4712,410.5425,459.4712,398.5425,471.4712,386.5425,459.4712,398.5425,447.4712" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="213.6406" x="291.7222" y="491.4712"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="193.6406" x="301.7222" y="513.5356">Recompute every readiness row</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="293.709" x="990.2065" y="131.7373"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="273.709" x="1000.2065" y="153.8018">Read existing participants and metadata only</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="241.5078" x="1016.3071" y="186.3213"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="221.5078" x="1026.3071" y="208.3857">No install, repair, activation, or login</text><polygon fill="#FFFFFF" points="762.8018,532.0552,774.8018,544.0552,762.8018,556.0552,750.8018,544.0552,762.8018,532.0552" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="301.4492" x="612.0771" y="576.0552"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="281.4492" x="622.0771" y="598.1196">Report currency, login, source, store/backend,</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="182.8359" x="622.0771" y="612.7036">caller session, and next action</text><polygon fill="#FFFFFF" points="655.9358,645.2231,869.6677,645.2231,881.6677,657.2231,869.6677,669.2231,655.9358,669.2231,643.9358,657.2231,655.9358,645.2231" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="213.7319" x="655.9358" y="661.5979">Every participant current and present?</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="18.7935" x="625.1423" y="654.9136">yes</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="13.6372" x="881.6677" y="654.9136">no</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="54.5586" x="606.6565" y="679.2231"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="34.5586" x="616.6565" y="701.2876">Exit 0</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="286.8652" x="748.2351" y="679.2231"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="266.8652" x="758.2351" y="701.2876">Nonzero; unknown never satisfies readiness</text><polygon fill="#FFFFFF" points="762.8018,719.8071,774.8018,731.8071,762.8018,743.8071,750.8018,731.8071,762.8018,719.8071" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><ellipse cx="762.8018" cy="774.8071" fill="none" rx="11" ry="11" style="stroke:#000000;stroke-width:1;"/><ellipse cx="762.8018" cy="774.8071" fill="#FFFFFF" rx="6" ry="6" style="stroke:#000000;stroke-width:1;"/><line style="stroke:#000000;stroke-width:1;" x1="398.5425" x2="398.5425" y1="166.3213" y2="186.3213"/><polygon fill="#000000" points="394.5425,176.3213,398.5425,186.3213,402.5425,176.3213,398.5425,180.3213" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="398.5425" x2="398.5425" y1="220.9053" y2="240.9053"/><polygon fill="#000000" points="394.5425,230.9053,398.5425,240.9053,402.5425,230.9053,398.5425,234.9053" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="398.5425" x2="398.5425" y1="275.4893" y2="295.4893"/><polygon fill="#000000" points="394.5425,285.4893,398.5425,295.4893,402.5425,285.4893,398.5425,289.4893" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="267.6479" x2="151.7842" y1="362.0732" y2="362.0732"/><line style="stroke:#000000;stroke-width:1;" x1="151.7842" x2="151.7842" y1="362.0732" y2="395.4802"/><polygon fill="#000000" points="147.7842,385.4802,151.7842,395.4802,155.7842,385.4802,151.7842,389.4802" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="529.437" x2="635.3008" y1="362.0732" y2="362.0732"/><line style="stroke:#000000;stroke-width:1;" x1="635.3008" x2="635.3008" y1="362.0732" y2="395.4802"/><polygon fill="#000000" points="631.3008,385.4802,635.3008,395.4802,639.3008,385.4802,635.3008,389.4802" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="151.7842" x2="151.7842" y1="430.0642" y2="459.4712"/><line style="stroke:#000000;stroke-width:1;" x1="151.7842" x2="386.5425" y1="459.4712" y2="459.4712"/><polygon fill="#000000" points="376.5425,455.4712,386.5425,459.4712,376.5425,463.4712,380.5425,459.4712" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="635.3008" x2="635.3008" y1="430.0642" y2="459.4712"/><line style="stroke:#000000;stroke-width:1;" x1="635.3008" x2="410.5425" y1="459.4712" y2="459.4712"/><polygon fill="#000000" points="420.5425,455.4712,410.5425,459.4712,420.5425,463.4712,416.5425,459.4712" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="398.5425" x2="398.5425" y1="330.0732" y2="350.0732"/><polygon fill="#000000" points="394.5425,340.0732,398.5425,350.0732,402.5425,340.0732,398.5425,344.0732" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="398.5425" x2="398.5425" y1="471.4712" y2="491.4712"/><polygon fill="#000000" points="394.5425,481.4712,398.5425,491.4712,402.5425,481.4712,398.5425,485.4712" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="1137.061" x2="1137.061" y1="166.3213" y2="186.3213"/><polygon fill="#000000" points="1133.061,176.3213,1137.061,186.3213,1141.061,176.3213,1137.061,180.3213" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="692.9631" x2="398.5425" y1="109.7373" y2="109.7373"/><line style="stroke:#000000;stroke-width:1;" x1="398.5425" x2="398.5425" y1="109.7373" y2="131.7373"/><polygon fill="#000000" points="394.5425,121.7373,398.5425,131.7373,402.5425,121.7373,398.5425,125.7373" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="832.6404" x2="1137.061" y1="109.7373" y2="109.7373"/><line style="stroke:#000000;stroke-width:1;" x1="1137.061" x2="1137.061" y1="109.7373" y2="131.7373"/><polygon fill="#000000" points="1133.061,121.7373,1137.061,131.7373,1141.061,121.7373,1137.061,125.7373" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="398.5425" x2="398.5425" y1="526.0552" y2="544.0552"/><line style="stroke:#000000;stroke-width:1;" x1="398.5425" x2="750.8018" y1="544.0552" y2="544.0552"/><polygon fill="#000000" points="740.8018,540.0552,750.8018,544.0552,740.8018,548.0552,744.8018,544.0552" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="1137.061" x2="1137.061" y1="220.9053" y2="544.0552"/><line style="stroke:#000000;stroke-width:1;" x1="1137.061" x2="774.8018" y1="544.0552" y2="544.0552"/><polygon fill="#000000" points="784.8018,540.0552,774.8018,544.0552,784.8018,548.0552,780.8018,544.0552" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="762.8018" x2="762.8018" y1="77.7373" y2="97.7373"/><polygon fill="#000000" points="758.8018,87.7373,762.8018,97.7373,766.8018,87.7373,762.8018,91.7373" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="762.8018" x2="762.8018" y1="556.0552" y2="576.0552"/><polygon fill="#000000" points="758.8018,566.0552,762.8018,576.0552,766.8018,566.0552,762.8018,570.0552" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="643.9358" x2="633.9358" y1="657.2231" y2="657.2231"/><line style="stroke:#000000;stroke-width:1;" x1="633.9358" x2="633.9358" y1="657.2231" y2="679.2231"/><polygon fill="#000000" points="629.9358,669.2231,633.9358,679.2231,637.9358,669.2231,633.9358,673.2231" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="881.6677" x2="891.6677" y1="657.2231" y2="657.2231"/><line style="stroke:#000000;stroke-width:1;" x1="891.6677" x2="891.6677" y1="657.2231" y2="679.2231"/><polygon fill="#000000" points="887.6677,669.2231,891.6677,679.2231,895.6677,669.2231,891.6677,673.2231" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="633.9358" x2="633.9358" y1="713.8071" y2="731.8071"/><line style="stroke:#000000;stroke-width:1;" x1="633.9358" x2="750.8018" y1="731.8071" y2="731.8071"/><polygon fill="#000000" points="740.8018,727.8071,750.8018,731.8071,740.8018,735.8071,744.8018,731.8071" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="891.6677" x2="891.6677" y1="713.8071" y2="731.8071"/><line style="stroke:#000000;stroke-width:1;" x1="891.6677" x2="774.8018" y1="731.8071" y2="731.8071"/><polygon fill="#000000" points="784.8018,727.8071,774.8018,731.8071,784.8018,735.8071,780.8018,731.8071" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="762.8018" x2="762.8018" y1="625.2231" y2="645.2231"/><polygon fill="#000000" points="758.8018,635.2231,762.8018,645.2231,766.8018,635.2231,762.8018,639.2231" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="762.8018" x2="762.8018" y1="743.8071" y2="763.8071"/><polygon fill="#000000" points="758.8018,753.8071,762.8018,763.8071,766.8018,753.8071,762.8018,757.8071" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/></g></svg>
+\ No newline at end of file
+diff --git a/diagrams/plantuml/agent-login-resolution.puml b/diagrams/plantuml/agent-login-resolution.puml
+new file mode 100644
+index 0000000000000000000000000000000000000000..982513927d93db95cbda7af621bc92c3b4adb87b
+--- /dev/null
++++ b/diagrams/plantuml/agent-login-resolution.puml
+@@ -0,0 +1,28 @@
++@startuml
++!theme plain
++title Login policy resolution (rc.7 contract)
++start
++:Resolve authentication source;
++note right
++  Home/native or explicitly admitted external source.
++  Protected setup-token delivery remains planned.
++end note
++:Resolve machine credential_store selector;
++note right
++  native (default), file, keychain.
++  Managed Muse native maps to file (CIP-0017).
++end note
++if (Supported source/store mapping?) then (yes)
++  :Check isolation admission;
++  if (Isolation and native source compatible?) then (yes)
++    :Select link strategy;
++    :Project home paths and backend policy;
++    :Launcher applies policy at login and launch;
++  else (no)
++    :Refuse; no credential migration;
++  endif
++else (no)
++  :Refuse; no fallback to native;
++endif
++stop
++@enduml
+diff --git a/diagrams/plantuml/agent-login-resolution.svg b/diagrams/plantuml/agent-login-resolution.svg
+new file mode 100644
+index 0000000000000000000000000000000000000000..286b135a24cade8677f8a4d30c5cddbc5122d149
+--- /dev/null
++++ b/diagrams/plantuml/agent-login-resolution.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" data-diagram-type="ACTIVITY" height="597px" preserveAspectRatio="none" style="width:965px;height:597px;background:#FFFFFF;" version="1.1" viewBox="0 0 965 597" width="965px" zoomAndPan="magnify"><?plantuml 1.2026.6?><defs/><g><g class="title" data-source-line="2"><text fill="#000000" font-family="Verdana" font-size="22" font-weight="700" lengthAdjust="spacing" textLength="469.498" x="247.2208" y="37.1182">Login policy resolution (rc.7 contract)</text></g><ellipse cx="465.9246" cy="67.7373" fill="#FFFFFF" rx="10" ry="10" style="stroke:#000000;stroke-width:1;"/><path d="M586.3757,94.23 L586.3757,111.0293 L566.3757,115.0293 L586.3757,119.0293 L586.3757,135.8286 A0,0 0 0 0 586.3757,135.8286 L944.5188,135.8286 A0,0 0 0 0 944.5188,135.8286 L944.5188,104.23 L934.5188,94.23 L586.3757,94.23 A0,0 0 0 0 586.3757,94.23" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><path d="M934.5188,94.23 L934.5188,104.23 L944.5188,104.23 L934.5188,94.23" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="337.1431" x="592.3757" y="112.2998">Home/native or explicitly admitted external source.</text><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="319.1792" x="592.3757" y="128.0991">Protected setup-token delivery remains planned.</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="200.9023" x="365.4734" y="97.7373"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="180.9023" x="375.4734" y="119.8018">Resolve authentication source</text><path d="M623.2429,152.3213 L623.2429,169.1206 L603.2429,173.1206 L623.2429,177.1206 L623.2429,193.9199 A0,0 0 0 0 623.2429,193.9199 L949.9397,193.9199 A0,0 0 0 0 949.9397,193.9199 L949.9397,162.3213 L939.9397,152.3213 L623.2429,152.3213 A0,0 0 0 0 623.2429,152.3213" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><path d="M939.9397,152.3213 L939.9397,162.3213 L949.9397,162.3213 L939.9397,152.3213" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="202.1855" x="629.2429" y="170.3911">native (default), file, keychain.</text><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="305.6968" x="629.2429" y="186.1904">Managed Muse native maps to file (CIP-0017).</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="274.6367" x="328.6062" y="155.8286"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="254.6367" x="338.6062" y="177.8931">Resolve machine credential_store selector</text><polygon fill="#FFFFFF" points="371.8203,213.9199,560.0288,213.9199,572.0288,225.9199,560.0288,237.9199,371.8203,237.9199,359.8203,225.9199,371.8203,213.9199" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="188.2085" x="371.8203" y="230.2947">Supported source/store mapping?</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="18.7935" x="341.0269" y="223.6104">yes</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="13.6372" x="572.0288" y="223.6104">no</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="175.4609" x="195.9487" y="247.9199"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="155.4609" x="205.9487" y="269.9844">Check isolation admission</text><polygon fill="#FFFFFF" points="173.5718,302.5039,393.7866,302.5039,405.7866,314.5039,393.7866,326.5039,173.5718,326.5039,161.5718,314.5039,173.5718,302.5039" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="220.2148" x="173.5718" y="318.8787">Isolation and native source compatible?</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="18.7935" x="142.7783" y="312.1943">yes</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="13.6372" x="405.7866" y="312.1943">no</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="136.2559" x="82.8887" y="336.5039"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="116.2559" x="92.8887" y="358.5684">Select link strategy</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="257.1816" x="22.4258" y="391.0879"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="237.1816" x="32.4258" y="413.1523">Project home paths and backend policy</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="280.0332" x="11" y="445.6719"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="260.0332" x="21" y="467.7363">Launcher applies policy at login and launch</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="210.6172" x="311.0332" y="336.5039"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="190.6172" x="321.0332" y="358.5684">Refuse; no credential migration</text><polygon fill="#FFFFFF" points="283.6792,486.2559,295.6792,498.2559,283.6792,510.2559,271.6792,498.2559,283.6792,486.2559" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="193.0391" x="551.6504" y="247.9199"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="173.0391" x="561.6504" y="269.9844">Refuse; no fallback to native</text><polygon fill="#FFFFFF" points="465.9246,516.2559,477.9246,528.2559,465.9246,540.2559,453.9246,528.2559,465.9246,516.2559" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><ellipse cx="465.9246" cy="571.2559" fill="none" rx="11" ry="11" style="stroke:#000000;stroke-width:1;"/><ellipse cx="465.9246" cy="571.2559" fill="#FFFFFF" rx="6" ry="6" style="stroke:#000000;stroke-width:1;"/><line style="stroke:#000000;stroke-width:1;" x1="465.9246" x2="465.9246" y1="77.7373" y2="97.7373"/><polygon fill="#000000" points="461.9246,87.7373,465.9246,97.7373,469.9246,87.7373,465.9246,91.7373" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="465.9246" x2="465.9246" y1="132.3213" y2="155.8286"/><polygon fill="#000000" points="461.9246,145.8286,465.9246,155.8286,469.9246,145.8286,465.9246,149.8286" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="151.0166" x2="151.0166" y1="371.0879" y2="391.0879"/><polygon fill="#000000" points="147.0166,381.0879,151.0166,391.0879,155.0166,381.0879,151.0166,385.0879" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="151.0166" x2="151.0166" y1="425.6719" y2="445.6719"/><polygon fill="#000000" points="147.0166,435.6719,151.0166,445.6719,155.0166,435.6719,151.0166,439.6719" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="161.5718" x2="151.0166" y1="314.5039" y2="314.5039"/><line style="stroke:#000000;stroke-width:1;" x1="151.0166" x2="151.0166" y1="314.5039" y2="336.5039"/><polygon fill="#000000" points="147.0166,326.5039,151.0166,336.5039,155.0166,326.5039,151.0166,330.5039" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="405.7866" x2="416.3418" y1="314.5039" y2="314.5039"/><line style="stroke:#000000;stroke-width:1;" x1="416.3418" x2="416.3418" y1="314.5039" y2="336.5039"/><polygon fill="#000000" points="412.3418,326.5039,416.3418,336.5039,420.3418,326.5039,416.3418,330.5039" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="151.0166" x2="151.0166" y1="480.2559" y2="498.2559"/><line style="stroke:#000000;stroke-width:1;" x1="151.0166" x2="271.6792" y1="498.2559" y2="498.2559"/><polygon fill="#000000" points="261.6792,494.2559,271.6792,498.2559,261.6792,502.2559,265.6792,498.2559" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="416.3418" x2="416.3418" y1="371.0879" y2="498.2559"/><line style="stroke:#000000;stroke-width:1;" x1="416.3418" x2="295.6792" y1="498.2559" y2="498.2559"/><polygon fill="#000000" points="305.6792,494.2559,295.6792,498.2559,305.6792,502.2559,301.6792,498.2559" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="283.6792" x2="283.6792" y1="282.5039" y2="302.5039"/><polygon fill="#000000" points="279.6792,292.5039,283.6792,302.5039,287.6792,292.5039,283.6792,296.5039" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="359.8203" x2="283.6792" y1="225.9199" y2="225.9199"/><line style="stroke:#000000;stroke-width:1;" x1="283.6792" x2="283.6792" y1="225.9199" y2="247.9199"/><polygon fill="#000000" points="279.6792,237.9199,283.6792,247.9199,287.6792,237.9199,283.6792,241.9199" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="572.0288" x2="648.1699" y1="225.9199" y2="225.9199"/><line style="stroke:#000000;stroke-width:1;" x1="648.1699" x2="648.1699" y1="225.9199" y2="247.9199"/><polygon fill="#000000" points="644.1699,237.9199,648.1699,247.9199,652.1699,237.9199,648.1699,241.9199" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="283.6792" x2="283.6792" y1="510.2559" y2="528.2559"/><line style="stroke:#000000;stroke-width:1;" x1="283.6792" x2="453.9246" y1="528.2559" y2="528.2559"/><polygon fill="#000000" points="443.9246,524.2559,453.9246,528.2559,443.9246,532.2559,447.9246,528.2559" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="648.1699" x2="648.1699" y1="282.5039" y2="528.2559"/><line style="stroke:#000000;stroke-width:1;" x1="648.1699" x2="477.9246" y1="528.2559" y2="528.2559"/><polygon fill="#000000" points="487.9246,524.2559,477.9246,528.2559,487.9246,532.2559,483.9246,528.2559" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="465.9246" x2="465.9246" y1="190.4126" y2="213.9199"/><polygon fill="#000000" points="461.9246,203.9199,465.9246,213.9199,469.9246,203.9199,465.9246,207.9199" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="465.9246" x2="465.9246" y1="540.2559" y2="560.2559"/><polygon fill="#000000" points="461.9246,550.2559,465.9246,560.2559,469.9246,550.2559,465.9246,554.2559" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/></g></svg>
+\ No newline at end of file
+diff --git a/diagrams/plantuml/agent-login-stores.puml b/diagrams/plantuml/agent-login-stores.puml
+new file mode 100644
+index 0000000000000000000000000000000000000000..309f2a90b44053b4bad8d73be0d30d02db382c38
+--- /dev/null
++++ b/diagrams/plantuml/agent-login-stores.puml
+@@ -0,0 +1,18 @@
++@startsalt
++!theme plain
++{
++**Agent login stores: measured releases and session bounds**
++{#
++Tool / platform | Session or selection | Login store
++Claude Code 2.1.299 / macOS 15 | Keychain-capable | Per-home Keychain item
++Claude Code 2.1.299 / macOS 15 | Measured ssh fallback | Home .credentials.json (0600)
++Claude Code 2.1.299 / macOS 15 | No login Keychain | Save fails; no file fallback
++Claude Code 2.1.299 / Linux | Home-file layout | Home .credentials.json
++Codex CLI 0.153.2 / macOS + Linux | file or absent selector | CODEX_HOME/auth.json
++Codex CLI 0.153.2 / macOS + Linux | keyring / auto | OS keyring when available
++Muse 1.4.8 / macOS | Native selection | Global Keychain; file fallback
++Muse 1.4.8 / macOS | Explicit file backend | XDG_CONFIG_HOME/muse/auth.json (0600)
++Muse 1.4.8 / Linux | No supplied login probe | File contract in rc.7; behavior unqualified
++}
++}
++@endsalt
+diff --git a/diagrams/plantuml/agent-login-stores.svg b/diagrams/plantuml/agent-login-stores.svg
+new file mode 100644
+index 0000000000000000000000000000000000000000..1fa180e663038db7614241c97e86bd6e002bc807
+--- /dev/null
++++ b/diagrams/plantuml/agent-login-stores.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" data-diagram-type="SALT" height="190px" preserveAspectRatio="none" style="width:628px;height:190px;background:#FFFFFF;" version="1.1" viewBox="0 0 628 190" width="628px" zoomAndPan="magnify"><?plantuml 1.2026.6?><defs/><g><text fill="#000000" font-family="sans-serif" font-size="12" font-weight="700" lengthAdjust="spacing" textLength="364.7637" x="6" y="17.6016">Agent login stores: measured releases and session bounds</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="89.7188" x="7" y="34.7344">Tool / platform</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="115.4238" x="220.459" y="34.7344">Session or selection</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="65.5371" x="363.2422" y="34.7344">Login store</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="195.7441" x="7" y="50.8672">Claude Code 2.1.299 / macOS 15</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="103.5293" x="220.459" y="50.8672">Keychain-capable</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="143.2441" x="363.2422" y="50.8672">Per-home Keychain item</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="195.7441" x="7" y="67">Claude Code 2.1.299 / macOS 15</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="128.9531" x="220.459" y="67">Measured ssh fallback</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="175.6055" x="363.2422" y="67">Home .credentials.json (0600)</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="195.7441" x="7" y="83.1328">Claude Code 2.1.299 / macOS 15</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="104.9941" x="220.459" y="83.1328">No login Keychain</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="147.2344" x="363.2422" y="83.1328">Save fails; no file fallback</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="169.1309" x="7" y="99.2656">Claude Code 2.1.299 / Linux</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="98.5254" x="220.459" y="99.2656">Home-file layout</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="133.6523" x="363.2422" y="99.2656">Home .credentials.json</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="211.459" x="7" y="115.3984">Codex CLI 0.153.2 / macOS + Linux</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="126.498" x="220.459" y="115.3984">file or absent selector</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="142.2949" x="363.2422" y="115.3984">CODEX_HOME/auth.json</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="211.459" x="7" y="131.5313">Codex CLI 0.153.2 / macOS + Linux</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="83.0977" x="220.459" y="131.5313">keyring / auto</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="152.0156" x="363.2422" y="131.5313">OS keyring when available</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="118.3887" x="7" y="147.6641">Muse 1.4.8 / macOS</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="92.0215" x="220.459" y="147.6641">Native selection</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="167.625" x="363.2422" y="147.6641">Global Keychain; file fallback</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="118.3887" x="7" y="163.7969">Muse 1.4.8 / macOS</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="117.1113" x="220.459" y="163.7969">Explicit file backend</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="257.5898" x="363.2422" y="163.7969">XDG_CONFIG_HOME/muse/auth.json (0600)</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="110.748" x="7" y="179.9297">Muse 1.4.8 / Linux</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="140.7832" x="220.459" y="179.9297">No supplied login probe</text><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacing" textLength="239.6719" x="363.2422" y="179.9297">File contract in rc.7; behavior unqualified</text><line style="stroke:#000000;stroke-width:1;" x1="6" x2="219.459" y1="22.1328" y2="22.1328"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="362.2422" y1="22.1328" y2="22.1328"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="621.832" y1="22.1328" y2="22.1328"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="219.459" y1="135.0625" y2="135.0625"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="362.2422" y1="135.0625" y2="135.0625"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="621.832" y1="135.0625" y2="135.0625"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="219.459" y1="70.5313" y2="70.5313"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="362.2422" y1="70.5313" y2="70.5313"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="621.832" y1="70.5313" y2="70.5313"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="219.459" y1="183.4609" y2="183.4609"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="362.2422" y1="183.4609" y2="183.4609"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="621.832" y1="183.4609" y2="183.4609"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="219.459" y1="118.9297" y2="118.9297"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="362.2422" y1="118.9297" y2="118.9297"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="621.832" y1="118.9297" y2="118.9297"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="219.459" y1="54.3984" y2="54.3984"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="362.2422" y1="54.3984" y2="54.3984"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="621.832" y1="54.3984" y2="54.3984"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="219.459" y1="167.3281" y2="167.3281"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="362.2422" y1="167.3281" y2="167.3281"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="621.832" y1="167.3281" y2="167.3281"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="219.459" y1="102.7969" y2="102.7969"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="362.2422" y1="102.7969" y2="102.7969"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="621.832" y1="102.7969" y2="102.7969"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="219.459" y1="38.2656" y2="38.2656"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="362.2422" y1="38.2656" y2="38.2656"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="621.832" y1="38.2656" y2="38.2656"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="219.459" y1="151.1953" y2="151.1953"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="362.2422" y1="151.1953" y2="151.1953"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="621.832" y1="151.1953" y2="151.1953"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="219.459" y1="86.6641" y2="86.6641"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="362.2422" y1="86.6641" y2="86.6641"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="621.832" y1="86.6641" y2="86.6641"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="6" y1="22.1328" y2="38.2656"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="219.459" y1="22.1328" y2="38.2656"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="362.2422" y1="22.1328" y2="38.2656"/><line style="stroke:#000000;stroke-width:1;" x1="621.832" x2="621.832" y1="22.1328" y2="38.2656"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="6" y1="135.0625" y2="151.1953"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="219.459" y1="135.0625" y2="151.1953"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="362.2422" y1="135.0625" y2="151.1953"/><line style="stroke:#000000;stroke-width:1;" x1="621.832" x2="621.832" y1="135.0625" y2="151.1953"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="6" y1="70.5313" y2="86.6641"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="219.459" y1="70.5313" y2="86.6641"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="362.2422" y1="70.5313" y2="86.6641"/><line style="stroke:#000000;stroke-width:1;" x1="621.832" x2="621.832" y1="70.5313" y2="86.6641"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="6" y1="118.9297" y2="135.0625"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="219.459" y1="118.9297" y2="135.0625"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="362.2422" y1="118.9297" y2="135.0625"/><line style="stroke:#000000;stroke-width:1;" x1="621.832" x2="621.832" y1="118.9297" y2="135.0625"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="6" y1="54.3984" y2="70.5313"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="219.459" y1="54.3984" y2="70.5313"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="362.2422" y1="54.3984" y2="70.5313"/><line style="stroke:#000000;stroke-width:1;" x1="621.832" x2="621.832" y1="54.3984" y2="70.5313"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="6" y1="167.3281" y2="183.4609"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="219.459" y1="167.3281" y2="183.4609"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="362.2422" y1="167.3281" y2="183.4609"/><line style="stroke:#000000;stroke-width:1;" x1="621.832" x2="621.832" y1="167.3281" y2="183.4609"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="6" y1="102.7969" y2="118.9297"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="219.459" y1="102.7969" y2="118.9297"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="362.2422" y1="102.7969" y2="118.9297"/><line style="stroke:#000000;stroke-width:1;" x1="621.832" x2="621.832" y1="102.7969" y2="118.9297"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="6" y1="38.2656" y2="54.3984"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="219.459" y1="38.2656" y2="54.3984"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="362.2422" y1="38.2656" y2="54.3984"/><line style="stroke:#000000;stroke-width:1;" x1="621.832" x2="621.832" y1="38.2656" y2="54.3984"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="6" y1="151.1953" y2="167.3281"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="219.459" y1="151.1953" y2="167.3281"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="362.2422" y1="151.1953" y2="167.3281"/><line style="stroke:#000000;stroke-width:1;" x1="621.832" x2="621.832" y1="151.1953" y2="167.3281"/><line style="stroke:#000000;stroke-width:1;" x1="6" x2="6" y1="86.6641" y2="102.7969"/><line style="stroke:#000000;stroke-width:1;" x1="219.459" x2="219.459" y1="86.6641" y2="102.7969"/><line style="stroke:#000000;stroke-width:1;" x1="362.2422" x2="362.2422" y1="86.6641" y2="102.7969"/><line style="stroke:#000000;stroke-width:1;" x1="621.832" x2="621.832" y1="86.6641" y2="102.7969"/></g></svg>
+\ No newline at end of file
+diff --git a/docs/agent-logins.md b/docs/agent-logins.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..e3f24c1d2b7ef7f646ac5558468acf4ba43695d5
+--- /dev/null
++++ b/docs/agent-logins.md
+@@ -0,0 +1,322 @@
++# Agent logins
++
++Curator gives each profile a managed agent home. The agent tool owns
++the login inside that home or in its selected operating-system store.
++Choose the store and isolation before preparing a home for launches.
++
++## Availability
++
++This reference checks Curator `main` at `205272e7` on 2026-10-16.
++**works today** means implemented there. **rc.7** identifies the next
++implementation contract; those commands are unavailable on this baseline.
++**planned** identifies a proposed capability with no implementation claim.
++The measurements below came from scratch homes on 2026-10-14.
++They describe the named tool releases, without claiming later versions
++behave identically.
++
++| Capability | Status | Bound |
++|---|---|---|
++| `isolation.<profile>.<env-id>` and credential links | works today | Follow the existing per-tool admission table linked below. |
++| `env resolve --format shell`, followed by the tool's login | works today | Login must use the same home and session kind as the launcher. |
++| `credential_store.<profile>.<env-id>` | rc.7 | Machine-owned selector; unsupported mappings refuse. |
++| `curator env login` and `curator profile prepare` | rc.7 | Interactive login requires a real terminal. |
++| `login: present \| absent \| unknown` readiness row | rc.7 | Metadata only; presence does not prove successful authentication. |
++| Codex typed `-c` settings and store overrides | rc.7 | The launcher applies overrides without rewriting `config.toml`. |
++| Managed Muse file selection and explicit `root_context` fragment | rc.7 | File mode admits shared and isolated homes; refresh writes remain unmeasured. |
++| Managed-home snapshots through `env materialize` | rc.7 | Readiness never authorizes copying credentials into an archive. |
++| Protected Claude `setup-token` source and executor injection | planned | Inference only; Remote Control refuses this token. |
++
++## Where the tools keep a login
++
++A native home is the tool's ordinary home before Curator exports any
++managed-home variables. A managed home is the profile-specific home selected
++by `env resolve`. Paths below use environment variables or home-relative
++names; they identify storage contracts, not a particular machine.
++
++### Claude Code
++
++Claude Code `2.1.299` chooses storage by session capability on macOS 15.
++Desktop and ssh are descriptions of the measured sessions. A daemon or
++tmux server inherits the capabilities of the session that started it.
++Transport alone does not establish Keychain access.
++
++| Platform/session | Store and observation | Status |
++|---|---|---|
++| macOS 15, session with login-Keychain access | A per-home Keychain item, `Claude Code-credentials-<hash>`. The hash is the first eight lowercase hex characters of SHA-256 of the exact `CLAUDE_CONFIG_DIR` string. Login writes no credential file and leaves the native login untouched. | works today |
++| macOS 15, ssh-started session without Keychain access | `$CLAUDE_CONFIG_DIR/.credentials.json`, mode `0600`. `security show-keychain-info` exited `36` in the measured session. Login wrote no Keychain item; hiding the file yielded "Not logged in". | works today |
++| macOS 15, user with no login Keychain | Login fails with "Couldn't save your login". This case has no file fallback. It differs from a session that lacks access to an existing login Keychain. | works today |
++| Linux, home-file backend | `$CLAUDE_CONFIG_DIR/.credentials.json`. Curator can link this file in shared mode. The supplied Claude Code `2.1.299` source pack records this layout without a Linux distribution or session probe matrix. | works today |
++
++The two measured macOS stores do not see each other. A desktop login
++reported `loggedIn=false` in the ssh-started session, and the reverse also
++held. Log in from the same kind of session as the launcher. Repeat the
++readiness check when that session changes.
++
++Claude Code `2.1.299` also accepts `CLAUDE_CODE_OAUTH_TOKEN` from
++`claude setup-token`. It reports `authMethod=oauth_token`, takes precedence
++over the home's login, and writes nothing to either store. The vendor
++mechanism **works today**; Curator's protected enrollment and delivery
++remain **planned**. Remote Control refuses this inference-only source.
++`claude auth status --json` reports `loggedIn` and `authMethod` without
++a model call on this measured release.
++
++### Codex CLI
++
++Codex CLI `0.153.2` selects storage through `cli_auth_credentials_store`
++in `config.toml`. The supplied measurement does not include separate
++macOS and Linux keyring qualification or vendor failure messages.
++
++| Platform/selection | Store and observation on Codex CLI `0.153.2` | Status |
++|---|---|---|
++| macOS or Linux, selector absent or `file` | `$CODEX_HOME/auth.json`; absence selects `file`. Curator's native file-sharing route is available. | works today |
++| macOS or Linux, `keyring` or `auto` | Uses the OS keyring when available. Backend availability and session access matter; a working desktop keyring does not establish ssh access. Curator refuses isolated mode for either selector. | works today |
++| Per-invocation `-c 'cli_auth_credentials_store="file"'` | The CLI override wins over `config.toml` for that invocation. This is an existing vendor interface. | works today |
++| Curator-selected file/keyring override at login and launch | The launcher transports the machine selection with typed `-c` arguments. | rc.7 |
++
++Curator currently follows the **native** `config.toml` selector. A
++different selector in the managed `config.toml` does not change Curator's
++link strategy. Curator rewrites neither file. Native `keyring` has no
++credential link; `auto` retains a file link for fallback but can use an
++ambient keyring login. Isolated `keyring` or `auto` refuses with
++`environment_isolated_unsupported`. An unknown native selector refuses
++with `environment_credential_unsupported`; an unreadable or malformed
++native configuration fails resolution, rather than selecting the default.
++
++The [official OpenAI authentication reference](https://developers.openai.com/codex/auth)
++describes file and keyring storage. The versioned observations above remain
++the baseline for this document.
++
++### Muse
++
++Muse `1.4.8` on macOS uses a global Keychain item by default.
++The measurement identifies the item as `ai.meta.dev.credentials`.
++An `auth.json` link alone cannot select the file backend.
++
++| Platform/selection | Store and observation on Muse `1.4.8` | Status |
++|---|---|---|
++| macOS, native selection | Global Keychain with `auth.json` as a fallback. Session metadata names `keychain`, `keychain_fallback_file`, or `file`. Desktop versus ssh behavior was not separately qualified. | works today |
++| macOS, no Keychain | OAuth succeeds but saving fails with "keychain write failed (os status -60006)"; login exits `1`. The measured failure has no file fallback. | works today |
++| macOS, `TBH_CREDENTIAL_BACKEND=file` | `$XDG_CONFIG_HOME/muse/auth.json`, mode `0600`; later runs use `file` with zero Keychain access. Hiding the file yields missing credentials. A linked `auth.json` also works. | works today |
++| Linux | The file contract uses `$XDG_CONFIG_HOME/muse/auth.json`. The source pack contains no Muse `1.4.8` Linux login probe or measured error message; backend behavior remains unqualified there. | rc.7 (Curator contract; Linux vendor measurement absent) |
++| Managed Muse, file backend applied at login and launch | Both shared and isolated homes are admitted through `TBH_CREDENTIAL_BACKEND=file`. | rc.7 |
++
++Muse `1.4.8` accepts a minted API key through `exec --api-key-stdin`;
++the measured request bills the subscription. `META_API_KEY` leaves the
++store untouched. These vendor routes **work today**. Token-refresh writes
++and concurrent refresh behavior remain unmeasured. File admission in rc.7
++does not establish those properties.
++
++The diagram summarizes measured stores and the Linux evidence limit:
++
++![Agent login stores by tool and session](../diagrams/plantuml/agent-login-stores.svg)
++
++## Isolation
++
++Isolation selects whose login a home uses. The machine knob
++`isolation.<profile>.<env-id>` accepts `shared` or `isolated`.
++Shared homes link the declared credential file to the native file.
++Isolated homes keep their own login and create no credential link.
++Ambient keyrings can prevent isolation even when homes differ.
++
++The [existing isolation table](environment-config.md#logging-in-to-managed-homes)
++is the reference for current defaults and admission. It covers each
++environment without duplicating the table here. In particular, macOS
++Claude defaults to isolated and refuses shared with
++`environment_shared_unsupported`. Muse isolated remains refused on the
++current baseline; the rc.7 file contract changes that admission.
++
++The layout below applies to file-backed logins. Claude's macOS Keychain
++login instead belongs to the managed home's exact config-directory identity:
++
++![Shared and isolated credential layout](../diagrams/plantuml/agent-login-homes.svg)
++
++## Credential store (rc.7)
++
++The machine selects where a tool stores its login. The exact knob is
++`credential_store.<profile>.<env-id>`, with values `native`, `file`, and
++`keychain`. Its default is `native`. This knob is **rc.7**, unavailable
++on the checked baseline.
++
++For profile `P`, select Codex file storage in rc.7 with:
++
++```bash
++curator env config set credential_store.P.codex_cli file
++```
++
++The general CLI spelling is
++`curator env config set credential_store.<profile>.<env-id> <value>`.
++The operator owns this machine setting. Packages, overlays, system locks,
++and repositories never select the store. Keychain availability and session
++capabilities belong to the machine. A package must not decide that login
++tokens go to disk.
++
++| Adapter | `native` | `file` | `keychain` | Status |
++|---|---|---|---|---|
++| Codex | Follow native `config.toml`; absent means file; no override. | `-c 'cli_auth_credentials_store="file"'` at login and launch. | `-c 'cli_auth_credentials_store="keyring"'` only on a qualified macOS backend; otherwise refuse. Isolated remains refused. | rc.7 |
++| Muse | For managed Muse, resolve to effective file under CIP-0017. Preserve the stored `native` default. | `TBH_CREDENTIAL_BACKEND=file` at login and launch. | Refuse; no qualified force-Keychain interface. | rc.7 |
++| Claude | Use the session-qualified native choice. | Refuse; no established force-file interface. | Refuse; no established force-Keychain interface. | rc.7 |
++
++CIP-0017 explicitly changes CIP-0015's generic Muse native mapping.
++An unset or `native` selector becomes effective `file` for managed Muse
++in rc.7. The vendor's ordinary native login remains Keychain-backed on
++the measured macOS release. Shared Muse therefore requires a native
++**file-backed** login; a Keychain-only login is insufficient.
++
++Changing the selector never migrates or deletes a login. Inspect and
++explicitly migrate a recorded backend or link conflict before launching.
++Repair cannot silently change credential ownership. Shared Codex file
++storage requires a compatible native file source; an old `auth.json`
++under native `keyring` or `auto` is not a shared login source.
++
++Curator resolves source, then store, then isolation admission, then link
++strategy. Unsupported selections refuse instead of falling back:
++
++![Login policy resolution order](../diagrams/plantuml/agent-login-resolution.svg)
++
++## Login routes
++
++### Resolve and log in (works today)
++
++For an installed, current Claude home, resolve and log in from the
++same kind of session as the launcher:
++
++```bash
++eval "$(curator env resolve claude_code --profile P --format shell)"
++claude auth login
++claude auth status --json
++```
++
++The export selects `CLAUDE_CONFIG_DIR` for profile `P`. Check that resolve
++succeeds before running login. A stale home needs explicit resolution or
++repair first. The status command is a vendor check, separate from Curator's
++planned metadata-only readiness row.
++
++### Login and prepare (rc.7)
++
++`curator env login` runs the tool's own login inside a current, trusted
++managed home. It supports Claude, Codex and Muse. It requires isolated,
++home-owned authentication and terminal input and output. Shared mode refuses
++with native-login guidance. The command never installs, repairs, migrates,
++or activates a profile, and never captures credential-bearing output.
++
++After selecting isolated mode and a supported store, log in with:
++
++```bash
++curator env login codex_cli --profile P
++```
++
++The child uses the same home and store projection as later launches.
++Curator recomputes readiness after the child exits.
++
++To prepare every participating environment in rc.7, run:
++
++```bash
++curator profile prepare P
++```
++
++Prepare installs only an absent profile. Existing locks and current-profile
++selections remain intact. It resolves every participant and starts login
++only for absent, supported, isolated, home-owned sources. Present rows skip
++login; unknown rows receive guidance and never trigger a login attempt.
++Non-interactive prepare is report-only: it performs no install, repair,
++browser interaction, or login.
++
++| Readiness row | Meaning | Status |
++|---|---|---|
++| `present` | Accessible candidate established from metadata in the caller's session. | rc.7 |
++| `absent` | Successful inspection found no candidate. | rc.7 |
++| `unknown` | Inspection was inaccessible, ambiguous, untrusted, or unqualified. Read failure never means absence. | rc.7 |
++
++Readiness contains no token bytes or account identities. A present row
++does not prove validity, expiry, scope, refresh safety, or inference.
++Ordinary status can display absent or unknown rows. In rc.7,
++`env status --check` and prepare succeed only when every participant is
++current and present. Ambient OpenCode remains unknown and therefore
++prevents aggregate success. Existing currency-only scripts must account
++for this stricter check; launch gains no new readiness gate.
++
++The preparation flow keeps unknown evidence separate from absence:
++
++![Profile preparation flow for rc.7](../diagrams/plantuml/agent-login-prepare.svg)
++
++### Protected setup-token source (planned)
++
++CIP-0010 proposes enrolling a Claude `setup-token` once in a protected
++per-user store under an authentication node. An opaque `source_ref`
++identifies the source. Only the final executor injects
++`CLAUDE_CODE_OAUTH_TOKEN`; plans and fragments never carry its value.
++Inherited authentication removes the per-home login requirement and the
++macOS desktop/ssh storage split. It also serves users without a Keychain.
++This path supports inference; Remote Control still requires another login
++route. No Curator enrollment command is available on the checked baseline.
++
++## Recipes
++
++### macOS desktop (works today)
++
++Use the resolve-and-login Claude recipe above in a desktop terminal.
++Start subsequent launches from a session with the same Keychain capability.
++For Codex CLI `0.153.2` with native file storage, log in natively;
++Curator's default shared home links `auth.json`. For Muse `1.4.8`, a native
++Keychain login alone does not establish file-backed sharing. The managed
++file selector and isolated Muse preparation arrive in rc.7.
++
++### macOS over ssh (works today; planned alternative)
++
++Run the Claude recipe in the ssh session that will start launches.
++Claude Code `2.1.299` uses the home's credential file in the measured
++session without Keychain access. A desktop login alone is insufficient.
++If the user has no login Keychain at all, native login fails; forcing
++Claude file storage is unsupported. The protected setup-token source is
++the **planned** inference alternative. For Codex, use a native file login
++instead of assuming a desktop keyring is accessible.
++
++### Linux server (works today; rc.7 preparation)
++
++Claude's default shared mode reuses the native `.credentials.json` file.
++Codex's native `file` mode reuses `auth.json`. Perform the native login
++before resolving a shared home. For a separate Codex login in rc.7, choose
++both isolation and storage before login:
++
++```bash
++curator env config set isolation.P.codex_cli isolated
++curator env config set credential_store.P.codex_cli file
++curator env login codex_cli --profile P
++```
++
++Resolve or repair the home explicitly before `env login` when needed.
++For Muse, rc.7 selects the file contract; Linux behavior still needs a
++versioned vendor probe. On a qualified file backend, prepare a shared
++native Muse login before applying managed XDG exports:
++
++```bash
++TBH_CREDENTIAL_BACKEND=file muse login
++```
++
++This vendor command selects file storage. It does not by itself qualify
++Linux refresh behavior or make the rc.7 launcher available today.
++
++### Spawned agent (works today; rc.7 preparation; planned source)
++
++Prepare the login before spawning. On today's baseline, use the same
++home and session kind as the launcher, then verify the vendor login.
++A headless child cannot perform the interactive login ceremony.
++In rc.7, run `curator profile prepare P` in a terminal before spawning;
++non-interactive prepare can only report remaining work. Readiness is
++session-scoped and does not authorize credential copying into a snapshot.
++The **planned** setup-token executor source supplies Claude inference
++without a home login. Keep token values out of task resources and plans.
++
++## Normative references
++
++Implementation availability remains defined by the table at the start.
++The specification describes the contracts separately from shipment:
++
++| Reference | Contract |
++|---|---|
++| [Login readiness](https://github.com/relux-works/curator-spec/blob/main/protocol/login-readiness.md) | Readiness metadata, machine selector, login, and prepare. |
++| [Environments](https://github.com/relux-works/curator-spec/blob/main/protocol/environments.md) | Managed homes, isolation, links, and launch fragments. |
++| [CIP-0010](https://github.com/relux-works/curator-spec/blob/main/cips/CIP-0010-credentials-setup-token-and-inherited-auth.md) | Planned setup-token and inherited authentication. |
++| [CIP-0015](https://github.com/relux-works/curator-spec/blob/main/cips/CIP-0015-login-readiness-and-profile-preparation.md) | Login readiness and preparation rationale. |
++| [CIP-0017](https://github.com/relux-works/curator-spec/blob/main/cips/CIP-0017-muse-root-context-and-credential-store.md) | Managed Muse file mapping and explicit root context. |
++| [CIP-0018](https://github.com/relux-works/curator-spec/blob/main/cips/CIP-0018-profile-level-codex-settings.md) | Typed Codex launch settings; machine ownership of credential selection. |
+diff --git a/docs/environment-config.md b/docs/environment-config.md
+index e189b80b2297153f0873c82d8ed0aee3ef952ad3..2f02a31d6e7faa9cbbbcde4eea8aa77cd77aa664 100644
+--- a/docs/environment-config.md
++++ b/docs/environment-config.md
+@@ -89,6 +89,12 @@ does not write launcher configuration.
+ ```
+ ## Logging in to managed homes
+ 
++See [Agent logins](agent-logins.md) for versioned Claude Code, Codex CLI and
++Muse storage behavior, session-specific recipes, and the rc.7 machine-owned
++`credential_store` selector (default `native`). The table below describes
++current isolation defaults; the reference marks rc.7 and planned changes
++separately.
++
+ Curator never copies, stores, or reads login tokens. A managed home gets its
+ login in one of two ways, chosen per profile × environment with
+ `curator env config set isolation.<profile>.<env-id> shared|isolated`:
+@@ -133,7 +139,7 @@ Keychain, and the two stores do not see each other (observed on Claude Code
+ | Session the login runs in | Login stored in | Visible to launches from |
+ |---|---|---|
+ | A session that can use the login Keychain: the desktop session and everything started from it, including tmux servers and daemons it launched | the home's Keychain item `Claude Code-credentials-<hash>` | sessions that can use the Keychain |
+-| A session that cannot: ssh, and anything started from an ssh session; `security show-keychain-info` exits 36 there | `<home>/.credentials.json`, mode 0600 | any session of that user |
++| A session that cannot: ssh, and anything started from an ssh session; `security show-keychain-info` exits 36 there | `<home>/.credentials.json`, mode 0600 | sessions using the same file fallback |
+ | An OS user with no login Keychain | nothing: the login fails with "Couldn't save your login" | none |
+ 
+ A home logged in from a desktop terminal reports "Not logged in" to a launch
