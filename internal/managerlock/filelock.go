@@ -20,16 +20,24 @@ type fileLock struct {
 }
 
 func acquireFileLock(ctx context.Context, path string, onRelease func()) (*fileLock, error) {
+	return acquireFileLockMode(ctx, path, onRelease, true)
+}
+
+func acquireFileLockMode(ctx context.Context, path string, onRelease func(), create bool) (*fileLock, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("lock context is nil")
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return nil, fmt.Errorf("create manager lock state: %w", err)
+	flags := os.O_RDWR
+	if create {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			return nil, fmt.Errorf("create manager lock state: %w", err)
+		}
+		flags |= os.O_CREATE
 	}
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600) // #nosec G304 -- path is derived below the canonical manager home
+	file, err := os.OpenFile(path, flags, 0o600) // #nosec G304 -- path is derived below the canonical manager home
 	if err != nil {
 		return nil, fmt.Errorf("open manager lock: %w", err)
 	}

@@ -691,7 +691,7 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
 	} else {
 		state.BackupsKnown = true
 	}
-	verdict := verifyHome(&resolve, adapter, source, lock, hash)
+	verdict := verifyHomeContent(&resolve, adapter, source, lock, hash)
 	state.markerState = verdict.markerState
 	state.Warnings = append(state.Warnings, verdict.warnings...)
 	if verdict.marker == nil {
@@ -1135,16 +1135,14 @@ func readLockError(err error) string {
 }
 
 // adapterStates reports the recorded and detected tool release per
-// adapter (§7.9). Detection is read-only; an unreadable tool reports
-// unknown, never matching.
+// adapter (§7.9). Status does not execute a vendor: unavailable metadata
+// reports unknown, never matching. Detect may supply an existing observation.
 func adapterStates(req StatusRequest) []AdapterState {
 	var out []AdapterState
 	for _, adapter := range envregistry.Registry {
 		var detected string
 		if req.Detect != nil {
 			detected = req.Detect(adapter)
-		} else {
-			detected = detectRelease(adapter.Probe)
 		}
 		if detected == "" {
 			detected = "unknown"

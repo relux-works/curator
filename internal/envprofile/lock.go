@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +26,38 @@ var lockTimeout = 30 * time.Second
 type operation struct {
 	lock   *managerlock.HomeLock
 	engine *transaction.Engine
+}
+
+// beginCaptureOperation never provisions a home or invokes recovery. The
+// observer validates every journal before reporting pending recovery.
+func beginCaptureOperation(home string, options ...transaction.Option) (*operation, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
+	defer cancel()
+	manager, err := managerlock.New(home)
+	if err != nil {
+		return nil, err
+	}
+	lock, err := manager.AcquireExistingHomeOnly(ctx)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("%s: source has no existing mutation lock", DiagHomeStale)
+		}
+		return nil, fmt.Errorf("%s: acquire capture lock: %w", DiagLockUnavailable, err)
+	}
+	op := &operation{lock: lock}
+	op.engine, err = transaction.New(home, options...)
+	if err == nil {
+		var pending bool
+		pending, err = op.engine.PendingRecovery(lock)
+		if err == nil && pending {
+			err = fmt.Errorf("%s: explicit recovery is required", DiagMaterializeRecoveryRequired)
+		}
+	}
+	if err != nil {
+		_ = op.close()
+		return nil, err
+	}
+	return op, nil
 }
 
 // beginOperation takes the manager-home mutation lock and recovers

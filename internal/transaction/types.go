@@ -251,6 +251,8 @@ type Event struct {
 type Hooks struct {
 	Fault   func(Event) error
 	Observe func(Event)
+	// ObserveRecovery reports entry to Recover, including an empty inventory.
+	ObserveRecovery func()
 }
 
 // Option configures an Engine.

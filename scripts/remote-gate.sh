@@ -43,9 +43,8 @@ if [ "$tree" = "$(git rev-parse "$head^{tree}")" ]; then
   commit=$head
 else
   commit=$(printf 'remote gate snapshot of %s\n\nworking tree on top of %s\n' "$name" "$head" \
-    | GIT_COMMITTER_NAME="remote-gate" GIT_COMMITTER_EMAIL="remote-gate@localhost" \
-      GIT_AUTHOR_NAME="remote-gate" GIT_AUTHOR_EMAIL="remote-gate@localhost" \
-      git -c commit.gpgsign=false commit-tree "$tree" -p "$head")
+    | git commit-tree -S "$tree" -p "$head")
+  test "$(git log -1 --format='%G?' "$commit")" = G
 fi
 
 ATTEMPTS="${REMOTE_GATE_ATTEMPTS:-3}"

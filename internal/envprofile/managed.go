@@ -120,8 +120,11 @@ type ResolveRequest struct {
 	readRegularFile      func(string) (stateread.File, error)
 	boundaryOwnerLookup  pathboundary.OwnerLookup
 	storeRepairAttempted bool
-	credentialPolicy     *credentialPolicyResolution
-	preserveLockHash     string
+	// credentialRelease scopes policy derivation to caller-supplied evidence.
+	// Nil permits vendor observation; content verification supplies unknown.
+	credentialRelease *string
+	credentialPolicy  *credentialPolicyResolution
+	preserveLockHash  string
 	// beforeRepairLock is a race-injection seam; production leaves it nil.
 	beforeRepairLock func()
 }
@@ -303,6 +306,14 @@ type homePlan struct {
 // store entries it names, and machine configuration: no read of the home
 // itself beyond the fallback and merge inputs the caller supplies.
 func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, adapter envregistry.Adapter, prior *envmarker.Marker) (*homePlan, error) {
+	return assembleHomeObserved(req, source, lock, hash, precedence, order, adapter, prior, req.credentialPolicyRelease(adapter))
+}
+
+// assembleHomeObserved derives the home from supplied release evidence without a probe.
+func assembleHomeObserved(req *ResolveRequest, source Source, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, adapter envregistry.Adapter, prior *envmarker.Marker, release string) (*homePlan, error) {
+	previous := req.credentialRelease
+	req.credentialRelease = &release
+	defer func() { req.credentialRelease = previous }()
 	if err := validateProfilePathSources(req.Profile, source, req.Policy); err != nil {
 		return nil, err
 	}
@@ -1713,6 +1724,23 @@ const (
 // here (fail-closed, no fragment); the same error under the repair lock
 // surfaces as environment_repair_failed.
 func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source, lock *contextlock.Lock, hash string) *verification {
+	verdict := verifyHomeObserved(req, adapter, source, lock, hash, req.detected(adapter))
+	verdict.checkToolRelease(req, adapter)
+	verdict.current = len(verdict.reasons) == 0
+	return verdict
+}
+
+// verifyHomeContent uses only file and metadata evidence; unavailable release
+// observations remain unknown and never trigger vendor execution.
+func verifyHomeContent(req *ResolveRequest, adapter envregistry.Adapter, source Source, lock *contextlock.Lock, hash string) *verification {
+	return verifyHomeObserved(req, adapter, source, lock, hash, "unknown")
+}
+
+// verifyHomeObserved shares content verification and one credential-policy path.
+func verifyHomeObserved(req *ResolveRequest, adapter envregistry.Adapter, source Source, lock *contextlock.Lock, hash, release string) *verification {
+	previous := req.credentialRelease
+	req.credentialRelease = &release
+	defer func() { req.credentialRelease = previous }()
 	verdict := &verification{surfaceState: map[string]string{}}
 	precedence := req.Policy.Precedence()
 	order, err := contextmaterialize.EmittedOrder(lock, precedence)
@@ -1747,7 +1775,7 @@ func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source,
 		return verdict
 	}
 	verdict.servers = servers
-	plan, err := assembleHome(req, source, lock, hash, precedence, order, adapter, marker)
+	plan, err := assembleHomeObserved(req, source, lock, hash, precedence, order, adapter, marker, release)
 	if err != nil {
 		verdict.reasons = append(verdict.reasons, fmt.Sprintf("expected home: %v", err))
 		return verdict
@@ -1791,7 +1819,6 @@ func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source,
 	verdict.checkClaudeProject(req, plan)
 	verdict.checkXDG(req, plan, marker)
 	verdict.checkShadows(plan, marker)
-	verdict.checkToolRelease(req, adapter)
 	verdict.current = len(verdict.reasons) == 0
 	return verdict
 }
@@ -2399,6 +2426,12 @@ func currentProfileFor(home, envID, named string) (string, error) {
 // reasons); under repair the home is provisioned or repaired from the
 // store under the mutation lock and the fragment is emitted.
 func Resolve(req ResolveRequest) (*ResolveResult, error) {
+	return resolveVerified(req, verifyHome)
+}
+
+// resolveVerified shares source admission while choosing the verification boundary.
+// Capture uses verifyHomeContent and forbids repair before entering this function.
+func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistry.Adapter, Source, *contextlock.Lock, string) *verification) (*ResolveResult, error) {
 	if req.PreserveLock && !req.Repair {
 		return nil, fmt.Errorf("usage: env resolve --preserve-lock requires --repair")
 	}
@@ -2439,7 +2472,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 	// Preserve native stale-home reporting through verification. Explicit
 	// selectors must refuse at the activation boundary before provisioning.
 	if selection != envregistry.CredentialStoreNative {
-		if _, err := req.resolveCredentialPolicy(adapter); err != nil {
+		if _, err := req.resolveCredentialPolicyObserved(adapter, "unknown"); err != nil {
 			return nil, err
 		}
 	}
@@ -2514,7 +2547,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 	if req.Repair && !req.DryRun && repairWouldChangeLockHash(lock) {
 		return repairUnderLock(&req, adapter, source)
 	}
-	verdict := verifyHome(&req, adapter, source, lock, hash)
+	verdict := verify(&req, adapter, source, lock, hash)
 	if verdict.markerReadFailed {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
 	}

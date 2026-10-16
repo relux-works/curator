@@ -238,6 +238,31 @@ func (lock *HomeLock) AssertHeld() error {
 	return lock.lock.AssertHeld()
 }
 
+// AssertCurrent also checks that the stable lock name still identifies the
+// held file. Capture cannot publish after an external replacement of that name.
+func (lock *HomeLock) AssertCurrent() error {
+	if err := lock.AssertHeld(); err != nil {
+		return err
+	}
+	lock.lock.mu.Lock()
+	defer lock.lock.mu.Unlock()
+	if lock.lock.file == nil {
+		return ErrNotHeld
+	}
+	held, err := lock.lock.file.Stat()
+	if err != nil {
+		return err
+	}
+	named, err := os.Lstat(lock.lock.file.Name())
+	if err != nil {
+		return err
+	}
+	if !named.Mode().IsRegular() || !os.SameFile(held, named) {
+		return ErrNotHeld
+	}
+	return nil
+}
+
 // Close releases the operating-system lock without deleting its stable file.
 func (lock *HomeLock) Close() error {
 	if lock == nil {
@@ -293,15 +318,29 @@ func (manager *Manager) AcquireHomeOnly(ctx context.Context, dryRun bool) (*Home
 	if err := manager.prepare(); err != nil {
 		return nil, err
 	}
+	return manager.acquireHomeOnly(ctx, true)
+}
+
+// AcquireExistingHomeOnly takes the same mutation lock without creating a
+// home, directory or lock file. An unprovisioned source cannot become one as
+// a side effect of observation. Existing writers establish this lock first.
+func (manager *Manager) AcquireExistingHomeOnly(ctx context.Context) (*HomeLock, error) {
+	if manager == nil {
+		return nil, fmt.Errorf("manager is nil")
+	}
+	return manager.acquireHomeOnly(ctx, false)
+}
+
+func (manager *Manager) acquireHomeOnly(ctx context.Context, create bool) (*HomeLock, error) {
 	process := manager.processState()
 	if err := process.reserve(acquireHome); err != nil {
 		return nil, err
 	}
 	acquired := false
 	defer func() { process.finish(acquireHome, acquired) }()
-	fileLock, err := acquireFileLock(ctx, manager.homeLockPath(), func() {
+	fileLock, err := acquireFileLockMode(ctx, manager.homeLockPath(), func() {
 		process.released(acquireHome)
-	})
+	}, create)
 	if err != nil {
 		return nil, err
 	}

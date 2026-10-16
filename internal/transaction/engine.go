@@ -323,6 +323,9 @@ func (engine *Engine) Recover(lock HomeLock) error {
 	if err := requireHomeLock(lock); err != nil {
 		return err
 	}
+	if engine.hooks.ObserveRecovery != nil {
+		engine.hooks.ObserveRecovery()
+	}
 	engine.mu.Lock()
 	defer engine.mu.Unlock()
 	ids, err := engine.journalIDs()

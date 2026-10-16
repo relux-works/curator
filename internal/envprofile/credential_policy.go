@@ -49,22 +49,37 @@ type effectiveCredentialPolicy struct {
 type credentialPolicyResolution struct {
 	profile     string
 	environment string
+	release     string
 	policy      *effectiveCredentialPolicy
 	err         error
 }
 
+// credentialPolicyRelease respects the content verifier's observation boundary.
+func (req *ResolveRequest) credentialPolicyRelease(adapter envregistry.Adapter) string {
+	if req.credentialRelease != nil {
+		return *req.credentialRelease
+	}
+	return req.detected(adapter)
+}
+
 // resolveCredentialPolicy admits isolation and derives links and records from
-// one native-store observation. New public operations observe policy afresh.
+// one native-store observation per release. New operations observe policy afresh.
 func (req *ResolveRequest) resolveCredentialPolicy(adapter envregistry.Adapter) (*effectiveCredentialPolicy, error) {
-	if cached := req.credentialPolicy; cached != nil && cached.profile == req.Profile && cached.environment == adapter.ID {
+	return req.resolveCredentialPolicyObserved(adapter, req.credentialPolicyRelease(adapter))
+}
+
+// resolveCredentialPolicyObserved uses supplied evidence, including unknown,
+// without discovering a tool. Cache entries never cross release observations.
+func (req *ResolveRequest) resolveCredentialPolicyObserved(adapter envregistry.Adapter, release string) (*effectiveCredentialPolicy, error) {
+	if cached := req.credentialPolicy; cached != nil && cached.profile == req.Profile && cached.environment == adapter.ID && cached.release == release {
 		return cached.policy, cached.err
 	}
-	policy, err := req.computeCredentialPolicy(adapter)
-	req.credentialPolicy = &credentialPolicyResolution{profile: req.Profile, environment: adapter.ID, policy: policy, err: err}
+	policy, err := req.computeCredentialPolicy(adapter, release)
+	req.credentialPolicy = &credentialPolicyResolution{profile: req.Profile, environment: adapter.ID, release: release, policy: policy, err: err}
 	return policy, err
 }
 
-func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter) (*effectiveCredentialPolicy, error) {
+func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter, release string) (*effectiveCredentialPolicy, error) {
 	selection, err := req.Machine.CredentialStoreFor(req.Profile, adapter.ID)
 	if err != nil {
 		return nil, err
@@ -88,7 +103,7 @@ func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter) 
 		return nil, err
 	}
 	atAbove := true
-	if ok, known := adapter.AtOrAbovePinned(req.detected(adapter)); known {
+	if ok, known := adapter.AtOrAbovePinned(release); known {
 		atAbove = ok
 	}
 	p.isolation, err = req.Machine.EffectiveIsolation(req.Profile, adapter, atAbove)
