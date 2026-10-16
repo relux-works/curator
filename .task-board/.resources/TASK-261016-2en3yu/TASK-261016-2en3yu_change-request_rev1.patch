@@ -1,0 +1,830 @@
+diff --git a/README.md b/README.md
+index f6cc1e52146e474b9660c6bb7792f1f036371b4e..bfc98cfbcd242122ee7f8c0f9d12ed28456afdde 100644
+--- a/README.md
++++ b/README.md
+@@ -306,6 +306,8 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run
+ 
+ ### Tools
+ 
++For the rc.7 credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run TestCredentialStore`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
++
+ Use `go build ./...` to compile and `go vet ./...` for static validation. Run `make lint` (golangci-lint) for repository lint; store local validation logs under `.temp/`. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate leaves the working tree and index unchanged. Go tests use temporary homes. Run `go test ./internal/envprofile/... ./cmd/curator/...` for focused environment validation. The preserve-lock vector family is pinned in `internal/envprofile/testdata/environments-repair-preserve-lock.json`; `CURATOR_PRESERVE_LOCK_VECTORS=/path/to/vectors.json go test ./internal/envprofile -run TestRepairPreserveLockVectors` runs its upstream counterpart.
+ 
+ PlantUML renders the agent-login diagrams. Run `plantuml -tsvg -nometadata diagrams/plantuml/agent-login-*.puml` to write SVG files beside their sources. The [agent login reference](docs/agent-logins.md) embeds these outputs.
+diff --git a/cmd/curator/env.go b/cmd/curator/env.go
+index ebd2ae178d865ae22420a67f357ed1f3cee24f9b..3cd4dc7a636cbef42dfaff9a33d07e9271520d8b 100644
+--- a/cmd/curator/env.go
++++ b/cmd/curator/env.go
+@@ -23,6 +23,7 @@ func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
+ 	machine.PassableEnvNames = cfg.Env.PassableEnvNames
+ 	machine.PassableEnvNamesSet = cfg.Env.PassableEnvNamesSet
+ 	machine.Isolation = cfg.Env.Isolation
++	machine.CredentialStore = cfg.Env.CredentialStore
+ 	machine.UserIsolation = cfg.UserIsolation
+ 	machine.IsolationLocked = cfg.Locked["environments.isolation"]
+ 	machine.IsolationLockSource = cfg.SystemConfigPath
+diff --git a/cmd/curator/env_credential_store_test.go b/cmd/curator/env_credential_store_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..138d3a9bf2489d063daaac7282251274fd51313c
+--- /dev/null
++++ b/cmd/curator/env_credential_store_test.go
+@@ -0,0 +1,188 @@
++package main
++
++import (
++	"bytes"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++func credentialStoreCLIHome(t *testing.T) stubConfigSource {
++	t.Helper()
++	source, _ := profileHome(t)
++	payload, err := json.Marshal(map[string]any{"schema_version": 2, "security_posture": "permissive", "skills_root": filepath.Join(source.cfg.Home(), "skills"), "projects": map[string]any{}})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(source.path, payload, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	return reloadSource(t, source)
++}
++
++// CLI aliases canonicalize only environment positions; setting/unsetting changes no home state.
++func TestCredentialStoreCLIConfigRoundTrip(t *testing.T) {
++	source := credentialStoreCLIHome(t)
++	installCLIEnvProfile(t, source)
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex", "--repair"); code != exitOK {
++		t.Fatal(stderr)
++	}
++	markerPath, marker, _ := cliEnvMarker(t, source, "codex_cli")
++	seedPath := filepath.Join(filepath.Dir(markerPath), "config.toml")
++	// Write a vendor-owned seed and a detached credential after provisioning.
++	seed := []byte("model = \"test\"\n")
++	if err := os.WriteFile(seedPath, seed, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	authPath := filepath.Join(filepath.Dir(markerPath), "auth.json")
++	if err := os.Remove(authPath); err != nil {
++		t.Fatal(err)
++	}
++	auth := []byte("synthetic-private-credential")
++	if err := os.WriteFile(authPath, auth, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	for _, knob := range []string{"credential_store.codex.codex", "credential_store.codex.codex_cli"} {
++		if code, stdout, stderr := runProfile(t, source, "env", "config", "set", knob, "file"); code != exitOK || strings.TrimSpace(stdout) != `"file"` {
++			t.Fatalf("set %s = %d %s %s", knob, code, stdout, stderr)
++		}
++		source = reloadSource(t, source)
++		if source.cfg.Schema != 5 {
++			t.Fatalf("schema = %d", source.cfg.Schema)
++		}
++		for _, query := range []string{"credential_store.codex.codex", "credential_store.codex.codex_cli"} {
++			if code, stdout, stderr := runProfile(t, source, "env", "config", "show", query); code != exitOK || strings.TrimSpace(stdout) != `"file"` {
++				t.Fatalf("show = %d %s %s", code, stdout, stderr)
++			}
++		}
++	}
++	raw, err := os.ReadFile(source.path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !bytes.Contains(raw, []byte(`"codex_cli": "file"`)) || bytes.Contains(raw, []byte(`"codex_cli": {`)) || !bytes.Contains(raw, []byte(`"codex": {`)) {
++		t.Fatalf("wrong profile/environment normalization: %s", raw)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "config", "unset", "credential_store.codex.codex"); code != exitOK {
++		t.Fatal(stderr)
++	}
++	source = reloadSource(t, source)
++	if code, stdout, stderr := runProfile(t, source, "env", "config", "show", "credential_store.codex.codex"); code != exitOK || strings.TrimSpace(stdout) != `"native"` {
++		t.Fatalf("default = %d %s %s", code, stdout, stderr)
++	}
++	for path, want := range map[string][]byte{markerPath: marker, seedPath: seed, authPath: auth} {
++		got, err := os.ReadFile(path)
++		if err != nil || !bytes.Equal(got, want) {
++			t.Fatalf("config edit changed vendor/managed state %s: %v", filepath.Base(path), err)
++		}
++	}
++}
++
++// Invalid selectors are rejected atomically beside valid canonical and alias-map controls.
++func TestCredentialStoreCLIConfigRefusesMalformed(t *testing.T) {
++	source := writeMachineConfig(t, `{"schema_version":5,"skills_root":"x","projects":{}}`)
++	for _, tc := range []struct{ knob, value string }{
++		{"credential_store", `null`},
++		{"credential_store.p", `[]`},
++		{"credential_store.p.codex", `auto`},
++		{"credential_store.p.codex", `null`},
++		{"credential_store.p.unknown", `file`},
++	} {
++		before, _ := os.ReadFile(source.path)
++		code, stdout, stderr := runProfile(t, source, "env", "config", "set", tc.knob, tc.value)
++		if code != exitFail || stdout != "" || !strings.Contains(stderr, "credential_store") {
++			t.Fatalf("invalid set = %d %s %s", code, stdout, stderr)
++		}
++		after, _ := os.ReadFile(source.path)
++		if !bytes.Equal(before, after) {
++			t.Fatal("refused set changed config")
++		}
++	}
++	if code, stdout, _ := runProfile(t, source, "env", "config", "show", "credential_store.p.unknown"); code != exitUsage || stdout != "" {
++		t.Fatal("unknown environment show acquired a native default")
++	}
++	if code, _, stderr := runProfile(t, source, "env", "config", "set", "credential_store", `{"codex":{"codex":"file","codex_cli":"native","claude":"keychain"}}`); code != exitOK {
++		t.Fatal(stderr)
++	}
++	source = reloadSource(t, source)
++	if code, stdout, stderr := runProfile(t, source, "env", "config", "show", "credential_store.codex"); code != exitOK || strings.Contains(stdout, `"codex":`) || !strings.Contains(stdout, `"codex_cli": "native"`) || !strings.Contains(stdout, `"claude_code": "keychain"`) {
++		t.Fatalf("collision/profile = %d %s %s", code, stdout, stderr)
++	}
++}
++
++// Promoting a schema-1 file for this knob preserves its permissive posture;
++// a failed edit does not promote it.
++func TestCredentialStoreCLIPromotion(t *testing.T) {
++	source := writeMachineConfig(t, `{"schema_version":1,"skills_root":"x","projects":{}}`)
++	before, _ := os.ReadFile(source.path)
++	if code, _, _ := runProfile(t, source, "env", "config", "set", "credential_store.p.codex", "auto"); code != exitFail {
++		t.Fatal("invalid selector accepted")
++	}
++	after, _ := os.ReadFile(source.path)
++	if !bytes.Equal(before, after) {
++		t.Fatal("failed edit promoted the envelope")
++	}
++	if code, _, stderr := runProfile(t, source, "env", "config", "set", "credential_store.p.codex", "native"); code != exitOK {
++		t.Fatal(stderr)
++	}
++	source = reloadSource(t, source)
++	if source.cfg.Schema != 5 || source.cfg.SecurityPosture != "permissive" {
++		t.Fatal("promotion changed unrelated posture")
++	}
++}
++
++// The production CLI composition refuses unavailable explicit-store delivery without a fragment or writes.
++// Native selection remains a positive control. This does not qualify any vendor runtime.
++func TestCredentialStoreCLIResolveRefusesUnqualifiedDelivery(t *testing.T) {
++	source := credentialStoreCLIHome(t)
++	installCLIEnvProfile(t, source)
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex", "--repair"); code != exitOK {
++		t.Fatal(stderr)
++	}
++	markerPath, marker, _ := cliEnvMarker(t, source, "codex_cli")
++	authPath := filepath.Join(filepath.Dir(markerPath), "auth.json")
++	link, err := os.Readlink(authPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	native, err := os.ReadFile(link)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, selection := range []string{"file", "keychain"} {
++		if code, _, stderr := runProfile(t, source, "env", "config", "set", "credential_store.acme.codex", selection); code != exitOK {
++			t.Fatal(stderr)
++		}
++		source = reloadSource(t, source)
++		configBefore, _ := os.ReadFile(source.path)
++		for _, repair := range [][]string{nil, {"--repair"}} {
++			args := append([]string{"env", "resolve", "codex"}, repair...)
++			code, stdout, stderr := runProfile(t, source, args...)
++			want := "codex_settings_unsupported"
++			if selection == "keychain" {
++				want = "environment_credential_store_unsupported"
++			}
++			if code != exitFail || stdout != "" || !strings.Contains(stderr, want) {
++				t.Fatalf("unqualified %s = %d %s %s", selection, code, stdout, stderr)
++			}
++		}
++		for path, want := range map[string][]byte{markerPath: marker, link: native, source.path: configBefore} {
++			got, err := os.ReadFile(path)
++			if err != nil || !bytes.Equal(got, want) {
++				t.Fatalf("refusal changed %s: %v", filepath.Base(path), err)
++			}
++		}
++		if got, err := os.Readlink(authPath); err != nil || got != link {
++			t.Fatal("refusal changed native credential link")
++		}
++	}
++	if code, _, stderr := runProfile(t, source, "env", "config", "unset", "credential_store.acme.codex"); code != exitOK {
++		t.Fatal(stderr)
++	}
++	source = reloadSource(t, source)
++	if code, stdout, stderr := runProfile(t, source, "env", "resolve", "codex"); code != exitOK || !strings.Contains(stdout, "launch-env-fragment") {
++		t.Fatalf("native control = %d %s %s", code, stdout, stderr)
++	}
++}
+diff --git a/cmd/curator/envalias.go b/cmd/curator/envalias.go
+index 7cc68da9245a1cb4f8f6eb587a0ab8f2eb9e2c19..fae81aba5c2bb0b8170b29980b7565aa515a1768 100644
+--- a/cmd/curator/envalias.go
++++ b/cmd/curator/envalias.go
+@@ -32,7 +32,7 @@ func normalizeEnvKnob(segments []string) []string {
+ 	case len(rewritten) >= 2 && (rewritten[0] == "forms" ||
+ 		rewritten[0] == "in_place_mode" || rewritten[0] == "scoped_current"):
+ 		rewritten[1] = envregistry.NormalizeEnvID(rewritten[1])
+-	case len(rewritten) >= 3 && rewritten[0] == "isolation":
++	case len(rewritten) >= 3 && (rewritten[0] == "isolation" || rewritten[0] == "credential_store"):
+ 		rewritten[2] = envregistry.NormalizeEnvID(rewritten[2])
+ 	}
+ 	return rewritten
+@@ -51,9 +51,9 @@ func normalizeEnvKnobValue(segments []string, value any) any {
+ 	case len(segments) == 1 && (segments[0] == "forms" ||
+ 		segments[0] == "in_place_mode" || segments[0] == "scoped_current"):
+ 		return normalizeEnvKeyedMap(value)
+-	case len(segments) == 2 && segments[0] == "isolation":
++	case len(segments) == 2 && (segments[0] == "isolation" || segments[0] == "credential_store"):
+ 		return normalizeEnvKeyedMap(value)
+-	case len(segments) == 1 && segments[0] == "isolation":
++	case len(segments) == 1 && (segments[0] == "isolation" || segments[0] == "credential_store"):
+ 		obj, ok := value.(map[string]any)
+ 		if !ok {
+ 			return value
+diff --git a/cmd/curator/envconfig.go b/cmd/curator/envconfig.go
+index 825b8eefab7d98645c348d6c3c0607ce5731b666..5a23cca331ba6c0fd928e1d8d18474b3acc6fec2 100644
+--- a/cmd/curator/envconfig.go
++++ b/cmd/curator/envconfig.go
+@@ -67,6 +67,14 @@ func (c cli) cmdEnvConfigShow(cfg *config.Config, args []string) int {
+ 		return exitUsage
+ 	}
+ 	segments = normalizeEnvKnob(segments)
++	if len(segments) == 3 && segments[0] == "credential_store" {
++		selection, err := machineFromConfig(cfg).CredentialStoreFor(segments[1], segments[2])
++		if err != nil {
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
++			return exitUsage
++		}
++		return c.printJSON(selection)
++	}
+ 	value, present := lookupKnob(env, segments)
+ 	if !present {
+ 		value = nil
+@@ -110,7 +118,14 @@ func (c cli) cmdEnvConfigSet(cfg *config.Config, args []string) int {
+ 		object["environments"] = env
+ 	}
+ 	setKnob(env, segments, value)
+-	if schema, _ := object["schema_version"].(float64); schema == float64(config.SchemaVersion) {
++	if segments[0] == "credential_store" {
++		// Schema 1 defaults to permissive. Preserve that posture when a
++		// selector edit promotes its envelope, without changing other knobs.
++		if schema, _ := object["schema_version"].(float64); schema == float64(config.SchemaVersion) {
++			object["security_posture"] = config.SecurityPosturePermissive
++		}
++		object["schema_version"] = float64(config.SchemaVersion5)
++	} else if schema, _ := object["schema_version"].(float64); schema == float64(config.SchemaVersion) {
+ 		object["schema_version"] = float64(config.SchemaVersion2)
+ 	}
+ 	updated, err := config.WriteRaw(cfg.Path, object)
+diff --git a/docs/environment-config.md b/docs/environment-config.md
+index 2f02a31d6e7faa9cbbbcde4eea8aa77cd77aa664..236e3a5449e8d08b8acadd5b11366b3d1a50c1b1 100644
+--- a/docs/environment-config.md
++++ b/docs/environment-config.md
+@@ -28,6 +28,44 @@ All three knobs sit under one `environments` object:
+ 
+ `env status` reports the effective state of every knob below.
+ 
++## Machine credential-store selector (rc.7 configuration slice)
++
++The user-owned selector uses the allocated `manager-config-v5` envelope:
++
++```sh
++curator env config set credential_store.example.codex file
++curator env config show credential_store.example.codex_cli
++curator env config unset credential_store.example.codex
++```
++
++Values are exactly `native`, `file`, or `keychain`; absent entries mean
++`native`. Set promotes the machine file to schema 5; unset leaves that
++version in place. The persisted member is `environments.credential_store`,
++a profile map of canonical environment IDs (`claude_code`, `codex_cli`,
++`muse`, `pi`, `opencode`). CLI environment positions also accept `claude`
++and `codex`. Profile names are preserved. For whole-map edits a canonical
++environment key wins over its alias, matching existing CLI collision rules.
++Nulls, malformed maps, unknown IDs and unknown selector values refuse
++without changing the machine file. Closed manager-config versions 1–3
++reject this member; version 4 is not allocated. Schema 5 retains version-3
++state-hash waiver semantics.
++
++This knob cannot appear in a system configuration or be locked. Packages,
++overlays and repositories do not select it. Existing isolation locks remain
++independent. Editing the knob changes no managed home, marker, link,
++credential, or vendor `config.toml`; it does not migrate a login.
++
++This first implementation slice stores policy and threads its typed selection
++into resolve. Explicit file/keychain application remains disabled: Codex file
++returns `codex_settings_unsupported` pending supported-release
++login/app-server/refresh qualification and strict successor consumers;
++other unavailable mappings return `environment_credential_store_unsupported`.
++Invalid or unreadable native Codex configuration still refuses before this
++delivery diagnostic. No explicit selector silently falls back to native.
++Unset or explicit native retains the existing producer behavior described
++below. This slice does not enable the rc.7 Muse effective-file default,
++new fragment carriers, readiness, or login wrappers.
++
+ ## Security posture
+ 
+ Schema-2 machine configurations default to `security_posture: hardened`
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 1e651a2aa43de16e87dc5d4beb35e199929bf9f3..87fed170293a0bddfbb920356b5f28da34f82a31 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -24,7 +24,8 @@ import (
+ 
+ // SchemaVersion is the original machine config schema. SchemaVersion2 adds
+ // the environments §12.1 object and registry bootstrap members, and
+-// SchemaVersion3 versions state-hash waiver pins. All three stay readable.
++// SchemaVersion3 versions state-hash waiver pins. SchemaVersion5 adds the
++// machine credential-store selector; all older allocated versions stay readable.
+ const SchemaVersion = 1
+ 
+ // SchemaVersion2 is the machine config schema carrying the environments
+@@ -34,6 +35,10 @@ const SchemaVersion2 = 2
+ // SchemaVersion3 adds hash_version to state-hash secret material waivers.
+ const SchemaVersion3 = 3
+ 
++// SchemaVersion5 is the allocated rc.7 machine credential-store carrier.
++// Version 4 is not allocated as a manager-config carrier.
++const SchemaVersion5 = 5
++
+ // DefaultWorktreeAliasPattern extracts checkout aliases for git worktrees.
+ const DefaultWorktreeAliasPattern = `[A-Z]+-[0-9]+`
+ 
+@@ -162,7 +167,7 @@ type Execution struct {
+ // Config is the effective machine configuration.
+ type Config struct {
+ 	Path string
+-	// Schema is the effective schema_version: 1, 2, or 3.
++	// Schema is the effective schema_version: 1, 2, 3, or 5.
+ 	Schema int
+ 	// Env is the effective environments §12.1 machine configuration with
+ 	// the §12.1 defaults applied. A schema-1 file carries every default.
+@@ -554,7 +559,7 @@ func parseConfig(data map[string]any, path string, locked map[string]bool, machi
+ 	if !ok {
+ 		return nil, verr.New("schema_version", "must be an integer")
+ 	}
+-	if schema != SchemaVersion && schema != SchemaVersion2 && schema != SchemaVersion3 {
++	if schema != SchemaVersion && schema != SchemaVersion2 && schema != SchemaVersion3 && schema != SchemaVersion5 {
+ 		return nil, verr.New("schema_version", "unsupported config schema_version %d; this config requires a newer tool", schema)
+ 	}
+ 	if schema == SchemaVersion && hasConfigKey(machineData, "security_posture") {
+diff --git a/internal/config/credential_store.go b/internal/config/credential_store.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..90cd8ba7a4854f46daa72487966bceba32ba6e0a
+--- /dev/null
++++ b/internal/config/credential_store.go
+@@ -0,0 +1,40 @@
++package config
++
++import (
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/identifiers"
++	"github.com/relux-works/curator/internal/verr"
++)
++
++// parseCredentialStore validates the v5 machine subtree. CLI aliases must
++// already be canonicalized; config files cannot acquire an alternate identity.
++func parseCredentialStore(raw any) (map[string]map[string]envregistry.CredentialStoreSelection, error) {
++	profiles, ok := raw.(map[string]any)
++	if !ok {
++		return nil, verr.New("environments.credential_store", "must be an object")
++	}
++	result := map[string]map[string]envregistry.CredentialStoreSelection{}
++	for profile, rawEntry := range profiles {
++		label := "environments.credential_store." + profile
++		if !identifiers.Valid(profile) {
++			return nil, verr.New("environments.credential_store", "profile %q %s", profile, identifiers.Rule)
++		}
++		entries, ok := rawEntry.(map[string]any)
++		if !ok {
++			return nil, verr.New(label, "must be an object")
++		}
++		result[profile] = map[string]envregistry.CredentialStoreSelection{}
++		for id, rawSelection := range entries {
++			if _, err := envregistry.ByID(id); err != nil {
++				return nil, verr.New(label, "unknown canonical environment %q", id)
++			}
++			value, ok := rawSelection.(string)
++			selection := envregistry.CredentialStoreSelection(value)
++			if !ok || !selection.Valid() {
++				return nil, verr.New(label+"."+id, "must be native, file, or keychain")
++			}
++			result[profile][id] = selection
++		}
++	}
++	return result, nil
++}
+diff --git a/internal/config/credential_store_test.go b/internal/config/credential_store_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..afb9d0af33ef0c2f7a82f6897e6ecc1a84472960
+--- /dev/null
++++ b/internal/config/credential_store_test.go
+@@ -0,0 +1,88 @@
++package config
++
++import (
++	"fmt"
++	"os"
++	"strings"
++	"testing"
++)
++
++// Load admits only canonical machine v5 selectors; failed validation never rewrites the file.
++func TestCredentialStoreConfigGrammar(t *testing.T) {
++	for _, tc := range []struct {
++		name, member string
++		valid        bool
++	}{
++		{"empty", `{}`, true},
++		{"all selectors", `{"codex":{"codex_cli":"file","claude_code":"native","muse":"keychain","pi":"file","opencode":"native"}}`, true},
++		{"null map", `null`, false},
++		{"array map", `[]`, false},
++		{"null profile", `{"p":null}`, false},
++		{"invalid profile", `{"../p":{}}`, false},
++		{"unknown id", `{"p":{"unknown":"file"}}`, false},
++		{"alias id", `{"p":{"codex":"file"}}`, false},
++		{"null selector", `{"p":{"codex_cli":null}}`, false},
++		{"unknown selector", `{"p":{"codex_cli":"auto"}}`, false},
++		{"wrong type", `{"p":{"codex_cli":true}}`, false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			text := fmt.Sprintf(`{"schema_version":5,"skills_root":"x","projects":{},"environments":{"credential_store":%s}}`, tc.member)
++			path := writeConfig(t, t.TempDir(), "config.json", text)
++			cfg, err := Load(path, nil)
++			if tc.valid {
++				if err != nil {
++					t.Fatal(err)
++				}
++				if cfg.Schema != 5 {
++					t.Fatalf("schema = %d", cfg.Schema)
++				}
++			} else if err == nil || !strings.Contains(err.Error(), "environments.credential_store") {
++				t.Fatalf("Load = %v, want credential_store refusal", err)
++			}
++			got, err := os.ReadFile(path)
++			if err != nil || string(got) != text {
++				t.Fatalf("Load changed machine config: %v", err)
++			}
++		})
++	}
++}
++
++// Frozen envelopes refuse even an empty selector map; v5 retains v3 waiver semantics.
++func TestCredentialStoreConfigVersionBoundary(t *testing.T) {
++	for _, version := range []int{1, 2, 3, 4} {
++		want := "credential_store"
++		if version == 1 || version == 4 {
++			want = "schema_version"
++		}
++		loadFails(t, fmt.Sprintf(`{"schema_version":%d,"skills_root":"x","projects":{},"environments":{"credential_store":{}}}`, version), want)
++	}
++	loadText(t, `{"schema_version":5,"skills_root":"x","projects":{},"environments":{"credential_store":{},"secret_material_waivers":[{"pin":"`+strings.Repeat("a", 64)+`","hash_version":2,"file":"a.md","span":[1,2],"reason":"test"}]}}`)
++	for _, version := range []int{1, 2, 3} {
++		cfg := loadText(t, fmt.Sprintf(`{"schema_version":%d,"skills_root":"x","projects":{}}`, version))
++		env := cfg.EffectiveJSON()["environments"].(map[string]any)
++		if _, exists := env["credential_store"]; exists {
++			t.Fatal("old effective envelope acquired credential_store")
++		}
++	}
++}
++
++// Neither locked nor unlocked system config may select a store; isolation locks still bind v5.
++func TestCredentialStoreConfigMachineOwnership(t *testing.T) {
++	user := `{"schema_version":5,"skills_root":"x","projects":{},"environments":{"credential_store":{"p":{"codex_cli":"file"}}}}`
++	for _, locked := range []string{`[]`, `["environments.credential_store"]`} {
++		_, _, err := loadWithSystem(t, user, `{"schema_version":2,"locked":`+locked+`,"environments":{"credential_store":{"p":{"codex_cli":"keychain"}}}}`)
++		if err == nil || !strings.Contains(err.Error(), "credential_store") {
++			t.Fatalf("system store accepted: %v", err)
++		}
++	}
++	cfg, _, err := loadWithSystem(t, user, `{"schema_version":2,"locked":["environments.isolation"],"environments":{"isolation":{"p":{"codex_cli":"isolated"}}}}`)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !cfg.Locked["environments.isolation"] || cfg.Env.Isolation["p"]["codex_cli"] != "isolated" {
++		t.Fatal("isolation lock lost")
++	}
++	if EnvLockKey("credential_store.p.codex_cli") != "" {
++		t.Fatal("store became lockable")
++	}
++}
+diff --git a/internal/config/environments.go b/internal/config/environments.go
+index 32ae1661a15f473c68423a3ac2a4c24d99f7cd75..87c9a5d9cd00e2e22a804a257e70d6b199e5a9fd 100644
+--- a/internal/config/environments.go
++++ b/internal/config/environments.go
+@@ -8,6 +8,7 @@ import (
+ 	"strings"
+ 	"unicode/utf8"
+ 
++	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/identifiers"
+ 	"github.com/relux-works/curator/internal/identity"
+ 	"github.com/relux-works/curator/internal/verr"
+@@ -18,6 +19,7 @@ import (
+ // name, value grammar, and default the §12.1 table declares. Parse applies
+ // the defaults before use; a knob that is absent takes the table default.
+ type Environments struct {
++	CredentialStore      map[string]map[string]envregistry.CredentialStoreSelection
+ 	CurrentProfile       *string
+ 	ScopedCurrent        map[string]string
+ 	Overlays             map[string][]OverlayDeclaration
+@@ -223,6 +225,16 @@ func parseEnvironmentsVersion(raw any, schema int) (Environments, error) {
+ 			return Environments{}, verr.New("environments", "has unsupported field %q", key)
+ 		}
+ 	}
++	if rawStore, present := obj["credential_store"]; present {
++		if schema != SchemaVersion5 {
++			return Environments{}, verr.New("environments.credential_store", "requires manager-config schema_version 5")
++		}
++		stores, err := parseCredentialStore(rawStore)
++		if err != nil {
++			return Environments{}, err
++		}
++		env.CredentialStore = stores
++	}
+ 	if err := parseProfileNameOrNull(obj, "current_profile", &env.CurrentProfile); err != nil {
+ 		return Environments{}, err
+ 	}
+@@ -393,6 +405,7 @@ func parseEnvironmentsVersion(raw any, schema int) (Environments, error) {
+ // from, so a knob added to the reader without test coverage — or to the
+ // test without the reader — fails instead of widening a gate silently.
+ var EnvKnobNames = []string{
++	"credential_store",
+ 	"current_profile", "scoped_current", "overlays", "overlay_default_weight",
+ 	"overlays_allowed", "precedence", "forms", "system_prompt_files",
+ 	"targets", "isolation", "xdg_seed_allowlist", "passable_env_names",
+@@ -955,7 +968,7 @@ func parseSecretWaivers(raw any, schema int) ([]SecretMaterialWaiver, error) {
+ 			return nil, verr.New(label, "must be an object")
+ 		}
+ 		for key := range entry {
+-			if key != "pin" && key != "file" && key != "span" && key != "reason" && (schema != SchemaVersion3 || key != "hash_version") {
++			if key != "pin" && key != "file" && key != "span" && key != "reason" && ((schema != SchemaVersion3 && schema != SchemaVersion5) || key != "hash_version") {
+ 				return nil, verr.New(label, "has unsupported field %q", key)
+ 			}
+ 		}
+@@ -965,7 +978,7 @@ func parseSecretWaivers(raw any, schema int) ([]SecretMaterialWaiver, error) {
+ 		}
+ 		hashVersion := 0
+ 		if rawVersion, present := entry["hash_version"]; present {
+-			if schema != SchemaVersion3 {
++			if schema != SchemaVersion3 && schema != SchemaVersion5 {
+ 				return nil, verr.New(label+".hash_version", "requires manager-config schema_version 3")
+ 			}
+ 			value, ok := integerValue(rawVersion)
+@@ -1147,6 +1160,17 @@ func (c *Config) EffectiveJSON() map[string]any {
+ 	env := map[string]any{}
+ 	if c != nil {
+ 		env = c.Env.render()
++		if c.Schema == SchemaVersion5 {
++			stores := map[string]any{}
++			for profile, entries := range c.Env.CredentialStore {
++				nested := map[string]any{}
++				for id, selection := range entries {
++					nested[id] = string(selection)
++				}
++				stores[profile] = nested
++			}
++			env["credential_store"] = stores
++		}
+ 	}
+ 	agents := DefaultAgents
+ 	mode := "auto"
+diff --git a/internal/config/environments_test.go b/internal/config/environments_test.go
+index 9e29e7be7500be0a593ec1968082e3de807c0028..61fdcf6e7d6e95300f6c68295071fce54abf0c0e 100644
+--- a/internal/config/environments_test.go
++++ b/internal/config/environments_test.go
+@@ -563,6 +563,7 @@ func TestRequireCurrentProfileUnlockedCarriesNoRefusal(t *testing.T) {
+ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
+ 	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
+ 	payloads := map[string]string{
++		"credential_store":          `{"credential_store": {"a": {"codex_cli": "file"}}}`,
+ 		"current_profile":           `{"current_profile": "a"}`,
+ 		"scoped_current":            `{"scoped_current": {"codex_cli": "a"}}`,
+ 		"overlays":                  `{"overlays": {}}`,
+diff --git a/internal/envprofile/credential_policy.go b/internal/envprofile/credential_policy.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..5f222d655d66a9ddf6986cf564346dd91b61b62e
+--- /dev/null
++++ b/internal/envprofile/credential_policy.go
+@@ -0,0 +1,42 @@
++package envprofile
++
++import (
++	"fmt"
++
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++// admitCredentialStore prevents a stored selector from silently becoming native
++// on an older producer. This is an activation boundary, not runtime qualification.
++// Effective-policy adoption and successor login/fragment consumers are separate.
++func (req *ResolveRequest) admitCredentialStore(adapter envregistry.Adapter) error {
++	selection, err := req.Machine.CredentialStoreFor(req.Profile, adapter.ID)
++	if err != nil {
++		return err
++	}
++	if selection == envregistry.CredentialStoreNative {
++		return nil
++	}
++	if adapter.ID == envregistry.CodexCLI {
++		native, err := req.nativeHome(adapter.ID)
++		if err != nil {
++			return err
++		}
++		// Even an explicit file selection cannot turn failed or unsupported
++		// native inspection into an absent selector and a file fallback.
++		if _, err := req.codexCredentialStore(native); err != nil {
++			return err
++		}
++		if selection == envregistry.CredentialStoreFile {
++			return fmt.Errorf("%s: explicit Codex file storage requires qualified login/app-server/refresh behavior and strict successor fragment consumers; no native fallback", envregistry.DiagCodexSettingsUnsupported)
++		}
++	}
++	guidance := "this adapter has no qualified forced-store mapping"
++	switch adapter.ID {
++	case envregistry.ClaudeCode:
++		guidance = "Claude has no established force-file or force-Keychain interface; log in from the same kind of session as the launcher, or explicitly enroll an environment-token source for inference"
++	case envregistry.Muse:
++		guidance = "managed Muse requires file storage; successor file-policy login and fragment delivery are not enabled"
++	}
++	return fmt.Errorf("%s: %s/%s selection %s: %s", envregistry.DiagCredentialStoreUnsupported, req.Profile, adapter.ID, selection, guidance)
++}
+diff --git a/internal/envprofile/credential_policy_test.go b/internal/envprofile/credential_policy_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..10465dd35da65fbf0e5fa1b9269b82e5a3f99773
+--- /dev/null
++++ b/internal/envprofile/credential_policy_test.go
+@@ -0,0 +1,92 @@
++package envprofile
++
++import (
++	"errors"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++// Resolve refuses each unavailable explicit mapping before provisioning; native
++// Codex remains a real fragment-producing positive control on synthetic homes.
++func TestCredentialStorePolicyActivation(t *testing.T) {
++	fx := writeManagedFixture(t, "store-policy")
++	for _, id := range []string{envregistry.ClaudeCode, envregistry.CodexCLI, envregistry.Muse, envregistry.Pi, envregistry.OpenCode} {
++		for _, selection := range []envregistry.CredentialStoreSelection{envregistry.CredentialStoreFile, envregistry.CredentialStoreKeychain} {
++			t.Run(id+"/"+string(selection), func(t *testing.T) {
++				req := fx.request(id)
++				req.Repair = true
++				req.Machine.CredentialStore = map[string]map[string]envregistry.CredentialStoreSelection{fx.profile: {id: selection}}
++				result, err := Resolve(req)
++				want := envregistry.DiagCredentialStoreUnsupported
++				if id == envregistry.CodexCLI && selection == envregistry.CredentialStoreFile {
++					want = envregistry.DiagCodexSettingsUnsupported
++				}
++				if err == nil || !strings.Contains(err.Error(), want) || result != nil {
++					t.Fatalf("Resolve = %v, %v; want %s and no fragment", result, err, want)
++				}
++				if _, err := os.Lstat(ManagedHomeDir(fx.home, fx.profile, id)); !errors.Is(err, os.ErrNotExist) {
++					t.Fatalf("refused selector provisioned a home: %v", err)
++				}
++			})
++		}
++	}
++	req := fx.request(envregistry.CodexCLI)
++	req.Repair = true
++	result, err := Resolve(req)
++	if err != nil || result == nil || len(result.Document) == 0 {
++		t.Fatalf("native control = %v, %v", result, err)
++	}
++}
++
++// Explicit file cannot turn an unreadable, malformed or unknown native selector
++// into the absent-key default. Positive readable/absent-key still reaches the
++// intentional delivery refusal, not a native-inspection diagnostic.
++func TestCredentialStorePolicyNativeInspection(t *testing.T) {
++	fx := writeManagedFixture(t, "store-inspection")
++	for _, tc := range []struct {
++		name, text, want string
++		readErr          error
++	}{
++		{"absent key", "model = 'test'", envregistry.DiagCodexSettingsUnsupported, nil},
++		{"keyring", "cli_auth_credentials_store = 'keyring'", envregistry.DiagCodexSettingsUnsupported, nil},
++		{"auto", "cli_auth_credentials_store = 'auto'", envregistry.DiagCodexSettingsUnsupported, nil},
++		{"unknown", "cli_auth_credentials_store = 'other'", envregistry.DiagCredentialUnsupported, nil},
++		{"malformed", "[broken", envregistry.DiagSeedUnreadable, nil},
++		{"permission", "", envregistry.DiagSeedUnreadable, os.ErrPermission},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			req := fx.request(envregistry.CodexCLI)
++			req.Repair = true
++			req.Machine.CredentialStore = map[string]map[string]envregistry.CredentialStoreSelection{fx.profile: {envregistry.CodexCLI: envregistry.CredentialStoreFile}}
++			req.Machine.Isolation[fx.profile] = map[string]string{envregistry.CodexCLI: envregistry.IsolationIsolated}
++			path := filepath.Join(fx.native[envregistry.CodexCLI], "config.toml")
++			if err := os.WriteFile(path, []byte(tc.text), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			if tc.readErr != nil {
++				req.readRegularFile = func(name string) (stateread.File, error) {
++					if name == path {
++						return stateread.File{}, tc.readErr
++					}
++					return stateread.ReadRegularFile(name)
++				}
++			}
++			result, err := Resolve(req)
++			if err == nil || !strings.Contains(err.Error(), tc.want) || result != nil {
++				t.Fatalf("Resolve = %v, %v; want %s", result, err, tc.want)
++			}
++			got, err := os.ReadFile(path)
++			if err != nil || string(got) != tc.text {
++				t.Fatal("refusal modified native configuration")
++			}
++			if _, err := os.Lstat(ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI)); !errors.Is(err, os.ErrNotExist) {
++				t.Fatal("refusal provisioned a home")
++			}
++		})
++	}
++}
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index d99cceb823933999f4fc0fb0a7c5fcc94811ad78..0842368c7a9cde1e77ed5d0c04f32d2c90db65ef 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -758,6 +758,9 @@ func codexCredentialStoreWith(native string, readRegularFile func(string) (state
+ // reader. Every other adapter × mode passes here: the static matrix in
+ // the registry already decided it.
+ func (req *ResolveRequest) checkIsolatedCredentialStore(adapter envregistry.Adapter, isolation string) error {
++	if err := req.admitCredentialStore(adapter); err != nil {
++		return err
++	}
+ 	if adapter.ID != envregistry.CodexCLI || isolation != envregistry.IsolationIsolated {
+ 		return nil
+ 	}
+@@ -2595,6 +2598,9 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	if err := req.admitCredentialStore(adapter); err != nil {
++		return nil, err
++	}
+ 	if req.PreserveLock {
+ 		if req.preserveLockHash == "" {
+ 			req.preserveLockHash = hash
+diff --git a/internal/envregistry/credential_store.go b/internal/envregistry/credential_store.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..05b3c31afe8a03c7789061334d741a255826ba32
+--- /dev/null
++++ b/internal/envregistry/credential_store.go
+@@ -0,0 +1,37 @@
++package envregistry
++
++import "fmt"
++
++// CredentialStoreSelection is the machine-owned selector, not a native backend
++// or a runtime capability claim. Native is the default, including for old configs.
++type CredentialStoreSelection string
++
++// Machine selector values and activation diagnostics (login-readiness section 2).
++const (
++	CredentialStoreNative          CredentialStoreSelection = "native"
++	CredentialStoreFile            CredentialStoreSelection = "file"
++	CredentialStoreKeychain        CredentialStoreSelection = "keychain"
++	DiagCredentialStoreUnsupported                          = "environment_credential_store_unsupported"
++	DiagCodexSettingsUnsupported                            = "codex_settings_unsupported"
++)
++
++// Valid reports the closed login-readiness section 2 selector vocabulary.
++func (s CredentialStoreSelection) Valid() bool {
++	return s == CredentialStoreNative || s == CredentialStoreFile || s == CredentialStoreKeychain
++}
++
++// CredentialStoreFor reads only the machine selector. It never probes vendor
++// state, normalizes profile names, or interprets package content as policy.
++func (c MachineConfig) CredentialStoreFor(profile, id string) (CredentialStoreSelection, error) {
++	if _, err := ByID(id); err != nil {
++		return "", err
++	}
++	selection, present := c.CredentialStore[profile][id]
++	if !present {
++		return CredentialStoreNative, nil
++	}
++	if !selection.Valid() {
++		return "", fmt.Errorf("%s: invalid machine credential_store selector for %s/%s", DiagCredentialStoreUnsupported, profile, id)
++	}
++	return selection, nil
++}
+diff --git a/internal/envregistry/envregistry.go b/internal/envregistry/envregistry.go
+index efe8a49ad50747d885b15b26b8962751b2604e6a..81b187949c5b2b6dc18a2da750e2601718460f69 100644
+--- a/internal/envregistry/envregistry.go
++++ b/internal/envregistry/envregistry.go
+@@ -575,6 +575,8 @@ func (a Adapter) AtOrAbovePinned(detected string) (bool, bool) {
+ // manager-config schema 2. DefaultMachineConfig applies their defaults;
+ // profile bytes never populate this struct.
+ type MachineConfig struct {
++	// CredentialStore is user-owned; system isolation locks remain independent.
++	CredentialStore map[string]map[string]CredentialStoreSelection
+ 	// Forms maps env-id to the configured root-context form.
+ 	Forms map[string]string
+ 	// Isolation maps profile to env-id to the configured isolation mode.

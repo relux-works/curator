@@ -1,0 +1,90 @@
+[
+  {
+    "name": "drop-codex-file",
+    "file": "cmd/curator/env.go",
+    "replacements": [
+      [
+        "machine.CredentialStore = cfg.Env.CredentialStore",
+        "machine.CredentialStore = map[string]map[string]envregistry.CredentialStoreSelection{}\n\tfor profile, entries := range cfg.Env.CredentialStore {\n\t\tmachine.CredentialStore[profile] = map[string]envregistry.CredentialStoreSelection{}\n\t\tfor id, selection := range entries {\n\t\t\tif id == envregistry.CodexCLI && selection == envregistry.CredentialStoreFile { continue }\n\t\t\tmachine.CredentialStore[profile][id] = selection\n\t\t}\n\t}"
+      ]
+    ],
+    "package": "./cmd/curator",
+    "test": "^TestCredentialStoreCLIResolveRefusesUnqualifiedDelivery$"
+  },
+  {
+    "name": "old-v3",
+    "file": "internal/config/environments.go",
+    "replacements": [
+      [
+        "if schema != SchemaVersion5 {",
+        "if schema != SchemaVersion5 && schema != SchemaVersion3 {"
+      ]
+    ],
+    "package": "./internal/config",
+    "test": "^TestCredentialStoreConfigVersionBoundary$"
+  },
+  {
+    "name": "permission-as-absent",
+    "file": "internal/envprofile/managed.go",
+    "replacements": [
+      [
+        "state, err := readRegularFile(path)\n\tif err != nil {",
+        "state, err := readRegularFile(path)\n\tif errors.Is(err, os.ErrPermission) { state = stateread.File{Kind: stateread.KindAbsent}; err = nil }\n\tif err != nil {"
+      ]
+    ],
+    "package": "./internal/envprofile",
+    "test": "^TestCredentialStorePolicyNativeInspection$"
+  },
+  {
+    "name": "persist-alias",
+    "file": "internal/config/credential_store.go",
+    "replacements": [
+      [
+        "envregistry.ByID(id)",
+        "envregistry.ByID(envregistry.NormalizeEnvID(id))"
+      ]
+    ],
+    "package": "./internal/config",
+    "test": "^TestCredentialStoreConfigGrammar$"
+  },
+  {
+    "name": "profile-normalization",
+    "file": "cmd/curator/envalias.go",
+    "replacements": [
+      [
+        "rewritten[2] = envregistry.NormalizeEnvID(rewritten[2])",
+        "rewritten[1] = envregistry.NormalizeEnvID(rewritten[1])\n\t\trewritten[2] = envregistry.NormalizeEnvID(rewritten[2])"
+      ]
+    ],
+    "package": "./cmd/curator",
+    "test": "^TestCredentialStoreCLIConfigRoundTrip$"
+  },
+  {
+    "name": "system-store",
+    "file": "internal/config/environments.go",
+    "replacements": [
+      [
+        "if !allowed[key] {",
+        "if !allowed[key] && key != \"credential_store\" {"
+      ],
+      [
+        "if _, err := parseEnvironments(raw); err != nil {",
+        "if _, err := parseEnvironmentsVersion(raw, SchemaVersion5); err != nil {"
+      ]
+    ],
+    "package": "./internal/config",
+    "test": "^TestCredentialStoreConfigMachineOwnership$"
+  },
+  {
+    "name": "unknown-auto",
+    "file": "internal/envregistry/credential_store.go",
+    "replacements": [
+      [
+        "s == CredentialStoreKeychain",
+        "s == CredentialStoreKeychain || s == \"auto\""
+      ]
+    ],
+    "package": "./internal/config",
+    "test": "^TestCredentialStoreConfigGrammar$"
+  }
+]
