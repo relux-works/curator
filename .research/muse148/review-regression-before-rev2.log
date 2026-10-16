@@ -1,0 +1,31 @@
+=== RUN   TestReviewContradictoryObservation
+=== RUN   TestReviewContradictoryObservation/outcome-ready-then-failed
+    review_attack_test.go:26: contradictory record admitted: event="skills.catalog_load" outcome="ready" outcome="failed" user_skills=0
+=== RUN   TestReviewContradictoryObservation/duplicate-count
+    review_attack_test.go:26: contradictory record admitted: event="skills.catalog_load" outcome="ready" user_skills=0 user_skills=0
+=== RUN   TestReviewContradictoryObservation/duplicate-outcome
+    review_attack_test.go:26: contradictory record admitted: event="skills.catalog_load" outcome="ready" outcome="ready" user_skills=0
+=== RUN   TestReviewContradictoryObservation/duplicate-event
+    review_attack_test.go:26: contradictory record admitted: event="skills.catalog_load" event="rules.context_load" outcome="ready" user_skills=0
+=== RUN   TestReviewContradictoryObservation/overflow-count
+=== RUN   TestReviewContradictoryObservation/count-zero-then-one
+    review_attack_test.go:26: contradictory record admitted: event="skills.catalog_load" outcome="ready" user_skills=0 user_skills=1
+=== RUN   TestReviewContradictoryObservation/count-one-then-zero
+=== RUN   TestReviewContradictoryObservation/outcome-failed-then-ready
+    review_attack_test.go:26: contradictory record admitted: event="skills.catalog_load" outcome="failed" outcome="ready" user_skills=0
+=== RUN   TestReviewContradictoryObservation/quoted-decoy
+=== RUN   TestReviewContradictoryObservation/malformed-count
+--- FAIL: TestReviewContradictoryObservation (0.00s)
+    --- FAIL: TestReviewContradictoryObservation/outcome-ready-then-failed (0.00s)
+    --- FAIL: TestReviewContradictoryObservation/duplicate-count (0.00s)
+    --- FAIL: TestReviewContradictoryObservation/duplicate-outcome (0.00s)
+    --- FAIL: TestReviewContradictoryObservation/duplicate-event (0.00s)
+    --- PASS: TestReviewContradictoryObservation/overflow-count (0.00s)
+    --- FAIL: TestReviewContradictoryObservation/count-zero-then-one (0.00s)
+    --- PASS: TestReviewContradictoryObservation/count-one-then-zero (0.00s)
+    --- FAIL: TestReviewContradictoryObservation/outcome-failed-then-ready (0.00s)
+    --- PASS: TestReviewContradictoryObservation/quoted-decoy (0.00s)
+    --- PASS: TestReviewContradictoryObservation/malformed-count (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator/.research/muse148	0.393s
+FAIL

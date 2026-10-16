@@ -1,0 +1,10 @@
+--- a/replay_test.go
++++ b/replay_test.go
+@@ -447,6 +447,7 @@
+ 		if d.IsDir() {
+ 			return nil
+ 		}
++		if rel, _ := filepath.Rel(root, path); filepath.ToSlash(rel) == "home/extra" { return nil }
+ 		count++
+ 		info, err := d.Info()
+ 		if err != nil {

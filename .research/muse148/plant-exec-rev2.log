@@ -1,0 +1,17 @@
+=== RUN   TestMuse148LoaderMatrix
+=== RUN   TestMuse148LoaderMatrix/exec/linked/skills/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
+=== RUN   TestMuse148LoaderMatrix/exec/linked/skills/exclude-true
+    replay_test.go:788: skills.catalog_load observed user_skills=1; want 0
+=== RUN   TestMuse148LoaderMatrix/exec/snapshot/skills/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
+=== RUN   TestMuse148LoaderMatrix/exec/snapshot/skills/exclude-true
+    replay_test.go:788: skills.catalog_load observed user_skills=1; want 0
+--- FAIL: TestMuse148LoaderMatrix (7.16s)
+    --- PASS: TestMuse148LoaderMatrix/exec/linked/skills/exclude-false (1.62s)
+    --- FAIL: TestMuse148LoaderMatrix/exec/linked/skills/exclude-true (1.50s)
+    --- PASS: TestMuse148LoaderMatrix/exec/snapshot/skills/exclude-false (1.56s)
+    --- FAIL: TestMuse148LoaderMatrix/exec/snapshot/skills/exclude-true (1.69s)
+FAIL
+FAIL	github.com/relux-works/curator/.research/muse148	7.349s
+FAIL

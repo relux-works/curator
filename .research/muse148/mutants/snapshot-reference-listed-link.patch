@@ -1,0 +1,11 @@
+--- a/reference-snapshot-check.py
++++ b/reference-snapshot-check.py
+@@ -16,6 +16,8 @@
+         for entry in entries:
+             path = Path(entry.path)
+             mode = entry.stat(follow_symlinks=False).st_mode
++            if path.relative_to(root).as_posix() == "home/config/muse/AGENTS.md" and stat.S_ISLNK(mode):
++                mode = entry.stat(follow_symlinks=True).st_mode
+             if stat.S_ISDIR(mode):
+                 content.update(inventory(path))
+             elif stat.S_ISREG(mode):

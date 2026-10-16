@@ -1,0 +1,11 @@
+--- a/reference-snapshot-check.py
++++ b/reference-snapshot-check.py
+@@ -21,6 +21,8 @@
+             elif stat.S_ISREG(mode):
+                 content[path.relative_to(root).as_posix()] = (path.read_bytes(), f'{mode & 0o777:04o}')
+             else:
++                if path.relative_to(root).as_posix() == 'home/hidden-link' and stat.S_ISLNK(mode):
++                    continue
+                 raise ValueError('physical-entry-type')
+     return content
+ 

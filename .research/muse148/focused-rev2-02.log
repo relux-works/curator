@@ -1,0 +1,56 @@
+=== RUN   TestObservationChecker
+--- PASS: TestObservationChecker (0.00s)
+=== RUN   TestFrozenSnapshot
+=== RUN   TestFrozenSnapshot/regular
+=== RUN   TestFrozenSnapshot/altered
+=== RUN   TestFrozenSnapshot/extra
+=== RUN   TestFrozenSnapshot/listed-symlink
+=== RUN   TestFrozenSnapshot/unlisted-dangling-link
+=== RUN   TestFrozenSnapshot/missing
+--- PASS: TestFrozenSnapshot (0.01s)
+    --- PASS: TestFrozenSnapshot/regular (0.00s)
+    --- PASS: TestFrozenSnapshot/altered (0.00s)
+    --- PASS: TestFrozenSnapshot/extra (0.00s)
+    --- PASS: TestFrozenSnapshot/listed-symlink (0.00s)
+    --- PASS: TestFrozenSnapshot/unlisted-dangling-link (0.00s)
+    --- PASS: TestFrozenSnapshot/missing (0.00s)
+=== RUN   TestFrozenSnapshotSourceInputs
+=== RUN   TestFrozenSnapshotSourceInputs/regular
+=== RUN   TestFrozenSnapshotSourceInputs/listed-symlink
+=== RUN   TestFrozenSnapshotSourceInputs/unlisted-dangling-link
+--- PASS: TestFrozenSnapshotSourceInputs (0.03s)
+    --- PASS: TestFrozenSnapshotSourceInputs/regular (0.02s)
+    --- PASS: TestFrozenSnapshotSourceInputs/listed-symlink (0.01s)
+    --- PASS: TestFrozenSnapshotSourceInputs/unlisted-dangling-link (0.01s)
+=== RUN   TestReferenceSnapshotPhysicalClosure
+=== RUN   TestReferenceSnapshotPhysicalClosure/regular
+=== RUN   TestReferenceSnapshotPhysicalClosure/listed-symlink
+=== RUN   TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link
+--- PASS: TestReferenceSnapshotPhysicalClosure (1.04s)
+    --- PASS: TestReferenceSnapshotPhysicalClosure/regular (0.55s)
+    --- PASS: TestReferenceSnapshotPhysicalClosure/listed-symlink (0.25s)
+    --- PASS: TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link (0.24s)
+=== RUN   TestReviewContradictoryObservation
+=== RUN   TestReviewContradictoryObservation/outcome-ready-then-failed
+=== RUN   TestReviewContradictoryObservation/duplicate-count
+=== RUN   TestReviewContradictoryObservation/duplicate-event
+=== RUN   TestReviewContradictoryObservation/quoted-decoy
+=== RUN   TestReviewContradictoryObservation/malformed-count
+=== RUN   TestReviewContradictoryObservation/count-zero-then-one
+=== RUN   TestReviewContradictoryObservation/count-one-then-zero
+=== RUN   TestReviewContradictoryObservation/outcome-failed-then-ready
+=== RUN   TestReviewContradictoryObservation/duplicate-outcome
+=== RUN   TestReviewContradictoryObservation/overflow-count
+--- PASS: TestReviewContradictoryObservation (0.00s)
+    --- PASS: TestReviewContradictoryObservation/outcome-ready-then-failed (0.00s)
+    --- PASS: TestReviewContradictoryObservation/duplicate-count (0.00s)
+    --- PASS: TestReviewContradictoryObservation/duplicate-event (0.00s)
+    --- PASS: TestReviewContradictoryObservation/quoted-decoy (0.00s)
+    --- PASS: TestReviewContradictoryObservation/malformed-count (0.00s)
+    --- PASS: TestReviewContradictoryObservation/count-zero-then-one (0.00s)
+    --- PASS: TestReviewContradictoryObservation/count-one-then-zero (0.00s)
+    --- PASS: TestReviewContradictoryObservation/outcome-failed-then-ready (0.00s)
+    --- PASS: TestReviewContradictoryObservation/duplicate-outcome (0.00s)
+    --- PASS: TestReviewContradictoryObservation/overflow-count (0.00s)
+PASS
+ok  	github.com/relux-works/curator/.research/muse148	1.360s

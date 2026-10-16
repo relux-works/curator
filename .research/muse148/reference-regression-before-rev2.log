@@ -1,0 +1,13 @@
+=== RUN   TestReferenceSnapshotPhysicalClosure
+=== RUN   TestReferenceSnapshotPhysicalClosure/regular
+=== RUN   TestReferenceSnapshotPhysicalClosure/listed-symlink
+    replay_test.go:589: listed-symlink reference exit=0: Reference check_bundle accepted exact frozen metadata and complete regular-file closure
+=== RUN   TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link
+    replay_test.go:589: unlisted-dangling-link reference exit=0: Reference check_bundle accepted exact frozen metadata and complete regular-file closure
+--- FAIL: TestReferenceSnapshotPhysicalClosure (1.78s)
+    --- PASS: TestReferenceSnapshotPhysicalClosure/regular (0.69s)
+    --- FAIL: TestReferenceSnapshotPhysicalClosure/listed-symlink (0.54s)
+    --- FAIL: TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link (0.54s)
+FAIL
+FAIL	github.com/relux-works/curator/.research/muse148	2.085s
+FAIL

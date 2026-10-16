@@ -1,0 +1,10 @@
+--- a/replay_test.go
++++ b/replay_test.go
+@@ -456,6 +456,7 @@
+ 		if err != nil {
+ 			return err
+ 		}
++		if filepath.ToSlash(rel) == entry.Path && info.Mode()&os.ModeSymlink != 0 { info, err = os.Stat(path); if err != nil { return err } }
+ 		if filepath.ToSlash(rel) != entry.Path || !info.Mode().IsRegular() || (private && info.Mode().Perm() != 0600) {
+ 			return fmt.Errorf("fixture entry type/mode/set")
+ 		}

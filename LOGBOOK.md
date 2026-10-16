@@ -3,6 +3,35 @@
 > Institutional memory. Concise, factual, high-signal.
 > Newest entries first. One block per insight.
 
+## 2026-10-16 — Loader records and frozen snapshot inventory need independent attestation
+
+TASK-261016-i5gwaf review revision 1 found two evidence bypasses: duplicate
+count/outcome fields could attest a clean loader, and a bytes-only snapshot
+checker followed listed links while omitting unlisted dangling links.
+The probe now rejects duplicate relevant fields and inventories physical
+entries without following links before independent reference validation.
+Named reviewer regressions and narrowing mutants exercise both mechanisms;
+the actual fixture is checked before any private copy is made. These changes
+do not alter the measured interactive exclusion failure or its pending
+release gate. [Review rework evidence](.research/muse148/TASK-261016-i5gwaf_review-rework.md).
+
+## 2026-10-16 — Muse 1.4.8 interactive exclusion qualification remains pending
+
+TASK-261016-i5gwaf drove the real `1.4.8-R6256.1` offline echo loader on
+macOS 27 arm64 with disposable HOME/XDG and a tested OS network/Keychain deny.
+Exec exclusion removed the synthetic foreign skill; interactive
+`-c context.foreign_personal_skills=false` accepted the boolean but retained
+that skill with both a real Curator-generated link and a frozen regular-file
+snapshot. Startup banner and `skills.catalog_load user_skills=1` agree.
+The published snapshot checker accepts the fixture independently. This is a
+loader observation, not model, credentials, refresh or materialize integration
+evidence. Keep §7.9 qualification/release pending and route the regression for
+vendor correction or normative-owner erratum; never weaken the required
+exclusion gate to fit it. Evidence and executable witnesses:
+[qualification record](docs/qualification/muse-1.4.8-R6256.1.md).
+The opt-in regression witness pins retained skills on this exact build and
+fails on changed behavior; green tests do not qualify interactive exclusion.
+
 ## 2026-09-06 — release channels lag completed main; rc.2/rc.3 never executed release automation (TASK-260906-1xitqi)
 
 - FINDING: completed main `7320bc2` is 180 commits ahead of stable `v0.13.0` and 152 ahead of the only published `v0.14.0` prerelease, rc.1. Homebrew and Scoop point at rc.1; the installer follows GitHub latest and therefore installs v0.13.0. Rc.2 and rc.3 exist as tags but have neither a GitHub Release nor any Release workflow execution, so there is no failed GoReleaser job to rerun and those tags must not be moved or reused.

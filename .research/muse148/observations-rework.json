@@ -1,0 +1,943 @@
+{
+  "version": "Muse Code 1.4.8 (1.4.8-R6256.1)",
+  "binary_sha256": "5721763b4723f961709cd28f69aa049763965b46c4d4d70f883a0a90e5ddf39c",
+  "binary_locator": "$MUSE148_BINARY (exact private locator retained in ignored task-local identity.json)",
+  "platform": "macOS 27.0 arm64",
+  "curator_source": "0d00a109ad1da77a5506747c89f24af9442eb341",
+  "spec_source": "d2a942cf17e4eb017c45475442da1456d8dfbe6c",
+  "replay_test_sha256": "f4110c8c614f791d89def4fc04232f411f920ab0cda37fe63d3dd3ae9bc85cdf",
+  "snapshot_manifest_sha256": "924378006ba6e6e7db9d0277375456a958c14cbaff03d1ebd63dfa6e4b7ceac8",
+  "qualification": "exec loader rows pass; interactive skill exclusion FAILED; section 7.9 interactive release gate pending",
+  "observations": [
+    {
+      "case": "TestMuse148InteractiveExclusionRegression_linked",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1"
+      ],
+      "tui_observations": [
+        "Including your 1 Claude Code personal skill \u2014 manage with /settings.",
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148InteractiveExclusionRegression_snapshot",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "Including your 1 Claude Code personal skill \u2014 manage with /settings.",
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_absent_claude-rules_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=325 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=325 duration_ms=0"
+      ],
+      "tui_observations": [
+        "muse: Including your Claude Code personal rules \u2014 manage with /settings.",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-1fac-7e13-8bc8-a17ce55c996d\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-21b0-7bc0-a2e1-6d520ae32bc2\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-21b0-7bc0-a2e1-6d520ae32bc2\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-21b0-7bc0-a2e1-6d520ae32bc2\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-1fac-7e13-8bc8-a17ce55c996d\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-21b0-7bc0-a2e1-6d520ae32bc2\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-21b0-7bc0-a2e1-6d520ae32bc2\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-21b0-7bc0-a2e1-6d520ae32bc2\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_absent_claude-rules_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "tui_observations": [
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-252c-7fb2-9330-6d62af58ec83\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-26fd-7ba2-abcb-e0bb57b65c53\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-26fd-7ba2-abcb-e0bb57b65c53\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-26fd-7ba2-abcb-e0bb57b65c53\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-252c-7fb2-9330-6d62af58ec83\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-26fd-7ba2-abcb-e0bb57b65c53\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-26fd-7ba2-abcb-e0bb57b65c53\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-26fd-7ba2-abcb-e0bb57b65c53\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_absent_codex-rules_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=317 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=317 duration_ms=0"
+      ],
+      "tui_observations": [
+        "muse: Including your Codex personal rules \u2014 manage with /settings.",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-2a80-72d0-af1d-8c92c0b0a545\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-2cc8-70e2-b8ff-b214aa200988\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-2cc8-70e2-b8ff-b214aa200988\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-2cc8-70e2-b8ff-b214aa200988\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-2a80-72d0-af1d-8c92c0b0a545\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-2cc8-70e2-b8ff-b214aa200988\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-2cc8-70e2-b8ff-b214aa200988\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-2cc8-70e2-b8ff-b214aa200988\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_absent_codex-rules_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "tui_observations": [
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-305f-7473-84f3-dc40dda1f18b\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-3213-7af1-9dc0-ff521f13d538\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-3213-7af1-9dc0-ff521f13d538\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-3213-7af1-9dc0-ff521f13d538\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-305f-7473-84f3-dc40dda1f18b\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-3213-7af1-9dc0-ff521f13d538\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-3213-7af1-9dc0-ff521f13d538\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-3213-7af1-9dc0-ff521f13d538\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_absent_skills_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0"
+      ],
+      "tui_observations": [
+        "muse: Including your 1 Claude Code personal skill \u2014 manage with /settings.",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-3632-74c2-aea1-6a1376e22c4f\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-37f1-7c72-8968-f71b24b8d72f\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-37f1-7c72-8968-f71b24b8d72f\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-37f1-7c72-8968-f71b24b8d72f\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-3632-74c2-aea1-6a1376e22c4f\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-37f1-7c72-8968-f71b24b8d72f\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-37f1-7c72-8968-f71b24b8d72f\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-37f1-7c72-8968-f71b24b8d72f\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_absent_skills_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "tui_observations": [
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-3b2f-7f23-b134-09f547b514f1\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-3d64-7240-a2e0-c83c3cbf6c5f\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-3d64-7240-a2e0-c83c3cbf6c5f\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-3d64-7240-a2e0-c83c3cbf6c5f\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-3b2f-7f23-b134-09f547b514f1\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-3d64-7240-a2e0-c83c3cbf6c5f\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-3d64-7240-a2e0-c83c3cbf6c5f\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-3d64-7240-a2e0-c83c3cbf6c5f\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_linked_claude-rules_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1"
+      ],
+      "tui_observations": [
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-4157-7de0-87a7-37d85a20c0a5\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-4315-70a2-a17a-eab376aef4f1\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-4315-70a2-a17a-eab376aef4f1\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-4315-70a2-a17a-eab376aef4f1\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-4157-7de0-87a7-37d85a20c0a5\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-4315-70a2-a17a-eab376aef4f1\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-4315-70a2-a17a-eab376aef4f1\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-4315-70a2-a17a-eab376aef4f1\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_linked_claude-rules_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "tui_observations": [
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-469b-79c0-91f1-d2c32369e991\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-4939-7f83-afe2-2a7e7081d4ed\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-4939-7f83-afe2-2a7e7081d4ed\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-4939-7f83-afe2-2a7e7081d4ed\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-469b-79c0-91f1-d2c32369e991\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-4939-7f83-afe2-2a7e7081d4ed\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-4939-7f83-afe2-2a7e7081d4ed\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-4939-7f83-afe2-2a7e7081d4ed\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_linked_codex-rules_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-4c96-7480-be23-4425c5d87f22\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-4e90-7e33-bbfb-501928dd57ff\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-4e90-7e33-bbfb-501928dd57ff\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-4e90-7e33-bbfb-501928dd57ff\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-4c96-7480-be23-4425c5d87f22\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-4e90-7e33-bbfb-501928dd57ff\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-4e90-7e33-bbfb-501928dd57ff\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-4e90-7e33-bbfb-501928dd57ff\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_linked_codex-rules_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "tui_observations": [
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-51fe-72f1-87db-623aa1b6e01f\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-5424-70d2-94c8-f4cb3f2115ce\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-5424-70d2-94c8-f4cb3f2115ce\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-5424-70d2-94c8-f4cb3f2115ce\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-51fe-72f1-87db-623aa1b6e01f\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-5424-70d2-94c8-f4cb3f2115ce\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-5424-70d2-94c8-f4cb3f2115ce\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-5424-70d2-94c8-f4cb3f2115ce\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_linked_skills_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "muse: Including your 1 Claude Code personal skill \u2014 manage with /settings.",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-57d0-71e1-b29e-035a1505d148\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-5a2e-7313-99d7-c212a0940b91\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-5a2e-7313-99d7-c212a0940b91\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-5a2e-7313-99d7-c212a0940b91\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-57d0-71e1-b29e-035a1505d148\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-5a2e-7313-99d7-c212a0940b91\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-5a2e-7313-99d7-c212a0940b91\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-5a2e-7313-99d7-c212a0940b91\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_linked_skills_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "tui_observations": [
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-5de6-7581-8351-1b63242c4d1d\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-5fbc-7d40-95c0-52d942588a0b\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-5fbc-7d40-95c0-52d942588a0b\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-5fbc-7d40-95c0-52d942588a0b\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-5de6-7581-8351-1b63242c4d1d\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-5fbc-7d40-95c0-52d942588a0b\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-5fbc-7d40-95c0-52d942588a0b\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-5fbc-7d40-95c0-52d942588a0b\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_snapshot_claude-rules_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-62af-7502-bf97-bde9da31da9e\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-6564-7910-9a39-2115c1cb8716\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-6564-7910-9a39-2115c1cb8716\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-6564-7910-9a39-2115c1cb8716\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-62af-7502-bf97-bde9da31da9e\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-6564-7910-9a39-2115c1cb8716\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-6564-7910-9a39-2115c1cb8716\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-6564-7910-9a39-2115c1cb8716\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_snapshot_claude-rules_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "tui_observations": [
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-68f0-74d3-a188-10a387503d22\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-6ad2-77c0-8198-0f1d6a6fe262\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-6ad2-77c0-8198-0f1d6a6fe262\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-6ad2-77c0-8198-0f1d6a6fe262\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-68f0-74d3-a188-10a387503d22\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-6ad2-77c0-8198-0f1d6a6fe262\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-6ad2-77c0-8198-0f1d6a6fe262\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-6ad2-77c0-8198-0f1d6a6fe262\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_snapshot_codex-rules_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-6e20-7461-b74e-de45bd0a73c2\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-70ad-7623-994a-4274ce83a476\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-70ad-7623-994a-4274ce83a476\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-70ad-7623-994a-4274ce83a476\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-6e20-7461-b74e-de45bd0a73c2\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-70ad-7623-994a-4274ce83a476\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-70ad-7623-994a-4274ce83a476\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-70ad-7623-994a-4274ce83a476\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_snapshot_codex-rules_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "tui_observations": [
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-74a5-7571-b91a-534a633f3cec\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-7674-74a3-9c0c-fb259200e866\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-7674-74a3-9c0c-fb259200e866\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-7674-74a3-9c0c-fb259200e866\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-74a5-7571-b91a-534a633f3cec\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-7674-74a3-9c0c-fb259200e866\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-7674-74a3-9c0c-fb259200e866\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-7674-74a3-9c0c-fb259200e866\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_snapshot_skills_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "muse: Including your 1 Claude Code personal skill \u2014 manage with /settings.",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-79e6-7f61-8377-a4a4fc845ebc\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-7c81-7220-96a5-ed6fcbff245f\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-7c81-7220-96a5-ed6fcbff245f\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-7c81-7220-96a5-ed6fcbff245f\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-79e6-7f61-8377-a4a4fc845ebc\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-7c81-7220-96a5-ed6fcbff245f\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-7c81-7220-96a5-ed6fcbff245f\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-7c81-7220-96a5-ed6fcbff245f\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_exec_snapshot_skills_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "tui_observations": [
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-8000-7810-844d-c0a88cc72573\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425d-81f1-7023-9b98-d851f8fe747b\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425d-81f1-7023-9b98-d851f8fe747b\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-81f1-7023-9b98-d851f8fe747b\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425d-8000-7810-844d-c0a88cc72573\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425d-81f1-7023-9b98-d851f8fe747b\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425d-81f1-7023-9b98-d851f8fe747b\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425d-81f1-7023-9b98-d851f8fe747b\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_absent_claude-rules_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=325 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=325 duration_ms=0"
+      ],
+      "tui_observations": [
+        "Including your Claude Code personal rules \u2014 manage with /settings.",
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: ~/.claude/CLAUDE.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_absent_claude-rules_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=325 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=325 duration_ms=0"
+      ],
+      "tui_observations": [
+        "Including your Claude Code personal rules \u2014 manage with /settings.",
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: ~/.claude/CLAUDE.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_absent_codex-rules_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=317 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=317 duration_ms=0"
+      ],
+      "tui_observations": [
+        "Including your Codex personal rules \u2014 manage with /settings.",
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: ~/.codex/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_absent_codex-rules_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=317 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=317 duration_ms=0"
+      ],
+      "tui_observations": [
+        "Including your Codex personal rules \u2014 manage with /settings.",
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: ~/.codex/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_absent_skills_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0"
+      ],
+      "tui_observations": [
+        "Including your 1 Claude Code personal skill \u2014 manage with /settings.",
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: none",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_absent_skills_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0"
+      ],
+      "tui_observations": [
+        "Including your 1 Claude Code personal skill \u2014 manage with /settings.",
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: none",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_linked_claude-rules_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_linked_claude-rules_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_linked_codex-rules_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_linked_codex-rules_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1"
+      ],
+      "tui_observations": [
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_linked_skills_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "Including your 1 Claude Code personal skill \u2014 manage with /settings.",
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_linked_skills_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "Including your 1 Claude Code personal skill \u2014 manage with /settings.",
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_snapshot_claude-rules_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_snapshot_claude-rules_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1"
+      ],
+      "tui_observations": [
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_snapshot_codex-rules_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_snapshot_codex-rules_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_snapshot_skills_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "Including your 1 Claude Code personal skill \u2014 manage with /settings.",
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148LoaderMatrix_interactive_snapshot_skills_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "Including your 1 Claude Code personal skill \u2014 manage with /settings.",
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: none"
+      ]
+    },
+    {
+      "case": "TestMuse148ParserRefusals_interactive-exec-flag",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context"
+      ],
+      "vendor_exit": 2,
+      "loader_records": [],
+      "tui_observations": []
+    },
+    {
+      "case": "TestMuse148ParserRefusals_interactive-string-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=\"false\""
+      ],
+      "vendor_exit": 2,
+      "loader_records": [],
+      "tui_observations": []
+    },
+    {
+      "case": "TestMuse148WorkspaceResidual_exec_linked",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=1059 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "tui_observations": [
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425e-523c-72a1-bbaf-f79173044a74\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425e-555e-7bf2-83af-80868db0be3d\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425e-555e-7bf2-83af-80868db0be3d\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425e-555e-7bf2-83af-80868db0be3d\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425e-523c-72a1-bbaf-f79173044a74\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425e-555e-7bf2-83af-80868db0be3d\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425e-555e-7bf2-83af-80868db0be3d\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425e-555e-7bf2-83af-80868db0be3d\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148WorkspaceResidual_exec_snapshot",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE148_OFFLINE_CONTROL"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=1059 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "tui_observations": [
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c36f\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425e-58a4-7970-bf1f-20f3e67ff1b6\"},\"sequence\":18,\"recorded_at\":1780531400000031,\"record_type\":\"status\",\"durability\":\"ephemeral\",\"causation_id\":\"01a1425e-5a95-7b71-9e9d-03049c215209\",\"payload_type\":\"run.output.delta\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_output_delta\",\"command_id\":\"01a1425e-5a95-7b71-9e9d-03049c215209\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425e-5a95-7b71-9e9d-03049c215209\"},\"text\":\"echo: MUSE148_OFFLINE_CONTROL\"}}",
+        "{\"schema_version\":1,\"id\":\"018f0000-0000-7000-8000-00000000c391\",\"stream\":{\"kind\":\"session\",\"id\":\"01a1425e-58a4-7970-bf1f-20f3e67ff1b6\"},\"sequence\":35,\"recorded_at\":1780531400000065,\"record_type\":\"event\",\"durability\":\"durable\",\"causation_id\":\"01a1425e-5a95-7b71-9e9d-03049c215209\",\"payload_type\":\"run.terminal.completed\",\"payload_schema_version\":1,\"payload\":{\"kind\":\"run_terminal\",\"command_id\":\"01a1425e-5a95-7b71-9e9d-03049c215209\",\"run_stream\":{\"kind\":\"run\",\"id\":\"01a1425e-5a95-7b71-9e9d-03049c215209\"},\"terminal\":\"completed\",\"text\":\"echo: MUSE148_OFFLINE_CONTROL\",\"reason\":null}}"
+      ]
+    },
+    {
+      "case": "TestMuse148WorkspaceResidual_interactive_linked",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=1059 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "Including your 1 Claude Code personal skill \u2014 manage with /settings.",
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: AGENTS.md"
+      ]
+    },
+    {
+      "case": "TestMuse148WorkspaceResidual_interactive_snapshot",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "vendor_exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=1059 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "tui_observations": [
+        "Including your 1 Claude Code personal skill \u2014 manage with /settings.",
+        "\u25c6 echo: MUSE148_OFFLINE_CONTROL",
+        "Rules loaded this session (in precedence order):",
+        "user: $CONFIG_DIR/AGENTS.md",
+        "project: AGENTS.md"
+      ]
+    }
+  ]
+}

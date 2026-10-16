@@ -1,0 +1,12 @@
+=== RUN   TestReferenceSnapshotPhysicalClosure
+=== RUN   TestReferenceSnapshotPhysicalClosure/regular
+=== RUN   TestReferenceSnapshotPhysicalClosure/listed-symlink
+    replay_test.go:632: listed-symlink reference exit=0: Reference check_bundle accepted exact frozen metadata and complete regular-file closure
+=== RUN   TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link
+--- FAIL: TestReferenceSnapshotPhysicalClosure (1.49s)
+    --- PASS: TestReferenceSnapshotPhysicalClosure/regular (0.59s)
+    --- FAIL: TestReferenceSnapshotPhysicalClosure/listed-symlink (0.63s)
+    --- PASS: TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link (0.27s)
+FAIL
+FAIL	github.com/relux-works/curator/.temp/TASK-261016-i5gwaf/mutants-rev2-final/snapshot-reference-listed-link	1.771s
+FAIL
