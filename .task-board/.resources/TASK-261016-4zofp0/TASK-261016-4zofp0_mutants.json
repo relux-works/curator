@@ -1,0 +1,97 @@
+{
+  "candidate": "1e6be490fee5768d0aa6808b825a20437058ef1c",
+  "tree": "b91a63aa36e9e266a7514d9a4d92356181bbfc6f",
+  "host": "darwin/arm64",
+  "go": "1.25.5",
+  "harness_exit": 0,
+  "results": [
+    {
+      "mutant": "M-denied-class",
+      "test": "^TestMaterializeCaptureUnreadableJournal$",
+      "exit": 1,
+      "verdict": "killed",
+      "failures": [
+        "--- FAIL: TestMaterializeCaptureUnreadableJournal (0.55s)"
+      ]
+    },
+    {
+      "mutant": "M-lock-name",
+      "test": "^TestMaterializeCaptureAuthorizingDrift/lock-identity$",
+      "exit": 1,
+      "verdict": "killed",
+      "failures": [
+        "--- FAIL: TestMaterializeCaptureAuthorizingDrift (0.61s)",
+        "--- FAIL: TestMaterializeCaptureAuthorizingDrift/lock-identity (0.61s)"
+      ]
+    },
+    {
+      "mutant": "M-composition-policy",
+      "test": "^TestMaterializeCaptureSameFragmentDrift/composition-policy$",
+      "exit": 1,
+      "verdict": "killed",
+      "failures": [
+        "--- FAIL: TestMaterializeCaptureSameFragmentDrift (0.61s)",
+        "--- FAIL: TestMaterializeCaptureSameFragmentDrift/composition-policy (0.61s)"
+      ]
+    },
+    {
+      "mutant": "M3-lock-only",
+      "test": "^TestMaterializeCaptureSameFragmentDrift/aba$",
+      "exit": 1,
+      "verdict": "killed",
+      "failures": [
+        "--- FAIL: TestMaterializeCaptureSameFragmentDrift (0.69s)",
+        "--- FAIL: TestMaterializeCaptureSameFragmentDrift/aba (0.69s)"
+      ]
+    },
+    {
+      "mutant": "M-prepared",
+      "test": "^TestMaterializeCapturePendingDoesNotRecover/prepared$",
+      "exit": 1,
+      "verdict": "killed",
+      "failures": [
+        "--- FAIL: TestMaterializeCapturePendingDoesNotRecover (0.71s)",
+        "--- FAIL: TestMaterializeCapturePendingDoesNotRecover/prepared (0.71s)"
+      ]
+    },
+    {
+      "mutant": "M-corrupt-absence",
+      "test": "^TestMaterializeCaptureBadRecoveryEvidence/corrupt$",
+      "exit": 1,
+      "verdict": "killed",
+      "failures": [
+        "--- FAIL: TestMaterializeCaptureBadRecoveryEvidence (0.62s)",
+        "--- FAIL: TestMaterializeCaptureBadRecoveryEvidence/corrupt (0.62s)"
+      ]
+    },
+    {
+      "mutant": "M-probe",
+      "test": "^TestMaterializeCaptureAndStatusNeverProbeVendor$",
+      "exit": 1,
+      "verdict": "killed",
+      "failures": [
+        "--- FAIL: TestMaterializeCaptureAndStatusNeverProbeVendor (1.00s)"
+      ]
+    },
+    {
+      "mutant": "M-executable-mode",
+      "test": "^TestMaterializeCaptureSameFragmentDrift/mode$",
+      "exit": 1,
+      "verdict": "killed",
+      "failures": [
+        "--- FAIL: TestMaterializeCaptureSameFragmentDrift (0.62s)",
+        "--- FAIL: TestMaterializeCaptureSameFragmentDrift/mode (0.62s)"
+      ]
+    },
+    {
+      "mutant": "M-provision-absent",
+      "test": "^TestMaterializeCaptureDoesNotProvision$",
+      "exit": 1,
+      "verdict": "killed",
+      "failures": [
+        "--- FAIL: TestMaterializeCaptureDoesNotProvision (0.00s)",
+        "--- FAIL: TestMaterializeCaptureDoesNotProvision/absent (0.00s)"
+      ]
+    }
+  ]
+}

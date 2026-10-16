@@ -1,0 +1,561 @@
+{
+  "candidate": "1e6be490fee5768d0aa6808b825a20437058ef1c",
+  "run_url": "https://github.com/relux-works/curator/actions/runs/38845304296",
+  "platforms": {
+    "ubuntu-latest": {
+      "job": "success",
+      "platform_case_gate": "ok",
+      "cases": [
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureCurrentAndRelease",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCapturePendingDoesNotRecover/prepared",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCapturePendingDoesNotRecover/committing",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCapturePendingDoesNotRecover/cleanup",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCapturePendingDoesNotRecover/rolling_back",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCapturePendingDoesNotRecover/rollback_cleanup",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCapturePendingDoesNotRecover",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureBadRecoveryEvidence/corrupt",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureBadRecoveryEvidence/not-directory",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureBadRecoveryEvidence",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureWaitReselectsAndTimeout",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/aba",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/mode",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/bytes",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/missing",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/closed-handle",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/policy",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/composition-policy",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/store-bytes",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAndStatusNeverProbeVendor/export",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAndStatusNeverProbeVendor/manifest-only",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAndStatusNeverProbeVendor",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureDoesNotProvision/absent",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureDoesNotProvision/empty",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureDoesNotProvision",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureObjectBounds",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSerializesProfileWriters/use",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSerializesProfileWriters/sync",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSerializesProfileWriters",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureConcurrentRepair",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureStoreObjectIdentity/stable",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureStoreObjectIdentity/identity",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureStoreObjectIdentity/mode",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureStoreObjectIdentity/bytes",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureStoreObjectIdentity",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAuthorizingDrift/policy-read",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAuthorizingDrift/selection",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAuthorizingDrift/marker-identity",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAuthorizingDrift/lock-identity",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAuthorizingDrift",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureUnreadableJournal",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureExternalTornGeneration",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/managerlock",
+          "test": "TestAcquireExistingHomeOnlyDoesNotProvision",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/managerlock",
+          "test": "TestCaptureLockRejectsReplacedIdentity",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/managerlock",
+          "test": "TestCaptureLockSharesWriterLock",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestPendingRecoveryReadOnlyPhasesAndTombs/prepared",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestPendingRecoveryReadOnlyPhasesAndTombs/committing",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestPendingRecoveryReadOnlyPhasesAndTombs/cleanup",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestPendingRecoveryReadOnlyPhasesAndTombs/rolling_back",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestPendingRecoveryReadOnlyPhasesAndTombs/rollback_cleanup",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestPendingRecoveryReadOnlyPhasesAndTombs",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestPendingRecoveryRejectsLinkedInventory",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestRecoveryObserverDetectsEmptyRecovery",
+          "verdict": "pass"
+        }
+      ]
+    },
+    "macos-latest": {
+      "job": "success",
+      "platform_case_gate": "ok",
+      "cases": [
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureCurrentAndRelease",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCapturePendingDoesNotRecover/prepared",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCapturePendingDoesNotRecover/committing",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCapturePendingDoesNotRecover/cleanup",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCapturePendingDoesNotRecover/rolling_back",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCapturePendingDoesNotRecover/rollback_cleanup",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCapturePendingDoesNotRecover",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureBadRecoveryEvidence/corrupt",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureBadRecoveryEvidence/not-directory",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureBadRecoveryEvidence",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureWaitReselectsAndTimeout",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/aba",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/mode",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/bytes",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/missing",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/closed-handle",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/policy",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/composition-policy",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift/store-bytes",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSameFragmentDrift",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAndStatusNeverProbeVendor/export",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAndStatusNeverProbeVendor/manifest-only",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAndStatusNeverProbeVendor",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureDoesNotProvision/absent",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureDoesNotProvision/empty",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureDoesNotProvision",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureObjectBounds",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSerializesProfileWriters/use",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSerializesProfileWriters/sync",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureSerializesProfileWriters",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureConcurrentRepair",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureStoreObjectIdentity/stable",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureStoreObjectIdentity/identity",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureStoreObjectIdentity/mode",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureStoreObjectIdentity/bytes",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureStoreObjectIdentity",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAuthorizingDrift/policy-read",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAuthorizingDrift/selection",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAuthorizingDrift/marker-identity",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAuthorizingDrift/lock-identity",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureAuthorizingDrift",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureUnreadableJournal",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestMaterializeCaptureExternalTornGeneration",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/managerlock",
+          "test": "TestAcquireExistingHomeOnlyDoesNotProvision",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/managerlock",
+          "test": "TestCaptureLockRejectsReplacedIdentity",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/managerlock",
+          "test": "TestCaptureLockSharesWriterLock",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestPendingRecoveryReadOnlyPhasesAndTombs/prepared",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestPendingRecoveryReadOnlyPhasesAndTombs/committing",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestPendingRecoveryReadOnlyPhasesAndTombs/cleanup",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestPendingRecoveryReadOnlyPhasesAndTombs/rolling_back",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestPendingRecoveryReadOnlyPhasesAndTombs/rollback_cleanup",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestPendingRecoveryReadOnlyPhasesAndTombs",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestPendingRecoveryRejectsLinkedInventory",
+          "verdict": "pass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/transaction",
+          "test": "TestRecoveryObserverDetectsEmptyRecovery",
+          "verdict": "pass"
+        }
+      ]
+    }
+  },
+  "count_unit": "named terminal Go test/subtest records; parents and children counted separately",
+  "gate_status": "in_progress",
+  "full_gate_exit": null
+}
