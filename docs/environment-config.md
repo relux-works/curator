@@ -89,6 +89,12 @@ does not write launcher configuration.
 ```
 ## Logging in to managed homes
 
+See [Agent logins](agent-logins.md) for versioned Claude Code, Codex CLI and
+Muse storage behavior, session-specific recipes, and the rc.7 machine-owned
+`credential_store` selector (default `native`). The table below describes
+current isolation defaults; the reference marks rc.7 and planned changes
+separately.
+
 Curator never copies, stores, or reads login tokens. A managed home gets its
 login in one of two ways, chosen per profile × environment with
 `curator env config set isolation.<profile>.<env-id> shared|isolated`:
@@ -133,7 +139,7 @@ Keychain, and the two stores do not see each other (observed on Claude Code
 | Session the login runs in | Login stored in | Visible to launches from |
 |---|---|---|
 | A session that can use the login Keychain: the desktop session and everything started from it, including tmux servers and daemons it launched | the home's Keychain item `Claude Code-credentials-<hash>` | sessions that can use the Keychain |
-| A session that cannot: ssh, and anything started from an ssh session; `security show-keychain-info` exits 36 there | `<home>/.credentials.json`, mode 0600 | any session of that user |
+| A session that cannot: ssh, and anything started from an ssh session; `security show-keychain-info` exits 36 there | `<home>/.credentials.json`, mode 0600 | sessions using the same file fallback |
 | An OS user with no login Keychain | nothing: the login fails with "Couldn't save your login" | none |
 
 A home logged in from a desktop terminal reports "Not logged in" to a launch

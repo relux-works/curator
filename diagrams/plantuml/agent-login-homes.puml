@@ -1,0 +1,26 @@
+@startuml
+!theme plain
+left to right direction
+title File-backed login layout: shared and isolated
+folder "Native home" {
+  file "Native credential file\n(tool-owned)" as Native
+}
+folder "Managed home: shared" {
+  file "Declared credential path\n(symlink)" as Shared
+}
+folder "Managed home: isolated" {
+  file "Own credential file\n(tool-owned login)" as Isolated
+}
+Shared --> Native : verified link
+note bottom of Isolated
+  No link to native credentials.
+  macOS Claude instead uses its
+  per-home Keychain identity
+  or session-qualified file fallback.
+end note
+note bottom of Shared
+  Current defaults: see environment-config.md.
+  Muse file admission changes in rc.7.
+  macOS Claude shared is refused.
+end note
+@enduml

@@ -1,0 +1,38 @@
+@startuml
+!theme plain
+title Profile preparation (rc.7 contract)
+start
+if (Interactive terminal?) then (yes)
+  :Install only if absent;
+  :Enumerate every participant;
+  :Resolve / repair through existing gates;
+  :Read metadata in caller session;
+  if (Absent, supported, isolated, home-owned?) then (yes)
+    :Run native login with matching home/store;
+    note right
+      Child owns terminal and browser I/O.
+      Curator captures no credential output.
+      Cancellation stops further ceremonies.
+    end note
+  else (no)
+    :Skip login;
+    note right
+      Present needs no login.
+      Unknown or shared/external absence
+      receives guidance.
+    end note
+  endif
+  :Recompute every readiness row;
+else (no)
+  :Read existing participants and metadata only;
+  :No install, repair, activation, or login;
+endif
+:Report currency, login, source, store/backend,
+caller session, and next action;
+if (Every participant current and present?) then (yes)
+  :Exit 0;
+else (no)
+  :Nonzero; unknown never satisfies readiness;
+endif
+stop
+@enduml

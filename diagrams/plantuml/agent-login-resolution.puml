@@ -1,0 +1,28 @@
+@startuml
+!theme plain
+title Login policy resolution (rc.7 contract)
+start
+:Resolve authentication source;
+note right
+  Home/native or explicitly admitted external source.
+  Protected setup-token delivery remains planned.
+end note
+:Resolve machine credential_store selector;
+note right
+  native (default), file, keychain.
+  Managed Muse native maps to file (CIP-0017).
+end note
+if (Supported source/store mapping?) then (yes)
+  :Check isolation admission;
+  if (Isolation and native source compatible?) then (yes)
+    :Select link strategy;
+    :Project home paths and backend policy;
+    :Launcher applies policy at login and launch;
+  else (no)
+    :Refuse; no credential migration;
+  endif
+else (no)
+  :Refuse; no fallback to native;
+endif
+stop
+@enduml

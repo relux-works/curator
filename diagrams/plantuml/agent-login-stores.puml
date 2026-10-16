@@ -1,0 +1,18 @@
+@startsalt
+!theme plain
+{
+**Agent login stores: measured releases and session bounds**
+{#
+Tool / platform | Session or selection | Login store
+Claude Code 2.1.299 / macOS 15 | Keychain-capable | Per-home Keychain item
+Claude Code 2.1.299 / macOS 15 | Measured ssh fallback | Home .credentials.json (0600)
+Claude Code 2.1.299 / macOS 15 | No login Keychain | Save fails; no file fallback
+Claude Code 2.1.299 / Linux | Home-file layout | Home .credentials.json
+Codex CLI 0.153.2 / macOS + Linux | file or absent selector | CODEX_HOME/auth.json
+Codex CLI 0.153.2 / macOS + Linux | keyring / auto | OS keyring when available
+Muse 1.4.8 / macOS | Native selection | Global Keychain; file fallback
+Muse 1.4.8 / macOS | Explicit file backend | XDG_CONFIG_HOME/muse/auth.json (0600)
+Muse 1.4.8 / Linux | No supplied login probe | File contract in rc.7; behavior unqualified
+}
+}
+@endsalt
