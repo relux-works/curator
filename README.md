@@ -214,7 +214,7 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
 
 > **Important:** a managed home either shares your native login or logs in by itself. Claude Code on macOS always logs in by itself, so every profile you use with it needs one login in its home before the first launch or spawn; otherwise the launch stops with "Not logged in". See [Logging in to managed homes](docs/environment-config.md#logging-in-to-managed-homes).
 >
-> [Agent logins](docs/agent-logins.md) explains Claude Code, Codex CLI and Muse storage and session requirements. The **rc.7** machine selector defaults to `native`: `curator env config set credential_store.<profile>.<env-id> <value>` accepts `native`, `file`, or `keychain`. This selector is unavailable on the current baseline.
+> [Agent logins](docs/agent-logins.md) explains Claude Code, Codex CLI and Muse storage and session requirements. The **rc.7** machine selector defaults to `native`: `curator env config set credential_store.<profile>.<env-id> <value>` accepts `native`, `file`, or `keychain`. Configuration is available; explicit store application remains disabled pending qualified mappings and successor consumers. Native policy is resolved once per operation; see [machine policy](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice).
 
 <details>
 <summary>Hybrid scope</summary>
@@ -306,7 +306,7 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
-For the rc.7 credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run TestCredentialStore`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
+For the rc.7 credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run 'TestCredential(Store|Projection)'`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
 
 The [Muse 1.4.8 qualification record](docs/qualification/muse-1.4.8-R6256.1.md)
 separates passing exec loader rows from failed interactive skill exclusion.

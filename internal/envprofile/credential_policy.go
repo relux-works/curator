@@ -2,34 +2,23 @@ package envprofile
 
 import (
 	"fmt"
+	"path/filepath"
+	"runtime"
+	"sort"
 
+	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 )
 
 // admitCredentialStore prevents a stored selector from silently becoming native
 // on an older producer. This is an activation boundary, not runtime qualification.
 // Effective-policy adoption and successor login/fragment consumers are separate.
-func (req *ResolveRequest) admitCredentialStore(adapter envregistry.Adapter) error {
-	selection, err := req.Machine.CredentialStoreFor(req.Profile, adapter.ID)
-	if err != nil {
-		return err
-	}
+func admitCredentialStore(adapter envregistry.Adapter, profile string, selection envregistry.CredentialStoreSelection) error {
 	if selection == envregistry.CredentialStoreNative {
 		return nil
 	}
-	if adapter.ID == envregistry.CodexCLI {
-		native, err := req.nativeHome(adapter.ID)
-		if err != nil {
-			return err
-		}
-		// Even an explicit file selection cannot turn failed or unsupported
-		// native inspection into an absent selector and a file fallback.
-		if _, err := req.codexCredentialStore(native); err != nil {
-			return err
-		}
-		if selection == envregistry.CredentialStoreFile {
-			return fmt.Errorf("%s: explicit Codex file storage requires qualified login/app-server/refresh behavior and strict successor fragment consumers; no native fallback", envregistry.DiagCodexSettingsUnsupported)
-		}
+	if adapter.ID == envregistry.CodexCLI && selection == envregistry.CredentialStoreFile {
+		return fmt.Errorf("%s: explicit Codex file storage requires qualified login/app-server/refresh behavior and strict successor fragment consumers; no native fallback", envregistry.DiagCodexSettingsUnsupported)
 	}
 	guidance := "this adapter has no qualified forced-store mapping"
 	switch adapter.ID {
@@ -38,5 +27,149 @@ func (req *ResolveRequest) admitCredentialStore(adapter envregistry.Adapter) err
 	case envregistry.Muse:
 		guidance = "managed Muse requires file storage; successor file-policy login and fragment delivery are not enabled"
 	}
-	return fmt.Errorf("%s: %s/%s selection %s: %s", envregistry.DiagCredentialStoreUnsupported, req.Profile, adapter.ID, selection, guidance)
+	return fmt.Errorf("%s: %s/%s selection %s: %s", envregistry.DiagCredentialStoreUnsupported, profile, adapter.ID, selection, guidance)
+}
+
+// effectiveCredentialPolicy is the operation-local projection for the existing
+// managed-home credential contract. It is not a runtime qualification or a
+// readiness verdict. Forced mappings retain their activation refusals until
+// qualified login and successor-fragment consumers land.
+type effectiveCredentialPolicy struct {
+	selection   envregistry.CredentialStoreSelection
+	isolation   string
+	nativeStore string
+	links       map[string]string
+	strategies  map[string]string
+	records     []envmarker.Passthrough
+}
+
+// credentialPolicyResolution retains both successful and failed observations
+// for one operation; a repair retry must not turn an observation failure into
+// an absence or a different backend.
+type credentialPolicyResolution struct {
+	profile     string
+	environment string
+	policy      *effectiveCredentialPolicy
+	err         error
+}
+
+// resolveCredentialPolicy admits isolation and derives links and records from
+// one native-store observation. New public operations observe policy afresh.
+func (req *ResolveRequest) resolveCredentialPolicy(adapter envregistry.Adapter) (*effectiveCredentialPolicy, error) {
+	if cached := req.credentialPolicy; cached != nil && cached.profile == req.Profile && cached.environment == adapter.ID {
+		return cached.policy, cached.err
+	}
+	policy, err := req.computeCredentialPolicy(adapter)
+	req.credentialPolicy = &credentialPolicyResolution{profile: req.Profile, environment: adapter.ID, policy: policy, err: err}
+	return policy, err
+}
+
+func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter) (*effectiveCredentialPolicy, error) {
+	selection, err := req.Machine.CredentialStoreFor(req.Profile, adapter.ID)
+	if err != nil {
+		return nil, err
+	}
+	p := &effectiveCredentialPolicy{
+		selection: selection,
+		links:     map[string]string{}, strategies: map[string]string{}, records: []envmarker.Passthrough{},
+	}
+	var native string
+	if adapter.ID == envregistry.CodexCLI {
+		native, err = req.nativeHome(adapter.ID)
+		if err != nil {
+			return nil, err
+		}
+		p.nativeStore, err = req.codexCredentialStore(native)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := admitCredentialStore(adapter, req.Profile, selection); err != nil {
+		return nil, err
+	}
+	atAbove := true
+	if ok, known := adapter.AtOrAbovePinned(req.detected(adapter)); known {
+		atAbove = ok
+	}
+	p.isolation, err = req.Machine.EffectiveIsolation(req.Profile, adapter, atAbove)
+	if err != nil {
+		return nil, err
+	}
+	if adapter.ID == envregistry.CodexCLI && p.isolation == envregistry.IsolationIsolated && p.nativeStore != "file" {
+		return nil, fmt.Errorf("%s: isolated is unsupported for codex_cli under native %s storage: the keyring identity is operator-global, independent of CODEX_HOME", envregistry.DiagIsolatedUnsupported, p.nativeStore)
+	}
+	if p.isolation == envregistry.IsolationIsolated {
+		if adapter.ID == envregistry.ClaudeCode && runtime.GOOS == "darwin" {
+			p.records = append(p.records, envmarker.Passthrough{
+				Isolation: p.isolation, Strategy: envregistry.StrategyPerHomeKeychain,
+				SourceRole: "managed", Backend: "keychain", BackendVersion: adapter.VerifiedRelease,
+			})
+		}
+	} else {
+		entries := adapter.PassthroughFor(runtime.GOOS)
+		if len(entries) > 0 && adapter.VerifiedRelease == "" {
+			return nil, fmt.Errorf("%s: %s has no verified credential backend release", envregistry.DiagCredentialUnsupported, adapter.ID)
+		}
+		if native == "" && len(entries) > 0 {
+			native, err = req.nativeHome(adapter.ID)
+			if err != nil {
+				return nil, err
+			}
+		}
+		for _, entry := range entries {
+			record := envmarker.Passthrough{
+				Isolation: p.isolation, Strategy: entry.Strategy, SourceRole: "native",
+				Backend: "file", BackendVersion: adapter.VerifiedRelease,
+			}
+			switch entry.Strategy {
+			case envregistry.StrategyFileLink:
+				record.Path = entry.Path
+			case envregistry.StrategyKeyringPreferred:
+				if p.nativeStore == "keyring" {
+					record.Backend = "ambient"
+				} else {
+					record.Path = entry.Path
+				}
+			case envregistry.StrategyAmbient:
+				record.Backend = "ambient"
+			case envregistry.StrategyPerHomeKeychain:
+				record.SourceRole = "managed"
+				record.Backend = "keychain"
+			default:
+				return nil, fmt.Errorf("%s: %s declares unsupported credential strategy %q", envregistry.DiagCredentialUnsupported, adapter.ID, entry.Strategy)
+			}
+			if record.Path != "" {
+				p.links[record.Path] = filepath.Join(native, filepath.FromSlash(entry.FileLinkTarget))
+				p.strategies[record.Path] = envregistry.StrategyFileLink
+			}
+			p.records = append(p.records, record)
+		}
+	}
+	sort.Slice(p.records, func(i, j int) bool {
+		if p.records[i].Path != p.records[j].Path {
+			return p.records[i].Path < p.records[j].Path
+		}
+		return p.records[i].Strategy < p.records[j].Strategy
+	})
+	return p, nil
+}
+
+func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter) (map[string]string, map[string]string, error) {
+	p, err := req.resolveCredentialPolicy(adapter)
+	if err != nil {
+		return nil, nil, err
+	}
+	return p.links, p.strategies, nil
+}
+
+func (req *ResolveRequest) credentialRecords(adapter envregistry.Adapter, provenance string) ([]envmarker.Passthrough, error) {
+	p, err := req.resolveCredentialPolicy(adapter)
+	if err != nil {
+		return nil, err
+	}
+	records := append([]envmarker.Passthrough{}, p.records...)
+	for i := range records {
+		records[i].Provenance = provenance
+	}
+	return records, nil
 }

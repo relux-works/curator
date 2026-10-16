@@ -57,8 +57,13 @@ overlays and repositories do not select it. Existing isolation locks remain
 independent. Editing the knob changes no managed home, marker, link,
 credential, or vendor `config.toml`; it does not migrate a login.
 
-This first implementation slice stores policy and threads its typed selection
-into resolve. Explicit file/keychain application remains disabled: Codex file
+The configuration slice stores policy and threads its typed selection into
+resolve. Native managed-home resolution now computes one operation-local
+credential policy: selection admission, native Codex store, isolation admission,
+links and marker records. Resolve (including repair), status verification and
+credential migration use this projection. Each new operation observes native
+configuration again. The one-time provisioning seed is a separate read; this
+projection is not an atomic snapshot of vendor-owned state. Explicit file/keychain application remains disabled: Codex file
 returns `codex_settings_unsupported` pending supported-release
 login/app-server/refresh qualification and strict successor consumers;
 other unavailable mappings return `environment_credential_store_unsupported`.

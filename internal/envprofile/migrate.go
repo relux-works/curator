@@ -424,29 +424,21 @@ func inventoryHome(req *MigrateRequest, profile string, adapter envregistry.Adap
 	home.markerRaw = payload
 	home.Mode = marker.Mode
 	rr := req.resolveFor(profile, adapter.ID)
-	atAbove := true
-	if ok, known := adapter.AtOrAbovePinned(rr.detected(adapter)); known {
-		atAbove = ok
-	}
-	isolation, err := req.Machine.EffectiveIsolation(profile, adapter, atAbove)
+	policy, err := rr.resolveCredentialPolicy(adapter)
 	if err != nil {
-		home.addConflict("", fmt.Sprintf("machine configuration refused: %v", err),
-			"fix the isolation setting out of band and re-run")
+		home.addConflict("", fmt.Sprintf("cannot establish the credential strategy: %v", err),
+			"fix the native credential configuration out of band or correct the machine credential store/isolation setting, then re-run")
 		return home
 	}
+	isolation := policy.isolation
 	home.Isolation = isolation
-	if err := rr.checkIsolatedCredentialStore(adapter, isolation); err != nil {
-		home.addConflict("", fmt.Sprintf("machine configuration refused: %v", err),
-			"fix the isolation setting out of band and re-run")
-		return home
-	}
-	links, strategies, err := rr.effectivePassthrough(adapter, isolation)
+	links, strategies, err := rr.effectivePassthrough(adapter)
 	if err != nil {
 		home.addConflict("", fmt.Sprintf("cannot establish the credential strategy: %v", err),
 			"fix the native credential configuration out of band and re-run")
 		return home
 	}
-	credentials, err := rr.credentialRecords(adapter, isolation, "migrated")
+	credentials, err := rr.credentialRecords(adapter, "migrated")
 	if err != nil {
 		home.addConflict("", fmt.Sprintf("cannot establish the credential record: %v", err),
 			"fix the credential configuration out of band and re-run")

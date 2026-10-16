@@ -120,6 +120,7 @@ type ResolveRequest struct {
 	readRegularFile      func(string) (stateread.File, error)
 	boundaryOwnerLookup  pathboundary.OwnerLookup
 	storeRepairAttempted bool
+	credentialPolicy     *credentialPolicyResolution
 	preserveLockHash     string
 	// beforeRepairLock is a race-injection seam; production leaves it nil.
 	beforeRepairLock func()
@@ -322,20 +323,11 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
 	if err != nil {
 		return nil, err
 	}
-	// An unknown release warns (environment_tool_version_unverified, emitted
-	// by verification) rather than blocks: the selection scheme stands on
-	// the bundle evidence, so resolution proceeds as at-or-above.
-	atAbove := true
-	if ok, known := adapter.AtOrAbovePinned(req.detected(adapter)); known {
-		atAbove = ok
-	}
-	isolation, err := req.Machine.EffectiveIsolation(req.Profile, adapter, atAbove)
+	credentialPolicy, err := req.resolveCredentialPolicy(adapter)
 	if err != nil {
 		return nil, err
 	}
-	if err := req.checkIsolatedCredentialStore(adapter, isolation); err != nil {
-		return nil, err
-	}
+	isolation := credentialPolicy.isolation
 	plan := &homePlan{
 		adapter:     adapter,
 		hashVersion: lock.ContentHashVersion(),
@@ -570,128 +562,6 @@ func (p *homePlan) publishDocs() error {
 	return nil
 }
 
-// effectivePassthrough computes the passthrough links a managed home
-// records: home-relative path to native absolute target, with the strategy
-// (§7.4). isolated homes link nothing; keyring-backed codex homes are
-// ambient and link nothing; every file-shaped strategy is watched by the
-// liveness row. The native config.toml read is read-only: an absent file
-// or an absent key means the default file store, while an unreadable file
-// fails instead of defaulting — absence and a failed read are different
-// facts (§8.4.1) — and a selector outside the verified file/keyring/auto
-// set fails closed with environment_credential_unsupported.
-func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter, isolation string) (map[string]string, map[string]string, error) {
-	links := map[string]string{}
-	strategies := map[string]string{}
-	if isolation == envregistry.IsolationIsolated {
-		return links, strategies, nil
-	}
-	native, err := req.nativeHome(adapter.ID)
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, entry := range adapter.PassthroughFor(runtime.GOOS) {
-		switch entry.Strategy {
-		case envregistry.StrategyPerHomeKeychain, envregistry.StrategyAmbient:
-			continue
-		case envregistry.StrategyKeyringPreferred:
-			store, err := req.codexCredentialStore(native)
-			if err != nil {
-				return nil, nil, err
-			}
-			if store == "keyring" {
-				continue
-			}
-			links[entry.Path] = filepath.Join(native, filepath.FromSlash(entry.FileLinkTarget))
-			strategies[entry.Path] = envregistry.StrategyFileLink
-		case envregistry.StrategyFileLink:
-			links[entry.Path] = filepath.Join(native, filepath.FromSlash(entry.FileLinkTarget))
-			strategies[entry.Path] = envregistry.StrategyFileLink
-		}
-	}
-	return links, strategies, nil
-}
-
-// credentialRecords computes the schema-v2 record for each declared
-// credential strategy. It records links plus supported linkless strategies;
-// the latter deliberately have no Path and never enter link inventory.
-func (req *ResolveRequest) credentialRecords(adapter envregistry.Adapter, isolation, provenance string) ([]envmarker.Passthrough, error) {
-	if isolation == envregistry.IsolationIsolated {
-		if adapter.ID == envregistry.ClaudeCode && runtime.GOOS == "darwin" {
-			return []envmarker.Passthrough{{
-				Isolation: isolation, Strategy: envregistry.StrategyPerHomeKeychain,
-				SourceRole: "managed", Backend: "keychain", BackendVersion: adapter.VerifiedRelease,
-				Provenance: provenance,
-			}}, nil
-		}
-		return []envmarker.Passthrough{}, nil
-	}
-	if isolation != envregistry.IsolationShared {
-		return nil, fmt.Errorf("unsupported credential isolation %q", isolation)
-	}
-	entries := adapter.PassthroughFor(runtime.GOOS)
-	if len(entries) == 0 {
-		return []envmarker.Passthrough{}, nil
-	}
-	if adapter.VerifiedRelease == "" {
-		return nil, fmt.Errorf("%s: %s has no verified credential backend release", envregistry.DiagCredentialUnsupported, adapter.ID)
-	}
-	native, err := req.nativeHome(adapter.ID)
-	if err != nil {
-		return nil, err
-	}
-	links, _, err := req.effectivePassthrough(adapter, isolation)
-	if err != nil {
-		return nil, err
-	}
-	var codexStore string
-	for _, entry := range entries {
-		if entry.Strategy == envregistry.StrategyKeyringPreferred {
-			codexStore, err = req.codexCredentialStore(native)
-			if err != nil {
-				return nil, err
-			}
-			break
-		}
-	}
-	records := make([]envmarker.Passthrough, 0, len(entries))
-	for _, entry := range entries {
-		record := envmarker.Passthrough{
-			Isolation: isolation, Strategy: entry.Strategy, SourceRole: "native",
-			Backend: "file", BackendVersion: adapter.VerifiedRelease, Provenance: provenance,
-		}
-		switch entry.Strategy {
-		case envregistry.StrategyFileLink:
-			record.Path = entry.Path
-		case envregistry.StrategyKeyringPreferred:
-			if codexStore == "keyring" {
-				record.Backend = "ambient"
-			} else {
-				record.Path = entry.Path
-			}
-		case envregistry.StrategyAmbient:
-			record.Backend = "ambient"
-		case envregistry.StrategyPerHomeKeychain:
-			record.SourceRole = "managed"
-			record.Backend = "keychain"
-		default:
-			return nil, fmt.Errorf("%s: %s declares unsupported credential strategy %q", envregistry.DiagCredentialUnsupported, adapter.ID, entry.Strategy)
-		}
-		if record.Path != "" {
-			if _, linked := links[record.Path]; !linked {
-				return nil, fmt.Errorf("%s: %s credential path %s has no effective link", envregistry.DiagCredentialUnsupported, adapter.ID, record.Path)
-			}
-		}
-		records = append(records, record)
-	}
-	sort.Slice(records, func(i, j int) bool {
-		if records[i].Path != records[j].Path {
-			return records[i].Path < records[j].Path
-		}
-		return records[i].Strategy < records[j].Strategy
-	})
-	return records, nil
-}
-
 // codexCredentialStore resolves the operator's native codex credential
 // store: the top-level cli_auth_credentials_store selector when the
 // native config.toml carries one, else the platform default file — an
@@ -745,42 +615,6 @@ func codexCredentialStoreWith(native string, readRegularFile func(string) (state
 		return store, nil
 	default:
 		return "", fmt.Errorf("%s: codex native cli_auth_credentials_store %q is outside the verified file, keyring, and auto set", envregistry.DiagCredentialUnsupported, store)
-	}
-}
-
-// checkIsolatedCredentialStore gates codex_cli isolated on the native
-// effective store (§7.4): isolated is admitted under file storage only —
-// including an absent cli_auth_credentials_store key, which resolves to
-// effective file. Under keyring or auto storage the keyring identity is
-// assumed operator-global, so isolated is
-// environment_isolated_unsupported; a selector outside the verified set
-// fails closed with environment_credential_unsupported from the store
-// reader. Every other adapter × mode passes here: the static matrix in
-// the registry already decided it.
-func (req *ResolveRequest) checkIsolatedCredentialStore(adapter envregistry.Adapter, isolation string) error {
-	if err := req.admitCredentialStore(adapter); err != nil {
-		return err
-	}
-	if adapter.ID != envregistry.CodexCLI || isolation != envregistry.IsolationIsolated {
-		return nil
-	}
-	native, err := req.nativeHome(adapter.ID)
-	if err != nil {
-		return err
-	}
-	store, err := req.codexCredentialStore(native)
-	if err != nil {
-		return err
-	}
-	switch store {
-	case "file":
-		return nil
-	case "keyring":
-		return fmt.Errorf("%s: isolated is unsupported for codex_cli under native keyring storage: the keyring identity is operator-global, independent of CODEX_HOME", envregistry.DiagIsolatedUnsupported)
-	case "auto":
-		return fmt.Errorf("%s: isolated is unsupported for codex_cli under native auto storage: the tool uses the keyring when one is available, so an isolated home on a keyring host would authenticate through the operator-global keyring", envregistry.DiagIsolatedUnsupported)
-	default:
-		return fmt.Errorf("%s: codex native cli_auth_credentials_store %q is outside the verified file, keyring, and auto set", envregistry.DiagCredentialUnsupported, store)
 	}
 }
 
@@ -1495,7 +1329,7 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 		record.NativeMCPServers = append([]string{}, seeds.codexSeedRecord.NativeMCPServers...)
 		marker.CodexSeedRecord = &record
 	}
-	links, _, err := req.effectivePassthrough(plan.adapter, plan.isolation)
+	links, _, err := req.effectivePassthrough(plan.adapter)
 	if err != nil {
 		return nil, err
 	}
@@ -1520,7 +1354,7 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 	if err := removeStaleCredentialLinks(plan.adapter, plan.homeDir, native, prior, links, migrateCmd); err != nil {
 		return nil, err
 	}
-	passthrough, err := req.credentialRecords(plan.adapter, plan.isolation, provenance)
+	passthrough, err := req.credentialRecords(plan.adapter, provenance)
 	if err != nil {
 		return nil, err
 	}
@@ -2181,13 +2015,13 @@ func equalStrings(a, b []string) bool {
 // is a conflict/inspection diagnostic and stays stale, never absence
 // and never silence.
 func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, marker *envmarker.Marker) {
-	links, strategies, err := req.effectivePassthrough(plan.adapter, plan.isolation)
+	links, strategies, err := req.effectivePassthrough(plan.adapter)
 	if err != nil {
 		v.reasons = append(v.reasons, fmt.Sprintf("passthrough: %v", err))
 		return
 	}
 	if marker.Version != envmarker.VersionV1 {
-		expected, err := req.credentialRecords(plan.adapter, plan.isolation, "provisioned")
+		expected, err := req.credentialRecords(plan.adapter, "provisioned")
 		if err != nil {
 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough: %v", err))
 			return
@@ -2598,8 +2432,16 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := req.admitCredentialStore(adapter); err != nil {
+	selection, err := req.Machine.CredentialStoreFor(req.Profile, adapter.ID)
+	if err != nil {
 		return nil, err
+	}
+	// Preserve native stale-home reporting through verification. Explicit
+	// selectors must refuse at the activation boundary before provisioning.
+	if selection != envregistry.CredentialStoreNative {
+		if _, err := req.resolveCredentialPolicy(adapter); err != nil {
+			return nil, err
+		}
 	}
 	if req.PreserveLock {
 		if req.preserveLockHash == "" {
@@ -2828,7 +2670,7 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 			return nil, err
 		}
 	}
-	passthroughLinks, _, err := req.effectivePassthrough(adapter, plan.isolation)
+	passthroughLinks, _, err := req.effectivePassthrough(adapter)
 	if err != nil {
 		if provisioned || isCredentialRefusal(err) {
 			return nil, err

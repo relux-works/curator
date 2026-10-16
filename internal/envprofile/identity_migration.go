@@ -258,6 +258,9 @@ func prepareIdentityMigration(req *ResolveRequest, profiles []string, report *Mi
 				}
 			}
 			rr := *req
+			// This subrequest adopts the recorded home's isolation below;
+			// the caller's projection describes different policy inputs.
+			rr.credentialPolicy = nil
 			rr.Profile = profile
 			rr.EnvID = adapter.ID
 			rr.Policy.PrecedenceWinner = prior.Precedence.Winner
@@ -411,7 +414,7 @@ func prepareIdentityMigration(req *ResolveRequest, profiles []string, report *Mi
 			marker.Members = plan.marker.Members
 			marker.Surfaces = plan.marker.Surfaces
 			if prior.Version == envmarker.VersionV1 {
-				records, err := rr.credentialRecords(adapter, plan.isolation, "migrated")
+				records, err := rr.credentialRecords(adapter, "migrated")
 				if err != nil {
 					return nil, err
 				}
