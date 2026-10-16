@@ -1,0 +1,3 @@
+# Review logbook — M2 Muse qualification
+
+Revision 3 repairs both earlier evidence-attestation bypasses. Named regressions and eight narrowing mutants reproduced the expected refusals; full exact-build offline replay preserves the measured interactive exclusion failure on both root representations. Accepting this record does not qualify interactive exclusion or close the section 7.9 release gate. Full CI evidence is reused from an independently confirmed successful exact-tree hosted run; the reviewer duplicate was intentionally cancelled, not passed. No product or runtime changes were made by review.
