@@ -32,7 +32,7 @@ func normalizeEnvKnob(segments []string) []string {
 	case len(rewritten) >= 2 && (rewritten[0] == "forms" ||
 		rewritten[0] == "in_place_mode" || rewritten[0] == "scoped_current"):
 		rewritten[1] = envregistry.NormalizeEnvID(rewritten[1])
-	case len(rewritten) >= 3 && rewritten[0] == "isolation":
+	case len(rewritten) >= 3 && (rewritten[0] == "isolation" || rewritten[0] == "credential_store"):
 		rewritten[2] = envregistry.NormalizeEnvID(rewritten[2])
 	}
 	return rewritten
@@ -51,9 +51,9 @@ func normalizeEnvKnobValue(segments []string, value any) any {
 	case len(segments) == 1 && (segments[0] == "forms" ||
 		segments[0] == "in_place_mode" || segments[0] == "scoped_current"):
 		return normalizeEnvKeyedMap(value)
-	case len(segments) == 2 && segments[0] == "isolation":
+	case len(segments) == 2 && (segments[0] == "isolation" || segments[0] == "credential_store"):
 		return normalizeEnvKeyedMap(value)
-	case len(segments) == 1 && segments[0] == "isolation":
+	case len(segments) == 1 && (segments[0] == "isolation" || segments[0] == "credential_store"):
 		obj, ok := value.(map[string]any)
 		if !ok {
 			return value

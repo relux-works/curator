@@ -758,6 +758,9 @@ func codexCredentialStoreWith(native string, readRegularFile func(string) (state
 // reader. Every other adapter × mode passes here: the static matrix in
 // the registry already decided it.
 func (req *ResolveRequest) checkIsolatedCredentialStore(adapter envregistry.Adapter, isolation string) error {
+	if err := req.admitCredentialStore(adapter); err != nil {
+		return err
+	}
 	if adapter.ID != envregistry.CodexCLI || isolation != envregistry.IsolationIsolated {
 		return nil
 	}
@@ -2593,6 +2596,9 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 	}
 	source, lock, hash, err := loadResolveInputsWithOwner(req.Home, profile, req.readRegularFile, req.boundaryOwnerLookup)
 	if err != nil {
+		return nil, err
+	}
+	if err := req.admitCredentialStore(adapter); err != nil {
 		return nil, err
 	}
 	if req.PreserveLock {

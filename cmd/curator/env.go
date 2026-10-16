@@ -23,6 +23,7 @@ func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
 	machine.PassableEnvNames = cfg.Env.PassableEnvNames
 	machine.PassableEnvNamesSet = cfg.Env.PassableEnvNamesSet
 	machine.Isolation = cfg.Env.Isolation
+	machine.CredentialStore = cfg.Env.CredentialStore
 	machine.UserIsolation = cfg.UserIsolation
 	machine.IsolationLocked = cfg.Locked["environments.isolation"]
 	machine.IsolationLockSource = cfg.SystemConfigPath

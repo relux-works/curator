@@ -24,7 +24,8 @@ import (
 
 // SchemaVersion is the original machine config schema. SchemaVersion2 adds
 // the environments §12.1 object and registry bootstrap members, and
-// SchemaVersion3 versions state-hash waiver pins. All three stay readable.
+// SchemaVersion3 versions state-hash waiver pins. SchemaVersion5 adds the
+// machine credential-store selector; all older allocated versions stay readable.
 const SchemaVersion = 1
 
 // SchemaVersion2 is the machine config schema carrying the environments
@@ -33,6 +34,10 @@ const SchemaVersion2 = 2
 
 // SchemaVersion3 adds hash_version to state-hash secret material waivers.
 const SchemaVersion3 = 3
+
+// SchemaVersion5 is the allocated rc.7 machine credential-store carrier.
+// Version 4 is not allocated as a manager-config carrier.
+const SchemaVersion5 = 5
 
 // DefaultWorktreeAliasPattern extracts checkout aliases for git worktrees.
 const DefaultWorktreeAliasPattern = `[A-Z]+-[0-9]+`
@@ -162,7 +167,7 @@ type Execution struct {
 // Config is the effective machine configuration.
 type Config struct {
 	Path string
-	// Schema is the effective schema_version: 1, 2, or 3.
+	// Schema is the effective schema_version: 1, 2, 3, or 5.
 	Schema int
 	// Env is the effective environments §12.1 machine configuration with
 	// the §12.1 defaults applied. A schema-1 file carries every default.
@@ -554,7 +559,7 @@ func parseConfig(data map[string]any, path string, locked map[string]bool, machi
 	if !ok {
 		return nil, verr.New("schema_version", "must be an integer")
 	}
-	if schema != SchemaVersion && schema != SchemaVersion2 && schema != SchemaVersion3 {
+	if schema != SchemaVersion && schema != SchemaVersion2 && schema != SchemaVersion3 && schema != SchemaVersion5 {
 		return nil, verr.New("schema_version", "unsupported config schema_version %d; this config requires a newer tool", schema)
 	}
 	if schema == SchemaVersion && hasConfigKey(machineData, "security_posture") {

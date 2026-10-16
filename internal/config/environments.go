@@ -8,6 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/verr"
@@ -18,6 +19,7 @@ import (
 // name, value grammar, and default the §12.1 table declares. Parse applies
 // the defaults before use; a knob that is absent takes the table default.
 type Environments struct {
+	CredentialStore      map[string]map[string]envregistry.CredentialStoreSelection
 	CurrentProfile       *string
 	ScopedCurrent        map[string]string
 	Overlays             map[string][]OverlayDeclaration
@@ -223,6 +225,16 @@ func parseEnvironmentsVersion(raw any, schema int) (Environments, error) {
 			return Environments{}, verr.New("environments", "has unsupported field %q", key)
 		}
 	}
+	if rawStore, present := obj["credential_store"]; present {
+		if schema != SchemaVersion5 {
+			return Environments{}, verr.New("environments.credential_store", "requires manager-config schema_version 5")
+		}
+		stores, err := parseCredentialStore(rawStore)
+		if err != nil {
+			return Environments{}, err
+		}
+		env.CredentialStore = stores
+	}
 	if err := parseProfileNameOrNull(obj, "current_profile", &env.CurrentProfile); err != nil {
 		return Environments{}, err
 	}
@@ -393,6 +405,7 @@ func parseEnvironmentsVersion(raw any, schema int) (Environments, error) {
 // from, so a knob added to the reader without test coverage — or to the
 // test without the reader — fails instead of widening a gate silently.
 var EnvKnobNames = []string{
+	"credential_store",
 	"current_profile", "scoped_current", "overlays", "overlay_default_weight",
 	"overlays_allowed", "precedence", "forms", "system_prompt_files",
 	"targets", "isolation", "xdg_seed_allowlist", "passable_env_names",
@@ -955,7 +968,7 @@ func parseSecretWaivers(raw any, schema int) ([]SecretMaterialWaiver, error) {
 			return nil, verr.New(label, "must be an object")
 		}
 		for key := range entry {
-			if key != "pin" && key != "file" && key != "span" && key != "reason" && (schema != SchemaVersion3 || key != "hash_version") {
+			if key != "pin" && key != "file" && key != "span" && key != "reason" && ((schema != SchemaVersion3 && schema != SchemaVersion5) || key != "hash_version") {
 				return nil, verr.New(label, "has unsupported field %q", key)
 			}
 		}
@@ -965,7 +978,7 @@ func parseSecretWaivers(raw any, schema int) ([]SecretMaterialWaiver, error) {
 		}
 		hashVersion := 0
 		if rawVersion, present := entry["hash_version"]; present {
-			if schema != SchemaVersion3 {
+			if schema != SchemaVersion3 && schema != SchemaVersion5 {
 				return nil, verr.New(label+".hash_version", "requires manager-config schema_version 3")
 			}
 			value, ok := integerValue(rawVersion)
@@ -1147,6 +1160,17 @@ func (c *Config) EffectiveJSON() map[string]any {
 	env := map[string]any{}
 	if c != nil {
 		env = c.Env.render()
+		if c.Schema == SchemaVersion5 {
+			stores := map[string]any{}
+			for profile, entries := range c.Env.CredentialStore {
+				nested := map[string]any{}
+				for id, selection := range entries {
+					nested[id] = string(selection)
+				}
+				stores[profile] = nested
+			}
+			env["credential_store"] = stores
+		}
 	}
 	agents := DefaultAgents
 	mode := "auto"
@@ -1338,6 +1362,15 @@ func SplitEnvKnob(knob string) ([]string, error) {
 		return nil, verr.New("knob", "requires a section 12.1 knob name")
 	}
 	if envKnob(segments[0]) {
+		if segments[0] == "credential_store" && len(segments) >= 3 {
+			// The final operand is the environment; dots inside the profile
+			// belong to its identifier, not to additional object levels.
+			profile := strings.Join(segments[1:len(segments)-1], ".")
+			if !identifiers.Valid(profile) {
+				return nil, verr.New("knob", "credential_store profile %q %s", profile, identifiers.Rule)
+			}
+			segments = []string{segments[0], profile, segments[len(segments)-1]}
+		}
 		for _, segment := range segments[1:] {
 			if segment == "" {
 				return nil, verr.New("knob", "requires a section 12.1 knob name")

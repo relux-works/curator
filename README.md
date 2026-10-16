@@ -306,6 +306,8 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+For the rc.7 credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run TestCredentialStore`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
+
 Use `go build ./...` to compile and `go vet ./...` for static validation. Run `make lint` (golangci-lint) for repository lint; store local validation logs under `.temp/`. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate leaves the working tree and index unchanged. Go tests use temporary homes. Run `go test ./internal/envprofile/... ./cmd/curator/...` for focused environment validation. The preserve-lock vector family is pinned in `internal/envprofile/testdata/environments-repair-preserve-lock.json`; `CURATOR_PRESERVE_LOCK_VECTORS=/path/to/vectors.json go test ./internal/envprofile -run TestRepairPreserveLockVectors` runs its upstream counterpart.
 
 PlantUML renders the agent-login diagrams. Run `plantuml -tsvg -nometadata diagrams/plantuml/agent-login-*.puml` to write SVG files beside their sources. The [agent login reference](docs/agent-logins.md) embeds these outputs.

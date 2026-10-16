@@ -28,6 +28,46 @@ All three knobs sit under one `environments` object:
 
 `env status` reports the effective state of every knob below.
 
+## Machine credential-store selector (rc.7 configuration slice)
+
+The user-owned selector uses the allocated `manager-config-v5` envelope:
+
+```sh
+curator env config set credential_store.example.codex file
+curator env config show credential_store.example.codex_cli
+curator env config unset credential_store.example.codex
+```
+
+Values are exactly `native`, `file`, or `keychain`; absent entries mean
+`native`. Set promotes the machine file to schema 5; unset leaves that
+version in place. The persisted member is `environments.credential_store`,
+a profile map of canonical environment IDs (`claude_code`, `codex_cli`,
+`muse`, `pi`, `opencode`). CLI environment positions also accept `claude`
+and `codex`. Profile names are preserved, including internal dots: in
+`credential_store.team.prod.codex`, `team.prod` is the profile and `codex`
+is the environment operand. For whole-map edits a canonical
+environment key wins over its alias, matching existing CLI collision rules.
+Nulls, malformed maps, unknown IDs and unknown selector values refuse
+without changing the machine file. Closed manager-config versions 1–3
+reject this member; version 4 is not allocated. Schema 5 retains version-3
+state-hash waiver semantics.
+
+This knob cannot appear in a system configuration or be locked. Packages,
+overlays and repositories do not select it. Existing isolation locks remain
+independent. Editing the knob changes no managed home, marker, link,
+credential, or vendor `config.toml`; it does not migrate a login.
+
+This first implementation slice stores policy and threads its typed selection
+into resolve. Explicit file/keychain application remains disabled: Codex file
+returns `codex_settings_unsupported` pending supported-release
+login/app-server/refresh qualification and strict successor consumers;
+other unavailable mappings return `environment_credential_store_unsupported`.
+Invalid or unreadable native Codex configuration still refuses before this
+delivery diagnostic. No explicit selector silently falls back to native.
+Unset or explicit native retains the existing producer behavior described
+below. This slice does not enable the rc.7 Muse effective-file default,
+new fragment carriers, readiness, or login wrappers.
+
 ## Security posture
 
 Schema-2 machine configurations default to `security_posture: hardened`

@@ -575,6 +575,8 @@ func (a Adapter) AtOrAbovePinned(detected string) (bool, bool) {
 // manager-config schema 2. DefaultMachineConfig applies their defaults;
 // profile bytes never populate this struct.
 type MachineConfig struct {
+	// CredentialStore is user-owned; system isolation locks remain independent.
+	CredentialStore map[string]map[string]CredentialStoreSelection
 	// Forms maps env-id to the configured root-context form.
 	Forms map[string]string
 	// Isolation maps profile to env-id to the configured isolation mode.

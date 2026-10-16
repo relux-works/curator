@@ -563,6 +563,7 @@ func TestRequireCurrentProfileUnlockedCarriesNoRefusal(t *testing.T) {
 func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
 	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
 	payloads := map[string]string{
+		"credential_store":          `{"credential_store": {"a": {"codex_cli": "file"}}}`,
 		"current_profile":           `{"current_profile": "a"}`,
 		"scoped_current":            `{"scoped_current": {"codex_cli": "a"}}`,
 		"overlays":                  `{"overlays": {}}`,

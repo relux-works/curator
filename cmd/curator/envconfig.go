@@ -67,6 +67,14 @@ func (c cli) cmdEnvConfigShow(cfg *config.Config, args []string) int {
 		return exitUsage
 	}
 	segments = normalizeEnvKnob(segments)
+	if len(segments) == 3 && segments[0] == "credential_store" {
+		selection, err := machineFromConfig(cfg).CredentialStoreFor(segments[1], segments[2])
+		if err != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+			return exitUsage
+		}
+		return c.printJSON(selection)
+	}
 	value, present := lookupKnob(env, segments)
 	if !present {
 		value = nil
@@ -110,7 +118,14 @@ func (c cli) cmdEnvConfigSet(cfg *config.Config, args []string) int {
 		object["environments"] = env
 	}
 	setKnob(env, segments, value)
-	if schema, _ := object["schema_version"].(float64); schema == float64(config.SchemaVersion) {
+	if segments[0] == "credential_store" {
+		// Schema 1 defaults to permissive. Preserve that posture when a
+		// selector edit promotes its envelope, without changing other knobs.
+		if schema, _ := object["schema_version"].(float64); schema == float64(config.SchemaVersion) {
+			object["security_posture"] = config.SecurityPosturePermissive
+		}
+		object["schema_version"] = float64(config.SchemaVersion5)
+	} else if schema, _ := object["schema_version"].(float64); schema == float64(config.SchemaVersion) {
 		object["schema_version"] = float64(config.SchemaVersion2)
 	}
 	updated, err := config.WriteRaw(cfg.Path, object)
