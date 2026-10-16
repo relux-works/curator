@@ -1,0 +1,85 @@
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index 0842368c..019d0a7b 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -302,6 +302,11 @@ type homePlan struct {
+ // store entries it names, and machine configuration: no read of the home
+ // itself beyond the fallback and merge inputs the caller supplies.
+ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, adapter envregistry.Adapter, prior *envmarker.Marker) (*homePlan, error) {
++	return assembleHomeObserved(req, source, lock, hash, precedence, order, adapter, prior, req.detected(adapter))
++}
++
++// assembleHomeObserved uses an already observed release and never runs a tool.
++func assembleHomeObserved(req *ResolveRequest, source Source, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, adapter envregistry.Adapter, prior *envmarker.Marker, release string) (*homePlan, error) {
+ 	if err := validateProfilePathSources(req.Profile, source, req.Policy); err != nil {
+ 		return nil, err
+ 	}
+@@ -326,7 +331,7 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
+ 	// by verification) rather than blocks: the selection scheme stands on
+ 	// the bundle evidence, so resolution proceeds as at-or-above.
+ 	atAbove := true
+-	if ok, known := adapter.AtOrAbovePinned(req.detected(adapter)); known {
++	if ok, known := adapter.AtOrAbovePinned(release); known {
+ 		atAbove = ok
+ 	}
+ 	isolation, err := req.Machine.EffectiveIsolation(req.Profile, adapter, atAbove)
+@@ -1879,6 +1884,20 @@ const (
+ // here (fail-closed, no fragment); the same error under the repair lock
+ // surfaces as environment_repair_failed.
+ func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source, lock *contextlock.Lock, hash string) *verification {
++	verdict := verifyHomeObserved(req, adapter, source, lock, hash, req.detected(adapter))
++	verdict.checkToolRelease(req, adapter)
++	return verdict
++}
++
++// verifyHomeContent uses file and metadata evidence only. Neither assembly nor
++// currency verification may execute a vendor tool through this entry point.
++func verifyHomeContent(req *ResolveRequest, adapter envregistry.Adapter, source Source, lock *contextlock.Lock, hash string) *verification {
++	return verifyHomeObserved(req, adapter, source, lock, hash, "unknown")
++}
++
++// verifyHomeObserved is the shared content verification core. A release is
++// evidence supplied by its caller; unavailable metadata remains unknown.
++func verifyHomeObserved(req *ResolveRequest, adapter envregistry.Adapter, source Source, lock *contextlock.Lock, hash, release string) *verification {
+ 	verdict := &verification{surfaceState: map[string]string{}}
+ 	precedence := req.Policy.Precedence()
+ 	order, err := contextmaterialize.EmittedOrder(lock, precedence)
+@@ -1913,7 +1932,7 @@ func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source,
+ 		return verdict
+ 	}
+ 	verdict.servers = servers
+-	plan, err := assembleHome(req, source, lock, hash, precedence, order, adapter, marker)
++	plan, err := assembleHomeObserved(req, source, lock, hash, precedence, order, adapter, marker, release)
+ 	if err != nil {
+ 		verdict.reasons = append(verdict.reasons, fmt.Sprintf("expected home: %v", err))
+ 		return verdict
+@@ -1957,7 +1976,6 @@ func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source,
+ 	verdict.checkClaudeProject(req, plan)
+ 	verdict.checkXDG(req, plan, marker)
+ 	verdict.checkShadows(plan, marker)
+-	verdict.checkToolRelease(req, adapter)
+ 	verdict.current = len(verdict.reasons) == 0
+ 	return verdict
+ }
+@@ -2565,6 +2583,12 @@ func currentProfileFor(home, envID, named string) (string, error) {
+ // reasons); under repair the home is provisioned or repaired from the
+ // store under the mutation lock and the fragment is emitted.
+ func Resolve(req ResolveRequest) (*ResolveResult, error) {
++	return resolveVerified(req, verifyHome)
++}
++
++// resolveVerified shares source refusals while choosing the observation boundary.
++// Snapshot callers always pass verifyHomeContent and prohibit repair.
++func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistry.Adapter, Source, *contextlock.Lock, string) *verification) (*ResolveResult, error) {
+ 	if req.PreserveLock && !req.Repair {
+ 		return nil, fmt.Errorf("usage: env resolve --preserve-lock requires --repair")
+ 	}
+@@ -2672,7 +2696,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 	if req.Repair && !req.DryRun && repairWouldChangeLockHash(lock) {
+ 		return repairUnderLock(&req, adapter, source)
+ 	}
+-	verdict := verifyHome(&req, adapter, source, lock, hash)
++	verdict := verify(&req, adapter, source, lock, hash)
+ 	if verdict.markerReadFailed {
+ 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
+ 	}

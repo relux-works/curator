@@ -1,0 +1,1740 @@
+diff --git a/README.md b/README.md
+index 8981f5f1e8a5a450191bd3631019cea8d11884b0..e5c09fb1cf14f8d6c0f01720553f126f23190bc3 100644
+--- a/README.md
++++ b/README.md
+@@ -306,6 +306,8 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run
+ 
+ Use `go build ./...` to compile and `go vet ./...` for static validation. Run `make lint` (golangci-lint) for repository lint; store local validation logs under `.temp/`. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate leaves the working tree and index unchanged. Go tests use temporary homes. Run `go test ./internal/envprofile/... ./cmd/curator/...` for focused environment validation. The preserve-lock vector family is pinned in `internal/envprofile/testdata/environments-repair-preserve-lock.json`; `CURATOR_PRESERVE_LOCK_VECTORS=/path/to/vectors.json go test ./internal/envprofile -run TestRepairPreserveLockVectors` runs its upstream counterpart.
+ 
++`go test ./internal/envprofile -run TestMaterializeCapture` checks the internal non-recovering snapshot capture transaction. Closure construction and CLI publication are separate integration work. Capture and metadata-only status share content verification without invoking vendor release probes; unavailable release metadata is reported as unknown. The remote gate signs its temporary snapshot with the configured author and signing key and verifies that signature before publication.
++
+ Managed Muse homes materialize monolithic root context at `config/muse/AGENTS.md`; `referenced` is refused. A profile without a context declaration writes no root file. Curator resolves the environment fragment; its external Muse `exec` consumer must add `--no-foreign-personal-context` exactly when the root target is materialized (environments §10.2). The v3 fragment has no argv member. `env status` records the remaining discovery, `serve`, and workspace-precedence bounds.
+ 
+ ## Contributing
+diff --git a/internal/envprofile/lock.go b/internal/envprofile/lock.go
+index 93a80398dce5894630163385d57ea7be13b901c0..18d85387884ac39a011fd92d1fd583a665099758 100644
+--- a/internal/envprofile/lock.go
++++ b/internal/envprofile/lock.go
+@@ -4,6 +4,7 @@ import (
+ 	"context"
+ 	"crypto/rand"
+ 	"encoding/hex"
++	"errors"
+ 	"fmt"
+ 	"os"
+ 	"path/filepath"
+@@ -27,6 +28,38 @@ type operation struct {
+ 	engine *transaction.Engine
+ }
+ 
++// beginCaptureOperation never provisions a home or invokes recovery. The
++// observer validates every journal before reporting pending recovery.
++func beginCaptureOperation(home string, options ...transaction.Option) (*operation, error) {
++	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
++	defer cancel()
++	manager, err := managerlock.New(home)
++	if err != nil {
++		return nil, err
++	}
++	lock, err := manager.AcquireExistingHomeOnly(ctx)
++	if err != nil {
++		if errors.Is(err, os.ErrNotExist) {
++			return nil, fmt.Errorf("%s: source has no existing mutation lock", DiagHomeStale)
++		}
++		return nil, fmt.Errorf("%s: acquire capture lock: %w", DiagLockUnavailable, err)
++	}
++	op := &operation{lock: lock}
++	op.engine, err = transaction.New(home, options...)
++	if err == nil {
++		var pending bool
++		pending, err = op.engine.PendingRecovery(lock)
++		if err == nil && pending {
++			err = fmt.Errorf("%s: explicit recovery is required", DiagMaterializeRecoveryRequired)
++		}
++	}
++	if err != nil {
++		_ = op.close()
++		return nil, err
++	}
++	return op, nil
++}
++
+ // beginOperation takes the manager-home mutation lock and recovers
+ // incomplete profile journals before the caller mutates anything: every
+ // profile mutation runs serialized like any other manager-home
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index d99cceb823933999f4fc0fb0a7c5fcc94811ad78..6adfc35582bda27f3bf4ee6b5c6eba9709e57c74 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -302,6 +302,11 @@ type homePlan struct {
+ // store entries it names, and machine configuration: no read of the home
+ // itself beyond the fallback and merge inputs the caller supplies.
+ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, adapter envregistry.Adapter, prior *envmarker.Marker) (*homePlan, error) {
++	return assembleHomeObserved(req, source, lock, hash, precedence, order, adapter, prior, req.detected(adapter))
++}
++
++// assembleHomeObserved uses an already observed release and never runs a tool.
++func assembleHomeObserved(req *ResolveRequest, source Source, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, adapter envregistry.Adapter, prior *envmarker.Marker, release string) (*homePlan, error) {
+ 	if err := validateProfilePathSources(req.Profile, source, req.Policy); err != nil {
+ 		return nil, err
+ 	}
+@@ -326,7 +331,7 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
+ 	// by verification) rather than blocks: the selection scheme stands on
+ 	// the bundle evidence, so resolution proceeds as at-or-above.
+ 	atAbove := true
+-	if ok, known := adapter.AtOrAbovePinned(req.detected(adapter)); known {
++	if ok, known := adapter.AtOrAbovePinned(release); known {
+ 		atAbove = ok
+ 	}
+ 	isolation, err := req.Machine.EffectiveIsolation(req.Profile, adapter, atAbove)
+@@ -1876,6 +1881,20 @@ const (
+ // here (fail-closed, no fragment); the same error under the repair lock
+ // surfaces as environment_repair_failed.
+ func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source, lock *contextlock.Lock, hash string) *verification {
++	verdict := verifyHomeObserved(req, adapter, source, lock, hash, req.detected(adapter))
++	verdict.checkToolRelease(req, adapter)
++	return verdict
++}
++
++// verifyHomeContent uses file and metadata evidence only. Neither assembly nor
++// currency verification may execute a vendor tool through this entry point.
++func verifyHomeContent(req *ResolveRequest, adapter envregistry.Adapter, source Source, lock *contextlock.Lock, hash string) *verification {
++	return verifyHomeObserved(req, adapter, source, lock, hash, "unknown")
++}
++
++// verifyHomeObserved is the shared content verification core. A release is
++// evidence supplied by its caller; unavailable metadata remains unknown.
++func verifyHomeObserved(req *ResolveRequest, adapter envregistry.Adapter, source Source, lock *contextlock.Lock, hash, release string) *verification {
+ 	verdict := &verification{surfaceState: map[string]string{}}
+ 	precedence := req.Policy.Precedence()
+ 	order, err := contextmaterialize.EmittedOrder(lock, precedence)
+@@ -1910,7 +1929,7 @@ func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source,
+ 		return verdict
+ 	}
+ 	verdict.servers = servers
+-	plan, err := assembleHome(req, source, lock, hash, precedence, order, adapter, marker)
++	plan, err := assembleHomeObserved(req, source, lock, hash, precedence, order, adapter, marker, release)
+ 	if err != nil {
+ 		verdict.reasons = append(verdict.reasons, fmt.Sprintf("expected home: %v", err))
+ 		return verdict
+@@ -1954,7 +1973,6 @@ func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source,
+ 	verdict.checkClaudeProject(req, plan)
+ 	verdict.checkXDG(req, plan, marker)
+ 	verdict.checkShadows(plan, marker)
+-	verdict.checkToolRelease(req, adapter)
+ 	verdict.current = len(verdict.reasons) == 0
+ 	return verdict
+ }
+@@ -2562,6 +2580,12 @@ func currentProfileFor(home, envID, named string) (string, error) {
+ // reasons); under repair the home is provisioned or repaired from the
+ // store under the mutation lock and the fragment is emitted.
+ func Resolve(req ResolveRequest) (*ResolveResult, error) {
++	return resolveVerified(req, verifyHome)
++}
++
++// resolveVerified shares source refusals while choosing the observation boundary.
++// Snapshot callers always pass verifyHomeContent and prohibit repair.
++func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistry.Adapter, Source, *contextlock.Lock, string) *verification) (*ResolveResult, error) {
+ 	if req.PreserveLock && !req.Repair {
+ 		return nil, fmt.Errorf("usage: env resolve --preserve-lock requires --repair")
+ 	}
+@@ -2666,7 +2690,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 	if req.Repair && !req.DryRun && repairWouldChangeLockHash(lock) {
+ 		return repairUnderLock(&req, adapter, source)
+ 	}
+-	verdict := verifyHome(&req, adapter, source, lock, hash)
++	verdict := verify(&req, adapter, source, lock, hash)
+ 	if verdict.markerReadFailed {
+ 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
+ 	}
+diff --git a/internal/envprofile/materialize_capture.go b/internal/envprofile/materialize_capture.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..14e769db43916dc7b72bbaa4c9c51d95c9f85810
+--- /dev/null
++++ b/internal/envprofile/materialize_capture.go
+@@ -0,0 +1,236 @@
++package envprofile
++
++import (
++	"bytes"
++	"context"
++	"crypto/sha256"
++	"encoding/json"
++	"fmt"
++	"io"
++	"os"
++	"path/filepath"
++	"time"
++
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++// Snapshot capture diagnostics preserve the normative refusal names.
++const (
++	DiagMaterializeRecoveryRequired = "environment_materialize_recovery_required"
++	DiagMaterializeCaptureDrift     = "environment_materialize_capture_drift"
++	// These local capture bounds are not transport/archive limits.
++	captureMaxBytes   int64 = 64 << 20
++	captureMaxObjects       = 16384
++	captureTimeout          = 30 * time.Second
++)
++
++// MaterializeCaptureRequest separates fresh machine selection from content
++// capture. ReloadMachine must read effective policy anew on each call, without
++// provisioning or executing providers. Capture is the bounded, local closure
++// builder: it must use ReadObject for admitted objects, never publish/transport
++// or wait on services. SNAP-CLI supplies ReloadMachine; SNAP-CLOSURE owns the
++// inventory, protected source handles, relocation and secret admission.
++// Neither callback may retain or mutate the capture after it returns.
++type MaterializeCaptureRequest struct {
++	Resolve       ResolveRequest
++	ReloadMachine func() (envregistry.MachineConfig, Policy, error)
++	Capture       func(*MaterializeCapture) ([]byte, error)
++}
++
++// CapturedMaterialization is returned only after revalidation and lock release.
++// Publication and transport consume these private bytes outside this operation.
++type CapturedMaterialization struct {
++	Fragment []byte
++	Content  []byte
++}
++
++// MaterializeCapture binds the closure to the verified inputs under the lock.
++type MaterializeCapture struct {
++	Request  ResolveRequest
++	Fragment []byte
++	ctx      context.Context
++	objects  []captureObject
++	total    int64
++}
++
++type captureObject struct {
++	path   string
++	file   *os.File
++	info   os.FileInfo
++	digest [32]byte
++}
++
++// ReadObject takes ownership of a protected regular-file handle supplied by
++// the closure builder. The path must name that same object. It records identity,
++// bytes, size, mode and timestamps for final revalidation; it never follows a
++// source link or opens credential bytes to discover an inventory.
++func (c *MaterializeCapture) ReadObject(path string, file *os.File) ([]byte, error) {
++	if file == nil {
++		return nil, captureDrift()
++	}
++	if err := c.ctx.Err(); err != nil {
++		_ = file.Close()
++		return nil, captureDrift()
++	}
++	before, err := file.Stat()
++	if err != nil || !before.Mode().IsRegular() || before.Size() > captureMaxBytes-c.total || len(c.objects) >= captureMaxObjects {
++		_ = file.Close()
++		return nil, captureDrift()
++	}
++	named, err := os.Lstat(path)
++	if err != nil || !sameCaptureInfo(before, named) {
++		_ = file.Close()
++		return nil, captureDrift()
++	}
++	data, err := io.ReadAll(io.LimitReader(file, captureMaxBytes-c.total+1))
++	after, statErr := file.Stat()
++	if err != nil || statErr != nil || int64(len(data)) != before.Size() || !sameCaptureInfo(before, after) {
++		_ = file.Close()
++		return nil, captureDrift()
++	}
++	c.total += int64(len(data))
++	c.objects = append(c.objects, captureObject{path, file, before, sha256.Sum256(data)})
++	return data, nil
++}
++
++func sameCaptureInfo(a, b os.FileInfo) bool {
++	return os.SameFile(a, b) && a.Mode() == b.Mode() && a.Size() == b.Size() && a.ModTime().Equal(b.ModTime())
++}
++
++func captureDrift() error {
++	return fmt.Errorf("%s: source generation changed or could not be revalidated", DiagMaterializeCaptureDrift)
++}
++
++func (c *MaterializeCapture) close() {
++	for _, object := range c.objects {
++		_ = object.file.Close()
++	}
++}
++
++func (c *MaterializeCapture) revalidateObjects() error {
++	for _, object := range c.objects {
++		if c.ctx.Err() != nil {
++			return captureDrift()
++		}
++		info, err := os.Lstat(object.path)
++		if err != nil || !sameCaptureInfo(object.info, info) {
++			return captureDrift()
++		}
++		info, err = object.file.Stat()
++		if err != nil || !sameCaptureInfo(object.info, info) {
++			return captureDrift()
++		}
++		if _, err := object.file.Seek(0, io.SeekStart); err != nil {
++			return captureDrift()
++		}
++		h := sha256.New()
++		size, err := io.Copy(h, io.LimitReader(object.file, object.info.Size()+1))
++		if err != nil || size != object.info.Size() || !bytes.Equal(h.Sum(nil), object.digest[:]) {
++			return captureDrift()
++		}
++		info, err = object.file.Stat()
++		if err != nil || !sameCaptureInfo(object.info, info) {
++			return captureDrift()
++		}
++		info, err = os.Lstat(object.path)
++		if err != nil || !sameCaptureInfo(object.info, info) {
++			return captureDrift()
++		}
++	}
++	return nil
++}
++
++// CaptureMaterialize is the non-recovering capture entry point, shared by
++// export and manifest-only. It cannot publish a destination or repair a source.
++func CaptureMaterialize(req MaterializeCaptureRequest) (result *CapturedMaterialization, resultErr error) {
++	if req.ReloadMachine == nil || req.Capture == nil || req.Resolve.Repair || req.Resolve.DryRun || req.Resolve.PreserveLock {
++		return nil, fmt.Errorf("usage: capture requires read-only inputs and local capture callbacks")
++	}
++	op, err := beginCaptureOperation(req.Resolve.Home, req.Resolve.transactionOptions...)
++	if err != nil {
++		return nil, err
++	}
++	defer func() {
++		if err := op.close(); resultErr == nil {
++			resultErr = err
++			if err != nil {
++				result = nil
++			}
++		}
++	}()
++	ctx, cancel := context.WithTimeout(context.Background(), captureTimeout)
++	defer cancel()
++	selectInputs := func() (ResolveRequest, error) {
++		selected := req.Resolve
++		selected.Machine, selected.Policy, err = req.ReloadMachine()
++		if err != nil {
++			return ResolveRequest{}, err
++		}
++		selected.Profile, err = currentProfileFor(selected.Home, selected.EnvID, req.Resolve.Profile)
++		selected.Format = "json"
++		return selected, err
++	}
++	selected, err := selectInputs()
++	if err != nil {
++		return nil, err
++	}
++	verified, err := resolveVerified(selected, verifyHomeContent)
++	if err != nil {
++		return nil, err
++	}
++	c := &MaterializeCapture{Request: selected, Fragment: append([]byte(nil), verified.Document...), ctx: ctx}
++	defer c.close()
++	// Retain identity as well as bytes for the records that authorize capture.
++	for _, path := range []string{sourcePath(selected.Home, selected.Profile), lockPath(selected.Home, selected.Profile), filepath.Join(ManagedHomeDir(selected.Home, selected.Profile, selected.EnvID), envmarker.Name)} {
++		file, err := openReadNoFollow(path)
++		if err != nil {
++			return nil, captureDrift()
++		}
++		if _, err := c.ReadObject(path, file); err != nil {
++			return nil, err
++		}
++	}
++	// Copy policy values: a callback must not make a changed map compare equal by
++	// mutating the original machine object in place.
++	baseline, err := json.Marshal(struct {
++		Machine envregistry.MachineConfig
++		Policy  Policy
++	}{selected.Machine, selected.Policy})
++	if err != nil {
++		return nil, err
++	}
++	content, err := req.Capture(c)
++	if err != nil {
++		return nil, err
++	}
++	next, err := selectInputs()
++	if err != nil || next.Profile != selected.Profile {
++		return nil, captureDrift()
++	}
++	nextPolicy, err := json.Marshal(struct {
++		Machine envregistry.MachineConfig
++		Policy  Policy
++	}{next.Machine, next.Policy})
++	if err != nil || !bytes.Equal(baseline, nextPolicy) {
++		return nil, captureDrift()
++	}
++	if err := op.lock.AssertCurrent(); err != nil {
++		return nil, captureDrift()
++	}
++	pending, err := op.engine.PendingRecovery(op.lock)
++	if err != nil || pending {
++		return nil, captureDrift()
++	}
++	after, err := resolveVerified(next, verifyHomeContent)
++	if err != nil || !bytes.Equal(verified.Document, after.Document) {
++		return nil, captureDrift()
++	}
++	if err := c.revalidateObjects(); err != nil {
++		return nil, err
++	}
++	if ctx.Err() != nil {
++		return nil, captureDrift()
++	}
++	return &CapturedMaterialization{Fragment: append([]byte(nil), verified.Document...), Content: append([]byte(nil), content...)}, nil
++}
+diff --git a/internal/envprofile/materialize_capture_test.go b/internal/envprofile/materialize_capture_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..2831e9e55ecc8e7e8ac4269cba01fa09355bd97c
+--- /dev/null
++++ b/internal/envprofile/materialize_capture_test.go
+@@ -0,0 +1,838 @@
++package envprofile
++
++import (
++	"bytes"
++	"context"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/managerlock"
++	"github.com/relux-works/curator/internal/transaction"
++)
++
++func captureFixture(t *testing.T) (*managedFixture, MaterializeCaptureRequest) {
++	t.Helper()
++	fx := writeManagedFixture(t, "capture")
++	seedLiveNativeCredentials(t, fx)
++	provision := fx.request(envregistry.CodexCLI)
++	provision.Repair = true
++	if _, err := Resolve(provision); err != nil {
++		t.Fatal(err)
++	}
++	req := MaterializeCaptureRequest{Resolve: fx.request(envregistry.CodexCLI)}
++	req.Resolve.Detect = nil // Exercise the production no-probe boundary.
++	req.ReloadMachine = func() (envregistry.MachineConfig, Policy, error) {
++		return envregistry.DefaultMachineConfig(), Policy{}, nil
++	}
++	req.Capture = func(c *MaterializeCapture) ([]byte, error) {
++		path := filepath.Join(ManagedHomeDir(c.Request.Home, c.Request.Profile, c.Request.EnvID), "AGENTS.md")
++		path, err := filepath.EvalSymlinks(path) // Fixture follows the marker-authorized rendered link.
++		if err != nil {
++			return nil, err
++		}
++		file, err := openReadNoFollow(path)
++		if err != nil {
++			return nil, err
++		}
++		return c.ReadObject(path, file)
++	}
++	return fx, req
++}
++
++func requireCaptureRefusal(t *testing.T, req MaterializeCaptureRequest, code string) {
++	t.Helper()
++	got, err := CaptureMaterialize(req)
++	if err == nil || !strings.Contains(err.Error(), code) || got != nil {
++		t.Fatalf("capture = %v, %v; want %s and no output", got, err, code)
++	}
++}
++
++func captureTree(t *testing.T, root string) map[string]string {
++	t.Helper()
++	result := map[string]string{}
++	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
++		if err != nil {
++			return err
++		}
++		info, err := entry.Info()
++		if err != nil {
++			return err
++		}
++		value := info.Mode().String()
++		if info.Mode()&os.ModeSymlink != 0 {
++			target, err := os.Readlink(path)
++			if err != nil {
++				return err
++			}
++			value += target
++		} else if info.Mode().IsRegular() {
++			relative, err := filepath.Rel(root, path)
++			if err != nil {
++				return err
++			}
++			// Windows byte-range locks forbid a second reader. Normal lock
++			// bookkeeping is observed by name, mode and size, not source bytes.
++			if filepath.Dir(relative) == filepath.Join("state", "locks", "v1") && strings.HasSuffix(relative, ".lock") {
++				result[path] = fmt.Sprintf("%s size=%d", value, info.Size())
++				return nil
++			}
++			data, err := os.ReadFile(path)
++			if err != nil {
++				return err
++			}
++			value += string(data)
++		}
++		result[path] = value
++		return nil
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	return result
++}
++
++// Snapshot owned fixture roots without dereferencing credential links.
++func captureFixtureState(t *testing.T, fx *managedFixture) ([]byte, error) {
++	t.Helper()
++	state := map[string]map[string]string{"manager": captureTree(t, fx.home), "xdg": captureTree(t, fx.xdg), "launch": captureTree(t, fx.launch)}
++	for id, root := range fx.native {
++		state["native-"+id] = captureTree(t, root)
++	}
++	source, err := readSource(fx.home, fx.profile)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if source.Path != "" {
++		state["path-source"] = captureTree(t, source.Path)
++	}
++	return json.Marshal(state)
++}
++
++// CaptureMaterialize returns verified bytes and releases its real lock before
++// the caller can publish. Successful capture changes neither source nor target.
++func TestMaterializeCaptureCurrentAndRelease(t *testing.T) {
++	fx, req := captureFixture(t)
++	target := t.TempDir()
++	before, _ := captureFixtureState(t, fx)
++	targetBefore, _ := json.Marshal(captureTree(t, target))
++	got, err := CaptureMaterialize(req)
++	if err != nil || got == nil || len(got.Fragment) == 0 || !bytes.Contains(got.Content, []byte("hello")) {
++		t.Fatalf("capture = %v, %v", got, err)
++	}
++	after, _ := captureFixtureState(t, fx)
++	targetAfter, _ := json.Marshal(captureTree(t, target))
++	if !bytes.Equal(before, after) || !bytes.Equal(targetBefore, targetAfter) {
++		t.Fatal("observation mutated source or target")
++	}
++	manager, err := managerlock.New(fx.home)
++	if err != nil {
++		t.Fatal(err)
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
++	defer cancel()
++	lock, err := manager.AcquireExistingHomeOnly(ctx)
++	if err != nil {
++		t.Fatal("lock retained after capture:", err)
++	}
++	_ = lock.Close()
++}
++
++// Every durable journal phase refuses at the production capture entry point;
++// real recovery would produce observed transaction events and/or mutate records.
++func TestMaterializeCapturePendingDoesNotRecover(t *testing.T) {
++	for _, phase := range []transaction.Phase{transaction.PhasePrepared, transaction.PhaseCommitting, transaction.PhaseCleanup, transaction.PhaseRollingBack, transaction.PhaseRollbackCleanup} {
++		t.Run(string(phase), func(t *testing.T) {
++			fx, req := captureFixture(t)
++			if _, err := CaptureMaterialize(req); err != nil {
++				t.Fatal("positive control:", err)
++			}
++			manager, _ := managerlock.New(fx.home)
++			lock, err := manager.AcquireExistingHomeOnly(context.Background())
++			if err != nil {
++				t.Fatal(err)
++			}
++			engine, err := transaction.New(fx.home)
++			if err != nil {
++				t.Fatal(err)
++			}
++			live := filepath.Join(t.TempDir(), "live")
++			stage := filepath.Join(t.TempDir(), "stage")
++			if err := os.WriteFile(live, []byte("old"), 0600); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(stage, []byte("new"), 0600); err != nil {
++				t.Fatal(err)
++			}
++			digest, err := transaction.DigestTarget(transaction.KindBytes, live)
++			if err != nil {
++				t.Fatal(err)
++			}
++			journal, err := engine.Prepare(lock, transaction.Plan{TransactionID: "capture-pending", ProjectIdentity: "capture", Targets: []transaction.Target{{Class: "profile", Identifier: "live", LivePath: live, StagedSource: stage, PreimageDigest: digest}}})
++			if err != nil {
++				t.Fatal(err)
++			}
++			path := filepath.Join(fx.home, "state", "transactions", "v1", "capture-pending.json")
++			journal.Phase = phase
++			// encoding/json preserves the journal struct's canonical field order.
++			payload, err := json.Marshal(journal)
++			if err != nil {
++				t.Fatal(err)
++			}
++			payload = append(payload, '\n')
++			if err := os.WriteFile(path, payload, 0600); err != nil {
++				t.Fatal(err)
++			}
++			_ = lock.Close()
++			events := 0
++			recoveries := 0
++			req.Resolve.transactionOptions = []transaction.Option{transaction.WithHooks(transaction.Hooks{Observe: func(transaction.Event) { events++ }, ObserveRecovery: func() { recoveries++ }})}
++			before, _ := captureFixtureState(t, fx)
++			requireCaptureRefusal(t, req, DiagMaterializeRecoveryRequired)
++			after, _ := captureFixtureState(t, fx)
++			liveBytes, err := os.ReadFile(live)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if !bytes.Equal(before, after) || string(liveBytes) != "old" || events != 0 || recoveries != 0 {
++				t.Fatal("capture recovered or changed pending state")
++			}
++		})
++	}
++}
++
++// Corrupt and unreadable inventory remain errors, never clean-source fallback;
++// an absent inventory on a current source is the adjacent positive control.
++func TestMaterializeCaptureBadRecoveryEvidence(t *testing.T) {
++	for _, kind := range []string{"corrupt", "not-directory"} {
++		t.Run(kind, func(t *testing.T) {
++			fx, req := captureFixture(t)
++			if _, err := CaptureMaterialize(req); err != nil {
++				t.Fatal(err)
++			}
++			path := filepath.Join(fx.home, "state", "transactions", "v1")
++			if kind == "corrupt" {
++				if err := os.MkdirAll(path, 0700); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(filepath.Join(path, "broken.json"), []byte("{"), 0600); err != nil {
++					t.Fatal(err)
++				}
++			} else {
++				if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
++					t.Fatal(err)
++				}
++				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(path, []byte("blocked"), 0600); err != nil {
++					t.Fatal(err)
++				}
++			}
++			before, _ := captureFixtureState(t, fx)
++			code := "invalid transaction journal"
++			if kind == "not-directory" {
++				code = "manager_state_unreadable"
++			}
++			requireCaptureRefusal(t, req, code)
++			after, _ := captureFixtureState(t, fx)
++			if !bytes.Equal(before, after) {
++				t.Fatal("failed observation changed evidence")
++			}
++		})
++	}
++}
++
++// A busy real lock times out without invoking selection or capture. Release
++// permits a fresh scoped selection and machine policy rather than stale inputs.
++func TestMaterializeCaptureWaitReselectsAndTimeout(t *testing.T) {
++	fx, req := captureFixture(t)
++	manager, _ := managerlock.New(fx.home)
++	lock, err := manager.AcquireExistingHomeOnly(context.Background())
++	if err != nil {
++		t.Fatal(err)
++	}
++	old := lockTimeout
++	lockTimeout = 30 * time.Millisecond
++	t.Cleanup(func() { lockTimeout = old })
++	calls := 0
++	req.ReloadMachine = func() (envregistry.MachineConfig, Policy, error) {
++		calls++
++		return envregistry.DefaultMachineConfig(), Policy{}, nil
++	}
++	requireCaptureRefusal(t, req, DiagLockUnavailable)
++	if calls != 0 {
++		t.Fatal("selected policy before acquiring lock")
++	}
++	_ = lock.Close()
++	if _, err := CaptureMaterialize(req); err != nil {
++		t.Fatal("released control:", err)
++	}
++	// While the waiter is blocked, a cooperating writer updates current selection.
++	req.Resolve.Profile = ""
++	if err := SetCurrent(fx.home, "missing-before-wait"); err != nil {
++		t.Fatal(err)
++	}
++	req.Resolve.Machine.Permissions = map[string]string{"capture": "yolo"}
++	lock, err = manager.AcquireExistingHomeOnly(context.Background())
++	if err != nil {
++		t.Fatal(err)
++	}
++	lockTimeout = time.Second
++	result := make(chan error, 1)
++	req.Capture = func(c *MaterializeCapture) ([]byte, error) {
++		if c.Request.Profile != "capture" || c.Request.Machine.Permissions["capture"] != "native" {
++			return nil, errors.New("stale selection")
++		}
++		return []byte("new generation"), nil
++	}
++	policyCalls := make(chan struct{}, 1)
++	req.ReloadMachine = func() (envregistry.MachineConfig, Policy, error) {
++		select {
++		case policyCalls <- struct{}{}:
++		default:
++		}
++		m := envregistry.DefaultMachineConfig()
++		m.Permissions = map[string]string{"capture": "native"}
++		return m, Policy{}, nil
++	}
++	go func() { _, err := CaptureMaterialize(req); result <- err }()
++	select {
++	case <-policyCalls:
++		t.Fatal("machine selected while lock held")
++	case <-time.After(30 * time.Millisecond):
++	}
++	if err := SetCurrent(fx.home, "capture"); err != nil {
++		t.Fatal(err)
++	}
++	_ = lock.Close()
++	if err := <-result; err != nil {
++		t.Fatal(err)
++	}
++}
++
++// Same-fragment ABA/replacement, mode/byte changes, failed reads and policy
++// changes must abort private output; the unmodified callback is the control.
++func TestMaterializeCaptureSameFragmentDrift(t *testing.T) {
++	for _, mutation := range []string{"aba", "mode", "bytes", "missing", "closed-handle", "policy", "composition-policy", "store-bytes"} {
++		t.Run(mutation, func(t *testing.T) {
++			fx, req := captureFixture(t)
++			if _, err := CaptureMaterialize(req); err != nil {
++				t.Fatal("stable control:", err)
++			}
++			var expected []byte
++			original := req.Capture
++			machine := envregistry.DefaultMachineConfig()
++			policy := Policy{}
++			req.ReloadMachine = func() (envregistry.MachineConfig, Policy, error) { return machine, policy, nil }
++			req.Capture = func(c *MaterializeCapture) ([]byte, error) {
++				content, err := original(c)
++				if err != nil {
++					return nil, err
++				}
++				path := c.objects[len(c.objects)-1].path
++				switch mutation {
++				case "aba":
++					info, err := os.Stat(path)
++					if err != nil {
++						return nil, err
++					}
++					replacement := path + ".replacement"
++					if err := os.WriteFile(replacement, content, info.Mode()); err != nil {
++						return nil, err
++					}
++					if err := os.Chtimes(replacement, info.ModTime(), info.ModTime()); err != nil {
++						return nil, err
++					}
++					err = replaceCapturedFixture(t, replacement, path)
++					if err != nil {
++						return nil, err
++					}
++					verified, err := resolveVerified(c.Request, verifyHomeContent)
++					if err != nil || !bytes.Equal(verified.Document, c.Fragment) {
++						return nil, fmt.Errorf("ABA witness changed the fragment: %v", err)
++					}
++
++				case "mode":
++					if runtime.GOOS == "windows" {
++						t.Skip("Windows does not expose portable executable permission bits")
++					}
++					info, err := os.Stat(path)
++					if err != nil {
++						return nil, err
++					}
++					if err := os.Chmod(path, info.Mode()^0100); err != nil {
++						return nil, err
++					}
++				case "bytes":
++					if err := os.WriteFile(path, []byte("changed"), 0600); err != nil {
++						return nil, err
++					}
++				case "missing":
++					if err := os.Remove(path); err != nil {
++						return nil, err
++					}
++				case "closed-handle":
++					_ = c.objects[len(c.objects)-1].file.Close()
++				case "policy":
++					machine.Permissions = map[string]string{"capture": "yolo"}
++				case "composition-policy":
++					policy.OverlaysAllowed = true
++				case "store-bytes":
++					_, lock, _, err := loadResolveInputs(fx.home, fx.profile)
++					if err != nil {
++						return nil, err
++					}
++					for _, member := range lock.Members {
++						if member.Kind == "skill" {
++							root := newGitManager(fx.home).entryPath(fx.home, resolvedOf(member))
++							p := filepath.Join(root, "SKILL.md")
++							if err := os.Chmod(p, 0600); err != nil {
++								return nil, err
++							}
++							if err := os.WriteFile(p, []byte("changed"), 0600); err != nil {
++								return nil, err
++							}
++						}
++					}
++				}
++				expected, _ = captureFixtureState(t, fx)
++				return content, nil
++			}
++			requireCaptureRefusal(t, req, DiagMaterializeCaptureDrift)
++			after, _ := captureFixtureState(t, fx)
++			if !bytes.Equal(expected, after) {
++				t.Fatal("capture changed the planted source or credential state")
++			}
++		})
++	}
++}
++
++// Real executable discovery is planted on PATH; capture and metadata status
++// must succeed without executing it even when Detect is nil, in both consumers.
++func TestMaterializeCaptureAndStatusNeverProbeVendor(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("shell sentinel is Unix-only")
++	}
++	fx, req := captureFixture(t)
++	bin := t.TempDir()
++	sentinel := filepath.Join(t.TempDir(), "ran")
++	for _, tool := range []string{"codex", "claude", "muse", "pi", "opencode"} {
++		if err := os.WriteFile(filepath.Join(bin, tool), []byte("#!/bin/sh\nprintf ran > '"+sentinel+"'\nprintf '1.2.3\\n'\n"), 0700); err != nil {
++			t.Fatal(err)
++		}
++	}
++	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
++	for _, form := range []string{"export", "manifest-only"} {
++		t.Run(form, func(t *testing.T) {
++			if _, err := CaptureMaterialize(req); err != nil {
++				t.Fatal(err)
++			}
++		})
++	}
++	status, err := StatusOf(StatusRequest{Home: fx.home, Machine: req.Resolve.Machine, NativeHomeOf: req.Resolve.NativeHomeOf, OperatorXDG: fx.xdg, LaunchDir: fx.launch})
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, adapter := range status.Adapters {
++		if adapter.Detected != "unknown" {
++			t.Fatalf("unsafe release observation: %v", adapter)
++		}
++	}
++	if _, err := os.Stat(sentinel); !os.IsNotExist(err) {
++		t.Fatal("vendor executable ran")
++	}
++}
++
++// Missing source homes and missing manager state cannot be provisioned by an
++// observation; an already provisioned source succeeds in the neighboring test.
++func TestMaterializeCaptureDoesNotProvision(t *testing.T) {
++	for _, exists := range []bool{false, true} {
++		t.Run(map[bool]string{false: "absent", true: "empty"}[exists], func(t *testing.T) {
++			root := t.TempDir()
++			home := filepath.Join(root, "manager")
++			if exists {
++				if err := os.Mkdir(home, 0700); err != nil {
++					t.Fatal(err)
++				}
++			}
++			req := MaterializeCaptureRequest{Resolve: ResolveRequest{Home: home, EnvID: envregistry.CodexCLI}, ReloadMachine: func() (envregistry.MachineConfig, Policy, error) {
++				t.Fatal("selected unprovisioned source")
++				return envregistry.MachineConfig{}, Policy{}, nil
++			}, Capture: func(*MaterializeCapture) ([]byte, error) { t.Fatal("captured absent source"); return nil, nil }}
++			before, _ := json.Marshal(captureTree(t, root))
++			requireCaptureRefusal(t, req, DiagHomeStale)
++			after, _ := json.Marshal(captureTree(t, root))
++			if !bytes.Equal(before, after) {
++				t.Fatal("created source state")
++			}
++		})
++	}
++}
++
++// An object exceeding the capture byte quota refuses before reading its bytes.
++// This local limit is not an archive-size qualification.
++func TestMaterializeCaptureObjectBounds(t *testing.T) {
++	_, req := captureFixture(t)
++	req.Capture = func(c *MaterializeCapture) ([]byte, error) {
++		path := filepath.Join(t.TempDir(), "large")
++		f, err := os.Create(path)
++		if err != nil {
++			return nil, err
++		}
++		if err := f.Truncate(captureMaxBytes + 1); err != nil {
++			return nil, err
++		}
++		return c.ReadObject(path, f)
++	}
++	requireCaptureRefusal(t, req, DiagMaterializeCaptureDrift)
++}
++
++// Real profile use and scope sync wait behind capture, then complete against
++// isolated native homes. Multi-file output remains one verified generation.
++func TestMaterializeCaptureSerializesProfileWriters(t *testing.T) {
++	for _, writer := range []string{"use", "sync"} {
++		t.Run(writer, func(t *testing.T) {
++			fx, req := captureFixture(t)
++			t.Setenv("CLAUDE_CONFIG_DIR", fx.native[envregistry.ClaudeCode])
++			t.Setenv("CODEX_HOME", fx.native[envregistry.CodexCLI])
++			t.Setenv("XDG_CONFIG_HOME", fx.xdg)
++			t.Setenv("PI_CODING_AGENT_DIR", fx.native[envregistry.Pi])
++			completed := make(chan error, 1)
++			original := req.Capture
++			req.Capture = func(c *MaterializeCapture) ([]byte, error) {
++				first, err := original(c)
++				if err != nil {
++					return nil, err
++				}
++				path, err := filepath.EvalSymlinks(filepath.Join(ManagedHomeDir(fx.home, fx.profile, req.Resolve.EnvID), ".agent-context", "system-prompt.md"))
++				if err != nil {
++					return nil, err
++				}
++				file, err := openReadNoFollow(path)
++				if err != nil {
++					return nil, err
++				}
++				second, err := c.ReadObject(path, file)
++				if err != nil {
++					return nil, err
++				}
++				go func() {
++					var err error
++					if writer == "use" {
++						_, err = UseWithPolicy(fx.home, fx.profile, envregistry.CodexCLI, "", false, Policy{})
++					} else {
++						_, err = SyncWithPolicy(fx.home, Policy{})
++					}
++					completed <- err
++				}()
++				select {
++				case err := <-completed:
++					return nil, errors.New("writer escaped capture lock: " + fmt.Sprint(err))
++				case <-time.After(30 * time.Millisecond):
++				}
++				return append(first, second...), nil
++			}
++			captured, err := CaptureMaterialize(req)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if !bytes.Contains(captured.Content, []byte("hello")) || !bytes.Contains(captured.Content, []byte("Be terse.")) {
++				t.Fatal("torn content")
++			}
++			if err := <-completed; err != nil {
++				t.Fatal("writer after capture:", err)
++			}
++		})
++	}
++}
++
++// A repair that sees an external multi-file change cannot race its writes into
++// capture: capture refuses drift, releases the lock, then real repair restores
++// a current source which the next invocation can capture.
++func TestMaterializeCaptureConcurrentRepair(t *testing.T) {
++	fx, req := captureFixture(t)
++	original := req.Capture
++	repair := fx.request(envregistry.CodexCLI)
++	repair.Repair = true
++	waiting := make(chan struct{})
++	repair.beforeRepairLock = func() { close(waiting) }
++	completed := make(chan error, 1)
++	req.Capture = func(c *MaterializeCapture) ([]byte, error) {
++		first, err := original(c)
++		if err != nil {
++			return nil, err
++		}
++		if err := os.WriteFile(c.objects[len(c.objects)-1].path, []byte("external generation"), 0600); err != nil {
++			return nil, err
++		}
++		go func() { _, err := Resolve(repair); completed <- err }()
++		select {
++		case <-waiting:
++		case <-time.After(2 * time.Second):
++			return nil, errors.New("repair did not reach mutation lock")
++		}
++		select {
++		case err := <-completed:
++			return nil, errors.New("repair escaped capture lock: " + fmt.Sprint(err))
++		case <-time.After(30 * time.Millisecond):
++		}
++		return first, nil
++	}
++	requireCaptureRefusal(t, req, DiagMaterializeCaptureDrift)
++	if err := <-completed; err != nil {
++		t.Fatal("repair after refusal:", err)
++	}
++	req.Capture = original
++	if _, err := CaptureMaterialize(req); err != nil {
++		t.Fatal("repaired positive control:", err)
++	}
++}
++
++// Captured store objects keep their byte, executable-mode and file identities
++// even when the profile fragment is unchanged. Stable objects are admitted.
++func TestMaterializeCaptureStoreObjectIdentity(t *testing.T) {
++	for _, change := range []string{"stable", "identity", "mode", "bytes"} {
++		t.Run(change, func(t *testing.T) {
++			fx, req := captureFixture(t)
++			_, lock, _, err := loadResolveInputs(fx.home, fx.profile)
++			if err != nil {
++				t.Fatal(err)
++			}
++			var path string
++			for _, member := range lock.Members {
++				if member.Kind == "skill" {
++					path = filepath.Join(newGitManager(fx.home).entryPath(fx.home, resolvedOf(member)), "SKILL.md")
++				}
++			}
++			var expected []byte
++			req.Capture = func(c *MaterializeCapture) ([]byte, error) {
++				f, err := openReadNoFollow(path)
++				if err != nil {
++					return nil, err
++				}
++				data, err := c.ReadObject(path, f)
++				if err != nil {
++					return nil, err
++				}
++				info, err := os.Stat(path)
++				if err != nil {
++					return nil, err
++				}
++				switch change {
++				case "identity":
++					replacement := path + ".replacement"
++					if err := os.WriteFile(replacement, data, info.Mode()); err != nil {
++						return nil, err
++					}
++					if err := os.Chtimes(replacement, info.ModTime(), info.ModTime()); err != nil {
++						return nil, err
++					}
++					if err := replaceCapturedFixture(t, replacement, path); err != nil {
++						return nil, err
++					}
++				case "mode":
++					if runtime.GOOS == "windows" {
++						t.Skip("Windows does not expose portable executable permission bits")
++					}
++					if err := os.Chmod(path, info.Mode()^0100); err != nil {
++						return nil, err
++					}
++				case "bytes":
++					if err := os.Chmod(path, 0600); err != nil {
++						return nil, err
++					}
++					if err := os.WriteFile(path, []byte("different"), 0600); err != nil {
++						return nil, err
++					}
++				}
++				expected, _ = captureFixtureState(t, fx)
++				return data, nil
++			}
++			if change == "stable" {
++				if _, err := CaptureMaterialize(req); err != nil {
++					t.Fatal(err)
++				}
++			} else {
++				requireCaptureRefusal(t, req, DiagMaterializeCaptureDrift)
++				after, _ := captureFixtureState(t, fx)
++				if !bytes.Equal(expected, after) {
++					t.Fatal("capture changed the planted source or credential state")
++				}
++			}
++		})
++	}
++}
++
++// Failed final reads and same-byte replacements of authorizing records cannot
++// be hidden by a valid, equal fragment. Callback mutations are the only writes.
++func TestMaterializeCaptureAuthorizingDrift(t *testing.T) {
++	for _, change := range []string{"policy-read", "selection", "marker-identity", "lock-identity"} {
++		t.Run(change, func(t *testing.T) {
++			fx, req := captureFixture(t)
++			if _, err := CaptureMaterialize(req); err != nil {
++				t.Fatal(err)
++			}
++			original := req.Capture
++			if change == "selection" {
++				req.Resolve.Profile = ""
++			}
++			calls := 0
++			req.ReloadMachine = func() (envregistry.MachineConfig, Policy, error) {
++				calls++
++				if change == "policy-read" && calls == 2 {
++					return envregistry.MachineConfig{}, Policy{}, os.ErrPermission
++				}
++				return envregistry.DefaultMachineConfig(), Policy{}, nil
++			}
++			var expected []byte
++			req.Capture = func(c *MaterializeCapture) ([]byte, error) {
++				data, err := original(c)
++				if err != nil {
++					return nil, err
++				}
++				switch change {
++				case "selection":
++					if err := SetCurrent(fx.home, "replacement-current"); err != nil {
++						return nil, err
++					}
++				case "marker-identity", "lock-identity":
++					var path string
++					if change == "marker-identity" {
++						path = c.objects[2].path
++					} else {
++						paths, err := filepath.Glob(filepath.Join(fx.home, "state", "locks", "v1", "*.lock"))
++						if err != nil || len(paths) != 1 {
++							return nil, fmt.Errorf("lock fixture: %v %v", paths, err)
++						}
++						path = paths[0]
++					}
++					info, err := os.Stat(path)
++					if err != nil {
++						return nil, err
++					}
++					var payload []byte
++					if change == "marker-identity" {
++						payload, err = os.ReadFile(path)
++						if err != nil {
++							return nil, err
++						}
++					} else if info.Size() != 0 {
++						return nil, errors.New("lock fixture is not empty")
++					}
++					replacement := path + ".new"
++					if err := os.WriteFile(replacement, payload, info.Mode()); err != nil {
++						return nil, err
++					}
++					if err := os.Chtimes(replacement, info.ModTime(), info.ModTime()); err != nil {
++						return nil, err
++					}
++					if err := replaceCapturedFixture(t, replacement, path); err != nil {
++						return nil, err
++					}
++				}
++				expected, _ = captureFixtureState(t, fx)
++				return data, nil
++			}
++			requireCaptureRefusal(t, req, DiagMaterializeCaptureDrift)
++			after, _ := captureFixtureState(t, fx)
++			if !bytes.Equal(expected, after) {
++				t.Fatal("refusal mutated source")
++			}
++		})
++	}
++}
++
++// A denied journal read is unreadable state, never absence or a recovery
++// request. A current source without a journal is the adjacent positive control.
++func TestMaterializeCaptureUnreadableJournal(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("POSIX mode-bit unreadability")
++	}
++	fx, req := captureFixture(t)
++	if _, err := CaptureMaterialize(req); err != nil {
++		t.Fatal(err)
++	}
++	root := filepath.Join(fx.home, "state", "transactions", "v1")
++	if err := os.MkdirAll(root, 0700); err != nil {
++		t.Fatal(err)
++	}
++	path := filepath.Join(root, "denied.json")
++	if err := os.WriteFile(path, []byte("{}"), 0000); err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = os.Chmod(path, 0600) })
++	if file, err := os.Open(path); err == nil {
++		_ = file.Close()
++		t.Skip("this environment can read a mode-000 file")
++	}
++	requireCaptureRefusal(t, req, "manager_state_unreadable")
++	info, err := os.Lstat(path)
++	if err != nil || info.Mode().Perm() != 0 {
++		t.Fatal("refusal changed journal permissions or removed it")
++	}
++}
++
++// A deterministic external writer changes both content objects between reads.
++// The private old/new mixture must never escape as successful capture, and
++// refusal preserves the externally planted generation without repairing it.
++func TestMaterializeCaptureExternalTornGeneration(t *testing.T) {
++	fx, req := captureFixture(t)
++	firstReader := req.Capture
++	secondPath, err := filepath.EvalSymlinks(filepath.Join(ManagedHomeDir(fx.home, fx.profile, req.Resolve.EnvID), ".agent-context", "system-prompt.md"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	mutate := false
++	var expected []byte
++	req.Capture = func(c *MaterializeCapture) ([]byte, error) {
++		first, err := firstReader(c)
++		if err != nil {
++			return nil, err
++		}
++		if mutate {
++			changed := make(chan error, 1)
++			firstPath := c.objects[len(c.objects)-1].path
++			go func() {
++				if err := os.WriteFile(firstPath, []byte("new root generation"), 0600); err != nil {
++					changed <- err
++					return
++				}
++				changed <- os.WriteFile(secondPath, []byte("new system generation"), 0600)
++			}()
++			if err := <-changed; err != nil {
++				return nil, err
++			}
++		}
++		file, err := openReadNoFollow(secondPath)
++		if err != nil {
++			return nil, err
++		}
++		second, err := c.ReadObject(secondPath, file)
++		if err != nil {
++			return nil, err
++		}
++		expected, _ = captureFixtureState(t, fx)
++		return append(first, second...), nil
++	}
++	captured, err := CaptureMaterialize(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !bytes.Contains(captured.Content, []byte("hello")) || !bytes.Contains(captured.Content, []byte("Be terse.")) {
++		t.Fatal("stable control missed a content object")
++	}
++	mutate = true
++	requireCaptureRefusal(t, req, DiagMaterializeCaptureDrift)
++	after, _ := captureFixtureState(t, fx)
++	if !bytes.Equal(expected, after) {
++		t.Fatal("refusal repaired or mutated the external generation")
++	}
++}
+diff --git a/internal/envprofile/materialize_fixture_unix_test.go b/internal/envprofile/materialize_fixture_unix_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..06e0179107e966ae06f8a7aa81217427bcb682fb
+--- /dev/null
++++ b/internal/envprofile/materialize_fixture_unix_test.go
+@@ -0,0 +1,13 @@
++//go:build !windows
++
++package envprofile
++
++import (
++	"os"
++	"testing"
++)
++
++func replaceCapturedFixture(t *testing.T, source, target string) error {
++	t.Helper()
++	return os.Rename(source, target)
++}
+diff --git a/internal/envprofile/materialize_fixture_windows_test.go b/internal/envprofile/materialize_fixture_windows_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..812d293d8fecfdd0740aa9c8eccf7f0411d27b12
+--- /dev/null
++++ b/internal/envprofile/materialize_fixture_windows_test.go
+@@ -0,0 +1,54 @@
++//go:build windows
++
++package envprofile
++
++import (
++	"errors"
++	"testing"
++	"unsafe"
++
++	"golang.org/x/sys/windows"
++)
++
++// MoveFileEx cannot plant replacement of an open target. FileRenameInformationEx
++// with POSIX semantics retains existing handles while replacing the named file.
++// This exercises identity drift without changing production file operations.
++func replaceCapturedFixture(t *testing.T, source, target string) error {
++	t.Helper()
++	name, err := windows.UTF16PtrFromString(source)
++	if err != nil {
++		return err
++	}
++	handle, err := windows.CreateFile(name, windows.DELETE|windows.FILE_WRITE_ATTRIBUTES,
++		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
++		nil, windows.OPEN_EXISTING, windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
++	if err != nil {
++		return err
++	}
++	defer windows.CloseHandle(handle)
++	nameUTF16, err := windows.UTF16FromString(`\??\` + target)
++	if err != nil {
++		return err
++	}
++	type renameInformation struct {
++		Flags          uint32
++		RootDirectory  windows.Handle
++		FileNameLength uint32
++		FileName       [1]uint16
++	}
++	var layout renameInformation
++	nameLength := len(nameUTF16) - 1
++	buffer := make([]byte, int(unsafe.Offsetof(layout.FileName))+nameLength*2)
++	info := (*renameInformation)(unsafe.Pointer(&buffer[0]))
++	info.Flags = windows.FILE_RENAME_REPLACE_IF_EXISTS | windows.FILE_RENAME_POSIX_SEMANTICS | windows.FILE_RENAME_IGNORE_READONLY_ATTRIBUTE
++	info.FileNameLength = uint32(nameLength * 2)
++	copy(unsafe.Slice(&info.FileName[0], nameLength), nameUTF16[:nameLength])
++	var iosb windows.IO_STATUS_BLOCK
++	const fileRenameInformationEx = 65
++	err = windows.NtSetInformationFile(handle, &iosb, &buffer[0], uint32(len(buffer)), fileRenameInformationEx)
++	var status windows.NTStatus
++	if errors.As(err, &status) && status.Errno() == windows.ERROR_SHARING_VIOLATION {
++		t.Skip("this host cannot create replacement of an open capture object: sharing violation")
++	}
++	return err
++}
+diff --git a/internal/envprofile/status.go b/internal/envprofile/status.go
+index f6419f36382ab9652128b22a37ba7856fcf343ff..e22b8b402e96db3e48afdcc64b50f1ae0fa1fe58 100644
+--- a/internal/envprofile/status.go
++++ b/internal/envprofile/status.go
+@@ -691,7 +691,7 @@ func homeState(req StatusRequest, profile string, adapter envregistry.Adapter) H
+ 	} else {
+ 		state.BackupsKnown = true
+ 	}
+-	verdict := verifyHome(&resolve, adapter, source, lock, hash)
++	verdict := verifyHomeContent(&resolve, adapter, source, lock, hash)
+ 	state.markerState = verdict.markerState
+ 	state.Warnings = append(state.Warnings, verdict.warnings...)
+ 	if verdict.marker == nil {
+@@ -1135,16 +1135,14 @@ func readLockError(err error) string {
+ }
+ 
+ // adapterStates reports the recorded and detected tool release per
+-// adapter (§7.9). Detection is read-only; an unreadable tool reports
+-// unknown, never matching.
++// adapter (§7.9). Status does not execute a vendor: unavailable metadata
++// reports unknown, never matching. Detect may supply an existing observation.
+ func adapterStates(req StatusRequest) []AdapterState {
+ 	var out []AdapterState
+ 	for _, adapter := range envregistry.Registry {
+ 		var detected string
+ 		if req.Detect != nil {
+ 			detected = req.Detect(adapter)
+-		} else {
+-			detected = detectRelease(adapter.Probe)
+ 		}
+ 		if detected == "" {
+ 			detected = "unknown"
+diff --git a/internal/managerlock/capture_test.go b/internal/managerlock/capture_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..886c9d8fad94b648f480679156b407c74a0a8c13
+--- /dev/null
++++ b/internal/managerlock/capture_test.go
+@@ -0,0 +1,106 @@
++package managerlock
++
++import (
++	"context"
++	"errors"
++	"os"
++	"path/filepath"
++	"runtime"
++	"syscall"
++	"testing"
++	"time"
++)
++
++// The observation path never creates an absent home or missing lock state;
++// the normal writer creates the same lock which observation subsequently uses.
++func TestAcquireExistingHomeOnlyDoesNotProvision(t *testing.T) {
++	home := filepath.Join(t.TempDir(), "absent")
++	manager, err := New(home)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err := manager.AcquireExistingHomeOnly(context.Background()); !errors.Is(err, os.ErrNotExist) {
++		t.Fatalf("missing lock = %v", err)
++	}
++	if _, err := os.Lstat(home); !os.IsNotExist(err) {
++		t.Fatalf("created home: %v", err)
++	}
++	if err := os.Mkdir(home, 0700); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := manager.AcquireExistingHomeOnly(context.Background()); !errors.Is(err, os.ErrNotExist) {
++		t.Fatalf("missing lock state = %v", err)
++	}
++	entries, err := os.ReadDir(home)
++	if err != nil || len(entries) != 0 {
++		t.Fatalf("created lock state: %v, %v", entries, err)
++	}
++	lock, err := manager.AcquireHomeOnly(context.Background(), false)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := lock.Close(); err != nil {
++		t.Fatal(err)
++	}
++	lock, err = manager.AcquireExistingHomeOnly(context.Background())
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := lock.AssertCurrent(); err != nil {
++		t.Fatal(err)
++	}
++	if err := lock.Close(); err != nil {
++		t.Fatal(err)
++	}
++	if !errors.Is(lock.AssertCurrent(), ErrNotHeld) {
++		t.Fatal("accepted released lock")
++	}
++}
++
++// An externally replaced stable name invalidates the held capture witness;
++// retaining an OS lock on an unlinked inode does not serialize later writers.
++func TestCaptureLockRejectsReplacedIdentity(t *testing.T) {
++	manager, err := New(t.TempDir())
++	if err != nil {
++		t.Fatal(err)
++	}
++	lock, err := manager.AcquireHomeOnly(context.Background(), false)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer func() { _ = lock.Close() }()
++	if err := lock.AssertCurrent(); err != nil {
++		t.Fatal(err)
++	}
++	path := lock.lock.file.Name()
++	if err := os.Rename(path, path+".old"); err != nil {
++		if runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(32)) { // ERROR_SHARING_VIOLATION
++			t.Skip("this host cannot create replacement of an open capture lock: sharing violation")
++		}
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, []byte{}, 0600); err != nil {
++		t.Fatal(err)
++	}
++	if !errors.Is(lock.AssertCurrent(), ErrNotHeld) {
++		t.Fatal("accepted replacement lock identity")
++	}
++}
++
++// Both acquisition paths contend on the same OS lock and honor the timeout.
++func TestCaptureLockSharesWriterLock(t *testing.T) {
++	manager, err := New(t.TempDir())
++	if err != nil {
++		t.Fatal(err)
++	}
++	lock, err := manager.AcquireHomeOnly(context.Background(), false)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer func() { _ = lock.Close() }()
++	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
++	defer cancel()
++	if _, err := manager.AcquireExistingHomeOnly(ctx); !errors.Is(err, context.DeadlineExceeded) {
++		t.Fatalf("lock wait = %v", err)
++	}
++}
+diff --git a/internal/managerlock/filelock.go b/internal/managerlock/filelock.go
+index 02ecd6c990be31a25387bc7330d1095dc5174049..6ca2522506a4287f17634828ccfa0139fa2e430e 100644
+--- a/internal/managerlock/filelock.go
++++ b/internal/managerlock/filelock.go
+@@ -20,16 +20,24 @@ type fileLock struct {
+ }
+ 
+ func acquireFileLock(ctx context.Context, path string, onRelease func()) (*fileLock, error) {
++	return acquireFileLockMode(ctx, path, onRelease, true)
++}
++
++func acquireFileLockMode(ctx context.Context, path string, onRelease func(), create bool) (*fileLock, error) {
+ 	if ctx == nil {
+ 		return nil, fmt.Errorf("lock context is nil")
+ 	}
+ 	if err := ctx.Err(); err != nil {
+ 		return nil, err
+ 	}
+-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+-		return nil, fmt.Errorf("create manager lock state: %w", err)
++	flags := os.O_RDWR
++	if create {
++		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
++			return nil, fmt.Errorf("create manager lock state: %w", err)
++		}
++		flags |= os.O_CREATE
+ 	}
+-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600) // #nosec G304 -- path is derived below the canonical manager home
++	file, err := os.OpenFile(path, flags, 0o600) // #nosec G304 -- path is derived below the canonical manager home
+ 	if err != nil {
+ 		return nil, fmt.Errorf("open manager lock: %w", err)
+ 	}
+diff --git a/internal/managerlock/managerlock.go b/internal/managerlock/managerlock.go
+index ed2a625bb9b9df5c3cdd04a4ca49fd5021c933cf..6c005db203224548f921ee1070d8ff8cfffd72c5 100644
+--- a/internal/managerlock/managerlock.go
++++ b/internal/managerlock/managerlock.go
+@@ -238,6 +238,31 @@ func (lock *HomeLock) AssertHeld() error {
+ 	return lock.lock.AssertHeld()
+ }
+ 
++// AssertCurrent also checks that the stable lock name still identifies the
++// held file. Capture cannot publish after an external replacement of that name.
++func (lock *HomeLock) AssertCurrent() error {
++	if err := lock.AssertHeld(); err != nil {
++		return err
++	}
++	lock.lock.mu.Lock()
++	defer lock.lock.mu.Unlock()
++	if lock.lock.file == nil {
++		return ErrNotHeld
++	}
++	held, err := lock.lock.file.Stat()
++	if err != nil {
++		return err
++	}
++	named, err := os.Lstat(lock.lock.file.Name())
++	if err != nil {
++		return err
++	}
++	if !named.Mode().IsRegular() || !os.SameFile(held, named) {
++		return ErrNotHeld
++	}
++	return nil
++}
++
+ // Close releases the operating-system lock without deleting its stable file.
+ func (lock *HomeLock) Close() error {
+ 	if lock == nil {
+@@ -293,15 +318,29 @@ func (manager *Manager) AcquireHomeOnly(ctx context.Context, dryRun bool) (*Home
+ 	if err := manager.prepare(); err != nil {
+ 		return nil, err
+ 	}
++	return manager.acquireHomeOnly(ctx, true)
++}
++
++// AcquireExistingHomeOnly takes the same mutation lock without creating a
++// home, directory or lock file. An unprovisioned source cannot become one as
++// a side effect of observation. Existing writers establish this lock first.
++func (manager *Manager) AcquireExistingHomeOnly(ctx context.Context) (*HomeLock, error) {
++	if manager == nil {
++		return nil, fmt.Errorf("manager is nil")
++	}
++	return manager.acquireHomeOnly(ctx, false)
++}
++
++func (manager *Manager) acquireHomeOnly(ctx context.Context, create bool) (*HomeLock, error) {
+ 	process := manager.processState()
+ 	if err := process.reserve(acquireHome); err != nil {
+ 		return nil, err
+ 	}
+ 	acquired := false
+ 	defer func() { process.finish(acquireHome, acquired) }()
+-	fileLock, err := acquireFileLock(ctx, manager.homeLockPath(), func() {
++	fileLock, err := acquireFileLockMode(ctx, manager.homeLockPath(), func() {
+ 		process.released(acquireHome)
+-	})
++	}, create)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+diff --git a/internal/transaction/engine.go b/internal/transaction/engine.go
+index 9503964b9ee8d6cc0001e01eb1d1076f22e2a6cb..4e9be900ebd6831ff8578880590da5fe066fdd69 100644
+--- a/internal/transaction/engine.go
++++ b/internal/transaction/engine.go
+@@ -323,6 +323,9 @@ func (engine *Engine) Recover(lock HomeLock) error {
+ 	if err := requireHomeLock(lock); err != nil {
+ 		return err
+ 	}
++	if engine.hooks.ObserveRecovery != nil {
++		engine.hooks.ObserveRecovery()
++	}
+ 	engine.mu.Lock()
+ 	defer engine.mu.Unlock()
+ 	ids, err := engine.journalIDs()
+diff --git a/internal/transaction/pending.go b/internal/transaction/pending.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b4b109faf0a21c713b6422a3d9e058990aa7837
+--- /dev/null
++++ b/internal/transaction/pending.go
+@@ -0,0 +1,47 @@
++package transaction
++
++import (
++	"errors"
++	"os"
++	"path/filepath"
++
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++// PendingRecovery observes all durable recovery records without resuming a
++// transaction or cleaning a journal/tomb. Invalid or unreadable evidence is an
++// error even when another record already establishes pending recovery.
++func (engine *Engine) PendingRecovery(lock HomeLock) (bool, error) {
++	if err := requireHomeLock(lock); err != nil {
++		return false, err
++	}
++	engine.mu.Lock()
++	defer engine.mu.Unlock()
++	// Inspect the manager-relative route without following a linked inventory.
++	for _, path := range []string{filepath.Dir(filepath.Dir(engine.journalRoot)), filepath.Dir(engine.journalRoot), engine.journalRoot} {
++		state, err := stateread.Lstat(path)
++		if err != nil {
++			return false, err
++		}
++		if state.Kind == stateread.KindAbsent {
++			return false, nil
++		}
++		if !state.Info.IsDir() {
++			return false, stateread.UnusableError(path, journalf("transaction inventory is not a directory"))
++		}
++	}
++	ids, err := engine.journalIDs()
++	if err != nil {
++		return false, err
++	}
++	for _, id := range ids {
++		if _, err := engine.loadJournal(id); err != nil {
++			var pathErr *os.PathError
++			if errors.As(err, &pathErr) {
++				return false, stateread.UnusableError(pathErr.Path, err)
++			}
++			return false, err
++		}
++	}
++	return len(ids) != 0, nil
++}
+diff --git a/internal/transaction/pending_test.go b/internal/transaction/pending_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..5b0c81e1940e7e3b4b2e68bba890ab17397494fb
+--- /dev/null
++++ b/internal/transaction/pending_test.go
+@@ -0,0 +1,80 @@
++package transaction
++
++import (
++	"errors"
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++// PendingRecovery preserves canonical records in every phase, including cleanup
++// tombs, while the held-witness and invalid-evidence controls fail closed.
++func TestPendingRecoveryReadOnlyPhasesAndTombs(t *testing.T) {
++	for _, phase := range []Phase{PhasePrepared, PhaseCommitting, PhaseCleanup, PhaseRollingBack, PhaseRollbackCleanup} {
++		t.Run(string(phase), func(t *testing.T) {
++			root := t.TempDir()
++			engine := mustEngine(t, filepath.Join(root, "home"))
++			if pending, err := engine.PendingRecovery(testLock{}); err != nil || pending {
++				t.Fatalf("absent inventory = %v, %v", pending, err)
++			}
++			target := fileTarget(t, "profile", "one", filepath.Join(root, "live"), filepath.Join(root, "stage"), "old", "new")
++			journal, err := engine.Prepare(testLock{}, Plan{TransactionID: "pending", ProjectIdentity: "capture", Targets: []Target{target}})
++			if err != nil {
++				t.Fatal(err)
++			}
++			journal.Phase = phase
++			if err := engine.saveJournal(journal); err != nil {
++				t.Fatal(err)
++			}
++			path := engine.journalPath("pending")
++			if phase == PhaseCleanup || phase == PhaseRollbackCleanup {
++				if err := os.Rename(path, path+".delete"); err != nil {
++					t.Fatal(err)
++				}
++				path += ".delete"
++			}
++			before := mustRead(t, path)
++			if pending, err := engine.PendingRecovery(testLock{}); err != nil || !pending {
++				t.Fatalf("pending inventory = %v, %v", pending, err)
++			}
++			if mustRead(t, path) != before || mustRead(t, target.LivePath) != "old" {
++				t.Fatal("observation mutated recovery state")
++			}
++			if _, err := engine.PendingRecovery(testLock{err: errors.New("released")}); err == nil {
++				t.Fatal("accepted released witness")
++			}
++			mustWrite(t, engine.journalPath("z-corrupt"), "{")
++			if pending, err := engine.PendingRecovery(testLock{}); err == nil || pending {
++				t.Fatalf("valid record masked corrupt evidence: %v, %v", pending, err)
++			}
++		})
++	}
++}
++
++// A linked inventory cannot be treated as an empty or valid recovery set.
++func TestPendingRecoveryRejectsLinkedInventory(t *testing.T) {
++	home := t.TempDir()
++	engine := mustEngine(t, home)
++	if err := os.MkdirAll(filepath.Dir(engine.journalRoot), 0700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink(t.TempDir(), engine.journalRoot); err != nil {
++		t.Skipf("symlink unavailable: %v", err)
++	}
++	if pending, err := engine.PendingRecovery(testLock{}); err == nil || pending {
++		t.Fatalf("linked inventory = %v, %v", pending, err)
++	}
++}
++
++// The instrumentation detects Recover even with no transactions, so a zero
++// recovery count at capture is evidence of non-entry, not merely no writes.
++func TestRecoveryObserverDetectsEmptyRecovery(t *testing.T) {
++	calls := 0
++	engine := mustEngine(t, t.TempDir(), WithHooks(Hooks{ObserveRecovery: func() { calls++ }}))
++	if err := engine.Recover(testLock{}); err != nil {
++		t.Fatal(err)
++	}
++	if calls != 1 {
++		t.Fatalf("recovery entry count = %d", calls)
++	}
++}
+diff --git a/internal/transaction/types.go b/internal/transaction/types.go
+index 15d792b1a6d54ddd830ffb3c967592113237ff60..d600816e386efd12bfebded01cfce28c089dc4a1 100644
+--- a/internal/transaction/types.go
++++ b/internal/transaction/types.go
+@@ -251,6 +251,8 @@ type Event struct {
+ type Hooks struct {
+ 	Fault   func(Event) error
+ 	Observe func(Event)
++	// ObserveRecovery reports entry to Recover, including an empty inventory.
++	ObserveRecovery func()
+ }
+ 
+ // Option configures an Engine.
+diff --git a/scripts/remote-gate.sh b/scripts/remote-gate.sh
+index b4cc0d3a8a6647f22465e6cc7b8ea8273ec64e61..a0889599447ac4d0ac65d80290ed98f5622018f2 100755
+--- a/scripts/remote-gate.sh
++++ b/scripts/remote-gate.sh
+@@ -43,9 +43,8 @@ if [ "$tree" = "$(git rev-parse "$head^{tree}")" ]; then
+   commit=$head
+ else
+   commit=$(printf 'remote gate snapshot of %s\n\nworking tree on top of %s\n' "$name" "$head" \
+-    | GIT_COMMITTER_NAME="remote-gate" GIT_COMMITTER_EMAIL="remote-gate@localhost" \
+-      GIT_AUTHOR_NAME="remote-gate" GIT_AUTHOR_EMAIL="remote-gate@localhost" \
+-      git -c commit.gpgsign=false commit-tree "$tree" -p "$head")
++    | git commit-tree -S "$tree" -p "$head")
++  test "$(git log -1 --format='%G?' "$commit")" = G
+ fi
+ 
+ ATTEMPTS="${REMOTE_GATE_ATTEMPTS:-3}"

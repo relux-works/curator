@@ -27,3 +27,13 @@ Brief gap: no catalog surface table was supplied. This map covers the five paire
 Negative cases require the intended refusal and no successful output. Source-generation matrices compare the post-refusal source, native credential roots and owned fixture state with the deliberately planted state; pending journals and transaction targets are preserved. Credential links are never dereferenced by fixture-state snapshots.
 
 The named narrowing controls and expected-red assertions are attached separately as task-scoped mutant outcomes. No Windows shell/execute-bit/POSIX unreadability runtime coverage is claimed; the platform-case ledger records those bounds. Lock bookkeeping is compared by name, mode and size because Windows byte-range locks forbid a second reader. Source, journal, target and native credential fixture bytes remain covered by the state comparisons. M-provision-absent is killed through TestMaterializeCaptureDoesNotProvision/absent at CaptureMaterialize.
+
+## Hosted leaf runtime evidence
+
+| Platform | Pass records | Skip records | Bound |
+|---|---:|---:|---|
+| Linux | 54 | 0 | All supplied leaf cases ran |
+| macOS | 54 | 0 | All supplied leaf cases ran |
+| Windows | 46 | 6 | Two held-lock identity plants are prevented by OS sharing; two executable-mode cases, the shell vendor sentinel and POSIX unreadability are unavailable |
+
+Counts are named terminal Go test/subtest records; parents and children are counted separately. Windows successfully executed the same-fragment ABA, store-object identity and marker-identity witnesses using the native replacement fixture. The six skipped cases are declared bounds, not passing qualification; the corresponding Unix cases ran. Exact names and verdicts are in `TASK-261016-4zofp0_platform-cases.json`. Narrowing mutants were executed on darwin/arm64, not replayed on Windows.

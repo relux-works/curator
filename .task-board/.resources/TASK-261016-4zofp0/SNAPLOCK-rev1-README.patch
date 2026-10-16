@@ -1,0 +1,13 @@
+diff --git a/README.md b/README.md
+index 8981f5f1..e5c09fb1 100644
+--- a/README.md
++++ b/README.md
+@@ -306,6 +306,8 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run
+ 
+ Use `go build ./...` to compile and `go vet ./...` for static validation. Run `make lint` (golangci-lint) for repository lint; store local validation logs under `.temp/`. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate leaves the working tree and index unchanged. Go tests use temporary homes. Run `go test ./internal/envprofile/... ./cmd/curator/...` for focused environment validation. The preserve-lock vector family is pinned in `internal/envprofile/testdata/environments-repair-preserve-lock.json`; `CURATOR_PRESERVE_LOCK_VECTORS=/path/to/vectors.json go test ./internal/envprofile -run TestRepairPreserveLockVectors` runs its upstream counterpart.
+ 
++`go test ./internal/envprofile -run TestMaterializeCapture` checks the internal non-recovering snapshot capture transaction. Closure construction and CLI publication are separate integration work. Capture and metadata-only status share content verification without invoking vendor release probes; unavailable release metadata is reported as unknown. The remote gate signs its temporary snapshot with the configured author and signing key and verifies that signature before publication.
++
+ Managed Muse homes materialize monolithic root context at `config/muse/AGENTS.md`; `referenced` is refused. A profile without a context declaration writes no root file. Curator resolves the environment fragment; its external Muse `exec` consumer must add `--no-foreign-personal-context` exactly when the root target is materialized (environments §10.2). The v3 fragment has no argv member. `env status` records the remaining discovery, `serve`, and workspace-precedence bounds.
+ 
+ ## Contributing
