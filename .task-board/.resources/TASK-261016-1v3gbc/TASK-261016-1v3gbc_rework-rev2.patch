@@ -1,0 +1,226 @@
+diff --git a/internal/envsnapshot/README.md b/internal/envsnapshot/README.md
+index 16a87837..2bbc558e 100644
+--- a/internal/envsnapshot/README.md
++++ b/internal/envsnapshot/README.md
+@@ -27,6 +27,9 @@ remain the consuming leaves' responsibility.
+ Filesystem verification uses retained no-follow directory handles on Unix.
+ It rejects linked ancestors as supplied, including links preceding `..`,
+ symlinks, hard links, special files, missing/extra directories and file drift.
++Path and component collision keys use canonical caseless matching: NFD before
++case folding and NFD again afterwards. Folding alone can introduce canonically
++equivalent Greek spellings with different byte sequences.
+ Other platforms currently refuse with the snapshot-mismatch code: no Windows
+ ACL or execute-mode equivalence is claimed. Codecs remain platform independent.
+ No runtime, archive, or materialize CLI qualification is claimed here.
+@@ -64,6 +67,15 @@ rather than a build/setup error, and remove only their own scratch allocations.
+ They never mutate the original package. Each child failure is expected exit 1;
+ the control harness succeeds only when every planted weakening is killed.
+ 
++The retained `TestReviewerGreekCollision` regression exercises `Verify` with
++iota and upsilon spellings as files and directory components, singleton positive
++controls and unchanged-manifest assertions. M12 restores the former
++normalization-before-fold-only algorithm while retaining collision checks; that
++named test must fail. To reproduce successful admission of colliding entries by
++the mutant, run with `TMPDIR` on a case-sensitive filesystem. On folding
++filesystems the test still requires the precise `path-collision` refusal before
++tree enumeration, but cannot establish that both physical names coexist.
++
+ Git is also required by `TestPinnedSchemaCheckoutBytes`. That test runs
+ `git hash-object`, `git update-index` and `git checkout-index` in isolated
+ temporary repositories with `core.autocrlf=true`, without commits or source
+diff --git a/internal/envsnapshot/controls_test.go b/internal/envsnapshot/controls_test.go
+index 5d6dc609..b952c36e 100644
+--- a/internal/envsnapshot/controls_test.go
++++ b/internal/envsnapshot/controls_test.go
+@@ -27,6 +27,7 @@ func TestNarrowingControls(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 	mutants := []struct{ name, file, old, new, test string }{
++		{"M12-casefold-without-renormalization", "metadata.go", "return norm.NFD.String(cases.Fold().String(norm.NFD.String(s)))", "return cases.Fold().String(norm.NFC.String(s))", "TestReviewerGreekCollision"},
+ 		{"M11-schema-README-EOL", ".gitattributes", "schemas/** -text", "schemas/** -text\nschemas/**/*.md text", "TestPinnedSchemaCheckoutBytes/protected"},
+ 		{"M10-UTF8-path-only", "codec.go", "return utf8.ValidString(v.String())", "return strings.HasSuffix(v.String(),\".txt\") || utf8.ValidString(v.String())", "TestTypedEncodingRejectsInvalidUTF8"},
+ 		{"M1-one-extra-LF", "codec.go", "payload := raw[:len(raw)-1]", "payload := raw[:len(raw)-1]; if bytes.HasSuffix(payload,[]byte{10}) { payload=payload[:len(payload)-1] }", "TestMetadataFramingAndHashDomains"},
+diff --git a/internal/envsnapshot/metadata.go b/internal/envsnapshot/metadata.go
+index ccf2dd7a..cea0db09 100644
+--- a/internal/envsnapshot/metadata.go
++++ b/internal/envsnapshot/metadata.go
+@@ -11,7 +11,11 @@ import (
+ 	"golang.org/x/text/unicode/norm"
+ )
+ 
+-func collisionKey(s string) string { return cases.Fold().String(norm.NFC.String(s)) }
++// Canonical caseless matching normalizes both before and after folding: full
++// case folding can introduce decomposed sequences even from normalized input.
++func collisionKey(s string) string {
++	return norm.NFD.String(cases.Fold().String(norm.NFD.String(s)))
++}
+ 
+ // validateMetadata returns the exact derived directory inventory. It performs
+ // semantic checks beyond the published structural schemas.
+diff --git a/internal/envsnapshot/reviewer_unix_test.go b/internal/envsnapshot/reviewer_unix_test.go
+new file mode 100644
+index 00000000..8e43a448
+--- /dev/null
++++ b/internal/envsnapshot/reviewer_unix_test.go
+@@ -0,0 +1,161 @@
++//go:build darwin || linux || freebsd || openbsd || netbsd || dragonfly
++
++package envsnapshot
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"sort"
++	"testing"
++)
++
++// Optional nulls must not erase a present invalid channel through typed decoding.
++func TestReviewerNullChannel(t *testing.T) {
++	r := fixture(t)
++	verified(t, r)
++	var d map[string]any
++	if err := json.Unmarshal(read(t, "golden/launch.json"), &d); err != nil {
++		t.Fatal(err)
++	}
++	d["mcp"] = nil
++	raw, err := json.Marshal(d)
++	if err != nil {
++		t.Fatal(err)
++	}
++	wire := canonical(t, raw)
++	write(t, r, "launch.json", wire, 0600)
++	m := manifest(t)
++	m.LaunchSHA256 = Digest(wire)
++	saveManifest(t, r, m)
++	_, err = Verify(r, "")
++	requireReason(t, err, "launch-schema")
++}
++
++// A metadata-only directory cannot pass either public tree-verification path.
++func TestReviewerManifestOnly(t *testing.T) {
++	r := fixture(t)
++	verified(t, r)
++	if err := os.RemoveAll(filepath.Join(r, "home")); err != nil {
++		t.Fatal(err)
++	}
++	_, err := Verify(r, "")
++	requireReason(t, err, "entry-set")
++	_, err = PortableEqual(r, r)
++	requireReason(t, err, "entry-set")
++}
++
++// Both sides must be re-observed; identical saved metadata cannot hide corrupt left bytes.
++func TestReviewerPortableLeftDrift(t *testing.T) {
++	a, b := fixture(t), fixture(t)
++	eq, err := PortableEqual(a, b)
++	if err != nil || !eq {
++		t.Fatal(eq, err)
++	}
++	write(t, a, "home/AGENTS.md", []byte("forged"), 0600)
++	_, err = PortableEqual(a, b)
++	requireReason(t, err, "file-identity")
++}
++
++// Recapture does not change an original externally retained baseline on either retry.
++func TestReviewerRecapture(t *testing.T) {
++	r := fixture(t)
++	v := verified(t, r)
++	m := manifest(t)
++	m.CuratorVersion = "9.9.9"
++	saveManifest(t, r, m)
++	for i := 0; i < 2; i++ {
++		_, err := Verify(r, v.ManifestSHA256())
++		requireReason(t, err, "baseline-mismatch")
++	}
++}
++
++// Metadata aliases and special mode bits cannot be laundered by valid hashes.
++func TestReviewerFreeHunt(t *testing.T) {
++	t.Run("launch-hardlink", func(t *testing.T) {
++		r := fixture(t)
++		v := verified(t, r)
++		if err := os.Link(filepath.Join(r, "launch.json"), filepath.Join(temporary(t), "alias")); err != nil {
++			t.Fatal(err)
++		}
++		_, err := Verify(r, v.ManifestSHA256())
++		requireReason(t, err, "metadata-kind-mode")
++	})
++	t.Run("sticky-content", func(t *testing.T) {
++		r := fixture(t)
++		v := verified(t, r)
++		if err := os.Chmod(filepath.Join(r, "home/AGENTS.md"), 0600|os.ModeSticky); err != nil {
++			t.Fatal(err)
++		}
++		_, err := Verify(r, v.ManifestSHA256())
++		requireReason(t, err, "file-mode")
++	})
++	t.Run("missing-metadata", func(t *testing.T) {
++		r := fixture(t)
++		v := verified(t, r)
++		if err := os.Remove(filepath.Join(r, "launch.json")); err != nil {
++			t.Fatal(err)
++		}
++		_, err := Verify(r, v.ManifestSHA256())
++		requireReason(t, err, "metadata-unreadable")
++	})
++}
++
++// Portable non-ASCII spellings and distinct non-colliding components remain valid.
++func TestReviewerUnicodePositive(t *testing.T) {
++	for _, p := range []string{"home/café/asset", "home/cafe\u0301/asset", "home/日本語/asset", "home/😀/asset"} {
++		t.Run(p, func(t *testing.T) {
++			r := fixture(t)
++			m := manifest(t)
++			data := []byte("unicode")
++			write(t, r, p, data, 0600)
++			m.Files = append(m.Files, File{Path: p, Size: int64(len(data)), SHA256: Digest(data), Mode: "0600"})
++			sort.Slice(m.Files, func(i, j int) bool { return m.Files[i].Path < m.Files[j].Path })
++			saveManifest(t, r, m)
++			verified(t, r)
++		})
++	}
++}
++
++// Canonically caseless-equivalent Greek components must refuse through Verify.
++// Each singleton is a positive control; two distinct entries are representable
++// on a case-sensitive filesystem. The original manifest must remain unchanged.
++func TestReviewerGreekCollision(t *testing.T) {
++	for _, tc := range []struct{ name, a, b string }{{"iota", "ι\u0308\u0301", "Ι\u0308\u0301"}, {"upsilon", "υ\u0308\u0301", "Υ\u0308\u0301"}} {
++		for _, kind := range []string{"directory", "file"} {
++			t.Run(tc.name+"/"+kind, func(t *testing.T) {
++				paths := []string{"home/" + tc.a, "home/" + tc.b}
++				if kind == "directory" {
++					paths[0] += "/a"
++					paths[1] += "/b"
++				}
++				makeTree := func(ps []string) string {
++					r := fixture(t)
++					m := manifest(t)
++					data := []byte("collision")
++					for _, p := range ps {
++						write(t, r, p, data, 0600)
++						m.Files = append(m.Files, File{Path: p, Size: int64(len(data)), SHA256: Digest(data), Mode: "0600"})
++					}
++					sort.Slice(m.Files, func(i, j int) bool { return m.Files[i].Path < m.Files[j].Path })
++					saveManifest(t, r, m)
++					return r
++				}
++				for _, p := range paths {
++					verified(t, makeTree([]string{p}))
++				}
++				r := makeTree(paths)
++				before, err := os.ReadFile(filepath.Join(r, "manifest.json"))
++				if err != nil {
++					t.Fatal(err)
++				}
++				_, err = Verify(r, "")
++				after, e := os.ReadFile(filepath.Join(r, "manifest.json"))
++				if e != nil || string(before) != string(after) {
++					t.Fatal("baseline rewritten", e)
++				}
++				requireReason(t, err, "path-collision")
++			})
++		}
++	}
++}

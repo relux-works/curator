@@ -1,5 +1,5 @@
 ## Status
-to-review
+done
 
 ## Review
 required
@@ -36,6 +36,13 @@ estimated(fibonacci(3))
 - [x] Relevant build/validation commands run after changes and build not broken
 - [x] New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables
 - [x] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant
+- [x] Implementation matches AC
+- [x] Solution fits project architecture
+- [x] Tests green
+- [x] Gate, refusal, validation, authorization, and attestation behavior attacked, not read — positive-path-only evidence is not accepted
+- [x] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
+- [x] Revision 2 regression: TestReviewerGreekCollision retains singleton controls and all four file/component cases, asserts path-collision and unchanged manifest, and reproduces red before the fix on a case-sensitive tree.
+- [x] Revision 2 narrowing control: M12 retains collision checks but restores missing post-fold normalization; TestReviewerGreekCollision fails with child exit 1, and all reviewer test names remain present and green.
 
 ## Notes
 spawn selection rationale tuple: {"role":"developer","pair":"gpt-6.1-sol/high","text":"Wave 7 SNAPID producer: docs-only, codex gpt-6.1-sol high (R80), owner go 2026-10-13"}
@@ -51,24 +58,76 @@ Current candidate 5fd9bed1663a16a4914cc341949e69eb58a2b7b0 remains uncommitted a
 Ready for review at candidate 5fd9bed1663a16a4914cc341949e69eb58a2b7b0. Full gate 38841469667 reports success on the exact head; directly executed remote-gate shell exit 0, 20 successful jobs and 2 skipped jobs (not claimed as executed). Current Linux/macOS package artifacts each contain 160 distinct passing test/subtest names; Windows contains 103, including TestCorpusPins, TestPinnedSchemaCheckoutBytes and TestUnqualifiedPlatformRefuses, with package-level pass and no package fail/skip. Focused race tests, 12 of 12 narrowing controls, lint, vet, build and Windows compile pass. Three task-scoped outcomes updated with exact commands, exits, coverage map, mutation table, historical red evidence and current named hosted results. Final identity check confirms 115 live files match the signed CI snapshot, only declared leaf directories change, Story checkpoint/index remain unchanged, and changes remain uncommitted. Windows actual-tree verification remains a declared fail-closed backend limitation; no CLI materialize, capture, hosted launch or runtime qualification is claimed by this helper leaf.
 agent completed: [implementer] developer (codex) (exit=0)
 spawn run completed: codex (run=RUN-261016-03b791, pid=37272, exit=0)
+spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/medium","text":"Deciding review B on codex gpt-6-astra medium: owner spawn policy 2026-10-16 (Codex only; reviewers astra medium)"}
+spawn selection rationale for gpt-6-astra/medium: Deciding review B on codex gpt-6-astra medium: owner spawn policy 2026-10-16 (Codex only; reviewers astra medium)
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[codex,claude], config: spawn.preferred_agentic_system)
+spawn queued: [reviewer] reviewer (codex) (run=RUN-261016-89399e, max_parallel=4)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-261016-89399e)
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-261016-89399e, pid=4366, exit=0)
+loop-detector rev1: S2/S3/S5 not evaluable — runtime-recorded verdict carries no stamped findings array
+spawn selection rationale for gpt-6.1-sol/high: Wave 7 SNAPID producer: docs-only, codex gpt-6.1-sol high (R80), owner go 2026-10-13
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[codex,claude], config: spawn.preferred_agentic_system)
+spawn queued: [implementer] developer (codex) (run=RUN-261016-396e9c, max_parallel=4)
+spawn run started: [implementer] developer (codex) (run=RUN-261016-396e9c)
+Revision 2 rework: address review unicode-casefold-renormalization with a production Verify regression, singleton positive controls, file/component variants, unchanged-baseline assertions and a narrowing normalization-after-fold mutant. Preserve reviewer tests; rerun focused suite, controls and full repository gate. Leave candidate uncommitted.
+Revision 2 ready for review at signed CI snapshot ad0947421e20acb08c1d980f04d04cb3c82847c1. Unicode canonical caseless collision keys now normalize before and after folding. Retained all reviewer test names; TestReviewerGreekCollision reproduces four nil-refusal bypasses before the fix and passes after it with singleton controls and unchanged manifests. M12 restores the old algorithm and is killed; 13 of 13 controls killed. Native race suite, lint, vet, build and Windows compilation pass. Full repository gate 38855636613 reports success on the exact head; directly executed shell exit 0, 20 successful jobs, two conditional skips not claimed as executed. Linux/macOS Test artifacts each contain 178 distinct passing package test/subtest names; Windows has 103 with explicit unsupported-backend refusal. Four rework paths only; 116 source files match CI blobs, signature G, Story checkpoint/index unchanged, candidate uncommitted. Five task-scoped outcomes retain coverage, real exits, historical red, hosted names and bounded diff. No CLI/runtime or Windows actual-tree success qualification is claimed.
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-261016-396e9c, pid=73037, exit=0)
+spawn selection rationale for gpt-6-astra/medium: Deciding review B on codex gpt-6-astra medium: owner spawn policy 2026-10-16 (Codex only; reviewers astra medium)
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[codex,claude], config: spawn.preferred_agentic_system)
+spawn queued: [reviewer] reviewer (codex) (run=RUN-261016-ebbbde, max_parallel=4)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-261016-ebbbde)
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-261016-ebbbde, pid=47434, exit=0)
 
 ## Precondition Resources
 - [rc7-leaf-snapshot-identity-verifier.md](file://TASK-261016-1v3gbc/rc7-leaf-snapshot-identity-verifier.md)
 - [gw-SNAPID-brief.md](file://TASK-261016-1v3gbc/gw-SNAPID-brief.md)
 - [rc7-code-common.md](file://TASK-261016-1v3gbc/rc7-code-common.md)
 - [rc7-decisions.md](file://TASK-261016-1v3gbc/rc7-decisions.md)
+- [gw-SNAPID-review-B-brief.md](file://TASK-261016-1v3gbc/gw-SNAPID-review-B-brief.md)
 
 ## Outcome Resources
 - [TASK-261016-1v3gbc_spawn-log_-implementer--developer--codex-_RUN-261016-03b791.log](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_spawn-log_-implementer--developer--codex-_RUN-261016-03b791.log) — System spawn log captured by task-board
 - [TASK-261016-1v3gbc_candidate.json](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_candidate.json)
 - [TASK-261016-1v3gbc_handoff.md](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_handoff.md)
 - [TASK-261016-1v3gbc_verification.log](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_verification.log)
+- [TASK-261016-1v3gbc_change-request_rev1.patch](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_change-request_rev1.patch) — Change Request CR-TASK-261016-1v3gbc-1 revision 1 candidate patch (repository_delta=present, 115 changed paths)
+- [TASK-261016-1v3gbc_change-request_rev1-validation.log](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_change-request_rev1-validation.log) — Change Request CR-TASK-261016-1v3gbc-1 revision 1 bounded validation log
+- [TASK-261016-1v3gbc_spawn-log_-reviewer--reviewer--codex-_RUN-261016-89399e.log](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_spawn-log_-reviewer--reviewer--codex-_RUN-261016-89399e.log) — System spawn log captured by task-board
+- [TASK-261016-1v3gbc_reviewer_test.go](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_reviewer_test.go)
+- [TASK-261016-1v3gbc_review-reproduce.py](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_review-reproduce.py)
+- [TASK-261016-1v3gbc_review-checks-rev1.log](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_review-checks-rev1.log) — Exact candidate identity, focused race suite, controls and final strengthened reviewer replay
+- [TASK-261016-1v3gbc_review-sweep-rev1.md](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_review-sweep-rev1.md)
+- [TASK-261016-1v3gbc_review-greek-collision-rev1.log](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_review-greek-collision-rev1.log) — Four failing public Verify regressions: Greek canonical caseless collisions incorrectly accepted; singleton controls pass
+- [TASK-261016-1v3gbc_review-greek-replay-rev1.log](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_review-greek-replay-rev1.log) — Final attached replay script reproduces all four P1 bypass variants; expected exit 1
+- [TASK-261016-1v3gbc_review-hosted-rev1.json](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_review-hosted-rev1.json) — Reviewer exact-head hosted rerun cancelled after confirmed P1 bypass; not green evidence
+- [TASK-261016-1v3gbc_review-verdict-rev1.md](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_review-verdict-rev1.md) — Changes requested: P1 Unicode canonical caseless collision bypass; four reproductions, complete swept table and required regression/narrowing control
+- [TASK-261016-1v3gbc_spawn-log_-implementer--developer--codex-_RUN-261016-396e9c.log](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_spawn-log_-implementer--developer--codex-_RUN-261016-396e9c.log) — System spawn log captured by task-board
+- [TASK-261016-1v3gbc_handoff-rev2.md](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_handoff-rev2.md)
+- [TASK-261016-1v3gbc_verification-rev2.log](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_verification-rev2.log)
+- [TASK-261016-1v3gbc_candidate-rev2.json](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_candidate-rev2.json)
+- [TASK-261016-1v3gbc_rework-rev2.patch](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_rework-rev2.patch) — Bounded four-path revision-1 to revision-2 rework diff; same exact signed CI candidate
+- [TASK-261016-1v3gbc_hosted-package-rev2.json](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_hosted-package-rev2.json)
+- [TASK-261016-1v3gbc_handoff-audit-rev2.md](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_handoff-audit-rev2.md) — Handoff returned to-review, exit 0; unresolved warn-policy attribution for other task chains, without direct control-root writes
+- [TASK-261016-1v3gbc_change-request_rev2.patch](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_change-request_rev2.patch) — Change Request CR-TASK-261016-1v3gbc-2 revision 2 candidate patch (repository_delta=present, 116 changed paths)
+- [TASK-261016-1v3gbc_change-request_rev2-validation.log](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_change-request_rev2-validation.log) — Change Request CR-TASK-261016-1v3gbc-2 revision 2 bounded validation log
+- [TASK-261016-1v3gbc_spawn-log_-reviewer--reviewer--codex-_RUN-261016-ebbbde.log](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_spawn-log_-reviewer--reviewer--codex-_RUN-261016-ebbbde.log) — System spawn log captured by task-board
+- [TASK-261016-1v3gbc_review-notes-rev2.md](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_review-notes-rev2.md) — Revision 2 sweep and task-scoped review logbook; hosted gate pending
+- [TASK-261016-1v3gbc_review-extra-rev2_test.go](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_review-extra-rev2_test.go) — Independent neighboring Unicode collision probes
+- [TASK-261016-1v3gbc_review-replay-rev2.py](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_review-replay-rev2.py) — Replay additional probes against exact candidate source in scratch
+- [TASK-261016-1v3gbc_review-local-rev2.log](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_review-local-rev2.log) — Independent four-row sweep, case-sensitive regression, controls, race and free hunt
+- [TASK-261016-1v3gbc_review-gate-rev2.log](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_review-gate-rev2.log) — Reviewer full gate exit 0 on exact signed candidate
+- [TASK-261016-1v3gbc_review-hosted-rev2.json](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_review-hosted-rev2.json) — Provider result: 20 successful jobs and 2 conditional skips
+- [TASK-261016-1v3gbc_review-verdict-rev2.md](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_review-verdict-rev2.md) — ACCEPT revision 2: full surface sweep, no blocking findings, exact-candidate green gate
+- [TASK-261016-1v3gbc_review-acceptance-rev2.md](file://TASK-261016-1v3gbc/TASK-261016-1v3gbc_review-acceptance-rev2.md) — Acceptance readback and nonblocking board attribution warning
 
 ## Created
 2026-10-16T01:03:48Z
 
 ## Last Update
-2026-10-16T03:31:32Z
+2026-10-16T10:42:11Z
 
 ## Assigned To
-[implementer] developer (codex)
+[reviewer] reviewer (codex)

@@ -1,0 +1,1390 @@
+{
+  "status": "completed",
+  "conclusion": "success",
+  "headSha": "d313a63f9d905ebe0a496e6de74f72d95649404e",
+  "url": "https://github.com/relux-works/curator/actions/runs/38869438224",
+  "jobs": [
+    {
+      "name": "Test (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify pnpm pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned pnpm via npm",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify rust pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Rust toolchain via rustup",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify versioned Go install compatibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "gofmt check",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "go vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Ledger consistency",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "go test + platform-case gate",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload gate evidence",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Interop conformance gate",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Shared protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Gate self-test (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Self-test the CI gates",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Naming gate",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Employer name gate",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Race (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify pnpm pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned pnpm via npm",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify rust pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Rust toolchain via rustup",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "go test -race + platform-case gate",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload race evidence",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Go 1.27.1 driver (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Race (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify pnpm pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned pnpm via npm",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify rust pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Rust toolchain via rustup",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "go test -race + platform-case gate",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload race evidence",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Gate self-test (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Self-test the CI gates",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Test (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify pnpm pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned pnpm via npm",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify rust pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Rust toolchain via rustup",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify versioned Go install compatibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "gofmt check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "go vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Ledger consistency",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "go test + platform-case gate",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload gate evidence",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Go 1.26.0 driver (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Test (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify pnpm pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned pnpm via npm",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify rust pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Rust toolchain via rustup",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify versioned Go install compatibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "gofmt check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "go vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Ledger consistency",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "go test + platform-case gate",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload gate evidence",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Go 1.26.0 driver (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Go 1.27.1 driver (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Lint",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run golangci/golangci-lint-action@v7",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "No broad suppression",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify GoReleaser rc channel values",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run golangci/golangci-lint-action@v7",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Gate self-test (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Self-test the CI gates",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Go 1.25.5 driver (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Go 1.27.1 driver (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Go 1.26.0 driver (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Go 1.25.5 driver (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Go 1.25.5 driver (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Test (rose-air)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "steps": []
+    },
+    {
+      "name": "Candidate suite (${{ matrix.os }})",
+      "status": "completed",
+      "conclusion": "skipped",
+      "steps": []
+    }
+  ]
+}
