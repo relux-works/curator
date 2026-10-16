@@ -7,4 +7,4 @@ L15-1b: the rest of the attached L15-1 leaf after slice 1: unified effective sou
 (define task scope)
 
 ## Acceptance Criteria
-Every remaining acceptance criterion, paired test and plant control of the L15-1 leaf is implemented and evidenced on top of slice 1.
+The L15-1 remainder (policy projection, Muse file literal, successor fragments, readiness/login consumption, qualified application rows) is implemented per the attached leaf on top of landed slice 1, with paired negative tests and controls; any narrowing is explicit.

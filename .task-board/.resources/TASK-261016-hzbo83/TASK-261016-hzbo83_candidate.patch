@@ -1,0 +1,797 @@
+diff --git a/README.md b/README.md
+index bfc98cfb..d52db0a5 100644
+--- a/README.md
++++ b/README.md
+@@ -214,7 +214,7 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
+ 
+ > **Important:** a managed home either shares your native login or logs in by itself. Claude Code on macOS always logs in by itself, so every profile you use with it needs one login in its home before the first launch or spawn; otherwise the launch stops with "Not logged in". See [Logging in to managed homes](docs/environment-config.md#logging-in-to-managed-homes).
+ >
+-> [Agent logins](docs/agent-logins.md) explains Claude Code, Codex CLI and Muse storage and session requirements. The **rc.7** machine selector defaults to `native`: `curator env config set credential_store.<profile>.<env-id> <value>` accepts `native`, `file`, or `keychain`. This selector is unavailable on the current baseline.
++> [Agent logins](docs/agent-logins.md) explains Claude Code, Codex CLI and Muse storage and session requirements. The **rc.7** machine selector defaults to `native`: `curator env config set credential_store.<profile>.<env-id> <value>` accepts `native`, `file`, or `keychain`. Configuration is available; explicit store application remains disabled pending qualified mappings and successor consumers. Native policy is resolved once per operation; see [machine policy](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice).
+ 
+ <details>
+ <summary>Hybrid scope</summary>
+@@ -306,7 +306,7 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run
+ 
+ ### Tools
+ 
+-For the rc.7 credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run TestCredentialStore`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
++For the rc.7 credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run 'TestCredential(Store|Projection)'`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
+ 
+ Use `go build ./...` to compile and `go vet ./...` for static validation. Run `make lint` (golangci-lint) for repository lint; store local validation logs under `.temp/`. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate leaves the working tree and index unchanged. Go tests use temporary homes. Run `go test ./internal/envprofile/... ./cmd/curator/...` for focused environment validation. The preserve-lock vector family is pinned in `internal/envprofile/testdata/environments-repair-preserve-lock.json`; `CURATOR_PRESERVE_LOCK_VECTORS=/path/to/vectors.json go test ./internal/envprofile -run TestRepairPreserveLockVectors` runs its upstream counterpart.
+ 
+diff --git a/docs/environment-config.md b/docs/environment-config.md
+index 68993789..caf29037 100644
+--- a/docs/environment-config.md
++++ b/docs/environment-config.md
+@@ -57,8 +57,13 @@ overlays and repositories do not select it. Existing isolation locks remain
+ independent. Editing the knob changes no managed home, marker, link,
+ credential, or vendor `config.toml`; it does not migrate a login.
+ 
+-This first implementation slice stores policy and threads its typed selection
+-into resolve. Explicit file/keychain application remains disabled: Codex file
++The configuration slice stores policy and threads its typed selection into
++resolve. Native managed-home resolution now computes one operation-local
++credential policy: selection admission, native Codex store, isolation admission,
++links and marker records. Resolve (including repair), status verification and
++credential migration use this projection. Each new operation observes native
++configuration again. The one-time provisioning seed is a separate read; this
++projection is not an atomic snapshot of vendor-owned state. Explicit file/keychain application remains disabled: Codex file
+ returns `codex_settings_unsupported` pending supported-release
+ login/app-server/refresh qualification and strict successor consumers;
+ other unavailable mappings return `environment_credential_store_unsupported`.
+diff --git a/internal/envprofile/credential_policy.go b/internal/envprofile/credential_policy.go
+index 5f222d65..80a50833 100644
+--- a/internal/envprofile/credential_policy.go
++++ b/internal/envprofile/credential_policy.go
+@@ -2,34 +2,23 @@ package envprofile
+ 
+ import (
+ 	"fmt"
++	"path/filepath"
++	"runtime"
++	"sort"
+ 
++	"github.com/relux-works/curator/internal/envmarker"
+ 	"github.com/relux-works/curator/internal/envregistry"
+ )
+ 
+ // admitCredentialStore prevents a stored selector from silently becoming native
+ // on an older producer. This is an activation boundary, not runtime qualification.
+ // Effective-policy adoption and successor login/fragment consumers are separate.
+-func (req *ResolveRequest) admitCredentialStore(adapter envregistry.Adapter) error {
+-	selection, err := req.Machine.CredentialStoreFor(req.Profile, adapter.ID)
+-	if err != nil {
+-		return err
+-	}
++func admitCredentialStore(adapter envregistry.Adapter, profile string, selection envregistry.CredentialStoreSelection) error {
+ 	if selection == envregistry.CredentialStoreNative {
+ 		return nil
+ 	}
+-	if adapter.ID == envregistry.CodexCLI {
+-		native, err := req.nativeHome(adapter.ID)
+-		if err != nil {
+-			return err
+-		}
+-		// Even an explicit file selection cannot turn failed or unsupported
+-		// native inspection into an absent selector and a file fallback.
+-		if _, err := req.codexCredentialStore(native); err != nil {
+-			return err
+-		}
+-		if selection == envregistry.CredentialStoreFile {
+-			return fmt.Errorf("%s: explicit Codex file storage requires qualified login/app-server/refresh behavior and strict successor fragment consumers; no native fallback", envregistry.DiagCodexSettingsUnsupported)
+-		}
++	if adapter.ID == envregistry.CodexCLI && selection == envregistry.CredentialStoreFile {
++		return fmt.Errorf("%s: explicit Codex file storage requires qualified login/app-server/refresh behavior and strict successor fragment consumers; no native fallback", envregistry.DiagCodexSettingsUnsupported)
+ 	}
+ 	guidance := "this adapter has no qualified forced-store mapping"
+ 	switch adapter.ID {
+@@ -38,5 +27,149 @@ func (req *ResolveRequest) admitCredentialStore(adapter envregistry.Adapter) err
+ 	case envregistry.Muse:
+ 		guidance = "managed Muse requires file storage; successor file-policy login and fragment delivery are not enabled"
+ 	}
+-	return fmt.Errorf("%s: %s/%s selection %s: %s", envregistry.DiagCredentialStoreUnsupported, req.Profile, adapter.ID, selection, guidance)
++	return fmt.Errorf("%s: %s/%s selection %s: %s", envregistry.DiagCredentialStoreUnsupported, profile, adapter.ID, selection, guidance)
++}
++
++// effectiveCredentialPolicy is the operation-local projection for the existing
++// managed-home credential contract. It is not a runtime qualification or a
++// readiness verdict. Forced mappings retain their activation refusals until
++// qualified login and successor-fragment consumers land.
++type effectiveCredentialPolicy struct {
++	selection   envregistry.CredentialStoreSelection
++	isolation   string
++	nativeStore string
++	links       map[string]string
++	strategies  map[string]string
++	records     []envmarker.Passthrough
++}
++
++// credentialPolicyResolution retains both successful and failed observations
++// for one operation; a repair retry must not turn an observation failure into
++// an absence or a different backend.
++type credentialPolicyResolution struct {
++	profile     string
++	environment string
++	policy      *effectiveCredentialPolicy
++	err         error
++}
++
++// resolveCredentialPolicy admits isolation and derives links and records from
++// one native-store observation. New public operations observe policy afresh.
++func (req *ResolveRequest) resolveCredentialPolicy(adapter envregistry.Adapter) (*effectiveCredentialPolicy, error) {
++	if cached := req.credentialPolicy; cached != nil && cached.profile == req.Profile && cached.environment == adapter.ID {
++		return cached.policy, cached.err
++	}
++	policy, err := req.computeCredentialPolicy(adapter)
++	req.credentialPolicy = &credentialPolicyResolution{profile: req.Profile, environment: adapter.ID, policy: policy, err: err}
++	return policy, err
++}
++
++func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter) (*effectiveCredentialPolicy, error) {
++	selection, err := req.Machine.CredentialStoreFor(req.Profile, adapter.ID)
++	if err != nil {
++		return nil, err
++	}
++	p := &effectiveCredentialPolicy{
++		selection: selection,
++		links:     map[string]string{}, strategies: map[string]string{}, records: []envmarker.Passthrough{},
++	}
++	var native string
++	if adapter.ID == envregistry.CodexCLI {
++		native, err = req.nativeHome(adapter.ID)
++		if err != nil {
++			return nil, err
++		}
++		p.nativeStore, err = req.codexCredentialStore(native)
++		if err != nil {
++			return nil, err
++		}
++	}
++	if err := admitCredentialStore(adapter, req.Profile, selection); err != nil {
++		return nil, err
++	}
++	atAbove := true
++	if ok, known := adapter.AtOrAbovePinned(req.detected(adapter)); known {
++		atAbove = ok
++	}
++	p.isolation, err = req.Machine.EffectiveIsolation(req.Profile, adapter, atAbove)
++	if err != nil {
++		return nil, err
++	}
++	if adapter.ID == envregistry.CodexCLI && p.isolation == envregistry.IsolationIsolated && p.nativeStore != "file" {
++		return nil, fmt.Errorf("%s: isolated is unsupported for codex_cli under native %s storage: the keyring identity is operator-global, independent of CODEX_HOME", envregistry.DiagIsolatedUnsupported, p.nativeStore)
++	}
++	if p.isolation == envregistry.IsolationIsolated {
++		if adapter.ID == envregistry.ClaudeCode && runtime.GOOS == "darwin" {
++			p.records = append(p.records, envmarker.Passthrough{
++				Isolation: p.isolation, Strategy: envregistry.StrategyPerHomeKeychain,
++				SourceRole: "managed", Backend: "keychain", BackendVersion: adapter.VerifiedRelease,
++			})
++		}
++	} else {
++		entries := adapter.PassthroughFor(runtime.GOOS)
++		if len(entries) > 0 && adapter.VerifiedRelease == "" {
++			return nil, fmt.Errorf("%s: %s has no verified credential backend release", envregistry.DiagCredentialUnsupported, adapter.ID)
++		}
++		if native == "" && len(entries) > 0 {
++			native, err = req.nativeHome(adapter.ID)
++			if err != nil {
++				return nil, err
++			}
++		}
++		for _, entry := range entries {
++			record := envmarker.Passthrough{
++				Isolation: p.isolation, Strategy: entry.Strategy, SourceRole: "native",
++				Backend: "file", BackendVersion: adapter.VerifiedRelease,
++			}
++			switch entry.Strategy {
++			case envregistry.StrategyFileLink:
++				record.Path = entry.Path
++			case envregistry.StrategyKeyringPreferred:
++				if p.nativeStore == "keyring" {
++					record.Backend = "ambient"
++				} else {
++					record.Path = entry.Path
++				}
++			case envregistry.StrategyAmbient:
++				record.Backend = "ambient"
++			case envregistry.StrategyPerHomeKeychain:
++				record.SourceRole = "managed"
++				record.Backend = "keychain"
++			default:
++				return nil, fmt.Errorf("%s: %s declares unsupported credential strategy %q", envregistry.DiagCredentialUnsupported, adapter.ID, entry.Strategy)
++			}
++			if record.Path != "" {
++				p.links[record.Path] = filepath.Join(native, filepath.FromSlash(entry.FileLinkTarget))
++				p.strategies[record.Path] = envregistry.StrategyFileLink
++			}
++			p.records = append(p.records, record)
++		}
++	}
++	sort.Slice(p.records, func(i, j int) bool {
++		if p.records[i].Path != p.records[j].Path {
++			return p.records[i].Path < p.records[j].Path
++		}
++		return p.records[i].Strategy < p.records[j].Strategy
++	})
++	return p, nil
++}
++
++func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter) (map[string]string, map[string]string, error) {
++	p, err := req.resolveCredentialPolicy(adapter)
++	if err != nil {
++		return nil, nil, err
++	}
++	return p.links, p.strategies, nil
++}
++
++func (req *ResolveRequest) credentialRecords(adapter envregistry.Adapter, provenance string) ([]envmarker.Passthrough, error) {
++	p, err := req.resolveCredentialPolicy(adapter)
++	if err != nil {
++		return nil, err
++	}
++	records := append([]envmarker.Passthrough{}, p.records...)
++	for i := range records {
++		records[i].Provenance = provenance
++	}
++	return records, nil
+ }
+diff --git a/internal/envprofile/credential_projection_test.go b/internal/envprofile/credential_projection_test.go
+new file mode 100644
+index 00000000..29056c9e
+--- /dev/null
++++ b/internal/envprofile/credential_projection_test.go
+@@ -0,0 +1,220 @@
++package envprofile
++
++import (
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++// Resolve must use one native selector observation for admission, links and
++// marker records, including repair's verification passes. A later operation
++// must observe a changed selector rather than reuse the previous projection.
++func TestCredentialProjectionSingleObservation(t *testing.T) {
++	requireLinkCapability(t)
++	for _, mode := range []string{envregistry.IsolationShared, envregistry.IsolationIsolated} {
++		t.Run(mode, func(t *testing.T) {
++			fx := writeManagedFixture(t, "projection")
++			seedLiveNativeCredentials(t, fx)
++			req := fx.request(envregistry.CodexCLI)
++			req.Repair = true
++			req.Machine.Isolation[fx.profile] = map[string]string{envregistry.CodexCLI: mode}
++			path := filepath.Join(fx.native[envregistry.CodexCLI], "config.toml")
++			if err := os.WriteFile(path, []byte("cli_auth_credentials_store = 'file'\n"), 0600); err != nil {
++				t.Fatal(err)
++			}
++			if _, err := Resolve(req); err != nil {
++				t.Fatal(err)
++			}
++			// Force the repair path without asking the one-time provisioning
++			// seed reader to share the policy observation.
++			if err := os.Remove(filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI), "AGENTS.md")); err != nil {
++				t.Fatal(err)
++			}
++			reads := 0
++			req.readRegularFile = func(name string) (stateread.File, error) {
++				if name == path {
++					reads++
++					if reads > 1 {
++						return stateread.File{}, os.ErrPermission
++					}
++				}
++				return stateread.ReadRegularFile(name)
++			}
++			result, err := Resolve(req)
++			if err != nil || result == nil || len(result.Document) == 0 {
++				t.Fatalf("one file observation should resolve: result=%+v err=%v reads=%d", result, err, reads)
++			}
++			if reads != 1 {
++				t.Fatalf("native selector observed %d times, want exactly once", reads)
++			}
++			marker := readManagedMarker(t, fx, envregistry.CodexCLI)
++			if marker.Passthrough == nil {
++				t.Fatal("missing credential records")
++			}
++			link := filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI), "auth.json")
++			if mode == envregistry.IsolationShared {
++				if len(*marker.Passthrough) != 1 || (*marker.Passthrough)[0].Backend != "file" {
++					t.Fatalf("records disagree with observed file policy: %+v", marker.Passthrough)
++				}
++				if target, err := os.Readlink(link); err != nil || target != filepath.Join(fx.native[envregistry.CodexCLI], "auth.json") {
++					t.Fatalf("file policy link = %s, %v", target, err)
++				}
++			} else if _, err := os.Lstat(link); !os.IsNotExist(err) || len(*marker.Passthrough) != 0 {
++				t.Fatalf("isolated policy must not share credentials: %v %+v", err, marker.Passthrough)
++			}
++
++			// The same public request value is reusable; the projection belongs
++			// to one operation, not to the caller or a process-wide cache.
++			reads = 0
++			if _, err := Resolve(req); err != nil || reads != 1 {
++				t.Fatalf("fresh operation must reobserve: err=%v reads=%d", err, reads)
++			}
++			if err := os.WriteFile(path, []byte("cli_auth_credentials_store = 'invalid'\n"), 0600); err != nil {
++				t.Fatal(err)
++			}
++			before := snapshotCredentialScope(t, fx)
++			reads = 0
++			result, err = Resolve(req)
++			if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialUnsupported) || result != nil && len(result.Document) != 0 || reads != 1 {
++				t.Fatalf("changed selector must refuse: result=%+v err=%v reads=%d", result, err, reads)
++			}
++			if !reflect.DeepEqual(before, snapshotCredentialScope(t, fx)) {
++				t.Fatal("selector refusal changed configuration, markers, links or credentials")
++			}
++		})
++	}
++}
++
++// Native keyring and auto remain forbidden for isolated homes. The adjacent
++// file control proves admission is reachable; refusals preserve all credential
++// scope bytes and links even when repair is requested.
++func TestCredentialProjectionIsolationRefusals(t *testing.T) {
++	for _, store := range []string{"file", "keyring", "auto"} {
++		t.Run(store, func(t *testing.T) {
++			fx := writeManagedFixture(t, "isolation")
++			seedLiveNativeCredentials(t, fx)
++			path := filepath.Join(fx.native[envregistry.CodexCLI], "config.toml")
++			if err := os.WriteFile(path, []byte("cli_auth_credentials_store = '"+store+"'\n"), 0600); err != nil {
++				t.Fatal(err)
++			}
++			req := fx.request(envregistry.CodexCLI)
++			req.Repair = true
++			req.Machine.Isolation[fx.profile] = map[string]string{envregistry.CodexCLI: envregistry.IsolationIsolated}
++			before := snapshotCredentialScope(t, fx)
++			result, err := Resolve(req)
++			if store == "file" {
++				if err != nil || result == nil || len(result.Document) == 0 {
++					t.Fatalf("file positive control: result=%+v err=%v", result, err)
++				}
++				return
++			}
++			if err == nil || !strings.Contains(err.Error(), envregistry.DiagIsolatedUnsupported) || result != nil && len(result.Document) != 0 {
++				t.Fatalf("native %s isolation must refuse: result=%+v err=%v", store, result, err)
++			}
++			if !reflect.DeepEqual(before, snapshotCredentialScope(t, fx)) {
++				t.Fatal("isolation refusal changed forbidden state")
++			}
++		})
++	}
++}
++
++// StatusOf uses the same policy as Resolve, without a second native selector
++// read. Failed observation reports non-current without modifying the home;
++// a later readable observation restores current status rather than caching it.
++func TestCredentialProjectionStatusObservation(t *testing.T) {
++	fx := writeManagedFixture(t, "status-projection")
++	seedLiveNativeCredentials(t, fx)
++	provision(t, fx, envregistry.CodexCLI, envregistry.DefaultMachineConfig())
++	path := filepath.Join(fx.native[envregistry.CodexCLI], "config.toml")
++	for _, refused := range []bool{false, true, false} {
++		req := statusRequest(fx)
++		reads := 0
++		req.readRegularFile = func(name string) (stateread.File, error) {
++			if name == path {
++				reads++
++				if refused || reads > 1 {
++					return stateread.File{}, os.ErrPermission
++				}
++			}
++			return stateread.ReadRegularFile(name)
++		}
++		before := snapshotCredentialScope(t, fx)
++		status, err := StatusOf(req)
++		if err != nil {
++			t.Fatal(err)
++		}
++		row := findHome(status, fx.profile, envregistry.CodexCLI)
++		if row == nil || row.Current == refused || reads != 1 {
++			t.Fatalf("status projection: row=%+v refused=%v reads=%d", row, refused, reads)
++		}
++		if refused && !strings.Contains(strings.Join(row.Findings, ";"), envregistry.DiagSeedUnreadable) {
++			t.Fatalf("failed observation must retain unreadable diagnostic: %+v", row)
++		}
++		if !reflect.DeepEqual(before, snapshotCredentialScope(t, fx)) {
++			t.Fatal("status observation changed forbidden state")
++		}
++	}
++}
++
++// Identity-only staging must preserve a sibling's recorded sharing policy,
++// even when the caller already resolved a different isolation. The internal
++// staging entry is the bound here: Resolve/ApplyMigration integration is
++// exercised separately by the existing RC14 identity-migration tests.
++func TestCredentialProjectionIdentitySubrequest(t *testing.T) {
++	for _, mode := range []string{envregistry.IsolationShared, envregistry.IsolationIsolated} {
++		t.Run(mode, func(t *testing.T) {
++			fx := legacyIdentityFixture(t, envregistry.Pi)
++			marker := readManagedMarker(t, fx, envregistry.Pi)
++			marker.Version = envmarker.VersionV1
++			records := []envmarker.Passthrough{}
++			for _, record := range *marker.Passthrough {
++				records = append(records, envmarker.Passthrough{Path: record.Path, Strategy: record.Strategy})
++			}
++			marker.Passthrough = &records
++			payload, err := marker.Marshal()
++			if err != nil {
++				t.Fatal(err)
++			}
++			markerPath := filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.Pi), envmarker.Name)
++			if err := os.WriteFile(markerPath, payload, 0600); err != nil {
++				t.Fatal(err)
++			}
++			req := fx.request(envregistry.Pi)
++			req.Machine.Isolation[fx.profile] = map[string]string{envregistry.Pi: mode}
++			adapter, err := envregistry.ByID(envregistry.Pi)
++			if err != nil {
++				t.Fatal(err)
++			}
++			policy, err := req.resolveCredentialPolicy(adapter)
++			if err != nil || policy.isolation != mode {
++				t.Fatalf("caller policy: %+v, %v", policy, err)
++			}
++			before := snapshotCredentialScope(t, fx)
++			migration, err := prepareIdentityMigration(&req, []string{fx.profile}, nil)
++			if err != nil {
++				t.Fatal(err)
++			}
++			defer migration.cleanup()
++			if !reflect.DeepEqual(before, snapshotCredentialScope(t, fx)) {
++				t.Fatal("identity staging changed live credential scope")
++			}
++			staged, err := os.ReadFile(migration.targets[markerPath])
++			if err != nil {
++				t.Fatal(err)
++			}
++			projected, err := envmarker.Parse(staged)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if projected.Passthrough == nil || len(*projected.Passthrough) != 1 || (*projected.Passthrough)[0].Isolation != envregistry.IsolationShared || (*projected.Passthrough)[0].Path != "auth.json" {
++				t.Fatalf("identity-only staging must keep recorded shared policy: %+v", projected.Passthrough)
++			}
++		})
++	}
++}
+diff --git a/internal/envprofile/identity_migration.go b/internal/envprofile/identity_migration.go
+index fc817fc2..5bffad1c 100644
+--- a/internal/envprofile/identity_migration.go
++++ b/internal/envprofile/identity_migration.go
+@@ -258,6 +258,9 @@ func prepareIdentityMigration(req *ResolveRequest, profiles []string, report *Mi
+ 				}
+ 			}
+ 			rr := *req
++			// This subrequest adopts the recorded home's isolation below;
++			// the caller's projection describes different policy inputs.
++			rr.credentialPolicy = nil
+ 			rr.Profile = profile
+ 			rr.EnvID = adapter.ID
+ 			rr.Policy.PrecedenceWinner = prior.Precedence.Winner
+@@ -411,7 +414,7 @@ func prepareIdentityMigration(req *ResolveRequest, profiles []string, report *Mi
+ 			marker.Members = plan.marker.Members
+ 			marker.Surfaces = plan.marker.Surfaces
+ 			if prior.Version == envmarker.VersionV1 {
+-				records, err := rr.credentialRecords(adapter, plan.isolation, "migrated")
++				records, err := rr.credentialRecords(adapter, "migrated")
+ 				if err != nil {
+ 					return nil, err
+ 				}
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index 0842368c..b50b2ee9 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -120,6 +120,7 @@ type ResolveRequest struct {
+ 	readRegularFile      func(string) (stateread.File, error)
+ 	boundaryOwnerLookup  pathboundary.OwnerLookup
+ 	storeRepairAttempted bool
++	credentialPolicy     *credentialPolicyResolution
+ 	preserveLockHash     string
+ 	// beforeRepairLock is a race-injection seam; production leaves it nil.
+ 	beforeRepairLock func()
+@@ -322,20 +323,11 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	// An unknown release warns (environment_tool_version_unverified, emitted
+-	// by verification) rather than blocks: the selection scheme stands on
+-	// the bundle evidence, so resolution proceeds as at-or-above.
+-	atAbove := true
+-	if ok, known := adapter.AtOrAbovePinned(req.detected(adapter)); known {
+-		atAbove = ok
+-	}
+-	isolation, err := req.Machine.EffectiveIsolation(req.Profile, adapter, atAbove)
++	credentialPolicy, err := req.resolveCredentialPolicy(adapter)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	if err := req.checkIsolatedCredentialStore(adapter, isolation); err != nil {
+-		return nil, err
+-	}
++	isolation := credentialPolicy.isolation
+ 	plan := &homePlan{
+ 		adapter:     adapter,
+ 		hashVersion: lock.ContentHashVersion(),
+@@ -570,128 +562,6 @@ func (p *homePlan) publishDocs() error {
+ 	return nil
+ }
+ 
+-// effectivePassthrough computes the passthrough links a managed home
+-// records: home-relative path to native absolute target, with the strategy
+-// (§7.4). isolated homes link nothing; keyring-backed codex homes are
+-// ambient and link nothing; every file-shaped strategy is watched by the
+-// liveness row. The native config.toml read is read-only: an absent file
+-// or an absent key means the default file store, while an unreadable file
+-// fails instead of defaulting — absence and a failed read are different
+-// facts (§8.4.1) — and a selector outside the verified file/keyring/auto
+-// set fails closed with environment_credential_unsupported.
+-func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter, isolation string) (map[string]string, map[string]string, error) {
+-	links := map[string]string{}
+-	strategies := map[string]string{}
+-	if isolation == envregistry.IsolationIsolated {
+-		return links, strategies, nil
+-	}
+-	native, err := req.nativeHome(adapter.ID)
+-	if err != nil {
+-		return nil, nil, err
+-	}
+-	for _, entry := range adapter.PassthroughFor(runtime.GOOS) {
+-		switch entry.Strategy {
+-		case envregistry.StrategyPerHomeKeychain, envregistry.StrategyAmbient:
+-			continue
+-		case envregistry.StrategyKeyringPreferred:
+-			store, err := req.codexCredentialStore(native)
+-			if err != nil {
+-				return nil, nil, err
+-			}
+-			if store == "keyring" {
+-				continue
+-			}
+-			links[entry.Path] = filepath.Join(native, filepath.FromSlash(entry.FileLinkTarget))
+-			strategies[entry.Path] = envregistry.StrategyFileLink
+-		case envregistry.StrategyFileLink:
+-			links[entry.Path] = filepath.Join(native, filepath.FromSlash(entry.FileLinkTarget))
+-			strategies[entry.Path] = envregistry.StrategyFileLink
+-		}
+-	}
+-	return links, strategies, nil
+-}
+-
+-// credentialRecords computes the schema-v2 record for each declared
+-// credential strategy. It records links plus supported linkless strategies;
+-// the latter deliberately have no Path and never enter link inventory.
+-func (req *ResolveRequest) credentialRecords(adapter envregistry.Adapter, isolation, provenance string) ([]envmarker.Passthrough, error) {
+-	if isolation == envregistry.IsolationIsolated {
+-		if adapter.ID == envregistry.ClaudeCode && runtime.GOOS == "darwin" {
+-			return []envmarker.Passthrough{{
+-				Isolation: isolation, Strategy: envregistry.StrategyPerHomeKeychain,
+-				SourceRole: "managed", Backend: "keychain", BackendVersion: adapter.VerifiedRelease,
+-				Provenance: provenance,
+-			}}, nil
+-		}
+-		return []envmarker.Passthrough{}, nil
+-	}
+-	if isolation != envregistry.IsolationShared {
+-		return nil, fmt.Errorf("unsupported credential isolation %q", isolation)
+-	}
+-	entries := adapter.PassthroughFor(runtime.GOOS)
+-	if len(entries) == 0 {
+-		return []envmarker.Passthrough{}, nil
+-	}
+-	if adapter.VerifiedRelease == "" {
+-		return nil, fmt.Errorf("%s: %s has no verified credential backend release", envregistry.DiagCredentialUnsupported, adapter.ID)
+-	}
+-	native, err := req.nativeHome(adapter.ID)
+-	if err != nil {
+-		return nil, err
+-	}
+-	links, _, err := req.effectivePassthrough(adapter, isolation)
+-	if err != nil {
+-		return nil, err
+-	}
+-	var codexStore string
+-	for _, entry := range entries {
+-		if entry.Strategy == envregistry.StrategyKeyringPreferred {
+-			codexStore, err = req.codexCredentialStore(native)
+-			if err != nil {
+-				return nil, err
+-			}
+-			break
+-		}
+-	}
+-	records := make([]envmarker.Passthrough, 0, len(entries))
+-	for _, entry := range entries {
+-		record := envmarker.Passthrough{
+-			Isolation: isolation, Strategy: entry.Strategy, SourceRole: "native",
+-			Backend: "file", BackendVersion: adapter.VerifiedRelease, Provenance: provenance,
+-		}
+-		switch entry.Strategy {
+-		case envregistry.StrategyFileLink:
+-			record.Path = entry.Path
+-		case envregistry.StrategyKeyringPreferred:
+-			if codexStore == "keyring" {
+-				record.Backend = "ambient"
+-			} else {
+-				record.Path = entry.Path
+-			}
+-		case envregistry.StrategyAmbient:
+-			record.Backend = "ambient"
+-		case envregistry.StrategyPerHomeKeychain:
+-			record.SourceRole = "managed"
+-			record.Backend = "keychain"
+-		default:
+-			return nil, fmt.Errorf("%s: %s declares unsupported credential strategy %q", envregistry.DiagCredentialUnsupported, adapter.ID, entry.Strategy)
+-		}
+-		if record.Path != "" {
+-			if _, linked := links[record.Path]; !linked {
+-				return nil, fmt.Errorf("%s: %s credential path %s has no effective link", envregistry.DiagCredentialUnsupported, adapter.ID, record.Path)
+-			}
+-		}
+-		records = append(records, record)
+-	}
+-	sort.Slice(records, func(i, j int) bool {
+-		if records[i].Path != records[j].Path {
+-			return records[i].Path < records[j].Path
+-		}
+-		return records[i].Strategy < records[j].Strategy
+-	})
+-	return records, nil
+-}
+-
+ // codexCredentialStore resolves the operator's native codex credential
+ // store: the top-level cli_auth_credentials_store selector when the
+ // native config.toml carries one, else the platform default file — an
+@@ -748,42 +618,6 @@ func codexCredentialStoreWith(native string, readRegularFile func(string) (state
+ 	}
+ }
+ 
+-// checkIsolatedCredentialStore gates codex_cli isolated on the native
+-// effective store (§7.4): isolated is admitted under file storage only —
+-// including an absent cli_auth_credentials_store key, which resolves to
+-// effective file. Under keyring or auto storage the keyring identity is
+-// assumed operator-global, so isolated is
+-// environment_isolated_unsupported; a selector outside the verified set
+-// fails closed with environment_credential_unsupported from the store
+-// reader. Every other adapter × mode passes here: the static matrix in
+-// the registry already decided it.
+-func (req *ResolveRequest) checkIsolatedCredentialStore(adapter envregistry.Adapter, isolation string) error {
+-	if err := req.admitCredentialStore(adapter); err != nil {
+-		return err
+-	}
+-	if adapter.ID != envregistry.CodexCLI || isolation != envregistry.IsolationIsolated {
+-		return nil
+-	}
+-	native, err := req.nativeHome(adapter.ID)
+-	if err != nil {
+-		return err
+-	}
+-	store, err := req.codexCredentialStore(native)
+-	if err != nil {
+-		return err
+-	}
+-	switch store {
+-	case "file":
+-		return nil
+-	case "keyring":
+-		return fmt.Errorf("%s: isolated is unsupported for codex_cli under native keyring storage: the keyring identity is operator-global, independent of CODEX_HOME", envregistry.DiagIsolatedUnsupported)
+-	case "auto":
+-		return fmt.Errorf("%s: isolated is unsupported for codex_cli under native auto storage: the tool uses the keyring when one is available, so an isolated home on a keyring host would authenticate through the operator-global keyring", envregistry.DiagIsolatedUnsupported)
+-	default:
+-		return fmt.Errorf("%s: codex native cli_auth_credentials_store %q is outside the verified file, keyring, and auto set", envregistry.DiagCredentialUnsupported, store)
+-	}
+-}
+-
+ // seedBundle is the one-time provisioning class (§7.4): non-credential
+ // files copied from the native home exactly once, at provisioning, never
+ // refreshed, never hashed.
+@@ -1495,7 +1329,7 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
+ 		record.NativeMCPServers = append([]string{}, seeds.codexSeedRecord.NativeMCPServers...)
+ 		marker.CodexSeedRecord = &record
+ 	}
+-	links, _, err := req.effectivePassthrough(plan.adapter, plan.isolation)
++	links, _, err := req.effectivePassthrough(plan.adapter)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -1520,7 +1354,7 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
+ 	if err := removeStaleCredentialLinks(plan.adapter, plan.homeDir, native, prior, links, migrateCmd); err != nil {
+ 		return nil, err
+ 	}
+-	passthrough, err := req.credentialRecords(plan.adapter, plan.isolation, provenance)
++	passthrough, err := req.credentialRecords(plan.adapter, provenance)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -2181,13 +2015,13 @@ func equalStrings(a, b []string) bool {
+ // is a conflict/inspection diagnostic and stays stale, never absence
+ // and never silence.
+ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, marker *envmarker.Marker) {
+-	links, strategies, err := req.effectivePassthrough(plan.adapter, plan.isolation)
++	links, strategies, err := req.effectivePassthrough(plan.adapter)
+ 	if err != nil {
+ 		v.reasons = append(v.reasons, fmt.Sprintf("passthrough: %v", err))
+ 		return
+ 	}
+ 	if marker.Version != envmarker.VersionV1 {
+-		expected, err := req.credentialRecords(plan.adapter, plan.isolation, "provisioned")
++		expected, err := req.credentialRecords(plan.adapter, "provisioned")
+ 		if err != nil {
+ 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough: %v", err))
+ 			return
+@@ -2598,9 +2432,17 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	if err := req.admitCredentialStore(adapter); err != nil {
++	selection, err := req.Machine.CredentialStoreFor(req.Profile, adapter.ID)
++	if err != nil {
+ 		return nil, err
+ 	}
++	// Preserve native stale-home reporting through verification. Explicit
++	// selectors must refuse at the activation boundary before provisioning.
++	if selection != envregistry.CredentialStoreNative {
++		if _, err := req.resolveCredentialPolicy(adapter); err != nil {
++			return nil, err
++		}
++	}
+ 	if req.PreserveLock {
+ 		if req.preserveLockHash == "" {
+ 			req.preserveLockHash = hash
+@@ -2828,7 +2670,7 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 			return nil, err
+ 		}
+ 	}
+-	passthroughLinks, _, err := req.effectivePassthrough(adapter, plan.isolation)
++	passthroughLinks, _, err := req.effectivePassthrough(adapter)
+ 	if err != nil {
+ 		if provisioned || isCredentialRefusal(err) {
+ 			return nil, err
+diff --git a/internal/envprofile/migrate.go b/internal/envprofile/migrate.go
+index 41c9a4e6..2767037b 100644
+--- a/internal/envprofile/migrate.go
++++ b/internal/envprofile/migrate.go
+@@ -424,29 +424,21 @@ func inventoryHome(req *MigrateRequest, profile string, adapter envregistry.Adap
+ 	home.markerRaw = payload
+ 	home.Mode = marker.Mode
+ 	rr := req.resolveFor(profile, adapter.ID)
+-	atAbove := true
+-	if ok, known := adapter.AtOrAbovePinned(rr.detected(adapter)); known {
+-		atAbove = ok
+-	}
+-	isolation, err := req.Machine.EffectiveIsolation(profile, adapter, atAbove)
++	policy, err := rr.resolveCredentialPolicy(adapter)
+ 	if err != nil {
+-		home.addConflict("", fmt.Sprintf("machine configuration refused: %v", err),
+-			"fix the isolation setting out of band and re-run")
++		home.addConflict("", fmt.Sprintf("cannot establish the credential strategy: %v", err),
++			"fix the native credential configuration out of band or correct the machine credential store/isolation setting, then re-run")
+ 		return home
+ 	}
++	isolation := policy.isolation
+ 	home.Isolation = isolation
+-	if err := rr.checkIsolatedCredentialStore(adapter, isolation); err != nil {
+-		home.addConflict("", fmt.Sprintf("machine configuration refused: %v", err),
+-			"fix the isolation setting out of band and re-run")
+-		return home
+-	}
+-	links, strategies, err := rr.effectivePassthrough(adapter, isolation)
++	links, strategies, err := rr.effectivePassthrough(adapter)
+ 	if err != nil {
+ 		home.addConflict("", fmt.Sprintf("cannot establish the credential strategy: %v", err),
+ 			"fix the native credential configuration out of band and re-run")
+ 		return home
+ 	}
+-	credentials, err := rr.credentialRecords(adapter, isolation, "migrated")
++	credentials, err := rr.credentialRecords(adapter, "migrated")
+ 	if err != nil {
+ 		home.addConflict("", fmt.Sprintf("cannot establish the credential record: %v", err),
+ 			"fix the credential configuration out of band and re-run")

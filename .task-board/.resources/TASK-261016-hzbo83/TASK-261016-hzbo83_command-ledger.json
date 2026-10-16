@@ -1,0 +1,200 @@
+[
+  {
+    "log": "projection-red-01.log",
+    "command": "go test ./internal/envprofile -run 'TestCredentialProjection' -count=1",
+    "exit_code": 1,
+    "note": "Expected-red regression on old production; also exposed the separate provisioning-seed read; not passing evidence"
+  },
+  {
+    "log": "projection-red-02.log",
+    "command": "go test ./internal/envprofile -run 'TestCredentialProjection' -count=1",
+    "exit_code": 1,
+    "note": "Expected-red regression after narrowing the fixture to repair; old policy repeated observations"
+  },
+  {
+    "log": "projection-green-01.log",
+    "command": "go test ./internal/envprofile -run 'TestCredentialProjection|TestCredentialStorePolicy' -count=1",
+    "exit_code": 0,
+    "note": "Historical intermediate implementation; superseded by current candidate tests"
+  },
+  {
+    "log": "projection-green-02.log",
+    "command": "go test ./internal/envprofile -run 'TestCredentialProjection|TestCredentialStorePolicy' -count=1",
+    "exit_code": 0,
+    "note": "Historical intermediate implementation; superseded"
+  },
+  {
+    "log": "focused-01.log",
+    "command": "go test ./internal/envprofile ./internal/envregistry ./internal/config ./cmd/curator -run 'Test(Credential|Codex|Muse|.*Isolation|Migrate|Resolve.*Credential)' -count=1",
+    "exit_code": 1,
+    "note": "Real failure: stale-home and migration diagnostic regressions; corrected with original tests preserved"
+  },
+  {
+    "log": "projection-green-03.log",
+    "command": "go test ./internal/envprofile -run 'TestCredentialProjection|TestCredentialStorePolicy|TestCodexUnreadableConfigFails|TestMigrateConflictsRefuse' -count=1",
+    "exit_code": 1,
+    "note": "Despite its provisional filename this log is RED: repeated failed observations; corrected"
+  },
+  {
+    "log": "focused-02.log",
+    "command": "go test ./internal/envprofile ./internal/envregistry ./internal/config ./cmd/curator -run 'Test(Credential|Codex|Muse|.*Isolation|Migrate|Resolve.*Credential)' -count=1",
+    "exit_code": 0,
+    "note": "Before final identity-subrequest correction; superseded"
+  },
+  {
+    "log": "build-01.log",
+    "command": "go build ./...",
+    "exit_code": 0,
+    "note": "Before final identity-subrequest correction; superseded"
+  },
+  {
+    "log": "projection-green-04.log",
+    "command": "go test ./internal/envprofile -run 'TestCredentialProjection|TestCredentialStorePolicy|TestCodexUnreadableConfigFails|TestMigrateConflictsRefuse|TestSharedToIsolatedRemovesStaleLink' -count=1",
+    "exit_code": 0,
+    "note": "Before final identity-subrequest correction; superseded"
+  },
+  {
+    "log": "lint-01.log",
+    "command": "make lint",
+    "exit_code": 2,
+    "note": "Real failure from stale shared lint cache; not passing evidence"
+  },
+  {
+    "log": "lint-02.log",
+    "command": "GOLANGCI_LINT_CACHE=\"$PWD/.temp/TASK-261016-hzbo83/lint-cache\" make lint",
+    "exit_code": 0,
+    "note": "Isolated cache; before final identity-subrequest correction; superseded"
+  },
+  {
+    "log": "remote-gate-01.log",
+    "command": "sh scripts/remote-gate.sh",
+    "exit_code": 129,
+    "note": "Deliberately cancelled during self-review; run 38904190282; not passing evidence"
+  },
+  {
+    "log": "projection-green-05.log",
+    "command": "go test ./internal/envprofile -run 'TestCredentialProjection|TestCredentialStorePolicy|TestRC14.*Identity' -count=1",
+    "exit_code": 0,
+    "note": "Before strengthening staged-marker assertion; superseded"
+  },
+  {
+    "log": "projection-green-06.log",
+    "command": "go test ./internal/envprofile -run 'TestCredentialProjection|TestCredentialStorePolicy|TestRC14.*Identity' -count=1",
+    "exit_code": 0,
+    "note": "Current candidate"
+  },
+  {
+    "log": "focused-03.log",
+    "command": "go test ./internal/envprofile ./internal/envregistry ./internal/config ./cmd/curator -run 'Test(Credential|Codex|Muse|.*Isolation|Migrate|Resolve.*Credential)' -count=1",
+    "exit_code": 0,
+    "note": "Current candidate"
+  },
+  {
+    "log": "build-02.log",
+    "command": "go build ./...",
+    "exit_code": 0,
+    "note": "Current candidate"
+  },
+  {
+    "log": "lint-03.log",
+    "command": "GOLANGCI_LINT_CACHE=\"$PWD/.temp/TASK-261016-hzbo83/lint-cache\" make lint",
+    "exit_code": 0,
+    "note": "Current candidate"
+  },
+  {
+    "log": "coverage-01.log",
+    "command": "go test ./internal/envprofile -run 'TestCredential|TestCodex|TestMuse|TestSharedToIsolatedRemovesStaleLink|TestRC14.*Identity' -coverprofile=.temp/TASK-261016-hzbo83/policy.coverage -count=1",
+    "exit_code": 0,
+    "note": "Current candidate; selected policy file 81.8%; package subset 33.7%"
+  },
+  {
+    "log": "coverage-functions.log",
+    "command": "go tool cover -func=.temp/TASK-261016-hzbo83/policy.coverage",
+    "exit_code": 0,
+    "note": "Current candidate coverage report"
+  },
+  {
+    "log": "controls-01.log",
+    "command": "python3 .temp/TASK-261016-hzbo83/mutants/run-controls.py",
+    "exit_code": 0,
+    "note": "All seven child Go tests exit 1 with named failure; M5 was subsequently narrowed further"
+  },
+  {
+    "log": "controls-02.log",
+    "command": "python3 <evidence>/TASK-261016-hzbo83_controls.py",
+    "exit_code": 0,
+    "note": "Portable script rehearsal; M5 was subsequently narrowed further"
+  },
+  {
+    "log": "controls-03.log",
+    "command": "python3 .temp/TASK-261016-hzbo83/TASK-261016-hzbo83_controls.py",
+    "exit_code": 0,
+    "note": "Current attached portable script; all seven child Go tests exit 1 with named failure"
+  },
+  {
+    "log": "mutant-M1.log",
+    "command": "go test -overlay .temp/TASK-261016-hzbo83/mutants/M1-auto-isolated.json ./internal/envprofile -run '^TestCredentialProjectionIsolationRefusals/auto$' -count=1",
+    "exit_code": 1,
+    "note": "Expected-red named behavioral failure; not a passing Go test; retained source/test identity unchanged except later M5 definition refinement"
+  },
+  {
+    "log": "mutant-M2.log",
+    "command": "go test -overlay .temp/TASK-261016-hzbo83/mutants/M2-muse-file-admitted.json ./internal/envprofile -run '^TestCredentialStorePolicyActivation/muse/file$' -count=1",
+    "exit_code": 1,
+    "note": "Expected-red named behavioral failure; not a passing Go test; retained source/test identity unchanged except later M5 definition refinement"
+  },
+  {
+    "log": "mutant-M3.log",
+    "command": "go test -overlay .temp/TASK-261016-hzbo83/mutants/M3-permission-defaults-file.json ./internal/envprofile -run '^TestCredentialStorePolicyNativeInspection/permission$' -count=1",
+    "exit_code": 1,
+    "note": "Expected-red named behavioral failure; not a passing Go test; retained source/test identity unchanged except later M5 definition refinement"
+  },
+  {
+    "log": "mutant-M4.log",
+    "command": "go test -overlay .temp/TASK-261016-hzbo83/mutants/M4-keyring-resurrects-file.json ./internal/envprofile -run '^TestCodexKeyringAmbient/keyring$' -count=1",
+    "exit_code": 1,
+    "note": "Expected-red named behavioral failure; not a passing Go test; retained source/test identity unchanged except later M5 definition refinement"
+  },
+  {
+    "log": "mutant-M5.log",
+    "command": "go test -overlay .temp/TASK-261016-hzbo83/mutants/M5-shared-second-observation.json ./internal/envprofile -run '^TestCredentialProjectionSingleObservation/shared$' -count=1",
+    "exit_code": 1,
+    "note": "Expected-red named behavioral failure; not a passing Go test; retained source/test identity unchanged except later M5 definition refinement"
+  },
+  {
+    "log": "mutant-M6.log",
+    "command": "go test -overlay .temp/TASK-261016-hzbo83/mutants/M6-error-reobservation.json ./internal/envprofile -run '^TestCredentialProjectionSingleObservation$' -count=1",
+    "exit_code": 1,
+    "note": "Expected-red named behavioral failure; not a passing Go test; retained source/test identity unchanged except later M5 definition refinement"
+  },
+  {
+    "log": "mutant-M7.log",
+    "command": "go test -overlay .temp/TASK-261016-hzbo83/mutants/M7-pi-subrequest-reuses-policy.json ./internal/envprofile -run '^TestCredentialProjectionIdentitySubrequest/isolated$' -count=1",
+    "exit_code": 1,
+    "note": "Expected-red named behavioral failure; not a passing Go test; retained source/test identity unchanged except later M5 definition refinement"
+  },
+  {
+    "log": "mutant-M5-narrowed.log",
+    "command": "go test -overlay .temp/TASK-261016-hzbo83/mutants/M5-shared-second-observation.json ./internal/envprofile -run '^TestCredentialProjectionSingleObservation/shared$' -count=1",
+    "exit_code": 1,
+    "note": "Current narrowed M5; only successful shared policy reuse bypassed; failed observations still cached"
+  },
+  {
+    "log": "diff-check-06.log",
+    "command": "git diff --check",
+    "exit_code": 0,
+    "note": "Current candidate; last standalone check"
+  },
+  {
+    "log": "candidate-tree.log / gate-tree.log",
+    "command": "cmp .temp/TASK-261016-hzbo83/candidate-tree.log .temp/TASK-261016-hzbo83/gate-tree.log",
+    "exit_code": 0,
+    "note": "Candidate tree equals hosted snapshot tree"
+  },
+  {
+    "log": "remote-gate-02.log",
+    "command": "sh scripts/remote-gate.sh",
+    "exit_code": 0,
+    "note": "Current exact candidate; hosted run 38904812207 success; supervising process exited 0; optional workflow-skipped jobs not claimed executed"
+  }
+]
