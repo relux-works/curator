@@ -1,0 +1,59 @@
+from pathlib import Path
+import json
+root=Path.cwd()
+p=root/'cmd/curator/muse_root_context_test.go'
+extra=r'''
+// Reviewer probes: self-minted marker omissions and same-byte retargets must
+// not turn a required root into a successful context-free resolve.
+func TestM1ReviewRootForgery(t *testing.T) {
+ for _, attack := range []string{"erase-surface-and-root", "retarget-same-bytes"} {
+  t.Run(attack, func(t *testing.T) {
+   source := museRootProfile(t, json.RawMessage(`{"modules":[{"path":"a.md"}]}`))
+   if code, _, stderr := runProfile(t, source, "env", "resolve", "muse", "--repair"); code != exitOK { t.Fatal(stderr) }
+   home := envprofile.ManagedHomeDir(source.cfg.Home(), "acme", envregistry.Muse)
+   target := filepath.Join(home, "config/muse/AGENTS.md")
+   markerPath := filepath.Join(home, envmarker.Name)
+   if attack == "erase-surface-and-root" {
+    raw, err := os.ReadFile(markerPath); if err != nil { t.Fatal(err) }
+    var marker map[string]any; if err := json.Unmarshal(raw, &marker); err != nil { t.Fatal(err) }
+    delete(marker["surfaces"].(map[string]any), envmarker.SurfaceRootContext)
+    raw, err = json.Marshal(marker); if err != nil { t.Fatal(err) }
+    if err := os.WriteFile(markerPath, raw, 0600); err != nil { t.Fatal(err) }
+    if err := os.Remove(target); err != nil { t.Fatal(err) }
+   } else {
+    raw, err := os.ReadFile(target); if err != nil { t.Fatal(err) }
+    foreign := filepath.Join(t.TempDir(), "AGENTS.md")
+    if err := os.WriteFile(foreign, raw, 0600); err != nil { t.Fatal(err) }
+    if err := os.Remove(target); err != nil { t.Fatal(err) }
+    if err := os.Symlink(foreign, target); err != nil { t.Fatal(err) }
+   }
+   before, err := os.ReadFile(markerPath); if err != nil { t.Fatal(err) }
+   for retry := 0; retry < 2; retry++ {
+    code, stdout, stderr := runProfile(t, source, "env", "resolve", "muse")
+    if code != exitFail || stdout != "" || !strings.Contains(stderr, envprofile.DiagHomeStale) { t.Fatalf("forged root admitted: %d %q %s", code, stdout, stderr) }
+    status := readMuseRootStatus(t, source)
+    for _, row := range status.Homes { if row.Profile == "acme" && row.Environment == envregistry.Muse && row.Current { t.Fatal("status trusted forged root") } }
+   }
+   after, err := os.ReadFile(markerPath); if err != nil || !bytes.Equal(before, after) { t.Fatal("refusal/status rewrote forged evidence") }
+  })
+ }
+}
+// A changed selector must never retain the previously valid file-policy report.
+func TestM1ReviewStatusUnsupported(t *testing.T) {
+ source := museRootProfile(t, nil)
+ if code, _, stderr := runProfile(t, source, "env", "resolve", "muse", "--repair"); code != exitOK { t.Fatal(stderr) }
+ source.cfg.Env.CredentialStore = map[string]map[string]envregistry.CredentialStoreSelection{"acme": {envregistry.Muse: envregistry.CredentialStoreKeychain}}
+ status := readMuseRootStatus(t, source)
+ found := false
+ for _, row := range status.Homes {
+  if row.Profile != "acme" || row.Environment != envregistry.Muse { continue }; found = true
+  if row.Current || strings.Contains(strings.Join(row.Warnings, " "), "effective backend=file") { t.Fatal("unsupported selector retained valid policy") }
+  if !strings.Contains(strings.Join(row.Findings, " "), envregistry.DiagCredentialStoreUnsupported) { t.Fatalf("wrong refusal: %+v", row) }
+ }
+ if !found { t.Fatal("missing status row") }
+}
+'''
+out=root/'.temp/m1-review/root-attacks_test.go'
+out.write_text(p.read_text()+extra)
+(root/'.temp/m1-review/overlay.json').write_text(json.dumps({'Replace':{str(p):str(out)}}))
+(root/'.temp/m1-review/reviewer-tests.txt').write_text(extra)
