@@ -33,6 +33,12 @@ pipes are treated as shell or prose punctuation. Punctuation before
 userinfo is retained, so `board.test,@github.com` still identifies
 `github.com`. Each HTTP(S) URL start is inspected independently, including
 adjacent URLs in substitution expressions.
+Pipes delimit authority lookahead, and lookahead stops before another URL
+start. Raw userinfo containing `;`, `&`, `(` or `)` is ambiguous with shell
+syntax. In that case both the parsed authority host and the historical
+host prefix are audited. This conservative rule can produce an extra
+finding for a quoted URL with such userinfo; it prevents source text after
+a command from hiding the command's real host behind a reserved name.
 
 The separate second-level reservations `example.com`, `example.net`, and
 `example.org`, including their descendants, are outside this exemption.

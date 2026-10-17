@@ -788,7 +788,7 @@ func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject
 // Deterministic detectors: observed behavior vs declared capabilities.
 var (
 	urlRE           = regexp.MustCompile(`https?://([A-Za-z0-9.-]+)`)
-	authorityTailRE = regexp.MustCompile(`^[^\s/?#"'<>]*`)
+	authorityTailRE = regexp.MustCompile(`^[^\s/?#"'<>|]*`)
 	execRE          = regexp.MustCompile(`(?m)(?:subprocess|exec\.Command|os\.system|shutil\.which)\(\s*["']([A-Za-z0-9._-]+)["']`)
 )
 
@@ -836,26 +836,43 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
 			return nil
 		}
 		text := string(payload)
-		for _, match := range urlRE.FindAllStringSubmatchIndex(text, -1) {
+		matches := urlRE.FindAllStringSubmatchIndex(text, -1)
+		for index, match := range matches {
 			host := strings.ToLower(text[match[2]:match[3]])
 			// Parse the complete authority so reserved-looking userinfo cannot
 			// exempt the real host. Discovery keeps the original match spans,
 			// so this lookahead never consumes a later URL. Strip only terminal
 			// shell/prose punctuation, never punctuation preceding userinfo.
-			authority := text[match[0]:match[1]] + authorityTailRE.FindString(text[match[1]:])
+			end := len(text)
+			if index+1 < len(matches) {
+				end = matches[index+1][0]
+			}
+			authority := text[match[0]:match[1]] + authorityTailRE.FindString(text[match[1]:end])
 			parsed, parseErr := url.Parse(strings.TrimRight(authority, "),;|]}"))
+			hosts := []string{host}
 			if parseErr == nil && parsed.User != nil {
-				host = strings.ToLower(parsed.Hostname())
+				actual := strings.ToLower(parsed.Hostname())
+				hosts = []string{actual}
+				// These characters are both legal userinfo and unquoted shell
+				// operators. Keep the legacy host candidate too: source text
+				// after a command must never erase its original network finding.
+				userinfo := authority[:strings.LastIndex(authority, "@")]
+				if actual != host && strings.ContainsAny(userinfo, ";&()") {
+					hosts = append(hosts, host)
+				}
 			}
-			if host == "localhost" || host == "127.0.0.1" || declaredHost(declaredHosts, host) ||
-				(parseErr == nil && reservedAuditHost(parsed.Hostname())) {
-				continue
+			for _, host := range hosts {
+				reserved := parseErr == nil && reservedAuditHost(host) &&
+					(parsed.User != nil || strings.EqualFold(host, parsed.Hostname()))
+				if host == "localhost" || host == "127.0.0.1" || declaredHost(declaredHosts, host) || reserved {
+					continue
+				}
+				findings = append(findings, Finding{
+					ID: "audit.capability.network-undeclared", Severity: SeverityHigh,
+					File: posix, Evidence: fmt.Sprintf("contacts %s, which no capabilities.network entry covers", host),
+					Verifiable: true,
+				})
 			}
-			findings = append(findings, Finding{
-				ID: "audit.capability.network-undeclared", Severity: SeverityHigh,
-				File: posix, Evidence: fmt.Sprintf("contacts %s, which no capabilities.network entry covers", host),
-				Verifiable: true,
-			})
 		}
 		for _, match := range execRE.FindAllStringSubmatch(text, -1) {
 			binary := match[1]

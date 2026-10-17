@@ -124,6 +124,37 @@ func TestReservedURLDiscoveryKeepsLaterHosts(t *testing.T) {
 	}
 }
 
+// Shell separators cannot replace a real request with later reserved-looking userinfo; genuine userinfo still works.
+func TestReservedURLSourceBoundaries(t *testing.T) {
+	for _, text := range []string{
+		"result=$(curl https://evil.com);contact=fixture@board.test",
+		"result=$(curl https://evil.com:443);contact=fixture@board.test",
+		"curl https://evil.com;contact=fixture@board.test",
+		"curl https://evil.com&contact=fixture@board.test",
+		"curl https://board.test;user@evil.com",
+		"sed 's|https://board.test|https://evil.com|g'",
+	} {
+		subject := subjectWith(t, text, capabilities.ImplicitNone(), 3)
+		if _, errs := Gate(newCfg(t, "strict", "high"), []Subject{subject}); len(errs) == 0 || !strings.Contains(strings.Join(errs, "\n"), "contacts evil.com") {
+			t.Errorf("real host hidden by source boundary %q: %v", text, errs)
+		}
+	}
+	for _, text := range []string{
+		"sed 's|https://board.test|https://github.com|g'",
+		"sed 's|https://github.com|https://board.test|g'",
+		"https://board.test,https://github.com",
+		"https://fixture@github.com",
+		"https://fixture@board.test",
+		"$(curl https://fixture@board.test)",
+		"https://board.test;user@service.test",
+	} {
+		subject := subjectWith(t, text, capabilities.Manifest{Network: []string{"github.com"}}, 3)
+		if warnings, errs := Gate(newCfg(t, "strict", "high"), []Subject{subject}); len(warnings) != 0 || len(errs) != 0 {
+			t.Errorf("valid control refused %q: warnings=%v errors=%v", text, warnings, errs)
+		}
+	}
+}
+
 // A reserved-only strict audit passes; adding an undeclared real host or revocation still blocks.
 func TestReservedDomainsKeepStrictGate(t *testing.T) {
 	cfg := newCfg(t, "strict", "high")
