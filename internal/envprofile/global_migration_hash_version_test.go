@@ -177,3 +177,88 @@ func TestMigratedGlobalSkillNetworkUndeclaredFollowUp(t *testing.T) {
 	err := EnsureDefaultWithPolicy(home, Policy{})
 	assertMigrationNetworkRefusal(t, home, err, "downloads.example.com")
 }
+
+// Null prompt_scope refuses migration without publication; omission and a valid statement still admit the declared host.
+func TestMigratedGlobalSkillPromptScopeValidation(t *testing.T) {
+	previous := hashing.EnableV2Writers
+	hashing.EnableV2Writers = true
+	t.Cleanup(func() { hashing.EnableV2Writers = previous })
+	for _, tc := range []struct {
+		name     string
+		field    string
+		admitted bool
+	}{
+		{name: "absent", admitted: true},
+		{name: "valid", field: `,"prompt_scope":"fetch upstream data"`, admitted: true},
+		{name: "null", field: `,"prompt_scope":null`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			home, commit := migrationRevisionFixture(t, map[string]string{
+				"README.md":        "network skill\n",
+				"agent-skill.json": `{"schema_version":3,"capabilities":{"network":["api.example.com"]` + tc.field + `}}`,
+				"scripts/fetch.sh": "curl https://api.example.com/data\n",
+			})
+			err := EnsureDefaultWithPolicy(home, Policy{})
+			if tc.admitted {
+				if err != nil {
+					t.Fatalf("valid migration: %v", err)
+				}
+				lock, _, err := readLock(home, DefaultProfile)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if member, ok := lock.Find(contextlock.KindSkill, "binary-skill"); !ok || member.Commit != commit {
+					t.Fatalf("migrated skill = %+v, present = %v", member, ok)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), "capabilities.prompt_scope") {
+				t.Fatalf("migration = %v, want malformed prompt_scope refusal", err)
+			}
+			assertMigrationUnpublished(t, home)
+		})
+	}
+}
+
+// Null capability objects and fields refuse without profile publication; an empty object still migrates a clean skill.
+func TestMigratedGlobalSkillNullCapabilityDeclarations(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		declaration string
+		want        string
+	}{
+		{"valid-empty", `{}`, ""},
+		{"object", `null`, "capabilities"},
+		{"network", `{"network":null}`, "capabilities.network"},
+		{"filesystem", `{"filesystem":null}`, "capabilities.filesystem"},
+		{"exec", `{"exec":null}`, "capabilities.exec"},
+		{"secrets", `{"secrets":null}`, "capabilities.secrets"},
+		{"env-read", `{"env_read":null}`, "capabilities.env_read"},
+		{"prompt-scope", `{"prompt_scope":null}`, "capabilities.prompt_scope"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			home, commit := migrationRevisionFixture(t, map[string]string{
+				"README.md":        "clean skill\n",
+				"agent-skill.json": `{"schema_version":3,"capabilities":` + tc.declaration + `}`,
+			})
+			err := EnsureDefaultWithPolicy(home, Policy{})
+			if tc.want == "" {
+				if err != nil {
+					t.Fatalf("valid migration: %v", err)
+				}
+				lock, _, err := readLock(home, DefaultProfile)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if member, ok := lock.Find(contextlock.KindSkill, "binary-skill"); !ok || member.Commit != commit {
+					t.Fatalf("migrated skill = %+v, present = %v", member, ok)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("migration = %v, want refusal naming %s", err, tc.want)
+			}
+			assertMigrationUnpublished(t, home)
+		})
+	}
+}

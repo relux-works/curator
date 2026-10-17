@@ -1,6 +1,7 @@
 package envprofile
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -116,6 +117,22 @@ func TestMigratedGlobalSkillIgnoresPreManifestVerdictCache(t *testing.T) {
 			if err != nil {
 				t.Fatalf("stale implicit-none refusal reused: %v", err)
 			}
+			payload, err := os.ReadFile(verdicts[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			var record struct {
+				Package audit.SourcePackage `json:"package"`
+			}
+			if err := json.Unmarshal(payload, &record); err != nil {
+				t.Fatal(err)
+			}
+			// Capability equality must not erase the independently required
+			// package identity when the migration writes its fresh verdict.
+			if record.Package.Kind == "" {
+				t.Fatal("migration verdict lost package identity")
+			}
+
 			lock, _, err := readLock(home, DefaultProfile)
 			if err != nil {
 				t.Fatal(err)

@@ -142,6 +142,9 @@ func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, erro
 		if _, present := data["capabilities"]; !present {
 			return nil, nil, verr.New("capabilities", "%s schema v%d requires 'capabilities'", sourceFile, schema)
 		}
+		if data["capabilities"] == nil {
+			return nil, nil, verr.New("capabilities", "must be an object")
+		}
 	}
 	caps := capabilities.ImplicitNone()
 	if schema >= 3 {

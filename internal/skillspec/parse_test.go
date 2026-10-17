@@ -164,6 +164,44 @@ func TestCapabilitiesRequiredFromV3(t *testing.T) {
 	}
 }
 
+// Load enforces the capability object and optional purpose-statement schema
+// for both filenames, including schema 9; absence is allowed only before v3.
+func TestCapabilitiesNullRejectedFromV3(t *testing.T) {
+	for schema := 3; schema <= 9; schema++ {
+		for _, name := range []string{CanonicalManifestName, LegacyManifestName} {
+			t.Run(fmt.Sprintf("v%d/%s", schema, name), func(t *testing.T) {
+				for _, tc := range []struct{ name, field, want string }{
+					{"null", `,"capabilities":null`, "capabilities"},
+					{"absent", "", "capabilities"},
+					{"empty-object", `,"capabilities":{}`, ""},
+					{"valid", `,"capabilities":{"network":["api.example.com"],"prompt_scope":"fetch data"}`, ""},
+					{"null-scope", `,"capabilities":{"prompt_scope":null}`, "capabilities.prompt_scope"},
+				} {
+					t.Run(tc.name, func(t *testing.T) {
+						dir := t.TempDir()
+						if err := os.WriteFile(filepath.Join(dir, name), []byte(fmt.Sprintf(`{"schema_version":%d%s}`, schema, tc.field)), 0600); err != nil {
+							t.Fatal(err)
+						}
+						spec, err := Load(dir)
+						if tc.want != "" {
+							if err == nil || !strings.Contains(err.Error(), tc.want) {
+								t.Fatalf("Load error=%v; want refusal naming %s", err, tc.want)
+							}
+						} else if err != nil || spec.Capabilities.Filesystem.Keyword != "repo" {
+							t.Fatalf("valid object refused or defaults changed: spec=%+v error=%v", spec, err)
+						}
+					})
+				}
+			})
+		}
+	}
+	for _, schema := range []int{1, 2} {
+		if _, err := Load(writeSkill(t, fmt.Sprintf(`{"schema_version":%d}`, schema), nil)); err != nil {
+			t.Fatalf("pre-v3 absence refused: %v", err)
+		}
+	}
+}
+
 func TestRuntimeRoots(t *testing.T) {
 	files := map[string]string{"scripts/tool": "#!/bin/sh\n", "lib/util.py": ""}
 	ok := writeSkill(t, `{"schema_version": 2, "runtime_roots": ["scripts", "lib"]}`, files)

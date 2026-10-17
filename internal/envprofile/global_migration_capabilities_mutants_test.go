@@ -54,7 +54,7 @@ func TestGlobalSkillCapabilitiesNarrowingMutants(t *testing.T) {
 			"packageIdentity, _ = audit.SkillPackage(resolved.Source, \"\", resolved.Name, resolved.Commit, resolved.Directory)",
 			"packageIdentity, _ = audit.SkillPackage(resolved.Source, \"\", resolved.Name, resolved.Commit, resolved.Directory)\npackageIdentity = audit.SourcePackage{}",
 			"^TestMigratedGlobalSkillIgnoresPreManifestVerdictCache$",
-			"TestMigratedGlobalSkillIgnoresPreManifestVerdictCache/undeclared-skill-old-allow", "migration admitted undeclared network use",
+			"TestMigratedGlobalSkillIgnoresPreManifestVerdictCache/declared-skill-old-refusal", "migration verdict lost package identity",
 		},
 		{
 			"legacy-schema-bypasses-network-finding", "if spec.SchemaVersion >= 3 {", "if spec.SchemaVersion >= 0 {",

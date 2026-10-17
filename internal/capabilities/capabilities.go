@@ -73,7 +73,7 @@ func Parse(raw any) (Manifest, error) {
 	}
 
 	promptScope := ""
-	if rawScope, present := obj["prompt_scope"]; present && rawScope != nil {
+	if rawScope, present := obj["prompt_scope"]; present {
 		text, ok := rawScope.(string)
 		if !ok || strings.TrimSpace(text) == "" {
 			return Manifest{}, verr.New("capabilities.prompt_scope", "must be a non-empty string when present")
