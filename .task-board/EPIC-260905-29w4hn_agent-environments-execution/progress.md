@@ -1,5 +1,5 @@
 ## Status
-development
+integrating
 
 ## Review
 required
@@ -29,4 +29,4 @@ Scope decision (operator, 2026-09-07): the epic ships stages (a) through (c) wit
 2026-09-05T06:55:16Z
 
 ## Last Update
-2026-10-17T04:59:26Z
+2026-10-17T10:02:42Z

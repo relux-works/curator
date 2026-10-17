@@ -1,0 +1,3 @@
+# Review logbook — BUG-261016-mlpvtn
+
+Review B of CR revision 1 swept all six requested surfaces. One token-preserving narrowing mutant survived the complete isolation suite: a shell export in the first Go consumer overrides the private cache paths. Real Go consumption confirms the shared values after initialization. Finding shell-cache-override-unguarded, repeat-of none. Other surfaces held under the named attacks. Remote run 39008448258 independently confirmed green on eight self-hosted Linux jobs; its snapshot tree equals the candidate. Changes requested for the checker regression, with no product deadline change, no host change, and no repository code edit by reviewer. Full reproduction, logs and findings array are attached in the task-scoped review verdict.

@@ -1,0 +1,528 @@
+diff --git a/.github/ci/isolate-go-state.sh b/.github/ci/isolate-go-state.sh
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6e8800c93572398a082ded387aa0d8ba608fa08
+--- /dev/null
++++ b/.github/ci/isolate-go-state.sh
+@@ -0,0 +1,15 @@
++#!/usr/bin/env bash
++# Run immediately after checkout, before setup-go or any other Go consumer.
++# GITHUB_ENV applies to subsequent steps, including action cache hooks.
++set -euo pipefail
++
++: "${RUNNER_TEMP:?RUNNER_TEMP is required}"
++: "${GITHUB_ENV:?GITHUB_ENV is required}"
++state="$(mktemp -d "$RUNNER_TEMP/curator-go.XXXXXXXX")"
++mkdir -p "$state/build" "$state/mod" "$state/path" "$state/lint"
++{
++  printf 'GOCACHE=%s/build\n' "$state"
++  printf 'GOMODCACHE=%s/mod\n' "$state"
++  printf 'GOPATH=%s/path\n' "$state"
++  printf 'GOLANGCI_LINT_CACHE=%s/lint\n' "$state"
++} >>"$GITHUB_ENV"
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 1a4ea66ea2fb2a9fd39e9f859e00fb7c6f3d1afb..d465636667b639f9f012bcad3a12226d6ac82584 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -29,6 +29,11 @@ on:
+         required: false
+         default: ""
+ 
++# Serialize repeated runs of the same workflow/ref without cancelling pushes.
++concurrency:
++  group: ${{ github.workflow }}-${{ github.ref }}
++  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
++
+ permissions:
+   contents: read
+ 
+@@ -89,6 +94,11 @@ jobs:
+         go: ['1.25.5', '1.26.0', '1.27.1']
+     steps:
+       - uses: actions/checkout@v4
++      - name: Initialize private Go state
++        if: runner.os == 'Linux'
++        shell: bash
++        run: bash .github/ci/isolate-go-state.sh
++
+       - name: Checkout authoritative protocol suite
+         uses: actions/checkout@v4
+         with:
+@@ -97,6 +107,7 @@ jobs:
+           path: protocol-spec
+       - uses: actions/setup-go@v5
+         with:
++          cache: ${{ runner.environment != 'self-hosted' || runner.os != 'Linux' }}
+           go-version: ${{ matrix.go }}
+       - name: Verify family toolchain identity
+         shell: bash
+@@ -158,6 +169,11 @@ jobs:
+         with:
+           submodules: true
+ 
++      - name: Initialize private Go state
++        if: runner.os == 'Linux'
++        shell: bash
++        run: bash .github/ci/isolate-go-state.sh
++
+       - name: Checkout authoritative protocol suite
+         uses: actions/checkout@v4
+         with:
+@@ -167,6 +183,7 @@ jobs:
+ 
+       - uses: actions/setup-go@v5
+         with:
++          cache: ${{ runner.environment != 'self-hosted' || runner.os != 'Linux' }}
+           go-version-file: go.mod
+ 
+       # The hosted images ship their own Node, but the pnpm the
+@@ -522,8 +539,14 @@ jobs:
+         with:
+           submodules: true
+ 
++      - name: Initialize private Go state
++        if: runner.os == 'Linux'
++        shell: bash
++        run: bash .github/ci/isolate-go-state.sh
++
+       - uses: actions/setup-go@v5
+         with:
++          cache: ${{ runner.environment != 'self-hosted' || runner.os != 'Linux' }}
+           go-version-file: go.mod
+ 
+       - name: Verify Go toolchain identity
+@@ -536,6 +559,16 @@ jobs:
+       - uses: golangci/golangci-lint-action@v7
+         with:
+           version: v2.12.2
++          skip-cache: ${{ runner.environment == 'self-hosted' && runner.os == 'Linux' }}
++
++      # The routing tests evaluate the workflow expression subset with Node.
++      - uses: actions/setup-node@v4
++        with:
++          node-version: "22"
++
++      - name: Verify Linux CI isolation
++        shell: bash
++        run: go test -count=1 ./tools/ciworkflow/
+ 
+       # Security findings may be suppressed narrowly and by name; they may not
+       # be suppressed wholesale. A suppression that names no rule silences
+@@ -573,6 +606,11 @@ jobs:
+     steps:
+       - uses: actions/checkout@v4
+ 
++      - name: Initialize private Go state
++        if: runner.os == 'Linux'
++        shell: bash
++        run: bash .github/ci/isolate-go-state.sh
++
+       - name: Self-test the CI gates
+         shell: bash
+         run: bash .github/ci/gate-selftest.sh
+@@ -590,6 +628,11 @@ jobs:
+         with:
+           submodules: true
+ 
++      - name: Initialize private Go state
++        if: runner.os == 'Linux'
++        shell: bash
++        run: bash .github/ci/isolate-go-state.sh
++
+       - name: Checkout authoritative protocol suite
+         uses: actions/checkout@v4
+         with:
+@@ -599,6 +642,7 @@ jobs:
+ 
+       - uses: actions/setup-go@v5
+         with:
++          cache: ${{ runner.environment != 'self-hosted' || runner.os != 'Linux' }}
+           go-version-file: go.mod
+ 
+       - name: Verify Go toolchain identity
+@@ -623,6 +667,11 @@ jobs:
+         with:
+           submodules: true
+ 
++      - name: Initialize private Go state
++        if: runner.os == 'Linux'
++        shell: bash
++        run: bash .github/ci/isolate-go-state.sh
++
+       - name: Employer name gate
+         # Rules, the binary-patch exemption and the assembled-from-parts
+         # patterns live in the script; gate-selftest.sh drives its rows.
+diff --git a/README.md b/README.md
+index 3eebf39bdb51d868693450e0e3618d4d69dcbe05..deb8236ef52311793413be32001380ccb0e6f612 100644
+--- a/README.md
++++ b/README.md
+@@ -306,6 +306,13 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run
+ 
+ ### Tools
+ 
++Run `go test -count=1 ./tools/ciworkflow/` to validate Linux CI cache isolation,
++workflow concurrency, and fork routing. CI initializes private Go state with
++`bash .github/ci/isolate-go-state.sh`; its environment records go to
++`GITHUB_ENV`, and caches stay under `RUNNER_TEMP`. See
++[the runner isolation contract](docs/self-hosted-runner-setup.md#linux-job-isolation-and-scheduling).
++Store local test and workflow lint logs under `.temp/`.
++
+ For the rc.7 credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run 'TestCredential(Store|Projection)'`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
+ 
+ The [Muse 1.4.8 qualification record](docs/qualification/muse-1.4.8-R6256.1.md)
+diff --git a/UNRESOLVED_QUESTIONS.md b/UNRESOLVED_QUESTIONS.md
+index 3f14968c62e3aa7d511ac3da7f469c4f3d84218e..0a8d57151e7d777cf02f743a96738e94277b4b04 100644
+--- a/UNRESOLVED_QUESTIONS.md
++++ b/UNRESOLVED_QUESTIONS.md
+@@ -1,5 +1,17 @@
+ # Unresolved questions
+ 
++- BUG-261016-mlpvtn — self-hosted Linux CI: workflow/ref concurrency cannot
++  bound competing repositories, and the go-v1 probe has no CI timeout knob.
++  Host-wide scheduling authority or a separate qualification decision remains
++  necessary if loaded-host deadlines recur. Three green self-hosted `main`
++  runs remain a rollout condition after integration.
++  The earlier candidate gate's two-minute fingerprint timeout coincided with
++  a runaway Landlock probe process tree. The incident was cleared and runner
++  task counts were capped; the recursion fix is tracked separately. Candidate
++  qualification requires a fresh green remote gate with the existing product
++  deadlines, followed by the orchestrator's post-integration rollout checks.
++  [Isolation contract and probe finding](docs/self-hosted-runner-setup.md#linux-job-isolation-and-scheduling).
++
+ - TASK-261016-i5gwaf — Muse 1.4.8 exclusion replay: the exact tested build
+   retains a foreign personal skill despite the required interactive boolean.
+   A vendor correction or explicit normative-owner resolution is required
+diff --git a/docs/self-hosted-runner-setup.md b/docs/self-hosted-runner-setup.md
+index 8dd0635fc3e94ac6cf502a76bb5fc7ccd8ce098b..0ac4aebe7984c8528a32479bf6b7685b30feef47 100644
+--- a/docs/self-hosted-runner-setup.md
++++ b/docs/self-hosted-runner-setup.md
+@@ -1,4 +1,4 @@
+-# Self-hosted runner setup (rose-air)
++# Self-hosted runner setup
+ 
+ The `test-self-hosted` lane (`Test (rose-air)` in
+ [ci.yml](../.github/workflows/ci.yml)) runs the default gate on the
+@@ -105,3 +105,48 @@ needs no sudo and no Docker):
+   Toolchains still come from the pinned `setup-*` actions and the pinned
+   installers, so the toolchain-identity rules hold on these runners as on
+   hosted ones.
++
++## Linux job isolation and scheduling
++
++Every Linux-routable job runs `bash .github/ci/isolate-go-state.sh` immediately
++after checkout, before `setup-go` or any Go command. The script creates a fresh
++directory under `RUNNER_TEMP` with `mktemp`, then publishes `GOCACHE`,
++`GOMODCACHE` and `GOPATH` through `GITHUB_ENV`. Even jobs sharing a runner
++account, temporary directory or Go version get separate build and module
++caches. The runner owns temporary-directory cleanup; isolation does not depend
++on a successful final step. No shared cache is deleted.
++
++On self-hosted Linux, `setup-go` cache restore/save is disabled. The lint
++action also skips its cache and uses a private `GOLANGCI_LINT_CACHE`. This
++prevents restored per-user state from reconnecting otherwise isolated jobs.
++Hosted macOS/Windows caching and routing, the fork guard, and the hosted Race
++lane retain their existing behavior. `GOTOOLCHAIN=local` and `GOENV=off` remain
++mandatory. Shared Go state was implicated in intermittent cross-toolchain
++link errors involving `golang.org/x/sys/unix.Syscall` and ABI0/ABIInternal.
++
++Workflow concurrency is keyed by workflow and ref. Pull requests cancel
++superseded runs; pushes (including `main` and `gate/**`) never cancel an active
++run. This bounds overlapping runs of the same ref, not the number of jobs
++inside a run, other refs, or work from other repositories. It does not impose
++a host-wide scheduling limit.
++
++The go-v1 probe has a fixed 15-second wall-clock bound in
++`internal/godriver/session.go`. `ConfigFromEnvironment` reads only trusted Go
++selectors; there is no existing documented CI timeout knob. `ProbeTimeout`
++cannot raise the bound: values above 15 seconds are clamped. The workflow
++therefore adds no timeout flag and makes no claim to qualify arbitrarily
++loaded hosts. The test package timeout is a different bound.
++Toolchain fingerprinting has a separate two-minute bound, and larger
++`FingerprintTimeout` values are also clamped. Neither bound has an environment
++override. A fingerprint timeout needs capacity/filesystem investigation or an
++explicit product deadline-policy decision; cache isolation alone does not
++establish loaded-host qualification.
++
++Validate this contract with `go test -count=1 ./tools/ciworkflow/`, which parses
++the real workflow, exercises narrowing plants, executes the initializer twice
++with poisoned ambient caches, and evaluates fork/trusted routing expressions.
++Use `sh scripts/remote-gate.sh` for actual runner evidence. Keep logs in
++`.temp/`. A workflow contract check does not reproduce the historical ABI
++linker failure. Require three consecutive green `main` runs on the self-hosted
++pool before declaring the pool qualified; a green `gate/**` snapshot alone
++does not satisfy that rollout requirement.
+diff --git a/tools/ciworkflow/isolation_test.go b/tools/ciworkflow/isolation_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..04a059f4f60f41900d529faf879c08fd87b3c7df
+--- /dev/null
++++ b/tools/ciworkflow/isolation_test.go
+@@ -0,0 +1,270 @@
++// Package ciworkflow tests the Linux CI isolation contract at its workflow entry point.
++package ciworkflow
++
++import (
++	"encoding/json"
++	"fmt"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"gopkg.in/yaml.v3"
++)
++
++const isolationCommand = "bash .github/ci/isolate-go-state.sh"
++const cacheCondition = "${{ runner.environment != 'self-hosted' || runner.os != 'Linux' }}"
++
++type step struct {
++	Uses string            `yaml:"uses"`
++	Run  string            `yaml:"run"`
++	If   string            `yaml:"if"`
++	Env  map[string]string `yaml:"env"`
++	With map[string]string `yaml:"with"`
++}
++
++type workflow struct {
++	Concurrency struct {
++		Group  string `yaml:"group"`
++		Cancel string `yaml:"cancel-in-progress"`
++	} `yaml:"concurrency"`
++	Jobs map[string]struct {
++		RunsOn any               `yaml:"runs-on"`
++		Env    map[string]string `yaml:"env"`
++		Steps  []step            `yaml:"steps"`
++	} `yaml:"jobs"`
++}
++
++func workflowBytes(t *testing.T) []byte {
++	t.Helper()
++	path := os.Getenv("CI_WORKFLOW_UNDER_TEST")
++	if path == "" {
++		path = "../../.github/workflows/ci.yml"
++	}
++	data, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return data
++}
++
++func checkIsolation(data []byte) error {
++	var wf workflow
++	if err := yaml.Unmarshal(data, &wf); err != nil {
++		return err
++	}
++	count := 0
++	for name, job := range wf.Jobs {
++		route, _ := job.RunsOn.(string)
++		if !strings.Contains(route, "LINUX_SELF_HOSTED") && !strings.Contains(route, "relux-linux") {
++			continue
++		}
++		count++
++		// Only checkout may precede initialization: even an action may invoke Go.
++		if len(job.Steps) < 2 || job.Steps[0].Uses != "actions/checkout@v4" || job.Steps[1].Run != isolationCommand || job.Steps[1].If != "runner.os == 'Linux'" {
++			return fmt.Errorf("%s: private Go state must precede every Go consumer", name)
++		}
++		for _, key := range []string{"GOCACHE", "GOMODCACHE", "GOPATH"} {
++			if _, exists := job.Env[key]; exists {
++				return fmt.Errorf("%s: job overrides %s", name, key)
++			}
++			for _, s := range job.Steps {
++				if _, exists := s.Env[key]; exists {
++					return fmt.Errorf("%s: step overrides %s", name, key)
++				}
++			}
++		}
++		for _, s := range job.Steps {
++			if strings.HasPrefix(s.Uses, "actions/setup-go@") && s.With["cache"] != cacheCondition {
++				return fmt.Errorf("%s: setup-go may restore shared Go cache", name)
++			}
++			if strings.HasPrefix(s.Uses, "actions/cache") {
++				return fmt.Errorf("%s: unqualified cache action", name)
++			}
++			if strings.HasPrefix(s.Uses, "golangci/golangci-lint-action@") && s.With["skip-cache"] != "${{ runner.environment == 'self-hosted' && runner.os == 'Linux' }}" {
++				return fmt.Errorf("%s: lint action may restore shared state", name)
++			}
++		}
++	}
++	if count < 6 {
++		return fmt.Errorf("found %d Linux-routable jobs, want at least six", count)
++	}
++	if wf.Concurrency.Group != "${{ github.workflow }}-${{ github.ref }}" || wf.Concurrency.Cancel != "${{ github.event_name == 'pull_request' }}" {
++		return fmt.Errorf("workflow concurrency must serialize each workflow/ref and cancel only pull requests")
++	}
++	live := 0
++	for _, s := range wf.Jobs["lint"].Steps {
++		if s.Run == "go test -count=1 ./tools/ciworkflow/" && s.If == "" {
++			live++
++		}
++	}
++	if live != 1 {
++		return fmt.Errorf("lint must run the isolation gate unconditionally exactly once")
++	}
++	return nil
++}
++
++// This production-file gate rejects ordering/cache/concurrency regressions; it does not reproduce an ABI linker race.
++func TestLinuxCIWorkflow(t *testing.T) {
++	if err := checkIsolation(workflowBytes(t)); err != nil {
++		t.Fatal(err)
++	}
++}
++
++// Each narrowing plant changes one job or one concurrency boundary while retaining the surrounding gates.
++func TestLinuxCIWorkflowRejectsNarrowingPlants(t *testing.T) {
++	data := workflowBytes(t)
++	for _, tc := range []struct{ name, old, replacement, finding string }{
++		{"one_job_skips_initialization", "run: " + isolationCommand, "run: echo '" + isolationCommand + "'", "private Go state"},
++		{"one_setup_restores_shared_cache", "cache: " + cacheCondition, "cache: true # " + cacheCondition, "shared Go cache"},
++		{"cancel_main", "cancel-in-progress: ${{ github.event_name == 'pull_request' }}", "cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}", "concurrency"},
++		{"split_same_ref", "group: ${{ github.workflow }}-${{ github.ref }}", "group: ${{ github.workflow }}-${{ github.ref }}-${{ github.run_id }}", "concurrency"},
++		{"skip_gate_on_push", "run: go test -count=1 ./tools/ciworkflow/", "if: github.event_name == 'pull_request'\n        run: go test -count=1 ./tools/ciworkflow/", "unconditionally"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			mutant := strings.Replace(string(data), tc.old, tc.replacement, 1)
++			if mutant == string(data) {
++				t.Fatal("plant was not applied")
++			}
++			if err := checkIsolation([]byte(mutant)); err == nil || !strings.Contains(err.Error(), tc.finding) {
++				t.Fatalf("want %q refusal, got %v", tc.finding, err)
++			}
++		})
++	}
++}
++
++func initialize(t *testing.T, script, temp string) map[string]string {
++	t.Helper()
++	envFile := filepath.Join(t.TempDir(), "github-env")
++	cmd := exec.Command("bash", script)
++	cmd.Env = append(os.Environ(), "RUNNER_TEMP="+temp, "GITHUB_ENV="+envFile,
++		"GOCACHE=/shared/go-build", "GOMODCACHE=/shared/gomod", "GOPATH=/shared/gopath")
++	if out, err := cmd.CombinedOutput(); err != nil {
++		t.Fatalf("initializer: %v: %s", err, out)
++	}
++	data, err := os.ReadFile(envFile)
++	if err != nil {
++		t.Fatal(err)
++	}
++	values := map[string]string{}
++	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
++		key, value, ok := strings.Cut(line, "=")
++		if !ok {
++			t.Fatalf("invalid GITHUB_ENV record %q", line)
++		}
++		values[key] = value
++	}
++	return values
++}
++
++func assertPrivate(t *testing.T, first, second map[string]string, temp string) {
++	t.Helper()
++	for _, key := range []string{"GOCACHE", "GOMODCACHE", "GOPATH"} {
++		for _, values := range []map[string]string{first, second} {
++			rel, err := filepath.Rel(temp, values[key])
++			if err != nil || rel == "." || strings.HasPrefix(rel, "..") || values[key] == "" {
++				t.Fatalf("%s is outside private runner temp", key)
++			}
++			if info, err := os.Stat(values[key]); err != nil || !info.IsDir() {
++				t.Fatalf("%s directory missing", key)
++			}
++		}
++		if first[key] == second[key] {
++			t.Fatalf("%s is shared by two jobs", key)
++		}
++	}
++}
++
++// Real shell entry point: two jobs sharing RUNNER_TEMP still get disjoint state despite poisoned ambient cache variables.
++func TestGoStateInitialization(t *testing.T) {
++	script := os.Getenv("CI_ISOLATION_SCRIPT_UNDER_TEST")
++	if script == "" {
++		script = "../../.github/ci/isolate-go-state.sh"
++	}
++	temp := t.TempDir()
++	first, second := initialize(t, script, temp), initialize(t, script, temp)
++	assertPrivate(t, first, second, temp)
++	cmd := exec.Command("go", "env", "GOCACHE", "GOMODCACHE", "GOPATH")
++	cmd.Env = append(os.Environ(), "GOTOOLCHAIN=local", "GOENV=off")
++	for key, value := range first {
++		cmd.Env = append(cmd.Env, key+"="+value)
++	}
++	out, err := cmd.CombinedOutput()
++	if err != nil {
++		t.Fatalf("go env: %v: %s", err, out)
++	}
++	got := strings.Fields(string(out))
++	want := []string{first["GOCACHE"], first["GOMODCACHE"], first["GOPATH"]}
++	if strings.Join(got, "\n") != strings.Join(want, "\n") {
++		t.Fatalf("Go did not consume the published private state: %s", out)
++	}
++}
++
++// Missing runner context fails before publishing partial environment state; no ambient-cache fallback is allowed.
++func TestGoStateMissingRunnerContext(t *testing.T) {
++	for _, missing := range []string{"RUNNER_TEMP", "GITHUB_ENV"} {
++		t.Run(missing, func(t *testing.T) {
++			temp := t.TempDir()
++			envFile := filepath.Join(temp, "github-env")
++			cmd := exec.Command("bash", "../../.github/ci/isolate-go-state.sh")
++			cmd.Env = append(os.Environ(), "RUNNER_TEMP="+temp, "GITHUB_ENV="+envFile, missing+"=")
++			out, err := cmd.CombinedOutput()
++			if err == nil || !strings.Contains(string(out), missing+" is required") {
++				t.Fatalf("want missing %s refusal, got %v: %s", missing, err, out)
++			}
++			entries, readErr := os.ReadDir(temp)
++			if readErr != nil || len(entries) != 0 {
++				t.Fatalf("partial state after refusal: %v, %v", entries, readErr)
++			}
++		})
++	}
++}
++
++// Execute the actual routing expressions in their JS-compatible subset; covers forks, trusted PRs, push and dispatch on every matrix OS.
++// GitHub scheduling itself is evidenced by the remote gate, not by this expression test.
++func TestLinuxRoutingKeepsForksHosted(t *testing.T) {
++	var wf workflow
++	if err := yaml.Unmarshal(workflowBytes(t), &wf); err != nil {
++		t.Fatal(err)
++	}
++	for name, job := range wf.Jobs {
++		route, _ := job.RunsOn.(string)
++		if !strings.Contains(route, "LINUX_SELF_HOSTED") {
++			continue
++		}
++		for _, event := range []string{"pull_request", "push", "workflow_dispatch"} {
++			for _, enabled := range []string{"true", "false"} {
++				for _, fork := range []bool{true, false} {
++					for _, platform := range []string{"ubuntu-latest", "macos-latest", "windows-latest"} {
++						osName := platform
++						if !strings.Contains(route, "matrix.os") {
++							osName = "ubuntu-latest"
++						}
++						head := "example/repository"
++						if fork {
++							head = "fork/repository"
++						}
++						ctx, err := json.Marshal(map[string]any{"vars": map[string]string{"LINUX_SELF_HOSTED": enabled}, "matrix": map[string]string{"os": osName}, "github": map[string]any{"event_name": event, "repository": "example/repository", "event": map[string]any{"pull_request": map[string]any{"head": map[string]any{"repo": map[string]string{"full_name": head}}}}}})
++						if err != nil {
++							t.Fatal(err)
++						}
++						expr := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(route, "${{"), "}}"))
++						program := "const {vars,matrix,github}=JSON.parse(process.argv[1]); const fromJSON=JSON.parse; console.log(JSON.stringify(" + expr + "));"
++						out, err := exec.Command("node", "-e", program, string(ctx)).CombinedOutput()
++						if err != nil {
++							t.Fatalf("%s routing: %v: %s", name, err, out)
++						}
++						want := `"` + osName + `"`
++						if enabled == "true" && osName == "ubuntu-latest" && (event != "pull_request" || !fork) {
++							want = `["self-hosted","relux-linux","curator"]`
++						}
++						if strings.TrimSpace(string(out)) != want {
++							t.Fatalf("%s %s enabled=%s fork=%v %s: got %s want %s", name, event, enabled, fork, platform, out, want)
++						}
++					}
++				}
++			}
++		}
++	}
++}
