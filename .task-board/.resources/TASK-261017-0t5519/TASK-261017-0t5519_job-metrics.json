@@ -1,0 +1,1307 @@
+[
+  {
+    "run": 39029649557,
+    "platform": "windows-latest",
+    "sha": "78d7bf05f2975889e451f9bdcb4ba9b6b906f0da",
+    "job": 117387368850,
+    "seconds": 3429.0,
+    "steps": [
+      {
+        "name": "Set up job",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "seconds": 21.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Initialize private Go state",
+        "seconds": 0.0,
+        "conclusion": "skipped"
+      },
+      {
+        "name": "Checkout authoritative protocol suite",
+        "seconds": 3.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-go@v5",
+        "seconds": 39.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-node@v4",
+        "seconds": 6.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify pnpm pin matches Go constant",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned pnpm via npm",
+        "seconds": 8.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify rust pin matches Go constant",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned Rust toolchain via rustup",
+        "seconds": 11.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify Go toolchain identity",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify versioned Go install compatibility",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "gofmt check",
+        "seconds": 0.0,
+        "conclusion": "skipped"
+      },
+      {
+        "name": "go vet",
+        "seconds": 20.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Ledger consistency",
+        "seconds": 48.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "go test + platform-case gate",
+        "seconds": 3260.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Upload gate evidence",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-node@v4",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-go@v5",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Checkout authoritative protocol suite",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "seconds": 3.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "seconds": 0.0,
+        "conclusion": "success"
+      }
+    ],
+    "counts": {
+      "start": 85,
+      "output": 24531,
+      "skip": 335,
+      "run": 11284,
+      "pass": 11034,
+      "pause": 478,
+      "cont": 478
+    },
+    "packages": 85,
+    "top_tests": 3432,
+    "cli_serial": 2481.4,
+    "cli_parallel": 1692.03,
+    "cli_serial_count": 291,
+    "cli_parallel_count": 123,
+    "cli_first_cont": "2026-10-17T12:26:52.339867+00:00",
+    "cli_package": {
+      "elapsed": 3161.97,
+      "wall": 3162.034428,
+      "start": "2026-10-17T11:45:30.598639+00:00",
+      "end": "2026-10-17T12:38:12.6330673Z",
+      "action": "pass",
+      "parallel": false,
+      "cont": null
+    },
+    "event_span": 3162.034428
+  },
+  {
+    "run": 39029649557,
+    "platform": "macos-latest",
+    "sha": "78d7bf05f2975889e451f9bdcb4ba9b6b906f0da",
+    "job": 117387368839,
+    "seconds": 1052.0,
+    "steps": [
+      {
+        "name": "Set up job",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "seconds": 10.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Initialize private Go state",
+        "seconds": 0.0,
+        "conclusion": "skipped"
+      },
+      {
+        "name": "Checkout authoritative protocol suite",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-go@v5",
+        "seconds": 23.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-node@v4",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify pnpm pin matches Go constant",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned pnpm via npm",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify rust pin matches Go constant",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned Rust toolchain via rustup",
+        "seconds": 6.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify Go toolchain identity",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify versioned Go install compatibility",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "gofmt check",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "go vet",
+        "seconds": 9.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Ledger consistency",
+        "seconds": 10.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "go test + platform-case gate",
+        "seconds": 979.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Upload gate evidence",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-node@v4",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-go@v5",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Checkout authoritative protocol suite",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "seconds": 0.0,
+        "conclusion": "success"
+      }
+    ],
+    "counts": {
+      "start": 85,
+      "output": 24797,
+      "skip": 42,
+      "run": 11541,
+      "pass": 11584,
+      "pause": 478,
+      "cont": 478
+    },
+    "packages": 85,
+    "top_tests": 3454,
+    "cli_serial": 432.33,
+    "cli_parallel": 471.16,
+    "cli_serial_count": 294,
+    "cli_parallel_count": 123,
+    "cli_first_cont": "2026-10-17T11:55:13.539671+00:00",
+    "cli_package": {
+      "elapsed": 760.738,
+      "wall": 760.737766,
+      "start": "2026-10-17T11:48:01.117193+00:00",
+      "end": "2026-10-17T12:00:41.854959Z",
+      "action": "pass",
+      "parallel": false,
+      "cont": null
+    },
+    "event_span": 963.964996
+  },
+  {
+    "run": 39029649557,
+    "platform": "ubuntu-latest",
+    "sha": "78d7bf05f2975889e451f9bdcb4ba9b6b906f0da",
+    "job": 117387368913,
+    "seconds": 140.0,
+    "steps": [
+      {
+        "name": "Set up job",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Initialize private Go state",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Checkout authoritative protocol suite",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-go@v5",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-node@v4",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify pnpm pin matches Go constant",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned pnpm via npm",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify rust pin matches Go constant",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned Rust toolchain via rustup",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify Go toolchain identity",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify versioned Go install compatibility",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "gofmt check",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "go vet",
+        "seconds": 13.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Ledger consistency",
+        "seconds": 3.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "go test + platform-case gate",
+        "seconds": 108.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Upload gate evidence",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-node@v4",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-go@v5",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Checkout authoritative protocol suite",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "seconds": 0.0,
+        "conclusion": "success"
+      }
+    ],
+    "counts": {
+      "start": 85,
+      "output": 23693,
+      "skip": 84,
+      "run": 10991,
+      "pass": 10992,
+      "pause": 474,
+      "cont": 474
+    },
+    "packages": 85,
+    "top_tests": 3323,
+    "cli_serial": 97.7,
+    "cli_parallel": 8.06,
+    "cli_serial_count": 294,
+    "cli_parallel_count": 123,
+    "cli_first_cont": "2026-10-17T11:47:36.580355+00:00",
+    "cli_package": {
+      "elapsed": 99.749,
+      "wall": 99.749444,
+      "start": "2026-10-17T11:45:58.722301+00:00",
+      "end": "2026-10-17T11:47:38.471745912Z",
+      "action": "pass",
+      "parallel": false,
+      "cont": null
+    },
+    "event_span": 100.205127
+  },
+  {
+    "run": 39029714957,
+    "platform": "windows-latest",
+    "sha": "26d8ddbf1278ac025a3333aee1053adbdb37f1bf",
+    "job": 117398102557,
+    "seconds": 2981.0,
+    "steps": [
+      {
+        "name": "Set up job",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "seconds": 21.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Initialize private Go state",
+        "seconds": 0.0,
+        "conclusion": "skipped"
+      },
+      {
+        "name": "Checkout authoritative protocol suite",
+        "seconds": 3.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-go@v5",
+        "seconds": 36.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-node@v4",
+        "seconds": 5.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify pnpm pin matches Go constant",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned pnpm via npm",
+        "seconds": 6.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify rust pin matches Go constant",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned Rust toolchain via rustup",
+        "seconds": 10.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify Go toolchain identity",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify versioned Go install compatibility",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "gofmt check",
+        "seconds": 0.0,
+        "conclusion": "skipped"
+      },
+      {
+        "name": "go vet",
+        "seconds": 19.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Ledger consistency",
+        "seconds": 51.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "go test + platform-case gate",
+        "seconds": 2817.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Upload gate evidence",
+        "seconds": 3.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-node@v4",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-go@v5",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Checkout authoritative protocol suite",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "seconds": 3.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "seconds": 0.0,
+        "conclusion": "success"
+      }
+    ],
+    "counts": {
+      "start": 85,
+      "output": 24531,
+      "skip": 335,
+      "run": 11284,
+      "pass": 11034,
+      "pause": 478,
+      "cont": 478
+    },
+    "packages": 85,
+    "top_tests": 3432,
+    "cli_serial": 2170.54,
+    "cli_parallel": 1352.93,
+    "cli_serial_count": 291,
+    "cli_parallel_count": 123,
+    "cli_first_cont": "2026-10-17T13:19:01.427092+00:00",
+    "cli_package": {
+      "elapsed": 2705.874,
+      "wall": 2705.868442,
+      "start": "2026-10-17T12:42:50.512268+00:00",
+      "end": "2026-10-17T13:27:56.3807103Z",
+      "action": "pass",
+      "parallel": false,
+      "cont": null
+    },
+    "event_span": 2705.868442
+  },
+  {
+    "run": 39029714957,
+    "platform": "macos-latest",
+    "sha": "26d8ddbf1278ac025a3333aee1053adbdb37f1bf",
+    "job": 117398102497,
+    "seconds": 1315.0,
+    "steps": [
+      {
+        "name": "Set up job",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "seconds": 14.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Initialize private Go state",
+        "seconds": 0.0,
+        "conclusion": "skipped"
+      },
+      {
+        "name": "Checkout authoritative protocol suite",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-go@v5",
+        "seconds": 43.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-node@v4",
+        "seconds": 3.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify pnpm pin matches Go constant",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned pnpm via npm",
+        "seconds": 3.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify rust pin matches Go constant",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned Rust toolchain via rustup",
+        "seconds": 9.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify Go toolchain identity",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify versioned Go install compatibility",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "gofmt check",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "go vet",
+        "seconds": 17.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Ledger consistency",
+        "seconds": 11.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "go test + platform-case gate",
+        "seconds": 1202.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Upload gate evidence",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-node@v4",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-go@v5",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Checkout authoritative protocol suite",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "seconds": 2.0,
+        "conclusion": "success"
+      }
+    ],
+    "counts": {
+      "start": 85,
+      "output": 24797,
+      "skip": 42,
+      "run": 11541,
+      "pass": 11584,
+      "pause": 478,
+      "cont": 478
+    },
+    "packages": 85,
+    "top_tests": 3454,
+    "cli_serial": 583.81,
+    "cli_parallel": 661.99,
+    "cli_serial_count": 294,
+    "cli_parallel_count": 123,
+    "cli_first_cont": "2026-10-17T12:52:29.956485+00:00",
+    "cli_package": {
+      "elapsed": 998.476,
+      "wall": 998.969498,
+      "start": "2026-10-17T12:42:45.632827+00:00",
+      "end": "2026-10-17T12:59:24.602325Z",
+      "action": "pass",
+      "parallel": false,
+      "cont": null
+    },
+    "event_span": 1185.264579
+  },
+  {
+    "run": 39029714957,
+    "platform": "ubuntu-latest",
+    "sha": "26d8ddbf1278ac025a3333aee1053adbdb37f1bf",
+    "job": 117398102506,
+    "seconds": 158.0,
+    "steps": [
+      {
+        "name": "Set up job",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Initialize private Go state",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Checkout authoritative protocol suite",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-go@v5",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-node@v4",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify pnpm pin matches Go constant",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned pnpm via npm",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify rust pin matches Go constant",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned Rust toolchain via rustup",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify Go toolchain identity",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify versioned Go install compatibility",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "gofmt check",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "go vet",
+        "seconds": 19.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Ledger consistency",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "go test + platform-case gate",
+        "seconds": 121.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Upload gate evidence",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-node@v4",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-go@v5",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Checkout authoritative protocol suite",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "seconds": 0.0,
+        "conclusion": "success"
+      }
+    ],
+    "counts": {
+      "start": 85,
+      "output": 23693,
+      "skip": 84,
+      "run": 10991,
+      "pass": 10992,
+      "pause": 474,
+      "cont": 474
+    },
+    "packages": 85,
+    "top_tests": 3323,
+    "cli_serial": 102.36,
+    "cli_parallel": 7.97,
+    "cli_serial_count": 294,
+    "cli_parallel_count": 123,
+    "cli_first_cont": "2026-10-17T12:41:58.246305+00:00",
+    "cli_package": {
+      "elapsed": 104.465,
+      "wall": 104.465084,
+      "start": "2026-10-17T12:40:15.688216+00:00",
+      "end": "2026-10-17T12:42:00.153300646Z",
+      "action": "pass",
+      "parallel": false,
+      "cont": null
+    },
+    "event_span": 104.916207
+  },
+  {
+    "run": 39042501825,
+    "platform": "windows-latest",
+    "sha": "499b539a54efe3699581702120fdd256afe44caf",
+    "job": 117424639211,
+    "seconds": 3122.0,
+    "steps": [
+      {
+        "name": "Set up job",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "seconds": 21.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Initialize private Go state",
+        "seconds": 0.0,
+        "conclusion": "skipped"
+      },
+      {
+        "name": "Checkout authoritative protocol suite",
+        "seconds": 3.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-go@v5",
+        "seconds": 35.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-node@v4",
+        "seconds": 5.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify pnpm pin matches Go constant",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned pnpm via npm",
+        "seconds": 6.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify rust pin matches Go constant",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned Rust toolchain via rustup",
+        "seconds": 9.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify Go toolchain identity",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify versioned Go install compatibility",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "gofmt check",
+        "seconds": 0.0,
+        "conclusion": "skipped"
+      },
+      {
+        "name": "go vet",
+        "seconds": 18.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Ledger consistency",
+        "seconds": 49.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "go test + platform-case gate",
+        "seconds": 2962.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Upload gate evidence",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-node@v4",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-go@v5",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Checkout authoritative protocol suite",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "seconds": 3.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "seconds": 0.0,
+        "conclusion": "success"
+      }
+    ],
+    "counts": {
+      "start": 85,
+      "output": 24563,
+      "skip": 337,
+      "run": 11296,
+      "pass": 11044,
+      "pause": 478,
+      "cont": 478
+    },
+    "packages": 85,
+    "top_tests": 3435,
+    "cli_serial": 2301.53,
+    "cli_parallel": 1314.95,
+    "cli_serial_count": 294,
+    "cli_parallel_count": 123,
+    "cli_first_cont": "2026-10-17T15:33:55.093663+00:00",
+    "cli_package": {
+      "elapsed": 2841.923,
+      "wall": 2841.926154,
+      "start": "2026-10-17T14:55:33.211727+00:00",
+      "end": "2026-10-17T15:42:55.1378812Z",
+      "action": "pass",
+      "parallel": false,
+      "cont": null
+    },
+    "event_span": 2841.926154
+  },
+  {
+    "run": 39042501825,
+    "platform": "macos-latest",
+    "sha": "499b539a54efe3699581702120fdd256afe44caf",
+    "job": 117424639027,
+    "seconds": 965.0,
+    "steps": [
+      {
+        "name": "Set up job",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "seconds": 10.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Initialize private Go state",
+        "seconds": 0.0,
+        "conclusion": "skipped"
+      },
+      {
+        "name": "Checkout authoritative protocol suite",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-go@v5",
+        "seconds": 20.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-node@v4",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify pnpm pin matches Go constant",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned pnpm via npm",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify rust pin matches Go constant",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned Rust toolchain via rustup",
+        "seconds": 7.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify Go toolchain identity",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify versioned Go install compatibility",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "gofmt check",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "go vet",
+        "seconds": 9.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Ledger consistency",
+        "seconds": 8.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "go test + platform-case gate",
+        "seconds": 896.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Upload gate evidence",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-node@v4",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-go@v5",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Checkout authoritative protocol suite",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "seconds": 2.0,
+        "conclusion": "success"
+      }
+    ],
+    "counts": {
+      "start": 85,
+      "output": 24828,
+      "skip": 42,
+      "run": 11553,
+      "pass": 11596,
+      "pause": 478,
+      "cont": 478
+    },
+    "packages": 85,
+    "top_tests": 3457,
+    "cli_serial": 464.91,
+    "cli_parallel": 432.2,
+    "cli_serial_count": 297,
+    "cli_parallel_count": 123,
+    "cli_first_cont": "2026-10-17T15:00:04.599218+00:00",
+    "cli_package": {
+      "elapsed": 739.776,
+      "wall": 739.775645,
+      "start": "2026-10-17T14:52:19.574400+00:00",
+      "end": "2026-10-17T15:04:39.350045Z",
+      "action": "pass",
+      "parallel": false,
+      "cont": null
+    },
+    "event_span": 882.222819
+  },
+  {
+    "run": 39042501825,
+    "platform": "ubuntu-latest",
+    "sha": "499b539a54efe3699581702120fdd256afe44caf",
+    "job": 117424639092,
+    "seconds": 126.0,
+    "steps": [
+      {
+        "name": "Set up job",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Initialize private Go state",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Checkout authoritative protocol suite",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-go@v5",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-node@v4",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify pnpm pin matches Go constant",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned pnpm via npm",
+        "seconds": 1.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify rust pin matches Go constant",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned Rust toolchain via rustup",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify Go toolchain identity",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify versioned Go install compatibility",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "gofmt check",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "go vet",
+        "seconds": 11.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Ledger consistency",
+        "seconds": 7.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "go test + platform-case gate",
+        "seconds": 96.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Upload gate evidence",
+        "seconds": 2.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-node@v4",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-go@v5",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Checkout authoritative protocol suite",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "seconds": 0.0,
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "seconds": 0.0,
+        "conclusion": "success"
+      }
+    ],
+    "counts": {
+      "start": 85,
+      "output": 23724,
+      "skip": 84,
+      "run": 11003,
+      "pass": 11004,
+      "pause": 474,
+      "cont": 474
+    },
+    "packages": 85,
+    "top_tests": 3326,
+    "cli_serial": 83.71000000000001,
+    "cli_parallel": 8.13,
+    "cli_serial_count": 297,
+    "cli_parallel_count": 123,
+    "cli_first_cont": "2026-10-17T14:53:01.968949+00:00",
+    "cli_package": {
+      "elapsed": 85.71,
+      "wall": 85.710156,
+      "start": "2026-10-17T14:51:38.123236+00:00",
+      "end": "2026-10-17T14:53:03.833392674Z",
+      "action": "pass",
+      "parallel": false,
+      "cont": null
+    },
+    "event_span": 86.160167
+  }
+]
