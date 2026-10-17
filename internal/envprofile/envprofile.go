@@ -51,6 +51,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -1730,6 +1731,18 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
 			Revocations: policy.Revocations,
 		},
 	}
+	// Environments §9.1: a skill member is audited against the capabilities
+	// its own package manifest declares; a skill without a manifest, and any
+	// non-skill member, declares nothing. An unreadable or malformed
+	// manifest blocks rather than falling back to an empty declaration.
+	declared := capabilities.ImplicitNone()
+	if resolved.Kind == contextlock.KindSkill {
+		spec, err := skillspec.Load(snapshot)
+		if err != nil {
+			return nil, fmt.Errorf("audit blocked: %v", err)
+		}
+		declared = spec.Capabilities
+	}
 	subject := audit.Subject{
 		Name:          resolved.Name,
 		Source:        sourceForRevocation,
@@ -1737,7 +1750,7 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
 		Commit:        resolved.Commit,
 		Snapshot:      snapshot,
 		SchemaVersion: 3,
-		Capabilities:  capabilities.ImplicitNone(),
+		Capabilities:  declared,
 		HashVersion:   version,
 	}
 	warnings, errs := audit.Gate(cfg, []audit.Subject{subject})
@@ -2040,6 +2053,11 @@ func migrateGlobalSkills(home string, policy Policy) ([]contextlock.Member, erro
 			Commit: resolved.Commit, HashVersion: hashing.WriteVersion(),
 		}
 		if _, err := strictAuditMember(home, manager, migrated, entry, policy); err != nil {
+			// Environments §9.4: an undeclared host names the remedy; the
+			// finding itself is never downgraded or declared on the skill's behalf.
+			if strings.Contains(err.Error(), "audit.capability.network-undeclared") {
+				return nil, fmt.Errorf("%s: migrated global skill %q %v; add a covering host glob to capabilities.network in the skill's agent-skill.json (or csk-skill.json when using the legacy alias), or leave the skill unmigrated", DiagSourceInvalid, decl.Name, err)
+			}
 			return nil, fmt.Errorf("%s: migrated global skill %q %v", DiagSourceInvalid, decl.Name, err)
 		}
 		members = append(members, contextlock.Member{
