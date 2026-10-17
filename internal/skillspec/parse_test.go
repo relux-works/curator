@@ -164,6 +164,27 @@ func TestCapabilitiesRequiredFromV3(t *testing.T) {
 	}
 }
 
+// Every capability-aware schema rejects null through either manifest filename; empty objects remain valid.
+func TestCapabilitiesNullRejectedFromV3(t *testing.T) {
+	for schema := 3; schema <= 8; schema++ {
+		for _, name := range []string{CanonicalManifestName, LegacyManifestName} {
+			t.Run(fmt.Sprintf("v%d/%s", schema, name), func(t *testing.T) {
+				for _, value := range []string{"null", "{}"} {
+					dir := t.TempDir()
+					if err := os.WriteFile(filepath.Join(dir, name), []byte(fmt.Sprintf(`{"schema_version":%d,"capabilities":%s}`, schema, value)), 0o644); err != nil {
+						t.Fatal(err)
+					}
+					if value == "null" {
+						mustFail(t, dir, "capabilities")
+					} else if _, err := Load(dir); err != nil {
+						t.Fatalf("empty object refused: %v", err)
+					}
+				}
+			})
+		}
+	}
+}
+
 func TestRuntimeRoots(t *testing.T) {
 	files := map[string]string{"scripts/tool": "#!/bin/sh\n", "lib/util.py": ""}
 	ok := writeSkill(t, `{"schema_version": 2, "runtime_roots": ["scripts", "lib"]}`, files)
