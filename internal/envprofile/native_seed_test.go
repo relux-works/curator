@@ -133,3 +133,69 @@ func TestNativeSeedDoesNotRelaxManagerState(t *testing.T) {
 		}
 	}
 }
+
+// Muse copies only regular files from its locked manager-owned snapshot. A
+// symlink planted after initial store admission must fail before publication;
+// the same bytes in a regular snapshot file are a positive control.
+func TestNativeSeedMuseSnapshotStaysStrict(t *testing.T) {
+	for _, linked := range []bool{false, true} {
+		t.Run(map[bool]string{false: "regular", true: "symlink"}[linked], func(t *testing.T) {
+			fx := writeManagedFixture(t, "native-muse-snapshot")
+			fx.native[envregistry.Muse] = t.TempDir()
+			if err := os.WriteFile(filepath.Join(fx.native[envregistry.Muse], "auth.json"), []byte("synthetic-auth\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			req := fx.request(envregistry.Muse)
+			req.Repair = true
+			root, err := req.museSeedRoot()
+			if err != nil {
+				t.Fatal(err)
+			}
+			seed := filepath.Join(root, "config", "muse", "settings.json")
+			target := filepath.Join(t.TempDir(), "outside-snapshot.json")
+			payload := []byte("{\"outside_snapshot\":true}\n")
+			if err := testseed.WriteFile(target, payload, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			before, err := os.Stat(target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.beforeRepairLock = func() {
+				if err := os.MkdirAll(filepath.Dir(seed), 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if linked {
+					if err := os.Symlink(target, seed); err != nil {
+						t.Fatal(err)
+					}
+				} else if err := testseed.WriteFile(seed, payload, 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			result, err := Resolve(req)
+			home := ManagedHomeDir(fx.home, fx.profile, envregistry.Muse)
+			if linked {
+				if err == nil || result != nil || !strings.Contains(err.Error(), envregistry.DiagSeedUnreadable) || !strings.Contains(err.Error(), "path must be a regular file") {
+					t.Fatalf("snapshot symlink must be refused: result=%+v err=%v", result, err)
+				}
+				if _, err := os.Lstat(home); !os.IsNotExist(err) {
+					t.Fatalf("refusal published home: %v", err)
+				}
+			} else {
+				if err != nil || result == nil || !result.Provisioned {
+					t.Fatalf("regular snapshot control: %+v %v", result, err)
+				}
+				got, err := os.ReadFile(filepath.Join(home, "config", "muse", "settings.json"))
+				if err != nil || !bytes.Equal(got, payload) {
+					t.Fatalf("regular snapshot bytes: %q %v", got, err)
+				}
+			}
+			got, err := os.ReadFile(target)
+			after, statErr := os.Stat(target)
+			if err != nil || statErr != nil || !bytes.Equal(got, payload) || !after.ModTime().Equal(before.ModTime()) {
+				t.Fatal("snapshot read changed outside target")
+			}
+		})
+	}
+}

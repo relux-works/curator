@@ -730,7 +730,12 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 			path := filepath.Join(seedRoot, filepath.FromSlash(seed))
 			readRegularFile := req.readRegularFile
 			if readRegularFile == nil {
-				readRegularFile = nativeseed.ReadFile
+				// Muse seeds belong to the locked manager snapshot, not the
+				// operator's native home, and retain the strict read boundary.
+				readRegularFile = stateread.ReadRegularFile
+				if adapter.ID != envregistry.Muse {
+					readRegularFile = nativeseed.ReadFile
+				}
 			}
 			file, err := readRegularFile(path) // #nosec G304 -- seed names are registry data
 			if err != nil {

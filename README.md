@@ -313,7 +313,8 @@ The target must be regular, owned by the current user, and have no group or othe
 write bits on Unix. Windows checks the open handle's owner SID and rejects DACL
 entries granting another identity mutation rights. Dangling links, cycles and
 unsafe targets refuse before provisioning. Curator never writes through native
-seed links. Manager-owned records retain their existing no-symlink rules.
+seed links. Manager-owned records and Muse seeds copied from the locked root
+snapshot retain their existing no-symlink rules.
 
 The Go fixture tests cover seed reads, descriptor swaps, linked provisioning,
 resolve/repair preservation and manager-state rejection:
