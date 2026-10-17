@@ -1,8 +1,10 @@
 package envprofile
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -66,7 +68,9 @@ func TestMigratedGlobalSkillNetworkCapabilities(t *testing.T) {
 // The real migration must neither reuse a refusal produced before it read
 // manifest capabilities nor accept an unstated-package allow for undeclared
 // network use. Seed each cache through the real audit gate, then drive the
-// public migration entry; only the covering manifest may publish.
+// public migration entry; only the covering manifest may publish. Fresh
+// verdicts must state the complete frozen package even when capabilities
+// independently force a cache miss.
 func TestMigratedGlobalSkillIgnoresPreManifestVerdictCache(t *testing.T) {
 	previous := hashing.EnableV2Writers
 	hashing.EnableV2Writers = true
@@ -109,6 +113,25 @@ func TestMigratedGlobalSkillIgnoresPreManifestVerdictCache(t *testing.T) {
 				t.Fatalf("old unstated-package cache seed: %v", errs)
 			}
 			err = EnsureDefaultWithPolicy(home, Policy{})
+			payload, readErr := os.ReadFile(verdicts[0])
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			var verdict struct {
+				Package   audit.SourcePackage `json:"package"`
+				Commit    string              `json:"commit"`
+				Directory string              `json:"directory"`
+			}
+			if err := json.Unmarshal(payload, &verdict); err != nil {
+				t.Fatal(err)
+			}
+			wantPackage := audit.SourcePackage{
+				Kind: audit.SourcePackageNetworkGit, Repository: "example.com/skills/binary-skill",
+				Commit: &audit.SourceCommit{ObjectFormat: "sha1", Hex: commit}, Directory: ".",
+			}
+			if !reflect.DeepEqual(verdict.Package, wantPackage) || verdict.Commit != commit || verdict.Directory != "." {
+				t.Fatalf("migration verdict lost frozen package identity: %+v", verdict)
+			}
 			if !declared {
 				assertMigrationNetworkRefusal(t, home, err, "downloads.example.com")
 				return
