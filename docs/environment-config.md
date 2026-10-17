@@ -81,6 +81,12 @@ Muse v4 carries `root_context: {"exclusive": true}` exactly when resolve
 verifies a declared root surface, including header-only output. Old v1–v3
 readers reject the successor; consumers must support v4 before managed launch.
 This producer change does not qualify an external launcher or refresh behavior.
+`env status` reports each verified Muse policy's effective file backend and
+shared/isolated mode without reading credential payloads. Its standing note
+separates 1.4.7 loader evidence from 1.4.8 file-backend evidence. Exact-build
+1.4.8 P1–P4 replay on both forms, linked and regular-file roots, remains a
+consumer-release prerequisite; refresh, discovery and model-visible exclusion
+remain unverified. Workspace precedence is an observed residual.
 
 ## Security posture
 

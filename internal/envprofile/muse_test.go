@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -277,6 +278,8 @@ func TestMuseDirectoriesAndIsolation(t *testing.T) {
 	}
 }
 
+// Repair admits only the live-relative/empty-directory controls. Conflicts,
+// read failures and linked parents preserve the full credential scope.
 func TestMuseAuthRepairAdditionalStates(t *testing.T) {
 	for _, state := range []string{"empty-directory", "nonempty-directory", "relative-link", "target-directory", "readlink-error", "missing-link-missing-target", "config-parent-link"} {
 		t.Run(state, func(t *testing.T) {
@@ -336,6 +339,36 @@ func TestMuseAuthRepairAdditionalStates(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			before := snapshotCredentialScope(t, fx)
+			statusReq := statusRequest(fx)
+			statusReq.passthroughReadlink = req.passthroughReadlink
+			status, err := StatusOf(statusReq)
+			if err != nil {
+				t.Fatal(err)
+			}
+			row := findHome(status, fx.profile, envregistry.Muse)
+			if row == nil {
+				t.Fatal("missing Muse status")
+			}
+			if state == "relative-link" {
+				if !row.Current {
+					t.Fatalf("live relative link not current: %v", row.Findings)
+				}
+			} else {
+				want := envregistry.DiagPassthroughDetached
+				if state == "readlink-error" {
+					want = envregistry.DiagPassthroughUnreadable
+				}
+				if state == "config-parent-link" {
+					want = DiagWriteWouldFollowLink
+				}
+				if row.Current || !strings.Contains(strings.Join(row.Findings, ";"), want) {
+					t.Fatalf("status should report %s: %+v", want, row.Findings)
+				}
+			}
+			if !reflect.DeepEqual(before, snapshotCredentialScope(t, fx)) {
+				t.Fatal("status changed credential scope")
+			}
 			result, err := Resolve(req)
 			wantSuccess := state == "empty-directory" || state == "relative-link"
 			if (err == nil) != wantSuccess {
@@ -343,6 +376,21 @@ func TestMuseAuthRepairAdditionalStates(t *testing.T) {
 			}
 			if !wantSuccess && result != nil && len(result.Document) > 0 {
 				t.Fatal("refusal emitted fragment")
+			}
+			if !wantSuccess {
+				want := envregistry.DiagCredentialConflict
+				if state == "readlink-error" {
+					want = envregistry.DiagPassthroughUnreadable
+				}
+				if state == "config-parent-link" {
+					want = DiagWriteWouldFollowLink
+				}
+				if !strings.Contains(err.Error(), want) {
+					t.Fatalf("refusal %v, want %s", err, want)
+				}
+				if !reflect.DeepEqual(before, snapshotCredentialScope(t, fx)) {
+					t.Fatal("refusal changed credential scope")
+				}
 			}
 			if wantSuccess {
 				if _, err := os.Readlink(link); err != nil {

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -79,6 +80,14 @@ func TestMuseRootContextVectors(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			source := museRootProfile(t, tc.Context)
 			source.cfg.Env.Forms = map[string]string{envregistry.Muse: tc.Form}
+			if tc.Name == "no-context" {
+				// Unrelated native/workspace/header-like files cannot mint policy.
+				for _, path := range []string{filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "muse", "AGENTS.md"), filepath.Join(source.cfg.Home(), "AGENTS.md")} {
+					if err := os.WriteFile(path, []byte("<!-- curator-root-context-v2 -->\n"), 0600); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
 			code, stdout, stderr := runProfile(t, source, "env", "resolve", "muse", "--repair", "--format", "json")
 			home := envprofile.ManagedHomeDir(source.cfg.Home(), "acme", envregistry.Muse)
 			target := filepath.Join(home, "config", "muse", "AGENTS.md")
@@ -141,12 +150,36 @@ func TestMuseRootContextVectors(t *testing.T) {
 			if !recorded || surface.Form != "monolithic" || len(surface.Paths) != 1 || surface.Paths[0] != "config/muse/AGENTS.md" {
 				t.Fatalf("root surface not recorded at admitted target: %+v", surface)
 			}
+			if info, err := os.Lstat(target); err != nil {
+				t.Fatal(err)
+			} else if info.Mode()&os.ModeSymlink == 0 {
+				copied := false
+				if surface.Copies != nil {
+					for _, copy := range *surface.Copies {
+						copied = copied || copy.Path == "config/muse/AGENTS.md" && copy.Reason == envmarker.ReasonSymlinkFallback
+					}
+				}
+				if !copied {
+					t.Fatal("regular root lacks fallback record")
+				}
+				t.Log("verified copied root")
+			}
 			wantHash, err := contextmaterialize.SurfaceHashWithVersion(map[string][]byte{"config/muse/AGENTS.md": []byte(want)}, lock.ContentHashVersion())
 			if err != nil || surface.ContentSHA256 != wantHash {
 				t.Fatalf("root marker hash: %q want %q err=%v", surface.ContentSHA256, wantHash, err)
 			}
-			if code, _, stderr := runProfile(t, source, "env", "resolve", "muse"); code != exitOK {
+			code, current, stderr := runProfile(t, source, "env", "resolve", "muse")
+			if code != exitOK {
 				t.Fatalf("unchanged root is not current: exit %d: %s", code, stderr)
+			}
+			var currentFragment struct {
+				RootContext *struct{ Exclusive bool } `json:"root_context"`
+			}
+			if err := json.Unmarshal([]byte(current), &currentFragment); err != nil {
+				t.Fatal(err)
+			}
+			if currentFragment.RootContext == nil || !currentFragment.RootContext.Exclusive {
+				t.Fatal("current root lost verified fact")
 			}
 		})
 	}
@@ -163,6 +196,11 @@ func TestMuseRootContextDrift(t *testing.T) {
 			home := envprofile.ManagedHomeDir(source.cfg.Home(), "acme", envregistry.Muse)
 			target := filepath.Join(home, "config", "muse", "AGENTS.md")
 			original, err := os.ReadFile(target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			markerPath := filepath.Join(home, envmarker.Name)
+			markerBefore, err := os.ReadFile(markerPath)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -197,12 +235,160 @@ func TestMuseRootContextDrift(t *testing.T) {
 			if !found {
 				t.Fatalf("missing Muse %s status", state)
 			}
+			if got, err := os.ReadFile(markerPath); err != nil || !bytes.Equal(got, markerBefore) {
+				t.Fatal("read-only refusal/status changed marker")
+			}
+			got, err := os.ReadFile(target)
+			if action == "changed" && (err != nil || string(got) != "changed\n") || action == "removed" && !os.IsNotExist(err) {
+				t.Fatal("read-only refusal/status changed root")
+			}
 			if code, _, stderr := runProfile(t, source, "env", "resolve", "muse", "--repair"); code != exitOK {
 				t.Fatalf("repair: exit %d: %s", code, stderr)
 			}
 			repaired, err := os.ReadFile(target)
 			if err != nil || !bytes.Equal(repaired, original) {
 				t.Fatalf("repair bytes: %q %v", repaired, err)
+			}
+		})
+	}
+}
+
+// Permission denial is exercised on hosts that enforce chmod; a blocked
+// repair uses a nonempty target directory on every platform. Neither path
+// may emit a fragment or publish a new marker; the declared root is retained.
+func TestMuseRootContextRefusals(t *testing.T) {
+	for _, action := range []string{"denied", "failed-repair"} {
+		t.Run(action, func(t *testing.T) {
+			source := museRootProfile(t, json.RawMessage(`{"modules":[{"path":"a.md"}]}`))
+			if code, _, stderr := runProfile(t, source, "env", "resolve", "muse", "--repair"); code != exitOK {
+				t.Fatal(stderr)
+			}
+			home := envprofile.ManagedHomeDir(source.cfg.Home(), "acme", envregistry.Muse)
+			target := filepath.Join(home, "config", "muse", "AGENTS.md")
+			markerPath := filepath.Join(home, envmarker.Name)
+			markerBefore, err := os.ReadFile(markerPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			original, err := os.ReadFile(target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			args := []string{"env", "resolve", "muse", "--format", "json"}
+			want := envprofile.DiagHomeStale
+			if action == "denied" {
+				if runtime.GOOS == "windows" {
+					t.Skip("POSIX mode-bit unreadability: chmod cannot establish Windows ACL denial")
+				}
+				if err := os.Chmod(target, 0); err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = os.Chmod(target, 0600) })
+				if _, err := os.ReadFile(target); !os.IsPermission(err) {
+					t.Skip("host does not enforce chmod read denial")
+				}
+			} else {
+				if err := os.Remove(target); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Mkdir(target, 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(target, "preserve"), []byte("foreign\n"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				args = append(args, "--repair")
+				want = envprofile.DiagRepairFailed
+			}
+			if code, stdout, stderr := runProfile(t, source, args...); code != exitFail || stdout != "" || !strings.Contains(stderr, want) {
+				t.Fatalf("required-root refusal: %d %q %s", code, stdout, stderr)
+			}
+			status := readMuseRootStatus(t, source)
+			found := false
+			for _, row := range status.Homes {
+				if row.Environment != envregistry.Muse || row.Profile != "acme" {
+					continue
+				}
+				if row.Current {
+					t.Fatal("unusable required root is current")
+				}
+				for _, surface := range row.Surfaces {
+					if surface.Key == envmarker.SurfaceRootContext {
+						found = true
+						if action == "denied" && surface.State != envprofile.DiagSurfaceUnreadable {
+							t.Fatalf("denial became %s", surface.State)
+						}
+					}
+				}
+			}
+			if !found {
+				t.Fatal("required root silently disappeared from status")
+			}
+			if got, err := os.ReadFile(markerPath); err != nil || !bytes.Equal(got, markerBefore) {
+				t.Fatal("refusal/status published a marker")
+			}
+			if action == "denied" {
+				if err := os.Chmod(target, 0600); err != nil {
+					t.Fatal(err)
+				}
+				if got, err := os.ReadFile(target); err != nil || !bytes.Equal(got, original) {
+					t.Fatal("refusal changed denied root")
+				}
+			} else {
+				if got, err := os.ReadFile(filepath.Join(target, "preserve")); err != nil || string(got) != "foreign\n" {
+					t.Fatal("failed repair changed blocked target")
+				}
+				if err := os.Remove(filepath.Join(target, "preserve")); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Remove(target); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// The adjacent recovery control must emit the fact, not just succeed.
+			code, stdout, stderr := runProfile(t, source, "env", "resolve", "muse", "--repair", "--format", "json")
+			var fragment struct {
+				RootContext *struct{ Exclusive bool } `json:"root_context"`
+			}
+			if err := json.Unmarshal([]byte(stdout), &fragment); err != nil {
+				t.Fatal(err)
+			}
+			if code != exitOK || fragment.RootContext == nil || !fragment.RootContext.Exclusive {
+				t.Fatalf("recovery lost fact: %d %s %s", code, stdout, stderr)
+			}
+		})
+	}
+}
+
+// Shared and isolated status reuse the verified policy, report effective
+// file/mode, preserve config bytes and never print synthetic credential bytes.
+func TestMuseCredentialPolicyStatus(t *testing.T) {
+	for _, mode := range []string{"shared", "isolated"} {
+		t.Run(mode, func(t *testing.T) {
+			source := museRootProfile(t, nil)
+			source.cfg.Env.Isolation = map[string]map[string]string{"acme": {envregistry.Muse: mode}}
+			if code, _, stderr := runProfile(t, source, "env", "resolve", "muse", "--repair"); code != exitOK {
+				t.Fatal(stderr)
+			}
+			configBefore, err := json.Marshal(source.cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			status := readMuseRootStatus(t, source)
+			found := false
+			for _, row := range status.Homes {
+				if row.Profile == "acme" && row.Environment == envregistry.Muse {
+					found = row.Current && strings.Contains(strings.Join(row.Warnings, "\n"), "effective backend=file; isolation="+mode)
+				}
+			}
+			if !found {
+				t.Fatalf("status omitted verified %s file policy", mode)
+			}
+			if raw, _ := json.Marshal(status); strings.Contains(string(raw), "synthetic-native") {
+				t.Fatal("status leaked credential bytes")
+			}
+			if got, err := json.Marshal(source.cfg); err != nil || !bytes.Equal(got, configBefore) {
+				t.Fatal("status changed config")
 			}
 		})
 	}
@@ -221,10 +407,12 @@ func readMuseRootStatus(t *testing.T, source stubConfigSource) envprofile.Status
 	return status
 }
 
+// Public status separates historical loader evidence, backend evidence and
+// unqualified replay/refresh; it reports no runtime qualification of its own.
 func TestMuseRootContextStatus(t *testing.T) {
 	source := museRootProfile(t, nil)
 	notes := strings.Join(readMuseRootStatus(t, source).Notes, "\n")
-	for _, text := range []string{"monolithic root context delivered at config/muse/AGENTS.md", "verified on 1.4.7", "exec requires --no-foreign-personal-context when the target is materialized", "serve cannot exclude foreign personal context", "workspace AGENTS.md prevailed", "model-visible foreign removal", "skills discovery", "system-prompt discovery", "remain unverified"} {
+	for _, text := range []string{"monolithic root context delivered at config/muse/AGENTS.md", "verified on 1.4.7", "1.4.7-R6101.1", "suppresses foreign personal rules fallback", "foreign personal skills persist", "exec requires --no-foreign-personal-context when the target is materialized", "interactive requires -c context.foreign_personal_skills=false (JSON boolean)", "serve cannot exclude foreign personal context", "required serve exclusion refuses", "workspace AGENTS.md prevailed", "1.4.8 on macOS 27: file backend", "zero Keychain access", "1.4.8 exclusion qualification unknown", "exact build", "P1–P4", "both forms", "root present/absent", "foreign rules/skills separately", "each exclusion spelling", "Curator link and regular-file snapshot", "loader observations separately from model-visible behavior", "model-visible foreign removal", "skills discovery", "system-prompt discovery", "refresh semantics", "remain unverified"} {
 		if !strings.Contains(notes, text) {
 			t.Fatalf("status omitted %q: %s", text, notes)
 		}

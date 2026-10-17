@@ -540,6 +540,8 @@ func TestMuseFragmentV4PublishedCases(t *testing.T) {
 
 // The public config/resolve chain preserves selectors, native auth, marker and
 // link identity; explicit keychain emits no fragment, even with repair.
+// Public config/resolve preserves the stored selector and both stores. All
+// five parsed renderer values agree, in independent XDG-then-backend order.
 func TestMuseCLIStorePolicy(t *testing.T) {
 	source := credentialStoreCLIHome(t)
 	prepareNativeMuse(t)
@@ -571,6 +573,7 @@ func TestMuseCLIStorePolicy(t *testing.T) {
 			}
 			before[path] = raw
 		}
+		var jsonEnv map[string]string
 		for _, format := range []string{"json", "env", "shell"} {
 			code, stdout, stderr := runProfile(t, source, "env", "resolve", "muse", "--repair", "--format", format)
 			if selector == "keychain" {
@@ -583,14 +586,39 @@ func TestMuseCLIStorePolicy(t *testing.T) {
 				}
 				if format == "json" {
 					validateMuseFragmentV3(t, museFragmentV4Schema(t), []byte(stdout))
+					var fragment struct{ Env map[string]string }
+					if err := json.Unmarshal([]byte(stdout), &fragment); err != nil {
+						t.Fatal(err)
+					}
+					jsonEnv = fragment.Env
 				} else {
 					lines := strings.Split(strings.TrimSpace(stdout), "\n")
-					want := "TBH_CREDENTIAL_BACKEND=file"
-					if format == "shell" {
-						want = "export TBH_CREDENTIAL_BACKEND='file'"
-					}
-					if len(lines) != 5 || lines[4] != want {
+					if len(lines) != 5 {
 						t.Fatalf("%s projection: %q", format, stdout)
+					}
+					parsed := map[string]string{}
+					for i, name := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "TBH_CREDENTIAL_BACKEND"} {
+						line := lines[i]
+						if format == "shell" {
+							if !strings.HasPrefix(line, "export ") {
+								t.Fatalf("missing export: %q", line)
+							}
+							line = strings.TrimPrefix(line, "export ")
+						}
+						key, value, ok := strings.Cut(line, "=")
+						if !ok || key != name {
+							t.Fatalf("%s order: %q", format, stdout)
+						}
+						if format == "shell" {
+							if len(value) < 2 || value[0] != '\'' || value[len(value)-1] != '\'' {
+								t.Fatalf("unquoted export: %q", value)
+							}
+							value = strings.ReplaceAll(value[1:len(value)-1], "'\\''", "'")
+						}
+						parsed[key] = value
+					}
+					if !reflect.DeepEqual(parsed, jsonEnv) {
+						t.Fatalf("%s differs from JSON: %v != %v", format, parsed, jsonEnv)
 					}
 				}
 			}
