@@ -831,11 +831,11 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
 			// Parse the complete authority so reserved-looking userinfo cannot
 			// exempt the real host. Invalid authorities keep the old finding.
 			parsed, parseErr := url.Parse(match[0])
-			if parseErr == nil {
+			if parseErr == nil && parsed.User != nil {
 				host = strings.ToLower(parsed.Hostname())
 			}
 			if host == "localhost" || host == "127.0.0.1" || declaredHost(declaredHosts, host) ||
-				(parseErr == nil && reservedAuditHost(host)) {
+				(parseErr == nil && reservedAuditHost(parsed.Hostname())) {
 				continue
 			}
 			findings = append(findings, Finding{

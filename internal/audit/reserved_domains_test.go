@@ -37,7 +37,7 @@ func TestReservedDomainLookalikesRemainAudited(t *testing.T) {
 		"evil.test.com", "example.com.attacker", "notest", "evillocalhost",
 		"test.attacker", "invalid.attacker", "localhost.attacker",
 		"example.com", "example.net", "example.org", "exfiltrate.example.com",
-		"api.example.net", "api.example.org", "board.test..", "board..test", "-board.test", "board_.test",
+		"api.example.net", "api.example.org", "board.test..", "board..test", "-board.test",
 	} {
 		t.Run(host, func(t *testing.T) {
 			subject := subjectWith(t, "curl https://"+host+"/data\n", capabilities.ImplicitNone(), 3)
@@ -51,7 +51,7 @@ func TestReservedDomainLookalikesRemainAudited(t *testing.T) {
 	}
 }
 
-// Reserved-looking userinfo cannot hide a real authority, and malformed ports do not earn an exemption.
+// Reserved-looking userinfo cannot hide a real authority; invalid ports and DNS labels retain findings.
 func TestReservedDomainAuthorityBoundary(t *testing.T) {
 	for _, tc := range []struct {
 		url, wantHost string
@@ -59,6 +59,7 @@ func TestReservedDomainAuthorityBoundary(t *testing.T) {
 		{"https://board.test@github.com/data", "github.com"},
 		{"https://board.test:443@brew.sh/data", "brew.sh"},
 		{"https://board.test:bad/data", "board.test"},
+		{"https://board_.test/data", "board"},
 	} {
 		t.Run(tc.url, func(t *testing.T) {
 			subject := subjectWith(t, "curl "+tc.url+"\n", capabilities.ImplicitNone(), 3)
@@ -66,6 +67,22 @@ func TestReservedDomainAuthorityBoundary(t *testing.T) {
 			if len(findings) != 1 || findings[0].ID != "audit.capability.network-undeclared" ||
 				!strings.Contains(findings[0].Evidence, "contacts "+tc.wantHost+",") {
 				t.Fatalf("URL produced findings %+v, want host %s", findings, tc.wantHost)
+			}
+		})
+	}
+}
+
+// Declared real hosts retain the previous detector behavior at shell and prose punctuation boundaries.
+func TestDeclaredHostURLPunctuation(t *testing.T) {
+	for _, text := range []string{
+		"$(curl https://github.com)",
+		"See https://github.com, then continue",
+		"curl https://github.com:443",
+	} {
+		t.Run(text, func(t *testing.T) {
+			subject := subjectWith(t, text, capabilities.Manifest{Network: []string{"github.com"}}, 3)
+			if findings := detect(subject.Snapshot, subject.Capabilities); len(findings) != 0 {
+				t.Fatalf("declared host produced findings at a punctuation boundary: %+v", findings)
 			}
 		})
 	}
