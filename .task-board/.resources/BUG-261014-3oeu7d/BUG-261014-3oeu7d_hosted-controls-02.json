@@ -1,0 +1,843 @@
+{
+  "run": {
+    "headSha": "0a2cdb08929afa6b5130c90d9354818077299ff7",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/relux-works/curator/actions/runs/39033322875",
+    "jobs": [
+      {
+        "name": "Interop conformance gate",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Test (ubuntu-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Naming gate",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Test (windows-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Race (macos-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Gate self-test (macos-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Gate self-test (windows-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Go 1.25.5 driver (ubuntu-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Lint",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Go 1.27.1 driver (macos-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Go 1.26.0 driver (windows-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Go 1.26.0 driver (ubuntu-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Go 1.25.5 driver (macos-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Gate self-test (ubuntu-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Go 1.26.0 driver (macos-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Race (ubuntu-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Go 1.27.1 driver (ubuntu-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Test (macos-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Go 1.25.5 driver (windows-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Go 1.27.1 driver (windows-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Candidate suite (${{ matrix.os }})",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "name": "Optional self-hosted macOS lane",
+        "status": "completed",
+        "conclusion": "skipped"
+      }
+    ]
+  },
+  "passing_record_counts": {
+    "linux": 46,
+    "macos": 46,
+    "windows": 46
+  },
+  "candidate": {
+    "base": "26d8ddbf1278ac025a3333aee1053adbdb37f1bf",
+    "gate_snapshot": "0a2cdb08929afa6b5130c90d9354818077299ff7",
+    "files": {
+      "LOGBOOK.md": "ecf312c054b64dfc40783cf13f24815b4412b68a8b8226263e75dc20b54dab31",
+      "internal/envprofile/envprofile.go": "28490d2dc61da11b5a4b736c7cdb8a25809dab844ed67355b977adb22c0a8ef1",
+      "internal/envprofile/global_migration_hash_version_test.go": "ace27beae3da73fc977ad3075472900e9b18ff6b79de35727cc90be742658b05",
+      "internal/envprofile/global_migration_capabilities_test.go": "70636dadbf69519fc57ffe49838b30ea47be008bbd3aea8168b6654db9c7ecf6",
+      "internal/envprofile/global_migration_capabilities_mutants_test.go": "2f058d9afb782e1882adffa34cd209f7a7d255293a05bd8c5cd0000f073df8f8"
+    },
+    "environment": "go1.25.5 darwin/arm64",
+    "spec_main": "1059b94b4135089d842bf017070b8ab47d79a536",
+    "gate_run": 39033322875,
+    "candidate_tree": "88c4200db2dcfce899bde15444031a6e4ea28d13",
+    "snapshot_tree": "88c4200db2dcfce899bde15444031a6e4ea28d13",
+    "snapshot_signature": "G",
+    "checkpoint_unchanged": true,
+    "candidate_matches_gate_snapshot": true,
+    "diff_check_exit": 0
+  },
+  "records": {
+    "linux": [
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/implicit-none",
+        "Elapsed": 7.62
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/malformed-network-fallback",
+        "Elapsed": 4.71
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/undeclared-neighbour-admitted",
+        "Elapsed": 3.81
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/context-authorized-by-skill-manifest",
+        "Elapsed": 6.19
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/unstated-verdict-reused",
+        "Elapsed": 6.98
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/legacy-schema-bypasses-network-finding",
+        "Elapsed": 3.32
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants",
+        "Elapsed": 32.62
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/exact-host-declared",
+        "Elapsed": 0.03
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/glob-host-declared",
+        "Elapsed": 0.03
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/legacy-alias",
+        "Elapsed": 0.04
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/schema-nine",
+        "Elapsed": 0.05
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/no-manifest",
+        "Elapsed": 0.08
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/network-none",
+        "Elapsed": 0.06
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/network-absent",
+        "Elapsed": 0.05
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/other-host-declared",
+        "Elapsed": 0.03
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/pre-capabilities-schema",
+        "Elapsed": 0.04
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities",
+        "Elapsed": 0.41
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillIgnoresPreManifestVerdictCache/declared-skill-old-refusal",
+        "Elapsed": 0.03
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillIgnoresPreManifestVerdictCache/undeclared-skill-old-allow",
+        "Elapsed": 0.03
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillIgnoresPreManifestVerdictCache",
+        "Elapsed": 0.06
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillDeclarationKeepsOtherGates/neighbouring-host",
+        "Elapsed": 0.02
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillDeclarationKeepsOtherGates/revoked-source",
+        "Elapsed": 0.02
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillDeclarationKeepsOtherGates/canary-failure",
+        "Elapsed": 0.02
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillDeclarationKeepsOtherGates",
+        "Elapsed": 0.06
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillManifestErrorsBlock/malformed-network",
+        "Elapsed": 0.02
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillManifestErrorsBlock/malformed-json",
+        "Elapsed": 0.02
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillManifestErrorsBlock/unreadable-manifest",
+        "Elapsed": 0.02
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillManifestErrorsBlock",
+        "Elapsed": 0.07
+      },
+      {
+        "Action": "pass",
+        "Test": "TestInstalledMemberCapabilitiesStayKindScoped/declared-skill",
+        "Elapsed": 0.07
+      },
+      {
+        "Action": "pass",
+        "Test": "TestInstalledMemberCapabilitiesStayKindScoped/clean-context-ignores-skill-manifest",
+        "Elapsed": 0.05
+      },
+      {
+        "Action": "pass",
+        "Test": "TestInstalledMemberCapabilitiesStayKindScoped/context-network-not-authorized",
+        "Elapsed": 0.1
+      },
+      {
+        "Action": "pass",
+        "Test": "TestInstalledMemberCapabilitiesStayKindScoped",
+        "Elapsed": 0.22
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-and-binary/v2",
+        "Elapsed": 0.04
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-and-binary/v1",
+        "Elapsed": 0.03
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-only/v2",
+        "Elapsed": 0.04
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-only/v1",
+        "Elapsed": 0.02
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/binary-only/v2",
+        "Elapsed": 0.03
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/binary-only/v1",
+        "Elapsed": 0.03
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-and-binary/v2",
+        "Elapsed": 0.03
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-and-binary/v1",
+        "Elapsed": 0.02
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-only/v2",
+        "Elapsed": 0.03
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-only/v1",
+        "Elapsed": 0.03
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/binary-only/v2",
+        "Elapsed": 0.03
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/binary-only/v1",
+        "Elapsed": 0.02
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion",
+        "Elapsed": 0.36
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkUndeclaredFollowUp",
+        "Elapsed": 0.02
+      }
+    ],
+    "macos": [
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/implicit-none",
+        "Elapsed": 14.34
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/malformed-network-fallback",
+        "Elapsed": 5.55
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/undeclared-neighbour-admitted",
+        "Elapsed": 4.87
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/context-authorized-by-skill-manifest",
+        "Elapsed": 6.29
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/unstated-verdict-reused",
+        "Elapsed": 4.97
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/legacy-schema-bypasses-network-finding",
+        "Elapsed": 8.34
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants",
+        "Elapsed": 44.37
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/exact-host-declared",
+        "Elapsed": 0.37
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/glob-host-declared",
+        "Elapsed": 0.29
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/legacy-alias",
+        "Elapsed": 0.3
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/schema-nine",
+        "Elapsed": 0.28
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/no-manifest",
+        "Elapsed": 0.25
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/network-none",
+        "Elapsed": 0.26
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/network-absent",
+        "Elapsed": 0.26
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/other-host-declared",
+        "Elapsed": 0.26
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/pre-capabilities-schema",
+        "Elapsed": 0.24
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities",
+        "Elapsed": 2.52
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillIgnoresPreManifestVerdictCache/declared-skill-old-refusal",
+        "Elapsed": 0.44
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillIgnoresPreManifestVerdictCache/undeclared-skill-old-allow",
+        "Elapsed": 0.31
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillIgnoresPreManifestVerdictCache",
+        "Elapsed": 0.75
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillDeclarationKeepsOtherGates/neighbouring-host",
+        "Elapsed": 0.25
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillDeclarationKeepsOtherGates/revoked-source",
+        "Elapsed": 0.27
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillDeclarationKeepsOtherGates/canary-failure",
+        "Elapsed": 0.27
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillDeclarationKeepsOtherGates",
+        "Elapsed": 0.79
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillManifestErrorsBlock/malformed-network",
+        "Elapsed": 0.25
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillManifestErrorsBlock/malformed-json",
+        "Elapsed": 0.28
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillManifestErrorsBlock/unreadable-manifest",
+        "Elapsed": 0.27
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillManifestErrorsBlock",
+        "Elapsed": 0.8
+      },
+      {
+        "Action": "pass",
+        "Test": "TestInstalledMemberCapabilitiesStayKindScoped/declared-skill",
+        "Elapsed": 0.63
+      },
+      {
+        "Action": "pass",
+        "Test": "TestInstalledMemberCapabilitiesStayKindScoped/clean-context-ignores-skill-manifest",
+        "Elapsed": 0.46
+      },
+      {
+        "Action": "pass",
+        "Test": "TestInstalledMemberCapabilitiesStayKindScoped/context-network-not-authorized",
+        "Elapsed": 0.35
+      },
+      {
+        "Action": "pass",
+        "Test": "TestInstalledMemberCapabilitiesStayKindScoped",
+        "Elapsed": 1.43
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-and-binary/v2",
+        "Elapsed": 0.31
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-and-binary/v1",
+        "Elapsed": 0.28
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-only/v2",
+        "Elapsed": 0.36
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-only/v1",
+        "Elapsed": 0.51
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/binary-only/v2",
+        "Elapsed": 0.47
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/binary-only/v1",
+        "Elapsed": 0.24
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-and-binary/v2",
+        "Elapsed": 0.34
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-and-binary/v1",
+        "Elapsed": 0.33
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-only/v2",
+        "Elapsed": 0.37
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-only/v1",
+        "Elapsed": 0.36
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/binary-only/v2",
+        "Elapsed": 0.35
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/binary-only/v1",
+        "Elapsed": 0.25
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion",
+        "Elapsed": 4.18
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkUndeclaredFollowUp",
+        "Elapsed": 0.36
+      }
+    ],
+    "windows": [
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/implicit-none",
+        "Elapsed": 23.18
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/malformed-network-fallback",
+        "Elapsed": 17.15
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/undeclared-neighbour-admitted",
+        "Elapsed": 14.13
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/context-authorized-by-skill-manifest",
+        "Elapsed": 21.78
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/unstated-verdict-reused",
+        "Elapsed": 11.65
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants/legacy-schema-bypasses-network-finding",
+        "Elapsed": 31.03
+      },
+      {
+        "Action": "pass",
+        "Test": "TestGlobalSkillCapabilitiesNarrowingMutants",
+        "Elapsed": 118.92
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/exact-host-declared",
+        "Elapsed": 4.83
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/glob-host-declared",
+        "Elapsed": 3.6
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/legacy-alias",
+        "Elapsed": 3.51
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/schema-nine",
+        "Elapsed": 3.04
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/no-manifest",
+        "Elapsed": 1.63
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/network-none",
+        "Elapsed": 1.6
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/network-absent",
+        "Elapsed": 1.94
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/other-host-declared",
+        "Elapsed": 1.64
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities/pre-capabilities-schema",
+        "Elapsed": 1.73
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkCapabilities",
+        "Elapsed": 23.52
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillIgnoresPreManifestVerdictCache/declared-skill-old-refusal",
+        "Elapsed": 3.91
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillIgnoresPreManifestVerdictCache/undeclared-skill-old-allow",
+        "Elapsed": 1.87
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillIgnoresPreManifestVerdictCache",
+        "Elapsed": 5.79
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillDeclarationKeepsOtherGates/neighbouring-host",
+        "Elapsed": 1.85
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillDeclarationKeepsOtherGates/revoked-source",
+        "Elapsed": 1.89
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillDeclarationKeepsOtherGates/canary-failure",
+        "Elapsed": 1.63
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillDeclarationKeepsOtherGates",
+        "Elapsed": 5.37
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillManifestErrorsBlock/malformed-network",
+        "Elapsed": 1.59
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillManifestErrorsBlock/malformed-json",
+        "Elapsed": 1.54
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillManifestErrorsBlock/unreadable-manifest",
+        "Elapsed": 1.52
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillManifestErrorsBlock",
+        "Elapsed": 4.66
+      },
+      {
+        "Action": "pass",
+        "Test": "TestInstalledMemberCapabilitiesStayKindScoped/declared-skill",
+        "Elapsed": 5.64
+      },
+      {
+        "Action": "pass",
+        "Test": "TestInstalledMemberCapabilitiesStayKindScoped/clean-context-ignores-skill-manifest",
+        "Elapsed": 4.52
+      },
+      {
+        "Action": "pass",
+        "Test": "TestInstalledMemberCapabilitiesStayKindScoped/context-network-not-authorized",
+        "Elapsed": 3.6
+      },
+      {
+        "Action": "pass",
+        "Test": "TestInstalledMemberCapabilitiesStayKindScoped",
+        "Elapsed": 13.76
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-and-binary/v2",
+        "Elapsed": 3.77
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-and-binary/v1",
+        "Elapsed": 1.54
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-only/v2",
+        "Elapsed": 3.08
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/gzip-only/v1",
+        "Elapsed": 2.11
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/binary-only/v2",
+        "Elapsed": 2.85
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/.task-board/attachments/binary-only/v1",
+        "Elapsed": 1.63
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-and-binary/v2",
+        "Elapsed": 2.96
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-and-binary/v1",
+        "Elapsed": 2.04
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-only/v2",
+        "Elapsed": 3.1
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/gzip-only/v1",
+        "Elapsed": 1.63
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/binary-only/v2",
+        "Elapsed": 4.23
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion/assets/deep/binary-only/v1",
+        "Elapsed": 1.82
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillBinaryWriteVersion",
+        "Elapsed": 30.76
+      },
+      {
+        "Action": "pass",
+        "Test": "TestMigratedGlobalSkillNetworkUndeclaredFollowUp",
+        "Elapsed": 2.5
+      }
+    ]
+  }
+}

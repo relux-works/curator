@@ -1,0 +1,186 @@
+diff --git a/internal/envprofile/envprofile.go b/internal/envprofile/envprofile.go
+index 645eb81b..aea0a8e6 100644
+--- a/internal/envprofile/envprofile.go
++++ b/internal/envprofile/envprofile.go
+@@ -51,6 +51,7 @@ import (
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/opaquescan"
+ 	"github.com/relux-works/curator/internal/protocoljson"
++	"github.com/relux-works/curator/internal/skillspec"
+ 	"github.com/relux-works/curator/internal/stateread"
+ )
+ 
+@@ -1730,6 +1731,18 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
+ 			Revocations: policy.Revocations,
+ 		},
+ 	}
++	// Environments §9.1: a skill member is audited against the capabilities
++	// its own package manifest declares; a skill without a manifest, and any
++	// non-skill member, declares nothing. An unreadable or malformed
++	// manifest blocks rather than falling back to an empty declaration.
++	declared := capabilities.ImplicitNone()
++	if resolved.Kind == contextlock.KindSkill {
++		spec, err := skillspec.Load(snapshot)
++		if err != nil {
++			return nil, fmt.Errorf("audit blocked: %v", err)
++		}
++		declared = spec.Capabilities
++	}
+ 	subject := audit.Subject{
+ 		Name:          resolved.Name,
+ 		Source:        sourceForRevocation,
+@@ -1737,7 +1750,7 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
+ 		Commit:        resolved.Commit,
+ 		Snapshot:      snapshot,
+ 		SchemaVersion: 3,
+-		Capabilities:  capabilities.ImplicitNone(),
++		Capabilities:  declared,
+ 		HashVersion:   version,
+ 	}
+ 	warnings, errs := audit.Gate(cfg, []audit.Subject{subject})
+@@ -2040,6 +2053,11 @@ func migrateGlobalSkills(home string, policy Policy) ([]contextlock.Member, erro
+ 			Commit: resolved.Commit, HashVersion: hashing.WriteVersion(),
+ 		}
+ 		if _, err := strictAuditMember(home, manager, migrated, entry, policy); err != nil {
++			// Environments §9.4: an undeclared host names the remedy; the
++			// finding itself is never downgraded or declared on the skill's behalf.
++			if strings.Contains(err.Error(), "audit.capability.network-undeclared") {
++				return nil, fmt.Errorf("%s: migrated global skill %q %v; add a covering host glob to capabilities.network in the skill's agent-skill.json (or csk-skill.json when using the legacy alias), or leave the skill unmigrated", DiagSourceInvalid, decl.Name, err)
++			}
+ 			return nil, fmt.Errorf("%s: migrated global skill %q %v", DiagSourceInvalid, decl.Name, err)
+ 		}
+ 		members = append(members, contextlock.Member{
+diff --git a/internal/envprofile/global_migration_hash_version_test.go b/internal/envprofile/global_migration_hash_version_test.go
+index 19b1b381..f914c565 100644
+--- a/internal/envprofile/global_migration_hash_version_test.go
++++ b/internal/envprofile/global_migration_hash_version_test.go
+@@ -162,24 +162,118 @@ func assertMigrationUnpublished(t *testing.T, home string) {
+ 	}
+ }
+ 
+-// Characterize the follow-up through the same production migration entry.
+-// Binary data passes the v2 audits, but the implicit-none capability contract
+-// still blocks the URL. This test records that bound, not a remedy for it.
+-func TestMigratedGlobalSkillNetworkUndeclaredFollowUp(t *testing.T) {
++// Environments §9.4 through the production migration entry: a migrated
++// global skill passes the strict network check only when its own
++// agent-skill.json declares a host glob covering the detected host. The
++// covering case is the positive control; absent, "none" and non-covering
++// declarations must still refuse with the named remedy and publish nothing.
++func TestMigratedGlobalSkillNetworkCapabilities(t *testing.T) {
++	previous := hashing.EnableV2Writers
++	hashing.EnableV2Writers = true
++	t.Cleanup(func() { hashing.EnableV2Writers = previous })
++	for _, testCase := range []struct {
++		name     string
++		manifest string
++		admitted bool
++	}{
++		{name: "exact-host-declared", manifest: `{"schema_version": 3, "capabilities": {"network": ["downloads.example.com"]}}`, admitted: true},
++		{name: "glob-host-declared", manifest: `{"schema_version": 3, "capabilities": {"network": ["*.example.com"]}}`, admitted: true},
++		{name: "no-manifest"},
++		{name: "network-none", manifest: `{"schema_version": 3, "capabilities": {"network": "none"}}`},
++		{name: "other-host-declared", manifest: `{"schema_version": 3, "capabilities": {"network": ["api.example.org"]}}`},
++		{name: "pre-capabilities-schema", manifest: `{"schema_version": 2}`},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			files := map[string]string{
++				"README.md":        "network skill\n",
++				"assets/small.bin": "a\x00b",
++				"scripts/fetch.sh": "curl https://downloads.example.com/archive\n",
++			}
++			if testCase.manifest != "" {
++				files["agent-skill.json"] = testCase.manifest
++			}
++			home, commit := migrationRevisionFixture(t, files)
++			err := EnsureDefaultWithPolicy(home, Policy{})
++			if testCase.admitted {
++				if err != nil {
++					t.Fatalf("migration with a covering declaration: %v", err)
++				}
++				lock, _, err := readLock(home, DefaultProfile)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if member, ok := lock.Find(contextlock.KindSkill, "binary-skill"); !ok || member.Commit != commit {
++					t.Fatalf("migrated skill = %+v, present = %v", member, ok)
++				}
++				return
++			}
++			if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) ||
++				!strings.Contains(err.Error(), `"binary-skill"`) ||
++				!strings.Contains(err.Error(), "audit.capability.network-undeclared") ||
++				!strings.Contains(err.Error(), "contacts downloads.example.com") ||
++				!strings.Contains(err.Error(), "scripts/fetch.sh") ||
++				!strings.Contains(err.Error(), "capabilities.network in the skill's agent-skill.json") {
++				t.Fatalf("migration = %v, want named network-undeclared refusal with remedy", err)
++			}
++			assertMigrationUnpublished(t, home)
++		})
++	}
++}
++
++// A covering network declaration widens only the network check: a second,
++// undeclared neighbouring host, a revoked source and a failed static canary
++// each still refuse the migration and publish nothing.
++func TestMigratedGlobalSkillDeclarationKeepsOtherGates(t *testing.T) {
++	previous := hashing.EnableV2Writers
++	hashing.EnableV2Writers = true
++	t.Cleanup(func() { hashing.EnableV2Writers = previous })
++	declared := `{"schema_version": 3, "capabilities": {"network": ["downloads.example.com"]}}`
++	for _, testCase := range []struct {
++		name   string
++		fetch  string
++		policy Policy
++		canary bool
++		want   string
++	}{
++		{name: "neighbouring-host", fetch: "curl https://downloads.example.com/a\ncurl https://uploads.example.com/b\n",
++			canary: true, want: "contacts uploads.example.com"},
++		{name: "revoked-source", fetch: "curl https://downloads.example.com/a\n",
++			policy: Policy{Revocations: []string{"source:example.com/skills/binary-skill"}}, canary: true, want: "revoked"},
++		{name: "canary-failure", fetch: "curl https://downloads.example.com/a\n", want: "canary"},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			if !testCase.canary {
++				previousCanary := canaryPasses
++				canaryPasses = func() bool { return false }
++				t.Cleanup(func() { canaryPasses = previousCanary })
++			}
++			home, _ := migrationRevisionFixture(t, map[string]string{
++				"README.md":        "network skill\n",
++				"agent-skill.json": declared,
++				"scripts/fetch.sh": testCase.fetch,
++			})
++			err := EnsureDefaultWithPolicy(home, testCase.policy)
++			if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), testCase.want) {
++				t.Fatalf("migration = %v, want refusal carrying %q", err, testCase.want)
++			}
++			assertMigrationUnpublished(t, home)
++		})
++	}
++}
++
++// A malformed skill manifest blocks the strict audit instead of falling back
++// to an empty declaration that a later fix could silently widen.
++func TestMigratedGlobalSkillMalformedManifestBlocks(t *testing.T) {
+ 	previous := hashing.EnableV2Writers
+ 	hashing.EnableV2Writers = true
+ 	t.Cleanup(func() { hashing.EnableV2Writers = previous })
+ 	home, _ := migrationRevisionFixture(t, map[string]string{
+ 		"README.md":        "network skill\n",
+-		"assets/small.bin": "a\x00b",
+-		"scripts/fetch.sh": "curl https://downloads.example.com/archive\n",
++		"agent-skill.json": `{"schema_version": 3, "capabilities": {"network": 7}}`,
+ 	})
+ 	err := EnsureDefaultWithPolicy(home, Policy{})
+-	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) ||
+-		!strings.Contains(err.Error(), "audit.capability.network-undeclared") ||
+-		!strings.Contains(err.Error(), "scripts/fetch.sh") {
+-		t.Fatalf("migration = %v, want strict network-undeclared finding", err)
++	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), "capabilities.network") {
++		t.Fatalf("migration = %v, want refusal naming the malformed capabilities.network", err)
+ 	}
+ 	assertMigrationUnpublished(t, home)
+-	t.Logf("follow-up refusal: %v", err)
+ }
