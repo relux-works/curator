@@ -1,0 +1,83 @@
+{
+  "run_id": 38997554340,
+  "job_id": 117293322669,
+  "artifact_id": 12087593346,
+  "snapshot": "23a4f4ee7dee14319f6215df7073dcef5b2ba900",
+  "stream_sha256": "aa277143d2e1112ae4f32ab71acf0ed04a912cf0a8bf1f4b796850d221e1ae52",
+  "tests": [
+    {
+      "Action": "pass",
+      "Package": "github.com/relux-works/curator/internal/scriptworker",
+      "Test": "TestLandlockProbeChildCannotReprobe",
+      "Elapsed": 0.01
+    },
+    {
+      "Action": "pass",
+      "Package": "github.com/relux-works/curator/internal/scriptworker",
+      "Test": "TestLandlockProbeNarrowingMutants",
+      "Elapsed": 8.39
+    },
+    {
+      "Action": "pass",
+      "Package": "github.com/relux-works/curator/internal/scriptworker",
+      "Test": "TestLandlockProbeCancellationKillsProcessGroup",
+      "Elapsed": 2.05
+    },
+    {
+      "Action": "pass",
+      "Package": "github.com/relux-works/curator/internal/scriptworker",
+      "Test": "TestLinuxLandlockProbeFindsPresentControls",
+      "Elapsed": 0.02
+    },
+    {
+      "Action": "pass",
+      "Package": "github.com/relux-works/curator/internal/scriptworker",
+      "Test": "TestLinuxLandlockProbeChildAnswersAtTheBoundary",
+      "Elapsed": 0.02
+    },
+    {
+      "Action": "pass",
+      "Package": "github.com/relux-works/curator/internal/scriptworker",
+      "Test": "TestLandlockProbeModeTerminatesAffectedTestBinaries",
+      "Elapsed": 4.62
+    },
+    {
+      "Action": "pass",
+      "Package": "github.com/relux-works/curator/cmd/curator",
+      "Test": "TestProductionBinaryDispatchesLandlockProbe",
+      "Elapsed": 0.86
+    }
+  ],
+  "mutants": [
+    "landlock_probe_linux_test.go:104: mutant dispatch-admits-extra-argument killed: exit=1; --- FAIL: TestLandlockProbeModeTerminatesAffectedTestBinaries; probe exit=0 output=\"\", want exit=1 and no test output",
+    "landlock_probe_linux_test.go:104: mutant reprobe-admits-malformed-child killed: exit=1; --- FAIL: TestLandlockProbeChildCannotReprobe; probe child argc=2 = true, <nil>, want absent without error",
+    "landlock_probe_linux_test.go:104: mutant cleanup-kills-group-only-on-deadline killed: exit=1; --- FAIL: TestLandlockProbeCancellationKillsProcessGroup/cancel; probe descendant survived cancellation"
+  ],
+  "binary_cases": {
+    "passed": 20,
+    "expected": 20,
+    "names": [
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/cmd/curator/owned",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/cmd/curator/missing",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/cmd/curator/no-directory",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/cmd/curator/extra-argument",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/install/owned",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/install/missing",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/install/no-directory",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/install/extra-argument",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/install/atomicity/owned",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/install/atomicity/missing",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/install/atomicity/no-directory",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/install/atomicity/extra-argument",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/crossconformance/owned",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/crossconformance/missing",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/crossconformance/no-directory",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/crossconformance/extra-argument",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/scriptworker/owned",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/scriptworker/missing",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/scriptworker/no-directory",
+      "TestLandlockProbeModeTerminatesAffectedTestBinaries/internal/scriptworker/extra-argument"
+    ]
+  },
+  "artifact_url": "https://github.com/relux-works/curator/actions/runs/38997554340/artifacts/12087593346"
+}

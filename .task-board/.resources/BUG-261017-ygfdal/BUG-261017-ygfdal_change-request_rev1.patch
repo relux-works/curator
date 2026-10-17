@@ -1,0 +1,426 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index bdf6b18851353125cefbdae6edfc4b3c3adcbca0..3fe3a3526eb646bd07434263dcb1a3f98f075d00 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,16 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-10-17 — Re-executed capability probes must own their entry point
++
++BUG-261017-ygfdal reproduced a test binary running its suite instead of the
++hidden Landlock probe. Dispatch now belongs to scriptworker initialization,
++covering all five importing test binaries before their TestMain or main.
++Malformed requests exit silently; a probe-shaped caller cannot probe again.
++Linux cancellation kills the private process group, with an isolated subreaper
++test checking that the grandchild is killed and reaped. Behavioral overlay
++mutants narrow argument admission, the recursion guard, and group cleanup.
++
+ ## 2026-10-16 — Loader records and frozen snapshot inventory need independent attestation
+ 
+ TASK-261016-i5gwaf review revision 1 found two evidence bypasses: duplicate
+diff --git a/internal/scriptworker/landlock_linux.go b/internal/scriptworker/landlock_linux.go
+index 93ee3a34fcb7ea93e14da03499bd5b45705cd208..ae840aa1cd74407328e236007967fa0605fadc67 100644
+--- a/internal/scriptworker/landlock_linux.go
++++ b/internal/scriptworker/landlock_linux.go
+@@ -9,6 +9,7 @@ import (
+ 	"os"
+ 	"os/exec"
+ 	"runtime"
++	"syscall"
+ 	"time"
+ 	"unsafe"
+ 
+@@ -93,6 +94,11 @@ func landlockABI() (int, error) {
+ // an older ABI, a denied privilege change, a failed restriction —
+ // reports absent without an error.
+ func probeScriptLandlock(_ string) (bool, error) {
++	// Defence in depth if an entry point ever calls the probe from a probe
++	// child: never re-execute, even for a malformed hidden request.
++	if isLandlockProbeChild() {
++		return false, nil
++	}
+ 	abi, err := landlockABI()
+ 	if err != nil || abi < 1 {
+ 		return false, nil
+@@ -108,14 +114,30 @@ func probeScriptLandlock(_ string) (bool, error) {
+ 	defer func() { _ = os.Remove(temporary) }()
+ 	ctx, cancel := context.WithTimeout(context.Background(), scriptLandlockProbeTimeout)
+ 	defer cancel()
+-	command := exec.CommandContext(ctx, manager, ScriptLandlockProbeMode, temporary) // #nosec G204 -- self-re-execution in the fixed hidden probe mode with a manager-created directory
+-	command.Env = scriptWorkerEnvironment()
++	command := landlockProbeCommand(ctx, manager, temporary)
+ 	if err := command.Run(); err != nil {
+ 		return false, nil
+ 	}
+ 	return true, nil
+ }
+ 
++// A probe has a private process group. CommandContext's default cancellation
++// only kills the direct child; replace it so descendants cannot outlive a
++// timeout or cancellation even if the child has not reached the dispatcher.
++func landlockProbeCommand(ctx context.Context, manager, directory string) *exec.Cmd {
++	command := exec.CommandContext(ctx, manager, ScriptLandlockProbeMode, directory) // #nosec G204 -- self-re-execution in the fixed hidden probe mode with a manager-created directory
++	command.Env = scriptWorkerEnvironment()
++	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
++	command.Cancel = func() error {
++		err := unix.Kill(-command.Process.Pid, unix.SIGKILL)
++		if errors.Is(err, unix.ESRCH) {
++			return os.ErrProcessDone
++		}
++		return err
++	}
++	return command
++}
++
+ // RunLandlockProbe is the hidden probe entry: on a locked OS thread it
+ // sets no_new_privs, creates the invocation-shaped ruleset for the
+ // probed ABI, adds one typed rule over the manager-owned directory, and
+diff --git a/internal/scriptworker/landlock_probe.go b/internal/scriptworker/landlock_probe.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..24d1e29c0f150e29543ec16f5eab97671476d95e
+--- /dev/null
++++ b/internal/scriptworker/landlock_probe.go
+@@ -0,0 +1,21 @@
++package scriptworker
++
++import "os"
++
++// Dispatch before any importing package's initialization, TestMain, or main.
++// Re-execution is safe even in binaries that do not know about worker modes:
++// importing the probe also installs its entry point. Malformed hidden requests
++// fail silently rather than falling through to unrelated application work.
++func init() {
++	if !isLandlockProbeChild() {
++		return
++	}
++	if len(os.Args) != 3 {
++		os.Exit(1)
++	}
++	os.Exit(RunLandlockProbe(os.Args[2]))
++}
++
++func isLandlockProbeChild() bool {
++	return len(os.Args) > 1 && os.Args[1] == ScriptLandlockProbeMode
++}
+diff --git a/internal/scriptworker/landlock_probe_linux_test.go b/internal/scriptworker/landlock_probe_linux_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..a7124326856daf1da308d8bf19849e69e57b4f50
+--- /dev/null
++++ b/internal/scriptworker/landlock_probe_linux_test.go
+@@ -0,0 +1,190 @@
++//go:build linux
++
++package scriptworker
++
++import (
++	"context"
++	"encoding/json"
++	"errors"
++	"go/build"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strconv"
++	"strings"
++	"testing"
++	"time"
++
++	"golang.org/x/sys/unix"
++)
++
++// A probe-shaped caller, including a malformed request, must report absent
++// without re-executing. The normal caller is the positive control on Landlock
++// hosts; changing argv here exercises the fallback guard after initialization.
++func TestLandlockProbeChildCannotReprobe(t *testing.T) {
++	original := os.Args
++	defer func() { os.Args = original }()
++	if present, err := probeScriptLandlock(ScriptControlDescendantExecDenial); !present || err != nil {
++		t.Fatalf("normal caller = %v, %v; requires the Linux Landlock test host", present, err)
++	}
++	for _, args := range [][]string{
++		{original[0], ScriptLandlockProbeMode, t.TempDir()},
++		{original[0], ScriptLandlockProbeMode},
++		{original[0], ScriptLandlockProbeMode, t.TempDir(), "extra"},
++	} {
++		os.Args = args
++		if present, err := probeScriptLandlock(ScriptControlDescendantExecDenial); present || err != nil {
++			t.Fatalf("probe child argc=%d = %v, %v, want absent without error", len(args), present, err)
++		}
++	}
++}
++
++// Each overlay weakens one guard while retaining the guard itself. Run the
++// behavioral regression, not a token checker, and require its named failure.
++// Overlays leave the checkout untouched and are inherited by nested builds.
++func TestLandlockProbeNarrowingMutants(t *testing.T) {
++	for _, mutant := range []struct {
++		name, file, before, after, run, failure, diagnostic string
++	}{
++		{
++			"dispatch-admits-extra-argument", "landlock_probe.go",
++			"if len(os.Args) != 3 {", "if len(os.Args) < 3 {",
++			"^TestLandlockProbeModeTerminatesAffectedTestBinaries$/internal/scriptworker/extra-argument$",
++			"--- FAIL: TestLandlockProbeModeTerminatesAffectedTestBinaries",
++			"probe exit=0 output=\"\", want exit=1 and no test output",
++		},
++		{
++			"reprobe-admits-malformed-child", "landlock_linux.go",
++			"if isLandlockProbeChild() {", "if isLandlockProbeChild() && len(os.Args) == 3 {",
++			"^TestLandlockProbeChildCannotReprobe$",
++			"--- FAIL: TestLandlockProbeChildCannotReprobe",
++			"probe child argc=2 = true, <nil>, want absent without error",
++		},
++		{
++			"cleanup-kills-group-only-on-deadline", "landlock_linux.go",
++			"err := unix.Kill(-command.Process.Pid, unix.SIGKILL)",
++			"if errors.Is(ctx.Err(), context.Canceled) { return command.Process.Kill() }; err := unix.Kill(-command.Process.Pid, unix.SIGKILL)",
++			"^TestLandlockProbeCancellationKillsProcessGroup$",
++			"--- FAIL: TestLandlockProbeCancellationKillsProcessGroup/cancel",
++			"probe descendant survived cancellation",
++		},
++	} {
++		t.Run(mutant.name, func(t *testing.T) {
++			source, err := filepath.Abs(mutant.file)
++			if err != nil {
++				t.Fatal(err)
++			}
++			payload, err := os.ReadFile(source)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if strings.Count(string(payload), mutant.before) != 1 {
++				t.Fatal("mutant not applied: source anchor must occur exactly once")
++			}
++			directory := t.TempDir()
++			replacement := filepath.Join(directory, mutant.file)
++			if err := os.WriteFile(replacement, []byte(strings.Replace(string(payload), mutant.before, mutant.after, 1)), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			overlay, err := json.Marshal(map[string]any{"Replace": map[string]string{source: replacement}})
++			if err != nil {
++				t.Fatal(err)
++			}
++			overlayPath := filepath.Join(directory, "overlay.json")
++			if err := os.WriteFile(overlayPath, overlay, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			command := exec.Command(filepath.Join(build.Default.GOROOT, "bin", "go"), "test", "-count=1", "-timeout=60s", "-run", mutant.run, ".") // #nosec G204 -- local toolchain and fixed behavioral tests
++			command.Env = append(os.Environ(), "GOFLAGS="+os.Getenv("GOFLAGS")+" "+strconv.Quote("-overlay="+overlayPath))
++			output, err := command.CombinedOutput()
++			var exit *exec.ExitError
++			if !errors.As(err, &exit) || !strings.Contains(string(output), mutant.failure) || !strings.Contains(string(output), mutant.diagnostic) {
++				t.Fatalf("mutant survived or failed outside its named regression: %v\n%s", err, output)
++			}
++			t.Logf("mutant %s killed: exit=%d; %s; %s", mutant.name, exit.ExitCode(), mutant.failure, mutant.diagnostic)
++		})
++	}
++}
++
++// Both deadline expiry and explicit cancellation kill a real grandchild in
++// the production probe command's process group. An isolated subreaper lets the
++// test reap it and assert SIGKILL, rather than mistaking a zombie for a survivor.
++func TestLandlockProbeCancellationKillsProcessGroup(t *testing.T) {
++	const helper = "CURATOR_TEST_LANDLOCK_SUBREAPER"
++	if os.Getenv(helper) != "1" {
++		command := exec.Command(os.Args[0], "-test.run=^TestLandlockProbeCancellationKillsProcessGroup$", "-test.v") // #nosec G204 -- fixed self-test entry
++		command.Env = append(os.Environ(), helper+"=1")
++		if output, err := command.CombinedOutput(); err != nil {
++			t.Fatalf("isolated cleanup test: %v\n%s", err, output)
++		}
++		return
++	}
++	if err := unix.Prctl(unix.PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0); err != nil {
++		t.Fatal(err)
++	}
++	for _, mode := range []string{"timeout", "cancel"} {
++		t.Run(mode, func(t *testing.T) {
++			directory := t.TempDir()
++			manager := filepath.Join(directory, "manager")
++			// Absolute sleep avoids depending on the sanitized worker PATH.
++			if err := os.WriteFile(manager, []byte("#!/bin/sh\n/bin/sleep 60 &\necho $! > \"$2/descendant\"\nwait\n"), 0o700); err != nil {
++				t.Fatal(err)
++			}
++			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
++			defer cancel()
++			command := landlockProbeCommand(ctx, manager, directory)
++			if err := command.Start(); err != nil {
++				t.Fatal(err)
++			}
++			defer func() { _ = unix.Kill(-command.Process.Pid, unix.SIGKILL) }()
++			var pid int
++			for deadline := time.Now().Add(time.Second); time.Now().Before(deadline); {
++				payload, err := os.ReadFile(filepath.Join(directory, "descendant"))
++				if err == nil {
++					pid, err = strconv.Atoi(strings.TrimSpace(string(payload)))
++					if err == nil && pid > 0 {
++						break
++					}
++				}
++				time.Sleep(10 * time.Millisecond)
++			}
++			if pid <= 0 {
++				cancel()
++				_ = command.Wait()
++				t.Fatal("probe fixture did not start its descendant")
++			}
++			if mode == "cancel" {
++				cancel()
++			}
++			if err := command.Wait(); err == nil || ctx.Err() == nil {
++				t.Fatalf("probe did not fail on %s: wait=%v context=%v", mode, err, ctx.Err())
++			}
++			var status unix.WaitStatus
++			for deadline := time.Now().Add(time.Second); ; {
++				reaped, err := unix.Wait4(pid, &status, unix.WNOHANG, nil)
++				if err != nil {
++					t.Fatalf("reap probe descendant: %v", err)
++				}
++				if reaped == pid {
++					break
++				}
++				if time.Now().After(deadline) {
++					_ = unix.Kill(pid, unix.SIGKILL)
++					_, _ = unix.Wait4(pid, &status, 0, nil)
++					t.Fatal("probe descendant survived cancellation")
++				}
++				time.Sleep(10 * time.Millisecond)
++			}
++			if !status.Signaled() || status.Signal() != unix.SIGKILL {
++				t.Fatalf("descendant status=%v, want SIGKILL", status)
++			}
++			if err := unix.Kill(pid, 0); !errors.Is(err, unix.ESRCH) {
++				t.Fatalf("descendant still exists after reap: %v", err)
++			}
++		})
++	}
++	// A normally exiting probe remains successful with the cancellation hook.
++	if err := landlockProbeCommand(context.Background(), "/bin/true", t.TempDir()).Run(); err != nil {
++		t.Fatalf("successful probe command: %v", err)
++	}
++}
+diff --git a/internal/scriptworker/landlock_probe_other_test.go b/internal/scriptworker/landlock_probe_other_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..b9a5f32ff4f7744701afa6cacb5266680d9157c9
+--- /dev/null
++++ b/internal/scriptworker/landlock_probe_other_test.go
+@@ -0,0 +1,11 @@
++//go:build !linux
++
++package scriptworker
++
++import "testing"
++
++// Process-group cancellation and subreaper verification are Linux-only; other
++// platforms never launch a Landlock availability probe.
++func TestLandlockProbeCancellationKillsProcessGroup(t *testing.T) {
++	t.Skip("Landlock probe cancellation is a Linux-only control in script-worker-v1-native-control-inventory-v1 (requires process groups and a subreaper)")
++}
+diff --git a/internal/scriptworker/probe_reexec_other_test.go b/internal/scriptworker/probe_reexec_other_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..b12d0903b2700c9390f9eb7d8cb3819b73e3b255
+--- /dev/null
++++ b/internal/scriptworker/probe_reexec_other_test.go
+@@ -0,0 +1,7 @@
++//go:build !linux && !darwin
++
++package scriptworker
++
++import "os/exec"
++
++func protectProbeTestProcess(_ *exec.Cmd) {}
+diff --git a/internal/scriptworker/probe_reexec_test.go b/internal/scriptworker/probe_reexec_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..ca4e0c99dc513f2fe9fc48a075a9c534a8b605b4
+--- /dev/null
++++ b/internal/scriptworker/probe_reexec_test.go
+@@ -0,0 +1,70 @@
++package scriptworker
++
++import (
++	"context"
++	"errors"
++	"go/build"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"testing"
++	"time"
++)
++
++// Every current test binary that transitively imports scriptworker must answer
++// the hidden mode before running tests, including malformed invocations. The
++// process-group watchdog also bounds the unfixed recursion on Unix hosts.
++func TestLandlockProbeModeTerminatesAffectedTestBinaries(t *testing.T) {
++	for _, pkg := range []string{"cmd/curator", "internal/install", "internal/install/atomicity", "internal/crossconformance", "internal/scriptworker"} {
++		t.Run(pkg, func(t *testing.T) {
++			binary := filepath.Join(t.TempDir(), "probe.test")
++			if runtime.GOOS == "windows" {
++				binary += ".exe"
++			}
++			compile := exec.Command(filepath.Join(build.Default.GOROOT, "bin", goBinaryName()), "test", "-c", "-o", binary, "../../"+pkg) // #nosec G204 -- fixed repository test packages
++			if output, err := compile.CombinedOutput(); err != nil {
++				t.Fatalf("build: %v\n%s", err, output)
++			}
++			owned := mustPhysical(t, t.TempDir())
++			for _, tc := range []struct {
++				name string
++				args []string
++				want int
++			}{
++				{"owned", []string{ScriptLandlockProbeMode, owned}, probeSuccessExit()},
++				{"missing", []string{ScriptLandlockProbeMode, filepath.Join(owned, "missing")}, 1},
++				{"no-directory", []string{ScriptLandlockProbeMode}, 1},
++				{"extra-argument", []string{ScriptLandlockProbeMode, owned, "extra"}, 1},
++			} {
++				t.Run(tc.name, func(t *testing.T) {
++					ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
++					defer cancel()
++					command := exec.CommandContext(ctx, binary, tc.args...) // #nosec G204 -- test-owned binary and fixed hidden arguments
++					command.Env = scriptWorkerEnvironment()
++					protectProbeTestProcess(command)
++					output, err := command.CombinedOutput()
++					if ctx.Err() != nil {
++						t.Fatalf("probe ran tests or hung: %v; output %.500s", ctx.Err(), output)
++					}
++					code := 0
++					var exit *exec.ExitError
++					if errors.As(err, &exit) {
++						code = exit.ExitCode()
++					} else if err != nil {
++						t.Fatal(err)
++					}
++					if code != tc.want || len(output) != 0 {
++						t.Fatalf("probe exit=%d output=%.500q, want exit=%d and no test output", code, output, tc.want)
++					}
++				})
++			}
++		})
++	}
++}
++
++func probeSuccessExit() int {
++	if runtime.GOOS == "linux" {
++		return 0 // The existing Linux probe contract requires a Landlock host.
++	}
++	return 1
++}
+diff --git a/internal/scriptworker/probe_reexec_unix_test.go b/internal/scriptworker/probe_reexec_unix_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..fe974c5cd8bb274d85aefda710edf4eb63eae7b9
+--- /dev/null
++++ b/internal/scriptworker/probe_reexec_unix_test.go
+@@ -0,0 +1,13 @@
++//go:build linux || darwin
++
++package scriptworker
++
++import (
++	"os/exec"
++	"syscall"
++)
++
++func protectProbeTestProcess(command *exec.Cmd) {
++	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
++	command.Cancel = func() error { return syscall.Kill(-command.Process.Pid, syscall.SIGKILL) }
++}
