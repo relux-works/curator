@@ -313,6 +313,15 @@ workflow concurrency, and fork routing. CI initializes private Go state with
 [the runner isolation contract](docs/self-hosted-runner-setup.md#linux-job-isolation-and-scheduling).
 Store local test and workflow lint logs under `.temp/`.
 
+Run `go test ./internal/audit -run 'Test(VerdictCacheBindsEffectiveCapabilities|CapabilityCacheRulesetRetainsOldRecords)'`
+for effective-capability cache equality and prior-record retention controls.
+Run `go test ./internal/envprofile -run 'Test(StrictAuditMemberCapabilityCacheIsolation|MigratedGlobalSkillNetworkCapabilities)'`
+for migration admission and cache isolation between skill, context and MCP
+members. Cache ruleset 3 separates these verdicts from ruleset 2 without
+deleting old records. All effective capability fields participate in cache
+equality; representation differences conservatively cause a miss. Keep
+local validation logs under `.temp/`.
+
 For the rc.7 Muse policy and v4 slice, run `go test ./internal/envfragment ./internal/envprofile ./cmd/curator -run TestMuse`; this includes synthetic fixtures and narrowing controls, not runtime qualification. For the credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run 'TestCredential(Store|Projection)'`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
 
 The [Muse 1.4.8 qualification record](docs/qualification/muse-1.4.8-R6256.1.md)

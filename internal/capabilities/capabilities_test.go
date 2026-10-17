@@ -88,6 +88,8 @@ func TestParseRejections(t *testing.T) {
 		{"fs dash", `{"filesystem": ["-x"]}`, "capabilities.filesystem[0]"},
 		{"scope empty", `{"prompt_scope": "  "}`, "capabilities.prompt_scope"},
 		{"scope type", `{"prompt_scope": 5}`, "capabilities.prompt_scope"},
+		// A present null scope is malformed, not an omitted optional statement.
+		{"scope null", `{"prompt_scope": null}`, "capabilities.prompt_scope"},
 		{"empty item", `{"secrets": [""]}`, "capabilities.secrets"},
 	}
 	for _, tc := range cases {
