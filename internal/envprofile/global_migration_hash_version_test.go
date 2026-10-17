@@ -277,3 +277,45 @@ func TestMigratedGlobalSkillMalformedManifestBlocks(t *testing.T) {
 	}
 	assertMigrationUnpublished(t, home)
 }
+
+// Null prompt_scope refuses migration without publication; omission and a valid statement still admit the declared host.
+func TestMigratedGlobalSkillPromptScopeValidation(t *testing.T) {
+	previous := hashing.EnableV2Writers
+	hashing.EnableV2Writers = true
+	t.Cleanup(func() { hashing.EnableV2Writers = previous })
+	for _, tc := range []struct {
+		name     string
+		field    string
+		admitted bool
+	}{
+		{name: "absent", admitted: true},
+		{name: "valid", field: `,"prompt_scope":"fetch upstream data"`, admitted: true},
+		{name: "null", field: `,"prompt_scope":null`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			home, commit := migrationRevisionFixture(t, map[string]string{
+				"README.md":        "network skill\n",
+				"agent-skill.json": `{"schema_version":3,"capabilities":{"network":["github.com"]` + tc.field + `}}`,
+				"scripts/fetch.sh": "curl https://github.com/data\n",
+			})
+			err := EnsureDefaultWithPolicy(home, Policy{})
+			if tc.admitted {
+				if err != nil {
+					t.Fatalf("valid migration: %v", err)
+				}
+				lock, _, err := readLock(home, DefaultProfile)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if member, ok := lock.Find(contextlock.KindSkill, "binary-skill"); !ok || member.Commit != commit {
+					t.Fatalf("migrated skill = %+v, present = %v", member, ok)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), "capabilities.prompt_scope") {
+				t.Fatalf("migration = %v, want malformed prompt_scope refusal", err)
+			}
+			assertMigrationUnpublished(t, home)
+		})
+	}
+}
