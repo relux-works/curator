@@ -34,7 +34,7 @@ func identifiedSubject(snapshot string) Subject {
 // none.
 func TestVerdictCacheBindsFullPackageIdentity(t *testing.T) {
 	root := t.TempDir()
-	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
+	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example.com/")})
 	digest, err := hashing.ContentSHA256(root, nil)
 	if err != nil {
 		t.Fatal(err)

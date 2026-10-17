@@ -16,7 +16,7 @@ import (
 // repository and commit match.
 func TestVerdictCacheBindsSelectedDirectory(t *testing.T) {
 	root := t.TempDir()
-	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
+	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example.com/")})
 	digest, err := hashing.ContentSHA256(root, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +51,7 @@ func TestVerdictCacheBindsSelectedDirectory(t *testing.T) {
 // a root subject still hits them, a subdirectory subject misses.
 func TestVerdictCacheLegacyRecordWithoutDirectoryBindsRoot(t *testing.T) {
 	root := t.TempDir()
-	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
+	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example.com/")})
 	digest, err := hashing.ContentSHA256(root, nil)
 	if err != nil {
 		t.Fatal(err)
