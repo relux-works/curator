@@ -1,0 +1,5044 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index 3fe3a3526eb646bd07434263dcb1a3f98f075d00..8eddf41d570b4704c4541e600217b2a7bab3dc62 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,51 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-10-17 — L151C revision 2 after SNAP-LOCK convergence
++
++The accepted Muse producer delta exposed a convergence regression: fragment
++construction re-entered release discovery after content verification restored
++its observation scope. The retained
++TestMaterializeCaptureAndStatusNeverProbeVendor reproduced vendor execution
++(exit 1). The fragment now consumes the credential policy from its verified
++home plan; one resolver and the release-keyed cache remain authoritative.
++The no-probe regression covers Muse native/file with shared/isolated homes,
++v4 backend agreement, current metadata status and unchanged source state.
++A narrowing plant restores re-observation only for Muse; it must fail the
++named behavioral test. Its real-executable sentinel remains Unix-only,
++including the corresponding Windows plant bound. SNAP-LOCK probe/cache plants
++are rerun on the combined tree. Exact commands and results belong to the
++revision-2 outcome; no inherited green log substitutes for new execution.
++The gate-script signing change is already on trunk and is absent from this
++delta. Readiness/login, Codex v5/application qualification, real hosted plant
++and adopted source policy remain with TASK-261017-0pawkw.
++
++## 2026-10-16 — Managed Muse credential policy and successor fragment
++
++TASK-261016-wh6v9a implements the first coherent slice allowed by its brief:
++managed Muse native/unset/file maps once to effective file, both isolation
++modes are admitted, shared still requires the captured native file, and
++resolve emits v4 agreement, the backend literal and the verified root fact.
++The stored selector and credential bytes are preserved; repair cannot migrate
++a shared link or erase a detached file. Explicit migration remains available.
++The independent successor schema corpus and narrowing behavioral controls are
++included. Normative source: curator-spec main
++`1059b94b4135089d842bf017070b8ab47d79a536`.
++
++Readiness/login, qualified Codex v5 application, the real hosted override plant
++and adopted external-source policy remain deferred. Synthetic child launch
++checks do not qualify a vendor runtime or hosted consumer. The gate helper signs/verifies its detached snapshot using the configured
++human identity; that supporting change landed with SNAP-LOCK and is absent
++from this revision's delta. It preserves the Story branch and index. Command results and exact scope/coverage are attached to the
++task handoff rather than recorded as premature qualification here.
++
++The first hosted gate caught two retained historical conformance assertions:
++the four-path registry row omitted the successor literal, and the v3 corpus
++lost its one-parent path check. The retained tests now distinguish historical
++home-path evidence from the new policy field. Focused reproduction uses the
++same pinned conformance root as hosted CI; schema-only success is insufficient
++for the corpus's relational path cases.
++
+ ## 2026-10-17 — Re-executed capability probes must own their entry point
+ 
+ BUG-261017-ygfdal reproduced a test binary running its suite instead of the
+diff --git a/README.md b/README.md
+index 3eebf39bdb51d868693450e0e3618d4d69dcbe05..fddc16a1a4d40ff54a0bd92f8b2a207346add7af 100644
+--- a/README.md
++++ b/README.md
+@@ -214,7 +214,7 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
+ 
+ > **Important:** a managed home either shares your native login or logs in by itself. Claude Code on macOS always logs in by itself, so every profile you use with it needs one login in its home before the first launch or spawn; otherwise the launch stops with "Not logged in". See [Logging in to managed homes](docs/environment-config.md#logging-in-to-managed-homes).
+ >
+-> [Agent logins](docs/agent-logins.md) explains Claude Code, Codex CLI and Muse storage and session requirements. The **rc.7** machine selector defaults to `native`: `curator env config set credential_store.<profile>.<env-id> <value>` accepts `native`, `file`, or `keychain`. Configuration is available; explicit store application remains disabled pending qualified mappings and successor consumers. Native policy is resolved once per operation; see [machine policy](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice).
++> [Agent logins](docs/agent-logins.md) explains Claude Code, Codex CLI and Muse storage and session requirements. The **rc.7** machine selector defaults to `native`: `curator env config set credential_store.<profile>.<env-id> <value>` accepts `native`, `file`, or `keychain`. Managed Muse maps native/unset/file to file and emits v4; other explicit store application remains disabled pending qualified mappings and successor consumers. Native policy is resolved once per operation; see [machine policy](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice).
+ 
+ <details>
+ <summary>Hybrid scope</summary>
+@@ -306,7 +306,7 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run
+ 
+ ### Tools
+ 
+-For the rc.7 credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run 'TestCredential(Store|Projection)'`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
++For the rc.7 Muse policy and v4 slice, run `go test ./internal/envfragment ./internal/envprofile ./cmd/curator -run TestMuse`; this includes synthetic fixtures and narrowing controls, not runtime qualification. For the credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run 'TestCredential(Store|Projection)'`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
+ 
+ The [Muse 1.4.8 qualification record](docs/qualification/muse-1.4.8-R6256.1.md)
+ separates passing exec loader rows from failed interactive skill exclusion.
+@@ -314,7 +314,7 @@ The [opt-in replay](.research/muse148/README.md) documents Go/tmux/sandbox-exec
+ commands, frozen fixtures and task-local outputs. The interactive release gate
+ remains pending; green regression tests do not authorize a new Muse build.
+ 
+-Use `go build ./...` to compile and `go vet ./...` for static validation. Run `make lint` (golangci-lint) for repository lint; store local validation logs under `.temp/`. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate leaves the working tree and index unchanged. Go tests use temporary homes. Run `go test ./internal/envprofile/... ./cmd/curator/...` for focused environment validation. The preserve-lock vector family is pinned in `internal/envprofile/testdata/environments-repair-preserve-lock.json`; `CURATOR_PRESERVE_LOCK_VECTORS=/path/to/vectors.json go test ./internal/envprofile -run TestRepairPreserveLockVectors` runs its upstream counterpart.
++Use `go build ./...` to compile and `go vet ./...` for static validation. Run `make lint` (golangci-lint) for repository lint; store local validation logs under `.temp/`. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate signs and verifies its detached snapshot with the configured human identity; it leaves the working tree, branch and index unchanged. Go tests use temporary homes. Run `go test ./internal/envprofile/... ./cmd/curator/...` for focused environment validation. The preserve-lock vector family is pinned in `internal/envprofile/testdata/environments-repair-preserve-lock.json`; `CURATOR_PRESERVE_LOCK_VECTORS=/path/to/vectors.json go test ./internal/envprofile -run TestRepairPreserveLockVectors` runs its upstream counterpart.
+ 
+ `go test ./internal/envprofile -run TestMaterializeCapture` checks the internal non-recovering snapshot capture transaction. Closure construction and CLI publication are separate integration work. Capture and metadata-only status share content verification without invoking vendor release probes; unavailable release metadata is reported as unknown. The remote gate signs its temporary snapshot with the configured author and signing key and verifies that signature before publication.
+ 
+@@ -322,7 +322,7 @@ PlantUML renders the agent-login diagrams. Run `plantuml -tsvg -nometadata diagr
+ 
+ Lychee checks Markdown links. Run `lychee --offline --include-fragments --no-progress README.md docs/environment-config.md docs/agent-logins.md` for local targets and anchors, then `lychee --no-progress --timeout 30 docs/agent-logins.md` for the reference's external links. Store logs under `.temp/`. Run `git diff --check` for whitespace validation.
+ 
+-Managed Muse homes materialize monolithic root context at `config/muse/AGENTS.md`; `referenced` is refused. A profile without a context declaration writes no root file. Curator resolves the environment fragment; its external Muse `exec` consumer must add `--no-foreign-personal-context` exactly when the root target is materialized (environments §10.2). The v3 fragment has no argv member. `env status` records the remaining discovery, `serve`, and workspace-precedence bounds.
++Managed Muse homes materialize monolithic root context at `config/muse/AGENTS.md`; `referenced` is refused. A profile without a context declaration writes no root file. Curator resolves the environment fragment; its external Muse `exec` consumer must add `--no-foreign-personal-context` exactly when the root target is materialized (environments §10.2). The v4 fragment carries the verified `root_context` fact, effective file agreement and mandatory `TBH_CREDENTIAL_BACKEND=file`; it carries no argv member. `env status` records the remaining discovery, `serve`, and workspace-precedence bounds.
+ 
+ ## Contributing
+ 
+diff --git a/cmd/curator/muse_credential_mutants_test.go b/cmd/curator/muse_credential_mutants_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..7634566a9a9da888d082625cfa2027d8947c17e8
+--- /dev/null
++++ b/cmd/curator/muse_credential_mutants_test.go
+@@ -0,0 +1,80 @@
++package main
++
++import (
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++)
++
++// Narrow one forbidden class at a time while retaining the surrounding gate.
++// Only a named behavioral failure with go test exit 1 counts as a kill.
++// The renderer plant drops only the mandatory backend; it is producer evidence,
++// not the separately required real hosted-consumer override plant.
++func TestMuseCredentialPolicyNarrowingMutants(t *testing.T) {
++	root, err := filepath.Abs("../..")
++	if err != nil {
++		t.Fatal(err)
++	}
++	mutants := []struct{ name, file, before, after, pkg, test string }{
++		{"fragment-reobserves-muse-release", "internal/envprofile/managed.go", "policy := plan.credentialPolicy", "policy := plan.credentialPolicy\nif adapter.ID == envregistry.Muse { var err error; policy, err = req.resolveCredentialPolicy(adapter); if err != nil { return nil, err } }", "./internal/envprofile", "TestMaterializeCaptureAndStatusNeverProbeVendor/muse-file-shared"},
++		{"muse-keychain-admitted", "internal/envprofile/credential_policy.go", "selection == envregistry.CredentialStoreNative || adapter.ID == envregistry.Muse && selection == envregistry.CredentialStoreFile", "selection == envregistry.CredentialStoreNative || adapter.ID == envregistry.Muse && (selection == envregistry.CredentialStoreFile || selection == envregistry.CredentialStoreKeychain)", "./internal/envprofile", "TestMuseCredentialPolicyMatrix/keychain/shared"},
++		{"missing-shared-source-admitted", "internal/envprofile/muse.go", "return conflict(\"native credential target is absent; run TBH_CREDENTIAL_BACKEND=file muse login in the native XDG environment before resolving shared Muse\")", "return museAuthState{live: true}", "./internal/envprofile", "TestMuseMissingNativeFilePolicy/shared"},
++		{"isolated-muse-native-link", "internal/envprofile/credential_policy.go", "if p.isolation == envregistry.IsolationIsolated {", "if p.isolation == envregistry.IsolationIsolated && adapter.ID != envregistry.Muse {", "./internal/envprofile", "TestMuseCredentialPolicyMatrix/file/isolated"},
++		{"renderer-drops-only-backend", "internal/envfragment/envfragment.go", "for name := range f.Env {", "for name := range f.Env {\nif name == \"TBH_CREDENTIAL_BACKEND\" { continue }", "./cmd/curator", "TestMuseCLIStorePolicy"},
++		{"header-only-root-fact-dropped", "internal/envprofile/managed.go", "fragment.RootContext = &envfragment.RootContext{Exclusive: true}", "fragment.RootContext = &envfragment.RootContext{Exclusive: true}\nif raw, e := os.ReadFile(filepath.Join(plan.homeDir,\"config/muse/AGENTS.md\")); e == nil && !strings.Contains(string(raw), \"## Context:\") { fragment.RootContext = nil }", "./cmd/curator", "TestMuseRootContextVectors/zero-applicable"},
++		{"boundary-admits-HOME", "internal/envfragment/envfragment.go", "if !allowed[name] {", "if !allowed[name] && !(adapter.ID == envregistry.Muse && name == \"HOME\") {", "./internal/envfragment", "TestMuseFragmentBoundary/HOME"},
++		{"boundary-admits-missing-literal", "internal/envfragment/envfragment.go", "fragment.Env[\"TBH_CREDENTIAL_BACKEND\"] != \"file\"", "(fragment.Env[\"TBH_CREDENTIAL_BACKEND\"] != \"file\" && fragment.Env[\"TBH_CREDENTIAL_BACKEND\"] != \"\")", "./internal/envfragment", "TestMuseFragmentBoundary/missing-literal"},
++		{"boundary-admits-false-root", "internal/envfragment/envfragment.go", "adapter.ID != envregistry.Muse || !fragment.RootContext.Exclusive", "adapter.ID != envregistry.Muse", "./internal/envfragment", "TestMuseFragmentBoundary/false-root"},
++	}
++	for _, mutant := range mutants {
++		t.Run(mutant.name, func(t *testing.T) {
++			if runtime.GOOS == "windows" && mutant.name == "fragment-reobserves-muse-release" {
++				t.Skip("shell sentinel is Unix-only")
++			}
++			original := filepath.Join(root, filepath.FromSlash(mutant.file))
++			payload, err := os.ReadFile(original)
++			if err != nil {
++				t.Fatal(err)
++			}
++			// Windows checkouts may use CRLF; overlays change Go behavior,
++			// independently of the checkout's line-ending convention.
++			source := strings.ReplaceAll(string(payload), "\r\n", "\n")
++			if strings.Count(source, mutant.before) != 1 {
++				t.Fatal("mutation anchor is not unique")
++			}
++			dir := t.TempDir()
++			replacement := filepath.Join(dir, "replacement.go")
++			if err := os.WriteFile(replacement, []byte(strings.Replace(source, mutant.before, mutant.after, 1)), 0600); err != nil {
++				t.Fatal(err)
++			}
++			overlay, err := json.Marshal(map[string]any{"Replace": map[string]string{original: replacement}})
++			if err != nil {
++				t.Fatal(err)
++			}
++			overlayPath := filepath.Join(dir, "overlay.json")
++			if err := os.WriteFile(overlayPath, overlay, 0600); err != nil {
++				t.Fatal(err)
++			}
++			parts := strings.Split(mutant.test, "/")
++			for i := range parts {
++				parts[i] = "^" + parts[i] + "$"
++			}
++			command := exec.Command("go", "test", "-overlay", overlayPath, "-count=1", "-timeout=5m", "-v", "-run", strings.Join(parts, "/"), mutant.pkg)
++			command.Dir = root
++			// Reuse the CLI helper protocol: the parent already holds the
++			// package GOROOT lock, and these behavioral tests do not mutate it.
++			// TestMain still isolates git in the child process.
++			command.Env = append(os.Environ(), cliHelperProcess+"=1")
++			output, err := command.CombinedOutput()
++			exit, ok := err.(*exec.ExitError)
++			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "--- FAIL: "+mutant.test) {
++				t.Fatalf("mutant survived or lacked named behavioral failure %s: %v\n%s", mutant.test, err, output)
++			}
++			t.Logf("%s: expected-red go test exit %d; killed by %s", mutant.name, exit.ExitCode(), mutant.test)
++		})
++	}
++}
+diff --git a/cmd/curator/muse_root_context_test.go b/cmd/curator/muse_root_context_test.go
+index 4dc73e35faa2f4ebe664eb655440c73dce53f8c7..971814b9b409b19abce992afec75a27a8309b57c 100644
+--- a/cmd/curator/muse_root_context_test.go
++++ b/cmd/curator/muse_root_context_test.go
+@@ -7,6 +7,7 @@ import (
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
++	"reflect"
+ 	"strings"
+ 	"testing"
+ 
+@@ -96,6 +97,14 @@ func TestMuseRootContextVectors(t *testing.T) {
+ 			if code != exitOK {
+ 				t.Fatalf("resolve: exit %d: %s", code, stderr)
+ 			}
++			var fragment map[string]any
++			if err := json.Unmarshal([]byte(stdout), &fragment); err != nil {
++				t.Fatal(err)
++			}
++			fact, present := fragment["root_context"]
++			if present != tc.Written || present && !reflect.DeepEqual(fact, map[string]any{"exclusive": true}) {
++				t.Fatalf("root fact disagrees with verified surface: %s", stdout)
++			}
+ 			if _, err := os.Lstat(filepath.Join(home, "AGENTS.md")); !os.IsNotExist(err) {
+ 				t.Fatalf("root context written outside the Muse XDG target: %v", err)
+ 			}
+diff --git a/cmd/curator/muse_test.go b/cmd/curator/muse_test.go
+index d34b1a3e9218b07b5db9135eb4205b7a0afdeb0d..27453a9ba66a55b2c095300dc5f8c8337e398836 100644
+--- a/cmd/curator/muse_test.go
++++ b/cmd/curator/muse_test.go
+@@ -1,9 +1,12 @@
+ package main
+ 
+ import (
++	"bytes"
+ 	"crypto/sha256"
+ 	"encoding/hex"
+ 	"encoding/json"
++	"github.com/relux-works/curator/internal/envfragment"
++	"github.com/relux-works/curator/internal/envmarker"
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
+@@ -13,7 +16,6 @@ import (
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/conformancecoverage"
+-	"github.com/relux-works/curator/internal/envfragment"
+ 	"github.com/relux-works/curator/internal/envprofile"
+ 	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/santhosh-tekuri/jsonschema/v6"
+@@ -26,7 +28,7 @@ func fakeMuse(t *testing.T) string {
+ 	src := filepath.Join(dir, "fake.go")
+ 	program := `package main
+ import("encoding/json";"os")
+-func main(){if len(os.Args)==2 && os.Args[1]=="--version" {os.Stdout.WriteString("1.4.1-R4503.1\n");return}; env:=map[string]string{};for _,key:=range []string{"HOME","XDG_CONFIG_HOME","XDG_DATA_HOME","XDG_STATE_HOME","XDG_CACHE_HOME"}{env[key]=os.Getenv(key)};json.NewEncoder(os.Stdout).Encode(map[string]any{"env":env,"argv":os.Args[1:]})}`
++func main(){if len(os.Args)==2 && os.Args[1]=="--version" {os.Stdout.WriteString("1.4.1-R4503.1\n");return}; env:=map[string]string{};for _,key:=range []string{"HOME","XDG_CONFIG_HOME","XDG_DATA_HOME","XDG_STATE_HOME","XDG_CACHE_HOME","TBH_CREDENTIAL_BACKEND"}{env[key]=os.Getenv(key)};json.NewEncoder(os.Stdout).Encode(map[string]any{"env":env,"argv":os.Args[1:]})}`
+ 	if err := os.WriteFile(src, []byte(program), 0600); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -100,7 +102,7 @@ func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
+ 	if code != exitOK {
+ 		t.Fatalf("resolve: %d %s", code, stderr)
+ 	}
+-	validateMuseFragmentV3(t, museFragmentV3Schema(t), []byte(stdout))
++	validateMuseFragmentV3(t, museFragmentV4Schema(t), []byte(stdout))
+ 	resolved, err := envprofile.Resolve(envprofile.ResolveRequest{
+ 		Home: source.cfg.Home(), Profile: "acme", EnvID: envregistry.Muse,
+ 		Machine: envregistry.DefaultMachineConfig(), Format: "json",
+@@ -108,7 +110,7 @@ func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	validateMuseFragmentV3(t, museFragmentV3Schema(t), resolved.Document)
++	validateMuseFragmentV3(t, museFragmentV4Schema(t), resolved.Document)
+ 	var fragment struct {
+ 		Fragment string            `json:"fragment"`
+ 		Env      map[string]string `json:"env"`
+@@ -116,7 +118,7 @@ func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
+ 	if err := json.Unmarshal([]byte(stdout), &fragment); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if fragment.Fragment != "launch-env-fragment-v3" || len(fragment.Env) != 4 {
++	if fragment.Fragment != "launch-env-fragment-v4" || len(fragment.Env) != 5 {
+ 		t.Fatalf("fragment %s", stdout)
+ 	}
+ 	home := envprofile.ManagedHomeDir(source.cfg.Home(), "acme", "muse")
+@@ -269,7 +271,7 @@ func TestMuseFragmentV3PublishedCases(t *testing.T) {
+ 		if tc.Valid && fixture["environment"] == envregistry.Muse {
+ 			// These four rows describe producer-reachable permission policies.
+ 			// Both entry points validate their actual, unmodified emitted JSON.
+-			driveMuseFragmentPolicy(t, schema, source, fixture)
++			driveMuseFragmentPolicy(t, museFragmentV4Schema(t), source, fixture)
+ 			t.Log("production Resolve + CLI emission; schema/reader oracle also checked")
+ 		} else {
+ 			// Invalid wire documents and other adapters' v3 documents are
+@@ -278,25 +280,17 @@ func TestMuseFragmentV3PublishedCases(t *testing.T) {
+ 			t.Log("static schema/reader oracle; not a production emission row")
+ 		}
+ 		err = schema.Validate(object)
+-		if err == nil {
+-			var value struct {
+-				Environment string            `json:"environment"`
+-				Env         map[string]string `json:"env"`
+-			}
+-			if decodeErr := json.Unmarshal(raw, &value); decodeErr != nil {
+-				t.Fatal(decodeErr)
+-			}
+-			if value.Environment == envregistry.Muse {
+-				adapter, lookupErr := envregistry.ByID(value.Environment)
+-				if lookupErr != nil {
+-					t.Fatal(lookupErr)
+-				}
+-				nativeRoot := filepath.Join(t.TempDir(), "environments")
+-				for name, path := range value.Env {
+-					value.Env[name] = filepath.FromSlash(strings.Replace(path, "/manager/environments", nativeRoot, 1))
+-				}
+-				err = envfragment.CheckBoundary(adapter, nativeRoot, &envfragment.Fragment{Environment: value.Environment, Env: value.Env})
++		if err == nil && fixture["environment"] == envregistry.Muse {
++			// The v3 corpus still proves the home-path boundary. Project its
++			// already schema-checked paths into the current typed boundary;
++			// this does not claim v3 wire ingestion or successor policy evidence.
++			env := map[string]string{"TBH_CREDENTIAL_BACKEND": "file"}
++			nativeRoot := filepath.Join(t.TempDir(), "environments")
++			for name, raw := range fixture["env"].(map[string]any) {
++				env[name] = filepath.FromSlash(strings.Replace(raw.(string), "/manager/environments", nativeRoot, 1))
+ 			}
++			adapter, _ := envregistry.ByID(envregistry.Muse)
++			err = envfragment.CheckBoundary(adapter, nativeRoot, &envfragment.Fragment{Environment: envregistry.Muse, Env: env, CredentialStore: &envfragment.CredentialStore{Selection: envregistry.CredentialStoreFile}})
+ 		}
+ 		if (err == nil) != tc.Valid {
+ 			t.Fatalf("valid=%v: %v", tc.Valid, err)
+@@ -304,16 +298,17 @@ func TestMuseFragmentV3PublishedCases(t *testing.T) {
+ 	})
+ }
+ 
+-// The v3 schema is copied verbatim from d373078a, independently of the selected
+-// conformance root. This keeps the emission regression live in rc.13 CI too.
+-func museFragmentV3Schema(t *testing.T) *jsonschema.Schema {
++// Frozen schemas are copied verbatim from the documented spec revisions.
++func museFragmentV3Schema(t *testing.T) *jsonschema.Schema { return museFragmentSchema(t, "v3") }
++func museFragmentV4Schema(t *testing.T) *jsonschema.Schema { return museFragmentSchema(t, "v4") }
++func museFragmentSchema(t *testing.T, version string) *jsonschema.Schema {
+ 	t.Helper()
+ 	mainDir, _ := launchEnvFragmentV2FixtureRoots(t)
+ 	compiler := jsonschema.NewCompiler()
+ 	compiler.UseRegexpEngine(compileECMARegexp)
+-	for _, name := range []string{"common", "agent-environment-marker-v1", "agent-context-v1", "agent-mcp-v1", "context-lock-v1", "launch-env-fragment-v3"} {
++	for _, name := range []string{"common", "agent-environment-marker-v1", "agent-context-v1", "agent-mcp-v1", "context-lock-v1", "launch-env-fragment-v1", "launch-env-fragment-v2", "launch-env-fragment-v3", "launch-env-fragment-v4"} {
+ 		path := filepath.Join(mainDir, name+".schema.json")
+-		if name == "launch-env-fragment-v3" {
++		if strings.HasPrefix(name, "launch-env-fragment-") {
+ 			path = filepath.Join(mainDir, "..", "..", "..", "curator-spec-muse", "schemas", "v1", name+".schema.json")
+ 		}
+ 		raw, err := os.ReadFile(path)
+@@ -326,6 +321,12 @@ func museFragmentV3Schema(t *testing.T) *jsonschema.Schema {
+ 				t.Fatal("pinned Muse v3 schema changed")
+ 			}
+ 		}
++		if name == "launch-env-fragment-v4" {
++			hash := sha256.Sum256(raw)
++			if hex.EncodeToString(hash[:]) != "afc824151de968d1bd2c3c9a15d6bf4024ad6920f0f0a56351ee755b56aa9847" {
++				t.Fatal("pinned Muse v4 schema changed")
++			}
++		}
+ 		var document map[string]any
+ 		if err := json.Unmarshal(raw, &document); err != nil {
+ 			t.Fatal(err)
+@@ -334,7 +335,7 @@ func museFragmentV3Schema(t *testing.T) *jsonschema.Schema {
+ 			t.Fatal(err)
+ 		}
+ 	}
+-	schema, err := compiler.Compile("https://relux-works.github.io/curator-spec/schemas/v1/launch-env-fragment-v3.schema.json")
++	schema, err := compiler.Compile("https://relux-works.github.io/curator-spec/schemas/v1/launch-env-fragment-" + version + ".schema.json")
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -352,17 +353,17 @@ func validateMuseFragmentV3(t *testing.T, schema *jsonschema.Schema, payload []b
+ 		// structure using slash-rooted projections of host paths; raw Windows
+ 		// path schema conformance remains an explicit spec bound. No members
+ 		// are synthesized, so missing permissions or XDG parents still fail.
+-		t.Log("v3 Windows path schema bound: structure checked with POSIX path projection")
++		t.Log("Windows path schema bound: structure checked with POSIX path projection")
+ 		if env, ok := object["env"].(map[string]any); ok {
+ 			for name, raw := range env {
+-				if path, ok := raw.(string); ok {
++				if path, ok := raw.(string); ok && name != "TBH_CREDENTIAL_BACKEND" {
+ 					env[name] = filepath.ToSlash(strings.TrimPrefix(path, filepath.VolumeName(path)))
+ 				}
+ 			}
+ 		}
+ 	}
+ 	if err := schema.Validate(object); err != nil {
+-		t.Fatalf("production Muse fragment violates pinned v3 schema: %v", err)
++		t.Fatalf("production Muse fragment violates pinned schema: %v", err)
+ 	}
+ 	return object
+ }
+@@ -475,3 +476,133 @@ func TestMuseCLIAuthParentBoundary(t *testing.T) {
+ 		})
+ 	}
+ }
++
++// The pinned successor corpus attacks closed members and policy agreement.
++// These are structural oracles; production emission is driven separately by
++// TestMuseCLIFragmentAndFakeLaunch and TestMuseCLIStorePolicy.
++func TestMuseFragmentV4PublishedCases(t *testing.T) {
++	schema := museFragmentV4Schema(t)
++	schemas := map[string]*jsonschema.Schema{}
++	for _, version := range []string{"v1", "v2", "v3"} {
++		schemas["launch-env-fragment-"+version+".schema.json"] = museFragmentSchema(t, version)
++	}
++	root := filepath.Join("..", "..", "internal", "envfragment", "testdata", "curator-spec-muse", "v4-cases")
++	raw, err := os.ReadFile(filepath.Join(root, "index.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	var cases []struct {
++		Schema   string
++		Instance string
++		Valid    bool
++	}
++	if err := json.Unmarshal(raw, &cases); err != nil {
++		t.Fatal(err)
++	}
++	for _, tc := range cases {
++		t.Run(tc.Instance, func(t *testing.T) {
++			raw, err := os.ReadFile(filepath.Join(root, tc.Instance))
++			if err != nil {
++				t.Fatal(err)
++			}
++			var object any
++			if err := json.Unmarshal(raw, &object); err != nil {
++				t.Fatal(err)
++			}
++			oracle := schema
++			if tc.Schema != "launch-env-fragment-v4.schema.json" {
++				oracle = schemas[tc.Schema]
++			}
++			// Select the exact frozen envelope named by the corpus.
++			err = oracle.Validate(object)
++			if err == nil && tc.Schema == "launch-env-fragment-v4.schema.json" {
++				value := object.(map[string]any)
++				if value["environment"] == envregistry.Muse {
++					env := map[string]string{}
++					nativeRoot := filepath.Join(t.TempDir(), "environments")
++					for key, raw := range value["env"].(map[string]any) {
++						text := raw.(string)
++						if key != "TBH_CREDENTIAL_BACKEND" {
++							text = filepath.FromSlash(strings.Replace(text, "/manager/environments", nativeRoot, 1))
++						}
++						env[key] = text
++					}
++					adapter, _ := envregistry.ByID(envregistry.Muse)
++					err = envfragment.CheckBoundary(adapter, nativeRoot, &envfragment.Fragment{Environment: envregistry.Muse, Env: env, CredentialStore: &envfragment.CredentialStore{Selection: envregistry.CredentialStoreFile}})
++				}
++			}
++			if (err == nil) != tc.Valid {
++				t.Fatalf("valid=%t: %v", tc.Valid, err)
++			}
++		})
++	}
++}
++
++// The public config/resolve chain preserves selectors, native auth, marker and
++// link identity; explicit keychain emits no fragment, even with repair.
++func TestMuseCLIStorePolicy(t *testing.T) {
++	source := credentialStoreCLIHome(t)
++	prepareNativeMuse(t)
++	installCLIEnvProfile(t, source)
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "muse", "--repair"); code != exitOK {
++		t.Fatal(stderr)
++	}
++	home := envprofile.ManagedHomeDir(source.cfg.Home(), "acme", envregistry.Muse)
++	markerPath := filepath.Join(home, envmarker.Name)
++	auth := filepath.Join(home, "config", "muse", "auth.json")
++	native, err := os.Readlink(auth)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, selector := range []string{"file", "native", "keychain", "unset"} {
++		args := []string{"env", "config", "set", "credential_store.acme.muse", selector}
++		if selector == "unset" {
++			args = []string{"env", "config", "unset", "credential_store.acme.muse"}
++		}
++		if code, _, stderr := runProfile(t, source, args...); code != exitOK {
++			t.Fatal(stderr)
++		}
++		source = reloadSource(t, source)
++		before := map[string][]byte{}
++		for _, path := range []string{source.path, markerPath, native} {
++			raw, err := os.ReadFile(path)
++			if err != nil {
++				t.Fatal(err)
++			}
++			before[path] = raw
++		}
++		for _, format := range []string{"json", "env", "shell"} {
++			code, stdout, stderr := runProfile(t, source, "env", "resolve", "muse", "--repair", "--format", format)
++			if selector == "keychain" {
++				if code != exitFail || stdout != "" || !strings.Contains(stderr, "environment_credential_store_unsupported") {
++					t.Fatalf("keychain: %d %q %s", code, stdout, stderr)
++				}
++			} else {
++				if code != exitOK {
++					t.Fatalf("%s %s: %d %s", selector, format, code, stderr)
++				}
++				if format == "json" {
++					validateMuseFragmentV3(t, museFragmentV4Schema(t), []byte(stdout))
++				} else {
++					lines := strings.Split(strings.TrimSpace(stdout), "\n")
++					want := "TBH_CREDENTIAL_BACKEND=file"
++					if format == "shell" {
++						want = "export TBH_CREDENTIAL_BACKEND='file'"
++					}
++					if len(lines) != 5 || lines[4] != want {
++						t.Fatalf("%s projection: %q", format, stdout)
++					}
++				}
++			}
++		}
++		for path, want := range before {
++			got, err := os.ReadFile(path)
++			if err != nil || !bytes.Equal(got, want) {
++				t.Fatalf("resolve changed %s: %v", filepath.Base(path), err)
++			}
++		}
++		if got, err := os.Readlink(auth); err != nil || got != native {
++			t.Fatal("credential link changed")
++		}
++	}
++}
+diff --git a/docs/environment-config.md b/docs/environment-config.md
+index caf290379a87d206637f699144cd4bedb8e7f19a..c33d8be98e03e335359f825237cf6db8702e48a5 100644
+--- a/docs/environment-config.md
++++ b/docs/environment-config.md
+@@ -63,15 +63,24 @@ credential policy: selection admission, native Codex store, isolation admission,
+ links and marker records. Resolve (including repair), status verification and
+ credential migration use this projection. Each new operation observes native
+ configuration again. The one-time provisioning seed is a separate read; this
+-projection is not an atomic snapshot of vendor-owned state. Explicit file/keychain application remains disabled: Codex file
++projection is not an atomic snapshot of vendor-owned state. Muse native/unset/file now resolves to effective file and emits v4 with the
++mandatory `TBH_CREDENTIAL_BACKEND=file` literal and all four managed XDG paths.
++The selector remains unchanged. Shared requires a native file-backed login
++under the original XDG config home; if absent, run
++`TBH_CREDENTIAL_BACKEND=file muse login` in that native environment first.
++Isolated creates neither a credential link nor an auth placeholder.
++Other explicit file/keychain application remains disabled: Codex file
+ returns `codex_settings_unsupported` pending supported-release
+ login/app-server/refresh qualification and strict successor consumers;
+ other unavailable mappings return `environment_credential_store_unsupported`.
+ Invalid or unreadable native Codex configuration still refuses before this
+ delivery diagnostic. No explicit selector silently falls back to native.
+-Unset or explicit native retains the existing producer behavior described
+-below. This slice does not enable the rc.7 Muse effective-file default,
+-new fragment carriers, readiness, or login wrappers.
++Other adapters retain their existing native behavior. Readiness/login wrappers,
++qualified Codex v5 delivery and adopted external sources remain separate work.
++Muse v4 carries `root_context: {"exclusive": true}` exactly when resolve
++verifies a declared root surface, including header-only output. Old v1–v3
++readers reject the successor; consumers must support v4 before managed launch.
++This producer change does not qualify an external launcher or refresh behavior.
+ 
+ ## Security posture
+ 
+@@ -156,7 +165,7 @@ login in one of two ways, chosen per profile × environment with
+ | `claude_code` on Linux | `shared` | `.credentials.json` links to the native file | one login per home |
+ | `codex_cli` | `shared` | `auth.json` links to the native file under `file` storage (the default when `cli_auth_credentials_store` is absent); under `keyring` or `auto` the login is ambient | admitted only under `file` storage; otherwise `environment_isolated_unsupported` |
+ | `pi` | `shared` | `auth.json` links to the native `~/.pi/agent/auth.json` | one login per home |
+-| `muse` | `shared` | `config/muse/auth.json` links to the native file | refused with `environment_isolated_unsupported` until a fresh-login probe verifies it |
++| `muse` | `shared` | file backend; `config/muse/auth.json` links to the captured native file | file backend; no passthrough link or placeholder; optimistic admission under D10, refresh unqualified |
+ | `opencode` | `shared` (ambient) | its login lives outside the swapped config home, so nothing is linked | not applicable: refused, since the login is outside the home |
+ 
+ For `codex_cli`, sharing follows the storage selected by your **native**
+diff --git a/internal/envfragment/envfragment.go b/internal/envfragment/envfragment.go
+index bc20a9d27413bb0d0cc407ed184732c84dff7ae9..6f4e64df531505a1291c81733032708789d21257 100644
+--- a/internal/envfragment/envfragment.go
++++ b/internal/envfragment/envfragment.go
+@@ -1,12 +1,12 @@
+-// Package envfragment builds and renders the launch-env-fragment-v2 object
++// Package envfragment builds and renders native v2 and managed Muse v4 objects
+ // (environments §10.2): the closed fragment a launcher consumes, with
+ // profile.lock_sha256, precedence, permissions, env, system_prompt, mcp
+ // (path, sorted env_names union, channel descriptor), and optional
+ // path_prepend. Resolution launches nothing and applies no channel; the
+ // fragment is data about channels. The §10.3 profile-influence boundary is
+ // enforced at build: variable names come only from the closed adapter
+-// registry and every value stays an absolute path below the manager-owned
+-// environments root.
++// registry. Paths stay below the manager-owned environments root; managed
++// Muse additionally carries the single policy-owned file-backend literal.
+ package envfragment
+ 
+ import (
+@@ -49,23 +49,37 @@ type MCP struct {
+ 	Channels []envregistry.Channel
+ }
+ 
+-// Fragment is one launch-env-fragment-v2 object. This resolver omits the
++// CredentialStore carries effective machine policy, never package settings.
++// This producer enables only Muse file and optional native agreement. Codex
++// overrides remain unavailable pending qualification and strict v5 consumers.
++type CredentialStore struct {
++	Selection envregistry.CredentialStoreSelection
++}
++
++// RootContext is the verified Muse root surface fact, not a path or argv.
++type RootContext struct {
++	Exclusive bool
++}
++
++// Fragment is one typed native v2 or Muse v4 object. This resolver omits the
+ // optional path_prepend member (environments §10.2).
+ type Fragment struct {
+-	Environment  string
+-	Profile      string
+-	LockSHA256   string
+-	Permissions  Permissions
+-	Winner       string
+-	Placement    string
+-	Env          map[string]string
+-	SystemPrompt *SystemPrompt
+-	MCP          *MCP
++	Environment     string
++	Profile         string
++	LockSHA256      string
++	Permissions     Permissions
++	Winner          string
++	Placement       string
++	Env             map[string]string
++	SystemPrompt    *SystemPrompt
++	MCP             *MCP
++	CredentialStore *CredentialStore
++	RootContext     *RootContext
+ }
+ 
+ func (f *Fragment) version() string {
+-	if f.Environment == envregistry.Muse {
+-		return "launch-env-fragment-v3"
++	if f.Environment == envregistry.Muse || f.CredentialStore != nil || f.RootContext != nil {
++		return "launch-env-fragment-v4"
+ 	}
+ 	return Version
+ }
+@@ -117,6 +131,12 @@ func (f *Fragment) Object() map[string]any {
+ 		env[name] = value
+ 	}
+ 	object["env"] = env
++	if f.CredentialStore != nil {
++		object["credential_store"] = map[string]any{"selection": string(f.CredentialStore.Selection)}
++	}
++	if f.RootContext != nil {
++		object["root_context"] = map[string]any{"exclusive": f.RootContext.Exclusive}
++	}
+ 	if f.SystemPrompt != nil {
+ 		channels := make([]any, 0, len(f.SystemPrompt.Channels))
+ 		for _, channel := range f.SystemPrompt.Channels {
+@@ -166,14 +186,17 @@ func (f *Fragment) variables(adapter envregistry.Adapter) [][2]string {
+ 		for _, variable := range adapter.HomeVariables {
+ 			out = append(out, [2]string{variable[0], f.Env[variable[0]]})
+ 		}
+-		return out
+ 	}
+-	if value, ok := f.Env[adapter.EnvVar]; ok {
++	if value, ok := f.Env[adapter.EnvVar]; ok && len(adapter.HomeVariables) == 0 {
+ 		out = append(out, [2]string{adapter.EnvVar, value})
+ 	}
+ 	rest := make([]string, 0, len(f.Env))
+ 	for name := range f.Env {
+-		if name == adapter.EnvVar {
++		declared := name == adapter.EnvVar
++		for _, variable := range adapter.HomeVariables {
++			declared = declared || name == variable[0]
++		}
++		if declared {
+ 			continue
+ 		}
+ 		rest = append(rest, name)
+@@ -341,15 +364,28 @@ func BoundEnvNames(names []string, passable []string) []string {
+ // CheckBoundary enforces the §10.3 profile-influence boundary on an
+ // assembled fragment: variable names come only from the closed adapter
+ // registry (the env member plus variable-kind channel names), and every
+-// path value — env values, system_prompt.path, mcp.path — is absolute,
++// path value — home env values, system_prompt.path, mcp.path — is absolute,
+ // carries no .. segment, and stays below the manager-owned environments
+ // root. Only the profile-name path segment is profile-derived.
+ func CheckBoundary(adapter envregistry.Adapter, envRoot string, fragment *Fragment) error {
++	if fragment.Environment != adapter.ID {
++		return fmt.Errorf("fragment environment disagrees with adapter")
++	}
++	if fragment.RootContext != nil && (adapter.ID != envregistry.Muse || !fragment.RootContext.Exclusive) {
++		return fmt.Errorf("fragment root_context is only an exclusive Muse fact")
++	}
++	if adapter.ID != envregistry.Muse && fragment.CredentialStore != nil && fragment.CredentialStore.Selection != envregistry.CredentialStoreNative {
++		return fmt.Errorf("%s: non-native successor delivery is not qualified", envregistry.DiagCodexSettingsUnsupported)
++	}
+ 	allowed := map[string]bool{adapter.EnvVar: true}
+ 	for _, variable := range adapter.HomeVariables {
+ 		allowed[variable[0]] = true
+ 	}
+ 	if adapter.ID == envregistry.Muse {
++		if fragment.CredentialStore == nil || fragment.CredentialStore.Selection != envregistry.CredentialStoreFile || fragment.Env["TBH_CREDENTIAL_BACKEND"] != "file" {
++			return fmt.Errorf("%s: managed Muse requires effective file policy and TBH_CREDENTIAL_BACKEND=file", envregistry.DiagCredentialStoreUnsupported)
++		}
++		allowed["TBH_CREDENTIAL_BACKEND"] = true
+ 		if fragment.SystemPrompt != nil || fragment.MCP != nil {
+ 			return fmt.Errorf("muse channels are unverified")
+ 		}
+@@ -393,6 +429,9 @@ func CheckBoundary(adapter envregistry.Adapter, envRoot string, fragment *Fragme
+ 		if !allowed[name] {
+ 			return fmt.Errorf("fragment variable %q is not registry-declared for %s", name, adapter.ID)
+ 		}
++		if adapter.ID == envregistry.Muse && name == "TBH_CREDENTIAL_BACKEND" {
++			continue // The single policy-owned literal; all remaining values are paths.
++		}
+ 		if err := checkPath("env "+name, value); err != nil {
+ 			return err
+ 		}
+diff --git a/internal/envfragment/muse_test.go b/internal/envfragment/muse_test.go
+index f4bfbab8f33346afa6417f3ee3a7d5ff1e4e41a7..a935636fd806c3621b5ce499c4cf82f276c0bea3 100644
+--- a/internal/envfragment/muse_test.go
++++ b/internal/envfragment/muse_test.go
+@@ -7,20 +7,34 @@ import (
+ 	"testing"
+ )
+ 
++// The successor boundary admits only the five-value file projection. Missing
++// policy, a conflicting literal and foreign variables/channels remain refused.
+ func TestMuseFragmentBoundary(t *testing.T) {
+ 	adapter, err := envregistry.ByID(envregistry.Muse)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	for _, state := range []string{"valid", "missing-data", "wrong-parent", "HOME", "channel"} {
++	for _, state := range []string{"valid", "missing-data", "wrong-parent", "HOME", "channel", "missing-policy", "native-policy", "missing-literal", "keychain-literal", "false-root"} {
+ 		t.Run(state, func(t *testing.T) {
+ 			root := filepath.Join(t.TempDir(), "environments")
+ 			parent := filepath.Join(root, "acme", "muse")
+ 			fragment := &Fragment{Environment: envregistry.Muse, Env: map[string]string{}}
++			fragment.CredentialStore = &CredentialStore{Selection: envregistry.CredentialStoreFile}
++			fragment.Env["TBH_CREDENTIAL_BACKEND"] = "file"
+ 			for _, variable := range adapter.HomeVariables {
+ 				fragment.Env[variable[0]] = filepath.Join(parent, variable[1])
+ 			}
+ 			switch state {
++			case "missing-policy":
++				fragment.CredentialStore = nil
++			case "native-policy":
++				fragment.CredentialStore.Selection = envregistry.CredentialStoreNative
++			case "missing-literal":
++				delete(fragment.Env, "TBH_CREDENTIAL_BACKEND")
++			case "keychain-literal":
++				fragment.Env["TBH_CREDENTIAL_BACKEND"] = "keychain"
++			case "false-root":
++				fragment.RootContext = &RootContext{Exclusive: false}
+ 			case "missing-data":
+ 				delete(fragment.Env, "XDG_DATA_HOME")
+ 			case "wrong-parent":
+@@ -36,6 +50,9 @@ func TestMuseFragmentBoundary(t *testing.T) {
+ 			}
+ 			if state == "valid" {
+ 				lines := strings.Split(strings.TrimSpace(string(fragment.EnvFormat(adapter))), "\n")
++				if len(lines) != 5 || lines[4] != "TBH_CREDENTIAL_BACKEND=file" {
++					t.Fatalf("missing last backend literal: %v", lines)
++				}
+ 				for i, variable := range adapter.HomeVariables {
+ 					if lines[i] != variable[0]+"="+filepath.Join(parent, variable[1]) {
+ 						t.Fatalf("variable order: %v", lines)
+diff --git a/internal/envfragment/testdata/curator-spec-muse/README.md b/internal/envfragment/testdata/curator-spec-muse/README.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..16e6647f471bfa172e8fd7ec70c778afc0caf39c
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/README.md
+@@ -0,0 +1,15 @@
++# Frozen fragment schema and successor corpus
++
++The v3 schema is retained verbatim from curator-spec `d373078a`.
++V1, v2 and v4 schemas and the v4 cases were copied verbatim from curator-spec
++main `1059b94b4135089d842bf017070b8ab47d79a536`:
++
++- `schemas/v1/launch-env-fragment-v{1,2,4}.schema.json`
++- `conformance/environments-muse-v4/schema-cases/`
++
++`TestMuseFragmentV4PublishedCases` selects each indexed frozen schema and
++also checks the one-parent/suffix relation through the production boundary.
++`TestMuseCLIFragmentAndFakeLaunch`, `TestMuseCLIStorePolicy` and
++`TestMuseRootContextVectors` drive current production emission. The inert
++child records environment/argv only; it does not qualify Muse authentication,
++refresh, hosted composition or context exclusion on a real vendor release.
+diff --git a/internal/envfragment/testdata/curator-spec-muse/schemas/v1/launch-env-fragment-v1.schema.json b/internal/envfragment/testdata/curator-spec-muse/schemas/v1/launch-env-fragment-v1.schema.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..7afe744512dd849108166afc4fab9cc57fb0bebd
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/schemas/v1/launch-env-fragment-v1.schema.json
+@@ -0,0 +1,198 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/v1/launch-env-fragment-v1.schema.json",
++  "title": "launch-env-fragment-v1",
++  "type": "object",
++  "required": ["fragment", "environment", "profile", "precedence", "env"],
++  "properties": {
++    "fragment": {"const": "launch-env-fragment-v1"},
++    "environment": {"enum": ["claude_code", "codex_cli", "opencode", "pi"]},
++    "profile": {
++      "type": "object",
++      "required": ["name", "lock_sha256"],
++      "properties": {
++        "name": {"$ref": "common.schema.json#/$defs/identifier"},
++        "lock_sha256": {"$ref": "common.schema.json#/$defs/hex256"}
++      },
++      "additionalProperties": false
++    },
++    "precedence": {"$ref": "agent-environment-marker-v1.schema.json#/$defs/precedence"},
++    "env": {
++      "type": "object",
++      "minProperties": 1,
++      "maxProperties": 1,
++      "propertyNames": {"enum": ["CLAUDE_CONFIG_DIR", "CODEX_HOME", "XDG_CONFIG_HOME", "PI_CODING_AGENT_DIR"]},
++      "additionalProperties": {"$ref": "#/$defs/absolutePath"}
++    },
++    "system_prompt": {
++      "type": "object",
++      "required": ["path", "channels"],
++      "properties": {
++        "path": {"$ref": "#/$defs/absolutePath"},
++        "channels": {
++          "type": "array",
++          "items": {"$ref": "#/$defs/systemPromptDescriptor"}
++        }
++      },
++      "additionalProperties": false
++    },
++    "mcp": {
++      "type": "object",
++      "required": ["path", "env_names", "channels"],
++      "properties": {
++        "path": {"$ref": "#/$defs/absolutePath"},
++        "env_names": {"$ref": "agent-mcp-v1.schema.json#/$defs/envNames"},
++        "channels": {
++          "type": "array",
++          "minItems": 1,
++          "maxItems": 1,
++          "items": {"$ref": "#/$defs/mcpDescriptor"}
++        }
++      },
++      "additionalProperties": false
++    },
++    "path_prepend": {"$ref": "#/$defs/absolutePath"}
++  },
++  "allOf": [
++    {
++      "if": {"properties": {"environment": {"const": "claude_code"}}},
++      "then": {"properties": {"env": {"required": ["CLAUDE_CONFIG_DIR"]}}}
++    },
++    {
++      "if": {"properties": {"environment": {"const": "codex_cli"}}},
++      "then": {"properties": {"env": {"required": ["CODEX_HOME"]}}}
++    },
++    {
++      "if": {"properties": {"environment": {"const": "opencode"}}},
++      "then": {"properties": {"env": {"required": ["XDG_CONFIG_HOME"]}}}
++    },
++    {
++      "if": {"properties": {"environment": {"const": "pi"}}},
++      "then": {"properties": {"env": {"required": ["PI_CODING_AGENT_DIR"]}, "mcp": false}}
++    }
++  ],
++  "additionalProperties": false,
++  "$defs": {
++    "absolutePath": {
++      "type": "string",
++      "minLength": 2,
++      "maxLength": 4096,
++      "pattern": "^/[^\\u0000]*$",
++      "not": {"pattern": "(?:^|/)\\.\\.(?:/|$)"}
++    },
++    "flagArgument": {"enum": ["path", "contents", "name"]},
++    "flagDescriptorCore": {
++      "properties": {
++        "kind": {"const": "flag"},
++        "flag": {"type": "string", "minLength": 2, "maxLength": 128, "pattern": "^-[^\\s]+$"},
++        "argument": {"$ref": "#/$defs/flagArgument"},
++        "name": {"$ref": "common.schema.json#/$defs/identifier"},
++        "with": {
++          "type": "array",
++          "minItems": 1,
++          "uniqueItems": true,
++          "items": {"type": "string", "minLength": 2, "maxLength": 128, "pattern": "^-[^\\s]+$"}
++        }
++      },
++      "allOf": [
++        {
++          "if": {"properties": {"argument": {"const": "name"}}},
++          "then": {"required": ["name"]},
++          "else": {"not": {"required": ["name"]}}
++        }
++      ]
++    },
++    "systemPromptDescriptor": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": ["kind", "semantics", "flag", "argument"],
++          "properties": {
++            "kind": {"const": "flag"},
++            "semantics": {"enum": ["append", "replace"]},
++            "flag": true,
++            "argument": true,
++            "name": true,
++            "with": true
++          },
++          "additionalProperties": false,
++          "allOf": [{"$ref": "#/$defs/flagDescriptorCore"}]
++        },
++        {
++          "type": "object",
++          "required": ["kind", "semantics", "key"],
++          "properties": {
++            "kind": {"const": "config-key"},
++            "semantics": {"enum": ["append", "replace"]},
++            "key": {"$ref": "common.schema.json#/$defs/identifier"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["kind", "semantics", "variable"],
++          "properties": {
++            "kind": {"const": "variable"},
++            "semantics": {"enum": ["append", "replace"]},
++            "variable": {"$ref": "common.schema.json#/$defs/identifier"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["kind", "semantics", "filename"],
++          "properties": {
++            "kind": {"const": "file"},
++            "semantics": {"enum": ["append", "replace"]},
++            "filename": {"$ref": "common.schema.json#/$defs/portablePath"}
++          },
++          "additionalProperties": false
++        }
++      ]
++    },
++    "mcpDescriptor": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": ["kind", "flag", "argument"],
++          "properties": {
++            "kind": {"const": "flag"},
++            "flag": true,
++            "argument": true,
++            "name": true,
++            "with": true
++          },
++          "additionalProperties": false,
++          "allOf": [{"$ref": "#/$defs/flagDescriptorCore"}]
++        },
++        {
++          "type": "object",
++          "required": ["kind", "key"],
++          "properties": {
++            "kind": {"const": "config-key"},
++            "key": {"$ref": "common.schema.json#/$defs/identifier"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["kind", "variable"],
++          "properties": {
++            "kind": {"const": "variable"},
++            "variable": {"$ref": "common.schema.json#/$defs/identifier"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["kind", "filename"],
++          "properties": {
++            "kind": {"const": "file"},
++            "filename": {"$ref": "common.schema.json#/$defs/portablePath"}
++          },
++          "additionalProperties": false
++        }
++      ]
++    }
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/schemas/v1/launch-env-fragment-v2.schema.json b/internal/envfragment/testdata/curator-spec-muse/schemas/v1/launch-env-fragment-v2.schema.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..f49b4434d69481607ca6fa571d25bfa299d178ee
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/schemas/v1/launch-env-fragment-v2.schema.json
+@@ -0,0 +1,222 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/v1/launch-env-fragment-v2.schema.json",
++  "title": "launch-env-fragment-v2",
++  "type": "object",
++  "required": ["fragment", "environment", "profile", "precedence", "env", "permissions"],
++  "properties": {
++    "fragment": {"const": "launch-env-fragment-v2"},
++    "environment": {"enum": ["claude_code", "codex_cli", "opencode", "pi"]},
++    "profile": {
++      "type": "object",
++      "required": ["name", "lock_sha256"],
++      "properties": {
++        "name": {"$ref": "common.schema.json#/$defs/identifier"},
++        "lock_sha256": {"$ref": "common.schema.json#/$defs/hex256"}
++      },
++      "additionalProperties": false
++    },
++    "precedence": {"$ref": "agent-environment-marker-v1.schema.json#/$defs/precedence"},
++    "env": {
++      "type": "object",
++      "minProperties": 1,
++      "maxProperties": 1,
++      "propertyNames": {"enum": ["CLAUDE_CONFIG_DIR", "CODEX_HOME", "XDG_CONFIG_HOME", "PI_CODING_AGENT_DIR"]},
++      "additionalProperties": {"$ref": "#/$defs/absolutePath"}
++    },
++    "system_prompt": {
++      "type": "object",
++      "required": ["path", "channels"],
++      "properties": {
++        "path": {"$ref": "#/$defs/absolutePath"},
++        "channels": {
++          "type": "array",
++          "items": {"$ref": "#/$defs/systemPromptDescriptor"}
++        }
++      },
++      "additionalProperties": false
++    },
++    "mcp": {
++      "type": "object",
++      "required": ["path", "env_names", "channels"],
++      "properties": {
++        "path": {"$ref": "#/$defs/absolutePath"},
++        "env_names": {"$ref": "agent-mcp-v1.schema.json#/$defs/envNames"},
++        "channels": {
++          "type": "array",
++          "minItems": 1,
++          "maxItems": 1,
++          "items": {"$ref": "#/$defs/mcpDescriptor"}
++        }
++      },
++      "additionalProperties": false
++    },
++    "path_prepend": {"$ref": "#/$defs/absolutePath"},
++    "permissions": {
++      "type": "object",
++      "required": ["mode", "locked", "source"],
++      "properties": {
++        "mode": {"enum": ["native", "yolo"]},
++        "locked": {"type": "boolean"},
++        "source": {"enum": ["profile", "global", "default"]}
++      },
++      "additionalProperties": false,
++      "allOf": [
++        {
++          "if": {"properties": {"locked": {"const": true}}},
++          "then": {"properties": {"source": {"const": "global"}}}
++        },
++        {
++          "if": {"properties": {"source": {"const": "global"}}},
++          "then": {"properties": {"locked": {"const": true}}}
++        },
++        {
++          "if": {"properties": {"source": {"enum": ["global", "default"]}}},
++          "then": {"properties": {"mode": {"const": "native"}}}
++        }
++      ]
++    }
++  },
++  "allOf": [
++    {
++      "if": {"properties": {"environment": {"const": "claude_code"}}},
++      "then": {"properties": {"env": {"required": ["CLAUDE_CONFIG_DIR"]}}}
++    },
++    {
++      "if": {"properties": {"environment": {"const": "codex_cli"}}},
++      "then": {"properties": {"env": {"required": ["CODEX_HOME"]}}}
++    },
++    {
++      "if": {"properties": {"environment": {"const": "opencode"}}},
++      "then": {"properties": {"env": {"required": ["XDG_CONFIG_HOME"]}}}
++    },
++    {
++      "if": {"properties": {"environment": {"const": "pi"}}},
++      "then": {"properties": {"env": {"required": ["PI_CODING_AGENT_DIR"]}, "mcp": false}}
++    }
++  ],
++  "additionalProperties": false,
++  "$defs": {
++    "absolutePath": {
++      "type": "string",
++      "minLength": 2,
++      "maxLength": 4096,
++      "pattern": "^/[^\\u0000]*$",
++      "not": {"pattern": "(?:^|/)\\.\\.(?:/|$)"}
++    },
++    "flagArgument": {"enum": ["path", "contents", "name"]},
++    "flagDescriptorCore": {
++      "properties": {
++        "kind": {"const": "flag"},
++        "flag": {"type": "string", "minLength": 2, "maxLength": 128, "pattern": "^-[^\\s]+$"},
++        "argument": {"$ref": "#/$defs/flagArgument"},
++        "name": {"$ref": "common.schema.json#/$defs/identifier"},
++        "with": {
++          "type": "array",
++          "minItems": 1,
++          "uniqueItems": true,
++          "items": {"type": "string", "minLength": 2, "maxLength": 128, "pattern": "^-[^\\s]+$"}
++        }
++      },
++      "allOf": [
++        {
++          "if": {"properties": {"argument": {"const": "name"}}},
++          "then": {"required": ["name"]},
++          "else": {"not": {"required": ["name"]}}
++        }
++      ]
++    },
++    "systemPromptDescriptor": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": ["kind", "semantics", "flag", "argument"],
++          "properties": {
++            "kind": {"const": "flag"},
++            "semantics": {"enum": ["append", "replace"]},
++            "flag": true,
++            "argument": true,
++            "name": true,
++            "with": true
++          },
++          "additionalProperties": false,
++          "allOf": [{"$ref": "#/$defs/flagDescriptorCore"}]
++        },
++        {
++          "type": "object",
++          "required": ["kind", "semantics", "key"],
++          "properties": {
++            "kind": {"const": "config-key"},
++            "semantics": {"enum": ["append", "replace"]},
++            "key": {"$ref": "common.schema.json#/$defs/identifier"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["kind", "semantics", "variable"],
++          "properties": {
++            "kind": {"const": "variable"},
++            "semantics": {"enum": ["append", "replace"]},
++            "variable": {"$ref": "common.schema.json#/$defs/identifier"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["kind", "semantics", "filename"],
++          "properties": {
++            "kind": {"const": "file"},
++            "semantics": {"enum": ["append", "replace"]},
++            "filename": {"$ref": "common.schema.json#/$defs/portablePath"}
++          },
++          "additionalProperties": false
++        }
++      ]
++    },
++    "mcpDescriptor": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": ["kind", "flag", "argument"],
++          "properties": {
++            "kind": {"const": "flag"},
++            "flag": true,
++            "argument": true,
++            "name": true,
++            "with": true
++          },
++          "additionalProperties": false,
++          "allOf": [{"$ref": "#/$defs/flagDescriptorCore"}]
++        },
++        {
++          "type": "object",
++          "required": ["kind", "key"],
++          "properties": {
++            "kind": {"const": "config-key"},
++            "key": {"$ref": "common.schema.json#/$defs/identifier"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["kind", "variable"],
++          "properties": {
++            "kind": {"const": "variable"},
++            "variable": {"$ref": "common.schema.json#/$defs/identifier"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["kind", "filename"],
++          "properties": {
++            "kind": {"const": "file"},
++            "filename": {"$ref": "common.schema.json#/$defs/portablePath"}
++          },
++          "additionalProperties": false
++        }
++      ]
++    }
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/schemas/v1/launch-env-fragment-v4.schema.json b/internal/envfragment/testdata/curator-spec-muse/schemas/v1/launch-env-fragment-v4.schema.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..23fd85f9a87b32be8fde2cce25edd4f8ac1ea27e
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/schemas/v1/launch-env-fragment-v4.schema.json
+@@ -0,0 +1,716 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/v1/launch-env-fragment-v4.schema.json",
++  "title": "launch-env-fragment-v4",
++  "type": "object",
++  "required": [
++    "fragment",
++    "environment",
++    "profile",
++    "precedence",
++    "env",
++    "permissions"
++  ],
++  "properties": {
++    "fragment": {
++      "const": "launch-env-fragment-v4"
++    },
++    "environment": {
++      "enum": [
++        "claude_code",
++        "codex_cli",
++        "opencode",
++        "pi",
++        "muse"
++      ]
++    },
++    "profile": {
++      "type": "object",
++      "required": [
++        "name",
++        "lock_sha256"
++      ],
++      "properties": {
++        "name": {
++          "$ref": "common.schema.json#/$defs/identifier"
++        },
++        "lock_sha256": {
++          "$ref": "common.schema.json#/$defs/hex256"
++        }
++      },
++      "additionalProperties": false
++    },
++    "precedence": {
++      "$ref": "agent-environment-marker-v1.schema.json#/$defs/precedence"
++    },
++    "env": {
++      "type": "object",
++      "minProperties": 1,
++      "maxProperties": 5,
++      "properties": {
++        "CLAUDE_CONFIG_DIR": {
++          "$ref": "#/$defs/absolutePath"
++        },
++        "CODEX_HOME": {
++          "$ref": "#/$defs/absolutePath"
++        },
++        "PI_CODING_AGENT_DIR": {
++          "$ref": "#/$defs/absolutePath"
++        },
++        "XDG_CONFIG_HOME": {
++          "$ref": "#/$defs/absolutePath"
++        },
++        "XDG_DATA_HOME": {
++          "$ref": "#/$defs/absolutePath"
++        },
++        "XDG_STATE_HOME": {
++          "$ref": "#/$defs/absolutePath"
++        },
++        "XDG_CACHE_HOME": {
++          "$ref": "#/$defs/absolutePath"
++        },
++        "TBH_CREDENTIAL_BACKEND": {
++          "const": "file"
++        }
++      },
++      "additionalProperties": false
++    },
++    "system_prompt": {
++      "type": "object",
++      "required": [
++        "path",
++        "channels"
++      ],
++      "properties": {
++        "path": {
++          "$ref": "#/$defs/absolutePath"
++        },
++        "channels": {
++          "type": "array",
++          "items": {
++            "$ref": "#/$defs/systemPromptDescriptor"
++          }
++        }
++      },
++      "additionalProperties": false
++    },
++    "mcp": {
++      "type": "object",
++      "required": [
++        "path",
++        "env_names",
++        "channels"
++      ],
++      "properties": {
++        "path": {
++          "$ref": "#/$defs/absolutePath"
++        },
++        "env_names": {
++          "$ref": "agent-mcp-v1.schema.json#/$defs/envNames"
++        },
++        "channels": {
++          "type": "array",
++          "minItems": 1,
++          "maxItems": 1,
++          "items": {
++            "$ref": "#/$defs/mcpDescriptor"
++          }
++        }
++      },
++      "additionalProperties": false
++    },
++    "path_prepend": {
++      "$ref": "#/$defs/absolutePath"
++    },
++    "permissions": {
++      "type": "object",
++      "required": [
++        "mode",
++        "locked",
++        "source"
++      ],
++      "properties": {
++        "mode": {
++          "enum": [
++            "native",
++            "yolo"
++          ]
++        },
++        "locked": {
++          "type": "boolean"
++        },
++        "source": {
++          "enum": [
++            "profile",
++            "global",
++            "default"
++          ]
++        }
++      },
++      "additionalProperties": false,
++      "allOf": [
++        {
++          "if": {
++            "properties": {
++              "locked": {
++                "const": true
++              }
++            }
++          },
++          "then": {
++            "properties": {
++              "source": {
++                "const": "global"
++              }
++            }
++          }
++        },
++        {
++          "if": {
++            "properties": {
++              "source": {
++                "const": "global"
++              }
++            }
++          },
++          "then": {
++            "properties": {
++              "locked": {
++                "const": true
++              }
++            }
++          }
++        },
++        {
++          "if": {
++            "properties": {
++              "source": {
++                "enum": [
++                  "global",
++                  "default"
++                ]
++              }
++            }
++          },
++          "then": {
++            "properties": {
++              "mode": {
++                "const": "native"
++              }
++            }
++          }
++        }
++      ]
++    },
++    "root_context": {
++      "type": "object",
++      "required": [
++        "exclusive"
++      ],
++      "properties": {
++        "exclusive": {
++          "const": true
++        }
++      },
++      "additionalProperties": false
++    },
++    "credential_store": {
++      "type": "object",
++      "required": [
++        "selection"
++      ],
++      "properties": {
++        "selection": {
++          "enum": [
++            "native",
++            "file",
++            "keychain"
++          ]
++        },
++        "config_overrides": {
++          "type": "object",
++          "required": [
++            "cli_auth_credentials_store"
++          ],
++          "properties": {
++            "cli_auth_credentials_store": {
++              "enum": [
++                "file",
++                "keyring"
++              ]
++            }
++          },
++          "additionalProperties": false
++        }
++      },
++      "additionalProperties": false
++    }
++  },
++  "allOf": [
++    {
++      "if": {
++        "properties": {
++          "environment": {
++            "const": "claude_code"
++          }
++        }
++      },
++      "then": {
++        "properties": {
++          "env": {
++            "required": [
++              "CLAUDE_CONFIG_DIR"
++            ],
++            "maxProperties": 1
++          },
++          "root_context": false,
++          "credential_store": {
++            "properties": {
++              "selection": {
++                "const": "native"
++              },
++              "config_overrides": false
++            }
++          }
++        }
++      }
++    },
++    {
++      "if": {
++        "properties": {
++          "environment": {
++            "const": "codex_cli"
++          }
++        }
++      },
++      "then": {
++        "properties": {
++          "env": {
++            "required": [
++              "CODEX_HOME"
++            ],
++            "maxProperties": 1
++          },
++          "root_context": false,
++          "credential_store": {
++            "allOf": [
++              {
++                "if": {
++                  "properties": {
++                    "selection": {
++                      "const": "native"
++                    }
++                  }
++                },
++                "then": {
++                  "properties": {
++                    "config_overrides": false
++                  }
++                }
++              },
++              {
++                "if": {
++                  "properties": {
++                    "selection": {
++                      "const": "file"
++                    }
++                  }
++                },
++                "then": {
++                  "required": [
++                    "config_overrides"
++                  ],
++                  "properties": {
++                    "config_overrides": {
++                      "properties": {
++                        "cli_auth_credentials_store": {
++                          "const": "file"
++                        }
++                      }
++                    }
++                  }
++                }
++              },
++              {
++                "if": {
++                  "properties": {
++                    "selection": {
++                      "const": "keychain"
++                    }
++                  }
++                },
++                "then": {
++                  "required": [
++                    "config_overrides"
++                  ],
++                  "properties": {
++                    "config_overrides": {
++                      "properties": {
++                        "cli_auth_credentials_store": {
++                          "const": "keyring"
++                        }
++                      }
++                    }
++                  }
++                }
++              }
++            ]
++          }
++        }
++      }
++    },
++    {
++      "if": {
++        "properties": {
++          "environment": {
++            "const": "opencode"
++          }
++        }
++      },
++      "then": {
++        "properties": {
++          "env": {
++            "required": [
++              "XDG_CONFIG_HOME"
++            ],
++            "maxProperties": 1
++          },
++          "root_context": false,
++          "credential_store": {
++            "properties": {
++              "selection": {
++                "const": "native"
++              },
++              "config_overrides": false
++            }
++          }
++        }
++      }
++    },
++    {
++      "if": {
++        "properties": {
++          "environment": {
++            "const": "pi"
++          }
++        }
++      },
++      "then": {
++        "properties": {
++          "env": {
++            "required": [
++              "PI_CODING_AGENT_DIR"
++            ],
++            "maxProperties": 1
++          },
++          "mcp": false,
++          "root_context": false,
++          "credential_store": {
++            "properties": {
++              "selection": {
++                "const": "native"
++              },
++              "config_overrides": false
++            }
++          }
++        }
++      }
++    },
++    {
++      "if": {
++        "properties": {
++          "environment": {
++            "const": "muse"
++          }
++        }
++      },
++      "then": {
++        "properties": {
++          "env": {
++            "required": [
++              "XDG_CONFIG_HOME",
++              "XDG_DATA_HOME",
++              "XDG_STATE_HOME",
++              "XDG_CACHE_HOME",
++              "TBH_CREDENTIAL_BACKEND"
++            ],
++            "minProperties": 5,
++            "maxProperties": 5,
++            "propertyNames": {
++              "enum": [
++                "XDG_CONFIG_HOME",
++                "XDG_DATA_HOME",
++                "XDG_STATE_HOME",
++                "XDG_CACHE_HOME",
++                "TBH_CREDENTIAL_BACKEND"
++              ]
++            }
++          },
++          "system_prompt": false,
++          "mcp": false,
++          "credential_store": {
++            "properties": {
++              "selection": {
++                "const": "file"
++              },
++              "config_overrides": false
++            }
++          }
++        },
++        "required": [
++          "credential_store"
++        ]
++      }
++    }
++  ],
++  "additionalProperties": false,
++  "$defs": {
++    "absolutePath": {
++      "type": "string",
++      "minLength": 2,
++      "maxLength": 4096,
++      "pattern": "^/[^\\u0000]*$",
++      "not": {
++        "pattern": "(?:^|/)\\.\\.(?:/|$)"
++      }
++    },
++    "flagArgument": {
++      "enum": [
++        "path",
++        "contents",
++        "name"
++      ]
++    },
++    "flagDescriptorCore": {
++      "properties": {
++        "kind": {
++          "const": "flag"
++        },
++        "flag": {
++          "type": "string",
++          "minLength": 2,
++          "maxLength": 128,
++          "pattern": "^-[^\\s]+$"
++        },
++        "argument": {
++          "$ref": "#/$defs/flagArgument"
++        },
++        "name": {
++          "$ref": "common.schema.json#/$defs/identifier"
++        },
++        "with": {
++          "type": "array",
++          "minItems": 1,
++          "uniqueItems": true,
++          "items": {
++            "type": "string",
++            "minLength": 2,
++            "maxLength": 128,
++            "pattern": "^-[^\\s]+$"
++          }
++        }
++      },
++      "allOf": [
++        {
++          "if": {
++            "properties": {
++              "argument": {
++                "const": "name"
++              }
++            }
++          },
++          "then": {
++            "required": [
++              "name"
++            ]
++          },
++          "else": {
++            "not": {
++              "required": [
++                "name"
++              ]
++            }
++          }
++        }
++      ]
++    },
++    "systemPromptDescriptor": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": [
++            "kind",
++            "semantics",
++            "flag",
++            "argument"
++          ],
++          "properties": {
++            "kind": {
++              "const": "flag"
++            },
++            "semantics": {
++              "enum": [
++                "append",
++                "replace"
++              ]
++            },
++            "flag": true,
++            "argument": true,
++            "name": true,
++            "with": true
++          },
++          "additionalProperties": false,
++          "allOf": [
++            {
++              "$ref": "#/$defs/flagDescriptorCore"
++            }
++          ]
++        },
++        {
++          "type": "object",
++          "required": [
++            "kind",
++            "semantics",
++            "key"
++          ],
++          "properties": {
++            "kind": {
++              "const": "config-key"
++            },
++            "semantics": {
++              "enum": [
++                "append",
++                "replace"
++              ]
++            },
++            "key": {
++              "$ref": "common.schema.json#/$defs/identifier"
++            }
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": [
++            "kind",
++            "semantics",
++            "variable"
++          ],
++          "properties": {
++            "kind": {
++              "const": "variable"
++            },
++            "semantics": {
++              "enum": [
++                "append",
++                "replace"
++              ]
++            },
++            "variable": {
++              "$ref": "common.schema.json#/$defs/identifier"
++            }
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": [
++            "kind",
++            "semantics",
++            "filename"
++          ],
++          "properties": {
++            "kind": {
++              "const": "file"
++            },
++            "semantics": {
++              "enum": [
++                "append",
++                "replace"
++              ]
++            },
++            "filename": {
++              "$ref": "common.schema.json#/$defs/portablePath"
++            }
++          },
++          "additionalProperties": false
++        }
++      ]
++    },
++    "mcpDescriptor": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": [
++            "kind",
++            "flag",
++            "argument"
++          ],
++          "properties": {
++            "kind": {
++              "const": "flag"
++            },
++            "flag": true,
++            "argument": true,
++            "name": true,
++            "with": true
++          },
++          "additionalProperties": false,
++          "allOf": [
++            {
++              "$ref": "#/$defs/flagDescriptorCore"
++            }
++          ]
++        },
++        {
++          "type": "object",
++          "required": [
++            "kind",
++            "key"
++          ],
++          "properties": {
++            "kind": {
++              "const": "config-key"
++            },
++            "key": {
++              "$ref": "common.schema.json#/$defs/identifier"
++            }
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": [
++            "kind",
++            "variable"
++          ],
++          "properties": {
++            "kind": {
++              "const": "variable"
++            },
++            "variable": {
++              "$ref": "common.schema.json#/$defs/identifier"
++            }
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": [
++            "kind",
++            "filename"
++          ],
++          "properties": {
++            "kind": {
++              "const": "file"
++            },
++            "filename": {
++              "$ref": "common.schema.json#/$defs/portablePath"
++            }
++          },
++          "additionalProperties": false
++        }
++      ]
++    }
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/index.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/index.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..bca4a69fc7479fac23ae6655856b025ca405c369
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/index.json
+@@ -0,0 +1,337 @@
++[
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "valid-muse-root.json",
++    "valid": true
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "valid-muse-no-root.json",
++    "valid": true
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-missing-XDG_CONFIG_HOME.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-missing-XDG_DATA_HOME.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-missing-XDG_STATE_HOME.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-missing-XDG_CACHE_HOME.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-missing-TBH_CREDENTIAL_BACKEND.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-root-null.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-root-empty.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-root-boolean.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-root-false.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-root-string.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-root-extra.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-backend-keychain.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-backend-absolute.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-backend-empty.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-store-native.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-store-keychain.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-store-null.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-store-empty.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-store-extra.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-store-override.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-store-missing.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-HOME.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-foreign-parent.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-wrong-suffix.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-relative-path.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-unknown-top.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-unknown-revision.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-system-prompt.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-mcp.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "valid-claude_code.json",
++    "valid": true
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-claude_code-root.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-claude_code-backend.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "valid-claude_code-native.json",
++    "valid": true
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-claude_code-file.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "valid-codex_cli.json",
++    "valid": true
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-codex_cli-root.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-codex_cli-backend.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "valid-codex_cli-native.json",
++    "valid": true
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "valid-codex-file.json",
++    "valid": true
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-codex-file-disagreement.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-codex-file-missing-override.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "valid-codex-keychain.json",
++    "valid": true
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-codex-keychain-disagreement.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-codex-keychain-missing-override.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-codex-native-override.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-codex-unknown-override.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "valid-opencode.json",
++    "valid": true
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-opencode-root.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-opencode-backend.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "valid-opencode-native.json",
++    "valid": true
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-opencode-file.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "valid-pi.json",
++    "valid": true
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-pi-root.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-pi-backend.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "valid-pi-native.json",
++    "valid": true
++  },
++  {
++    "schema": "launch-env-fragment-v4.schema.json",
++    "instance": "invalid-pi-file.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v1.schema.json",
++    "instance": "invalid-v4-on-v1.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v1.schema.json",
++    "instance": "invalid-additions-on-v1.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v2.schema.json",
++    "instance": "invalid-v4-on-v2.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v2.schema.json",
++    "instance": "invalid-additions-on-v2.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v3.schema.json",
++    "instance": "invalid-v4-on-v3.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v3.schema.json",
++    "instance": "invalid-additions-on-v3.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v3.schema.json",
++    "instance": "invalid-v3-root_context.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v3.schema.json",
++    "instance": "invalid-v3-credential_store.json",
++    "valid": false
++  },
++  {
++    "schema": "launch-env-fragment-v3.schema.json",
++    "instance": "invalid-v3-backend.json",
++    "valid": false
++  }
++]
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-HOME.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-HOME.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..aeffa5481246df605f67faa58dd600b7abd357ff
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-HOME.json
+@@ -0,0 +1,31 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file",
++    "HOME": "/other"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-additions-on-v1.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-additions-on-v1.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..982a509c0ed3fb5b8006bd0f8a1a3fc873c7396b
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-additions-on-v1.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v1",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-additions-on-v2.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-additions-on-v2.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..3c38621694cf1803f0aa962d99616cd764cb80ff
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-additions-on-v2.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v2",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-additions-on-v3.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-additions-on-v3.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..2e0d766156f5510c5c35cde48fadb39554e8eccc
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-additions-on-v3.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v3",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-backend-absolute.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-backend-absolute.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..1051d6479f132fd4173528020bf46d7875061daf
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-backend-absolute.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "/file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-backend-empty.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-backend-empty.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..d9fdccb57a42eebdb31d7b383964b9e7d3268b09
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-backend-empty.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": ""
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-backend-keychain.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-backend-keychain.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..d9542a3cf3a1210b77f778377d1624ebc0772142
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-backend-keychain.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "keychain"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-claude_code-backend.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-claude_code-backend.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..62d3556fe546fec52c96f88a9f56a9880e3c21dc
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-claude_code-backend.json
+@@ -0,0 +1,21 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-claude_code-file.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-claude_code-file.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..b68668200e7cf151c5f195c934ff506c141d445e
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-claude_code-file.json
+@@ -0,0 +1,23 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-claude_code-root.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-claude_code-root.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..3c62890c9127bb225f466af7782f2ddab163bf16
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-claude_code-root.json
+@@ -0,0 +1,23 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-file-disagreement.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-file-disagreement.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..978f2d6075cd34a58b572c9ceb7791e7e0f895c2
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-file-disagreement.json
+@@ -0,0 +1,26 @@
++{
++  "env": {
++    "CODEX_HOME": "/manager/environments/companyA/codex_cli"
++  },
++  "environment": "codex_cli",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "file",
++    "config_overrides": {
++      "cli_auth_credentials_store": "keyring"
++    }
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-file-missing-override.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-file-missing-override.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..59f0799552875e102c25b4922fb969f721a65835
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-file-missing-override.json
+@@ -0,0 +1,23 @@
++{
++  "env": {
++    "CODEX_HOME": "/manager/environments/companyA/codex_cli"
++  },
++  "environment": "codex_cli",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-keychain-disagreement.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-keychain-disagreement.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..1751c64f88a7edf391d74902f2e8316e86dce704
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-keychain-disagreement.json
+@@ -0,0 +1,26 @@
++{
++  "env": {
++    "CODEX_HOME": "/manager/environments/companyA/codex_cli"
++  },
++  "environment": "codex_cli",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "keychain",
++    "config_overrides": {
++      "cli_auth_credentials_store": "file"
++    }
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-keychain-missing-override.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-keychain-missing-override.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..66edadbdf0d41403d64a6f32fee0c6fde8c4844c
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-keychain-missing-override.json
+@@ -0,0 +1,23 @@
++{
++  "env": {
++    "CODEX_HOME": "/manager/environments/companyA/codex_cli"
++  },
++  "environment": "codex_cli",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "keychain"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-native-override.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-native-override.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..560b9e1790b182e77523189ef99eabd6ace732a9
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-native-override.json
+@@ -0,0 +1,26 @@
++{
++  "env": {
++    "CODEX_HOME": "/manager/environments/companyA/codex_cli"
++  },
++  "environment": "codex_cli",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "native",
++    "config_overrides": {
++      "cli_auth_credentials_store": "file"
++    }
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-unknown-override.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-unknown-override.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..f62e2f00bb91f4cf3063e32f6302e91e94259407
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex-unknown-override.json
+@@ -0,0 +1,27 @@
++{
++  "env": {
++    "CODEX_HOME": "/manager/environments/companyA/codex_cli"
++  },
++  "environment": "codex_cli",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "file",
++    "config_overrides": {
++      "cli_auth_credentials_store": "file",
++      "unknown": "file"
++    }
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex_cli-backend.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex_cli-backend.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..76d87066f09acd3924352a30ab69fad1d7ffcbc7
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex_cli-backend.json
+@@ -0,0 +1,21 @@
++{
++  "env": {
++    "CODEX_HOME": "/manager/environments/companyA/codex_cli",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "codex_cli",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex_cli-root.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex_cli-root.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..f12157b4225a272eb8a5f3fbd77f46d1cf808758
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-codex_cli-root.json
+@@ -0,0 +1,23 @@
++{
++  "env": {
++    "CODEX_HOME": "/manager/environments/companyA/codex_cli"
++  },
++  "environment": "codex_cli",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-foreign-parent.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-foreign-parent.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..44099f4f210fb29d9fcb19f3944354052cc0491c
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-foreign-parent.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/other/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-mcp.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-mcp.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..49c01bff32d641dbb5d27aa5957d7cdf8d9a4a77
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-mcp.json
+@@ -0,0 +1,35 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  },
++  "mcp": {
++    "path": "/mcp",
++    "env_names": [],
++    "channels": []
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-missing-TBH_CREDENTIAL_BACKEND.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-missing-TBH_CREDENTIAL_BACKEND.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..e2886482faa2c7bbd306039c81997274449e3de5
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-missing-TBH_CREDENTIAL_BACKEND.json
+@@ -0,0 +1,29 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-missing-XDG_CACHE_HOME.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-missing-XDG_CACHE_HOME.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..2ee31a32af20f6fd744f9256e2ee9f158728d2a9
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-missing-XDG_CACHE_HOME.json
+@@ -0,0 +1,29 @@
++{
++  "env": {
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-missing-XDG_CONFIG_HOME.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-missing-XDG_CONFIG_HOME.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..26deea4a98a967753121bc22177d0a2e27455105
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-missing-XDG_CONFIG_HOME.json
+@@ -0,0 +1,29 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-missing-XDG_DATA_HOME.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-missing-XDG_DATA_HOME.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..e4c8b016eb0f8938ca6bf6b4d512f804aca74faa
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-missing-XDG_DATA_HOME.json
+@@ -0,0 +1,29 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-missing-XDG_STATE_HOME.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-missing-XDG_STATE_HOME.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..33414466502653dc0b9fa41d55d63516c2c2c40f
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-missing-XDG_STATE_HOME.json
+@@ -0,0 +1,29 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-opencode-backend.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-opencode-backend.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..ca46439918607b01e916947616b21e8b7be3d8b0
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-opencode-backend.json
+@@ -0,0 +1,21 @@
++{
++  "env": {
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/opencode",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "opencode",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-opencode-file.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-opencode-file.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..90373b869b4541a9829bc4081a1fe8fb551098f8
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-opencode-file.json
+@@ -0,0 +1,23 @@
++{
++  "env": {
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/opencode"
++  },
++  "environment": "opencode",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-opencode-root.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-opencode-root.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..52526fac410d0f5400dca797f95a9d9d4f0f91a6
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-opencode-root.json
+@@ -0,0 +1,23 @@
++{
++  "env": {
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/opencode"
++  },
++  "environment": "opencode",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-pi-backend.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-pi-backend.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..24f02a413e5d4afed9f502812e1f97bab2841067
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-pi-backend.json
+@@ -0,0 +1,21 @@
++{
++  "env": {
++    "PI_CODING_AGENT_DIR": "/manager/environments/companyA/pi",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "pi",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-pi-file.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-pi-file.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..b2bb01c00470960e0efe7ddb78086dca700549c7
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-pi-file.json
+@@ -0,0 +1,23 @@
++{
++  "env": {
++    "PI_CODING_AGENT_DIR": "/manager/environments/companyA/pi"
++  },
++  "environment": "pi",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-pi-root.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-pi-root.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..46169b76cea633f683c7003b764ea8970576746d
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-pi-root.json
+@@ -0,0 +1,23 @@
++{
++  "env": {
++    "PI_CODING_AGENT_DIR": "/manager/environments/companyA/pi"
++  },
++  "environment": "pi",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-relative-path.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-relative-path.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..0d75c0eaab9321c9b92685c61f99db5ec28943e0
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-relative-path.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "relative/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-boolean.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-boolean.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..ed4d1152f759223b3d34d51ab23d8631bd82c519
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-boolean.json
+@@ -0,0 +1,28 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": false,
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-empty.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-empty.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..557d2f7ed414bb2ebfc0dd726ff64b195b770376
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-empty.json
+@@ -0,0 +1,28 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {},
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-extra.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-extra.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..e50211bae0d9085f40e84da0e7a0adbb87b3fb72
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-extra.json
+@@ -0,0 +1,31 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true,
++    "path": "/context"
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-false.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-false.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..1b962fbda280dbd17118677ce32cff6c121dc386
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-false.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": false
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-null.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-null.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..64d2e260a75242403d9bd37d85d51a93f7374de8
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-null.json
+@@ -0,0 +1,28 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": null,
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-string.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-string.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..96a3c11ad6826cba38bae8803ae838dac513735f
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-root-string.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": "true"
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-empty.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-empty.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..5daeef9dd99ad21513be85a5fbaef944b6f9ed5b
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-empty.json
+@@ -0,0 +1,28 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {}
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-extra.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-extra.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..36b1f31e80d29ee9390920aa0d9bc6d24acfea35
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-extra.json
+@@ -0,0 +1,31 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file",
++    "unknown": true
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-keychain.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-keychain.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..26e5abed6f523cb2508e5154683676061a49878f
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-keychain.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "keychain"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-missing.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-missing.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..6d3cd516b1f786b1917d85345d51607204e04ee5
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-missing.json
+@@ -0,0 +1,27 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-native.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-native.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec85e5f34b715eefb1591722a861b999be265986
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-native.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "native"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-null.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-null.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..4244c1dabf3f2a7ed27833994e1a39f6bdabce7d
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-null.json
+@@ -0,0 +1,28 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": null
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-override.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-override.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec81a5af2f9143aa3b53626b5ae3cbeab67bac23
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-store-override.json
+@@ -0,0 +1,33 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file",
++    "config_overrides": {
++      "cli_auth_credentials_store": "file"
++    }
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-system-prompt.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-system-prompt.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..a7f20092c85bf6c2671584a7c019bf82a022f750
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-system-prompt.json
+@@ -0,0 +1,34 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  },
++  "system_prompt": {
++    "path": "/context",
++    "channels": []
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-unknown-revision.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-unknown-revision.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..8715820081f1bb5b17af3feaaf6009bdadd4c2e0
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-unknown-revision.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v99",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-unknown-top.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-unknown-top.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..0a6f2020d60f5c4c4354b2589efff58c53076121
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-unknown-top.json
+@@ -0,0 +1,31 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  },
++  "unknown": true
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v3-backend.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v3-backend.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..5de4e3f2b033680fb4d278c0233c0b6ca9715e0a
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v3-backend.json
+@@ -0,0 +1,24 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v3",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v3-credential_store.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v3-credential_store.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..6af7dc8bc60acf1db1eeadff8649b7213f0cfea5
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v3-credential_store.json
+@@ -0,0 +1,26 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v3",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v3-root_context.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v3-root_context.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..835385cb626dbfb28ef820cf2bf95ec059aee1b3
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v3-root_context.json
+@@ -0,0 +1,26 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v3",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v4-on-v1.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v4-on-v1.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..179c17469c8878057d50905cfc6ff986bbd78431
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v4-on-v1.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v4-on-v2.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v4-on-v2.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..179c17469c8878057d50905cfc6ff986bbd78431
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v4-on-v2.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v4-on-v3.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v4-on-v3.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..179c17469c8878057d50905cfc6ff986bbd78431
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-v4-on-v3.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-wrong-suffix.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-wrong-suffix.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..1c51c720474c7a457f4127c0a379a7721bc0fb8a
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/invalid-wrong-suffix.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/other",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-claude_code-native.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-claude_code-native.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..fe709262163b7a0e1bba4b1ed436d4b955dbd004
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-claude_code-native.json
+@@ -0,0 +1,23 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "native"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-claude_code.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-claude_code.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..d4c3e22f934600006799c78a959d70bc29b29030
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-claude_code.json
+@@ -0,0 +1,20 @@
++{
++  "env": {
++    "CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"
++  },
++  "environment": "claude_code",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-codex-file.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-codex-file.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..19db45c3565f57f9fbd630a4a1764b2ab3dd5b65
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-codex-file.json
+@@ -0,0 +1,26 @@
++{
++  "env": {
++    "CODEX_HOME": "/manager/environments/companyA/codex_cli"
++  },
++  "environment": "codex_cli",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "file",
++    "config_overrides": {
++      "cli_auth_credentials_store": "file"
++    }
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-codex-keychain.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-codex-keychain.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e7f5642affd478d5f0ded8192c66b079c3d1258
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-codex-keychain.json
+@@ -0,0 +1,26 @@
++{
++  "env": {
++    "CODEX_HOME": "/manager/environments/companyA/codex_cli"
++  },
++  "environment": "codex_cli",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "keychain",
++    "config_overrides": {
++      "cli_auth_credentials_store": "keyring"
++    }
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-codex_cli-native.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-codex_cli-native.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..836e851b56d87d05f841b07fd829dc2c2e160d7e
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-codex_cli-native.json
+@@ -0,0 +1,23 @@
++{
++  "env": {
++    "CODEX_HOME": "/manager/environments/companyA/codex_cli"
++  },
++  "environment": "codex_cli",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "native"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-codex_cli.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-codex_cli.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..24e08c299c3094d886f9e716468fa60d8dd93841
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-codex_cli.json
+@@ -0,0 +1,20 @@
++{
++  "env": {
++    "CODEX_HOME": "/manager/environments/companyA/codex_cli"
++  },
++  "environment": "codex_cli",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-muse-no-root.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-muse-no-root.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..292cd74f21371d275cde9dabffe86bce63061bb2
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-muse-no-root.json
+@@ -0,0 +1,27 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-muse-root.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-muse-root.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..179c17469c8878057d50905cfc6ff986bbd78431
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-muse-root.json
+@@ -0,0 +1,30 @@
++{
++  "env": {
++    "XDG_CACHE_HOME": "/manager/environments/companyA/muse/cache",
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/muse/config",
++    "XDG_DATA_HOME": "/manager/environments/companyA/muse/data",
++    "XDG_STATE_HOME": "/manager/environments/companyA/muse/state",
++    "TBH_CREDENTIAL_BACKEND": "file"
++  },
++  "environment": "muse",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "root_context": {
++    "exclusive": true
++  },
++  "credential_store": {
++    "selection": "file"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-opencode-native.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-opencode-native.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..6ba51fe8a234e370394177d030e344038ef45529
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-opencode-native.json
+@@ -0,0 +1,23 @@
++{
++  "env": {
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/opencode"
++  },
++  "environment": "opencode",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "native"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-opencode.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-opencode.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..fa38aad2b63549f5f599c659cbfb0b68a577d3bc
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-opencode.json
+@@ -0,0 +1,20 @@
++{
++  "env": {
++    "XDG_CONFIG_HOME": "/manager/environments/companyA/opencode"
++  },
++  "environment": "opencode",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-pi-native.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-pi-native.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..4f2230f4449781abcedc77577e6addfe8150f208
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-pi-native.json
+@@ -0,0 +1,23 @@
++{
++  "env": {
++    "PI_CODING_AGENT_DIR": "/manager/environments/companyA/pi"
++  },
++  "environment": "pi",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  },
++  "credential_store": {
++    "selection": "native"
++  }
++}
+diff --git a/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-pi.json b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-pi.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..f7bc5809ec9c284387bf80f3a972fe7d4cd488b3
+--- /dev/null
++++ b/internal/envfragment/testdata/curator-spec-muse/v4-cases/valid-pi.json
+@@ -0,0 +1,20 @@
++{
++  "env": {
++    "PI_CODING_AGENT_DIR": "/manager/environments/companyA/pi"
++  },
++  "environment": "pi",
++  "fragment": "launch-env-fragment-v4",
++  "permissions": {
++    "locked": false,
++    "mode": "native",
++    "source": "profile"
++  },
++  "precedence": {
++    "placement": "winner-last",
++    "winner": "higher-weight"
++  },
++  "profile": {
++    "lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++    "name": "companyA"
++  }
++}
+diff --git a/internal/envprofile/credential_policy.go b/internal/envprofile/credential_policy.go
+index ead005270659aafc89fa2bedce034c59de3278c2..f6666cd9e7509057a3c04c2f933bdfe6189400f4 100644
+--- a/internal/envprofile/credential_policy.go
++++ b/internal/envprofile/credential_policy.go
+@@ -12,9 +12,9 @@ import (
+ 
+ // admitCredentialStore prevents a stored selector from silently becoming native
+ // on an older producer. This is an activation boundary, not runtime qualification.
+-// Effective-policy adoption and successor login/fragment consumers are separate.
++// Muse file is admitted by D10; other forced mappings remain gated.
+ func admitCredentialStore(adapter envregistry.Adapter, profile string, selection envregistry.CredentialStoreSelection) error {
+-	if selection == envregistry.CredentialStoreNative {
++	if selection == envregistry.CredentialStoreNative || adapter.ID == envregistry.Muse && selection == envregistry.CredentialStoreFile {
+ 		return nil
+ 	}
+ 	if adapter.ID == envregistry.CodexCLI && selection == envregistry.CredentialStoreFile {
+@@ -25,22 +25,24 @@ func admitCredentialStore(adapter envregistry.Adapter, profile string, selection
+ 	case envregistry.ClaudeCode:
+ 		guidance = "Claude has no established force-file or force-Keychain interface; log in from the same kind of session as the launcher, or explicitly enroll an environment-token source for inference"
+ 	case envregistry.Muse:
+-		guidance = "managed Muse requires file storage; successor file-policy login and fragment delivery are not enabled"
++		guidance = "managed Muse requires file storage; select native or file, then use TBH_CREDENTIAL_BACKEND=file for native file login"
+ 	}
+ 	return fmt.Errorf("%s: %s/%s selection %s: %s", envregistry.DiagCredentialStoreUnsupported, profile, adapter.ID, selection, guidance)
+ }
+ 
+ // effectiveCredentialPolicy is the operation-local projection for the existing
+ // managed-home credential contract. It is not a runtime qualification or a
+-// readiness verdict. Forced mappings retain their activation refusals until
+-// qualified login and successor-fragment consumers land.
++// readiness verdict. Muse maps native to file here; other forced mappings
++// retain activation refusals until qualification and strict consumers land.
+ type effectiveCredentialPolicy struct {
+-	selection   envregistry.CredentialStoreSelection
+-	isolation   string
+-	nativeStore string
+-	links       map[string]string
+-	strategies  map[string]string
+-	records     []envmarker.Passthrough
++	selection      envregistry.CredentialStoreSelection
++	effectiveStore envregistry.CredentialStoreSelection
++	launchEnv      map[string]string
++	isolation      string
++	nativeStore    string
++	links          map[string]string
++	strategies     map[string]string
++	records        []envmarker.Passthrough
+ }
+ 
+ // credentialPolicyResolution retains both successful and failed observations
+@@ -85,8 +87,10 @@ func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter,
+ 		return nil, err
+ 	}
+ 	p := &effectiveCredentialPolicy{
+-		selection: selection,
+-		links:     map[string]string{}, strategies: map[string]string{}, records: []envmarker.Passthrough{},
++		selection:      selection,
++		effectiveStore: selection,
++		launchEnv:      map[string]string{},
++		links:          map[string]string{}, strategies: map[string]string{}, records: []envmarker.Passthrough{},
+ 	}
+ 	var native string
+ 	if adapter.ID == envregistry.CodexCLI {
+@@ -102,6 +106,10 @@ func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter,
+ 	if err := admitCredentialStore(adapter, req.Profile, selection); err != nil {
+ 		return nil, err
+ 	}
++	if adapter.ID == envregistry.Muse {
++		p.effectiveStore = envregistry.CredentialStoreFile
++		p.launchEnv["TBH_CREDENTIAL_BACKEND"] = "file"
++	}
+ 	atAbove := true
+ 	if ok, known := adapter.AtOrAbovePinned(release); known {
+ 		atAbove = ok
+diff --git a/internal/envprofile/credential_policy_test.go b/internal/envprofile/credential_policy_test.go
+index 10465dd35da65fbf0e5fa1b9269b82e5a3f99773..1f62de46413909098de932d54cfa7176b2e852cf 100644
+--- a/internal/envprofile/credential_policy_test.go
++++ b/internal/envprofile/credential_policy_test.go
+@@ -17,6 +17,9 @@ func TestCredentialStorePolicyActivation(t *testing.T) {
+ 	fx := writeManagedFixture(t, "store-policy")
+ 	for _, id := range []string{envregistry.ClaudeCode, envregistry.CodexCLI, envregistry.Muse, envregistry.Pi, envregistry.OpenCode} {
+ 		for _, selection := range []envregistry.CredentialStoreSelection{envregistry.CredentialStoreFile, envregistry.CredentialStoreKeychain} {
++			if id == envregistry.Muse && selection == envregistry.CredentialStoreFile {
++				continue // Admitted Muse file controls live in TestMuseCredentialPolicyMatrix.
++			}
+ 			t.Run(id+"/"+string(selection), func(t *testing.T) {
+ 				req := fx.request(id)
+ 				req.Repair = true
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index 83c6ead0e9ffdad3019fd622e93336af5d188acf..a34c9b421ee2c75db4c4b55c634a988a94892a70 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -287,19 +287,20 @@ func storeDocPath(home, profile, envID, rel string) string {
+ // homePlan is the fully assembled managed home: every write, link, and
+ // removal, with the marker recording them.
+ type homePlan struct {
+-	adapter     envregistry.Adapter
+-	hashVersion hashing.Version
+-	parent      string
+-	homeDir     string
+-	storeRoot   string
+-	form        string
+-	isolation   string
+-	copies      map[string][]byte
+-	links       map[string]string
+-	docs        map[string][]byte
+-	marker      *envmarker.Marker
+-	fileHashes  map[string][]byte
+-	warnings    []string
++	credentialPolicy *effectiveCredentialPolicy
++	adapter          envregistry.Adapter
++	hashVersion      hashing.Version
++	parent           string
++	homeDir          string
++	storeRoot        string
++	form             string
++	isolation        string
++	copies           map[string][]byte
++	links            map[string]string
++	docs             map[string][]byte
++	marker           *envmarker.Marker
++	fileHashes       map[string][]byte
++	warnings         []string
+ }
+ 
+ // assembleHome builds the desired managed home purely from the lock, the
+@@ -340,17 +341,21 @@ func assembleHomeObserved(req *ResolveRequest, source Source, lock *contextlock.
+ 	}
+ 	isolation := credentialPolicy.isolation
+ 	plan := &homePlan{
+-		adapter:     adapter,
+-		hashVersion: lock.ContentHashVersion(),
+-		parent:      ManagedParent(req.Home, req.Profile, adapter.ID),
+-		homeDir:     ManagedHomeDir(req.Home, req.Profile, adapter.ID),
+-		storeRoot:   ProfilesDir(req.Home),
+-		form:        form,
+-		isolation:   isolation,
+-		copies:      map[string][]byte{},
+-		links:       map[string]string{},
+-		docs:        map[string][]byte{},
+-		fileHashes:  map[string][]byte{},
++		credentialPolicy: credentialPolicy,
++		adapter:          adapter,
++		hashVersion:      lock.ContentHashVersion(),
++		parent:           ManagedParent(req.Home, req.Profile, adapter.ID),
++		homeDir:          ManagedHomeDir(req.Home, req.Profile, adapter.ID),
++		storeRoot:        ProfilesDir(req.Home),
++		form:             form,
++		isolation:        isolation,
++		copies:           map[string][]byte{},
++		links:            map[string]string{},
++		docs:             map[string][]byte{},
++		fileHashes:       map[string][]byte{},
++	}
++	if adapter.ID == envregistry.Muse && credentialPolicy.selection == envregistry.CredentialStoreNative {
++		plan.warnings = append(plan.warnings, "managed Muse maps configured native (including unset) to effective file storage; the stored selector is unchanged; refresh remains unqualified")
+ 	}
+ 	if form == envregistry.FormReferenced && adapter.ID == envregistry.OpenCode {
+ 		if blocked, err := referencedBlocked(plan.homeDir, prior); err != nil {
+@@ -2276,6 +2281,9 @@ func recordedRelease(adapter envregistry.Adapter) string {
+ // member is not produced by this resolver.
+ func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *verification) (*envfragment.Fragment, error) {
+ 	plan := verdict.plan
++	// Reuse the policy verified with this plan's release observation. Resolving
++	// again here would escape capture's metadata-only observation boundary.
++	policy := plan.credentialPolicy
+ 	fragment := &envfragment.Fragment{
+ 		Environment: adapter.ID,
+ 		Profile:     req.Profile,
+@@ -2290,6 +2298,15 @@ func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *ve
+ 			fragment.Env[variable[0]] = filepath.Join(plan.parent, variable[1])
+ 		}
+ 	}
++	for name, value := range policy.launchEnv {
++		fragment.Env[name] = value
++	}
++	if adapter.ID == envregistry.Muse {
++		fragment.CredentialStore = &envfragment.CredentialStore{Selection: policy.effectiveStore}
++		if _, ok := plan.marker.Surfaces[envmarker.SurfaceRootContext]; ok {
++			fragment.RootContext = &envfragment.RootContext{Exclusive: true}
++		}
++	}
+ 	fragment.Permissions = PermissionsForProfile(req.Machine, req.Profile)
+ 	if _, ok := plan.marker.Surfaces[envmarker.SurfaceSystemPrompt]; ok {
+ 		fragment.SystemPrompt = &envfragment.SystemPrompt{
+diff --git a/internal/envprofile/materialize_capture_test.go b/internal/envprofile/materialize_capture_test.go
+index 81851f1c1bb0f9b63937cd10389f23bee384d56d..161c6eeca480c1b7f7f6263a0f768d5fc30fed74 100644
+--- a/internal/envprofile/materialize_capture_test.go
++++ b/internal/envprofile/materialize_capture_test.go
+@@ -464,39 +464,107 @@ func TestMaterializeCaptureSameFragmentDrift(t *testing.T) {
+ }
+ 
+ // Real executable discovery is planted on PATH; capture and metadata status
+-// must succeed without executing it even when Detect is nil, in both consumers.
++// succeed without executing it when Detect is nil. Muse native/file and both
++// isolation modes retain the v4 file projection and leave source state unchanged.
+ func TestMaterializeCaptureAndStatusNeverProbeVendor(t *testing.T) {
+ 	if runtime.GOOS == "windows" {
+ 		t.Skip("shell sentinel is Unix-only")
+ 	}
+-	fx, req := captureFixture(t)
+-	bin := t.TempDir()
+-	sentinel := filepath.Join(t.TempDir(), "ran")
+-	for _, tool := range []string{"codex", "claude", "muse", "pi", "opencode"} {
+-		if err := os.WriteFile(filepath.Join(bin, tool), []byte("#!/bin/sh\nprintf ran > '"+sentinel+"'\nprintf '1.2.3\\n'\n"), 0700); err != nil {
+-			t.Fatal(err)
+-		}
+-	}
+-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+-	for _, form := range []string{"export", "manifest-only"} {
+-		t.Run(form, func(t *testing.T) {
+-			if _, err := CaptureMaterialize(req); err != nil {
++	for _, tc := range []struct {
++		name, environment, isolation string
++		selection                    envregistry.CredentialStoreSelection
++	}{
++		{name: "codex", environment: envregistry.CodexCLI},
++		{"muse-native-shared", envregistry.Muse, envregistry.IsolationShared, envregistry.CredentialStoreNative},
++		{"muse-file-shared", envregistry.Muse, envregistry.IsolationShared, envregistry.CredentialStoreFile},
++		{"muse-native-isolated", envregistry.Muse, envregistry.IsolationIsolated, envregistry.CredentialStoreNative},
++		{"muse-file-isolated", envregistry.Muse, envregistry.IsolationIsolated, envregistry.CredentialStoreFile},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			fx, req := captureFixture(t)
++			if tc.environment == envregistry.Muse {
++				fx.native[envregistry.Muse] = t.TempDir()
++				if err := os.WriteFile(filepath.Join(fx.native[envregistry.Muse], "auth.json"), []byte("synthetic-muse\n"), 0600); err != nil {
++					t.Fatal(err)
++				}
++				provision := fx.request(envregistry.Muse)
++				provision.Machine.Isolation[fx.profile] = map[string]string{envregistry.Muse: tc.isolation}
++				provision.Machine.CredentialStore = map[string]map[string]envregistry.CredentialStoreSelection{fx.profile: {envregistry.Muse: tc.selection}}
++				provision.Repair = true
++				if _, err := Resolve(provision); err != nil {
++					t.Fatal(err)
++				}
++				req.Resolve = provision
++				req.Resolve.Repair = false
++				req.Resolve.Detect = nil
++				req.ReloadMachine = func() (envregistry.MachineConfig, Policy, error) {
++					return provision.Machine, Policy{}, nil
++				}
++				req.Capture = func(c *MaterializeCapture) ([]byte, error) {
++					path := filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.Muse), "config", "muse", "AGENTS.md")
++					path, err := filepath.EvalSymlinks(path)
++					if err != nil {
++						return nil, err
++					}
++					file, err := openReadNoFollow(path)
++					if err != nil {
++						return nil, err
++					}
++					return c.ReadObject(path, file)
++				}
++			}
++			before, _ := captureFixtureState(t, fx)
++			bin := t.TempDir()
++			sentinel := filepath.Join(t.TempDir(), "ran")
++			for _, tool := range []string{"codex", "claude", "muse", "pi", "opencode"} {
++				if err := os.WriteFile(filepath.Join(bin, tool), []byte("#!/bin/sh\nprintf ran > '"+sentinel+"'\nprintf '1.2.3\\n'\n"), 0700); err != nil {
++					t.Fatal(err)
++				}
++			}
++			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
++			for _, form := range []string{"export", "manifest-only"} {
++				t.Run(form, func(t *testing.T) {
++					captured, err := CaptureMaterialize(req)
++					if err != nil {
++						t.Fatal(err)
++					}
++					if tc.environment == envregistry.Muse {
++						var fragment struct {
++							Fragment        string
++							Env             map[string]string
++							CredentialStore struct{ Selection string } `json:"credential_store"`
++						}
++						if err := json.Unmarshal(captured.Fragment, &fragment); err != nil {
++							t.Fatal(err)
++						}
++						if fragment.Fragment != "launch-env-fragment-v4" || fragment.Env["TBH_CREDENTIAL_BACKEND"] != "file" || fragment.CredentialStore.Selection != "file" {
++							t.Fatalf("capture lost Muse file projection: %s", captured.Fragment)
++						}
++					}
++				})
++			}
++			status, err := StatusOf(StatusRequest{Home: fx.home, Machine: req.Resolve.Machine, NativeHomeOf: req.Resolve.NativeHomeOf, OperatorXDG: fx.xdg, LaunchDir: fx.launch})
++			if err != nil {
+ 				t.Fatal(err)
+ 			}
++			for _, adapter := range status.Adapters {
++				if adapter.Detected != "unknown" {
++					t.Fatalf("unsafe release observation: %v", adapter)
++				}
++			}
++			row := findHome(status, fx.profile, tc.environment)
++			if row == nil || !row.Current {
++				t.Fatalf("metadata status lost current home: %+v", row)
++			}
++			after, _ := captureFixtureState(t, fx)
++			if !bytes.Equal(before, after) {
++				t.Fatal("capture or status changed source or credential state")
++			}
++			if _, err := os.Stat(sentinel); !os.IsNotExist(err) {
++				t.Fatal("vendor executable ran")
++			}
+ 		})
+ 	}
+-	status, err := StatusOf(StatusRequest{Home: fx.home, Machine: req.Resolve.Machine, NativeHomeOf: req.Resolve.NativeHomeOf, OperatorXDG: fx.xdg, LaunchDir: fx.launch})
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	for _, adapter := range status.Adapters {
+-		if adapter.Detected != "unknown" {
+-			t.Fatalf("unsafe release observation: %v", adapter)
+-		}
+-	}
+-	if _, err := os.Stat(sentinel); !os.IsNotExist(err) {
+-		t.Fatal("vendor executable ran")
+-	}
+ }
+ 
+ // Missing source homes and missing manager state cannot be provisioned by an
+diff --git a/internal/envprofile/muse.go b/internal/envprofile/muse.go
+index 6d58a2945c89791bd12f6ffe1e5f3264bb732aae..08e39a04c6a36790fda5d069fd7f9359d6834de8 100644
+--- a/internal/envprofile/muse.go
++++ b/internal/envprofile/muse.go
+@@ -119,7 +119,7 @@ func (req *ResolveRequest) inspectMuseAuth(full, target string) museAuthState {
+ 		return unreadable(err)
+ 	}
+ 	if metadata.Kind == stateread.KindAbsent {
+-		return conflict("native credential target is absent")
++		return conflict("native credential target is absent; run TBH_CREDENTIAL_BACKEND=file muse login in the native XDG environment before resolving shared Muse")
+ 	}
+ 	if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
+ 		return unreadable(fmt.Errorf("native target metadata unavailable"))
+diff --git a/internal/envprofile/muse_credential_policy_test.go b/internal/envprofile/muse_credential_policy_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..65b9cfde9acfc975062ae7eb87fd27d034bf1c49
+--- /dev/null
++++ b/internal/envprofile/muse_credential_policy_test.go
+@@ -0,0 +1,189 @@
++package envprofile
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++// Resolve projects native/unset/file to file without mutating the selector.
++// Isolated never imports a native credential; shared requires a live native file.
++// Keychain refuses before any home, marker, link or credential mutation.
++func TestMuseCredentialPolicyMatrix(t *testing.T) {
++	requireLinkCapability(t)
++	for _, selection := range []envregistry.CredentialStoreSelection{"", "native", "file", "keychain"} {
++		for _, isolation := range []string{"shared", "isolated"} {
++			t.Run(string(selection)+"/"+isolation, func(t *testing.T) {
++				fx := writeManagedFixture(t, "muse-policy")
++				fx.native[envregistry.Muse] = t.TempDir()
++				native := filepath.Join(fx.native[envregistry.Muse], "auth.json")
++				if err := os.WriteFile(native, []byte("synthetic-native\n"), 0600); err != nil {
++					t.Fatal(err)
++				}
++				req := fx.request(envregistry.Muse)
++				req.Repair = true
++				req.Machine.Isolation[fx.profile] = map[string]string{envregistry.Muse: isolation}
++				if selection != "" {
++					req.Machine.CredentialStore = map[string]map[string]envregistry.CredentialStoreSelection{fx.profile: {envregistry.Muse: selection}}
++				}
++				before := snapshotCredentialScope(t, fx)
++				configured, _ := json.Marshal(req.Machine.CredentialStore)
++				result, err := Resolve(req)
++				if selection == "keychain" {
++					if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialStoreUnsupported) || result != nil {
++						t.Fatalf("keychain: %v %v", result, err)
++					}
++					if !reflect.DeepEqual(before, snapshotCredentialScope(t, fx)) {
++						t.Fatal("refusal changed forbidden state")
++					}
++					return
++				}
++				if err != nil {
++					t.Fatal(err)
++				}
++				after, _ := json.Marshal(req.Machine.CredentialStore)
++				if string(configured) != string(after) {
++					t.Fatal("selector rewritten")
++				}
++				var fragment struct {
++					Fragment        string
++					Env             map[string]string
++					CredentialStore struct {
++						Selection string `json:"selection"`
++					} `json:"credential_store"`
++					RootContext any `json:"root_context"`
++				}
++				if err := json.Unmarshal(result.Document, &fragment); err != nil {
++					t.Fatal(err)
++				}
++				if fragment.Fragment != "launch-env-fragment-v4" || len(fragment.Env) != 5 || fragment.Env["TBH_CREDENTIAL_BACKEND"] != "file" || fragment.CredentialStore.Selection != "file" || fragment.RootContext == nil {
++					t.Fatalf("projection: %s", result.Document)
++				}
++				if selection != "file" && !strings.Contains(strings.Join(result.Warnings, ";"), "maps configured native") {
++					t.Fatal("mapping not reported")
++				}
++				auth := filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.Muse), "config", "muse", "auth.json")
++				if isolation == "shared" {
++					if got, err := os.Readlink(auth); err != nil || got != native {
++						t.Fatalf("shared source: %q %v", got, err)
++					}
++				} else if _, err := os.Lstat(auth); !os.IsNotExist(err) {
++					t.Fatalf("isolated imported or synthesized auth: %v", err)
++				}
++				for _, format := range []string{"json", "env", "shell"} {
++					req.Format = format
++					req.Repair = false
++					r, err := Resolve(req)
++					if err != nil || !strings.Contains(string(r.Document), "TBH_CREDENTIAL_BACKEND") || !strings.Contains(string(r.Document), "file") {
++						t.Fatalf("%s: %v %v", format, r, err)
++					}
++				}
++				if got, err := os.ReadFile(native); err != nil || string(got) != "synthetic-native\n" {
++					t.Fatal("native bytes changed")
++				}
++			})
++		}
++	}
++}
++
++// A missing shared source refuses with actionable native-file guidance and no
++// writes; the same missing native file is irrelevant to a new isolated home.
++func TestMuseMissingNativeFilePolicy(t *testing.T) {
++	for _, mode := range []string{"shared", "isolated"} {
++		t.Run(mode, func(t *testing.T) {
++			fx := writeManagedFixture(t, "muse-missing")
++			fx.native[envregistry.Muse] = t.TempDir()
++			req := fx.request(envregistry.Muse)
++			req.Repair = true
++			req.Machine.Isolation[fx.profile] = map[string]string{envregistry.Muse: mode}
++			before := snapshotCredentialScope(t, fx)
++			result, err := Resolve(req)
++			if mode == "shared" {
++				if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) || !strings.Contains(err.Error(), "TBH_CREDENTIAL_BACKEND=file muse login") || result != nil {
++					t.Fatalf("missing shared source: %v %v", result, err)
++				}
++				if !reflect.DeepEqual(before, snapshotCredentialScope(t, fx)) {
++					t.Fatal("missing native source caused writes")
++				}
++			} else if err != nil {
++				t.Fatal(err)
++			}
++			if _, err := os.Lstat(filepath.Join(fx.native[envregistry.Muse], "auth.json")); !os.IsNotExist(err) {
++				t.Fatal("native placeholder created")
++			}
++		})
++	}
++}
++
++// Repair cannot apply a shared-to-isolated policy change or erase a detached
++// vendor-owned file. The unchanged shared control resolves before each switch.
++func TestMusePolicySwitchPreservesCredentials(t *testing.T) {
++	for _, detached := range []bool{false, true} {
++		t.Run(map[bool]string{false: "link", true: "detached-file"}[detached], func(t *testing.T) {
++			fx, auth, _ := museFixture(t)
++			if _, err := Resolve(fx.request(envregistry.Muse)); err != nil {
++				t.Fatal(err)
++			}
++			if detached {
++				if err := os.Remove(auth); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(auth, []byte("synthetic-detached\n"), 0600); err != nil {
++					t.Fatal(err)
++				}
++			}
++			req := fx.request(envregistry.Muse)
++			req.Repair = true
++			req.Machine.Isolation[fx.profile] = map[string]string{envregistry.Muse: "isolated"}
++			before := snapshotCredentialScope(t, fx)
++			result, err := Resolve(req)
++			if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) || result != nil && len(result.Document) != 0 {
++				t.Fatalf("switch bypassed migration: %v %v", result, err)
++			}
++			if !reflect.DeepEqual(before, snapshotCredentialScope(t, fx)) {
++				t.Fatal("repair migrated or deleted credentials")
++			}
++		})
++	}
++}
++
++// Explicit inspect/plan/apply may unlink the verified shared route and publish
++// isolated records, preserving native credential bytes. Repair alone may not.
++func TestMusePolicyExplicitMigration(t *testing.T) {
++	fx, auth, native := museFixture(t)
++	before, err := os.ReadFile(native)
++	if err != nil {
++		t.Fatal(err)
++	}
++	req := fx.migrateRequest()
++	req.Profile = fx.profile
++	req.EnvID = envregistry.Muse
++	req.Machine.Isolation[fx.profile] = map[string]string{envregistry.Muse: envregistry.IsolationIsolated}
++	report, err := PlanMigration(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(report.Conflicts()) != 0 || len(report.Ops()) != 1 || report.Ops()[0].Kind != MigrateOpUnlink {
++		t.Fatalf("plan: %+v", report)
++	}
++	req.Expect = report.Hash
++	if _, err := ApplyMigration(req); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := os.Lstat(auth); !os.IsNotExist(err) {
++		t.Fatalf("shared link survived migration: %v", err)
++	}
++	if got, err := os.ReadFile(native); err != nil || string(got) != string(before) {
++		t.Fatal("migration changed native bytes")
++	}
++	resolve := fx.request(envregistry.Muse)
++	resolve.Machine = req.Machine
++	if _, err := Resolve(resolve); err != nil {
++		t.Fatalf("migrated isolated home not current: %v", err)
++	}
++}
+diff --git a/internal/envprofile/muse_test.go b/internal/envprofile/muse_test.go
+index 642c7da307212e2f38b2620740c842b957b68311..9c8c49b4d9b515d9a9d88e185b08e62a5d917446 100644
+--- a/internal/envprofile/muse_test.go
++++ b/internal/envprofile/muse_test.go
+@@ -272,8 +272,8 @@ func TestMuseDirectoriesAndIsolation(t *testing.T) {
+ 	}
+ 	req := fx.request(envregistry.Muse)
+ 	req.Machine.Isolation = map[string]map[string]string{fx.profile: {envregistry.Muse: "isolated"}}
+-	if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), envregistry.DiagIsolatedUnsupported) {
+-		t.Fatalf("isolated: %v", err)
++	if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
++		t.Fatalf("isolation switch requires migration: %v", err)
+ 	}
+ }
+ 
+@@ -483,8 +483,10 @@ func TestMusePublishedRegistryLayout(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 	parent := ManagedHomeDir(fx.home, fx.profile, envregistry.Muse)
+-	if len(fragment.Env) != len(vector.Registry.Variables) {
+-		t.Fatal("XDG variable set changed")
++	// Historical vectors describe four home paths. The successor adds exactly
++	// the effective file literal while preserving every published layout path.
++	if len(fragment.Env) != len(vector.Registry.Variables)+1 || fragment.Env["TBH_CREDENTIAL_BACKEND"] != "file" {
++		t.Fatal("XDG variable set or successor file literal changed")
+ 	}
+ 	for name, expected := range vector.Registry.Variables {
+ 		if fragment.Env[name] != filepath.Join(parent, filepath.Base(expected)) {
+diff --git a/internal/envregistry/envregistry.go b/internal/envregistry/envregistry.go
+index 81b187949c5b2b6dc18a2da750e2601718460f69..afa6bd80ac27c766d7c9e555850f1ff8b2b74f22 100644
+--- a/internal/envregistry/envregistry.go
++++ b/internal/envregistry/envregistry.go
+@@ -458,9 +458,6 @@ func (a Adapter) ResolveIsolation(configured string, atOrAbovePinned bool) (stri
+ // resolveIsolation is ResolveIsolation over an explicit platform so the
+ // matrix is asserted on every CI runner, not only on macOS.
+ func (a Adapter) resolveIsolation(goos, configured string, atOrAbovePinned bool) (string, error) {
+-	if a.ID == Muse && configured == IsolationIsolated {
+-		return "", fmt.Errorf("%s: Muse fresh-login isolation is unverified", DiagIsolatedUnsupported)
+-	}
+ 	if a.ID == OpenCode && configured == IsolationIsolated {
+ 		return "", fmt.Errorf("%s: isolated is a no-op for opencode: auth lives outside the swapped config home", DiagIsolatedUnsupported)
+ 	}

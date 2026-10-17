@@ -1,0 +1,143 @@
+{
+  "run_url": "https://github.com/relux-works/curator/actions/runs/39018771945",
+  "snapshot": "7a2cc26eb4c2553aca352aec0ff5b9240538ca44",
+  "candidate_tree": "da51dd68abb173fc894d8369e28662d6a17886d7",
+  "signature": "G",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "name": "Race (macos-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356196733"
+    },
+    {
+      "name": "Interop conformance gate",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356196852"
+    },
+    {
+      "name": "Lint",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356196859"
+    },
+    {
+      "name": "Race (ubuntu-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356196870"
+    },
+    {
+      "name": "Gate self-test (macos-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356196881"
+    },
+    {
+      "name": "Gate self-test (ubuntu-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356196884"
+    },
+    {
+      "name": "Test (macos-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356196887"
+    },
+    {
+      "name": "Naming gate",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356196912"
+    },
+    {
+      "name": "Go 1.27.1 driver (ubuntu-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356196916"
+    },
+    {
+      "name": "Go 1.25.5 driver (macos-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356196923"
+    },
+    {
+      "name": "Go 1.25.5 driver (windows-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356196930"
+    },
+    {
+      "name": "Gate self-test (windows-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356196933"
+    },
+    {
+      "name": "Test (ubuntu-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356196952"
+    },
+    {
+      "name": "Test (windows-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356196986"
+    },
+    {
+      "name": "Go 1.27.1 driver (macos-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356196989"
+    },
+    {
+      "name": "Go 1.26.0 driver (macos-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356197005"
+    },
+    {
+      "name": "Go 1.26.0 driver (windows-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356197008"
+    },
+    {
+      "name": "Go 1.26.0 driver (ubuntu-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356197009"
+    },
+    {
+      "name": "Go 1.25.5 driver (ubuntu-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356197011"
+    },
+    {
+      "name": "Go 1.27.1 driver (windows-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356197030"
+    },
+    {
+      "name": "Test (rose-air)",
+      "conclusion": "skipped",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356197576"
+    },
+    {
+      "name": "Candidate suite (${{ matrix.os }})",
+      "conclusion": "skipped",
+      "url": "https://github.com/relux-works/curator/actions/runs/39018771945/job/117356197772"
+    }
+  ],
+  "local_waiter_exit": 137,
+  "waiter_note": "Stopped only the owned local waiter before the bounded shell window; hosted run observed through bounded reads until terminal success. No script exit 0 claimed. Temporary gate branch deleted.",
+  "prior_findings_replay": {
+    "run": 39018771945,
+    "job": 117356196952,
+    "candidate_tree": "da51dd68abb173fc894d8369e28662d6a17886d7",
+    "result": "Both previous failures did not reproduce",
+    "pass_events": [
+      {
+        "Time": "2026-10-17T08:50:39.474976435Z",
+        "Action": "pass",
+        "Package": "github.com/relux-works/curator/internal/install",
+        "Test": "TestAuthoritativeDryRunCasesMutateNothingPersistent/compiled-cache-miss-is-read-only",
+        "Elapsed": 7.14
+      },
+      {
+        "Time": "2026-10-17T08:50:58.651297321Z",
+        "Action": "pass",
+        "Package": "github.com/relux-works/curator/cmd/curator",
+        "Test": "TestReviewProbeLegacyLaneIdentityInvalid",
+        "Elapsed": 5.78
+      }
+    ]
+  }
+}
