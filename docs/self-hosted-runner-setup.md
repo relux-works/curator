@@ -1,4 +1,4 @@
-# Self-hosted runner setup (rose-air)
+# Self-hosted runner setup
 
 The `test-self-hosted` lane (`Test (rose-air)` in
 [ci.yml](../.github/workflows/ci.yml)) runs the default gate on the
@@ -105,3 +105,43 @@ needs no sudo and no Docker):
   Toolchains still come from the pinned `setup-*` actions and the pinned
   installers, so the toolchain-identity rules hold on these runners as on
   hosted ones.
+
+## Linux job isolation and scheduling
+
+Every Linux-routable job runs `bash .github/ci/isolate-go-state.sh` immediately
+after checkout, before `setup-go` or any Go command. The script creates a fresh
+directory under `RUNNER_TEMP` with `mktemp`, then publishes `GOCACHE`,
+`GOMODCACHE` and `GOPATH` through `GITHUB_ENV`. Even jobs sharing a runner
+account, temporary directory or Go version get separate build and module
+caches. The runner owns temporary-directory cleanup; isolation does not depend
+on a successful final step. No shared cache is deleted.
+
+On self-hosted Linux, `setup-go` cache restore/save is disabled. The lint
+action also skips its cache and uses a private `GOLANGCI_LINT_CACHE`. This
+prevents restored per-user state from reconnecting otherwise isolated jobs.
+Hosted macOS/Windows caching and routing, the fork guard, and the hosted Race
+lane retain their existing behavior. `GOTOOLCHAIN=local` and `GOENV=off` remain
+mandatory. Shared Go state was implicated in intermittent cross-toolchain
+link errors involving `golang.org/x/sys/unix.Syscall` and ABI0/ABIInternal.
+
+Workflow concurrency is keyed by workflow and ref. Pull requests cancel
+superseded runs; pushes (including `main` and `gate/**`) never cancel an active
+run. This bounds overlapping runs of the same ref, not the number of jobs
+inside a run, other refs, or work from other repositories. It does not impose
+a host-wide scheduling limit.
+
+The go-v1 probe has a fixed 15-second wall-clock bound in
+`internal/godriver/session.go`. `ConfigFromEnvironment` reads only trusted Go
+selectors; there is no existing documented CI timeout knob. `ProbeTimeout`
+cannot raise the bound: values above 15 seconds are clamped. The workflow
+therefore adds no timeout flag and makes no claim to qualify arbitrarily
+loaded hosts. The test package timeout is a different bound.
+
+Validate this contract with `go test -count=1 ./tools/ciworkflow/`, which parses
+the real workflow, exercises narrowing plants, executes the initializer twice
+with poisoned ambient caches, and evaluates fork/trusted routing expressions.
+Use `sh scripts/remote-gate.sh` for actual runner evidence. Keep logs in
+`.temp/`. A workflow contract check does not reproduce the historical ABI
+linker failure. Require three consecutive green `main` runs on the self-hosted
+pool before declaring the pool qualified; a green `gate/**` snapshot alone
+does not satisfy that rollout requirement.

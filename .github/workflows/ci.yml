@@ -29,6 +29,11 @@ on:
         required: false
         default: ""
 
+# Serialize repeated runs of the same workflow/ref without cancelling pushes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
@@ -89,6 +94,11 @@ jobs:
         go: ['1.25.5', '1.26.0', '1.27.1']
     steps:
       - uses: actions/checkout@v4
+      - name: Initialize private Go state
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash .github/ci/isolate-go-state.sh
+
       - name: Checkout authoritative protocol suite
         uses: actions/checkout@v4
         with:
@@ -97,6 +107,7 @@ jobs:
           path: protocol-spec
       - uses: actions/setup-go@v5
         with:
+          cache: ${{ runner.environment != 'self-hosted' || runner.os != 'Linux' }}
           go-version: ${{ matrix.go }}
       - name: Verify family toolchain identity
         shell: bash
@@ -158,6 +169,11 @@ jobs:
         with:
           submodules: true
 
+      - name: Initialize private Go state
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash .github/ci/isolate-go-state.sh
+
       - name: Checkout authoritative protocol suite
         uses: actions/checkout@v4
         with:
@@ -167,6 +183,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
+          cache: ${{ runner.environment != 'self-hosted' || runner.os != 'Linux' }}
           go-version-file: go.mod
 
       # The hosted images ship their own Node, but the pnpm the
@@ -522,8 +539,14 @@ jobs:
         with:
           submodules: true
 
+      - name: Initialize private Go state
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash .github/ci/isolate-go-state.sh
+
       - uses: actions/setup-go@v5
         with:
+          cache: ${{ runner.environment != 'self-hosted' || runner.os != 'Linux' }}
           go-version-file: go.mod
 
       - name: Verify Go toolchain identity
@@ -536,6 +559,16 @@ jobs:
       - uses: golangci/golangci-lint-action@v7
         with:
           version: v2.12.2
+          skip-cache: ${{ runner.environment == 'self-hosted' && runner.os == 'Linux' }}
+
+      # The routing tests evaluate the workflow expression subset with Node.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify Linux CI isolation
+        shell: bash
+        run: go test -count=1 ./tools/ciworkflow/
 
       # Security findings may be suppressed narrowly and by name; they may not
       # be suppressed wholesale. A suppression that names no rule silences
@@ -573,6 +606,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Initialize private Go state
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash .github/ci/isolate-go-state.sh
+
       - name: Self-test the CI gates
         shell: bash
         run: bash .github/ci/gate-selftest.sh
@@ -590,6 +628,11 @@ jobs:
         with:
           submodules: true
 
+      - name: Initialize private Go state
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash .github/ci/isolate-go-state.sh
+
       - name: Checkout authoritative protocol suite
         uses: actions/checkout@v4
         with:
@@ -599,6 +642,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
+          cache: ${{ runner.environment != 'self-hosted' || runner.os != 'Linux' }}
           go-version-file: go.mod
 
       - name: Verify Go toolchain identity
@@ -622,6 +666,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
+
+      - name: Initialize private Go state
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash .github/ci/isolate-go-state.sh
 
       - name: Employer name gate
         # Rules, the binary-patch exemption and the assembled-from-parts
