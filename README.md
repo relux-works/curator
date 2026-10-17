@@ -306,6 +306,11 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+Run `go test ./internal/audit -run '^TestReserved'` and
+`go test ./internal/envprofile -run '^TestMigratedGlobalSkillReservedFixture$'`
+to validate the [reserved-domain source audit rules](docs/audit-reserved-domains.md).
+Keep local validation logs under `.temp/`.
+
 Run `go test -count=1 ./tools/ciworkflow/` to validate Linux CI cache isolation,
 workflow concurrency, and fork routing. CI initializes private Go state with
 `bash .github/ci/isolate-go-state.sh`; its environment records go to

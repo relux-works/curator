@@ -9,6 +9,7 @@ package audit
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -46,7 +47,7 @@ var severityRank = map[string]int{
 // backend and model (Spec §12.1).
 const (
 	PromptVersion  = "1"
-	RulesetVersion = "2"
+	RulesetVersion = "3"
 )
 
 // findingOpaqueNUL is the shared opaque-NUL finding id: every v1
@@ -777,7 +778,7 @@ func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject
 
 // Deterministic detectors: observed behavior vs declared capabilities.
 var (
-	urlRE  = regexp.MustCompile(`https?://([A-Za-z0-9.-]+)`)
+	urlRE  = regexp.MustCompile(`https?://([A-Za-z0-9.-]+)([^\s/?#"'<>]*)`)
 	execRE = regexp.MustCompile(`(?m)(?:subprocess|exec\.Command|os\.system|shutil\.which)\(\s*["']([A-Za-z0-9._-]+)["']`)
 )
 
@@ -827,7 +828,14 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
 		text := string(payload)
 		for _, match := range urlRE.FindAllStringSubmatch(text, -1) {
 			host := strings.ToLower(match[1])
-			if host == "localhost" || host == "127.0.0.1" || declaredHost(declaredHosts, host) {
+			// Parse the complete authority so reserved-looking userinfo cannot
+			// exempt the real host. Invalid authorities keep the old finding.
+			parsed, parseErr := url.Parse(match[0])
+			if parseErr == nil {
+				host = strings.ToLower(parsed.Hostname())
+			}
+			if host == "localhost" || host == "127.0.0.1" || declaredHost(declaredHosts, host) ||
+				(parseErr == nil && reservedAuditHost(host)) {
 				continue
 			}
 			findings = append(findings, Finding{
@@ -885,6 +893,33 @@ func auditFindingMessage(prefix, subject string, finding Finding) string {
 		message += fmt.Sprintf(" (file: %s)", finding.File)
 	}
 	return message
+}
+
+// reservedAuditHost recognizes only the RFC 2606 TLDs and their descendants.
+// This source-detector exemption makes no claim about runtime network access.
+// RFC 2606's separate example.com/net/org reservations remain audited.
+func reservedAuditHost(host string) bool {
+	host = strings.TrimSuffix(strings.ToLower(host), ".")
+	if len(host) == 0 || len(host) > 253 {
+		return false
+	}
+	labels := strings.Split(host, ".")
+	switch labels[len(labels)-1] {
+	case "test", "example", "invalid", "localhost":
+	default:
+		return false
+	}
+	for _, label := range labels {
+		if len(label) == 0 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return false
+		}
+		for _, char := range label {
+			if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func declaredHost(declared map[string]bool, host string) bool {
