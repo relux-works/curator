@@ -1,0 +1,629 @@
+diff --git a/README.md b/README.md
+index 3766e48659182c336ea83a9d5419af3b7faae398..8ba42268be0106b4110f1c071d3c37d5f159ee20 100644
+--- a/README.md
++++ b/README.md
+@@ -313,6 +313,19 @@ workflow concurrency, and fork routing. CI initializes private Go state with
+ [the runner isolation contract](docs/self-hosted-runner-setup.md#linux-job-isolation-and-scheduling).
+ Store local test and workflow lint logs under `.temp/`.
+ 
++Run `go test ./internal/audit -run 'Test(VerdictCacheBindsEffectiveCapabilities|CapabilityCacheRulesetRetainsOldRecords)'`
++for effective-capability cache equality and prior-record retention controls.
++Run `go test ./internal/audit -run 'Test(GateEffectiveCapabilityCacheCrossover|CapabilityCacheNarrowingMutants)'`
++for both cache orders, v1/v2 framing, and behavioral narrowing mutants. Run
++`go test ./internal/skillspec -run TestCapabilitiesNullRejectedFromV3`
++for schema-3-through-9 capability-object and purpose-statement validation.
++Run `go test ./internal/envprofile -run 'Test(StrictAuditMemberCapabilityCacheIsolation|MigratedGlobalSkillNetworkCapabilities)'`
++for migration admission and cache isolation between skill, context and MCP
++members. Cache ruleset 3 separates these verdicts from ruleset 2 without
++deleting old records. All effective capability fields participate in cache
++equality; representation differences conservatively cause a miss. Keep
++local validation logs under `.temp/`.
++
+ For the rc.7 Muse policy and v4 slice, run `go test ./internal/envfragment ./internal/envprofile ./cmd/curator -run TestMuse`; this includes synthetic fixtures and narrowing controls, not runtime qualification. For the credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run 'TestCredential(Store|Projection)'`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
+ 
+ The [Muse 1.4.8 qualification record](docs/qualification/muse-1.4.8-R6256.1.md)
+diff --git a/internal/audit/audit.go b/internal/audit/audit.go
+index 667430bac8ee9705c1fd7a381049d13e158021a5..9ff19c287f4d21415dcbf1c71afa1bb97393f520 100644
+--- a/internal/audit/audit.go
++++ b/internal/audit/audit.go
+@@ -11,6 +11,7 @@ import (
+ 	"fmt"
+ 	"os"
+ 	"path/filepath"
++	"reflect"
+ 	"regexp"
+ 	"sort"
+ 	"strings"
+@@ -46,7 +47,7 @@ var severityRank = map[string]int{
+ // backend and model (Spec §12.1).
+ const (
+ 	PromptVersion  = "1"
+-	RulesetVersion = "2"
++	RulesetVersion = "3"
+ )
+ 
+ // findingOpaqueNUL is the shared opaque-NUL finding id: every v1
+@@ -374,7 +375,8 @@ func auditSubjectWithOpaquePaths(cfg *config.Config, subject Subject, persist bo
+ 
+ 	// Verdict cache: findings cached by (framing version, content hash),
+ 	// backend, model, versions, and the complete selected package
+-	// identity (repository, commit, directory); the decision is
++	// identity (repository, commit, directory) and effective capabilities;
++	// the decision is
+ 	// recomputed under the current policy.
+ 	if findings, hit := loadCachedFindings(cfg, contentHash, version, subject); hit {
+ 		report.CacheHit = true
+@@ -658,12 +660,13 @@ func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.
+ 		return nil, false
+ 	}
+ 	var data struct {
+-		SchemaVersion int             `json:"schema_version"`
+-		HashVersion   hashing.Version `json:"hash_version"`
+-		Commit        string          `json:"commit"`
+-		Directory     string          `json:"directory"`
+-		Package       SourcePackage   `json:"package"`
+-		Findings      []Finding       `json:"findings"`
++		SchemaVersion int                   `json:"schema_version"`
++		HashVersion   hashing.Version       `json:"hash_version"`
++		Commit        string                `json:"commit"`
++		Directory     string                `json:"directory"`
++		Package       SourcePackage         `json:"package"`
++		Capabilities  capabilities.Manifest `json:"capabilities"`
++		Findings      []Finding             `json:"findings"`
+ 	}
+ 	if err := json.Unmarshal(payload, &data); err != nil {
+ 		return nil, false
+@@ -699,6 +702,11 @@ func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.
+ 	if !sameAuditPackage(data.Package, subject.Package) {
+ 		return nil, false
+ 	}
++	// Findings depend on the effective declaration, including implicit-none
++	// on non-skill paths. Representation differences conservatively miss.
++	if !reflect.DeepEqual(data.Capabilities, subject.Capabilities) {
++		return nil, false
++	}
+ 	return data.Findings, true
+ }
+ 
+@@ -755,6 +763,7 @@ func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject
+ 		"prompt_version":  PromptVersion,
+ 		"ruleset_version": RulesetVersion,
+ 		"findings":        findings,
++		"capabilities":    subject.Capabilities,
+ 		"script_policies": policies,
+ 	}
+ 	// The record binds the stated package identity, when the subject
+diff --git a/internal/audit/capability_cache_mutants_test.go b/internal/audit/capability_cache_mutants_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..496ba183102207d5721f0a5f76300b7b0871fb8d
+--- /dev/null
++++ b/internal/audit/capability_cache_mutants_test.go
+@@ -0,0 +1,86 @@
++package audit
++
++import (
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// Overlays retain the equality/validation gates while admitting one forbidden
++// class. Only exit 1 and the named behavioral failure count as a killed mutant;
++// setup failures, compilation errors and missing tests fail this harness.
++func TestCapabilityCacheNarrowingMutants(t *testing.T) {
++	root, err := filepath.Abs("../..")
++	if err != nil {
++		t.Fatal(err)
++	}
++	type mutation struct{ name, file, before, after, pkg, run, fails, message string }
++	equality := "if !reflect.DeepEqual(data.Capabilities, subject.Capabilities) {"
++	var mutants []mutation
++	for _, field := range []struct{ name, goField string }{
++		{"network", "Network"}, {"exec", "Exec"}, {"filesystem-keyword", "Filesystem.Keyword"},
++		{"filesystem-paths", "Filesystem.Paths"}, {"secrets", "Secrets"}, {"env-read", "EnvRead"}, {"prompt-scope", "PromptScope"},
++	} {
++		mutants = append(mutants, mutation{field.name, "internal/audit/audit.go", equality,
++			"recordCaps := data.Capabilities\nrecordCaps." + field.goField + " = subject.Capabilities." + field.goField + "\nif !reflect.DeepEqual(recordCaps, subject.Capabilities) {",
++			"./internal/audit", "^TestVerdictCacheBindsEffectiveCapabilities$", "TestVerdictCacheBindsEffectiveCapabilities/" + field.name, "changed capabilities reused the allowance"})
++	}
++	for _, direction := range []struct{ name, condition string }{
++		{"admit-none-crossover", "len(subject.Capabilities.Network) != 0"},
++		{"admit-declared-crossover", "len(subject.Capabilities.Network) == 0"},
++	} {
++		for _, suite := range []struct{ name, pkg, run, fails, message string }{
++			{"gate", "./internal/audit", "^TestGateEffectiveCapabilityCacheCrossover$", "TestGateEffectiveCapabilityCacheCrossover/", "before Gate: hit=true want=false"},
++			{"members", "./internal/envprofile", "^TestStrictAuditMemberCapabilityCacheIsolation$", "TestStrictAuditMemberCapabilityCacheIsolation/", "after another audit"},
++		} {
++			message := suite.message
++			if direction.name == "admit-none-crossover" && suite.name == "members" {
++				message = "audit reused skill allowance"
++			}
++			mutants = append(mutants, mutation{direction.name + "/" + suite.name, "internal/audit/audit.go", equality,
++				"if !reflect.DeepEqual(data.Capabilities, subject.Capabilities) && " + direction.condition + " {", suite.pkg, suite.run, suite.fails, message})
++		}
++	}
++	mutants = append(mutants,
++		mutation{"reuse-ruleset-two", "internal/audit/audit.go", `RulesetVersion = "3"`, `RulesetVersion = "2"`, "./internal/audit", "^TestCapabilityCacheRulesetRetainsOldRecords$", "TestCapabilityCacheRulesetRetainsOldRecords", "want block, cache hit=false"},
++		mutation{"accept-null-scope", "internal/capabilities/capabilities.go", `if rawScope, present := obj["prompt_scope"]; present {`, `if rawScope, present := obj["prompt_scope"]; present && rawScope != nil {`, "./internal/skillspec", "^TestCapabilitiesNullRejectedFromV3$", "TestCapabilitiesNullRejectedFromV3/v3/agent-skill.json/null-scope", "want refusal naming capabilities.prompt_scope"},
++		mutation{"accept-null-schema-three", "internal/skillspec/parse.go", `if data["capabilities"] == nil {`, `if data["capabilities"] == nil && schema != 3 {`, "./internal/skillspec", "^TestCapabilitiesNullRejectedFromV3$", "TestCapabilitiesNullRejectedFromV3/v3/agent-skill.json/null ", "want refusal naming capabilities"},
++	)
++	for _, mutant := range mutants {
++		t.Run(mutant.name, func(t *testing.T) {
++			original := filepath.Join(root, filepath.FromSlash(mutant.file))
++			payload, err := os.ReadFile(original)
++			if err != nil {
++				t.Fatal(err)
++			}
++			source := strings.ReplaceAll(string(payload), "\r\n", "\n")
++			if strings.Count(source, mutant.before) != 1 {
++				t.Fatal("mutation anchor is not unique")
++			}
++			dir := t.TempDir()
++			replacement := filepath.Join(dir, "replacement.go")
++			if err := os.WriteFile(replacement, []byte(strings.Replace(source, mutant.before, mutant.after, 1)), 0600); err != nil {
++				t.Fatal(err)
++			}
++			overlay, err := json.Marshal(map[string]any{"Replace": map[string]string{original: replacement}})
++			if err != nil {
++				t.Fatal(err)
++			}
++			overlayPath := filepath.Join(dir, "overlay.json")
++			if err := os.WriteFile(overlayPath, overlay, 0600); err != nil {
++				t.Fatal(err)
++			}
++			command := exec.Command("go", "test", "-overlay", overlayPath, "-count=1", "-timeout=2m", "-v", "-run", mutant.run, mutant.pkg)
++			command.Dir = root
++			output, err := command.CombinedOutput()
++			exit, ok := err.(*exec.ExitError)
++			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "--- FAIL: "+mutant.fails) || !strings.Contains(string(output), mutant.message) {
++				t.Fatalf("mutant survived or lacked intended behavioral failure: %v\n%s", err, output)
++			}
++			t.Logf("expected-red go test exit %d:\n%s", exit.ExitCode(), output)
++		})
++	}
++}
+diff --git a/internal/audit/capability_cache_test.go b/internal/audit/capability_cache_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..b2bfa0fde26cf0c421c0186ab2bc636f9c51d717
+--- /dev/null
++++ b/internal/audit/capability_cache_test.go
+@@ -0,0 +1,128 @@
++package audit
++
++import (
++	"bytes"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/capabilities"
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++// Identical effective capabilities hit; changing any capability input misses without reusing the allowance.
++func TestVerdictCacheBindsEffectiveCapabilities(t *testing.T) {
++	cfg := newCfg(t, "strict", "high")
++	caps := capabilities.Manifest{
++		Network: []string{"api.example.com"}, Exec: []string{"git"},
++		Filesystem: capabilities.Filesystem{Keyword: "repo"},
++		Secrets:    []string{"credential-name"}, EnvRead: []string{"HOME"}, PromptScope: "repo",
++	}
++	subject := subjectWith(t, "curl https://api.example.com/data\n", caps, 3)
++	digest, err := hashing.ContentSHA256WithVersion(subject.Snapshot, nil, hashing.VersionV1)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err := auditSubject(cfg, subject, true); err != nil {
++		t.Fatal(err)
++	}
++	if _, hit := loadCachedFindings(cfg, digest, hashing.VersionV1, subject); !hit {
++		t.Fatal("same effective capabilities missed")
++	}
++	for _, change := range []struct {
++		name  string
++		apply func(*capabilities.Manifest)
++	}{
++		{"network", func(c *capabilities.Manifest) { c.Network = nil }},
++		{"exec", func(c *capabilities.Manifest) { c.Exec = nil }},
++		{"filesystem-keyword", func(c *capabilities.Manifest) { c.Filesystem.Keyword = "home-config" }},
++		{"filesystem-paths", func(c *capabilities.Manifest) { c.Filesystem.Paths = []string{"src"} }},
++		{"secrets", func(c *capabilities.Manifest) { c.Secrets = nil }},
++		{"env-read", func(c *capabilities.Manifest) { c.EnvRead = nil }},
++		{"prompt-scope", func(c *capabilities.Manifest) { c.PromptScope = "other" }},
++	} {
++		t.Run(change.name, func(t *testing.T) {
++			probe := subject
++			change.apply(&probe.Capabilities)
++			report, err := auditSubject(cfg, probe, false)
++			if err != nil || report.CacheHit {
++				t.Fatalf("changed capabilities reused the allowance: hit=%v error=%v", report.CacheHit, err)
++			}
++		})
++	}
++}
++
++// Ruleset-2 allowances cannot authorize current audits; fresh refusals cache normally and old records remain byte-identical.
++func TestCapabilityCacheRulesetRetainsOldRecords(t *testing.T) {
++	cfg := newCfg(t, "strict", "high")
++	subject := subjectWith(t, "curl https://api.example.com/data\n", capabilities.ImplicitNone(), 3)
++	digest, err := hashing.ContentSHA256WithVersion(subject.Snapshot, nil, hashing.VersionV1)
++	if err != nil {
++		t.Fatal(err)
++	}
++	oldPath := filepath.Join(trustDir(cfg.Home(), digest), "verdict-"+strings.Join([]string{cfg.Audit.Backend, cfg.Audit.Model, PromptVersion, "2"}, "-")+".json")
++	old := []byte(`{"schema_version":1,"commit":"abc","directory":".","findings":[]}`)
++	if err := os.MkdirAll(filepath.Dir(oldPath), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(oldPath, old, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	for _, wantHit := range []bool{false, true} {
++		report, err := auditSubject(cfg, subject, true)
++		if err != nil || report.CacheHit != wantHit || report.Decision != DecisionBlock || len(report.Findings) != 1 || report.Findings[0].ID != "audit.capability.network-undeclared" {
++			t.Fatalf("audit = %+v, error=%v; want block, cache hit=%v", report, err, wantHit)
++		}
++	}
++	if retained, err := os.ReadFile(oldPath); err != nil || !bytes.Equal(retained, old) {
++		t.Fatalf("old record changed: error=%v", err)
++	}
++	declared := subject
++	declared.Capabilities = capabilities.Manifest{Network: []string{"api.example.com"}}
++	for _, wantHit := range []bool{false, true} {
++		report, err := auditSubject(cfg, declared, true)
++		if err != nil || report.CacheHit != wantHit || report.Decision != DecisionAllow || len(report.Findings) != 0 {
++			t.Fatalf("declared control = %+v, error=%v; want allow, cache hit=%v", report, err, wantHit)
++		}
++	}
++}
++
++// Gate must recompute both network and exec findings when only capabilities
++// change, in either order and hash framing. Immediate repeats must hit.
++func TestGateEffectiveCapabilityCacheCrossover(t *testing.T) {
++	for _, version := range []hashing.Version{hashing.VersionV1, hashing.VersionV2} {
++		for _, declaredFirst := range []bool{true, false} {
++			t.Run(fmt.Sprintf("v%d/declared-first=%v", version, declaredFirst), func(t *testing.T) {
++				cfg := newCfg(t, "strict", "medium")
++				subject := subjectWith(t, "curl https://api.example.com/data\nsubprocess(\"git\")\n", capabilities.ImplicitNone(), 3)
++				subject.HashVersion = version
++				declared := capabilities.Manifest{Network: []string{"api.example.com"}, Exec: []string{"git"}}
++				for _, allowed := range []bool{declaredFirst, !declaredFirst, declaredFirst} {
++					subject.Capabilities = capabilities.ImplicitNone()
++					if allowed {
++						subject.Capabilities = declared
++					}
++					for _, wantHit := range []bool{false, true} {
++						before, err := auditSubject(cfg, subject, false)
++						if err != nil || before.CacheHit != wantHit {
++							t.Fatalf("before Gate: hit=%v want=%v error=%v", before.CacheHit, wantHit, err)
++						}
++						warnings, errs := Gate(cfg, []Subject{subject})
++						if allowed {
++							if len(errs) != 0 || len(warnings) != 0 {
++								t.Fatalf("declared audit refused: %v %v", warnings, errs)
++							}
++						} else {
++							joined := strings.Join(errs, ";")
++							if !strings.Contains(joined, "audit.capability.network-undeclared") || !strings.Contains(joined, "audit.capability.exec-undeclared") {
++								t.Fatalf("implicit-none audit reused allowance: %v", errs)
++							}
++						}
++					}
++				}
++			})
++		}
++	}
++}
+diff --git a/internal/capabilities/capabilities.go b/internal/capabilities/capabilities.go
+index 6698815995e5c84309f2a6691cb91c10b012bd6a..e15b3022831753018a7e8b7d4fa7480f89b99a19 100644
+--- a/internal/capabilities/capabilities.go
++++ b/internal/capabilities/capabilities.go
+@@ -73,7 +73,7 @@ func Parse(raw any) (Manifest, error) {
+ 	}
+ 
+ 	promptScope := ""
+-	if rawScope, present := obj["prompt_scope"]; present && rawScope != nil {
++	if rawScope, present := obj["prompt_scope"]; present {
+ 		text, ok := rawScope.(string)
+ 		if !ok || strings.TrimSpace(text) == "" {
+ 			return Manifest{}, verr.New("capabilities.prompt_scope", "must be a non-empty string when present")
+diff --git a/internal/capabilities/capabilities_test.go b/internal/capabilities/capabilities_test.go
+index ee3c6d2ace387d7757f522811d25d23a48f54494..afef0c525afd2ae400333772853ea1c7b20343a7 100644
+--- a/internal/capabilities/capabilities_test.go
++++ b/internal/capabilities/capabilities_test.go
+@@ -88,6 +88,8 @@ func TestParseRejections(t *testing.T) {
+ 		{"fs dash", `{"filesystem": ["-x"]}`, "capabilities.filesystem[0]"},
+ 		{"scope empty", `{"prompt_scope": "  "}`, "capabilities.prompt_scope"},
+ 		{"scope type", `{"prompt_scope": 5}`, "capabilities.prompt_scope"},
++		// A present null scope is malformed, not an omitted optional statement.
++		{"scope null", `{"prompt_scope": null}`, "capabilities.prompt_scope"},
+ 		{"empty item", `{"secrets": [""]}`, "capabilities.secrets"},
+ 	}
+ 	for _, tc := range cases {
+diff --git a/internal/envprofile/capability_cache_test.go b/internal/envprofile/capability_cache_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..86db30b69122bc5643064e82dfc23b8d490d081f
+--- /dev/null
++++ b/internal/envprofile/capability_cache_test.go
+@@ -0,0 +1,72 @@
++package envprofile
++
++import (
++	"fmt"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/audit"
++	"github.com/relux-works/curator/internal/capabilities"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextresolve"
++	"github.com/relux-works/curator/internal/skillspec"
++)
++
++// strictAuditMember must ignore an opposite-capability verdict with the SAME
++// package identity. Each member kind runs declared-first and none-first;
++// repeating each side also exercises writable reuse through the real Gate.
++func TestStrictAuditMemberCapabilityCacheIsolation(t *testing.T) {
++	for _, kind := range []string{contextlock.KindSkill, contextlock.KindContext, contextlock.KindMCP} {
++		for _, declaredFirst := range []bool{true, false} {
++			t.Run(kind+map[bool]string{true: "/skill-first", false: "/non-skill-first"}[declaredFirst], func(t *testing.T) {
++				home, entry := t.TempDir(), t.TempDir()
++				writeStoreTestFiles(t, entry, map[string][]byte{
++					"agent-skill.json": []byte(`{"schema_version":3,"capabilities":{"network":["api.example.com"]}}`),
++					"scripts/fetch.sh": []byte("curl https://api.example.com/data\n"),
++				})
++				resolved := contextresolve.Resolved{Kind: kind, Name: "same", Source: "example.com/skills/same", Commit: strings.Repeat("a", 40)}
++				spec, err := skillspec.Load(entry)
++				if err != nil {
++					t.Fatal(err)
++				}
++				cfg := &config.Config{Path: filepath.Join(home, "config.json"), Audit: config.Audit{Enabled: true, Mode: "strict", FailOn: "high", Backend: "null"}}
++				subject := audit.Subject{Name: resolved.Name, Source: resolved.Source, Git: resolved.Source, Commit: resolved.Commit, Snapshot: entry, SchemaVersion: 3, HashVersion: resolvedHashVersion(resolved)}
++				if kind == contextlock.KindSkill {
++					var ok bool
++					subject.Package, ok = audit.SkillPackage(resolved.Source, "", resolved.Name, resolved.Commit, resolved.Directory)
++					if !ok {
++						t.Fatal("fixture package identity invalid")
++					}
++				}
++				for _, declared := range []bool{declaredFirst, !declaredFirst, declaredFirst} {
++					for repeat := 0; repeat < 2; repeat++ {
++						// For the other declaration, seed through the production Gate while
++						// preserving every non-capability input used by strictAuditMember.
++						if declared == (kind == contextlock.KindSkill) {
++							_, err = strictAuditMember(home, &gitManager{}, resolved, entry, Policy{})
++						} else {
++							subject.Capabilities = capabilities.ImplicitNone()
++							if declared {
++								subject.Capabilities = spec.Capabilities
++							}
++							_, errs := audit.Gate(cfg, []audit.Subject{subject})
++							err = nil
++							if len(errs) != 0 {
++								err = fmt.Errorf("%s", strings.Join(errs, ";"))
++							}
++						}
++						if declared {
++							if err != nil {
++								t.Fatalf("declared skill refused after another audit: %v", err)
++							}
++						} else if err == nil || !strings.Contains(err.Error(), "audit.capability.network-undeclared") || !strings.Contains(err.Error(), "contacts api.example.com") {
++							t.Fatalf("%s audit reused skill allowance: %v", kind, err)
++						}
++					}
++				}
++			})
++		}
++	}
++}
+diff --git a/internal/envprofile/global_migration_capabilities_mutants_test.go b/internal/envprofile/global_migration_capabilities_mutants_test.go
+index 8552d9ba2f611c62ee6a245cd4adf360c45c4a0c..0289083542056eacaf0c5d069a0075751497f853 100644
+--- a/internal/envprofile/global_migration_capabilities_mutants_test.go
++++ b/internal/envprofile/global_migration_capabilities_mutants_test.go
+@@ -54,7 +54,7 @@ func TestGlobalSkillCapabilitiesNarrowingMutants(t *testing.T) {
+ 			"packageIdentity, _ = audit.SkillPackage(resolved.Source, \"\", resolved.Name, resolved.Commit, resolved.Directory)",
+ 			"packageIdentity, _ = audit.SkillPackage(resolved.Source, \"\", resolved.Name, resolved.Commit, resolved.Directory)\npackageIdentity = audit.SourcePackage{}",
+ 			"^TestMigratedGlobalSkillIgnoresPreManifestVerdictCache$",
+-			"TestMigratedGlobalSkillIgnoresPreManifestVerdictCache/undeclared-skill-old-allow", "migration admitted undeclared network use",
++			"TestMigratedGlobalSkillIgnoresPreManifestVerdictCache/declared-skill-old-refusal", "migration verdict lost package identity",
+ 		},
+ 		{
+ 			"legacy-schema-bypasses-network-finding", "if spec.SchemaVersion >= 3 {", "if spec.SchemaVersion >= 0 {",
+diff --git a/internal/envprofile/global_migration_capabilities_test.go b/internal/envprofile/global_migration_capabilities_test.go
+index b94c5cf47edeb6b8daa896ccc4b7615acb5a7b58..9f8fac2318fc0aa8fd61773058659bfc0e481a7f 100644
+--- a/internal/envprofile/global_migration_capabilities_test.go
++++ b/internal/envprofile/global_migration_capabilities_test.go
+@@ -1,6 +1,7 @@
+ package envprofile
+ 
+ import (
++	"encoding/json"
+ 	"os"
+ 	"path/filepath"
+ 	"strings"
+@@ -116,6 +117,22 @@ func TestMigratedGlobalSkillIgnoresPreManifestVerdictCache(t *testing.T) {
+ 			if err != nil {
+ 				t.Fatalf("stale implicit-none refusal reused: %v", err)
+ 			}
++			payload, err := os.ReadFile(verdicts[0])
++			if err != nil {
++				t.Fatal(err)
++			}
++			var record struct {
++				Package audit.SourcePackage `json:"package"`
++			}
++			if err := json.Unmarshal(payload, &record); err != nil {
++				t.Fatal(err)
++			}
++			// Capability equality must not erase the independently required
++			// package identity when the migration writes its fresh verdict.
++			if record.Package.Kind == "" {
++				t.Fatal("migration verdict lost package identity")
++			}
++
+ 			lock, _, err := readLock(home, DefaultProfile)
+ 			if err != nil {
+ 				t.Fatal(err)
+diff --git a/internal/envprofile/global_migration_hash_version_test.go b/internal/envprofile/global_migration_hash_version_test.go
+index acd31f4bd89d8fdf59954489e3106064a8759489..24674864a8eaf9fe5b5bc38c2b9eaebbe24a05de 100644
+--- a/internal/envprofile/global_migration_hash_version_test.go
++++ b/internal/envprofile/global_migration_hash_version_test.go
+@@ -177,3 +177,88 @@ func TestMigratedGlobalSkillNetworkUndeclaredFollowUp(t *testing.T) {
+ 	err := EnsureDefaultWithPolicy(home, Policy{})
+ 	assertMigrationNetworkRefusal(t, home, err, "downloads.example.com")
+ }
++
++// Null prompt_scope refuses migration without publication; omission and a valid statement still admit the declared host.
++func TestMigratedGlobalSkillPromptScopeValidation(t *testing.T) {
++	previous := hashing.EnableV2Writers
++	hashing.EnableV2Writers = true
++	t.Cleanup(func() { hashing.EnableV2Writers = previous })
++	for _, tc := range []struct {
++		name     string
++		field    string
++		admitted bool
++	}{
++		{name: "absent", admitted: true},
++		{name: "valid", field: `,"prompt_scope":"fetch upstream data"`, admitted: true},
++		{name: "null", field: `,"prompt_scope":null`},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			home, commit := migrationRevisionFixture(t, map[string]string{
++				"README.md":        "network skill\n",
++				"agent-skill.json": `{"schema_version":3,"capabilities":{"network":["api.example.com"]` + tc.field + `}}`,
++				"scripts/fetch.sh": "curl https://api.example.com/data\n",
++			})
++			err := EnsureDefaultWithPolicy(home, Policy{})
++			if tc.admitted {
++				if err != nil {
++					t.Fatalf("valid migration: %v", err)
++				}
++				lock, _, err := readLock(home, DefaultProfile)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if member, ok := lock.Find(contextlock.KindSkill, "binary-skill"); !ok || member.Commit != commit {
++					t.Fatalf("migrated skill = %+v, present = %v", member, ok)
++				}
++				return
++			}
++			if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), "capabilities.prompt_scope") {
++				t.Fatalf("migration = %v, want malformed prompt_scope refusal", err)
++			}
++			assertMigrationUnpublished(t, home)
++		})
++	}
++}
++
++// Null capability objects and fields refuse without profile publication; an empty object still migrates a clean skill.
++func TestMigratedGlobalSkillNullCapabilityDeclarations(t *testing.T) {
++	for _, tc := range []struct {
++		name        string
++		declaration string
++		want        string
++	}{
++		{"valid-empty", `{}`, ""},
++		{"object", `null`, "capabilities"},
++		{"network", `{"network":null}`, "capabilities.network"},
++		{"filesystem", `{"filesystem":null}`, "capabilities.filesystem"},
++		{"exec", `{"exec":null}`, "capabilities.exec"},
++		{"secrets", `{"secrets":null}`, "capabilities.secrets"},
++		{"env-read", `{"env_read":null}`, "capabilities.env_read"},
++		{"prompt-scope", `{"prompt_scope":null}`, "capabilities.prompt_scope"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			home, commit := migrationRevisionFixture(t, map[string]string{
++				"README.md":        "clean skill\n",
++				"agent-skill.json": `{"schema_version":3,"capabilities":` + tc.declaration + `}`,
++			})
++			err := EnsureDefaultWithPolicy(home, Policy{})
++			if tc.want == "" {
++				if err != nil {
++					t.Fatalf("valid migration: %v", err)
++				}
++				lock, _, err := readLock(home, DefaultProfile)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if member, ok := lock.Find(contextlock.KindSkill, "binary-skill"); !ok || member.Commit != commit {
++					t.Fatalf("migrated skill = %+v, present = %v", member, ok)
++				}
++				return
++			}
++			if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), tc.want) {
++				t.Fatalf("migration = %v, want refusal naming %s", err, tc.want)
++			}
++			assertMigrationUnpublished(t, home)
++		})
++	}
++}
+diff --git a/internal/skillspec/parse.go b/internal/skillspec/parse.go
+index f667284cdbf1d3c112e56da58254861104c3e8af..26341dcc10ebb1fbde06c52789ad0637e1c5dced 100644
+--- a/internal/skillspec/parse.go
++++ b/internal/skillspec/parse.go
+@@ -142,6 +142,9 @@ func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, erro
+ 		if _, present := data["capabilities"]; !present {
+ 			return nil, nil, verr.New("capabilities", "%s schema v%d requires 'capabilities'", sourceFile, schema)
+ 		}
++		if data["capabilities"] == nil {
++			return nil, nil, verr.New("capabilities", "must be an object")
++		}
+ 	}
+ 	caps := capabilities.ImplicitNone()
+ 	if schema >= 3 {
+diff --git a/internal/skillspec/parse_test.go b/internal/skillspec/parse_test.go
+index 60ad68bc17f86272647bc6cd1f192bf4791be8bd..26ae3a41f6c1120bd48da9473be9d99c9d394a8c 100644
+--- a/internal/skillspec/parse_test.go
++++ b/internal/skillspec/parse_test.go
+@@ -164,6 +164,44 @@ func TestCapabilitiesRequiredFromV3(t *testing.T) {
+ 	}
+ }
+ 
++// Load enforces the capability object and optional purpose-statement schema
++// for both filenames, including schema 9; absence is allowed only before v3.
++func TestCapabilitiesNullRejectedFromV3(t *testing.T) {
++	for schema := 3; schema <= 9; schema++ {
++		for _, name := range []string{CanonicalManifestName, LegacyManifestName} {
++			t.Run(fmt.Sprintf("v%d/%s", schema, name), func(t *testing.T) {
++				for _, tc := range []struct{ name, field, want string }{
++					{"null", `,"capabilities":null`, "capabilities"},
++					{"absent", "", "capabilities"},
++					{"empty-object", `,"capabilities":{}`, ""},
++					{"valid", `,"capabilities":{"network":["api.example.com"],"prompt_scope":"fetch data"}`, ""},
++					{"null-scope", `,"capabilities":{"prompt_scope":null}`, "capabilities.prompt_scope"},
++				} {
++					t.Run(tc.name, func(t *testing.T) {
++						dir := t.TempDir()
++						if err := os.WriteFile(filepath.Join(dir, name), []byte(fmt.Sprintf(`{"schema_version":%d%s}`, schema, tc.field)), 0600); err != nil {
++							t.Fatal(err)
++						}
++						spec, err := Load(dir)
++						if tc.want != "" {
++							if err == nil || !strings.Contains(err.Error(), tc.want) {
++								t.Fatalf("Load error=%v; want refusal naming %s", err, tc.want)
++							}
++						} else if err != nil || spec.Capabilities.Filesystem.Keyword != "repo" {
++							t.Fatalf("valid object refused or defaults changed: spec=%+v error=%v", spec, err)
++						}
++					})
++				}
++			})
++		}
++	}
++	for _, schema := range []int{1, 2} {
++		if _, err := Load(writeSkill(t, fmt.Sprintf(`{"schema_version":%d}`, schema), nil)); err != nil {
++			t.Fatalf("pre-v3 absence refused: %v", err)
++		}
++	}
++}
++
+ func TestRuntimeRoots(t *testing.T) {
+ 	files := map[string]string{"scripts/tool": "#!/bin/sh\n", "lib/util.py": ""}
+ 	ok := writeSkill(t, `{"schema_version": 2, "runtime_roots": ["scripts", "lib"]}`, files)
