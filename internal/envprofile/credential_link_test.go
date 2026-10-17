@@ -14,6 +14,7 @@ import (
 
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/testseed"
 )
 
 // TestSharedToIsolatedRemovesStaleLink is row (a): a shared→isolated turn
@@ -336,7 +337,7 @@ func TestCodexIsolatedAdmission(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fx := writeManagedFixture(t, "acme")
 			if tc.config != nil {
-				if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte(*tc.config), 0o644); err != nil {
+				if err := testseed.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte(*tc.config), 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -378,7 +379,7 @@ func TestCodexUnknownStoreSharedRefuses(t *testing.T) {
 	requireLinkCapability(t)
 	fx := writeManagedFixture(t, "acme")
 	config := filepath.Join(fx.native["codex_cli"], "config.toml")
-	if err := os.WriteFile(config, []byte("cli_auth_credentials_store = \"ephemeral\"\n"), 0o644); err != nil {
+	if err := testseed.WriteFile(config, []byte("cli_auth_credentials_store = \"ephemeral\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	req := fx.request("codex_cli")
@@ -389,7 +390,7 @@ func TestCodexUnknownStoreSharedRefuses(t *testing.T) {
 	if _, err := os.Lstat(ManagedHomeDir(fx.home, "acme", "codex_cli")); !os.IsNotExist(err) {
 		t.Fatalf("a refused provisioning writes nothing: %v", err)
 	}
-	if err := os.WriteFile(config, []byte("cli_auth_credentials_store = \"file\"\n"), 0o644); err != nil {
+	if err := testseed.WriteFile(config, []byte("cli_auth_credentials_store = \"file\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Resolve(req); err != nil {
@@ -554,7 +555,7 @@ func TestCredentialLinkDirectory(t *testing.T) {
 func TestCredentialLinkUnrecordedSymlinkRefuses(t *testing.T) {
 	requireLinkCapability(t)
 	fx := writeManagedFixture(t, "acme")
-	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"keyring\"\n"), 0o644); err != nil {
+	if err := testseed.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"keyring\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
@@ -568,7 +569,7 @@ func TestCredentialLinkUnrecordedSymlinkRefuses(t *testing.T) {
 	}
 	// The native store turns to file, and the operator's own symlink sits
 	// at the now-wanted link path.
-	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"file\"\n"), 0o644); err != nil {
+	if err := testseed.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"file\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
@@ -653,7 +654,7 @@ func TestReviewerLiteralCodexSelector(t *testing.T) {
 		t.Run(value, func(t *testing.T) {
 			fx := writeManagedFixture(t, "acme")
 			config := "cli_auth_credentials_store = '" + value + "'\n"
-			if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte(config), 0600); err != nil {
+			if err := testseed.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte(config), 0600); err != nil {
 				t.Fatal(err)
 			}
 			req := fx.request("codex_cli")
@@ -827,7 +828,7 @@ func TestCodexCredentialStoreTOMLSpellings(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fx := writeManagedFixture(t, "acme")
-			if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte(tc.config), 0o644); err != nil {
+			if err := testseed.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte(tc.config), 0o644); err != nil {
 				t.Fatal(err)
 			}
 			machine := envregistry.DefaultMachineConfig()
@@ -867,7 +868,7 @@ func TestCodexMalformedStoreSharedRefuses(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fx := writeManagedFixture(t, "acme")
 			config := filepath.Join(fx.native["codex_cli"], "config.toml")
-			if err := os.WriteFile(config, []byte(tc.config), 0o644); err != nil {
+			if err := testseed.WriteFile(config, []byte(tc.config), 0o644); err != nil {
 				t.Fatal(err)
 			}
 			req := fx.request("codex_cli")
@@ -888,7 +889,7 @@ func TestCodexMalformedStoreSharedRefuses(t *testing.T) {
 			if _, err := os.Lstat(ManagedHomeDir(fx.home, "acme", "codex_cli")); !os.IsNotExist(err) {
 				t.Fatalf("a refused provisioning writes nothing: %v", err)
 			}
-			if err := os.WriteFile(config, []byte("cli_auth_credentials_store = \"file\"\n"), 0o644); err != nil {
+			if err := testseed.WriteFile(config, []byte("cli_auth_credentials_store = \"file\"\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := Resolve(req); err != nil {

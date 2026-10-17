@@ -15,6 +15,7 @@ import (
 
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/testseed"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -968,7 +969,7 @@ func TestMaterializeCaptureCredentialPolicyReleaseObservation(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(fx.native[adapter.ID], "config.toml")
-	if err := os.WriteFile(path, []byte("cli_auth_credentials_store = 'invalid'\n"), 0600); err != nil {
+	if err := testseed.WriteFile(path, []byte("cli_auth_credentials_store = 'invalid'\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	before, _ := captureFixtureState(t, fx)

@@ -10,6 +10,7 @@ import (
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/stateread"
+	"github.com/relux-works/curator/internal/testseed"
 )
 
 // Resolve must use one native selector observation for admission, links and
@@ -25,7 +26,7 @@ func TestCredentialProjectionSingleObservation(t *testing.T) {
 			req.Repair = true
 			req.Machine.Isolation[fx.profile] = map[string]string{envregistry.CodexCLI: mode}
 			path := filepath.Join(fx.native[envregistry.CodexCLI], "config.toml")
-			if err := os.WriteFile(path, []byte("cli_auth_credentials_store = 'file'\n"), 0600); err != nil {
+			if err := testseed.WriteFile(path, []byte("cli_auth_credentials_store = 'file'\n"), 0600); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := Resolve(req); err != nil {
@@ -75,7 +76,7 @@ func TestCredentialProjectionSingleObservation(t *testing.T) {
 			if _, err := Resolve(req); err != nil || reads != 1 {
 				t.Fatalf("fresh operation must reobserve: err=%v reads=%d", err, reads)
 			}
-			if err := os.WriteFile(path, []byte("cli_auth_credentials_store = 'invalid'\n"), 0600); err != nil {
+			if err := testseed.WriteFile(path, []byte("cli_auth_credentials_store = 'invalid'\n"), 0600); err != nil {
 				t.Fatal(err)
 			}
 			before := snapshotCredentialScope(t, fx)
@@ -100,7 +101,7 @@ func TestCredentialProjectionIsolationRefusals(t *testing.T) {
 			fx := writeManagedFixture(t, "isolation")
 			seedLiveNativeCredentials(t, fx)
 			path := filepath.Join(fx.native[envregistry.CodexCLI], "config.toml")
-			if err := os.WriteFile(path, []byte("cli_auth_credentials_store = '"+store+"'\n"), 0600); err != nil {
+			if err := testseed.WriteFile(path, []byte("cli_auth_credentials_store = '"+store+"'\n"), 0600); err != nil {
 				t.Fatal(err)
 			}
 			req := fx.request(envregistry.CodexCLI)

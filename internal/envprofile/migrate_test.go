@@ -18,6 +18,7 @@ import (
 
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/testseed"
 )
 
 func (fx *managedFixture) migrateRequest() MigrateRequest {
@@ -629,11 +630,11 @@ func TestMigrateConflictsRefuse(t *testing.T) {
 	}
 	t.Run("foreign symlink", func(t *testing.T) {
 		fx := writeManagedFixture(t, "acme")
-		if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"keyring\"\n"), 0o644); err != nil {
+		if err := testseed.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"keyring\"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
-		if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"file\"\n"), 0o644); err != nil {
+		if err := testseed.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"file\"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "auth.json"), []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
@@ -745,7 +746,7 @@ func TestMigrateConflictsRefuse(t *testing.T) {
 		fx := writeManagedFixture(t, "acme")
 		seedLiveNativeCredentials(t, fx)
 		provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
-		if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"ephemeral\"\n"), 0o644); err != nil {
+		if err := testseed.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("cli_auth_credentials_store = \"ephemeral\"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		assertMigrateConflict(t, fx, fx.migrateRequest(), "",

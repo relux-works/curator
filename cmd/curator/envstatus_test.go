@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
+	"github.com/relux-works/curator/internal/testseed"
 
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envprofile"
@@ -46,7 +47,7 @@ func TestEnvStatusReportsNotInheritedNativeCodexServers(t *testing.T) {
 	installCLIEnvProfile(t, source)
 	configPath := filepath.Join(os.Getenv("CODEX_HOME"), "config.toml")
 	nativeConfig := "model = \"gpt-5-codex\"\n\n[mcp_servers.figma]\ncommand = \"server\"\nargs = []\n"
-	if err := os.WriteFile(configPath, []byte(nativeConfig), 0o600); err != nil {
+	if err := testseed.WriteFile(configPath, []byte(nativeConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
@@ -86,7 +87,7 @@ func TestEnvResolveStripsAndReportsInlineNativeCodexMCPTable(t *testing.T) {
 	nativeConfig := `model = "gpt-5-codex"
 mcp_servers = { local = { command = "server", args = [] } }
 `
-	if err := os.WriteFile(configPath, []byte(nativeConfig), 0o600); err != nil {
+	if err := testseed.WriteFile(configPath, []byte(nativeConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {

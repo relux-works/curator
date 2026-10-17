@@ -9,6 +9,7 @@ import (
 
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/stateread"
+	"github.com/relux-works/curator/internal/testseed"
 )
 
 // Resolve refuses each unavailable explicit mapping before provisioning; native
@@ -68,7 +69,7 @@ func TestCredentialStorePolicyNativeInspection(t *testing.T) {
 			req.Machine.CredentialStore = map[string]map[string]envregistry.CredentialStoreSelection{fx.profile: {envregistry.CodexCLI: envregistry.CredentialStoreFile}}
 			req.Machine.Isolation[fx.profile] = map[string]string{envregistry.CodexCLI: envregistry.IsolationIsolated}
 			path := filepath.Join(fx.native[envregistry.CodexCLI], "config.toml")
-			if err := os.WriteFile(path, []byte(tc.text), 0o600); err != nil {
+			if err := testseed.WriteFile(path, []byte(tc.text), 0o600); err != nil {
 				t.Fatal(err)
 			}
 			if tc.readErr != nil {

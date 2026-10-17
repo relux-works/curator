@@ -15,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/testseed"
 )
 
 const codexSeedVectorFile = "environments-codex-seed.json"
@@ -61,7 +62,7 @@ func TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
 	native := "model = \"gpt-5-codex\"\n\n[projects.\"/Users/operator/work\"]\ntrust_level = \"trusted\"\n\n[tui]\ntheme = \"dark\"\n\n[mcp_servers.gh]\ncommand = \"gh\"\nargs = [\"mcp\"]\n\n[mcp_servers.figma]\ncommand = \"npx\"\nargs = [\"-y\", \"figma-developer-mcp\", \"--stdio\"]\n"
-	if err := os.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte(native), 0o600); err != nil {
+	if err := testseed.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte(native), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -176,7 +177,7 @@ func TestCodexSeedStripsInlineMCPTable(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
 	native := "model = \"gpt-5-codex\"\nmcp_servers = { local = { command = \"server\", args = [] } }\n"
-	if err := os.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte(native), 0o600); err != nil {
+	if err := testseed.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte(native), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	req := fx.request(envregistry.CodexCLI)
@@ -209,7 +210,7 @@ func TestCodexSeedStripsInlineMCPTable(t *testing.T) {
 func TestCodexSeedRejectsInvalidTOMLBeforePublishingHome(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
-	if err := os.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte("[mcp_servers.figma\ncommand = \"npx\"\n"), 0o600); err != nil {
+	if err := testseed.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte("[mcp_servers.figma\ncommand = \"npx\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	req := fx.request(envregistry.CodexCLI)
@@ -226,7 +227,7 @@ func TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
 	native := "model = \"gpt-5-codex\"\n\n[mcp_servers.original]\ncommand = \"server\"\nargs = []\n"
-	if err := os.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte(native), 0o600); err != nil {
+	if err := testseed.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte(native), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	req := fx.request(envregistry.CodexCLI)
@@ -241,7 +242,7 @@ func TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 	beforeRecord := readManagedMarker(t, fx, envregistry.CodexCLI).CodexSeedRecord
-	if err := os.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte("model = \"changed\"\n\n[mcp_servers.later]\ncommand = \"server\"\nargs = []\n"), 0o600); err != nil {
+	if err := testseed.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte("model = \"changed\"\n\n[mcp_servers.later]\ncommand = \"server\"\nargs = []\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Remove(filepath.Join(managedHome, "AGENTS.md")); err != nil {
@@ -313,7 +314,7 @@ func runCodexSeedProvisioningVector(t *testing.T, tc codexSeedProvisioningVector
 	t.Helper()
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
-	if err := os.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte(tc.NativeConfig), 0o600); err != nil {
+	if err := testseed.WriteFile(filepath.Join(fx.native[envregistry.CodexCLI], "config.toml"), []byte(tc.NativeConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	req := fx.request(envregistry.CodexCLI)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/stateread"
+	"github.com/relux-works/curator/internal/testseed"
 )
 
 // The same native bytes produce the same fragment through a regular file, a
@@ -19,7 +20,7 @@ func TestNativeSeedSymlinkResolve(t *testing.T) {
 	seedLiveNativeCredentials(t, fx)
 	config := filepath.Join(fx.native[envregistry.CodexCLI], "config.toml")
 	payload := []byte("model = 'fixture'\ncli_auth_credentials_store = 'file'\n")
-	if err := os.WriteFile(config, payload, 0o600); err != nil {
+	if err := testseed.WriteFile(config, payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	req := fx.request(envregistry.CodexCLI)
@@ -37,7 +38,7 @@ func TestNativeSeedSymlinkResolve(t *testing.T) {
 		t.Fatal(err)
 	}
 	target := filepath.Join(filepath.Dir(config), "seed.toml")
-	if err := os.WriteFile(target, payload, 0o600); err != nil {
+	if err := testseed.WriteFile(target, payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	stamp := time.Unix(1600000000, 123000000)

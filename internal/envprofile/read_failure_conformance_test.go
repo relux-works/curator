@@ -13,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/stateread"
+	"github.com/relux-works/curator/internal/testseed"
 )
 
 type readFailureVectorCase struct {
@@ -307,12 +308,12 @@ func runSeedReadFailureVector(t *testing.T, tc readFailureVectorCase) {
 	case "permission-denied", "io-error", "parent-not-directory":
 		readRegularFile = vectorRegularFileReader(seed, vectorFailure(tc.FailureClass))
 	case "unparseable-content":
-		if err := os.WriteFile(seed, []byte("not = [toml\n"), 0o600); err != nil {
+		if err := testseed.WriteFile(seed, []byte("not = [toml\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	case "symlink-where-regular-required":
 		target := filepath.Join(t.TempDir(), "config.toml")
-		if err := os.WriteFile(target, []byte("cli_auth_credentials_store = \"file\"\n"), 0o600); err != nil {
+		if err := testseed.WriteFile(target, []byte("cli_auth_credentials_store = \"file\"\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.Symlink(target, seed); err != nil {

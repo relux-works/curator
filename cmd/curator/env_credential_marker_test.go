@@ -10,6 +10,7 @@ import (
 
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/testseed"
 )
 
 func installCLIEnvProfile(t *testing.T, source stubConfigSource) {
@@ -75,7 +76,7 @@ func TestEnvResolveCredentialRecordProvisionAndRepair(t *testing.T) {
 func TestEnvResolveCredentialRecordPathlessKeyring(t *testing.T) {
 	source, _ := profileHome(t)
 	writeNativeCredentials(t)
-	if err := os.WriteFile(filepath.Join(os.Getenv("CODEX_HOME"), "config.toml"), []byte("cli_auth_credentials_store = \"keyring\"\n"), 0o644); err != nil {
+	if err := testseed.WriteFile(filepath.Join(os.Getenv("CODEX_HOME"), "config.toml"), []byte("cli_auth_credentials_store = \"keyring\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	pkg := t.TempDir()

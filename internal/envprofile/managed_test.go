@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
+	"github.com/relux-works/curator/internal/testseed"
 )
 
 // managedFixture installs a hand-built profile: a context root with a
@@ -779,7 +780,7 @@ func TestCodexKeyringAmbient(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fx := writeManagedFixture(t, "acme")
 			if tc.config != "" {
-				if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte(tc.config), 0o644); err != nil {
+				if err := testseed.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte(tc.config), 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -863,7 +864,7 @@ func TestCodexUnreadableConfigFails(t *testing.T) {
 func TestRepairNeverRefreshesSeeds(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
 	nativeSeed := []byte("operator = true\n")
-	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), nativeSeed, 0o644); err != nil {
+	if err := testseed.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), nativeSeed, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	// The linked credential gets a live native target so the
@@ -877,7 +878,7 @@ func TestRepairNeverRefreshesSeeds(t *testing.T) {
 		t.Fatal(err)
 	}
 	homeDir := ManagedHomeDir(fx.home, "acme", "codex_cli")
-	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("changed = true\n"), 0o644); err != nil {
+	if err := testseed.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("changed = true\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	_ = os.Remove(filepath.Join(homeDir, "AGENTS.md"))
