@@ -201,7 +201,7 @@ func TestDraftProjectResolveHelp(t *testing.T) {
 	for _, verb := range []string{"resolve", "refresh"} {
 		for _, spelling := range []string{"-h", "--help"} {
 			code, stdout, stderr := capture(t, configPath, "project", verb, spelling)
-			if code != exitOK || stdout != projectResolveUsage || stderr != "" {
+			if code != exitOK || !strings.HasPrefix(stdout, "usage: curator project "+verb+" [path]\n") || !strings.Contains(stdout, projectResolveUsage) || stderr != "" {
 				t.Fatalf("project %s %s = code %d, stdout %d bytes, stderr %q; want the help golden on stdout", verb, spelling, code, len(stdout), stderr)
 			}
 		}
@@ -235,12 +235,12 @@ func TestDraftProjectResolveHelp(t *testing.T) {
 func TestDraftInstallStatusHelpIncludesSchema2Workflow(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	for _, command := range []string{"install", "status"} {
-		code, _, stderr := capture(t, configPath, command, "-h")
-		if code != exitUsage {
-			t.Fatalf("%s -h = %d, want %d", command, code, exitUsage)
+		code, stdout, stderr := capture(t, configPath, command, "-h")
+		if code != exitOK || stderr != "" {
+			t.Fatalf("%s -h = %d, stderr %q, want exit 0", command, code, stderr)
 		}
-		if !strings.Contains(stderr, "Usage of "+command+":") || !strings.Contains(stderr, draftWorkflowSection) {
-			t.Fatalf("%s -h misses usage or schema-2 workflow help:\n%s", command, stderr)
+		if !strings.Contains(stdout, "usage: curator "+command) || !strings.Contains(stdout, draftWorkflowSection) {
+			t.Fatalf("%s -h misses usage or schema-2 workflow help:\n%s", command, stdout)
 		}
 	}
 }

@@ -77,6 +77,8 @@ func TestGlobalInitHelpWithoutConfig(t *testing.T) {
 	}
 }
 
+// Child help now succeeds before configuration loading, preserving this test's
+// original name as a regression witness for the previous refusal contract.
 func TestGlobalInitSubcommandHelpWithoutConfigRefuses(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	for _, args := range [][]string{
@@ -85,34 +87,34 @@ func TestGlobalInitSubcommandHelpWithoutConfigRefuses(t *testing.T) {
 		{"profile", "install", "--help"},
 	} {
 		code, stdout, stderr := runFile(t, configPath, args...)
-		want := "curator: global config not found: " + configPath + "\n" + wantConfigHint + "\n"
-		if code != exitFail || stdout != "" || stderr != want {
-			t.Fatalf("%v = %d stdout %q stderr %q; want refusal %q", args, code, stdout, stderr, want)
+		if code != exitOK || stderr != "" || !strings.Contains(stdout, "curator "+strings.Join(args[:2], " ")) {
+			t.Fatalf("%v = %d stdout %q stderr %q; want dedicated help without config", args, code, stdout, stderr)
 		}
 	}
 }
 
 const wantPostureWarning = "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults\n"
 
+// Dedicated help preserves the documented options while avoiding config
+// warnings, command execution and the old FlagSet exit-2 behavior.
 func TestGlobalInitEnvResolveSubcommandHelpPreservesFlagSet(t *testing.T) {
-	home := t.TempDir()
-	configPath := filepath.Join(home, "config.json")
-	t.Setenv(postureWarnedEnv, "")
-	if code, _, stderr := runFile(t, configPath, "bootstrap", "--non-interactive", "--skills-root", filepath.Join(home, "skills")); code != exitOK {
-		t.Fatalf("bootstrap = %d\n%s", code, stderr)
-	}
+	configPath := bootstrapConfig(t)
 	for _, row := range []struct {
-		name  string
-		args  []string
-		usage string
+		args    []string
+		options []string
 	}{
-		{"env resolve", []string{"env", "resolve", "--help"}, "Usage of env resolve:\n  -dry-run\n    \treport store rebuilds without modifying state (requires --repair)\n  -format string\n    \tfragment format: json | env | shell (default \"json\")\n  -preserve-lock\n    \trefuse repair that would change the lock hash (requires --repair)\n  -profile string\n    \tprofile name (default: the current profile)\n  -repair\n    \tprovision or repair the managed home under the mutation lock\n  -takeover\n    \ttake over the unmanaged files the repair would write (only with --repair)\ncurator: env resolve <env-id> [--profile <name>] [--repair [--preserve-lock] [--dry-run]] [--takeover] [--format json|env|shell]\n" + envAliasUsage + "\n"},
-		{"global add", []string{"global", "add", "--help"}, "Usage of global add:\n  -branch string\n    \tgit branch\n  -git string\n    \tgit clone URL\n  -revision string\n    \tgit revision\n  -source string\n    \tsource directory under skills_root\n  -tag string\n    \tgit tag\n"},
+		{[]string{"env", "resolve", "--help"}, []string{"--dry-run", "--format json|env|shell", "--preserve-lock", "--profile", "--repair", "--takeover", envAliasUsage}},
+		{[]string{"global", "add", "--help"}, []string{"--branch", "--git", "--revision", "--source", "--tag"}},
 	} {
-		t.Run(row.name, func(t *testing.T) {
+		t.Run(strings.Join(row.args[:2], " "), func(t *testing.T) {
 			code, stdout, stderr := runFile(t, configPath, row.args...)
-			if code != exitUsage || stdout != "" || stderr != wantPostureWarning+row.usage {
-				t.Fatalf("subcommand help = %d stdout %q stderr %q; want exit 2 stderr %q", code, stdout, stderr, wantPostureWarning+row.usage)
+			if code != exitOK || stderr != "" {
+				t.Fatalf("subcommand help = %d stdout %q stderr %q", code, stdout, stderr)
+			}
+			for _, option := range row.options {
+				if !strings.Contains(stdout, option) {
+					t.Errorf("%v help misses %q", row.args, option)
+				}
 			}
 		})
 	}
