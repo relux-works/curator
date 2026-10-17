@@ -1,0 +1,15 @@
+Exact standalone validation commands. Each exited 0, including the corrected observation verifier.
+Restore the three task-scoped script resources to their original filenames under .temp/TASK-261017-yyg01d/ before replay. Run from the same source commit in a fresh scratch directory; the drivers deliberately refuse to reuse existing fixture directories. $TOOLCHAIN is the Go 1.25.5 installation; $MODULE_CACHE is the existing module cache. These placeholders redact machine-local paths.
+
+go build -o .temp/TASK-261017-yyg01d/curator ./cmd/curator > .temp/TASK-261017-yyg01d/build-01.log 2>&1
+python3 .temp/TASK-261017-yyg01d/reproduce.py > .temp/TASK-261017-yyg01d/driver-05.log 2>&1
+python3 .temp/TASK-261017-yyg01d/supplement.py > .temp/TASK-261017-yyg01d/supplement-01.log 2>&1
+python3 .temp/TASK-261017-yyg01d/verify-observations.py > .temp/TASK-261017-yyg01d/observations-02.log 2>&1
+
+test "$(stat -f '%Lp' .temp/TASK-261017-yyg01d/test-home)" = 700 && env -i HOME="$PWD/.temp/TASK-261017-yyg01d/test-home" PATH=/usr/bin:/bin:$TOOLCHAIN/bin GOROOT=$TOOLCHAIN GOMODCACHE=$MODULE_CACHE GOCACHE="$PWD/.temp/TASK-261017-yyg01d/go-cache" TMPDIR="$PWD/.temp/TASK-261017-yyg01d/test-tmp" GOPROXY=off GOSUMDB=off GIT_ALLOW_PROTOCOL=file go test ./internal/install -run '^(TestDraftUnmanagedAdapterDestinationRefuses)$' -count=1 -v > .temp/TASK-261017-yyg01d/tests-install-01.log 2>&1
+
+test "$(stat -f '%Lp' .temp/TASK-261017-yyg01d/test-home)" = 700 && env -i HOME="$PWD/.temp/TASK-261017-yyg01d/test-home" PATH=/usr/bin:/bin:$TOOLCHAIN/bin GOROOT=$TOOLCHAIN GOMODCACHE=$MODULE_CACHE GOCACHE="$PWD/.temp/TASK-261017-yyg01d/go-cache" TMPDIR="$PWD/.temp/TASK-261017-yyg01d/test-tmp" GOPROXY=off GOSUMDB=off GIT_ALLOW_PROTOCOL=file go test ./internal/envprofile -run '^(TestUseWithoutTakeoverRefusesUnmanaged|TestUseTakeoverBacksUpAndNotifies|TestUsePartialRecordsNothing)$' -count=1 -v > .temp/TASK-261017-yyg01d/tests-profiles-01.log 2>&1
+
+test "$(stat -f '%Lp' .temp/TASK-261017-yyg01d/test-home)" = 700 && env -i HOME="$PWD/.temp/TASK-261017-yyg01d/test-home" PATH=/usr/bin:/bin:$TOOLCHAIN/bin GOROOT=$TOOLCHAIN GOMODCACHE=$MODULE_CACHE GOCACHE="$PWD/.temp/TASK-261017-yyg01d/go-cache" TMPDIR="$PWD/.temp/TASK-261017-yyg01d/test-tmp" GOPROXY=off GOSUMDB=off GIT_ALLOW_PROTOCOL=file go test ./cmd/curator -run '^(TestProfileInstallListUse|TestProfileInstallUsePartialLeavesCurrent)$' -count=1 -v > .temp/TASK-261017-yyg01d/tests-cli-01.log 2>&1
+
+git diff --exit-code > .temp/TASK-261017-yyg01d/git-diff-01.log

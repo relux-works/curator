@@ -1,0 +1,3552 @@
+
+===== sandbox.log =====
+Private CLI reproductions; no inherited environment or credentials.
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/A/project
+$ git init -q -b main
+stdout:
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/A/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator bootstrap -non-interactive --skills-root $WORKTREE/.temp/TASK-261017-yyg01d/A/sources
+stdout:
+wrote $WORKTREE/.temp/TASK-261017-yyg01d/A/home/.curator/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/A/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator install .
+stdout:
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+error: skills[0]: source_selection_invalid: directory must be a portable contained path or '.'; fix the named selector (directory, include/exclude, and ref rules in docs/cli.md), then retry the explicit attempt
+exit=1
+
+===== sandbox-02/sandbox.log =====
+Private CLI reproductions; no inherited environment or credentials.
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-02/A/project
+$ git init -q -b main
+stdout:
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-02/A/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator bootstrap -non-interactive --skills-root $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-02/A/sources
+stdout:
+wrote $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-02/A/home/.curator/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-02/A/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator install .
+stdout:
+project: generated paths are not ignored by git; missing entries: .agents/, .claude/skills/, .codex/skills/; skipped
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+
+===== sandbox-03/sandbox.log =====
+Private CLI reproductions; no inherited environment or credentials.
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-03/A/project
+$ git init -q -b main
+stdout:
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-03/A/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator bootstrap -non-interactive --skills-root $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-03/A/sources
+stdout:
+wrote $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-03/A/home/.curator/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-03/A/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator install .
+stdout:
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+error: source_snapshot_unavailable: no Skillfile lock at $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-03/A/project/Skillfile.lock.json; run explicit resolve first
+exit=1
+
+===== sandbox-04/sandbox.log =====
+Private CLI reproductions; no inherited environment or credentials.
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/A/project
+$ git init -q -b main
+stdout:
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/A/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator bootstrap -non-interactive --skills-root $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/A/sources
+stdout:
+wrote $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/A/home/.curator/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/A/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator project resolve .
+stdout:
+resolve project: 1 skills
+lock: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/A/project/Skillfile.lock.json
+bindings: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/A/home/.curator/source-bindings/029db64371a9ab2e.json
+lock_sha256: sha256:7d9205c4f6e0aa868da484716bfd104f9f87663eecbc38e0ce539b74f760a36c
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/A/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator install .
+stdout:
+project: sample    context=yes commands=[] via=<project> installed
+project: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 38057: invalid argument; all builds retained
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+A BEFORE managed $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/A/project/.agents
+{
+  "env.ps1": {
+    "sha256": "28c63c72bc490f6b05036136733659cc788c4035ef7137b14643f5f33cfd1059",
+    "bytes": 264
+  },
+  "env.sh": {
+    "sha256": "ebe6c8ce75ef68bf4ff8eff7c549cccebf1c5c72b0671a3c82afb2a9b395b88c",
+    "bytes": 382
+  },
+  "skills": {
+    "directory": true
+  },
+  "skills/loose.txt": {
+    "sha256": "7770448a73f1fd7f493ef3018012ce433a3382bdbf6e5f39badbba93dc7c6aa1",
+    "bytes": 24
+  },
+  "skills/sample": {
+    "directory": true
+  },
+  "skills/sample/.csk-install.json": {
+    "sha256": "27dd56d83009407ecc96e92c25c735fe8996dbd2935b0ad273b3ce92bd9975e4",
+    "bytes": 760
+  },
+  "skills/sample/SKILL.md": {
+    "sha256": "52186a317289e99003af01971a8c9dcea38deb77b4733acc445a51ce71357469",
+    "bytes": 81
+  },
+  "skills/unmanaged-notes": {
+    "directory": true
+  },
+  "skills/unmanaged-notes/notes.md": {
+    "sha256": "9e39549a24dd982d2352d39dbf082f8c90c38bc7326f792c21556e78d1dbb7fb",
+    "bytes": 19
+  },
+  "skills/unmanaged-skill": {
+    "directory": true
+  },
+  "skills/unmanaged-skill/SKILL.md": {
+    "sha256": "c5ea0768451564a3cff47b80fa065e37d43c936ad65ed9eed536b4ec0a29e42c",
+    "bytes": 13
+  }
+}
+A BEFORE native $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/A/project/.codex
+{
+  "skills": {
+    "directory": true
+  },
+  "skills/.csk-managed.json": {
+    "sha256": "6f1fc2af1fdbbcbfc7fb5a0dc982cd2d1d2fa09d6e55c54769c6d9bd71906c49",
+    "bytes": 59
+  },
+  "skills/manual-link": {
+    "link": "../../.agents/skills/unmanaged-skill",
+    "resolves": true
+  },
+  "skills/sample": {
+    "link": "../../.agents/skills/sample",
+    "resolves": true
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/A/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator install .
+stdout:
+project: sample    context=yes commands=[] via=<project> installed
+project: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 38057: invalid argument; all builds retained
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+A AFTER managed $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/A/project/.agents
+{
+  "env.ps1": {
+    "sha256": "28c63c72bc490f6b05036136733659cc788c4035ef7137b14643f5f33cfd1059",
+    "bytes": 264
+  },
+  "env.sh": {
+    "sha256": "ebe6c8ce75ef68bf4ff8eff7c549cccebf1c5c72b0671a3c82afb2a9b395b88c",
+    "bytes": 382
+  },
+  "skills": {
+    "directory": true
+  },
+  "skills/sample": {
+    "directory": true
+  },
+  "skills/sample/.csk-install.json": {
+    "sha256": "27dd56d83009407ecc96e92c25c735fe8996dbd2935b0ad273b3ce92bd9975e4",
+    "bytes": 760
+  },
+  "skills/sample/SKILL.md": {
+    "sha256": "52186a317289e99003af01971a8c9dcea38deb77b4733acc445a51ce71357469",
+    "bytes": 81
+  }
+}
+A AFTER native $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/A/project/.codex
+{
+  "skills": {
+    "directory": true
+  },
+  "skills/.csk-managed.json": {
+    "sha256": "6f1fc2af1fdbbcbfc7fb5a0dc982cd2d1d2fa09d6e55c54769c6d9bd71906c49",
+    "bytes": 59
+  },
+  "skills/manual-link": {
+    "link": "../../.agents/skills/unmanaged-skill",
+    "resolves": false
+  },
+  "skills/sample": {
+    "link": "../../.agents/skills/sample",
+    "resolves": true
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/project
+$ git init -q -b main
+stdout:
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator bootstrap -non-interactive --skills-root $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/sources
+stdout:
+wrote $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/home/.curator/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator skill check ./agents/skills/sample
+stdout:
+$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/project/agents/skills/sample: ok
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator project resolve .
+stdout:
+resolve project: 1 skills
+lock: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/project/Skillfile.lock.json
+bindings: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/home/.curator/source-bindings/9b60f28cea51ed6a.json
+lock_sha256: sha256:0331f77c28609b0b17d60967c0f84228c3fdb09a3063bc4fee55d1855c9995f6
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator install .
+stdout:
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+error: sample: install marker is invalid for schema 5
+exit=1
+B rejection project output $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/project/.agents
+{}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator skill check ./agents/skills/sample
+stdout:
+$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/project/agents/skills/sample: ok
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator project refresh .
+stdout:
+refresh project: 1 skills
+lock: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/project/Skillfile.lock.json
+bindings: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/home/.curator/source-bindings/9b60f28cea51ed6a.json
+lock_sha256: sha256:7d9205c4f6e0aa868da484716bfd104f9f87663eecbc38e0ce539b74f760a36c
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/B/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator install .
+stdout:
+project: sample    context=yes commands=[] via=<project> installed
+project: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 38057: invalid argument; all builds retained
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/C-project/project
+$ git init -q -b main
+stdout:
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/C-project/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator bootstrap -non-interactive --skills-root $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/C-project/sources
+stdout:
+wrote $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/C-project/home/.curator/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+stderr:
+exit=0
+C project BEFORE $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/C-project/project/.agents
+{
+  ".instructions": {
+    "directory": true
+  },
+  ".instructions/hand.md": {
+    "sha256": "f680d0f2ec0d8456407dde8182cadb327c2d6208e4ddb19377e0345fdbe534e1",
+    "bytes": 40
+  },
+  "README.md": {
+    "sha256": "2233fad0d1a4c24773ce103f078f25e6a83f1569a8813a2ff2af7b57a9379203",
+    "bytes": 25
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/C-project/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator project resolve .
+stdout:
+resolve project: 1 skills
+lock: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/C-project/project/Skillfile.lock.json
+bindings: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/C-project/home/.curator/source-bindings/5490d60bf2ca8220.json
+lock_sha256: sha256:7d9205c4f6e0aa868da484716bfd104f9f87663eecbc38e0ce539b74f760a36c
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/C-project/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator install .
+stdout:
+project: sample    context=yes commands=[] via=<project> installed
+project: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 38057: invalid argument; all builds retained
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+C project AFTER $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/C-project/project/.agents
+{
+  ".instructions": {
+    "directory": true
+  },
+  ".instructions/hand.md": {
+    "sha256": "f680d0f2ec0d8456407dde8182cadb327c2d6208e4ddb19377e0345fdbe534e1",
+    "bytes": 40
+  },
+  "README.md": {
+    "sha256": "2233fad0d1a4c24773ce103f078f25e6a83f1569a8813a2ff2af7b57a9379203",
+    "bytes": 25
+  },
+  "env.ps1": {
+    "sha256": "28c63c72bc490f6b05036136733659cc788c4035ef7137b14643f5f33cfd1059",
+    "bytes": 264
+  },
+  "env.sh": {
+    "sha256": "ebe6c8ce75ef68bf4ff8eff7c549cccebf1c5c72b0671a3c82afb2a9b395b88c",
+    "bytes": 382
+  },
+  "skills": {
+    "directory": true
+  },
+  "skills/sample": {
+    "directory": true
+  },
+  "skills/sample/.csk-install.json": {
+    "sha256": "735d1e065dc164561321544c9422f7075a514ef62666355cf4a07432e0efc19e",
+    "bytes": 760
+  },
+  "skills/sample/SKILL.md": {
+    "sha256": "52186a317289e99003af01971a8c9dcea38deb77b4733acc445a51ce71357469",
+    "bytes": 81
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/project
+$ git init -q -b main
+stdout:
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator bootstrap -non-interactive --skills-root $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/sources
+stdout:
+wrote $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+stderr:
+exit=0
+D BEFORE $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home
+{
+  ".curator": {
+    "directory": true
+  },
+  ".curator/config.json": {
+    "sha256": "25f232e2069eeafbeed7d063d59c40b1e7759208e06172a38014159e97c8cc1a",
+    "bytes": 261
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile install ./alpha
+stdout:
+claude_code: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.claude)
+codex_cli: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.codex)
+opencode: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.config/opencode)
+pi: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.pi)
+installed and activated profile alpha (root alpha 1.0.0, lock sha256:366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957)
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile list
+stdout:
+alpha	alpha	path	./alpha	path ./alpha	1.0.0	sha256:366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957	current
+default	default	local	-	local -	0.0.0	sha256:06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4	
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+D AFTER $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home
+{
+  ".claude": {
+    "directory": true
+  },
+  ".claude/.agent-environment.json": {
+    "sha256": "6f8afa97ded4d6e46060ed38eca359337010563250d80427b348066cbbbdc793",
+    "bytes": 902
+  },
+  ".claude/CLAUDE.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".codex": {
+    "directory": true
+  },
+  ".codex/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".codex/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".config": {
+    "directory": true
+  },
+  ".config/opencode": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".config/opencode/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".curator": {
+    "directory": true
+  },
+  ".curator/audit": {
+    "directory": true
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/verdict-null--1-2.json": {
+    "sha256": "f36eca9676933ac9bd8d2d220146752a364780bed71a675c6ce40c14f40273b8",
+    "bytes": 330
+  },
+  ".curator/config.json": {
+    "sha256": "25f232e2069eeafbeed7d063d59c40b1e7759208e06172a38014159e97c8cc1a",
+    "bytes": 261
+  },
+  ".curator/contexts": {
+    "directory": true
+  },
+  ".curator/contexts/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/agent-context.json": {
+    "sha256": "fe3804dea44592388c87b7ad7113eedc933b8f1be4a7f1e0447cb030d19f3b48",
+    "bytes": 102
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context/a.md": {
+    "sha256": "e08f14b2d0cceb2c97a11e82efd94f9d09ce50d67db0cf545f92002b6e818559",
+    "bytes": 14
+  },
+  ".curator/contexts/context/default": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c/agent-context.json": {
+    "sha256": "c983559c39533345fe36ddd49361b9ae9748501cf341e0af971c15cbf8e350aa",
+    "bytes": 61
+  },
+  ".curator/profiles": {
+    "directory": true
+  },
+  ".curator/profiles/alpha": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/lock.json": {
+    "sha256": "366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957",
+    "bytes": 242
+  },
+  ".curator/profiles/alpha/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/opencode/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/pi/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/source.json": {
+    "sha256": "40493b200b6ebb0ac7660bf3ffae57c37cd3423b1299ba9cfe18bf8c3baaa1f2",
+    "bytes": 63
+  },
+  ".curator/profiles/current": {
+    "sha256": "b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060",
+    "bytes": 6
+  },
+  ".curator/profiles/default": {
+    "directory": true
+  },
+  ".curator/profiles/default/lock.json": {
+    "sha256": "06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4",
+    "bytes": 246
+  },
+  ".curator/profiles/default/source.json": {
+    "sha256": "cc25406719c6bc36269a587a93433412bf705bb3734ee21d9087ea62fe849342",
+    "bytes": 43
+  },
+  ".curator/state": {
+    "directory": true
+  },
+  ".curator/state/locks": {
+    "directory": true
+  },
+  ".curator/state/locks/v1": {
+    "directory": true
+  },
+  ".curator/state/locks/v1/ae22a2c72eb634db5bbbf47fbee3d0a3409cfd3038680fe051710d007e5b5915.lock": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  ".curator/state/transactions": {
+    "directory": true
+  },
+  ".curator/state/transactions/v1": {
+    "directory": true
+  },
+  ".pi": {
+    "directory": true
+  },
+  ".pi/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".pi/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/pi/AGENTS.md",
+    "resolves": true
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile install ./beta
+stdout:
+installed profile beta (root beta 1.0.0, lock sha256:3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047); activate with 'curator profile use beta'
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile list
+stdout:
+alpha	alpha	path	./alpha	path ./alpha	1.0.0	sha256:366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957	current
+beta	beta	path	./beta	path ./beta	1.0.0	sha256:3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047	
+default	default	local	-	local -	0.0.0	sha256:06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4	
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+E marker candidates: []
+E BEFORE $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home
+{
+  ".claude": {
+    "directory": true
+  },
+  ".claude/.agent-environment.json": {
+    "sha256": "6f8afa97ded4d6e46060ed38eca359337010563250d80427b348066cbbbdc793",
+    "bytes": 902
+  },
+  ".claude/CLAUDE.md": {
+    "sha256": "8ac55d38584d6a891f374bcf24f90ee1ed78ca8ba25f87126108208560350a96",
+    "bytes": 40
+  },
+  ".codex": {
+    "directory": true
+  },
+  ".codex/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".codex/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".config": {
+    "directory": true
+  },
+  ".config/opencode": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".config/opencode/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".curator": {
+    "directory": true
+  },
+  ".curator/audit": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/verdict-null--1-2.json": {
+    "sha256": "9656057b8bc6910e4eb6b5e8aba07c7f86165611458f54dab37e86970124fe5d",
+    "bytes": 329
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/verdict-null--1-2.json": {
+    "sha256": "f36eca9676933ac9bd8d2d220146752a364780bed71a675c6ce40c14f40273b8",
+    "bytes": 330
+  },
+  ".curator/config.json": {
+    "sha256": "25f232e2069eeafbeed7d063d59c40b1e7759208e06172a38014159e97c8cc1a",
+    "bytes": 261
+  },
+  ".curator/contexts": {
+    "directory": true
+  },
+  ".curator/contexts/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/agent-context.json": {
+    "sha256": "fe3804dea44592388c87b7ad7113eedc933b8f1be4a7f1e0447cb030d19f3b48",
+    "bytes": 102
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context/a.md": {
+    "sha256": "e08f14b2d0cceb2c97a11e82efd94f9d09ce50d67db0cf545f92002b6e818559",
+    "bytes": 14
+  },
+  ".curator/contexts/context/beta": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/agent-context.json": {
+    "sha256": "49e9ff8919c6cb8567cdf944a3bef50d2c011102f28ec736ce9d0a24ebed43e4",
+    "bytes": 101
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context/a.md": {
+    "sha256": "7cec3841f774fff6802fe9b62a0f29577ace0c38d5b5b4f3f1fe71218e7398ab",
+    "bytes": 13
+  },
+  ".curator/contexts/context/default": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c/agent-context.json": {
+    "sha256": "c983559c39533345fe36ddd49361b9ae9748501cf341e0af971c15cbf8e350aa",
+    "bytes": 61
+  },
+  ".curator/profiles": {
+    "directory": true
+  },
+  ".curator/profiles/alpha": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/lock.json": {
+    "sha256": "366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957",
+    "bytes": 242
+  },
+  ".curator/profiles/alpha/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/opencode/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/pi/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/source.json": {
+    "sha256": "40493b200b6ebb0ac7660bf3ffae57c37cd3423b1299ba9cfe18bf8c3baaa1f2",
+    "bytes": 63
+  },
+  ".curator/profiles/beta": {
+    "directory": true
+  },
+  ".curator/profiles/beta/lock.json": {
+    "sha256": "3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047",
+    "bytes": 240
+  },
+  ".curator/profiles/beta/source.json": {
+    "sha256": "b2c1f47c9f8af168cb19e51c6a80211b767df5dfcf2e5d336680b54301f2672a",
+    "bytes": 62
+  },
+  ".curator/profiles/current": {
+    "sha256": "b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060",
+    "bytes": 6
+  },
+  ".curator/profiles/default": {
+    "directory": true
+  },
+  ".curator/profiles/default/lock.json": {
+    "sha256": "06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4",
+    "bytes": 246
+  },
+  ".curator/profiles/default/source.json": {
+    "sha256": "cc25406719c6bc36269a587a93433412bf705bb3734ee21d9087ea62fe849342",
+    "bytes": 43
+  },
+  ".curator/state": {
+    "directory": true
+  },
+  ".curator/state/locks": {
+    "directory": true
+  },
+  ".curator/state/locks/v1": {
+    "directory": true
+  },
+  ".curator/state/locks/v1/ae22a2c72eb634db5bbbf47fbee3d0a3409cfd3038680fe051710d007e5b5915.lock": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  ".curator/state/transactions": {
+    "directory": true
+  },
+  ".curator/state/transactions/v1": {
+    "directory": true
+  },
+  ".pi": {
+    "directory": true
+  },
+  ".pi/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".pi/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/pi/AGENTS.md",
+    "resolves": true
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile use beta
+stdout:
+claude_code: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.claude)
+codex_cli: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.codex)
+opencode: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.config/opencode)
+pi: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.pi)
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile list
+stdout:
+alpha	alpha	path	./alpha	path ./alpha	1.0.0	sha256:366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957	
+beta	beta	path	./beta	path ./beta	1.0.0	sha256:3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047	current
+default	default	local	-	local -	0.0.0	sha256:06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4	
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+E AFTER failed use $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home
+{
+  ".claude": {
+    "directory": true
+  },
+  ".claude/.agent-environment-backup": {
+    "directory": true
+  },
+  ".claude/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".claude/.agent-environment-backup/1/CLAUDE.md": {
+    "sha256": "8ac55d38584d6a891f374bcf24f90ee1ed78ca8ba25f87126108208560350a96",
+    "bytes": 40
+  },
+  ".claude/.agent-environment.json": {
+    "sha256": "1ecc545bd41b363856a5e994b44ac7ce2ca1db9971c05f389508c0fe8c246adb",
+    "bytes": 898
+  },
+  ".claude/CLAUDE.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".codex": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".codex/.agent-environment.json": {
+    "sha256": "039756d47236d35f4f780c8b4e611bdf58d53dfc994ab8948bbb4ae962e54d0f",
+    "bytes": 793
+  },
+  ".codex/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/beta/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".config": {
+    "directory": true
+  },
+  ".config/opencode": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".config/opencode/.agent-environment.json": {
+    "sha256": "039756d47236d35f4f780c8b4e611bdf58d53dfc994ab8948bbb4ae962e54d0f",
+    "bytes": 793
+  },
+  ".config/opencode/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/beta/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".curator": {
+    "directory": true
+  },
+  ".curator/audit": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/verdict-null--1-2.json": {
+    "sha256": "9656057b8bc6910e4eb6b5e8aba07c7f86165611458f54dab37e86970124fe5d",
+    "bytes": 329
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/verdict-null--1-2.json": {
+    "sha256": "f36eca9676933ac9bd8d2d220146752a364780bed71a675c6ce40c14f40273b8",
+    "bytes": 330
+  },
+  ".curator/config.json": {
+    "sha256": "25f232e2069eeafbeed7d063d59c40b1e7759208e06172a38014159e97c8cc1a",
+    "bytes": 261
+  },
+  ".curator/contexts": {
+    "directory": true
+  },
+  ".curator/contexts/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/agent-context.json": {
+    "sha256": "fe3804dea44592388c87b7ad7113eedc933b8f1be4a7f1e0447cb030d19f3b48",
+    "bytes": 102
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context/a.md": {
+    "sha256": "e08f14b2d0cceb2c97a11e82efd94f9d09ce50d67db0cf545f92002b6e818559",
+    "bytes": 14
+  },
+  ".curator/contexts/context/beta": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/agent-context.json": {
+    "sha256": "49e9ff8919c6cb8567cdf944a3bef50d2c011102f28ec736ce9d0a24ebed43e4",
+    "bytes": 101
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context/a.md": {
+    "sha256": "7cec3841f774fff6802fe9b62a0f29577ace0c38d5b5b4f3f1fe71218e7398ab",
+    "bytes": 13
+  },
+  ".curator/contexts/context/default": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c/agent-context.json": {
+    "sha256": "c983559c39533345fe36ddd49361b9ae9748501cf341e0af971c15cbf8e350aa",
+    "bytes": 61
+  },
+  ".curator/profiles": {
+    "directory": true
+  },
+  ".curator/profiles/alpha": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/lock.json": {
+    "sha256": "366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957",
+    "bytes": 242
+  },
+  ".curator/profiles/alpha/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/opencode/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/pi/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/source.json": {
+    "sha256": "40493b200b6ebb0ac7660bf3ffae57c37cd3423b1299ba9cfe18bf8c3baaa1f2",
+    "bytes": 63
+  },
+  ".curator/profiles/beta": {
+    "directory": true
+  },
+  ".curator/profiles/beta/lock.json": {
+    "sha256": "3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047",
+    "bytes": 240
+  },
+  ".curator/profiles/beta/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/opencode/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/pi/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/source.json": {
+    "sha256": "b2c1f47c9f8af168cb19e51c6a80211b767df5dfcf2e5d336680b54301f2672a",
+    "bytes": 62
+  },
+  ".curator/profiles/current": {
+    "sha256": "f2c82decdd7181cf98945929a62598db7e6b477e11f6e0eb0ae97020eff151ad",
+    "bytes": 5
+  },
+  ".curator/profiles/default": {
+    "directory": true
+  },
+  ".curator/profiles/default/lock.json": {
+    "sha256": "06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4",
+    "bytes": 246
+  },
+  ".curator/profiles/default/source.json": {
+    "sha256": "cc25406719c6bc36269a587a93433412bf705bb3734ee21d9087ea62fe849342",
+    "bytes": 43
+  },
+  ".curator/state": {
+    "directory": true
+  },
+  ".curator/state/locks": {
+    "directory": true
+  },
+  ".curator/state/locks/v1": {
+    "directory": true
+  },
+  ".curator/state/locks/v1/ae22a2c72eb634db5bbbf47fbee3d0a3409cfd3038680fe051710d007e5b5915.lock": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  ".curator/state/transactions": {
+    "directory": true
+  },
+  ".curator/state/transactions/v1": {
+    "directory": true
+  },
+  ".pi": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/pi/AGENTS.md",
+    "resolves": true
+  },
+  ".pi/.agent-environment.json": {
+    "sha256": "039756d47236d35f4f780c8b4e611bdf58d53dfc994ab8948bbb4ae962e54d0f",
+    "bytes": 793
+  },
+  ".pi/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/beta/rendered/pi/AGENTS.md",
+    "resolves": true
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile use alpha
+stdout:
+claude_code: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.claude)
+codex_cli: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.codex)
+opencode: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.config/opencode)
+pi: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.pi)
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+E AFTER recovery attempt $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home
+{
+  ".claude": {
+    "directory": true
+  },
+  ".claude/.agent-environment-backup": {
+    "directory": true
+  },
+  ".claude/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".claude/.agent-environment-backup/1/CLAUDE.md": {
+    "sha256": "8ac55d38584d6a891f374bcf24f90ee1ed78ca8ba25f87126108208560350a96",
+    "bytes": 40
+  },
+  ".claude/.agent-environment-backup/2": {
+    "directory": true
+  },
+  ".claude/.agent-environment-backup/2/CLAUDE.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".claude/.agent-environment.json": {
+    "sha256": "6f8afa97ded4d6e46060ed38eca359337010563250d80427b348066cbbbdc793",
+    "bytes": 902
+  },
+  ".claude/CLAUDE.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".codex": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".codex/.agent-environment-backup/2": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/2/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/beta/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".codex/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".codex/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".config": {
+    "directory": true
+  },
+  ".config/opencode": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".config/opencode/.agent-environment-backup/2": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/2/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/beta/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".config/opencode/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".config/opencode/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".curator": {
+    "directory": true
+  },
+  ".curator/audit": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/verdict-null--1-2.json": {
+    "sha256": "9656057b8bc6910e4eb6b5e8aba07c7f86165611458f54dab37e86970124fe5d",
+    "bytes": 329
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/verdict-null--1-2.json": {
+    "sha256": "f36eca9676933ac9bd8d2d220146752a364780bed71a675c6ce40c14f40273b8",
+    "bytes": 330
+  },
+  ".curator/config.json": {
+    "sha256": "25f232e2069eeafbeed7d063d59c40b1e7759208e06172a38014159e97c8cc1a",
+    "bytes": 261
+  },
+  ".curator/contexts": {
+    "directory": true
+  },
+  ".curator/contexts/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/agent-context.json": {
+    "sha256": "fe3804dea44592388c87b7ad7113eedc933b8f1be4a7f1e0447cb030d19f3b48",
+    "bytes": 102
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context/a.md": {
+    "sha256": "e08f14b2d0cceb2c97a11e82efd94f9d09ce50d67db0cf545f92002b6e818559",
+    "bytes": 14
+  },
+  ".curator/contexts/context/beta": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/agent-context.json": {
+    "sha256": "49e9ff8919c6cb8567cdf944a3bef50d2c011102f28ec736ce9d0a24ebed43e4",
+    "bytes": 101
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context/a.md": {
+    "sha256": "7cec3841f774fff6802fe9b62a0f29577ace0c38d5b5b4f3f1fe71218e7398ab",
+    "bytes": 13
+  },
+  ".curator/contexts/context/default": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c/agent-context.json": {
+    "sha256": "c983559c39533345fe36ddd49361b9ae9748501cf341e0af971c15cbf8e350aa",
+    "bytes": 61
+  },
+  ".curator/profiles": {
+    "directory": true
+  },
+  ".curator/profiles/alpha": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/lock.json": {
+    "sha256": "366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957",
+    "bytes": 242
+  },
+  ".curator/profiles/alpha/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/opencode/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/pi/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/source.json": {
+    "sha256": "40493b200b6ebb0ac7660bf3ffae57c37cd3423b1299ba9cfe18bf8c3baaa1f2",
+    "bytes": 63
+  },
+  ".curator/profiles/beta": {
+    "directory": true
+  },
+  ".curator/profiles/beta/lock.json": {
+    "sha256": "3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047",
+    "bytes": 240
+  },
+  ".curator/profiles/beta/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/opencode/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/pi/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/source.json": {
+    "sha256": "b2c1f47c9f8af168cb19e51c6a80211b767df5dfcf2e5d336680b54301f2672a",
+    "bytes": 62
+  },
+  ".curator/profiles/current": {
+    "sha256": "b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060",
+    "bytes": 6
+  },
+  ".curator/profiles/default": {
+    "directory": true
+  },
+  ".curator/profiles/default/lock.json": {
+    "sha256": "06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4",
+    "bytes": 246
+  },
+  ".curator/profiles/default/source.json": {
+    "sha256": "cc25406719c6bc36269a587a93433412bf705bb3734ee21d9087ea62fe849342",
+    "bytes": 43
+  },
+  ".curator/state": {
+    "directory": true
+  },
+  ".curator/state/locks": {
+    "directory": true
+  },
+  ".curator/state/locks/v1": {
+    "directory": true
+  },
+  ".curator/state/locks/v1/ae22a2c72eb634db5bbbf47fbee3d0a3409cfd3038680fe051710d007e5b5915.lock": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  ".curator/state/transactions": {
+    "directory": true
+  },
+  ".curator/state/transactions/v1": {
+    "directory": true
+  },
+  ".pi": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/pi/AGENTS.md",
+    "resolves": true
+  },
+  ".pi/.agent-environment-backup/2": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/2/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/beta/rendered/pi/AGENTS.md",
+    "resolves": true
+  },
+  ".pi/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".pi/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/pi/AGENTS.md",
+    "resolves": true
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile use beta --takeover
+stdout:
+claude_code: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.claude)
+codex_cli: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.codex)
+opencode: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.config/opencode)
+pi: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.pi)
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+C native AFTER takeover $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home
+{
+  ".claude": {
+    "directory": true
+  },
+  ".claude/.agent-environment-backup": {
+    "directory": true
+  },
+  ".claude/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".claude/.agent-environment-backup/1/CLAUDE.md": {
+    "sha256": "8ac55d38584d6a891f374bcf24f90ee1ed78ca8ba25f87126108208560350a96",
+    "bytes": 40
+  },
+  ".claude/.agent-environment-backup/2": {
+    "directory": true
+  },
+  ".claude/.agent-environment-backup/2/CLAUDE.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".claude/.agent-environment-backup/3": {
+    "directory": true
+  },
+  ".claude/.agent-environment-backup/3/CLAUDE.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".claude/.agent-environment.json": {
+    "sha256": "1ecc545bd41b363856a5e994b44ac7ce2ca1db9971c05f389508c0fe8c246adb",
+    "bytes": 898
+  },
+  ".claude/CLAUDE.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".codex": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".codex/.agent-environment-backup/2": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/2/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/beta/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".codex/.agent-environment-backup/3": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/3/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".codex/.agent-environment.json": {
+    "sha256": "039756d47236d35f4f780c8b4e611bdf58d53dfc994ab8948bbb4ae962e54d0f",
+    "bytes": 793
+  },
+  ".codex/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/beta/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".config": {
+    "directory": true
+  },
+  ".config/opencode": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".config/opencode/.agent-environment-backup/2": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/2/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/beta/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".config/opencode/.agent-environment-backup/3": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/3/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".config/opencode/.agent-environment.json": {
+    "sha256": "039756d47236d35f4f780c8b4e611bdf58d53dfc994ab8948bbb4ae962e54d0f",
+    "bytes": 793
+  },
+  ".config/opencode/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/beta/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".curator": {
+    "directory": true
+  },
+  ".curator/audit": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/verdict-null--1-2.json": {
+    "sha256": "9656057b8bc6910e4eb6b5e8aba07c7f86165611458f54dab37e86970124fe5d",
+    "bytes": 329
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/verdict-null--1-2.json": {
+    "sha256": "f36eca9676933ac9bd8d2d220146752a364780bed71a675c6ce40c14f40273b8",
+    "bytes": 330
+  },
+  ".curator/config.json": {
+    "sha256": "25f232e2069eeafbeed7d063d59c40b1e7759208e06172a38014159e97c8cc1a",
+    "bytes": 261
+  },
+  ".curator/contexts": {
+    "directory": true
+  },
+  ".curator/contexts/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/agent-context.json": {
+    "sha256": "fe3804dea44592388c87b7ad7113eedc933b8f1be4a7f1e0447cb030d19f3b48",
+    "bytes": 102
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context/a.md": {
+    "sha256": "e08f14b2d0cceb2c97a11e82efd94f9d09ce50d67db0cf545f92002b6e818559",
+    "bytes": 14
+  },
+  ".curator/contexts/context/beta": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/agent-context.json": {
+    "sha256": "49e9ff8919c6cb8567cdf944a3bef50d2c011102f28ec736ce9d0a24ebed43e4",
+    "bytes": 101
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context/a.md": {
+    "sha256": "7cec3841f774fff6802fe9b62a0f29577ace0c38d5b5b4f3f1fe71218e7398ab",
+    "bytes": 13
+  },
+  ".curator/contexts/context/default": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c/agent-context.json": {
+    "sha256": "c983559c39533345fe36ddd49361b9ae9748501cf341e0af971c15cbf8e350aa",
+    "bytes": 61
+  },
+  ".curator/profiles": {
+    "directory": true
+  },
+  ".curator/profiles/alpha": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/lock.json": {
+    "sha256": "366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957",
+    "bytes": 242
+  },
+  ".curator/profiles/alpha/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/opencode/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/pi/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/source.json": {
+    "sha256": "40493b200b6ebb0ac7660bf3ffae57c37cd3423b1299ba9cfe18bf8c3baaa1f2",
+    "bytes": 63
+  },
+  ".curator/profiles/beta": {
+    "directory": true
+  },
+  ".curator/profiles/beta/lock.json": {
+    "sha256": "3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047",
+    "bytes": 240
+  },
+  ".curator/profiles/beta/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/opencode/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/pi/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/source.json": {
+    "sha256": "b2c1f47c9f8af168cb19e51c6a80211b767df5dfcf2e5d336680b54301f2672a",
+    "bytes": 62
+  },
+  ".curator/profiles/current": {
+    "sha256": "f2c82decdd7181cf98945929a62598db7e6b477e11f6e0eb0ae97020eff151ad",
+    "bytes": 5
+  },
+  ".curator/profiles/default": {
+    "directory": true
+  },
+  ".curator/profiles/default/lock.json": {
+    "sha256": "06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4",
+    "bytes": 246
+  },
+  ".curator/profiles/default/source.json": {
+    "sha256": "cc25406719c6bc36269a587a93433412bf705bb3734ee21d9087ea62fe849342",
+    "bytes": 43
+  },
+  ".curator/state": {
+    "directory": true
+  },
+  ".curator/state/locks": {
+    "directory": true
+  },
+  ".curator/state/locks/v1": {
+    "directory": true
+  },
+  ".curator/state/locks/v1/ae22a2c72eb634db5bbbf47fbee3d0a3409cfd3038680fe051710d007e5b5915.lock": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  ".curator/state/transactions": {
+    "directory": true
+  },
+  ".curator/state/transactions/v1": {
+    "directory": true
+  },
+  ".pi": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/pi/AGENTS.md",
+    "resolves": true
+  },
+  ".pi/.agent-environment-backup/2": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/2/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/beta/rendered/pi/AGENTS.md",
+    "resolves": true
+  },
+  ".pi/.agent-environment-backup/3": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/3/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/alpha/rendered/pi/AGENTS.md",
+    "resolves": true
+  },
+  ".pi/.agent-environment.json": {
+    "sha256": "039756d47236d35f4f780c8b4e611bdf58d53dfc994ab8948bbb4ae962e54d0f",
+    "bytes": 793
+  },
+  ".pi/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/home/.curator/profiles/beta/rendered/pi/AGENTS.md",
+    "resolves": true
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-04/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile list
+stdout:
+alpha	alpha	path	./alpha	path ./alpha	1.0.0	sha256:366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957	
+beta	beta	path	./beta	path ./beta	1.0.0	sha256:3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047	current
+default	default	local	-	local -	0.0.0	sha256:06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4	
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+
+===== sandbox-05/sandbox.log =====
+Private CLI reproductions; no inherited environment or credentials.
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/A/project
+$ git init -q -b main
+stdout:
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/A/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator bootstrap -non-interactive --skills-root $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/A/sources
+stdout:
+wrote $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/A/home/.curator/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/A/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator project resolve .
+stdout:
+resolve project: 1 skills
+lock: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/A/project/Skillfile.lock.json
+bindings: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/A/home/.curator/source-bindings/30cc9c376875a773.json
+lock_sha256: sha256:7d9205c4f6e0aa868da484716bfd104f9f87663eecbc38e0ce539b74f760a36c
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/A/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator install .
+stdout:
+project: sample    context=yes commands=[] via=<project> installed
+project: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 34427: invalid argument; all builds retained
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+A BEFORE managed $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/A/project/.agents
+{
+  "env.ps1": {
+    "sha256": "28c63c72bc490f6b05036136733659cc788c4035ef7137b14643f5f33cfd1059",
+    "bytes": 264
+  },
+  "env.sh": {
+    "sha256": "ebe6c8ce75ef68bf4ff8eff7c549cccebf1c5c72b0671a3c82afb2a9b395b88c",
+    "bytes": 382
+  },
+  "skills": {
+    "directory": true
+  },
+  "skills/loose.txt": {
+    "sha256": "7770448a73f1fd7f493ef3018012ce433a3382bdbf6e5f39badbba93dc7c6aa1",
+    "bytes": 24
+  },
+  "skills/sample": {
+    "directory": true
+  },
+  "skills/sample/.csk-install.json": {
+    "sha256": "3177dcf2473d75add45ba6f302487ce290de3540a2f9b3ddc8fe0e3a786f90e5",
+    "bytes": 760
+  },
+  "skills/sample/SKILL.md": {
+    "sha256": "52186a317289e99003af01971a8c9dcea38deb77b4733acc445a51ce71357469",
+    "bytes": 81
+  },
+  "skills/unmanaged-notes": {
+    "directory": true
+  },
+  "skills/unmanaged-notes/notes.md": {
+    "sha256": "9e39549a24dd982d2352d39dbf082f8c90c38bc7326f792c21556e78d1dbb7fb",
+    "bytes": 19
+  },
+  "skills/unmanaged-skill": {
+    "directory": true
+  },
+  "skills/unmanaged-skill/SKILL.md": {
+    "sha256": "c5ea0768451564a3cff47b80fa065e37d43c936ad65ed9eed536b4ec0a29e42c",
+    "bytes": 13
+  }
+}
+A BEFORE native $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/A/project/.codex
+{
+  "skills": {
+    "directory": true
+  },
+  "skills/.csk-managed.json": {
+    "sha256": "6f1fc2af1fdbbcbfc7fb5a0dc982cd2d1d2fa09d6e55c54769c6d9bd71906c49",
+    "bytes": 59
+  },
+  "skills/manual-link": {
+    "link": "../../.agents/skills/unmanaged-skill",
+    "resolves": true
+  },
+  "skills/sample": {
+    "link": "../../.agents/skills/sample",
+    "resolves": true
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/A/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator install .
+stdout:
+project: sample    context=yes commands=[] via=<project> installed
+project: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 34427: invalid argument; all builds retained
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+A AFTER managed $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/A/project/.agents
+{
+  "env.ps1": {
+    "sha256": "28c63c72bc490f6b05036136733659cc788c4035ef7137b14643f5f33cfd1059",
+    "bytes": 264
+  },
+  "env.sh": {
+    "sha256": "ebe6c8ce75ef68bf4ff8eff7c549cccebf1c5c72b0671a3c82afb2a9b395b88c",
+    "bytes": 382
+  },
+  "skills": {
+    "directory": true
+  },
+  "skills/sample": {
+    "directory": true
+  },
+  "skills/sample/.csk-install.json": {
+    "sha256": "111eb975f91025c1989d03f52954da0a7a9d04c997cfd70a7d50299aa0fdf0e1",
+    "bytes": 760
+  },
+  "skills/sample/SKILL.md": {
+    "sha256": "52186a317289e99003af01971a8c9dcea38deb77b4733acc445a51ce71357469",
+    "bytes": 81
+  }
+}
+A AFTER native $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/A/project/.codex
+{
+  "skills": {
+    "directory": true
+  },
+  "skills/.csk-managed.json": {
+    "sha256": "6f1fc2af1fdbbcbfc7fb5a0dc982cd2d1d2fa09d6e55c54769c6d9bd71906c49",
+    "bytes": 59
+  },
+  "skills/manual-link": {
+    "link": "../../.agents/skills/unmanaged-skill",
+    "resolves": false
+  },
+  "skills/sample": {
+    "link": "../../.agents/skills/sample",
+    "resolves": true
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/project
+$ git init -q -b main
+stdout:
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator bootstrap -non-interactive --skills-root $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/sources
+stdout:
+wrote $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/home/.curator/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator skill check ./agents/skills/sample
+stdout:
+$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/project/agents/skills/sample: ok
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator project resolve .
+stdout:
+resolve project: 1 skills
+lock: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/project/Skillfile.lock.json
+bindings: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/home/.curator/source-bindings/32e87638e613f6ef.json
+lock_sha256: sha256:0331f77c28609b0b17d60967c0f84228c3fdb09a3063bc4fee55d1855c9995f6
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator install .
+stdout:
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+error: sample: install marker is invalid for schema 5
+exit=1
+B rejection project output $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/project/.agents
+{}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator skill check ./agents/skills/sample
+stdout:
+$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/project/agents/skills/sample: ok
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator project refresh .
+stdout:
+refresh project: 1 skills
+lock: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/project/Skillfile.lock.json
+bindings: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/home/.curator/source-bindings/32e87638e613f6ef.json
+lock_sha256: sha256:7d9205c4f6e0aa868da484716bfd104f9f87663eecbc38e0ce539b74f760a36c
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/B/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator install .
+stdout:
+project: sample    context=yes commands=[] via=<project> installed
+project: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 34427: invalid argument; all builds retained
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/C-project/project
+$ git init -q -b main
+stdout:
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/C-project/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator bootstrap -non-interactive --skills-root $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/C-project/sources
+stdout:
+wrote $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/C-project/home/.curator/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+stderr:
+exit=0
+C project BEFORE $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/C-project/project/.agents
+{
+  ".instructions": {
+    "directory": true
+  },
+  ".instructions/hand.md": {
+    "sha256": "f680d0f2ec0d8456407dde8182cadb327c2d6208e4ddb19377e0345fdbe534e1",
+    "bytes": 40
+  },
+  "README.md": {
+    "sha256": "2233fad0d1a4c24773ce103f078f25e6a83f1569a8813a2ff2af7b57a9379203",
+    "bytes": 25
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/C-project/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator project resolve .
+stdout:
+resolve project: 1 skills
+lock: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/C-project/project/Skillfile.lock.json
+bindings: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/C-project/home/.curator/source-bindings/67032001c37f899f.json
+lock_sha256: sha256:7d9205c4f6e0aa868da484716bfd104f9f87663eecbc38e0ce539b74f760a36c
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/C-project/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator install .
+stdout:
+project: sample    context=yes commands=[] via=<project> installed
+project: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 34427: invalid argument; all builds retained
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+C project AFTER $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/C-project/project/.agents
+{
+  ".instructions": {
+    "directory": true
+  },
+  ".instructions/hand.md": {
+    "sha256": "f680d0f2ec0d8456407dde8182cadb327c2d6208e4ddb19377e0345fdbe534e1",
+    "bytes": 40
+  },
+  "README.md": {
+    "sha256": "2233fad0d1a4c24773ce103f078f25e6a83f1569a8813a2ff2af7b57a9379203",
+    "bytes": 25
+  },
+  "env.ps1": {
+    "sha256": "28c63c72bc490f6b05036136733659cc788c4035ef7137b14643f5f33cfd1059",
+    "bytes": 264
+  },
+  "env.sh": {
+    "sha256": "ebe6c8ce75ef68bf4ff8eff7c549cccebf1c5c72b0671a3c82afb2a9b395b88c",
+    "bytes": 382
+  },
+  "skills": {
+    "directory": true
+  },
+  "skills/sample": {
+    "directory": true
+  },
+  "skills/sample/.csk-install.json": {
+    "sha256": "ece11bba67351ae1b357c5a52d09083fded435b84a087dd46e4d6e7b68ee3aeb",
+    "bytes": 760
+  },
+  "skills/sample/SKILL.md": {
+    "sha256": "52186a317289e99003af01971a8c9dcea38deb77b4733acc445a51ce71357469",
+    "bytes": 81
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/project
+$ git init -q -b main
+stdout:
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator bootstrap -non-interactive --skills-root $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/sources
+stdout:
+wrote $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+stderr:
+exit=0
+D BEFORE $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home
+{
+  ".curator": {
+    "directory": true
+  },
+  ".curator/config.json": {
+    "sha256": "467884d0eb4d006593101eafc59d5b4e9e0d0e52a7bea28f045c4a252bb08cc5",
+    "bytes": 261
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile install ./alpha
+stdout:
+claude_code: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.claude)
+codex_cli: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.codex)
+opencode: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.config/opencode)
+pi: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.pi)
+installed and activated profile alpha (root alpha 1.0.0, lock sha256:366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957)
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile list
+stdout:
+alpha	alpha	path	./alpha	path ./alpha	1.0.0	sha256:366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957	current
+default	default	local	-	local -	0.0.0	sha256:06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4	
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+D AFTER $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home
+{
+  ".claude": {
+    "directory": true
+  },
+  ".claude/.agent-environment.json": {
+    "sha256": "6f8afa97ded4d6e46060ed38eca359337010563250d80427b348066cbbbdc793",
+    "bytes": 902
+  },
+  ".claude/CLAUDE.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".codex": {
+    "directory": true
+  },
+  ".codex/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".codex/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".config": {
+    "directory": true
+  },
+  ".config/opencode": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".config/opencode/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".curator": {
+    "directory": true
+  },
+  ".curator/audit": {
+    "directory": true
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/verdict-null--1-2.json": {
+    "sha256": "f36eca9676933ac9bd8d2d220146752a364780bed71a675c6ce40c14f40273b8",
+    "bytes": 330
+  },
+  ".curator/config.json": {
+    "sha256": "467884d0eb4d006593101eafc59d5b4e9e0d0e52a7bea28f045c4a252bb08cc5",
+    "bytes": 261
+  },
+  ".curator/contexts": {
+    "directory": true
+  },
+  ".curator/contexts/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/agent-context.json": {
+    "sha256": "fe3804dea44592388c87b7ad7113eedc933b8f1be4a7f1e0447cb030d19f3b48",
+    "bytes": 102
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context/a.md": {
+    "sha256": "e08f14b2d0cceb2c97a11e82efd94f9d09ce50d67db0cf545f92002b6e818559",
+    "bytes": 14
+  },
+  ".curator/contexts/context/default": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c/agent-context.json": {
+    "sha256": "c983559c39533345fe36ddd49361b9ae9748501cf341e0af971c15cbf8e350aa",
+    "bytes": 61
+  },
+  ".curator/profiles": {
+    "directory": true
+  },
+  ".curator/profiles/alpha": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/lock.json": {
+    "sha256": "366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957",
+    "bytes": 242
+  },
+  ".curator/profiles/alpha/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/opencode/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/pi/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/source.json": {
+    "sha256": "40493b200b6ebb0ac7660bf3ffae57c37cd3423b1299ba9cfe18bf8c3baaa1f2",
+    "bytes": 63
+  },
+  ".curator/profiles/current": {
+    "sha256": "b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060",
+    "bytes": 6
+  },
+  ".curator/profiles/default": {
+    "directory": true
+  },
+  ".curator/profiles/default/lock.json": {
+    "sha256": "06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4",
+    "bytes": 246
+  },
+  ".curator/profiles/default/source.json": {
+    "sha256": "cc25406719c6bc36269a587a93433412bf705bb3734ee21d9087ea62fe849342",
+    "bytes": 43
+  },
+  ".curator/state": {
+    "directory": true
+  },
+  ".curator/state/locks": {
+    "directory": true
+  },
+  ".curator/state/locks/v1": {
+    "directory": true
+  },
+  ".curator/state/locks/v1/cd3580f6fb094747f215dd7849cfd389f29e8f63bdb1ecdf5e408c67ce48309a.lock": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  ".curator/state/transactions": {
+    "directory": true
+  },
+  ".curator/state/transactions/v1": {
+    "directory": true
+  },
+  ".pi": {
+    "directory": true
+  },
+  ".pi/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".pi/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/pi/AGENTS.md",
+    "resolves": true
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile install ./beta
+stdout:
+installed profile beta (root beta 1.0.0, lock sha256:3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047); activate with 'curator profile use beta'
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+warning: mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile list
+stdout:
+alpha	alpha	path	./alpha	path ./alpha	1.0.0	sha256:366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957	current
+beta	beta	path	./beta	path ./beta	1.0.0	sha256:3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047	
+default	default	local	-	local -	0.0.0	sha256:06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4	
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+E marker candidates: ['$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.claude/.agent-environment.json']
+E BEFORE $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home
+{
+  ".claude": {
+    "directory": true
+  },
+  ".claude/CLAUDE.md": {
+    "sha256": "8ac55d38584d6a891f374bcf24f90ee1ed78ca8ba25f87126108208560350a96",
+    "bytes": 40
+  },
+  ".codex": {
+    "directory": true
+  },
+  ".codex/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".codex/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".config": {
+    "directory": true
+  },
+  ".config/opencode": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".config/opencode/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".curator": {
+    "directory": true
+  },
+  ".curator/audit": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/verdict-null--1-2.json": {
+    "sha256": "9656057b8bc6910e4eb6b5e8aba07c7f86165611458f54dab37e86970124fe5d",
+    "bytes": 329
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/verdict-null--1-2.json": {
+    "sha256": "f36eca9676933ac9bd8d2d220146752a364780bed71a675c6ce40c14f40273b8",
+    "bytes": 330
+  },
+  ".curator/config.json": {
+    "sha256": "467884d0eb4d006593101eafc59d5b4e9e0d0e52a7bea28f045c4a252bb08cc5",
+    "bytes": 261
+  },
+  ".curator/contexts": {
+    "directory": true
+  },
+  ".curator/contexts/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/agent-context.json": {
+    "sha256": "fe3804dea44592388c87b7ad7113eedc933b8f1be4a7f1e0447cb030d19f3b48",
+    "bytes": 102
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context/a.md": {
+    "sha256": "e08f14b2d0cceb2c97a11e82efd94f9d09ce50d67db0cf545f92002b6e818559",
+    "bytes": 14
+  },
+  ".curator/contexts/context/beta": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/agent-context.json": {
+    "sha256": "49e9ff8919c6cb8567cdf944a3bef50d2c011102f28ec736ce9d0a24ebed43e4",
+    "bytes": 101
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context/a.md": {
+    "sha256": "7cec3841f774fff6802fe9b62a0f29577ace0c38d5b5b4f3f1fe71218e7398ab",
+    "bytes": 13
+  },
+  ".curator/contexts/context/default": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c/agent-context.json": {
+    "sha256": "c983559c39533345fe36ddd49361b9ae9748501cf341e0af971c15cbf8e350aa",
+    "bytes": 61
+  },
+  ".curator/profiles": {
+    "directory": true
+  },
+  ".curator/profiles/alpha": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/lock.json": {
+    "sha256": "366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957",
+    "bytes": 242
+  },
+  ".curator/profiles/alpha/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/opencode/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/pi/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/source.json": {
+    "sha256": "40493b200b6ebb0ac7660bf3ffae57c37cd3423b1299ba9cfe18bf8c3baaa1f2",
+    "bytes": 63
+  },
+  ".curator/profiles/beta": {
+    "directory": true
+  },
+  ".curator/profiles/beta/lock.json": {
+    "sha256": "3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047",
+    "bytes": 240
+  },
+  ".curator/profiles/beta/source.json": {
+    "sha256": "b2c1f47c9f8af168cb19e51c6a80211b767df5dfcf2e5d336680b54301f2672a",
+    "bytes": 62
+  },
+  ".curator/profiles/current": {
+    "sha256": "b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060",
+    "bytes": 6
+  },
+  ".curator/profiles/default": {
+    "directory": true
+  },
+  ".curator/profiles/default/lock.json": {
+    "sha256": "06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4",
+    "bytes": 246
+  },
+  ".curator/profiles/default/source.json": {
+    "sha256": "cc25406719c6bc36269a587a93433412bf705bb3734ee21d9087ea62fe849342",
+    "bytes": 43
+  },
+  ".curator/state": {
+    "directory": true
+  },
+  ".curator/state/locks": {
+    "directory": true
+  },
+  ".curator/state/locks/v1": {
+    "directory": true
+  },
+  ".curator/state/locks/v1/cd3580f6fb094747f215dd7849cfd389f29e8f63bdb1ecdf5e408c67ce48309a.lock": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  ".curator/state/transactions": {
+    "directory": true
+  },
+  ".curator/state/transactions/v1": {
+    "directory": true
+  },
+  ".pi": {
+    "directory": true
+  },
+  ".pi/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".pi/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/pi/AGENTS.md",
+    "resolves": true
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile use beta
+stdout:
+codex_cli: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.codex)
+opencode: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.config/opencode)
+pi: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.pi)
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+claude_code: environment_surface_unmanaged_conflict: CLAUDE.md exists and no marker records it
+curator: profile_use_partial: the scope is partially switched; the recorded current is unchanged
+exit=1
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile list
+stdout:
+alpha	alpha	path	./alpha	path ./alpha	1.0.0	sha256:366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957	current
+beta	beta	path	./beta	path ./beta	1.0.0	sha256:3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047	
+default	default	local	-	local -	0.0.0	sha256:06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4	
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+E AFTER failed use $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home
+{
+  ".claude": {
+    "directory": true
+  },
+  ".claude/CLAUDE.md": {
+    "sha256": "8ac55d38584d6a891f374bcf24f90ee1ed78ca8ba25f87126108208560350a96",
+    "bytes": 40
+  },
+  ".codex": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".codex/.agent-environment.json": {
+    "sha256": "039756d47236d35f4f780c8b4e611bdf58d53dfc994ab8948bbb4ae962e54d0f",
+    "bytes": 793
+  },
+  ".codex/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/beta/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".config": {
+    "directory": true
+  },
+  ".config/opencode": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".config/opencode/.agent-environment.json": {
+    "sha256": "039756d47236d35f4f780c8b4e611bdf58d53dfc994ab8948bbb4ae962e54d0f",
+    "bytes": 793
+  },
+  ".config/opencode/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/beta/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".curator": {
+    "directory": true
+  },
+  ".curator/audit": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/verdict-null--1-2.json": {
+    "sha256": "9656057b8bc6910e4eb6b5e8aba07c7f86165611458f54dab37e86970124fe5d",
+    "bytes": 329
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/verdict-null--1-2.json": {
+    "sha256": "f36eca9676933ac9bd8d2d220146752a364780bed71a675c6ce40c14f40273b8",
+    "bytes": 330
+  },
+  ".curator/config.json": {
+    "sha256": "467884d0eb4d006593101eafc59d5b4e9e0d0e52a7bea28f045c4a252bb08cc5",
+    "bytes": 261
+  },
+  ".curator/contexts": {
+    "directory": true
+  },
+  ".curator/contexts/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/agent-context.json": {
+    "sha256": "fe3804dea44592388c87b7ad7113eedc933b8f1be4a7f1e0447cb030d19f3b48",
+    "bytes": 102
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context/a.md": {
+    "sha256": "e08f14b2d0cceb2c97a11e82efd94f9d09ce50d67db0cf545f92002b6e818559",
+    "bytes": 14
+  },
+  ".curator/contexts/context/beta": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/agent-context.json": {
+    "sha256": "49e9ff8919c6cb8567cdf944a3bef50d2c011102f28ec736ce9d0a24ebed43e4",
+    "bytes": 101
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context/a.md": {
+    "sha256": "7cec3841f774fff6802fe9b62a0f29577ace0c38d5b5b4f3f1fe71218e7398ab",
+    "bytes": 13
+  },
+  ".curator/contexts/context/default": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c/agent-context.json": {
+    "sha256": "c983559c39533345fe36ddd49361b9ae9748501cf341e0af971c15cbf8e350aa",
+    "bytes": 61
+  },
+  ".curator/profiles": {
+    "directory": true
+  },
+  ".curator/profiles/alpha": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/lock.json": {
+    "sha256": "366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957",
+    "bytes": 242
+  },
+  ".curator/profiles/alpha/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/opencode/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/pi/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/source.json": {
+    "sha256": "40493b200b6ebb0ac7660bf3ffae57c37cd3423b1299ba9cfe18bf8c3baaa1f2",
+    "bytes": 63
+  },
+  ".curator/profiles/beta": {
+    "directory": true
+  },
+  ".curator/profiles/beta/lock.json": {
+    "sha256": "3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047",
+    "bytes": 240
+  },
+  ".curator/profiles/beta/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/opencode/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/pi/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/source.json": {
+    "sha256": "b2c1f47c9f8af168cb19e51c6a80211b767df5dfcf2e5d336680b54301f2672a",
+    "bytes": 62
+  },
+  ".curator/profiles/current": {
+    "sha256": "b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060",
+    "bytes": 6
+  },
+  ".curator/profiles/default": {
+    "directory": true
+  },
+  ".curator/profiles/default/lock.json": {
+    "sha256": "06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4",
+    "bytes": 246
+  },
+  ".curator/profiles/default/source.json": {
+    "sha256": "cc25406719c6bc36269a587a93433412bf705bb3734ee21d9087ea62fe849342",
+    "bytes": 43
+  },
+  ".curator/state": {
+    "directory": true
+  },
+  ".curator/state/locks": {
+    "directory": true
+  },
+  ".curator/state/locks/v1": {
+    "directory": true
+  },
+  ".curator/state/locks/v1/cd3580f6fb094747f215dd7849cfd389f29e8f63bdb1ecdf5e408c67ce48309a.lock": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  ".curator/state/transactions": {
+    "directory": true
+  },
+  ".curator/state/transactions/v1": {
+    "directory": true
+  },
+  ".pi": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/pi/AGENTS.md",
+    "resolves": true
+  },
+  ".pi/.agent-environment.json": {
+    "sha256": "039756d47236d35f4f780c8b4e611bdf58d53dfc994ab8948bbb4ae962e54d0f",
+    "bytes": 793
+  },
+  ".pi/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/beta/rendered/pi/AGENTS.md",
+    "resolves": true
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile use alpha
+stdout:
+codex_cli: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.codex)
+opencode: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.config/opencode)
+pi: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.pi)
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+claude_code: environment_surface_unmanaged_conflict: CLAUDE.md exists and no marker records it
+curator: profile_use_partial: the scope is partially switched; the recorded current is unchanged
+exit=1
+E AFTER recovery attempt $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home
+{
+  ".claude": {
+    "directory": true
+  },
+  ".claude/CLAUDE.md": {
+    "sha256": "8ac55d38584d6a891f374bcf24f90ee1ed78ca8ba25f87126108208560350a96",
+    "bytes": 40
+  },
+  ".codex": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".codex/.agent-environment-backup/2": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/2/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/beta/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".codex/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".codex/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".config": {
+    "directory": true
+  },
+  ".config/opencode": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".config/opencode/.agent-environment-backup/2": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/2/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/beta/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".config/opencode/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".config/opencode/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".curator": {
+    "directory": true
+  },
+  ".curator/audit": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/verdict-null--1-2.json": {
+    "sha256": "9656057b8bc6910e4eb6b5e8aba07c7f86165611458f54dab37e86970124fe5d",
+    "bytes": 329
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/verdict-null--1-2.json": {
+    "sha256": "f36eca9676933ac9bd8d2d220146752a364780bed71a675c6ce40c14f40273b8",
+    "bytes": 330
+  },
+  ".curator/config.json": {
+    "sha256": "467884d0eb4d006593101eafc59d5b4e9e0d0e52a7bea28f045c4a252bb08cc5",
+    "bytes": 261
+  },
+  ".curator/contexts": {
+    "directory": true
+  },
+  ".curator/contexts/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/agent-context.json": {
+    "sha256": "fe3804dea44592388c87b7ad7113eedc933b8f1be4a7f1e0447cb030d19f3b48",
+    "bytes": 102
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context/a.md": {
+    "sha256": "e08f14b2d0cceb2c97a11e82efd94f9d09ce50d67db0cf545f92002b6e818559",
+    "bytes": 14
+  },
+  ".curator/contexts/context/beta": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/agent-context.json": {
+    "sha256": "49e9ff8919c6cb8567cdf944a3bef50d2c011102f28ec736ce9d0a24ebed43e4",
+    "bytes": 101
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context/a.md": {
+    "sha256": "7cec3841f774fff6802fe9b62a0f29577ace0c38d5b5b4f3f1fe71218e7398ab",
+    "bytes": 13
+  },
+  ".curator/contexts/context/default": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c/agent-context.json": {
+    "sha256": "c983559c39533345fe36ddd49361b9ae9748501cf341e0af971c15cbf8e350aa",
+    "bytes": 61
+  },
+  ".curator/profiles": {
+    "directory": true
+  },
+  ".curator/profiles/alpha": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/lock.json": {
+    "sha256": "366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957",
+    "bytes": 242
+  },
+  ".curator/profiles/alpha/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/opencode/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/pi/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/source.json": {
+    "sha256": "40493b200b6ebb0ac7660bf3ffae57c37cd3423b1299ba9cfe18bf8c3baaa1f2",
+    "bytes": 63
+  },
+  ".curator/profiles/beta": {
+    "directory": true
+  },
+  ".curator/profiles/beta/lock.json": {
+    "sha256": "3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047",
+    "bytes": 240
+  },
+  ".curator/profiles/beta/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/opencode/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/pi/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/source.json": {
+    "sha256": "b2c1f47c9f8af168cb19e51c6a80211b767df5dfcf2e5d336680b54301f2672a",
+    "bytes": 62
+  },
+  ".curator/profiles/current": {
+    "sha256": "b6a98d9ce9a2d9149288fa3df42d377c3e42737afdcdaf714e33c0a100b51060",
+    "bytes": 6
+  },
+  ".curator/profiles/default": {
+    "directory": true
+  },
+  ".curator/profiles/default/lock.json": {
+    "sha256": "06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4",
+    "bytes": 246
+  },
+  ".curator/profiles/default/source.json": {
+    "sha256": "cc25406719c6bc36269a587a93433412bf705bb3734ee21d9087ea62fe849342",
+    "bytes": 43
+  },
+  ".curator/state": {
+    "directory": true
+  },
+  ".curator/state/locks": {
+    "directory": true
+  },
+  ".curator/state/locks/v1": {
+    "directory": true
+  },
+  ".curator/state/locks/v1/cd3580f6fb094747f215dd7849cfd389f29e8f63bdb1ecdf5e408c67ce48309a.lock": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  ".curator/state/transactions": {
+    "directory": true
+  },
+  ".curator/state/transactions/v1": {
+    "directory": true
+  },
+  ".pi": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/pi/AGENTS.md",
+    "resolves": true
+  },
+  ".pi/.agent-environment-backup/2": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/2/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/beta/rendered/pi/AGENTS.md",
+    "resolves": true
+  },
+  ".pi/.agent-environment.json": {
+    "sha256": "c0db326a083d1082cd1e6b38e27fdaa09af8e345a729e244f058197323925bfe",
+    "bytes": 797
+  },
+  ".pi/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/pi/AGENTS.md",
+    "resolves": true
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile use beta --takeover
+stdout:
+claude_code: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.claude)
+codex_cli: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.codex)
+opencode: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.config/opencode)
+pi: switched ($WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.pi)
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+notice: taking over unmanaged CLAUDE.md for claude_code: native global context files are being replaced by managed ones; backups land in $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.claude/.agent-environment-backup/
+exit=0
+C native AFTER takeover $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home
+{
+  ".claude": {
+    "directory": true
+  },
+  ".claude/.agent-environment-backup": {
+    "directory": true
+  },
+  ".claude/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".claude/.agent-environment-backup/1/CLAUDE.md": {
+    "sha256": "8ac55d38584d6a891f374bcf24f90ee1ed78ca8ba25f87126108208560350a96",
+    "bytes": 40
+  },
+  ".claude/.agent-environment.json": {
+    "sha256": "1ecc545bd41b363856a5e994b44ac7ce2ca1db9971c05f389508c0fe8c246adb",
+    "bytes": 898
+  },
+  ".claude/CLAUDE.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".codex": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".codex/.agent-environment-backup/2": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/2/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/beta/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".codex/.agent-environment-backup/3": {
+    "directory": true
+  },
+  ".codex/.agent-environment-backup/3/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".codex/.agent-environment.json": {
+    "sha256": "039756d47236d35f4f780c8b4e611bdf58d53dfc994ab8948bbb4ae962e54d0f",
+    "bytes": 793
+  },
+  ".codex/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/beta/rendered/codex_cli/AGENTS.md",
+    "resolves": true
+  },
+  ".config": {
+    "directory": true
+  },
+  ".config/opencode": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".config/opencode/.agent-environment-backup/2": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/2/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/beta/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".config/opencode/.agent-environment-backup/3": {
+    "directory": true
+  },
+  ".config/opencode/.agent-environment-backup/3/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".config/opencode/.agent-environment.json": {
+    "sha256": "039756d47236d35f4f780c8b4e611bdf58d53dfc994ab8948bbb4ae962e54d0f",
+    "bytes": 793
+  },
+  ".config/opencode/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/beta/rendered/opencode/AGENTS.md",
+    "resolves": true
+  },
+  ".curator": {
+    "directory": true
+  },
+  ".curator/audit": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/audit/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/verdict-null--1-2.json": {
+    "sha256": "9656057b8bc6910e4eb6b5e8aba07c7f86165611458f54dab37e86970124fe5d",
+    "bytes": 329
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/audit/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/verdict-null--1-2.json": {
+    "sha256": "f36eca9676933ac9bd8d2d220146752a364780bed71a675c6ce40c14f40273b8",
+    "bytes": 330
+  },
+  ".curator/config.json": {
+    "sha256": "467884d0eb4d006593101eafc59d5b4e9e0d0e52a7bea28f045c4a252bb08cc5",
+    "bytes": 261
+  },
+  ".curator/contexts": {
+    "directory": true
+  },
+  ".curator/contexts/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/agent-context.json": {
+    "sha256": "fe3804dea44592388c87b7ad7113eedc933b8f1be4a7f1e0447cb030d19f3b48",
+    "bytes": 102
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/alpha/69cfddf4726785cbb07612b702923129866c4902e9c51ccc30a3508cdf2bbbd3/context/a.md": {
+    "sha256": "e08f14b2d0cceb2c97a11e82efd94f9d09ce50d67db0cf545f92002b6e818559",
+    "bytes": 14
+  },
+  ".curator/contexts/context/beta": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/agent-context.json": {
+    "sha256": "49e9ff8919c6cb8567cdf944a3bef50d2c011102f28ec736ce9d0a24ebed43e4",
+    "bytes": 101
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context": {
+    "directory": true
+  },
+  ".curator/contexts/context/beta/045d44cfaf758772fb39e6c7e91c6a08edd8d58cc1b0c396d72ce46e777e12ed/context/a.md": {
+    "sha256": "7cec3841f774fff6802fe9b62a0f29577ace0c38d5b5b4f3f1fe71218e7398ab",
+    "bytes": 13
+  },
+  ".curator/contexts/context/default": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c": {
+    "directory": true
+  },
+  ".curator/contexts/context/default/dad68a7531ffbbbe74916f1dbf2af120a39c5f3ed147e0b98f8de51055a2363c/agent-context.json": {
+    "sha256": "c983559c39533345fe36ddd49361b9ae9748501cf341e0af971c15cbf8e350aa",
+    "bytes": 61
+  },
+  ".curator/profiles": {
+    "directory": true
+  },
+  ".curator/profiles/alpha": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/lock.json": {
+    "sha256": "366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957",
+    "bytes": 242
+  },
+  ".curator/profiles/alpha/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/opencode/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/alpha/rendered/pi/AGENTS.md": {
+    "sha256": "53293e2425bf8f1ae5ccae93120d80c8f6540b210988c7667e7d45ffa9521664",
+    "bytes": 662
+  },
+  ".curator/profiles/alpha/source.json": {
+    "sha256": "40493b200b6ebb0ac7660bf3ffae57c37cd3423b1299ba9cfe18bf8c3baaa1f2",
+    "bytes": 63
+  },
+  ".curator/profiles/beta": {
+    "directory": true
+  },
+  ".curator/profiles/beta/lock.json": {
+    "sha256": "3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047",
+    "bytes": 240
+  },
+  ".curator/profiles/beta/rendered": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/codex_cli": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/codex_cli/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/rendered/opencode": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/opencode/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/rendered/pi": {
+    "directory": true
+  },
+  ".curator/profiles/beta/rendered/pi/AGENTS.md": {
+    "sha256": "53f7b4c5401f1250f63cc2bf6036d6e37bec1753f859f14f530f550f4c94b1cb",
+    "bytes": 658
+  },
+  ".curator/profiles/beta/source.json": {
+    "sha256": "b2c1f47c9f8af168cb19e51c6a80211b767df5dfcf2e5d336680b54301f2672a",
+    "bytes": 62
+  },
+  ".curator/profiles/current": {
+    "sha256": "f2c82decdd7181cf98945929a62598db7e6b477e11f6e0eb0ae97020eff151ad",
+    "bytes": 5
+  },
+  ".curator/profiles/default": {
+    "directory": true
+  },
+  ".curator/profiles/default/lock.json": {
+    "sha256": "06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4",
+    "bytes": 246
+  },
+  ".curator/profiles/default/source.json": {
+    "sha256": "cc25406719c6bc36269a587a93433412bf705bb3734ee21d9087ea62fe849342",
+    "bytes": 43
+  },
+  ".curator/state": {
+    "directory": true
+  },
+  ".curator/state/locks": {
+    "directory": true
+  },
+  ".curator/state/locks/v1": {
+    "directory": true
+  },
+  ".curator/state/locks/v1/cd3580f6fb094747f215dd7849cfd389f29e8f63bdb1ecdf5e408c67ce48309a.lock": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  ".curator/state/transactions": {
+    "directory": true
+  },
+  ".curator/state/transactions/v1": {
+    "directory": true
+  },
+  ".pi": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/1": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/1/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/pi/AGENTS.md",
+    "resolves": true
+  },
+  ".pi/.agent-environment-backup/2": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/2/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/beta/rendered/pi/AGENTS.md",
+    "resolves": true
+  },
+  ".pi/.agent-environment-backup/3": {
+    "directory": true
+  },
+  ".pi/.agent-environment-backup/3/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/alpha/rendered/pi/AGENTS.md",
+    "resolves": true
+  },
+  ".pi/.agent-environment.json": {
+    "sha256": "039756d47236d35f4f780c8b4e611bdf58d53dfc994ab8948bbb4ae962e54d0f",
+    "bytes": 793
+  },
+  ".pi/AGENTS.md": {
+    "link": "$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/home/.curator/profiles/beta/rendered/pi/AGENTS.md",
+    "resolves": true
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-05/D-E/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator profile list
+stdout:
+alpha	alpha	path	./alpha	path ./alpha	1.0.0	sha256:366e2619b74df94f355d815f87895e63965af9c016c172b672a04db6d0db5957	
+beta	beta	path	./beta	path ./beta	1.0.0	sha256:3e0d36c30c50fd557f7f0d889c04751a5ed6d1b5bbaf602a5a93fd2319b49047	current
+default	default	local	-	local -	0.0.0	sha256:06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4	
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+
+===== sandbox-06/sandbox.log =====
+Private CLI reproductions; no inherited environment or credentials.
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-selected/project
+$ git init -q -b main
+stdout:
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-selected/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator bootstrap -non-interactive --skills-root $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-selected/sources
+stdout:
+wrote $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-selected/home/.curator/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-selected/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator project resolve .
+stdout:
+resolve project: 1 skills
+lock: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-selected/project/Skillfile.lock.json
+bindings: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-selected/home/.curator/source-bindings/9f2b1a03bf3938bc.json
+lock_sha256: sha256:7d9205c4f6e0aa868da484716bfd104f9f87663eecbc38e0ce539b74f760a36c
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+C selected BEFORE $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-selected/project/.agents
+{
+  "skills": {
+    "directory": true
+  },
+  "skills/sample": {
+    "directory": true
+  },
+  "skills/sample/SKILL.md": {
+    "sha256": "c40373fc8fafe5373a644c29f3992308b6babf5be0a1137970c9c5bd1375f734",
+    "bytes": 39
+  },
+  "skills/sample/private-note.md": {
+    "sha256": "8689ae45e7d0cd4be236c16a64b47ede9f106256d29dbc3d90c3f77b5d3c4560",
+    "bytes": 26
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-selected/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator install .
+stdout:
+project: sample    context=yes commands=[] via=<project> installed
+project: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 50418: invalid argument; all builds retained
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+C selected AFTER $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-selected/project/.agents
+{
+  "env.ps1": {
+    "sha256": "28c63c72bc490f6b05036136733659cc788c4035ef7137b14643f5f33cfd1059",
+    "bytes": 264
+  },
+  "env.sh": {
+    "sha256": "ebe6c8ce75ef68bf4ff8eff7c549cccebf1c5c72b0671a3c82afb2a9b395b88c",
+    "bytes": 382
+  },
+  "skills": {
+    "directory": true
+  },
+  "skills/sample": {
+    "directory": true
+  },
+  "skills/sample/.csk-install.json": {
+    "sha256": "30e69e46cc32317f9c749d8fdc1dd2e1c3e6890f504f400273a4f55f9bef9137",
+    "bytes": 760
+  },
+  "skills/sample/SKILL.md": {
+    "sha256": "52186a317289e99003af01971a8c9dcea38deb77b4733acc445a51ce71357469",
+    "bytes": 81
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-native-adapter/project
+$ git init -q -b main
+stdout:
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-native-adapter/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator bootstrap -non-interactive --skills-root $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-native-adapter/sources
+stdout:
+wrote $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-native-adapter/home/.curator/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+stderr:
+exit=0
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-native-adapter/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator project resolve .
+stdout:
+resolve project: 1 skills
+lock: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-native-adapter/project/Skillfile.lock.json
+bindings: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-native-adapter/home/.curator/source-bindings/7d7aafad84dce12e.json
+lock_sha256: sha256:7d9205c4f6e0aa868da484716bfd104f9f87663eecbc38e0ce539b74f760a36c
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+exit=0
+C adapter BEFORE $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-native-adapter/project/.codex
+{
+  "skills": {
+    "directory": true
+  },
+  "skills/sample": {
+    "directory": true
+  },
+  "skills/sample/SKILL.md": {
+    "sha256": "e1f0272a2bf651169c022d38561007199fda63ca9536731bcb6dda5086df5058",
+    "bytes": 33
+  }
+}
+HOME CHECK: private, mode 0700; cwd=$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-native-adapter/project
+$ $WORKTREE/.temp/TASK-261017-yyg01d/curator install .
+stdout:
+stderr:
+warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+error: adapter target already exists and is not managed: $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-native-adapter/project/.codex/skills/sample
+exit=1
+C adapter AFTER $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-native-adapter/project/.codex
+{
+  "skills": {
+    "directory": true
+  },
+  "skills/sample": {
+    "directory": true
+  },
+  "skills/sample/SKILL.md": {
+    "sha256": "e1f0272a2bf651169c022d38561007199fda63ca9536731bcb6dda5086df5058",
+    "bytes": 33
+  }
+}
+C adapter canonical AFTER $WORKTREE/.temp/TASK-261017-yyg01d/sandbox-06/C-native-adapter/project/.agents
+{}
+OBSERVATION ASSERTIONS: A deletion + dangling link + managed positive control; C unrelated files preserved; native takeover backup bytes preserved: PASS
+
+===== driver-01.log =====
+Traceback (most recent call last):
+  File "$WORKTREE/.temp/TASK-261017-yyg01d/reproduce.py", line 63, in <module>
+    (p/'.codex/skills/manual-link').symlink_to('../../.agents/skills/unmanaged-skill')
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$PYTHON_STDLIB/pathlib/__init__.py", line 1213, in symlink_to
+    os.symlink(target, self, target_is_directory)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '../../.agents/skills/unmanaged-skill' -> '$WORKTREE/.temp/TASK-261017-yyg01d/A/project/.codex/skills/manual-link'
+
+===== driver-02.log =====
+Traceback (most recent call last):
+  File "$WORKTREE/.temp/TASK-261017-yyg01d/reproduce.py", line 65, in <module>
+    (p/'.codex/skills/manual-link').symlink_to('../../.agents/skills/unmanaged-skill')
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$PYTHON_STDLIB/pathlib/__init__.py", line 1213, in symlink_to
+    os.symlink(target, self, target_is_directory)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '../../.agents/skills/unmanaged-skill' -> '$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-02/A/project/.codex/skills/manual-link'
+
+===== driver-03.log =====
+Traceback (most recent call last):
+  File "$WORKTREE/.temp/TASK-261017-yyg01d/reproduce.py", line 66, in <module>
+    (p/'.codex/skills/manual-link').symlink_to('../../.agents/skills/unmanaged-skill')
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$PYTHON_STDLIB/pathlib/__init__.py", line 1213, in symlink_to
+    os.symlink(target, self, target_is_directory)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '../../.agents/skills/unmanaged-skill' -> '$WORKTREE/.temp/TASK-261017-yyg01d/sandbox-03/A/project/.codex/skills/manual-link'
+
+===== driver-04.log =====
+
+===== driver-05.log =====
+
+===== supplement-01.log =====
+
+===== observations-01.log =====
+Traceback (most recent call last):
+  File "$WORKTREE/.temp/TASK-261017-yyg01d/verify-observations.py", line 17, in <module>
+    assert digest(before,path)!=digest(partial,path)
+           ~~~~~~^^^^^^^^^^^^^
+  File "$WORKTREE/.temp/TASK-261017-yyg01d/verify-observations.py", line 9, in digest
+    def digest(snapshot,path): return snapshot[path]['sha256']
+                                      ~~~~~~~~~~~~~~^^^^^^^^^^
+KeyError: 'sha256'
+
+===== observations-02.log =====
+PASS: E Claude unchanged on refusal; 3/3 other roots changed, persisted, and restored by explicit retry; takeover converged.
+PASS: C selected canonical collision loses manual notes and replaces SKILL.md; native collision refuses with unchanged bytes and no canonical publication.
