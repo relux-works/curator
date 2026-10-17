@@ -17,6 +17,9 @@ func TestCredentialStorePolicyActivation(t *testing.T) {
 	fx := writeManagedFixture(t, "store-policy")
 	for _, id := range []string{envregistry.ClaudeCode, envregistry.CodexCLI, envregistry.Muse, envregistry.Pi, envregistry.OpenCode} {
 		for _, selection := range []envregistry.CredentialStoreSelection{envregistry.CredentialStoreFile, envregistry.CredentialStoreKeychain} {
+			if id == envregistry.Muse && selection == envregistry.CredentialStoreFile {
+				continue // Admitted Muse file controls live in TestMuseCredentialPolicyMatrix.
+			}
 			t.Run(id+"/"+string(selection), func(t *testing.T) {
 				req := fx.request(id)
 				req.Repair = true

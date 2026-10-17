@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/relux-works/curator/internal/envfragment"
+	"github.com/relux-works/curator/internal/envmarker"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,7 +16,6 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/conformancecoverage"
-	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -26,7 +28,7 @@ func fakeMuse(t *testing.T) string {
 	src := filepath.Join(dir, "fake.go")
 	program := `package main
 import("encoding/json";"os")
-func main(){if len(os.Args)==2 && os.Args[1]=="--version" {os.Stdout.WriteString("1.4.1-R4503.1\n");return}; env:=map[string]string{};for _,key:=range []string{"HOME","XDG_CONFIG_HOME","XDG_DATA_HOME","XDG_STATE_HOME","XDG_CACHE_HOME"}{env[key]=os.Getenv(key)};json.NewEncoder(os.Stdout).Encode(map[string]any{"env":env,"argv":os.Args[1:]})}`
+func main(){if len(os.Args)==2 && os.Args[1]=="--version" {os.Stdout.WriteString("1.4.1-R4503.1\n");return}; env:=map[string]string{};for _,key:=range []string{"HOME","XDG_CONFIG_HOME","XDG_DATA_HOME","XDG_STATE_HOME","XDG_CACHE_HOME","TBH_CREDENTIAL_BACKEND"}{env[key]=os.Getenv(key)};json.NewEncoder(os.Stdout).Encode(map[string]any{"env":env,"argv":os.Args[1:]})}`
 	if err := os.WriteFile(src, []byte(program), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +102,7 @@ func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
 	if code != exitOK {
 		t.Fatalf("resolve: %d %s", code, stderr)
 	}
-	validateMuseFragmentV3(t, museFragmentV3Schema(t), []byte(stdout))
+	validateMuseFragmentV3(t, museFragmentV4Schema(t), []byte(stdout))
 	resolved, err := envprofile.Resolve(envprofile.ResolveRequest{
 		Home: source.cfg.Home(), Profile: "acme", EnvID: envregistry.Muse,
 		Machine: envregistry.DefaultMachineConfig(), Format: "json",
@@ -108,7 +110,7 @@ func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	validateMuseFragmentV3(t, museFragmentV3Schema(t), resolved.Document)
+	validateMuseFragmentV3(t, museFragmentV4Schema(t), resolved.Document)
 	var fragment struct {
 		Fragment string            `json:"fragment"`
 		Env      map[string]string `json:"env"`
@@ -116,7 +118,7 @@ func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &fragment); err != nil {
 		t.Fatal(err)
 	}
-	if fragment.Fragment != "launch-env-fragment-v3" || len(fragment.Env) != 4 {
+	if fragment.Fragment != "launch-env-fragment-v4" || len(fragment.Env) != 5 {
 		t.Fatalf("fragment %s", stdout)
 	}
 	home := envprofile.ManagedHomeDir(source.cfg.Home(), "acme", "muse")
@@ -269,7 +271,7 @@ func TestMuseFragmentV3PublishedCases(t *testing.T) {
 		if tc.Valid && fixture["environment"] == envregistry.Muse {
 			// These four rows describe producer-reachable permission policies.
 			// Both entry points validate their actual, unmodified emitted JSON.
-			driveMuseFragmentPolicy(t, schema, source, fixture)
+			driveMuseFragmentPolicy(t, museFragmentV4Schema(t), source, fixture)
 			t.Log("production Resolve + CLI emission; schema/reader oracle also checked")
 		} else {
 			// Invalid wire documents and other adapters' v3 documents are
@@ -278,25 +280,17 @@ func TestMuseFragmentV3PublishedCases(t *testing.T) {
 			t.Log("static schema/reader oracle; not a production emission row")
 		}
 		err = schema.Validate(object)
-		if err == nil {
-			var value struct {
-				Environment string            `json:"environment"`
-				Env         map[string]string `json:"env"`
+		if err == nil && fixture["environment"] == envregistry.Muse {
+			// The v3 corpus still proves the home-path boundary. Project its
+			// already schema-checked paths into the current typed boundary;
+			// this does not claim v3 wire ingestion or successor policy evidence.
+			env := map[string]string{"TBH_CREDENTIAL_BACKEND": "file"}
+			nativeRoot := filepath.Join(t.TempDir(), "environments")
+			for name, raw := range fixture["env"].(map[string]any) {
+				env[name] = filepath.FromSlash(strings.Replace(raw.(string), "/manager/environments", nativeRoot, 1))
 			}
-			if decodeErr := json.Unmarshal(raw, &value); decodeErr != nil {
-				t.Fatal(decodeErr)
-			}
-			if value.Environment == envregistry.Muse {
-				adapter, lookupErr := envregistry.ByID(value.Environment)
-				if lookupErr != nil {
-					t.Fatal(lookupErr)
-				}
-				nativeRoot := filepath.Join(t.TempDir(), "environments")
-				for name, path := range value.Env {
-					value.Env[name] = filepath.FromSlash(strings.Replace(path, "/manager/environments", nativeRoot, 1))
-				}
-				err = envfragment.CheckBoundary(adapter, nativeRoot, &envfragment.Fragment{Environment: value.Environment, Env: value.Env})
-			}
+			adapter, _ := envregistry.ByID(envregistry.Muse)
+			err = envfragment.CheckBoundary(adapter, nativeRoot, &envfragment.Fragment{Environment: envregistry.Muse, Env: env, CredentialStore: &envfragment.CredentialStore{Selection: envregistry.CredentialStoreFile}})
 		}
 		if (err == nil) != tc.Valid {
 			t.Fatalf("valid=%v: %v", tc.Valid, err)
@@ -304,16 +298,17 @@ func TestMuseFragmentV3PublishedCases(t *testing.T) {
 	})
 }
 
-// The v3 schema is copied verbatim from d373078a, independently of the selected
-// conformance root. This keeps the emission regression live in rc.13 CI too.
-func museFragmentV3Schema(t *testing.T) *jsonschema.Schema {
+// Frozen schemas are copied verbatim from the documented spec revisions.
+func museFragmentV3Schema(t *testing.T) *jsonschema.Schema { return museFragmentSchema(t, "v3") }
+func museFragmentV4Schema(t *testing.T) *jsonschema.Schema { return museFragmentSchema(t, "v4") }
+func museFragmentSchema(t *testing.T, version string) *jsonschema.Schema {
 	t.Helper()
 	mainDir, _ := launchEnvFragmentV2FixtureRoots(t)
 	compiler := jsonschema.NewCompiler()
 	compiler.UseRegexpEngine(compileECMARegexp)
-	for _, name := range []string{"common", "agent-environment-marker-v1", "agent-context-v1", "agent-mcp-v1", "context-lock-v1", "launch-env-fragment-v3"} {
+	for _, name := range []string{"common", "agent-environment-marker-v1", "agent-context-v1", "agent-mcp-v1", "context-lock-v1", "launch-env-fragment-v1", "launch-env-fragment-v2", "launch-env-fragment-v3", "launch-env-fragment-v4"} {
 		path := filepath.Join(mainDir, name+".schema.json")
-		if name == "launch-env-fragment-v3" {
+		if strings.HasPrefix(name, "launch-env-fragment-") {
 			path = filepath.Join(mainDir, "..", "..", "..", "curator-spec-muse", "schemas", "v1", name+".schema.json")
 		}
 		raw, err := os.ReadFile(path)
@@ -326,6 +321,12 @@ func museFragmentV3Schema(t *testing.T) *jsonschema.Schema {
 				t.Fatal("pinned Muse v3 schema changed")
 			}
 		}
+		if name == "launch-env-fragment-v4" {
+			hash := sha256.Sum256(raw)
+			if hex.EncodeToString(hash[:]) != "afc824151de968d1bd2c3c9a15d6bf4024ad6920f0f0a56351ee755b56aa9847" {
+				t.Fatal("pinned Muse v4 schema changed")
+			}
+		}
 		var document map[string]any
 		if err := json.Unmarshal(raw, &document); err != nil {
 			t.Fatal(err)
@@ -334,7 +335,7 @@ func museFragmentV3Schema(t *testing.T) *jsonschema.Schema {
 			t.Fatal(err)
 		}
 	}
-	schema, err := compiler.Compile("https://relux-works.github.io/curator-spec/schemas/v1/launch-env-fragment-v3.schema.json")
+	schema, err := compiler.Compile("https://relux-works.github.io/curator-spec/schemas/v1/launch-env-fragment-" + version + ".schema.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,17 +353,17 @@ func validateMuseFragmentV3(t *testing.T, schema *jsonschema.Schema, payload []b
 		// structure using slash-rooted projections of host paths; raw Windows
 		// path schema conformance remains an explicit spec bound. No members
 		// are synthesized, so missing permissions or XDG parents still fail.
-		t.Log("v3 Windows path schema bound: structure checked with POSIX path projection")
+		t.Log("Windows path schema bound: structure checked with POSIX path projection")
 		if env, ok := object["env"].(map[string]any); ok {
 			for name, raw := range env {
-				if path, ok := raw.(string); ok {
+				if path, ok := raw.(string); ok && name != "TBH_CREDENTIAL_BACKEND" {
 					env[name] = filepath.ToSlash(strings.TrimPrefix(path, filepath.VolumeName(path)))
 				}
 			}
 		}
 	}
 	if err := schema.Validate(object); err != nil {
-		t.Fatalf("production Muse fragment violates pinned v3 schema: %v", err)
+		t.Fatalf("production Muse fragment violates pinned schema: %v", err)
 	}
 	return object
 }
@@ -473,5 +474,135 @@ func TestMuseCLIAuthParentBoundary(t *testing.T) {
 				t.Fatalf("outside auth link changed: %s %v", target, err)
 			}
 		})
+	}
+}
+
+// The pinned successor corpus attacks closed members and policy agreement.
+// These are structural oracles; production emission is driven separately by
+// TestMuseCLIFragmentAndFakeLaunch and TestMuseCLIStorePolicy.
+func TestMuseFragmentV4PublishedCases(t *testing.T) {
+	schema := museFragmentV4Schema(t)
+	schemas := map[string]*jsonschema.Schema{}
+	for _, version := range []string{"v1", "v2", "v3"} {
+		schemas["launch-env-fragment-"+version+".schema.json"] = museFragmentSchema(t, version)
+	}
+	root := filepath.Join("..", "..", "internal", "envfragment", "testdata", "curator-spec-muse", "v4-cases")
+	raw, err := os.ReadFile(filepath.Join(root, "index.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		Schema   string
+		Instance string
+		Valid    bool
+	}
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range cases {
+		t.Run(tc.Instance, func(t *testing.T) {
+			raw, err := os.ReadFile(filepath.Join(root, tc.Instance))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var object any
+			if err := json.Unmarshal(raw, &object); err != nil {
+				t.Fatal(err)
+			}
+			oracle := schema
+			if tc.Schema != "launch-env-fragment-v4.schema.json" {
+				oracle = schemas[tc.Schema]
+			}
+			// Select the exact frozen envelope named by the corpus.
+			err = oracle.Validate(object)
+			if err == nil && tc.Schema == "launch-env-fragment-v4.schema.json" {
+				value := object.(map[string]any)
+				if value["environment"] == envregistry.Muse {
+					env := map[string]string{}
+					nativeRoot := filepath.Join(t.TempDir(), "environments")
+					for key, raw := range value["env"].(map[string]any) {
+						text := raw.(string)
+						if key != "TBH_CREDENTIAL_BACKEND" {
+							text = filepath.FromSlash(strings.Replace(text, "/manager/environments", nativeRoot, 1))
+						}
+						env[key] = text
+					}
+					adapter, _ := envregistry.ByID(envregistry.Muse)
+					err = envfragment.CheckBoundary(adapter, nativeRoot, &envfragment.Fragment{Environment: envregistry.Muse, Env: env, CredentialStore: &envfragment.CredentialStore{Selection: envregistry.CredentialStoreFile}})
+				}
+			}
+			if (err == nil) != tc.Valid {
+				t.Fatalf("valid=%t: %v", tc.Valid, err)
+			}
+		})
+	}
+}
+
+// The public config/resolve chain preserves selectors, native auth, marker and
+// link identity; explicit keychain emits no fragment, even with repair.
+func TestMuseCLIStorePolicy(t *testing.T) {
+	source := credentialStoreCLIHome(t)
+	prepareNativeMuse(t)
+	installCLIEnvProfile(t, source)
+	if code, _, stderr := runProfile(t, source, "env", "resolve", "muse", "--repair"); code != exitOK {
+		t.Fatal(stderr)
+	}
+	home := envprofile.ManagedHomeDir(source.cfg.Home(), "acme", envregistry.Muse)
+	markerPath := filepath.Join(home, envmarker.Name)
+	auth := filepath.Join(home, "config", "muse", "auth.json")
+	native, err := os.Readlink(auth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, selector := range []string{"file", "native", "keychain", "unset"} {
+		args := []string{"env", "config", "set", "credential_store.acme.muse", selector}
+		if selector == "unset" {
+			args = []string{"env", "config", "unset", "credential_store.acme.muse"}
+		}
+		if code, _, stderr := runProfile(t, source, args...); code != exitOK {
+			t.Fatal(stderr)
+		}
+		source = reloadSource(t, source)
+		before := map[string][]byte{}
+		for _, path := range []string{source.path, markerPath, native} {
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before[path] = raw
+		}
+		for _, format := range []string{"json", "env", "shell"} {
+			code, stdout, stderr := runProfile(t, source, "env", "resolve", "muse", "--repair", "--format", format)
+			if selector == "keychain" {
+				if code != exitFail || stdout != "" || !strings.Contains(stderr, "environment_credential_store_unsupported") {
+					t.Fatalf("keychain: %d %q %s", code, stdout, stderr)
+				}
+			} else {
+				if code != exitOK {
+					t.Fatalf("%s %s: %d %s", selector, format, code, stderr)
+				}
+				if format == "json" {
+					validateMuseFragmentV3(t, museFragmentV4Schema(t), []byte(stdout))
+				} else {
+					lines := strings.Split(strings.TrimSpace(stdout), "\n")
+					want := "TBH_CREDENTIAL_BACKEND=file"
+					if format == "shell" {
+						want = "export TBH_CREDENTIAL_BACKEND='file'"
+					}
+					if len(lines) != 5 || lines[4] != want {
+						t.Fatalf("%s projection: %q", format, stdout)
+					}
+				}
+			}
+		}
+		for path, want := range before {
+			got, err := os.ReadFile(path)
+			if err != nil || !bytes.Equal(got, want) {
+				t.Fatalf("resolve changed %s: %v", filepath.Base(path), err)
+			}
+		}
+		if got, err := os.Readlink(auth); err != nil || got != native {
+			t.Fatal("credential link changed")
+		}
 	}
 }

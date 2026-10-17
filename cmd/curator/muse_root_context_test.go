@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -95,6 +96,14 @@ func TestMuseRootContextVectors(t *testing.T) {
 			}
 			if code != exitOK {
 				t.Fatalf("resolve: exit %d: %s", code, stderr)
+			}
+			var fragment map[string]any
+			if err := json.Unmarshal([]byte(stdout), &fragment); err != nil {
+				t.Fatal(err)
+			}
+			fact, present := fragment["root_context"]
+			if present != tc.Written || present && !reflect.DeepEqual(fact, map[string]any{"exclusive": true}) {
+				t.Fatalf("root fact disagrees with verified surface: %s", stdout)
 			}
 			if _, err := os.Lstat(filepath.Join(home, "AGENTS.md")); !os.IsNotExist(err) {
 				t.Fatalf("root context written outside the Muse XDG target: %v", err)

@@ -464,38 +464,106 @@ func TestMaterializeCaptureSameFragmentDrift(t *testing.T) {
 }
 
 // Real executable discovery is planted on PATH; capture and metadata status
-// must succeed without executing it even when Detect is nil, in both consumers.
+// succeed without executing it when Detect is nil. Muse native/file and both
+// isolation modes retain the v4 file projection and leave source state unchanged.
 func TestMaterializeCaptureAndStatusNeverProbeVendor(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell sentinel is Unix-only")
 	}
-	fx, req := captureFixture(t)
-	bin := t.TempDir()
-	sentinel := filepath.Join(t.TempDir(), "ran")
-	for _, tool := range []string{"codex", "claude", "muse", "pi", "opencode"} {
-		if err := os.WriteFile(filepath.Join(bin, tool), []byte("#!/bin/sh\nprintf ran > '"+sentinel+"'\nprintf '1.2.3\\n'\n"), 0700); err != nil {
-			t.Fatal(err)
-		}
-	}
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	for _, form := range []string{"export", "manifest-only"} {
-		t.Run(form, func(t *testing.T) {
-			if _, err := CaptureMaterialize(req); err != nil {
+	for _, tc := range []struct {
+		name, environment, isolation string
+		selection                    envregistry.CredentialStoreSelection
+	}{
+		{name: "codex", environment: envregistry.CodexCLI},
+		{"muse-native-shared", envregistry.Muse, envregistry.IsolationShared, envregistry.CredentialStoreNative},
+		{"muse-file-shared", envregistry.Muse, envregistry.IsolationShared, envregistry.CredentialStoreFile},
+		{"muse-native-isolated", envregistry.Muse, envregistry.IsolationIsolated, envregistry.CredentialStoreNative},
+		{"muse-file-isolated", envregistry.Muse, envregistry.IsolationIsolated, envregistry.CredentialStoreFile},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fx, req := captureFixture(t)
+			if tc.environment == envregistry.Muse {
+				fx.native[envregistry.Muse] = t.TempDir()
+				if err := os.WriteFile(filepath.Join(fx.native[envregistry.Muse], "auth.json"), []byte("synthetic-muse\n"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				provision := fx.request(envregistry.Muse)
+				provision.Machine.Isolation[fx.profile] = map[string]string{envregistry.Muse: tc.isolation}
+				provision.Machine.CredentialStore = map[string]map[string]envregistry.CredentialStoreSelection{fx.profile: {envregistry.Muse: tc.selection}}
+				provision.Repair = true
+				if _, err := Resolve(provision); err != nil {
+					t.Fatal(err)
+				}
+				req.Resolve = provision
+				req.Resolve.Repair = false
+				req.Resolve.Detect = nil
+				req.ReloadMachine = func() (envregistry.MachineConfig, Policy, error) {
+					return provision.Machine, Policy{}, nil
+				}
+				req.Capture = func(c *MaterializeCapture) ([]byte, error) {
+					path := filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.Muse), "config", "muse", "AGENTS.md")
+					path, err := filepath.EvalSymlinks(path)
+					if err != nil {
+						return nil, err
+					}
+					file, err := openReadNoFollow(path)
+					if err != nil {
+						return nil, err
+					}
+					return c.ReadObject(path, file)
+				}
+			}
+			before, _ := captureFixtureState(t, fx)
+			bin := t.TempDir()
+			sentinel := filepath.Join(t.TempDir(), "ran")
+			for _, tool := range []string{"codex", "claude", "muse", "pi", "opencode"} {
+				if err := os.WriteFile(filepath.Join(bin, tool), []byte("#!/bin/sh\nprintf ran > '"+sentinel+"'\nprintf '1.2.3\\n'\n"), 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+			for _, form := range []string{"export", "manifest-only"} {
+				t.Run(form, func(t *testing.T) {
+					captured, err := CaptureMaterialize(req)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if tc.environment == envregistry.Muse {
+						var fragment struct {
+							Fragment        string
+							Env             map[string]string
+							CredentialStore struct{ Selection string } `json:"credential_store"`
+						}
+						if err := json.Unmarshal(captured.Fragment, &fragment); err != nil {
+							t.Fatal(err)
+						}
+						if fragment.Fragment != "launch-env-fragment-v4" || fragment.Env["TBH_CREDENTIAL_BACKEND"] != "file" || fragment.CredentialStore.Selection != "file" {
+							t.Fatalf("capture lost Muse file projection: %s", captured.Fragment)
+						}
+					}
+				})
+			}
+			status, err := StatusOf(StatusRequest{Home: fx.home, Machine: req.Resolve.Machine, NativeHomeOf: req.Resolve.NativeHomeOf, OperatorXDG: fx.xdg, LaunchDir: fx.launch})
+			if err != nil {
 				t.Fatal(err)
 			}
+			for _, adapter := range status.Adapters {
+				if adapter.Detected != "unknown" {
+					t.Fatalf("unsafe release observation: %v", adapter)
+				}
+			}
+			row := findHome(status, fx.profile, tc.environment)
+			if row == nil || !row.Current {
+				t.Fatalf("metadata status lost current home: %+v", row)
+			}
+			after, _ := captureFixtureState(t, fx)
+			if !bytes.Equal(before, after) {
+				t.Fatal("capture or status changed source or credential state")
+			}
+			if _, err := os.Stat(sentinel); !os.IsNotExist(err) {
+				t.Fatal("vendor executable ran")
+			}
 		})
-	}
-	status, err := StatusOf(StatusRequest{Home: fx.home, Machine: req.Resolve.Machine, NativeHomeOf: req.Resolve.NativeHomeOf, OperatorXDG: fx.xdg, LaunchDir: fx.launch})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, adapter := range status.Adapters {
-		if adapter.Detected != "unknown" {
-			t.Fatalf("unsafe release observation: %v", adapter)
-		}
-	}
-	if _, err := os.Stat(sentinel); !os.IsNotExist(err) {
-		t.Fatal("vendor executable ran")
 	}
 }
 

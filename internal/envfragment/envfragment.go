@@ -1,12 +1,12 @@
-// Package envfragment builds and renders the launch-env-fragment-v2 object
+// Package envfragment builds and renders native v2 and managed Muse v4 objects
 // (environments §10.2): the closed fragment a launcher consumes, with
 // profile.lock_sha256, precedence, permissions, env, system_prompt, mcp
 // (path, sorted env_names union, channel descriptor), and optional
 // path_prepend. Resolution launches nothing and applies no channel; the
 // fragment is data about channels. The §10.3 profile-influence boundary is
 // enforced at build: variable names come only from the closed adapter
-// registry and every value stays an absolute path below the manager-owned
-// environments root.
+// registry. Paths stay below the manager-owned environments root; managed
+// Muse additionally carries the single policy-owned file-backend literal.
 package envfragment
 
 import (
@@ -49,23 +49,37 @@ type MCP struct {
 	Channels []envregistry.Channel
 }
 
-// Fragment is one launch-env-fragment-v2 object. This resolver omits the
+// CredentialStore carries effective machine policy, never package settings.
+// This producer enables only Muse file and optional native agreement. Codex
+// overrides remain unavailable pending qualification and strict v5 consumers.
+type CredentialStore struct {
+	Selection envregistry.CredentialStoreSelection
+}
+
+// RootContext is the verified Muse root surface fact, not a path or argv.
+type RootContext struct {
+	Exclusive bool
+}
+
+// Fragment is one typed native v2 or Muse v4 object. This resolver omits the
 // optional path_prepend member (environments §10.2).
 type Fragment struct {
-	Environment  string
-	Profile      string
-	LockSHA256   string
-	Permissions  Permissions
-	Winner       string
-	Placement    string
-	Env          map[string]string
-	SystemPrompt *SystemPrompt
-	MCP          *MCP
+	Environment     string
+	Profile         string
+	LockSHA256      string
+	Permissions     Permissions
+	Winner          string
+	Placement       string
+	Env             map[string]string
+	SystemPrompt    *SystemPrompt
+	MCP             *MCP
+	CredentialStore *CredentialStore
+	RootContext     *RootContext
 }
 
 func (f *Fragment) version() string {
-	if f.Environment == envregistry.Muse {
-		return "launch-env-fragment-v3"
+	if f.Environment == envregistry.Muse || f.CredentialStore != nil || f.RootContext != nil {
+		return "launch-env-fragment-v4"
 	}
 	return Version
 }
@@ -117,6 +131,12 @@ func (f *Fragment) Object() map[string]any {
 		env[name] = value
 	}
 	object["env"] = env
+	if f.CredentialStore != nil {
+		object["credential_store"] = map[string]any{"selection": string(f.CredentialStore.Selection)}
+	}
+	if f.RootContext != nil {
+		object["root_context"] = map[string]any{"exclusive": f.RootContext.Exclusive}
+	}
 	if f.SystemPrompt != nil {
 		channels := make([]any, 0, len(f.SystemPrompt.Channels))
 		for _, channel := range f.SystemPrompt.Channels {
@@ -166,14 +186,17 @@ func (f *Fragment) variables(adapter envregistry.Adapter) [][2]string {
 		for _, variable := range adapter.HomeVariables {
 			out = append(out, [2]string{variable[0], f.Env[variable[0]]})
 		}
-		return out
 	}
-	if value, ok := f.Env[adapter.EnvVar]; ok {
+	if value, ok := f.Env[adapter.EnvVar]; ok && len(adapter.HomeVariables) == 0 {
 		out = append(out, [2]string{adapter.EnvVar, value})
 	}
 	rest := make([]string, 0, len(f.Env))
 	for name := range f.Env {
-		if name == adapter.EnvVar {
+		declared := name == adapter.EnvVar
+		for _, variable := range adapter.HomeVariables {
+			declared = declared || name == variable[0]
+		}
+		if declared {
 			continue
 		}
 		rest = append(rest, name)
@@ -341,15 +364,28 @@ func BoundEnvNames(names []string, passable []string) []string {
 // CheckBoundary enforces the §10.3 profile-influence boundary on an
 // assembled fragment: variable names come only from the closed adapter
 // registry (the env member plus variable-kind channel names), and every
-// path value — env values, system_prompt.path, mcp.path — is absolute,
+// path value — home env values, system_prompt.path, mcp.path — is absolute,
 // carries no .. segment, and stays below the manager-owned environments
 // root. Only the profile-name path segment is profile-derived.
 func CheckBoundary(adapter envregistry.Adapter, envRoot string, fragment *Fragment) error {
+	if fragment.Environment != adapter.ID {
+		return fmt.Errorf("fragment environment disagrees with adapter")
+	}
+	if fragment.RootContext != nil && (adapter.ID != envregistry.Muse || !fragment.RootContext.Exclusive) {
+		return fmt.Errorf("fragment root_context is only an exclusive Muse fact")
+	}
+	if adapter.ID != envregistry.Muse && fragment.CredentialStore != nil && fragment.CredentialStore.Selection != envregistry.CredentialStoreNative {
+		return fmt.Errorf("%s: non-native successor delivery is not qualified", envregistry.DiagCodexSettingsUnsupported)
+	}
 	allowed := map[string]bool{adapter.EnvVar: true}
 	for _, variable := range adapter.HomeVariables {
 		allowed[variable[0]] = true
 	}
 	if adapter.ID == envregistry.Muse {
+		if fragment.CredentialStore == nil || fragment.CredentialStore.Selection != envregistry.CredentialStoreFile || fragment.Env["TBH_CREDENTIAL_BACKEND"] != "file" {
+			return fmt.Errorf("%s: managed Muse requires effective file policy and TBH_CREDENTIAL_BACKEND=file", envregistry.DiagCredentialStoreUnsupported)
+		}
+		allowed["TBH_CREDENTIAL_BACKEND"] = true
 		if fragment.SystemPrompt != nil || fragment.MCP != nil {
 			return fmt.Errorf("muse channels are unverified")
 		}
@@ -392,6 +428,9 @@ func CheckBoundary(adapter envregistry.Adapter, envRoot string, fragment *Fragme
 	for name, value := range fragment.Env {
 		if !allowed[name] {
 			return fmt.Errorf("fragment variable %q is not registry-declared for %s", name, adapter.ID)
+		}
+		if adapter.ID == envregistry.Muse && name == "TBH_CREDENTIAL_BACKEND" {
+			continue // The single policy-owned literal; all remaining values are paths.
 		}
 		if err := checkPath("env "+name, value); err != nil {
 			return err

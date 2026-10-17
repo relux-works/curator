@@ -272,8 +272,8 @@ func TestMuseDirectoriesAndIsolation(t *testing.T) {
 	}
 	req := fx.request(envregistry.Muse)
 	req.Machine.Isolation = map[string]map[string]string{fx.profile: {envregistry.Muse: "isolated"}}
-	if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), envregistry.DiagIsolatedUnsupported) {
-		t.Fatalf("isolated: %v", err)
+	if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
+		t.Fatalf("isolation switch requires migration: %v", err)
 	}
 }
 
@@ -483,8 +483,10 @@ func TestMusePublishedRegistryLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 	parent := ManagedHomeDir(fx.home, fx.profile, envregistry.Muse)
-	if len(fragment.Env) != len(vector.Registry.Variables) {
-		t.Fatal("XDG variable set changed")
+	// Historical vectors describe four home paths. The successor adds exactly
+	// the effective file literal while preserving every published layout path.
+	if len(fragment.Env) != len(vector.Registry.Variables)+1 || fragment.Env["TBH_CREDENTIAL_BACKEND"] != "file" {
+		t.Fatal("XDG variable set or successor file literal changed")
 	}
 	for name, expected := range vector.Registry.Variables {
 		if fragment.Env[name] != filepath.Join(parent, filepath.Base(expected)) {

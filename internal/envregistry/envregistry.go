@@ -458,9 +458,6 @@ func (a Adapter) ResolveIsolation(configured string, atOrAbovePinned bool) (stri
 // resolveIsolation is ResolveIsolation over an explicit platform so the
 // matrix is asserted on every CI runner, not only on macOS.
 func (a Adapter) resolveIsolation(goos, configured string, atOrAbovePinned bool) (string, error) {
-	if a.ID == Muse && configured == IsolationIsolated {
-		return "", fmt.Errorf("%s: Muse fresh-login isolation is unverified", DiagIsolatedUnsupported)
-	}
 	if a.ID == OpenCode && configured == IsolationIsolated {
 		return "", fmt.Errorf("%s: isolated is a no-op for opencode: auth lives outside the swapped config home", DiagIsolatedUnsupported)
 	}

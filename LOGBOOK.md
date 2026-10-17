@@ -3,6 +3,51 @@
 > Institutional memory. Concise, factual, high-signal.
 > Newest entries first. One block per insight.
 
+## 2026-10-17 — L151C revision 2 after SNAP-LOCK convergence
+
+The accepted Muse producer delta exposed a convergence regression: fragment
+construction re-entered release discovery after content verification restored
+its observation scope. The retained
+TestMaterializeCaptureAndStatusNeverProbeVendor reproduced vendor execution
+(exit 1). The fragment now consumes the credential policy from its verified
+home plan; one resolver and the release-keyed cache remain authoritative.
+The no-probe regression covers Muse native/file with shared/isolated homes,
+v4 backend agreement, current metadata status and unchanged source state.
+A narrowing plant restores re-observation only for Muse; it must fail the
+named behavioral test. Its real-executable sentinel remains Unix-only,
+including the corresponding Windows plant bound. SNAP-LOCK probe/cache plants
+are rerun on the combined tree. Exact commands and results belong to the
+revision-2 outcome; no inherited green log substitutes for new execution.
+The gate-script signing change is already on trunk and is absent from this
+delta. Readiness/login, Codex v5/application qualification, real hosted plant
+and adopted source policy remain with TASK-261017-0pawkw.
+
+## 2026-10-16 — Managed Muse credential policy and successor fragment
+
+TASK-261016-wh6v9a implements the first coherent slice allowed by its brief:
+managed Muse native/unset/file maps once to effective file, both isolation
+modes are admitted, shared still requires the captured native file, and
+resolve emits v4 agreement, the backend literal and the verified root fact.
+The stored selector and credential bytes are preserved; repair cannot migrate
+a shared link or erase a detached file. Explicit migration remains available.
+The independent successor schema corpus and narrowing behavioral controls are
+included. Normative source: curator-spec main
+`1059b94b4135089d842bf017070b8ab47d79a536`.
+
+Readiness/login, qualified Codex v5 application, the real hosted override plant
+and adopted external-source policy remain deferred. Synthetic child launch
+checks do not qualify a vendor runtime or hosted consumer. The gate helper signs/verifies its detached snapshot using the configured
+human identity; that supporting change landed with SNAP-LOCK and is absent
+from this revision's delta. It preserves the Story branch and index. Command results and exact scope/coverage are attached to the
+task handoff rather than recorded as premature qualification here.
+
+The first hosted gate caught two retained historical conformance assertions:
+the four-path registry row omitted the successor literal, and the v3 corpus
+lost its one-parent path check. The retained tests now distinguish historical
+home-path evidence from the new policy field. Focused reproduction uses the
+same pinned conformance root as hosted CI; schema-only success is insufficient
+for the corpus's relational path cases.
+
 ## 2026-10-17 — Re-executed capability probes must own their entry point
 
 BUG-261017-ygfdal reproduced a test binary running its suite instead of the

@@ -119,7 +119,7 @@ func (req *ResolveRequest) inspectMuseAuth(full, target string) museAuthState {
 		return unreadable(err)
 	}
 	if metadata.Kind == stateread.KindAbsent {
-		return conflict("native credential target is absent")
+		return conflict("native credential target is absent; run TBH_CREDENTIAL_BACKEND=file muse login in the native XDG environment before resolving shared Muse")
 	}
 	if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
 		return unreadable(fmt.Errorf("native target metadata unavailable"))

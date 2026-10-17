@@ -287,19 +287,20 @@ func storeDocPath(home, profile, envID, rel string) string {
 // homePlan is the fully assembled managed home: every write, link, and
 // removal, with the marker recording them.
 type homePlan struct {
-	adapter     envregistry.Adapter
-	hashVersion hashing.Version
-	parent      string
-	homeDir     string
-	storeRoot   string
-	form        string
-	isolation   string
-	copies      map[string][]byte
-	links       map[string]string
-	docs        map[string][]byte
-	marker      *envmarker.Marker
-	fileHashes  map[string][]byte
-	warnings    []string
+	credentialPolicy *effectiveCredentialPolicy
+	adapter          envregistry.Adapter
+	hashVersion      hashing.Version
+	parent           string
+	homeDir          string
+	storeRoot        string
+	form             string
+	isolation        string
+	copies           map[string][]byte
+	links            map[string]string
+	docs             map[string][]byte
+	marker           *envmarker.Marker
+	fileHashes       map[string][]byte
+	warnings         []string
 }
 
 // assembleHome builds the desired managed home purely from the lock, the
@@ -340,17 +341,21 @@ func assembleHomeObserved(req *ResolveRequest, source Source, lock *contextlock.
 	}
 	isolation := credentialPolicy.isolation
 	plan := &homePlan{
-		adapter:     adapter,
-		hashVersion: lock.ContentHashVersion(),
-		parent:      ManagedParent(req.Home, req.Profile, adapter.ID),
-		homeDir:     ManagedHomeDir(req.Home, req.Profile, adapter.ID),
-		storeRoot:   ProfilesDir(req.Home),
-		form:        form,
-		isolation:   isolation,
-		copies:      map[string][]byte{},
-		links:       map[string]string{},
-		docs:        map[string][]byte{},
-		fileHashes:  map[string][]byte{},
+		credentialPolicy: credentialPolicy,
+		adapter:          adapter,
+		hashVersion:      lock.ContentHashVersion(),
+		parent:           ManagedParent(req.Home, req.Profile, adapter.ID),
+		homeDir:          ManagedHomeDir(req.Home, req.Profile, adapter.ID),
+		storeRoot:        ProfilesDir(req.Home),
+		form:             form,
+		isolation:        isolation,
+		copies:           map[string][]byte{},
+		links:            map[string]string{},
+		docs:             map[string][]byte{},
+		fileHashes:       map[string][]byte{},
+	}
+	if adapter.ID == envregistry.Muse && credentialPolicy.selection == envregistry.CredentialStoreNative {
+		plan.warnings = append(plan.warnings, "managed Muse maps configured native (including unset) to effective file storage; the stored selector is unchanged; refresh remains unqualified")
 	}
 	if form == envregistry.FormReferenced && adapter.ID == envregistry.OpenCode {
 		if blocked, err := referencedBlocked(plan.homeDir, prior); err != nil {
@@ -2276,6 +2281,9 @@ func recordedRelease(adapter envregistry.Adapter) string {
 // member is not produced by this resolver.
 func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *verification) (*envfragment.Fragment, error) {
 	plan := verdict.plan
+	// Reuse the policy verified with this plan's release observation. Resolving
+	// again here would escape capture's metadata-only observation boundary.
+	policy := plan.credentialPolicy
 	fragment := &envfragment.Fragment{
 		Environment: adapter.ID,
 		Profile:     req.Profile,
@@ -2288,6 +2296,15 @@ func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *ve
 		fragment.Env = map[string]string{}
 		for _, variable := range adapter.HomeVariables {
 			fragment.Env[variable[0]] = filepath.Join(plan.parent, variable[1])
+		}
+	}
+	for name, value := range policy.launchEnv {
+		fragment.Env[name] = value
+	}
+	if adapter.ID == envregistry.Muse {
+		fragment.CredentialStore = &envfragment.CredentialStore{Selection: policy.effectiveStore}
+		if _, ok := plan.marker.Surfaces[envmarker.SurfaceRootContext]; ok {
+			fragment.RootContext = &envfragment.RootContext{Exclusive: true}
 		}
 	}
 	fragment.Permissions = PermissionsForProfile(req.Machine, req.Profile)

@@ -63,15 +63,24 @@ credential policy: selection admission, native Codex store, isolation admission,
 links and marker records. Resolve (including repair), status verification and
 credential migration use this projection. Each new operation observes native
 configuration again. The one-time provisioning seed is a separate read; this
-projection is not an atomic snapshot of vendor-owned state. Explicit file/keychain application remains disabled: Codex file
+projection is not an atomic snapshot of vendor-owned state. Muse native/unset/file now resolves to effective file and emits v4 with the
+mandatory `TBH_CREDENTIAL_BACKEND=file` literal and all four managed XDG paths.
+The selector remains unchanged. Shared requires a native file-backed login
+under the original XDG config home; if absent, run
+`TBH_CREDENTIAL_BACKEND=file muse login` in that native environment first.
+Isolated creates neither a credential link nor an auth placeholder.
+Other explicit file/keychain application remains disabled: Codex file
 returns `codex_settings_unsupported` pending supported-release
 login/app-server/refresh qualification and strict successor consumers;
 other unavailable mappings return `environment_credential_store_unsupported`.
 Invalid or unreadable native Codex configuration still refuses before this
 delivery diagnostic. No explicit selector silently falls back to native.
-Unset or explicit native retains the existing producer behavior described
-below. This slice does not enable the rc.7 Muse effective-file default,
-new fragment carriers, readiness, or login wrappers.
+Other adapters retain their existing native behavior. Readiness/login wrappers,
+qualified Codex v5 delivery and adopted external sources remain separate work.
+Muse v4 carries `root_context: {"exclusive": true}` exactly when resolve
+verifies a declared root surface, including header-only output. Old v1–v3
+readers reject the successor; consumers must support v4 before managed launch.
+This producer change does not qualify an external launcher or refresh behavior.
 
 ## Security posture
 
@@ -156,7 +165,7 @@ login in one of two ways, chosen per profile × environment with
 | `claude_code` on Linux | `shared` | `.credentials.json` links to the native file | one login per home |
 | `codex_cli` | `shared` | `auth.json` links to the native file under `file` storage (the default when `cli_auth_credentials_store` is absent); under `keyring` or `auto` the login is ambient | admitted only under `file` storage; otherwise `environment_isolated_unsupported` |
 | `pi` | `shared` | `auth.json` links to the native `~/.pi/agent/auth.json` | one login per home |
-| `muse` | `shared` | `config/muse/auth.json` links to the native file | refused with `environment_isolated_unsupported` until a fresh-login probe verifies it |
+| `muse` | `shared` | file backend; `config/muse/auth.json` links to the captured native file | file backend; no passthrough link or placeholder; optimistic admission under D10, refresh unqualified |
 | `opencode` | `shared` (ambient) | its login lives outside the swapped config home, so nothing is linked | not applicable: refused, since the login is outside the home |
 
 For `codex_cli`, sharing follows the storage selected by your **native**

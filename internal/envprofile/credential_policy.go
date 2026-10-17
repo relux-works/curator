@@ -12,9 +12,9 @@ import (
 
 // admitCredentialStore prevents a stored selector from silently becoming native
 // on an older producer. This is an activation boundary, not runtime qualification.
-// Effective-policy adoption and successor login/fragment consumers are separate.
+// Muse file is admitted by D10; other forced mappings remain gated.
 func admitCredentialStore(adapter envregistry.Adapter, profile string, selection envregistry.CredentialStoreSelection) error {
-	if selection == envregistry.CredentialStoreNative {
+	if selection == envregistry.CredentialStoreNative || adapter.ID == envregistry.Muse && selection == envregistry.CredentialStoreFile {
 		return nil
 	}
 	if adapter.ID == envregistry.CodexCLI && selection == envregistry.CredentialStoreFile {
@@ -25,22 +25,24 @@ func admitCredentialStore(adapter envregistry.Adapter, profile string, selection
 	case envregistry.ClaudeCode:
 		guidance = "Claude has no established force-file or force-Keychain interface; log in from the same kind of session as the launcher, or explicitly enroll an environment-token source for inference"
 	case envregistry.Muse:
-		guidance = "managed Muse requires file storage; successor file-policy login and fragment delivery are not enabled"
+		guidance = "managed Muse requires file storage; select native or file, then use TBH_CREDENTIAL_BACKEND=file for native file login"
 	}
 	return fmt.Errorf("%s: %s/%s selection %s: %s", envregistry.DiagCredentialStoreUnsupported, profile, adapter.ID, selection, guidance)
 }
 
 // effectiveCredentialPolicy is the operation-local projection for the existing
 // managed-home credential contract. It is not a runtime qualification or a
-// readiness verdict. Forced mappings retain their activation refusals until
-// qualified login and successor-fragment consumers land.
+// readiness verdict. Muse maps native to file here; other forced mappings
+// retain activation refusals until qualification and strict consumers land.
 type effectiveCredentialPolicy struct {
-	selection   envregistry.CredentialStoreSelection
-	isolation   string
-	nativeStore string
-	links       map[string]string
-	strategies  map[string]string
-	records     []envmarker.Passthrough
+	selection      envregistry.CredentialStoreSelection
+	effectiveStore envregistry.CredentialStoreSelection
+	launchEnv      map[string]string
+	isolation      string
+	nativeStore    string
+	links          map[string]string
+	strategies     map[string]string
+	records        []envmarker.Passthrough
 }
 
 // credentialPolicyResolution retains both successful and failed observations
@@ -85,8 +87,10 @@ func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter, 
 		return nil, err
 	}
 	p := &effectiveCredentialPolicy{
-		selection: selection,
-		links:     map[string]string{}, strategies: map[string]string{}, records: []envmarker.Passthrough{},
+		selection:      selection,
+		effectiveStore: selection,
+		launchEnv:      map[string]string{},
+		links:          map[string]string{}, strategies: map[string]string{}, records: []envmarker.Passthrough{},
 	}
 	var native string
 	if adapter.ID == envregistry.CodexCLI {
@@ -101,6 +105,10 @@ func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter, 
 	}
 	if err := admitCredentialStore(adapter, req.Profile, selection); err != nil {
 		return nil, err
+	}
+	if adapter.ID == envregistry.Muse {
+		p.effectiveStore = envregistry.CredentialStoreFile
+		p.launchEnv["TBH_CREDENTIAL_BACKEND"] = "file"
 	}
 	atAbove := true
 	if ok, known := adapter.AtOrAbovePinned(release); known {

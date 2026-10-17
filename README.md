@@ -214,7 +214,7 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
 
 > **Important:** a managed home either shares your native login or logs in by itself. Claude Code on macOS always logs in by itself, so every profile you use with it needs one login in its home before the first launch or spawn; otherwise the launch stops with "Not logged in". See [Logging in to managed homes](docs/environment-config.md#logging-in-to-managed-homes).
 >
-> [Agent logins](docs/agent-logins.md) explains Claude Code, Codex CLI and Muse storage and session requirements. The **rc.7** machine selector defaults to `native`: `curator env config set credential_store.<profile>.<env-id> <value>` accepts `native`, `file`, or `keychain`. Configuration is available; explicit store application remains disabled pending qualified mappings and successor consumers. Native policy is resolved once per operation; see [machine policy](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice).
+> [Agent logins](docs/agent-logins.md) explains Claude Code, Codex CLI and Muse storage and session requirements. The **rc.7** machine selector defaults to `native`: `curator env config set credential_store.<profile>.<env-id> <value>` accepts `native`, `file`, or `keychain`. Managed Muse maps native/unset/file to file and emits v4; other explicit store application remains disabled pending qualified mappings and successor consumers. Native policy is resolved once per operation; see [machine policy](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice).
 
 <details>
 <summary>Hybrid scope</summary>
@@ -306,7 +306,7 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
-For the rc.7 credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run 'TestCredential(Store|Projection)'`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
+For the rc.7 Muse policy and v4 slice, run `go test ./internal/envfragment ./internal/envprofile ./cmd/curator -run TestMuse`; this includes synthetic fixtures and narrowing controls, not runtime qualification. For the credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run 'TestCredential(Store|Projection)'`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
 
 The [Muse 1.4.8 qualification record](docs/qualification/muse-1.4.8-R6256.1.md)
 separates passing exec loader rows from failed interactive skill exclusion.
@@ -314,7 +314,7 @@ The [opt-in replay](.research/muse148/README.md) documents Go/tmux/sandbox-exec
 commands, frozen fixtures and task-local outputs. The interactive release gate
 remains pending; green regression tests do not authorize a new Muse build.
 
-Use `go build ./...` to compile and `go vet ./...` for static validation. Run `make lint` (golangci-lint) for repository lint; store local validation logs under `.temp/`. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate leaves the working tree and index unchanged. Go tests use temporary homes. Run `go test ./internal/envprofile/... ./cmd/curator/...` for focused environment validation. The preserve-lock vector family is pinned in `internal/envprofile/testdata/environments-repair-preserve-lock.json`; `CURATOR_PRESERVE_LOCK_VECTORS=/path/to/vectors.json go test ./internal/envprofile -run TestRepairPreserveLockVectors` runs its upstream counterpart.
+Use `go build ./...` to compile and `go vet ./...` for static validation. Run `make lint` (golangci-lint) for repository lint; store local validation logs under `.temp/`. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate signs and verifies its detached snapshot with the configured human identity; it leaves the working tree, branch and index unchanged. Go tests use temporary homes. Run `go test ./internal/envprofile/... ./cmd/curator/...` for focused environment validation. The preserve-lock vector family is pinned in `internal/envprofile/testdata/environments-repair-preserve-lock.json`; `CURATOR_PRESERVE_LOCK_VECTORS=/path/to/vectors.json go test ./internal/envprofile -run TestRepairPreserveLockVectors` runs its upstream counterpart.
 
 `go test ./internal/envprofile -run TestMaterializeCapture` checks the internal non-recovering snapshot capture transaction. Closure construction and CLI publication are separate integration work. Capture and metadata-only status share content verification without invoking vendor release probes; unavailable release metadata is reported as unknown. The remote gate signs its temporary snapshot with the configured author and signing key and verifies that signature before publication.
 
@@ -322,7 +322,7 @@ PlantUML renders the agent-login diagrams. Run `plantuml -tsvg -nometadata diagr
 
 Lychee checks Markdown links. Run `lychee --offline --include-fragments --no-progress README.md docs/environment-config.md docs/agent-logins.md` for local targets and anchors, then `lychee --no-progress --timeout 30 docs/agent-logins.md` for the reference's external links. Store logs under `.temp/`. Run `git diff --check` for whitespace validation.
 
-Managed Muse homes materialize monolithic root context at `config/muse/AGENTS.md`; `referenced` is refused. A profile without a context declaration writes no root file. Curator resolves the environment fragment; its external Muse `exec` consumer must add `--no-foreign-personal-context` exactly when the root target is materialized (environments §10.2). The v3 fragment has no argv member. `env status` records the remaining discovery, `serve`, and workspace-precedence bounds.
+Managed Muse homes materialize monolithic root context at `config/muse/AGENTS.md`; `referenced` is refused. A profile without a context declaration writes no root file. Curator resolves the environment fragment; its external Muse `exec` consumer must add `--no-foreign-personal-context` exactly when the root target is materialized (environments §10.2). The v4 fragment carries the verified `root_context` fact, effective file agreement and mandatory `TBH_CREDENTIAL_BACKEND=file`; it carries no argv member. `env status` records the remaining discovery, `serve`, and workspace-precedence bounds.
 
 ## Contributing
 
