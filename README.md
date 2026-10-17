@@ -306,6 +306,13 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+Run `go test -count=1 ./tools/ciworkflow/` to validate Linux CI cache isolation,
+workflow concurrency, and fork routing. CI initializes private Go state with
+`bash .github/ci/isolate-go-state.sh`; its environment records go to
+`GITHUB_ENV`, and caches stay under `RUNNER_TEMP`. See
+[the runner isolation contract](docs/self-hosted-runner-setup.md#linux-job-isolation-and-scheduling).
+Store local test and workflow lint logs under `.temp/`.
+
 For the rc.7 Muse policy and v4 slice, run `go test ./internal/envfragment ./internal/envprofile ./cmd/curator -run TestMuse`; this includes synthetic fixtures and narrowing controls, not runtime qualification. For the credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run 'TestCredential(Store|Projection)'`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
 
 The [Muse 1.4.8 qualification record](docs/qualification/muse-1.4.8-R6256.1.md)
