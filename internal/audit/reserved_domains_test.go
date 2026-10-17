@@ -11,13 +11,13 @@ import (
 	"github.com/relux-works/curator/internal/hashing"
 )
 
-// Reserved TLDs and descendants are silent for both URL schemes, ignoring case and one root dot.
+// Reserved descendants are silent for both schemes, ignoring case and one root dot; bare localhost keeps its exception.
 func TestReservedTopLevelDomains(t *testing.T) {
 	for _, host := range []string{
-		"test", "board.example.test", "TEST", "Board.Example.TeSt.", "board.test:8443", "Board.TeSt.:8443",
-		"example", "docs.example", "EXAMPLE.", "Docs.Example.",
-		"invalid", "missing.invalid", "INVALID.", "Missing.Invalid.",
-		"localhost", "service.localhost", "LOCALHOST.", "Service.LocalHost.",
+		"board.example.test", "BOARD.EXAMPLE.TEST", "Board.Example.TeSt.", "board.test:8443", "Board.TeSt.:8443",
+		"docs.example", "Docs.Example.",
+		"missing.invalid", "Missing.Invalid.",
+		"localhost", "LOCALHOST", "127.0.0.1", "service.localhost", "Service.LocalHost.",
 	} {
 		for _, scheme := range []string{"http", "https"} {
 			t.Run(scheme+"/"+host, func(t *testing.T) {
@@ -30,10 +30,11 @@ func TestReservedTopLevelDomains(t *testing.T) {
 	}
 }
 
-// Real hosts, suffix lookalikes and second-level example domains retain high, verifiable findings.
+// Bare TLD labels, real hosts, suffix lookalikes and second-level example domains retain high, verifiable findings.
 func TestReservedDomainLookalikesRemainAudited(t *testing.T) {
 	for _, host := range []string{
 		"github.com", "brew.sh", "GITHUB.COM.",
+		"test", "TEST", "test.", "example", "EXAMPLE.", "invalid", "INVALID.", "localhost.",
 		"evil.test.com", "example.com.attacker", "notest", "evillocalhost",
 		"test.attacker", "invalid.attacker", "localhost.attacker",
 		"example.com", "example.net", "example.org", "exfiltrate.example.com",

@@ -895,7 +895,7 @@ func auditFindingMessage(prefix, subject string, finding Finding) string {
 	return message
 }
 
-// reservedAuditHost recognizes only the RFC 2606 TLDs and their descendants.
+// reservedAuditHost recognizes only proper descendants of the RFC 2606 TLDs.
 // This source-detector exemption makes no claim about runtime network access.
 // RFC 2606's separate example.com/net/org reservations remain audited.
 func reservedAuditHost(host string) bool {
@@ -904,6 +904,9 @@ func reservedAuditHost(host string) bool {
 		return false
 	}
 	labels := strings.Split(host, ".")
+	if len(labels) < 2 {
+		return false
+	}
 	switch labels[len(labels)-1] {
 	case "test", "example", "invalid", "localhost":
 	default:
