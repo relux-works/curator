@@ -162,9 +162,9 @@ func assertMigrationUnpublished(t *testing.T, home string) {
 	}
 }
 
-// Characterize the follow-up through the same production migration entry.
-// Binary data passes the v2 audits, but the implicit-none capability contract
-// still blocks the URL. This test records that bound, not a remedy for it.
+// A manifestless legacy skill still refuses with the network finding and its
+// declaration remedy, rather than hiding it behind the generic require-pin
+// decision for pre-capability manifests. Binary data passes the v2 audits.
 func TestMigratedGlobalSkillNetworkUndeclaredFollowUp(t *testing.T) {
 	previous := hashing.EnableV2Writers
 	hashing.EnableV2Writers = true
@@ -175,11 +175,5 @@ func TestMigratedGlobalSkillNetworkUndeclaredFollowUp(t *testing.T) {
 		"scripts/fetch.sh": "curl https://downloads.example.com/archive\n",
 	})
 	err := EnsureDefaultWithPolicy(home, Policy{})
-	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) ||
-		!strings.Contains(err.Error(), "audit.capability.network-undeclared") ||
-		!strings.Contains(err.Error(), "scripts/fetch.sh") {
-		t.Fatalf("migration = %v, want strict network-undeclared finding", err)
-	}
-	assertMigrationUnpublished(t, home)
-	t.Logf("follow-up refusal: %v", err)
+	assertMigrationNetworkRefusal(t, home, err, "downloads.example.com")
 }

@@ -3,6 +3,31 @@
 > Institutional memory. Concise, factual, high-signal.
 > Newest entries first. One block per insight.
 
+## 2026-10-17 — Migrated skill capability declarations
+
+BUG-261014-3oeu7d: profile strict audit now loads each skill's own package
+manifest capabilities, including the legacy manifest alias, while context
+and MCP members retain implicit-none. Missing manifests declare nothing;
+malformed or unreadable manifests block. Migration refuses undeclared hosts
+with the skill, host, file and the capabilities.network declaration remedy.
+It never declares capabilities on a skill's behalf.
+
+The profile audit retains its existing schema floor of 3 for missing and
+pre-capability manifests. Environments §9.4 requires network-undeclared in
+these cases; forwarding schema 0 or 2 would hide that finding behind the
+generic skill pipeline's require-pin decision. Modern schemas are forwarded
+exactly. The generic audit pipeline is unchanged. Normative source:
+curator-spec main `1059b94b4135089d842bf017070b8ab47d79a536`, §9.1 and §9.4.
+Skill subjects also bind their frozen Git package through the existing
+audit.SkillPackage API. A regression probe found that older unstated-package
+verdicts could otherwise retain an implicit-none refusal or authorize an
+undeclared host. Both directions are tested through the migration entry;
+the cache-binding narrowing overlay must fail those controls. This source
+change requires a new gate identity; earlier snapshot results do not qualify it.
+The supplied candidate patch informed the implementation; its fixed schema
+3 was corrected and its controls expanded. Production migration and Install
+controls, narrowing overlays and gate evidence are attached to the bug.
+
 ## 2026-10-17 — L151C revision 2 after SNAP-LOCK convergence
 
 The accepted Muse producer delta exposed a convergence regression: fragment

@@ -51,6 +51,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -1730,15 +1731,40 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
 			Revocations: policy.Revocations,
 		},
 	}
+	declared := capabilities.ImplicitNone()
+	schema := 3
+	var packageIdentity audit.SourcePackage
+	directory := ""
+	if resolved.Kind == contextlock.KindSkill {
+		spec, err := skillspec.Load(snapshot)
+		if err != nil {
+			return nil, fmt.Errorf("audit blocked: %v", err)
+		}
+		// Environments §9.1 uses the skill's own capabilities. Keep the
+		// profile audit's schema floor of 3 for missing/legacy manifests:
+		// §9.4 requires network-undeclared with a remedy, not require_pin.
+		// Modern manifests retain their exact schema and audit semantics.
+		declared = spec.Capabilities
+		if spec.SchemaVersion >= 3 {
+			schema = spec.SchemaVersion
+		}
+		// Bind the same frozen Git package as the skill pipeline. Older
+		// profile verdicts stated no package and may reflect implicit-none;
+		// they cannot attest an audit using the manifest's capabilities.
+		packageIdentity, _ = audit.SkillPackage(resolved.Source, "", resolved.Name, resolved.Commit, resolved.Directory)
+		directory = resolved.Directory
+	}
 	subject := audit.Subject{
 		Name:          resolved.Name,
 		Source:        sourceForRevocation,
 		Git:           gitForRevocation,
 		Commit:        resolved.Commit,
 		Snapshot:      snapshot,
-		SchemaVersion: 3,
-		Capabilities:  capabilities.ImplicitNone(),
+		SchemaVersion: schema,
+		Capabilities:  declared,
 		HashVersion:   version,
+		Package:       packageIdentity,
+		Directory:     directory,
 	}
 	warnings, errs := audit.Gate(cfg, []audit.Subject{subject})
 	if len(errs) > 0 {
@@ -2040,6 +2066,11 @@ func migrateGlobalSkills(home string, policy Policy) ([]contextlock.Member, erro
 			Commit: resolved.Commit, HashVersion: hashing.WriteVersion(),
 		}
 		if _, err := strictAuditMember(home, manager, migrated, entry, policy); err != nil {
+			// Environments §9.4 names the declaration remedy without
+			// supplying capabilities on the skill's behalf or weakening audit.
+			if strings.Contains(err.Error(), "audit.capability.network-undeclared") {
+				return nil, fmt.Errorf("%s: migrated global skill %q %v; add a covering host glob to capabilities.network in the skill's agent-skill.json (or csk-skill.json when using the legacy alias), or leave the skill unmigrated", DiagSourceInvalid, decl.Name, err)
+			}
 			return nil, fmt.Errorf("%s: migrated global skill %q %v", DiagSourceInvalid, decl.Name, err)
 		}
 		members = append(members, contextlock.Member{
