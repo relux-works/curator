@@ -3,6 +3,16 @@
 > Institutional memory. Concise, factual, high-signal.
 > Newest entries first. One block per insight.
 
+## 2026-10-17 — Re-executed capability probes must own their entry point
+
+BUG-261017-ygfdal reproduced a test binary running its suite instead of the
+hidden Landlock probe. Dispatch now belongs to scriptworker initialization,
+covering all five importing test binaries before their TestMain or main.
+Malformed requests exit silently; a probe-shaped caller cannot probe again.
+Linux cancellation kills the private process group, with an isolated subreaper
+test checking that the grandchild is killed and reaped. Behavioral overlay
+mutants narrow argument admission, the recursion guard, and group cleanup.
+
 ## 2026-10-16 — Loader records and frozen snapshot inventory need independent attestation
 
 TASK-261016-i5gwaf review revision 1 found two evidence bypasses: duplicate

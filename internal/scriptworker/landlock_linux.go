@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"syscall"
 	"time"
 	"unsafe"
 
@@ -93,6 +94,11 @@ func landlockABI() (int, error) {
 // an older ABI, a denied privilege change, a failed restriction —
 // reports absent without an error.
 func probeScriptLandlock(_ string) (bool, error) {
+	// Defence in depth if an entry point ever calls the probe from a probe
+	// child: never re-execute, even for a malformed hidden request.
+	if isLandlockProbeChild() {
+		return false, nil
+	}
 	abi, err := landlockABI()
 	if err != nil || abi < 1 {
 		return false, nil
@@ -108,12 +114,28 @@ func probeScriptLandlock(_ string) (bool, error) {
 	defer func() { _ = os.Remove(temporary) }()
 	ctx, cancel := context.WithTimeout(context.Background(), scriptLandlockProbeTimeout)
 	defer cancel()
-	command := exec.CommandContext(ctx, manager, ScriptLandlockProbeMode, temporary) // #nosec G204 -- self-re-execution in the fixed hidden probe mode with a manager-created directory
-	command.Env = scriptWorkerEnvironment()
+	command := landlockProbeCommand(ctx, manager, temporary)
 	if err := command.Run(); err != nil {
 		return false, nil
 	}
 	return true, nil
+}
+
+// A probe has a private process group. CommandContext's default cancellation
+// only kills the direct child; replace it so descendants cannot outlive a
+// timeout or cancellation even if the child has not reached the dispatcher.
+func landlockProbeCommand(ctx context.Context, manager, directory string) *exec.Cmd {
+	command := exec.CommandContext(ctx, manager, ScriptLandlockProbeMode, directory) // #nosec G204 -- self-re-execution in the fixed hidden probe mode with a manager-created directory
+	command.Env = scriptWorkerEnvironment()
+	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	command.Cancel = func() error {
+		err := unix.Kill(-command.Process.Pid, unix.SIGKILL)
+		if errors.Is(err, unix.ESRCH) {
+			return os.ErrProcessDone
+		}
+		return err
+	}
+	return command
 }
 
 // RunLandlockProbe is the hidden probe entry: on a locked OS thread it
