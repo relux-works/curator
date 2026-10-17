@@ -28,6 +28,11 @@ exemption. Ports do not change the host. In
 the reserved-looking username does not silence its finding. A malformed
 authority does not earn the new exemption. Existing explicit declarations
 and the historical loopback-address exception retain their behavior.
+Terminal closing parentheses, brackets, braces, commas, semicolons and
+pipes are treated as shell or prose punctuation. Punctuation before
+userinfo is retained, so `board.test,@github.com` still identifies
+`github.com`. Each HTTP(S) URL start is inspected independently, including
+adjacent URLs in substitution expressions.
 
 The separate second-level reservations `example.com`, `example.net`, and
 `example.org`, including their descendants, are outside this exemption.
@@ -41,8 +46,12 @@ claim that reserved names cannot resolve. In particular,
 [RFC 6761 section 6.2](https://www.rfc-editor.org/rfc/rfc6761.html#section-6.2)
 permits test names to resolve differently on private networks. The exemption
 does not alter execution policy, DNS, source allowlists, revocations, or the
-static canary. Audit ruleset version 3 separates new verdicts from cached
-findings produced under version 2; old records are retained.
+static canary. Audit ruleset version 4 separates new verdicts from cached
+findings produced under versions 2 and 3; old records are retained.
+Cached findings also bind all effective capability inputs, so a skill's
+declared-host allowance cannot authorize the same bytes as a context or
+MCP member with no declared capabilities. Capability representation
+differences conservatively produce a cache miss.
 
 Run `go test ./internal/audit -run '^TestReserved'` for matching, refusal,
 strict-gate, canary, and cache controls. Run

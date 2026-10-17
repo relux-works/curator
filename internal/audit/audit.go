@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -47,7 +48,7 @@ var severityRank = map[string]int{
 // backend and model (Spec §12.1).
 const (
 	PromptVersion  = "1"
-	RulesetVersion = "3"
+	RulesetVersion = "4"
 )
 
 // findingOpaqueNUL is the shared opaque-NUL finding id: every v1
@@ -659,12 +660,13 @@ func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.
 		return nil, false
 	}
 	var data struct {
-		SchemaVersion int             `json:"schema_version"`
-		HashVersion   hashing.Version `json:"hash_version"`
-		Commit        string          `json:"commit"`
-		Directory     string          `json:"directory"`
-		Package       SourcePackage   `json:"package"`
-		Findings      []Finding       `json:"findings"`
+		SchemaVersion int                   `json:"schema_version"`
+		HashVersion   hashing.Version       `json:"hash_version"`
+		Commit        string                `json:"commit"`
+		Directory     string                `json:"directory"`
+		Package       SourcePackage         `json:"package"`
+		Capabilities  capabilities.Manifest `json:"capabilities"`
+		Findings      []Finding             `json:"findings"`
 	}
 	if err := json.Unmarshal(payload, &data); err != nil {
 		return nil, false
@@ -698,6 +700,12 @@ func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.
 		return nil, false
 	}
 	if !sameAuditPackage(data.Package, subject.Package) {
+		return nil, false
+	}
+	// Identical bytes can be audited as a skill with its declaration or as
+	// a non-skill with implicit-none. Findings bind the effective inputs,
+	// not just the tree. Representation differences safely cause a miss.
+	if !reflect.DeepEqual(data.Capabilities, subject.Capabilities) {
 		return nil, false
 	}
 	return data.Findings, true
@@ -756,6 +764,7 @@ func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject
 		"prompt_version":  PromptVersion,
 		"ruleset_version": RulesetVersion,
 		"findings":        findings,
+		"capabilities":    subject.Capabilities,
 		"script_policies": policies,
 	}
 	// The record binds the stated package identity, when the subject
@@ -778,8 +787,9 @@ func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject
 
 // Deterministic detectors: observed behavior vs declared capabilities.
 var (
-	urlRE  = regexp.MustCompile(`https?://([A-Za-z0-9.-]+)([^\s/?#"'<>]*)`)
-	execRE = regexp.MustCompile(`(?m)(?:subprocess|exec\.Command|os\.system|shutil\.which)\(\s*["']([A-Za-z0-9._-]+)["']`)
+	urlRE           = regexp.MustCompile(`https?://([A-Za-z0-9.-]+)`)
+	authorityTailRE = regexp.MustCompile(`^[^\s/?#"'<>]*`)
+	execRE          = regexp.MustCompile(`(?m)(?:subprocess|exec\.Command|os\.system|shutil\.which)\(\s*["']([A-Za-z0-9._-]+)["']`)
 )
 
 func detect(snapshot string, caps capabilities.Manifest) []Finding {
@@ -826,11 +836,14 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
 			return nil
 		}
 		text := string(payload)
-		for _, match := range urlRE.FindAllStringSubmatch(text, -1) {
-			host := strings.ToLower(match[1])
+		for _, match := range urlRE.FindAllStringSubmatchIndex(text, -1) {
+			host := strings.ToLower(text[match[2]:match[3]])
 			// Parse the complete authority so reserved-looking userinfo cannot
-			// exempt the real host. Invalid authorities keep the old finding.
-			parsed, parseErr := url.Parse(match[0])
+			// exempt the real host. Discovery keeps the original match spans,
+			// so this lookahead never consumes a later URL. Strip only terminal
+			// shell/prose punctuation, never punctuation preceding userinfo.
+			authority := text[match[0]:match[1]] + authorityTailRE.FindString(text[match[1]:])
+			parsed, parseErr := url.Parse(strings.TrimRight(authority, "),;|]}"))
 			if parseErr == nil && parsed.User != nil {
 				host = strings.ToLower(parsed.Hostname())
 			}
