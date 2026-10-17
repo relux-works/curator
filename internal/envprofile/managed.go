@@ -35,6 +35,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/nativeseed"
 	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
@@ -596,7 +597,7 @@ func (p *homePlan) publishDocs() error {
 func (req *ResolveRequest) codexCredentialStore(native string) (string, error) {
 	readRegularFile := req.readRegularFile
 	if readRegularFile == nil {
-		readRegularFile = stateread.ReadRegularFile
+		readRegularFile = nativeseed.ReadFile
 	}
 	return codexCredentialStoreWith(native, readRegularFile)
 }
@@ -729,7 +730,7 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 			path := filepath.Join(seedRoot, filepath.FromSlash(seed))
 			readRegularFile := req.readRegularFile
 			if readRegularFile == nil {
-				readRegularFile = stateread.ReadRegularFile
+				readRegularFile = nativeseed.ReadFile
 			}
 			file, err := readRegularFile(path) // #nosec G304 -- seed names are registry data
 			if err != nil {

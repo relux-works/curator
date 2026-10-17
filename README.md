@@ -351,3 +351,23 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for working agreements: board-first workf
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+### Native seed symlinks
+
+Read-only native seed inputs may be symlinks, including multi-level relative
+chains. Curator resolves the full chain once, opens the resolved leaf without
+following a replacement final link, then checks and reads the same open file.
+The target must be regular, owned by the current user, and have no group or other
+write bits on Unix. Windows checks the open handle's owner SID and rejects DACL
+entries granting another identity mutation rights. Dangling links, cycles and
+unsafe targets refuse before provisioning. Curator never writes through native
+seed links. Manager-owned records retain their existing no-symlink rules.
+
+The Go fixture tests cover seed reads, descriptor swaps, linked provisioning,
+resolve/repair preservation and manager-state rejection:
+
+```sh
+go test -count=1 ./internal/nativeseed ./internal/envprofile -run '^TestNativeSeed'
+```
+
+The tests use synthetic temporary homes and do not inspect native credentials.
