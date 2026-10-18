@@ -2564,6 +2564,18 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	if req.Repair && !req.DryRun && repairWouldChangeLockHash(lock) {
 		return repairUnderLock(&req, adapter, source)
 	}
+	if req.Repair {
+		row, err := nativeSkillsState(req.Home, profile, adapter.ID, req.NativeHomeOf)
+		if err != nil {
+			return nil, err
+		}
+		if row != nil && row.State != "current" {
+			if req.DryRun {
+				return &ResolveResult{StaleReasons: []string{row.Detail}}, fmt.Errorf("%s: %s", DiagHomeStale, row.Detail)
+			}
+			return repairUnderLock(&req, adapter, source)
+		}
+	}
 	verdict := verify(&req, adapter, source, lock, hash)
 	if verdict.markerReadFailed {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
@@ -2660,6 +2672,15 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 			return nil, err
 		}
 	}
+	row, err := nativeSkillsState(req.Home, req.Profile, adapter.ID, req.NativeHomeOf)
+	if err != nil {
+		return nil, err
+	}
+	if row != nil && row.State != "current" {
+		if err := preflightInPlaceScope(req.Home, req.Profile, adapter.ID, req.Policy, req.NativeHomeOf); err != nil {
+			return nil, err
+		}
+	}
 	verdict := verifyHome(req, adapter, source, lock, hash)
 	if verdict.markerReadFailed {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
@@ -2668,6 +2689,9 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))
 	}
 	if verdict.current {
+		if err := repairNativeSkills(req); err != nil {
+			return nil, err
+		}
 		fragment, err := buildFragment(req, adapter, verdict)
 		if err != nil {
 			return nil, err
@@ -2807,6 +2831,9 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	after := verifyHome(req, adapter, source, lock, hash)
 	if !after.current {
 		return nil, fmt.Errorf("%s: %s", DiagRepairFailed, strings.Join(after.reasons, "; "))
+	}
+	if err := repairNativeSkills(req); err != nil {
+		return nil, err
 	}
 	fragment, err := buildFragment(req, adapter, after)
 	if err != nil {

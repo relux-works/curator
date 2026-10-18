@@ -122,6 +122,41 @@ func hasHelpFlag(args []string) bool {
 	return false
 }
 
+// Validate consent before dispatch: argument-free wrappers and providers must
+// not silently discard it. Arguments after -- belong to the invoked program.
+func rejectsTakeover(args []string) bool {
+	var takeover, use, repair bool
+	for _, arg := range args {
+		if arg == "--" {
+			break
+		}
+		name, value, assigned := strings.Cut(arg, "=")
+		switch name {
+		case "--takeover", "-takeover":
+			takeover = true
+		case "--use", "-use":
+			use = !assigned || value == "true"
+		case "--repair", "-repair":
+			repair = !assigned || value == "true"
+		}
+	}
+	if !takeover {
+		return false
+	}
+	command, _ := registeredCommand(args)
+	if command != nil {
+		switch command.name {
+		case "profile use", "profile sync", "profile update":
+			return false
+		case "profile install":
+			return !use
+		case "env resolve":
+			return !repair
+		}
+	}
+	return true
+}
+
 // registeredCommand selects the deepest contiguous command path. Help flags
 // may precede a child verb; ordinary operands and -- end command discovery.
 func registeredCommand(args []string) (*commandSpec, int) {
