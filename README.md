@@ -329,10 +329,12 @@ for both cache orders, v1/v2 framing, and behavioral narrowing mutants. Run
 for schema-3-through-9 capability-object and purpose-statement validation.
 Run `go test ./internal/envprofile -run 'Test(StrictAuditMemberCapabilityCacheIsolation|MigratedGlobalSkillNetworkCapabilities)'`
 for migration admission and cache isolation between skill, context and MCP
-members. Cache ruleset 3 separates these verdicts from ruleset 2 without
+members. Cache ruleset 4 separates these verdicts from rulesets 2 and 3 without
 deleting old records. All effective capability fields participate in cache
 equality; representation differences conservatively cause a miss. Keep
 local validation logs under `.temp/`.
+
+The 40 network-contact vectors from curator-spec `c1a2bb25` are pinned in `internal/audit/testdata/network-contacts.json`; run `go test ./internal/audit ./internal/envprofile -run 'Test(NetworkContact|ProfileNetworkContact)'` for classification, cache, member-install and migration coverage. Fixture paths are placed under `scripts/`, the existing detector surface; save execution logs under `.temp/`.
 
 For the rc.7 Muse policy and v4 slice, run `go test ./internal/envfragment ./internal/envprofile ./cmd/curator -run TestMuse`; this includes synthetic fixtures and narrowing controls, not runtime qualification. For the credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run 'TestCredential(Store|Projection)'`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
 

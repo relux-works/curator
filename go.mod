@@ -10,8 +10,9 @@ require (
 	github.com/dlclark/regexp2 v1.11.0
 	github.com/relux-works/skill-go-testing-tools/tuitestkit v0.1.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
-	golang.org/x/sys v0.36.0
-	golang.org/x/text v0.14.0
+	golang.org/x/net v0.47.0
+	golang.org/x/sys v0.38.0
+	golang.org/x/text v0.31.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

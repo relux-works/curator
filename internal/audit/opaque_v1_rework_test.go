@@ -111,7 +111,7 @@ func TestV2VerdictCarrierRecordsHashVersion(t *testing.T) {
 // digest text is a synthetic version-pair fixture, not a hash collision.
 func TestV2RejectsLegacyUnversionedVerdict(t *testing.T) {
 	root := t.TempDir()
-	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
+	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example.com/")})
 	digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV2)
 	if err != nil {
 		t.Fatal(err)
@@ -134,7 +134,7 @@ func TestV2RejectsLegacyUnversionedVerdict(t *testing.T) {
 // allow at the v1 digest must not authorize the v1 read.
 func TestV1IgnoresV2VerdictCarrier(t *testing.T) {
 	root := t.TempDir()
-	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
+	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example.com/")})
 	digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV1)
 	if err != nil {
 		t.Fatal(err)
@@ -157,7 +157,7 @@ func TestV1IgnoresV2VerdictCarrier(t *testing.T) {
 // reads, and the script-policy backfill preserves their frozen shape.
 func TestV1HonorsLegacySchema1Verdict(t *testing.T) {
 	root := t.TempDir()
-	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
+	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example.com/")})
 	digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV1)
 	if err != nil {
 		t.Fatal(err)

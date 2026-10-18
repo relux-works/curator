@@ -9,6 +9,7 @@ package audit
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -16,6 +17,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"golang.org/x/net/idna"
 
 	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/config"
@@ -47,7 +50,7 @@ var severityRank = map[string]int{
 // backend and model (Spec §12.1).
 const (
 	PromptVersion  = "1"
-	RulesetVersion = "3"
+	RulesetVersion = "4"
 )
 
 // findingOpaqueNUL is the shared opaque-NUL finding id: every v1
@@ -786,7 +789,7 @@ func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject
 
 // Deterministic detectors: observed behavior vs declared capabilities.
 var (
-	urlRE  = regexp.MustCompile(`https?://([A-Za-z0-9.-]+)`)
+	urlRE  = regexp.MustCompile("https?://[^\\s\"'`<>()\\\\/?#]+")
 	execRE = regexp.MustCompile(`(?m)(?:subprocess|exec\.Command|os\.system|shutil\.which)\(\s*["']([A-Za-z0-9._-]+)["']`)
 )
 
@@ -834,9 +837,13 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
 			return nil
 		}
 		text := string(payload)
-		for _, match := range urlRE.FindAllStringSubmatch(text, -1) {
-			host := strings.ToLower(match[1])
-			if host == "localhost" || host == "127.0.0.1" || declaredHost(declaredHosts, host) {
+		for _, rawURL := range urlRE.FindAllString(text, -1) {
+			parsed, err := url.Parse(rawURL)
+			if err != nil || parsed.Hostname() == "" {
+				continue
+			}
+			host, exempt := classifyNetworkHost(parsed.Hostname())
+			if exempt || declaredHost(declaredHosts, host) {
 				continue
 			}
 			findings = append(findings, Finding{
@@ -865,6 +872,31 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
 		return findings[i].Evidence < findings[j].Evidence
 	})
 	return findings
+}
+
+// classifyNetworkHost implements environments §9.1 and §9.4. An invalid
+// IDNA name remains a contact; normalization failure never grants an exemption.
+func classifyNetworkHost(raw string) (host string, exempt bool) {
+	if raw == "::1" {
+		return raw, true
+	}
+	ascii, err := idna.Lookup.ToASCII(raw)
+	if err != nil {
+		return strings.ToLower(strings.TrimSuffix(raw, ".")), false
+	}
+	host = strings.TrimSuffix(strings.ToLower(ascii), ".")
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		return host, true
+	}
+	lastDot := strings.LastIndexByte(host, '.')
+	if lastDot <= 0 {
+		return host, false
+	}
+	switch host[lastDot+1:] {
+	case "test", "example", "invalid", "localhost":
+		return host, true
+	}
+	return host, false
 }
 
 func opaqueNULFindings(paths []string) []Finding {
