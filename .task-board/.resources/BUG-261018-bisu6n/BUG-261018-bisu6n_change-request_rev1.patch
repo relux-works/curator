@@ -1,0 +1,2190 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 9503060ae368353cf75d4d45cc3e8d26f247498f..6b5974918fb6f83503b7dc7d3eb8ed37609a535e 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -138,6 +138,12 @@ jobs:
+         run: go vet ./internal/godriver
+       - name: Build manager
+         run: go build ./cmd/curator
++      - name: Restore runner temporary tree permissions
++        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
++        continue-on-error: true
++        shell: bash
++        run: bash scripts/restore-runner-tmp.sh
++
+ 
+   # ---------------------------------------------------------------------------
+   # The default lane, against the committed conformance pin, on all three runners.
+@@ -294,6 +300,12 @@ jobs:
+           name: test-evidence-${{ matrix.os }}
+           path: .temp/ci-evidence/
+           if-no-files-found: warn
++      - name: Restore runner temporary tree permissions
++        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
++        continue-on-error: true
++        shell: bash
++        run: bash scripts/restore-runner-tmp.sh
++
+ 
+   # ---------------------------------------------------------------------------
+   # The same default lane on the organisation's self-hosted macOS ARM64
+@@ -536,6 +548,11 @@ jobs:
+           name: race-evidence-${{ matrix.os }}
+           path: .temp/ci-evidence/
+           if-no-files-found: warn
++      - name: Restore runner temporary tree permissions
++        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
++        continue-on-error: true
++        shell: bash
++        run: bash scripts/restore-runner-tmp.sh
+ 
+   lint:
+     name: Lint
+@@ -598,6 +615,12 @@ jobs:
+       - name: Verify GoReleaser rc channel values
+         shell: bash
+         run: go test -count=1 ./tools/goreleaserconfig/
++      - name: Restore runner temporary tree permissions
++        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
++        continue-on-error: true
++        shell: bash
++        run: bash scripts/restore-runner-tmp.sh
++
+ 
+   # The gates are only worth their exit codes if they reject what they claim
+   # to reject. This runs on all three runners because the gate scripts must
+@@ -625,6 +648,11 @@ jobs:
+       - name: Self-test the CI gates
+         shell: bash
+         run: bash .github/ci/gate-selftest.sh
++      - name: Restore runner temporary tree permissions
++        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
++        continue-on-error: true
++        shell: bash
++        run: bash scripts/restore-runner-tmp.sh
+ 
+   interop:
+     name: Interop conformance gate
+@@ -664,6 +692,11 @@ jobs:
+         env:
+           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+         run: go test -count=1 -timeout 30m ./internal/interop/ -v
++      - name: Restore runner temporary tree permissions
++        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
++        continue-on-error: true
++        shell: bash
++        run: bash scripts/restore-runner-tmp.sh
+ 
+   naming-gate:
+     name: Naming gate
+@@ -687,6 +720,12 @@ jobs:
+         # Rules, the binary-patch exemption and the assembled-from-parts
+         # patterns live in the script; gate-selftest.sh drives its rows.
+         run: bash .github/ci/naming-gate.sh
++      - name: Restore runner temporary tree permissions
++        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
++        continue-on-error: true
++        shell: bash
++        run: bash scripts/restore-runner-tmp.sh
++
+   candidate-conformance:
+     name: Candidate suite (${{ matrix.os }})
+     if: >-
+diff --git a/docs/self-hosted-runner-setup.md b/docs/self-hosted-runner-setup.md
+index f560ac8937a41bb3579fa3fc95eec6b7949090fb..6a7f3382c52dfab9407e7b854e95fed1606783c7 100644
+--- a/docs/self-hosted-runner-setup.md
++++ b/docs/self-hosted-runner-setup.md
+@@ -163,3 +163,15 @@ Use `sh scripts/remote-gate.sh` for actual runner evidence. Keep logs in
+ linker failure. Require three consecutive green `main` runs on the self-hosted
+ pool before declaring the pool qualified; a green `gate/**` snapshot alone
+ does not satisfy that rollout requirement.
++
++### Temporary tree self-heal
++
++Each Linux-routable job ends with `scripts/restore-runner-tmp.sh`, guarded by
++`always() && runner.environment == 'self-hosted' && runner.os == 'Linux'`.
++The host job-completed hook removes the runner's `TMPDIR` tree (including
++stale test trees from previous jobs); `RUNNER_TEMP` holds Actions state and
++is not a substitute for that root. The script restores owner write permission
++with `chmod -R u+w`, never removes files, and always exits successfully.
++Unset, empty, non-directory, symlink and filesystem-root values are refused.
++Recursive chmod does not follow links inside the tree. Run
++`go test -count=1 ./tools/ciworkflow/` for workflow, refusal and behavior checks.
+diff --git a/internal/npmsource/conformance_test.go b/internal/npmsource/conformance_test.go
+index 790400af77dade7208ab50d0dec7e3ddc934c9cd..661bfa0c54117649a8014af1f92fd399904fc5d8 100644
+--- a/internal/npmsource/conformance_test.go
++++ b/internal/npmsource/conformance_test.go
+@@ -45,8 +45,8 @@ type npmFixture struct {
+ 
+ func newNPMFixture(t *testing.T) npmFixture {
+ 	t.Helper()
+-	root := filepath.Join(t.TempDir(), "project")
+-	work := filepath.Join(t.TempDir(), "work")
++	root := filepath.Join(writableTempDir(t), "project")
++	work := filepath.Join(writableTempDir(t), "work")
+ 	if err := os.MkdirAll(filepath.Join(root, "packages", "workspace"), 0o700); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -78,7 +78,7 @@ func newNPMFixture(t *testing.T) npmFixture {
+ 			entry["optional"] = true
+ 		}
+ 		lockPackages[installPath] = entry
+-		rawPath := filepath.Join(t.TempDir(), strings.ReplaceAll(pkg.name, "/", "-")+".tgz")
++		rawPath := filepath.Join(writableTempDir(t), strings.ReplaceAll(pkg.name, "/", "-")+".tgz")
+ 		if err := os.WriteFile(rawPath, payload, 0o600); err != nil {
+ 			t.Fatal(err)
+ 		}
+@@ -377,7 +377,7 @@ func TestS02S03S04S07S08N12N13OfflineMaterializationGates(t *testing.T) {
+ 		}
+ 		runner := &fakeRunner{graph: fixture.graph}
+ 		cache := deriveCacheFixture(t, capture, runner)
+-		materialized, err := Materialize(context.Background(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "materialize-work")}, runner.context)
++		materialized, err := Materialize(context.Background(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "materialize-work")}, runner.context)
+ 		if err != nil {
+ 			t.Fatal(err)
+ 		}
+@@ -393,7 +393,7 @@ func TestS02S03S04S07S08N12N13OfflineMaterializationGates(t *testing.T) {
+ 		capture := captureFixture(t, fixture)
+ 		runner := &fakeRunner{graph: fixture.graph, extraPackage: "node_modules/extra"}
+ 		cache := deriveCacheFixture(t, capture, runner)
+-		_, err := Materialize(context.Background(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "work")}, runner.context)
++		_, err := Materialize(context.Background(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "work")}, runner.context)
+ 		assertCode(t, err, CodeGraphIncomplete)
+ 	})
+ 	t.Run("N12 missing private cache", func(t *testing.T) {
+@@ -407,7 +407,7 @@ func TestS02S03S04S07S08N12N13OfflineMaterializationGates(t *testing.T) {
+ 		if err := os.Remove(filepath.Join(cache.root, cache.Receipt.Files[0].Path)); err != nil {
+ 			t.Fatal(err)
+ 		}
+-		_, err := Materialize(context.Background(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "work")}, runner.context)
++		_, err := Materialize(context.Background(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "work")}, runner.context)
+ 		assertCode(t, err, CodeOfflineInputMissing)
+ 	})
+ 	t.Run("S04 verified network attempt", func(t *testing.T) {
+@@ -418,8 +418,8 @@ func TestS02S03S04S07S08N12N13OfflineMaterializationGates(t *testing.T) {
+ 		authority := makeVerifiedExecutionContext(t, capture, provider, recheck)
+ 		provider.allowExecution = true
+ 		provider.networkAttempt = true
+-		destination := filepath.Join(t.TempDir(), "cache")
+-		_, err := DerivePrivateCache(t.Context(), capture, destination, filepath.Join(t.TempDir(), "work"), authority)
++		destination := filepath.Join(writableTempDir(t), "cache")
++		_, err := DerivePrivateCache(t.Context(), capture, destination, filepath.Join(writableTempDir(t), "work"), authority)
+ 		var diagnostic *closureexec.DiagnosticError
+ 		if !errors.As(err, &diagnostic) || diagnostic.Code != CodeNetworkAttempted {
+ 			t.Fatalf("network attempt diagnostic=%v", err)
+@@ -438,7 +438,7 @@ func TestN07ShippedGeneratedTextAndOfflineInvocation(t *testing.T) {
+ 	capture := captureFixture(t, fixture)
+ 	runner := &fakeRunner{graph: fixture.graph}
+ 	cache := deriveCacheFixture(t, capture, runner)
+-	materialized, err := Materialize(context.Background(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "work")}, runner.context)
++	materialized, err := Materialize(context.Background(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "work")}, runner.context)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -459,7 +459,7 @@ func TestMaterializedPackagesMustMatchAndReadmitExactTarballBytes(t *testing.T)
+ 			return os.WriteFile(filepath.Join(root, "node_modules", "a", "index.js"), []byte("module.exports='substituted'\n"), 0o600)
+ 		}}
+ 		cache := deriveCacheFixture(t, capture, runner)
+-		_, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "work")}, runner.context)
++		_, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "work")}, runner.context)
+ 		assertCode(t, err, CodeIntegrityMismatch)
+ 	})
+ 	for _, testCase := range []struct {
+@@ -483,7 +483,7 @@ func TestMaterializedPackagesMustMatchAndReadmitExactTarballBytes(t *testing.T)
+ 			capture := captureFixture(t, fixture)
+ 			runner := &fakeRunner{graph: fixture.graph, mutateInstall: testCase.mutate}
+ 			cache := deriveCacheFixture(t, capture, runner)
+-			_, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "work")}, runner.context)
++			_, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "work")}, runner.context)
+ 			assertCode(t, err, testCase.code)
+ 		})
+ 	}
+@@ -521,7 +521,7 @@ func TestMaterializedPackagesMustMatchAndReadmitExactTarballBytes(t *testing.T)
+ 				return os.WriteFile(filepath.Join(root, "node_modules", "a", testCase.path), testCase.payload, 0o600)
+ 			}}
+ 			cache := deriveCacheFixture(t, capture, runner)
+-			_, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "work")}, runner.context)
++			_, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "work")}, runner.context)
+ 			if got := artifactpolicy.ErrorCode(err); got != testCase.code {
+ 				t.Fatalf("materialized payload error=%v code=%s, want %s", err, got, testCase.code)
+ 			}
+@@ -549,7 +549,7 @@ func TestExecutionAuditDiagnosticsAndInvocationContainment(t *testing.T) {
+ 	capture := captureFixture(t, fixture)
+ 	runner := &fakeRunner{graph: fixture.graph}
+ 	cache := deriveCacheFixture(t, capture, runner)
+-	materialized, err := Materialize(context.Background(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "work")}, runner.context)
++	materialized, err := Materialize(context.Background(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "work")}, runner.context)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -568,7 +568,7 @@ func TestPortableSuccessAndVerifiedProviderGates(t *testing.T) {
+ 	if err := validateExecutionContext(portable); err != nil {
+ 		t.Fatalf("portable runner rejected: %v", err)
+ 	}
+-	_, err := DerivePrivateCache(context.Background(), capture, filepath.Join(t.TempDir(), "cache"), filepath.Join(t.TempDir(), "work"), &ExecutionContext{})
++	_, err := DerivePrivateCache(context.Background(), capture, filepath.Join(writableTempDir(t), "cache"), filepath.Join(writableTempDir(t), "work"), &ExecutionContext{})
+ 	assertCode(t, err, CodeDerivationUnauthorized)
+ 	if runner.starts != 0 {
+ 		t.Fatalf("verified missing-provider gate started %d processes", runner.starts)
+@@ -611,7 +611,7 @@ func TestVerifiedAuthorityFailuresAreZeroStart(t *testing.T) {
+ 			recheck := &fakeRunner{graph: fixture.graph, capture: capture}
+ 			context := makeVerifiedExecutionContext(t, capture, caseProvider, recheck)
+ 			testCase.mutate(caseProvider, context)
+-			_, err := DerivePrivateCache(t.Context(), capture, filepath.Join(t.TempDir(), "cache"), filepath.Join(t.TempDir(), "work"), context)
++			_, err := DerivePrivateCache(t.Context(), capture, filepath.Join(writableTempDir(t), "cache"), filepath.Join(writableTempDir(t), "work"), context)
+ 			if err == nil {
+ 				t.Fatal("invalid verified authority was accepted")
+ 			}
+@@ -629,12 +629,12 @@ func TestVerifiedProviderExecutesExactCacheCIAndNodePermits(t *testing.T) {
+ 	recheck := &fakeRunner{graph: fixture.graph, capture: capture}
+ 	authority := makeVerifiedExecutionContext(t, capture, provider, recheck)
+ 	provider.allowExecution = true
+-	cache, err := DerivePrivateCache(t.Context(), capture, filepath.Join(t.TempDir(), "cache"), filepath.Join(t.TempDir(), "cache-work"), authority)
++	cache, err := DerivePrivateCache(t.Context(), capture, filepath.Join(writableTempDir(t), "cache"), filepath.Join(writableTempDir(t), "cache-work"), authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(cache.root) })
+-	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "materialize-work")}, authority)
++
++	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "materialize-work")}, authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -659,12 +659,12 @@ func TestVerifiedProviderObservesRealNodeLaunchedNPMBoundary(t *testing.T) {
+ 	provider := newVerifiedFixtureProvider()
+ 	authority := makeVerifiedExecutionContext(t, capture, provider, runner)
+ 	provider.allowExecution = true
+-	cache, err := DerivePrivateCache(t.Context(), capture, filepath.Join(t.TempDir(), "cache"), filepath.Join(t.TempDir(), "cache-work"), authority)
++	cache, err := DerivePrivateCache(t.Context(), capture, filepath.Join(writableTempDir(t), "cache"), filepath.Join(writableTempDir(t), "cache-work"), authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(cache.root) })
+-	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "materialize-work")}, authority)
++
++	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "materialize-work")}, authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -704,7 +704,7 @@ func TestVerifiedProviderRejectsUndeclaredProcessObservation(t *testing.T) {
+ 	authority := makeVerifiedExecutionContext(t, capture, provider, recheck)
+ 	provider.allowExecution = true
+ 	provider.extraProcess = "ambient/downloader"
+-	_, err := DerivePrivateCache(t.Context(), capture, filepath.Join(t.TempDir(), "cache"), filepath.Join(t.TempDir(), "cache-work"), authority)
++	_, err := DerivePrivateCache(t.Context(), capture, filepath.Join(writableTempDir(t), "cache"), filepath.Join(writableTempDir(t), "cache-work"), authority)
+ 	if err == nil || !strings.Contains(err.Error(), "process set") {
+ 		t.Fatalf("undeclared verified process observation was accepted: %v", err)
+ 	}
+@@ -718,7 +718,7 @@ func TestC5AndExactExecutableGatesAreZeroStart(t *testing.T) {
+ 		context := makeExecutionContext(t, capture, runner)
+ 		context.BuildPlan.ActionNodeIDs = context.BuildPlan.ActionNodeIDs[1:]
+ 		context.BuildPlan.Waves = [][]closuregraph.ID{append([]closuregraph.ID(nil), context.BuildPlan.ActionNodeIDs...)}
+-		_, err := DerivePrivateCache(t.Context(), capture, filepath.Join(t.TempDir(), "cache"), filepath.Join(t.TempDir(), "work"), context)
++		_, err := DerivePrivateCache(t.Context(), capture, filepath.Join(writableTempDir(t), "cache"), filepath.Join(writableTempDir(t), "work"), context)
+ 		assertCode(t, err, CodeDerivationUnauthorized)
+ 		if runner.starts != 0 {
+ 			t.Fatalf("absent C5 action started %d processes", runner.starts)
+@@ -728,7 +728,7 @@ func TestC5AndExactExecutableGatesAreZeroStart(t *testing.T) {
+ 		runner := &fakeRunner{graph: fixture.graph, capture: capture}
+ 		context := makeExecutionContext(t, capture, runner)
+ 		context.Runtime.Manager.ExecutableRelativePath = "bin/npm"
+-		_, err := DerivePrivateCache(t.Context(), capture, filepath.Join(t.TempDir(), "cache"), filepath.Join(t.TempDir(), "work"), context)
++		_, err := DerivePrivateCache(t.Context(), capture, filepath.Join(writableTempDir(t), "cache"), filepath.Join(writableTempDir(t), "work"), context)
+ 		assertCode(t, err, CodeDerivationUnauthorized)
+ 		if runner.starts != 0 {
+ 			t.Fatalf("unbound interpreter started %d processes", runner.starts)
+@@ -776,7 +776,7 @@ func TestPortableAuditDoesNotEncodeUnobservedLosslessZeros(t *testing.T) {
+ 	capture := captureFixture(t, fixture)
+ 	runner := &fakeRunner{graph: fixture.graph}
+ 	cache := deriveCacheFixture(t, capture, runner)
+-	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "work")}, runner.context)
++	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "work")}, runner.context)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -915,8 +915,8 @@ func TestN01RealNPMCIUsesOnlyDerivedPrivateCache(t *testing.T) {
+ 		t.Fatalf("private npm cache derivation is not deterministic: %s != %s\nfirst=%+v\nsecond=%+v", cache.Receipt.ID, secondCache.Receipt.ID, cache.Receipt.Files, secondCache.Receipt.Files)
+ 	}
+ 	materialized, err := Materialize(context.Background(), cache, MaterializeRequest{
+-		Destination: filepath.Join(t.TempDir(), "materialized"),
+-		WorkRoot:    filepath.Join(t.TempDir(), "materialize-work"),
++		Destination: filepath.Join(writableTempDir(t), "materialized"),
++		WorkRoot:    filepath.Join(writableTempDir(t), "materialize-work"),
+ 	}, runner.context)
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -943,7 +943,7 @@ func TestN01RealNPMCIUsesOnlyDerivedPrivateCache(t *testing.T) {
+ 	if err = os.WriteFile(ambient, []byte("same package identity, different ambient bytes"), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	second, err := Materialize(context.Background(), secondCache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "materialize-work")}, runner.context)
++	second, err := Materialize(context.Background(), secondCache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "materialize-work")}, runner.context)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -995,7 +995,7 @@ type concreteNPMRunner struct {
+ 
+ func newConcreteNPMRunner(t *testing.T) *concreteNPMRunner {
+ 	t.Helper()
+-	executionRoot := filepath.Join(t.TempDir(), "execution")
++	executionRoot := filepath.Join(writableTempDir(t), "execution")
+ 	if err := os.MkdirAll(filepath.Join(executionRoot, "bin"), 0o700); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -1296,7 +1296,7 @@ func makeExecutionContext(t *testing.T, capture *Capture, runner interface {
+ 	if concrete, ok := runner.(*concreteNPMRunner); ok {
+ 		executionRoot = concrete.executionRoot
+ 	} else {
+-		executionRoot = filepath.Join(t.TempDir(), "execution")
++		executionRoot = filepath.Join(writableTempDir(t), "execution")
+ 		if err := os.MkdirAll(filepath.Join(executionRoot, "bin"), 0o700); err != nil {
+ 			t.Fatal(err)
+ 		}
+@@ -1383,12 +1383,12 @@ func captureFixture(t *testing.T, fixture npmFixture) *Capture {
+ }
+ func captureFixtureError(t *testing.T, fixture npmFixture) (*Capture, error) {
+ 	t.Helper()
+-	storeRoot := filepath.Join(t.TempDir(), "capture-store")
++	storeRoot := filepath.Join(writableTempDir(t), "capture-store")
+ 	store, err := closureexec.NewCaptureStore(storeRoot)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
++
+ 	return CaptureAndAdmit(context.Background(), CaptureRequest{Graph: fixture.graph, ProjectRoot: fixture.root, Tarballs: fixture.tarballs, WorkRoot: fixture.work, Store: store, Policy: artifactpolicy.NewService(), PreviousCausalHead: "test-head"})
+ }
+ func deriveCacheFixture(t *testing.T, capture *Capture, runner interface {
+@@ -1405,12 +1405,12 @@ func deriveCacheFixture(t *testing.T, capture *Capture, runner interface {
+ 	if concrete, ok := runner.(*concreteNPMRunner); ok && concrete.context == nil {
+ 		concrete.context = makeExecutionContext(t, capture, concrete)
+ 	}
+-	cacheRoot := filepath.Join(t.TempDir(), "cache")
+-	cache, err := DerivePrivateCache(context.Background(), capture, cacheRoot, filepath.Join(t.TempDir(), "cache-work"), runnerContext(runner))
++	cacheRoot := filepath.Join(writableTempDir(t), "cache")
++	cache, err := DerivePrivateCache(context.Background(), capture, cacheRoot, filepath.Join(writableTempDir(t), "cache-work"), runnerContext(runner))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(cacheRoot) })
++
+ 	return cache
+ }
+ 
+@@ -1708,13 +1708,30 @@ func argAfter(args []string, name string) string {
+ 	return ""
+ }
+ func makeTreeWritable(root string) error {
+-	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
++	return filepath.WalkDir(root, func(current string, entry os.DirEntry, err error) error {
+ 		if err != nil {
+ 			return err
+ 		}
+-		if info.IsDir() {
+-			return os.Chmod(path, 0o700)
++		if entry.Type()&os.ModeSymlink != 0 {
++			return nil
++		}
++		info, err := entry.Info()
++		if err != nil {
++			return err
++		}
++		return os.Chmod(current, info.Mode().Perm()|0o200)
++	})
++}
++
++// writableTempDir registers restoration before callers can seal any child tree.
++// TempDir's removal is registered first, so restoration runs before removal.
++func writableTempDir(t *testing.T) string {
++	t.Helper()
++	root := t.TempDir()
++	t.Cleanup(func() {
++		if err := makeTreeWritable(root); err != nil && !os.IsNotExist(err) {
++			t.Errorf("restore temporary tree permissions: %v", err)
+ 		}
+-		return os.Chmod(path, 0o600)
+ 	})
++	return root
+ }
+diff --git a/internal/npmsource/tmp_hygiene_test.go b/internal/npmsource/tmp_hygiene_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..0e92b9edd93e6cc5e1db744c1e50b7bf738df5f5
+--- /dev/null
++++ b/internal/npmsource/tmp_hygiene_test.go
+@@ -0,0 +1,53 @@
++package npmsource
++
++import (
++	"os"
++	"path/filepath"
++	"runtime"
++	"testing"
++)
++
++// Nested sealed fixture trees are owner-writable before removal, preserving executability and external symlink targets.
++func TestWritableTempDirRestoresNestedTrees(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("POSIX permission fixture is exercised on Linux and macOS")
++	}
++	outside := filepath.Join(t.TempDir(), "outside")
++	if err := os.WriteFile(outside, []byte("outside"), 0o400); err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = os.Chmod(outside, 0o600) })
++	t.Run("sealed", func(t *testing.T) {
++		_ = t.TempDir() // Register TempDir removal before the audit.
++		var root string
++		t.Cleanup(func() {
++			for _, path := range []string{root, filepath.Join(root, "nested"), filepath.Join(root, "nested", "executable")} {
++				info, err := os.Stat(path)
++				if err != nil || info.Mode().Perm()&0o200 == 0 {
++					t.Errorf("tree not restored: %s: %v", path, err)
++				}
++			}
++			info, err := os.Stat(filepath.Join(root, "nested", "executable"))
++			if err != nil || info.Mode().Perm()&0o100 == 0 {
++				t.Error("executable bit lost")
++			}
++		})
++		root = writableTempDir(t)
++		dir := filepath.Join(root, "nested")
++		if err := os.Mkdir(dir, 0o700); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(dir, "executable"), []byte("x"), 0o500); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Symlink(outside, filepath.Join(dir, "link")); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Chmod(dir, 0o500); err != nil {
++			t.Fatal(err)
++		}
++	})
++	if info, err := os.Stat(outside); err != nil || info.Mode().Perm()&0o200 != 0 {
++		t.Errorf("outside target changed: %v", err)
++	}
++}
+diff --git a/internal/pnpmsource/conformance_test.go b/internal/pnpmsource/conformance_test.go
+index 839bebd07631fc78a90fcf0d0ec24393809d48b4..a5d40bd6d70b0462599ee0ffb766f0ee4b79cf1d 100644
+--- a/internal/pnpmsource/conformance_test.go
++++ b/internal/pnpmsource/conformance_test.go
+@@ -38,8 +38,8 @@ type pnpmFixture struct {
+ 
+ func newPNPMFixture(t *testing.T) pnpmFixture {
+ 	t.Helper()
+-	root := filepath.Join(t.TempDir(), "project")
+-	work := filepath.Join(t.TempDir(), "work")
++	root := filepath.Join(writableTempDir(t), "project")
++	work := filepath.Join(writableTempDir(t), "work")
+ 	if err := os.MkdirAll(filepath.Join(root, "packages", "cli"), 0o700); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -60,7 +60,7 @@ func newPNPMFixture(t *testing.T) pnpmFixture {
+ 		payloads[key] = payload
+ 		sum := sha512.Sum512(payload)
+ 		integrities[key] = "sha512-" + base64.StdEncoding.EncodeToString(sum[:])
+-		file := filepath.Join(t.TempDir(), pkg.name+".tgz")
++		file := filepath.Join(writableTempDir(t), pkg.name+".tgz")
+ 		if err := os.WriteFile(file, payload, 0o600); err != nil {
+ 			t.Fatal(err)
+ 		}
+@@ -158,7 +158,7 @@ func newTwoPeerContextFixture(t *testing.T) pnpmFixture {
+ 	fixture.request.Manifests = cloneBytesMap(fixture.request.Manifests)
+ 	fixture.request.Manifests["packages/cli/package.json"] = workspaceManifest
+ 	fixture.graph = mustParse(t, fixture.request)
+-	file := filepath.Join(t.TempDir(), "peer-2.1.0.tgz")
++	file := filepath.Join(writableTempDir(t), "peer-2.1.0.tgz")
+ 	if err := os.WriteFile(file, payload, 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -188,7 +188,7 @@ func newHostPNPMFixture(t *testing.T) pnpmFixture {
+ 	fixture.request.Target.OS = runtime.GOOS
+ 	fixture.request.Target.Architecture = runtime.GOARCH
+ 	fixture.graph = mustParse(t, fixture.request)
+-	file := filepath.Join(t.TempDir(), "optional-host.tgz")
++	file := filepath.Join(writableTempDir(t), "optional-host.tgz")
+ 	if err := os.WriteFile(file, payload, 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -245,11 +245,11 @@ func newTargetPrunedSnapshotDependencyFixture(t *testing.T) pnpmFixture {
+ 	fixture.request.Target.OS = runtime.GOOS
+ 	fixture.request.Target.Architecture = runtime.GOARCH
+ 	fixture.graph = mustParse(t, fixture.request)
+-	optionalFile := filepath.Join(t.TempDir(), "optional-pruned.tgz")
++	optionalFile := filepath.Join(writableTempDir(t), "optional-pruned.tgz")
+ 	if err := os.WriteFile(optionalFile, optionalPayload, 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	aFile := filepath.Join(t.TempDir(), "a-with-optional.tgz")
++	aFile := filepath.Join(writableTempDir(t), "a-with-optional.tgz")
+ 	if err := os.WriteFile(aFile, aPayload, 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -293,7 +293,7 @@ func newUnreachableSnapshotDependencyTargetFixture(t *testing.T, selector, unsup
+ 	lock = strings.Replace(lock, "  peer@2.0.0: {}\n", "  peer@2.0.0: {}\n  dormant@1.0.0:\n    dependencies:\n      b: 1.0.0\n", 1)
+ 	fixture.request.LockBytes = []byte(lock)
+ 	fixture.graph = mustParse(t, fixture.request)
+-	file := filepath.Join(t.TempDir(), "dormant.tgz")
++	file := filepath.Join(writableTempDir(t), "dormant.tgz")
+ 	if err := os.WriteFile(file, payload, 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -311,13 +311,13 @@ func materializeFixture(t *testing.T, capture *Capture, mutate func(string) erro
+ 	runner := &fakePNPMRunner{capture: capture, mutateInstall: mutate}
+ 	authority := makeExecutionContext(t, capture, runner)
+ 	runner.authority = authority
+-	storeRoot := filepath.Join(t.TempDir(), "store")
++	storeRoot := filepath.Join(writableTempDir(t), "store")
+ 	store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
+-	return Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, authority)
++
++	return Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, authority)
+ }
+ 
+ func snapshotDependencyLink(root, snapshot, dependency string) string {
+@@ -539,13 +539,13 @@ func TestClosedParserAndInvocationBoundaryVariants(t *testing.T) {
+ 	runner := &fakePNPMRunner{capture: capture}
+ 	authority := makeExecutionContext(t, capture, runner)
+ 	runner.authority = authority
+-	storeRoot := filepath.Join(t.TempDir(), "store")
++	storeRoot := filepath.Join(writableTempDir(t), "store")
+ 	store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
+-	materialized, err := Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "out"), WorkRoot: t.TempDir()}, authority)
++
++	materialized, err := Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "out"), WorkRoot: writableTempDir(t)}, authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -593,13 +593,13 @@ func TestOverridesAndDeclaredPatchAreBoundAndAdmitted(t *testing.T) {
+ 	runner := &fakePNPMRunner{capture: capture}
+ 	authority := makeExecutionContext(t, capture, runner)
+ 	runner.authority = authority
+-	storeRoot := filepath.Join(t.TempDir(), "store")
++	storeRoot := filepath.Join(writableTempDir(t), "store")
+ 	store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
+-	materialized, err := Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, authority)
++
++	materialized, err := Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -653,7 +653,7 @@ func TestS02N06N12IntegrityNativeAndAmbientStoreVectors(t *testing.T) {
+ 		fixture := newPNPMFixture(t)
+ 		variant := fixture
+ 		variant.tarballs = cloneTarballs(fixture.tarballs)
+-		file := filepath.Join(t.TempDir(), "bad.tgz")
++		file := filepath.Join(writableTempDir(t), "bad.tgz")
+ 		_ = os.WriteFile(file, []byte("tampered"), 0o600)
+ 		variant.tarballs["b@1.0.0"] = RawTarball{Path: file}
+ 		_, err := captureFixtureError(t, variant)
+@@ -694,20 +694,20 @@ func TestS03S08N01PrivateStoreAndFrozenOfflineMaterialization(t *testing.T) {
+ 	runner := &fakePNPMRunner{capture: capture}
+ 	authority := makeExecutionContext(t, capture, runner)
+ 	runner.authority = authority
+-	storeRoot := filepath.Join(t.TempDir(), "private-store")
++	storeRoot := filepath.Join(writableTempDir(t), "private-store")
+ 	store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
++
+ 	if runner.starts != 1 || !store.Receipt.ID.Valid() || len(store.Receipt.Files) == 0 {
+ 		t.Fatalf("private store evidence missing: starts=%d receipt=%+v", runner.starts, store.Receipt)
+ 	}
+ 	if !containsAll(runner.storePermit.Argv, "store", "add", "--config.side-effects-cache=false") || runner.storePermit.Environment["NPM_CONFIG_OFFLINE"] != "true" || runner.storePermit.Environment["NPM_CONFIG_IGNORE_SCRIPTS"] != "true" {
+ 		t.Fatalf("store argv is not closed: %v", runner.storePermit.Argv)
+ 	}
+-	materializedRoot := filepath.Join(t.TempDir(), "materialized")
+-	materialized, err := Materialize(context.Background(), store, MaterializeRequest{Destination: materializedRoot, WorkRoot: t.TempDir()}, authority)
++	materializedRoot := filepath.Join(writableTempDir(t), "materialized")
++	materialized, err := Materialize(context.Background(), store, MaterializeRequest{Destination: materializedRoot, WorkRoot: writableTempDir(t)}, authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -793,13 +793,13 @@ func TestUnreachableLockSupersetSnapshotRejectsBeforeInstall(t *testing.T) {
+ 	runner := &fakePNPMRunner{capture: capture}
+ 	authority := makeExecutionContext(t, capture, runner)
+ 	runner.authority = authority
+-	storeRoot := filepath.Join(t.TempDir(), "store")
++	storeRoot := filepath.Join(writableTempDir(t), "store")
+ 	store, err := DerivePrivateStore(t.Context(), capture, storeRoot, authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
+-	_, err = Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, authority)
++
++	_, err = Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, authority)
+ 	assertCode(t, err, CodeGraphIncomplete)
+ 	if runner.starts != 1 {
+ 		t.Fatalf("unreachable snapshot started install: starts=%d", runner.starts)
+@@ -826,13 +826,13 @@ func TestTargetPrunedUnreachableSnapshotRejectsBeforeInstall(t *testing.T) {
+ 			runner := &fakePNPMRunner{capture: capture}
+ 			authority := makeExecutionContext(t, capture, runner)
+ 			runner.authority = authority
+-			storeRoot := filepath.Join(t.TempDir(), "store")
++			storeRoot := filepath.Join(writableTempDir(t), "store")
+ 			store, err := DerivePrivateStore(t.Context(), capture, storeRoot, authority)
+ 			if err != nil {
+ 				t.Fatal(err)
+ 			}
+-			t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
+-			_, err = Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, authority)
++
++			_, err = Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, authority)
+ 			assertCode(t, err, CodeGraphIncomplete)
+ 			if runner.starts != 1 {
+ 				t.Fatalf("target-pruned unreachable snapshot started install: starts=%d", runner.starts)
+@@ -849,14 +849,14 @@ func TestRealPinnedPNPMTargetPrunedUnreachableRejectsBeforeInstall(t *testing.T)
+ 	capture := captureFixture(t, fixture)
+ 	runner := newConcretePNPMRunner(t)
+ 	runner.context = makeExecutionContext(t, capture, runner)
+-	storeRoot := filepath.Join(t.TempDir(), "store")
++	storeRoot := filepath.Join(writableTempDir(t), "store")
+ 	store, err := DerivePrivateStore(t.Context(), capture, storeRoot, runner.context)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
++
+ 	launchesBeforeInstall := len(runner.launches)
+-	_, err = Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "work")}, runner.context)
++	_, err = Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "work")}, runner.context)
+ 	assertCode(t, err, CodeGraphIncomplete)
+ 	if len(runner.launches) != launchesBeforeInstall {
+ 		t.Fatalf("target-pruned unreachable snapshot started install: launches=%d before=%d", len(runner.launches), launchesBeforeInstall)
+@@ -871,13 +871,13 @@ func TestRealPinnedPNPMLockSupersetSnapshotDependencies(t *testing.T) {
+ 	capture := captureFixture(t, fixture)
+ 	runner := newConcretePNPMRunner(t)
+ 	runner.context = makeExecutionContext(t, capture, runner)
+-	storeRoot := filepath.Join(t.TempDir(), "store")
++	storeRoot := filepath.Join(writableTempDir(t), "store")
+ 	store, err := DerivePrivateStore(t.Context(), capture, storeRoot, runner.context)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
+-	materialized, err := Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "work")}, runner.context)
++
++	materialized, err := Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "work")}, runner.context)
+ 	if err != nil {
+ 		if diagnostic, ok := err.(*Error); ok {
+ 			t.Fatalf("%v fields=%v", err, diagnostic.Fields)
+@@ -896,17 +896,17 @@ func TestN04N11N12MaterializationSideEffectsMissingStoreAndAmbientFallbackFailCl
+ 		runner := &fakePNPMRunner{capture: capture}
+ 		authority := makeExecutionContext(t, capture, runner)
+ 		runner.authority = authority
+-		storeRoot := filepath.Join(t.TempDir(), "store")
++		storeRoot := filepath.Join(writableTempDir(t), "store")
+ 		store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
+ 		if err != nil {
+ 			t.Fatal(err)
+ 		}
+-		t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
++
+ 		_ = makeTreeWritable(storeRoot)
+ 		if err = os.Remove(filepath.Join(storeRoot, filepath.FromSlash(store.Receipt.Files[0].Path))); err != nil {
+ 			t.Fatal(err)
+ 		}
+-		_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "out"), WorkRoot: t.TempDir()}, authority)
++		_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "out"), WorkRoot: writableTempDir(t)}, authority)
+ 		assertCode(t, err, CodeIntegrityMismatch)
+ 		if runner.starts != 1 {
+ 			t.Fatalf("install started after store drift: %d", runner.starts)
+@@ -918,7 +918,7 @@ func TestN04N11N12MaterializationSideEffectsMissingStoreAndAmbientFallbackFailCl
+ 		runner := &fakePNPMRunner{capture: capture, emitSideEffects: true}
+ 		authority := makeExecutionContext(t, capture, runner)
+ 		runner.authority = authority
+-		storeRoot := filepath.Join(t.TempDir(), "store")
++		storeRoot := filepath.Join(writableTempDir(t), "store")
+ 		_, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
+ 		assertCode(t, err, CodeHookUndeclared)
+ 	})
+@@ -928,17 +928,17 @@ func TestN04N11N12MaterializationSideEffectsMissingStoreAndAmbientFallbackFailCl
+ 		runner := &fakePNPMRunner{capture: capture}
+ 		authority := makeExecutionContext(t, capture, runner)
+ 		runner.authority = authority
+-		storeRoot := filepath.Join(t.TempDir(), "store")
++		storeRoot := filepath.Join(writableTempDir(t), "store")
+ 		store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
+ 		if err != nil {
+ 			t.Fatal(err)
+ 		}
+-		t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
++
+ 		runner.omitPackage = "b@1.0.0"
+-		ambient := filepath.Join(t.TempDir(), "ambient-store")
++		ambient := filepath.Join(writableTempDir(t), "ambient-store")
+ 		_ = os.MkdirAll(ambient, 0o700)
+ 		_ = os.WriteFile(filepath.Join(ambient, "b"), fixture.payloads["b@1.0.0"], 0o600)
+-		_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "out"), WorkRoot: t.TempDir()}, authority)
++		_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "out"), WorkRoot: writableTempDir(t)}, authority)
+ 		assertCode(t, err, CodeGraphIncomplete)
+ 	})
+ 	t.Run("local root drift", func(t *testing.T) {
+@@ -949,13 +949,13 @@ func TestN04N11N12MaterializationSideEffectsMissingStoreAndAmbientFallbackFailCl
+ 		}}
+ 		authority := makeExecutionContext(t, capture, runner)
+ 		runner.authority = authority
+-		storeRoot := filepath.Join(t.TempDir(), "store")
++		storeRoot := filepath.Join(writableTempDir(t), "store")
+ 		store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
+ 		if err != nil {
+ 			t.Fatal(err)
+ 		}
+-		t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
+-		_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "out"), WorkRoot: t.TempDir()}, authority)
++
++		_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "out"), WorkRoot: writableTempDir(t)}, authority)
+ 		assertCode(t, err, CodeIntegrityMismatch)
+ 	})
+ }
+@@ -994,13 +994,13 @@ func TestMaterializedVirtualStoreRejectsEveryUnclaimedOrInvalidPackageRoot(t *te
+ 			runner := &fakePNPMRunner{capture: capture, mutateInstall: variant.mutate}
+ 			authority := makeExecutionContext(t, capture, runner)
+ 			runner.authority = authority
+-			storeRoot := filepath.Join(t.TempDir(), "store")
++			storeRoot := filepath.Join(writableTempDir(t), "store")
+ 			store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
+ 			if err != nil {
+ 				t.Fatal(err)
+ 			}
+-			t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
+-			_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "out"), WorkRoot: t.TempDir()}, authority)
++
++			_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "out"), WorkRoot: writableTempDir(t)}, authority)
+ 			assertCode(t, err, variant.code)
+ 		})
+ 	}
+@@ -1059,7 +1059,7 @@ func TestUnsupportedPNPMManagerVersionIsZeroStart(t *testing.T) {
+ 	authority := makeExecutionContext(t, capture, runner)
+ 	runner.authority = authority
+ 	authority.Runtime.Manager.VersionOutput = "10.32.1"
+-	_, err := DerivePrivateStore(t.Context(), capture, filepath.Join(t.TempDir(), "store"), authority)
++	_, err := DerivePrivateStore(t.Context(), capture, filepath.Join(writableTempDir(t), "store"), authority)
+ 	assertCode(t, err, CodeRuntimeIdentityChanged)
+ 	if runner.starts != 0 {
+ 		t.Fatalf("unsupported pnpm release started %d processes", runner.starts)
+@@ -1069,8 +1069,8 @@ func TestUnsupportedPNPMManagerVersionIsZeroStart(t *testing.T) {
+ func TestWritableStoreOverlayAllowsOnlyExactProjectRegistration(t *testing.T) {
+ 	makeFixture := func(t *testing.T) (string, string, []StoreFile) {
+ 		t.Helper()
+-		store := filepath.Join(t.TempDir(), "store")
+-		project := filepath.Join(t.TempDir(), "project")
++		store := filepath.Join(writableTempDir(t), "store")
++		project := filepath.Join(writableTempDir(t), "project")
+ 		if err := os.MkdirAll(filepath.Join(store, "v10", "files"), 0o700); err != nil {
+ 			t.Fatal(err)
+ 		}
+@@ -1132,13 +1132,13 @@ func TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization(t *testing.T) {
+ 	capture := captureFixture(t, fixture)
+ 	runner := newConcretePNPMRunner(t)
+ 	runner.context = makeExecutionContext(t, capture, runner)
+-	storeRoot := filepath.Join(t.TempDir(), "store")
++	storeRoot := filepath.Join(writableTempDir(t), "store")
+ 	store, err := DerivePrivateStore(t.Context(), capture, storeRoot, runner.context)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
+-	materialized, err := Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "work")}, runner.context)
++
++	materialized, err := Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "work")}, runner.context)
+ 	if err != nil {
+ 		if diagnostic, ok := err.(*Error); ok {
+ 			t.Fatalf("%v fields=%v\nlaunches=%+v", err, diagnostic.Fields, runner.launches)
+@@ -1273,7 +1273,7 @@ func TestResolveWindowsPNPMEntrypoint(t *testing.T) {
+ 	})
+ 	t.Run("windows launcher resolves to the adjacent package entry point", func(t *testing.T) {
+ 		for _, launcherName := range []string{"pnpm.cmd", "pnpm.bat", "pnpm.ps1", "pnpm.CMD"} {
+-			prefix := t.TempDir()
++			prefix := writableTempDir(t)
+ 			launcher := filepath.Join(prefix, launcherName)
+ 			entrypoint := filepath.Join(prefix, "node_modules", "pnpm", "bin", "pnpm.cjs")
+ 			if err := os.MkdirAll(filepath.Dir(entrypoint), 0o700); err != nil {
+@@ -1311,7 +1311,7 @@ func newConcretePNPMRunner(t *testing.T) *concretePNPMRunner {
+ 		t.Fatal(err)
+ 	}
+ 	pnpmRoot := filepath.Dir(filepath.Dir(pnpmPath))
+-	executionRoot := filepath.Join(t.TempDir(), "execution")
++	executionRoot := filepath.Join(writableTempDir(t), "execution")
+ 	// The portable runner privacy-validates OutputRoot before every operation
+ 	// (closureexec ensureEmptyDirectory), so the harness creates it the way
+ 	// production does. os.MkdirAll(0o700) passes that check on unix but fails
+@@ -1593,7 +1593,7 @@ func makeExecutionContext(t *testing.T, capture *Capture, runner interface {
+ 	if concrete, ok := runner.(*concretePNPMRunner); ok {
+ 		executionRoot = concrete.executionRoot
+ 	} else {
+-		executionRoot = filepath.Join(t.TempDir(), "execution")
++		executionRoot = filepath.Join(writableTempDir(t), "execution")
+ 		for _, dir := range []string{"bin", "work", "output"} {
+ 			if err := os.MkdirAll(filepath.Join(executionRoot, dir), 0o700); err != nil {
+ 				t.Fatal(err)
+@@ -1734,12 +1734,12 @@ func captureFixture(t *testing.T, fixture pnpmFixture) *Capture {
+ }
+ func captureFixtureError(t *testing.T, fixture pnpmFixture) (*Capture, error) {
+ 	t.Helper()
+-	storeRoot := filepath.Join(t.TempDir(), "capture-store")
++	storeRoot := filepath.Join(writableTempDir(t), "capture-store")
+ 	store, err := closureexec.NewCaptureStore(storeRoot)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
++
+ 	return CaptureAndAdmit(context.Background(), CaptureRequest{Graph: fixture.graph, ProjectRoot: fixture.root, Tarballs: fixture.tarballs, WorkRoot: fixture.work, Store: store, Policy: artifactpolicy.NewService(), PreviousCausalHead: "test-head"})
+ }
+ func replacePackage(t *testing.T, fixture *pnpmFixture, key string, pkg fixturePackage) {
+@@ -1749,7 +1749,7 @@ func replacePackage(t *testing.T, fixture *pnpmFixture, key string, pkg fixtureP
+ 	integrity := "sha512-" + base64.StdEncoding.EncodeToString(sum[:])
+ 	fixture.request.LockBytes = []byte(strings.Replace(string(fixture.request.LockBytes), fixture.graph.Packages[fixture.graph.packageIndex[key]].Integrity, integrity, 1))
+ 	fixture.graph = mustParse(t, fixture.request)
+-	file := filepath.Join(t.TempDir(), "replacement.tgz")
++	file := filepath.Join(writableTempDir(t), "replacement.tgz")
+ 	_ = os.WriteFile(file, payload, 0o600)
+ 	fixture.tarballs = cloneTarballs(fixture.tarballs)
+ 	fixture.tarballs[key] = RawTarball{Path: file}
+@@ -1841,9 +1841,26 @@ func makeTreeWritable(root string) error {
+ 		if err != nil {
+ 			return err
+ 		}
+-		if entry.IsDir() {
+-			return os.Chmod(current, 0o700)
++		if entry.Type()&os.ModeSymlink != 0 {
++			return nil
++		}
++		info, err := entry.Info()
++		if err != nil {
++			return err
++		}
++		return os.Chmod(current, info.Mode().Perm()|0o200)
++	})
++}
++
++// writableTempDir registers restoration before callers can seal any child tree.
++// TempDir's removal is registered first, so restoration runs before removal.
++func writableTempDir(t *testing.T) string {
++	t.Helper()
++	root := t.TempDir()
++	t.Cleanup(func() {
++		if err := makeTreeWritable(root); err != nil && !os.IsNotExist(err) {
++			t.Errorf("restore temporary tree permissions: %v", err)
+ 		}
+-		return os.Chmod(current, 0o600)
+ 	})
++	return root
+ }
+diff --git a/internal/pnpmsource/tmp_controls_test.go b/internal/pnpmsource/tmp_controls_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..412a31f44e89c7a7128ba0eb69e4eb958a3eff9a
+--- /dev/null
++++ b/internal/pnpmsource/tmp_controls_test.go
+@@ -0,0 +1,64 @@
++//go:build tmphygienecontrols
++
++package pnpmsource
++
++import (
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// Isolated overlays prove deletion and capture-store-only bypass plants fail the real-body cleanup witness by name.
++func TestPNPMTemporaryTreeCleanupControls(t *testing.T) {
++	newConcretePNPMRunner(t)
++	root, err := filepath.Abs("../..")
++	if err != nil {
++		t.Fatal(err)
++	}
++	source := filepath.Join(root, "internal/pnpmsource/conformance_test.go")
++	raw, err := os.ReadFile(source)
++	if err != nil {
++		t.Fatal(err)
++	}
++	old := `if err := makeTreeWritable(root); err != nil && !os.IsNotExist(err) {`
++	for _, p := range []struct{ name, replacement string }{
++		{"remove-restore", `if err := error(nil); err != nil && !os.IsNotExist(err) {`},
++		{"capture-only-bypass", `if err := func() error { if _, err := os.Stat(filepath.Join(root, "capture-store")); err == nil { return nil }; return makeTreeWritable(root) }(); err != nil && !os.IsNotExist(err) {`},
++	} {
++		t.Run(p.name, func(t *testing.T) {
++			if strings.Count(string(raw), old) != 1 {
++				t.Fatal("plant target absent or ambiguous")
++			}
++			scratch := writableTempDir(t)
++			childTmp := filepath.Join(scratch, "child-tmp")
++			if err := os.Mkdir(childTmp, 0o700); err != nil {
++				t.Fatal(err)
++			}
++			replacement := filepath.Join(scratch, "conformance_test.go")
++			if err := os.WriteFile(replacement, []byte(strings.Replace(string(raw), old, p.replacement, 1)), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			// Paths are JSON encoded to keep the overlay independent of shell quoting.
++			overlay := filepath.Join(scratch, "overlay.json")
++			data, err := json.Marshal(map[string]any{"Replace": map[string]string{source: replacement}})
++			if err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(overlay, data, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			cmd := exec.Command("go", "test", "-overlay", overlay, "-count=1", "-v", "./internal/pnpmsource", "-run", "^TestPNPMTemporaryTreeRemovable$")
++			cmd.Dir = root
++			cmd.Env = append(os.Environ(), "TMPDIR="+childTmp, "TMP="+childTmp, "TEMP="+childTmp)
++			out, runErr := cmd.CombinedOutput()
++			exit, ok := runErr.(*exec.ExitError)
++			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(out), "--- FAIL: TestPNPMTemporaryTreeRemovable") || !strings.Contains(string(out), "non-writable entry after body cleanup") {
++				t.Fatalf("survivor or invalid plant: %v: %s", runErr, out)
++			}
++			t.Logf("%s killed by TestPNPMTemporaryTreeRemovable; child exit 1 (expected red)", p.name)
++		})
++	}
++}
+diff --git a/internal/pnpmsource/tmp_hygiene_test.go b/internal/pnpmsource/tmp_hygiene_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..18f175ad00758d1fa3faac5037ebe873a8e63765
+--- /dev/null
++++ b/internal/pnpmsource/tmp_hygiene_test.go
+@@ -0,0 +1,150 @@
++package pnpmsource
++
++import (
++	"fmt"
++	"io/fs"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++)
++
++// The real conformance body and its capture-only early failure restore all modes before TempDir removal.
++func TestPNPMTemporaryTreeRemovable(t *testing.T) {
++	if testing.Short() {
++		t.Skip("real pnpm cleanup integration")
++	}
++	newConcretePNPMRunner(t) // Require the same pinned runtime as the real conformance test.
++	for _, mode := range []string{"pass", "failure", "capture-failure"} {
++		t.Run(mode, func(t *testing.T) {
++			report := filepath.Join(t.TempDir(), "restored")
++			childTmp := filepath.Join(writableTempDir(t), "child-tmp")
++			if err := os.Mkdir(childTmp, 0o700); err != nil {
++				t.Fatal(err)
++			}
++			cmd := exec.Command(os.Args[0], "-test.run=^TestPNPMTemporaryTreeChild$", "-test.v")
++			cmd.Env = append(os.Environ(), "CURATOR_PNPM_CLEANUP_CHILD="+mode, "CURATOR_PNPM_CLEANUP_REPORT="+report, "TMPDIR="+childTmp, "TMP="+childTmp, "TEMP="+childTmp)
++			out, err := cmd.CombinedOutput()
++			want := 0
++			if mode != "pass" {
++				want = 1
++			}
++			code := 0
++			if err != nil {
++				exit, ok := err.(*exec.ExitError)
++				if !ok {
++					t.Fatal(err)
++				}
++				code = exit.ExitCode()
++			}
++			if code != want {
++				t.Fatalf("child exit=%d want=%d: %s", code, want, out)
++			}
++			data, readErr := os.ReadFile(report)
++			if readErr != nil || string(data) != "writable and removed\n" {
++				t.Fatalf("cleanup witness missing: %v; child: %s", readErr, out)
++			}
++			if mode != "pass" && !strings.Contains(string(out), "forced cleanup failure") {
++				t.Fatalf("child failed for an unrelated reason: %s", out)
++			}
++		})
++	}
++}
++
++// Subprocess isolation allows an actual Fatal path without marking the parent test failed.
++func TestPNPMTemporaryTreeChild(t *testing.T) {
++	mode := os.Getenv("CURATOR_PNPM_CLEANUP_CHILD")
++	if mode == "" {
++		t.Skip("helper process")
++	}
++	base := filepath.Dir(t.TempDir())
++	// Registered after TempDir removal and before the body: LIFO restores, audits, then removes.
++	t.Cleanup(func() {
++		err := filepath.WalkDir(base, func(path string, entry fs.DirEntry, err error) error {
++			if err != nil {
++				return err
++			}
++			if entry.Type()&os.ModeSymlink != 0 {
++				return nil
++			}
++			info, err := entry.Info()
++			if err != nil {
++				return err
++			}
++			if info.Mode().Perm()&0o200 == 0 {
++				return fmt.Errorf("non-writable entry after body cleanup: %s", path)
++			}
++			return nil
++		})
++		if err != nil {
++			t.Errorf("audit tree: %v", err)
++			return
++		}
++		if t.Failed() && mode == "pass" {
++			return
++		}
++		// Don't publish success merely because the child's forced failure was expected.
++		if err = os.RemoveAll(base); err != nil {
++			t.Errorf("remove tree: %v", err)
++			return
++		}
++		if err = os.WriteFile(os.Getenv("CURATOR_PNPM_CLEANUP_REPORT"), []byte("writable and removed\n"), 0o600); err != nil {
++			t.Error(err)
++		}
++	})
++	if mode == "capture-failure" {
++		captureFixture(t, newHostPNPMFixture(t))
++	} else {
++		TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization(t)
++	}
++	if mode != "pass" {
++		t.Fatal("forced cleanup failure")
++	}
++}
++
++// Nested sealed fixture trees are owner-writable before removal, preserving executability and external symlink targets.
++func TestWritableTempDirRestoresNestedTrees(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("POSIX permission fixture is exercised on Linux and macOS")
++	}
++	outside := filepath.Join(t.TempDir(), "outside")
++	if err := os.WriteFile(outside, []byte("outside"), 0o400); err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = os.Chmod(outside, 0o600) })
++	t.Run("sealed", func(t *testing.T) {
++		_ = t.TempDir() // Register TempDir removal before the audit.
++		var root string
++		t.Cleanup(func() {
++			for _, path := range []string{root, filepath.Join(root, "nested"), filepath.Join(root, "nested", "executable")} {
++				info, err := os.Stat(path)
++				if err != nil || info.Mode().Perm()&0o200 == 0 {
++					t.Errorf("tree not restored: %s: %v", path, err)
++				}
++			}
++			info, err := os.Stat(filepath.Join(root, "nested", "executable"))
++			if err != nil || info.Mode().Perm()&0o100 == 0 {
++				t.Error("executable bit lost")
++			}
++		})
++		root = writableTempDir(t)
++		dir := filepath.Join(root, "nested")
++		if err := os.Mkdir(dir, 0o700); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(dir, "executable"), []byte("x"), 0o500); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Symlink(outside, filepath.Join(dir, "link")); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Chmod(dir, 0o500); err != nil {
++			t.Fatal(err)
++		}
++	})
++	if info, err := os.Stat(outside); err != nil || info.Mode().Perm()&0o200 != 0 {
++		t.Errorf("outside target changed: %v", err)
++	}
++}
+diff --git a/internal/yarnclassicsource/conformance_test.go b/internal/yarnclassicsource/conformance_test.go
+index bfa6ad0b6883507b237af095d2dfd11e675c12d1..0efbe8a6206f81e2b715af6d8c2dca6ecf852d81 100644
+--- a/internal/yarnclassicsource/conformance_test.go
++++ b/internal/yarnclassicsource/conformance_test.go
+@@ -43,8 +43,8 @@ type yarnFixture struct {
+ 
+ func newYarnFixture(t *testing.T) yarnFixture {
+ 	t.Helper()
+-	root := filepath.Join(t.TempDir(), "project")
+-	work := filepath.Join(t.TempDir(), "capture-work")
++	root := filepath.Join(writableTempDir(t), "project")
++	work := filepath.Join(writableTempDir(t), "capture-work")
+ 	if err := os.MkdirAll(filepath.Join(root, "packages", "workspace"), 0o700); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -72,7 +72,7 @@ func newYarnFixture(t *testing.T) yarnFixture {
+ 		}
+ 		entries = append(entries, entry)
+ 		payloadByName[pkg.name] = payload
+-		file := filepath.Join(t.TempDir(), pkg.name+"-1.0.0.tgz")
++		file := filepath.Join(writableTempDir(t), pkg.name+"-1.0.0.tgz")
+ 		if err := os.WriteFile(file, payload, 0o600); err != nil {
+ 			t.Fatal(err)
+ 		}
+@@ -299,16 +299,16 @@ func TestS03S08N12PrivateMirrorEmptyCacheFrozenOfflineMaterialization(t *testing
+ 	}
+ 	runner := &fakeYarnRunner{capture: capture}
+ 	runner.context = makeExecutionContext(t, capture, runner)
+-	mirrorRoot := filepath.Join(t.TempDir(), "private-mirror")
+-	mirror, err := DerivePrivateMirror(t.Context(), capture, mirrorRoot, filepath.Join(t.TempDir(), "mirror-work"), runner.context)
++	mirrorRoot := filepath.Join(writableTempDir(t), "private-mirror")
++	mirror, err := DerivePrivateMirror(t.Context(), capture, mirrorRoot, filepath.Join(writableTempDir(t), "mirror-work"), runner.context)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(mirrorRoot) })
++
+ 	if len(mirror.Receipt.Files) != 4 || mirror.Receipt.SchemaID != "yarn-classic-private-mirror-receipt-v1" {
+ 		t.Fatalf("unexpected mirror receipt: %+v", mirror.Receipt)
+ 	}
+-	materialized, err := Materialize(t.Context(), mirror, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "materialize-work")}, runner.context)
++	materialized, err := Materialize(t.Context(), mirror, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "materialize-work")}, runner.context)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -338,7 +338,7 @@ func TestS03S08N12PrivateMirrorEmptyCacheFrozenOfflineMaterialization(t *testing
+ 	if err = os.Remove(filepath.Join(mirror.root, filepath.FromSlash(mirror.Receipt.Files[0].Path))); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	_, err = Materialize(t.Context(), mirror, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "missing"), WorkRoot: t.TempDir()}, runner.context)
++	_, err = Materialize(t.Context(), mirror, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "missing"), WorkRoot: writableTempDir(t)}, runner.context)
+ 	assertCode(t, err, CodeOfflineInputMissing)
+ }
+ 
+@@ -466,16 +466,16 @@ func TestMaterializationAPIFailsClosedWithoutExactAuthority(t *testing.T) {
+ 	authority := makeExecutionContext(t, capture, runner)
+ 	runner.context = authority
+ 
+-	_, err := DerivePrivateMirror(t.Context(), nil, filepath.Join(t.TempDir(), "mirror"), t.TempDir(), authority)
++	_, err := DerivePrivateMirror(t.Context(), nil, filepath.Join(writableTempDir(t), "mirror"), writableTempDir(t), authority)
+ 	assertCode(t, err, CodeInputUndeclared)
+-	_, err = Materialize(t.Context(), nil, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "project"), WorkRoot: t.TempDir()}, authority)
++	_, err = Materialize(t.Context(), nil, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "project"), WorkRoot: writableTempDir(t)}, authority)
+ 	assertCode(t, err, CodeInputUndeclared)
+ 	_, err = Invoke(t.Context(), nil, "index.js", nil, authority)
+ 	assertCode(t, err, CodeInputUndeclared)
+ 	if _, err = cleanAbsentAbsolute(""); ErrorCode(err) != CodeInputUndeclared {
+ 		t.Fatalf("empty destination error=%v", err)
+ 	}
+-	existing := t.TempDir()
++	existing := writableTempDir(t)
+ 	if _, err = cleanAbsentAbsolute(existing); ErrorCode(err) != CodeInputUndeclared {
+ 		t.Fatalf("existing destination error=%v", err)
+ 	}
+@@ -589,8 +589,8 @@ func TestRealPinnedYarnClassicReadsPrivateMirrorWithEmptyOrdinaryCache(t *testin
+ 	capture := captureFixture(t, fixture)
+ 	runner := newConcreteYarnRunner(t)
+ 	t.Setenv("YARN_RC_FILENAME", "ambient-yarnrc")
+-	t.Setenv("YARN_CACHE_FOLDER", filepath.Join(t.TempDir(), "ambient-yarn-cache"))
+-	t.Setenv("npm_config_cache", filepath.Join(t.TempDir(), "ambient-npm-cache"))
++	t.Setenv("YARN_CACHE_FOLDER", filepath.Join(writableTempDir(t), "ambient-yarn-cache"))
++	t.Setenv("npm_config_cache", filepath.Join(writableTempDir(t), "ambient-npm-cache"))
+ 	observe := runner.ProcessLaunchObserver
+ 	runner.ProcessLaunchObserver = func(launch closureexec.ProcessLaunch) {
+ 		poison := []byte("--install.modules-folder ambient_modules\n")
+@@ -604,13 +604,13 @@ func TestRealPinnedYarnClassicReadsPrivateMirrorWithEmptyOrdinaryCache(t *testin
+ 	}
+ 	provider := newVerifiedYarnProvider(runner)
+ 	authority := makeVerifiedExecutionContext(t, capture, runner, provider)
+-	mirrorRoot := filepath.Join(t.TempDir(), "private-mirror")
+-	mirror, err := DerivePrivateMirror(t.Context(), capture, mirrorRoot, filepath.Join(t.TempDir(), "mirror-work"), authority)
++	mirrorRoot := filepath.Join(writableTempDir(t), "private-mirror")
++	mirror, err := DerivePrivateMirror(t.Context(), capture, mirrorRoot, filepath.Join(writableTempDir(t), "mirror-work"), authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(mirrorRoot) })
+-	materialized, err := Materialize(t.Context(), mirror, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "materialize-work")}, authority)
++
++	materialized, err := Materialize(t.Context(), mirror, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "materialize-work")}, authority)
+ 	if err != nil {
+ 		t.Fatalf("real frozen offline Yarn replay through protected executor failed: %v", err)
+ 	}
+@@ -654,7 +654,7 @@ type concreteYarnRunner struct {
+ 
+ func newConcreteYarnRunner(t *testing.T) *concreteYarnRunner {
+ 	t.Helper()
+-	executionRoot := filepath.Join(t.TempDir(), "execution")
++	executionRoot := filepath.Join(writableTempDir(t), "execution")
+ 	for _, dir := range []string{"toolchain/node/bin", "toolchain/yarn", "work"} {
+ 		if err := os.MkdirAll(filepath.Join(executionRoot, filepath.FromSlash(dir)), 0o700); err != nil {
+ 			t.Fatal(err)
+@@ -755,7 +755,7 @@ func TestYarnClassicPackageRootRecognizesPinnedInstallLayouts(t *testing.T) {
+ 		{name: "package-root", command: "bin/yarn.js", root: "."},
+ 	} {
+ 		t.Run(layout.name, func(t *testing.T) {
+-			prefix := t.TempDir()
++			prefix := writableTempDir(t)
+ 			root := filepath.Clean(filepath.Join(prefix, layout.root))
+ 			entrypoint := filepath.Join(root, "bin", "yarn.js")
+ 			if err := os.MkdirAll(filepath.Dir(entrypoint), 0o700); err != nil {
+@@ -770,7 +770,7 @@ func TestYarnClassicPackageRootRecognizesPinnedInstallLayouts(t *testing.T) {
+ 			}
+ 		})
+ 	}
+-	if _, err := yarnClassicPackageRoot(filepath.Join(t.TempDir(), "bin", "yarn.js")); err == nil {
++	if _, err := yarnClassicPackageRoot(filepath.Join(writableTempDir(t), "bin", "yarn.js")); err == nil {
+ 		t.Fatal("missing pinned Yarn tool root was accepted")
+ 	}
+ }
+@@ -935,7 +935,7 @@ func (runner *fakeYarnRunner) Run(_ context.Context, request closureexec.Executi
+ 
+ func makeExecutionContext(t *testing.T, capture *Capture, runner yarnTestRunner) *ExecutionContext {
+ 	t.Helper()
+-	executionRoot := filepath.Join(t.TempDir(), "execution")
++	executionRoot := filepath.Join(writableTempDir(t), "execution")
+ 	if concrete, ok := runner.(*concreteYarnRunner); ok {
+ 		executionRoot = concrete.executionRoot
+ 	}
+@@ -1077,12 +1077,12 @@ func captureFixture(t *testing.T, fixture yarnFixture) *Capture {
+ }
+ func captureFixtureError(t *testing.T, fixture yarnFixture) (*Capture, error) {
+ 	t.Helper()
+-	storeRoot := filepath.Join(t.TempDir(), "capture-store")
++	storeRoot := filepath.Join(writableTempDir(t), "capture-store")
+ 	store, err := closureexec.NewCaptureStore(storeRoot)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
++
+ 	return CaptureAndAdmit(t.Context(), CaptureRequest{Graph: fixture.graph, ProjectRoot: fixture.root, Tarballs: fixture.tarballs, WorkRoot: fixture.work, Store: store, Policy: artifactpolicy.NewService(), PreviousCausalHead: "test-head"})
+ }
+ 
+@@ -1244,14 +1244,18 @@ func containsAll(values []string, wanted ...string) bool {
+ }
+ 
+ func makeTreeWritable(root string) error {
+-	return filepath.WalkDir(root, func(current string, entry fs.DirEntry, walkErr error) error {
+-		if walkErr != nil {
+-			return walkErr
++	return filepath.WalkDir(root, func(current string, entry os.DirEntry, err error) error {
++		if err != nil {
++			return err
+ 		}
+-		if entry.IsDir() {
+-			return os.Chmod(current, 0o700)
++		if entry.Type()&os.ModeSymlink != 0 {
++			return nil
+ 		}
+-		return os.Chmod(current, 0o600)
++		info, err := entry.Info()
++		if err != nil {
++			return err
++		}
++		return os.Chmod(current, info.Mode().Perm()|0o200)
+ 	})
+ }
+ 
+@@ -1284,3 +1288,16 @@ func copyWritableTree(source, destination string) error {
+ 		return os.WriteFile(target, payload, 0o600)
+ 	})
+ }
++
++// writableTempDir registers restoration before callers can seal any child tree.
++// TempDir's removal is registered first, so restoration runs before removal.
++func writableTempDir(t *testing.T) string {
++	t.Helper()
++	root := t.TempDir()
++	t.Cleanup(func() {
++		if err := makeTreeWritable(root); err != nil && !os.IsNotExist(err) {
++			t.Errorf("restore temporary tree permissions: %v", err)
++		}
++	})
++	return root
++}
+diff --git a/internal/yarnclassicsource/tmp_hygiene_test.go b/internal/yarnclassicsource/tmp_hygiene_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..9154674a54f06b7c4eeb5353fe01d4ebac3006e3
+--- /dev/null
++++ b/internal/yarnclassicsource/tmp_hygiene_test.go
+@@ -0,0 +1,53 @@
++package yarnclassicsource
++
++import (
++	"os"
++	"path/filepath"
++	"runtime"
++	"testing"
++)
++
++// Nested sealed fixture trees are owner-writable before removal, preserving executability and external symlink targets.
++func TestWritableTempDirRestoresNestedTrees(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("POSIX permission fixture is exercised on Linux and macOS")
++	}
++	outside := filepath.Join(t.TempDir(), "outside")
++	if err := os.WriteFile(outside, []byte("outside"), 0o400); err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = os.Chmod(outside, 0o600) })
++	t.Run("sealed", func(t *testing.T) {
++		_ = t.TempDir() // Register TempDir removal before the audit.
++		var root string
++		t.Cleanup(func() {
++			for _, path := range []string{root, filepath.Join(root, "nested"), filepath.Join(root, "nested", "executable")} {
++				info, err := os.Stat(path)
++				if err != nil || info.Mode().Perm()&0o200 == 0 {
++					t.Errorf("tree not restored: %s: %v", path, err)
++				}
++			}
++			info, err := os.Stat(filepath.Join(root, "nested", "executable"))
++			if err != nil || info.Mode().Perm()&0o100 == 0 {
++				t.Error("executable bit lost")
++			}
++		})
++		root = writableTempDir(t)
++		dir := filepath.Join(root, "nested")
++		if err := os.Mkdir(dir, 0o700); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(dir, "executable"), []byte("x"), 0o500); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Symlink(outside, filepath.Join(dir, "link")); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Chmod(dir, 0o500); err != nil {
++			t.Fatal(err)
++		}
++	})
++	if info, err := os.Stat(outside); err != nil || info.Mode().Perm()&0o200 != 0 {
++		t.Errorf("outside target changed: %v", err)
++	}
++}
+diff --git a/internal/yarnmodernsource/conformance_test.go b/internal/yarnmodernsource/conformance_test.go
+index aafb5c650c740cf3a11c8ed3df3e8ed0fedbd92f..e3a398d7bc29a5667af0d74e27db57c1a0986719 100644
+--- a/internal/yarnmodernsource/conformance_test.go
++++ b/internal/yarnmodernsource/conformance_test.go
+@@ -413,13 +413,13 @@ func TestModernRuntimeCyclesCaptureMaterializeAndInvoke(t *testing.T) {
+ 			capture := captureModernFixture(t, fixture)
+ 			runner := &modernFakeRunner{capture: capture}
+ 			runner.authority = makeModernExecutionContext(t, capture, runner)
+-			cacheRoot := filepath.Join(t.TempDir(), "private-cache")
+-			cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), runner.authority)
++			cacheRoot := filepath.Join(writableTempDir(t), "private-cache")
++			cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), runner.authority)
+ 			if err != nil {
+ 				t.Fatal(err)
+ 			}
+-			t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
+-			materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, runner.authority)
++
++			materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, runner.authority)
+ 			if err != nil {
+ 				t.Fatal(err)
+ 			}
+@@ -447,13 +447,13 @@ func TestModernRuntimeCyclesThroughRealPinnedYarn(t *testing.T) {
+ 			runner := newModernConcreteRunner(t, yarnJS)
+ 			provider := newModernVerifiedProvider(runner)
+ 			authority := makeModernVerifiedExecutionContext(t, capture, runner, provider)
+-			cacheRoot := filepath.Join(t.TempDir(), "private-cache")
+-			cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), authority)
++			cacheRoot := filepath.Join(writableTempDir(t), "private-cache")
++			cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), authority)
+ 			if err != nil {
+ 				t.Fatal(err)
+ 			}
+-			t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
+-			materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, authority)
++
++			materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, authority)
+ 			if err != nil {
+ 				t.Fatal(err)
+ 			}
+@@ -979,7 +979,7 @@ func TestN09WorkspaceEscapeAndPostCheckpointDriftFailClosed(t *testing.T) {
+ }
+ 
+ func TestN13PreseededStateDiscardedPatchPreservedAndPluginsRejected(t *testing.T) {
+-	source := t.TempDir()
++	source := writableTempDir(t)
+ 	mustWrite(t, source, "package.json", []byte(`{"name":"root","version":"1.0.0"}`))
+ 	mustWrite(t, source, "yarn.lock", []byte("lock\n"))
+ 	mustWrite(t, source, ".yarnrc.yml", []byte(baseRC()))
+@@ -987,7 +987,7 @@ func TestN13PreseededStateDiscardedPatchPreservedAndPluginsRejected(t *testing.T
+ 	mustWrite(t, source, ".yarn/install-state.gz", []byte("poison"))
+ 	mustWrite(t, source, ".yarn/cache/poison.zip", []byte("poison"))
+ 	mustWrite(t, source, ".yarn/patches/a.patch", []byte("patch\n"))
+-	destination := t.TempDir()
++	destination := writableTempDir(t)
+ 	discarded, err := copyProjectSource(source, destination, "")
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -1001,12 +1001,12 @@ func TestN13PreseededStateDiscardedPatchPreservedAndPluginsRejected(t *testing.T
+ 	if _, err = os.Stat(filepath.Join(destination, ".yarn/patches/a.patch")); err != nil {
+ 		t.Fatalf("patch not preserved: %v", err)
+ 	}
+-	pluginSource := t.TempDir()
++	pluginSource := writableTempDir(t)
+ 	mustWrite(t, pluginSource, "package.json", []byte(`{"name":"root","version":"1.0.0"}`))
+ 	mustWrite(t, pluginSource, "yarn.lock", []byte("lock\n"))
+ 	mustWrite(t, pluginSource, ".yarnrc.yml", []byte(baseRC()))
+ 	mustWrite(t, pluginSource, ".yarn/plugins/local.cjs", []byte("module.exports = {}\n"))
+-	_, err = copyProjectSource(pluginSource, t.TempDir(), "")
++	_, err = copyProjectSource(pluginSource, writableTempDir(t), "")
+ 	if ErrorCode(err) != CodeManagerPluginUndeclared {
+ 		t.Fatalf("plugin error = %v", err)
+ 	}
+@@ -1029,16 +1029,16 @@ func TestS03S08N12N13ProtectedPrivateCachePnPReplayAndInvoke(t *testing.T) {
+ 	}
+ 	runner := &modernFakeRunner{capture: capture}
+ 	runner.authority = makeModernExecutionContext(t, capture, runner)
+-	cacheRoot := filepath.Join(t.TempDir(), "private-cache")
+-	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), runner.authority)
++	cacheRoot := filepath.Join(writableTempDir(t), "private-cache")
++	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), runner.authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
++
+ 	if cache.Receipt.SchemaID != "yarn-modern-private-cache-receipt-v1" || len(cache.Receipt.Files) != 1 {
+ 		t.Fatalf("cache receipt = %+v", cache.Receipt)
+ 	}
+-	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, runner.authority)
++	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, runner.authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -1063,7 +1063,7 @@ func TestS03S08N12N13ProtectedPrivateCachePnPReplayAndInvoke(t *testing.T) {
+ 	if err = os.Remove(filepath.Join(cache.root, ".yarn", "cache", cache.Receipt.Files[0].Path)); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	_, err = Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "missing"), WorkRoot: t.TempDir()}, runner.authority)
++	_, err = Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "missing"), WorkRoot: writableTempDir(t)}, runner.authority)
+ 	if ErrorCode(err) != CodeOfflineInputMissing {
+ 		t.Fatalf("missing cache error = %v", err)
+ 	}
+@@ -1074,14 +1074,14 @@ func TestN13NonfunctionalPnPLoaderCannotMaterializeOrPublish(t *testing.T) {
+ 	capture := captureModernFixture(t, fixture)
+ 	runner := &modernFakeRunner{capture: capture, invalidPnP: true}
+ 	runner.authority = makeModernExecutionContext(t, capture, runner)
+-	cacheRoot := filepath.Join(t.TempDir(), "private-cache")
+-	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), runner.authority)
++	cacheRoot := filepath.Join(writableTempDir(t), "private-cache")
++	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), runner.authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
+-	destination := filepath.Join(t.TempDir(), "materialized")
+-	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: destination, WorkRoot: t.TempDir()}, runner.authority)
++
++	destination := filepath.Join(writableTempDir(t), "materialized")
++	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: destination, WorkRoot: writableTempDir(t)}, runner.authority)
+ 	if materialized != nil || ErrorCode(err) != CodeMetadataMismatch || runner.starts != 1 {
+ 		t.Fatalf("materialized = %v, error = %v, starts = %d", materialized, err, runner.starts)
+ 	}
+@@ -1100,13 +1100,13 @@ func TestN01RealPinnedYarnPnPInvokeThroughVerifiedExecutor(t *testing.T) {
+ 	runner := newModernConcreteRunner(t, yarnJS)
+ 	provider := newModernVerifiedProvider(runner)
+ 	authority := makeModernVerifiedExecutionContext(t, capture, runner, provider)
+-	cacheRoot := filepath.Join(t.TempDir(), "private-cache")
+-	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), authority)
++	cacheRoot := filepath.Join(writableTempDir(t), "private-cache")
++	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
+-	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, authority)
++
++	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, authority)
+ 	if err != nil {
+ 		t.Fatalf("real Yarn materialization failed: %v", err)
+ 	}
+@@ -1132,13 +1132,13 @@ func TestN10RealPinnedYarnWorkspacePeerPnPInvokeThroughVerifiedExecutor(t *testi
+ 	runner := newModernConcreteRunner(t, yarnJS)
+ 	provider := newModernVerifiedProvider(runner)
+ 	authority := makeModernVerifiedExecutionContext(t, capture, runner, provider)
+-	cacheRoot := filepath.Join(t.TempDir(), "private-peer-cache")
+-	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), authority)
++	cacheRoot := filepath.Join(writableTempDir(t), "private-peer-cache")
++	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
+-	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized-peer"), WorkRoot: t.TempDir()}, authority)
++
++	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized-peer"), WorkRoot: writableTempDir(t)}, authority)
+ 	if err != nil {
+ 		t.Fatalf("real Yarn peer materialization failed: %v", err)
+ 	}
+@@ -1160,13 +1160,13 @@ func TestN10RealPinnedYarnRemotePeerContextsThroughVerifiedExecutor(t *testing.T
+ 	runner := newModernConcreteRunner(t, yarnJS)
+ 	provider := newModernVerifiedProvider(runner)
+ 	authority := makeModernVerifiedExecutionContext(t, capture, runner, provider)
+-	cacheRoot := filepath.Join(t.TempDir(), "private-remote-peer-cache")
+-	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), authority)
++	cacheRoot := filepath.Join(writableTempDir(t), "private-remote-peer-cache")
++	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
+-	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized-remote-peers"), WorkRoot: t.TempDir()}, authority)
++
++	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized-remote-peers"), WorkRoot: writableTempDir(t)}, authority)
+ 	if err != nil {
+ 		t.Fatalf("real Yarn remote peer materialization failed: %v", err)
+ 	}
+@@ -1180,13 +1180,13 @@ func TestN01NodeModulesLinkerReconcilesInstalledPayload(t *testing.T) {
+ 	capture := captureModernFixture(t, fixture)
+ 	runner := &modernFakeRunner{capture: capture}
+ 	runner.authority = makeModernExecutionContext(t, capture, runner)
+-	cacheRoot := filepath.Join(t.TempDir(), "cache")
+-	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), runner.authority)
++	cacheRoot := filepath.Join(writableTempDir(t), "cache")
++	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), runner.authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
+-	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, runner.authority)
++
++	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, runner.authority)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -1218,7 +1218,7 @@ func newModernExecutionFixtureForLinker(t *testing.T, linker string) modernExecu
+ }
+ func newModernExecutionFixtureWithPackageFiles(t *testing.T, linker string, packageFiles map[string][]byte) modernExecutionFixture {
+ 	t.Helper()
+-	root := filepath.Join(t.TempDir(), "project")
++	root := filepath.Join(writableTempDir(t), "project")
+ 	if err := os.MkdirAll(root, 0o700); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -1243,7 +1243,7 @@ func newModernExecutionFixtureWithPackageFiles(t *testing.T, linker string, pack
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	archivePath := filepath.Join(t.TempDir(), "is-number.zip")
++	archivePath := filepath.Join(writableTempDir(t), "is-number.zip")
+ 	if err = os.WriteFile(archivePath, zipBytes, 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -1257,12 +1257,12 @@ func newModernExecutionFixtureWithPackageFiles(t *testing.T, linker string, pack
+ 			archives[candidate.Key] = RawArchive{Path: archivePath, Format: "zip", SHA256: string(digestID(zipBytes)), YarnChecksum: checksum, CacheName: cacheName}
+ 		}
+ 	}
+-	return modernExecutionFixture{root: root, work: t.TempDir(), graph: graph, archives: archives}
++	return modernExecutionFixture{root: root, work: writableTempDir(t), graph: graph, archives: archives}
+ }
+ 
+ func newModernWorkspaceCycleFixture(t *testing.T) modernExecutionFixture {
+ 	t.Helper()
+-	root := filepath.Join(t.TempDir(), "workspace-cycle-project")
++	root := filepath.Join(writableTempDir(t), "workspace-cycle-project")
+ 	lock := "# This file is generated by running \"yarn install\" inside your project.\n# Manual changes might be lost - proceed with caution!\n\n__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"a@workspace:*, a@workspace:packages/a\":\n  version: 0.0.0-use.local\n  resolution: \"a@workspace:packages/a\"\n  dependencies:\n    b: \"workspace:*\"\n  languageName: unknown\n  linkType: soft\n\n\"b@workspace:*, b@workspace:packages/b\":\n  version: 0.0.0-use.local\n  resolution: \"b@workspace:packages/b\"\n  dependencies:\n    a: \"workspace:*\"\n  languageName: unknown\n  linkType: soft\n\n\"root@workspace:.\":\n  version: 0.0.0-use.local\n  resolution: \"root@workspace:.\"\n  dependencies:\n    a: \"workspace:*\"\n  languageName: unknown\n  linkType: soft\n"
+ 	manifests := map[string][]byte{
+ 		"package.json":            []byte(`{"name":"root","version":"1.0.0","private":true,"packageManager":"yarn@4.9.2","workspaces":["packages/*"],"dependencies":{"a":"workspace:*"}}`),
+@@ -1287,12 +1287,12 @@ func newModernWorkspaceCycleFixture(t *testing.T) modernExecutionFixture {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	return modernExecutionFixture{root: root, work: t.TempDir(), graph: graph, archives: map[string]RawArchive{}}
++	return modernExecutionFixture{root: root, work: writableTempDir(t), graph: graph, archives: map[string]RawArchive{}}
+ }
+ 
+ func newModernWorkspacePeerCycleFixture(t *testing.T) modernExecutionFixture {
+ 	t.Helper()
+-	root := filepath.Join(t.TempDir(), "workspace-peer-cycle-project")
++	root := filepath.Join(writableTempDir(t), "workspace-peer-cycle-project")
+ 	lock := "# This file is generated by running \"yarn install\" inside your project.\n# Manual changes might be lost - proceed with caution!\n\n__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"a@workspace:*, a@workspace:packages/a\":\n  version: 0.0.0-use.local\n  resolution: \"a@workspace:packages/a\"\n  dependencies:\n    b: \"workspace:*\"\n    host: \"workspace:*\"\n  languageName: unknown\n  linkType: soft\n\n\"b@workspace:*, b@workspace:packages/b\":\n  version: 0.0.0-use.local\n  resolution: \"b@workspace:packages/b\"\n  dependencies:\n    a: \"workspace:*\"\n  peerDependencies:\n    host: \"*\"\n  languageName: unknown\n  linkType: soft\n\n\"host@workspace:*, host@workspace:packages/host\":\n  version: 0.0.0-use.local\n  resolution: \"host@workspace:packages/host\"\n  languageName: unknown\n  linkType: soft\n\n\"root@workspace:.\":\n  version: 0.0.0-use.local\n  resolution: \"root@workspace:.\"\n  dependencies:\n    a: \"workspace:*\"\n    host: \"workspace:*\"\n  languageName: unknown\n  linkType: soft\n"
+ 	manifests := map[string][]byte{
+ 		"package.json":               []byte(`{"name":"root","version":"1.0.0","private":true,"packageManager":"yarn@4.9.2","workspaces":["packages/*"],"dependencies":{"a":"workspace:*","host":"workspace:*"}}`),
+@@ -1319,7 +1319,7 @@ func newModernWorkspacePeerCycleFixture(t *testing.T) modernExecutionFixture {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	return modernExecutionFixture{root: root, work: t.TempDir(), graph: graph, archives: map[string]RawArchive{}}
++	return modernExecutionFixture{root: root, work: writableTempDir(t), graph: graph, archives: map[string]RawArchive{}}
+ }
+ 
+ func newModernRemoteCycleFixture(t *testing.T) modernExecutionFixture {
+@@ -1347,7 +1347,7 @@ func newModernRemoteCycleFixture(t *testing.T) modernExecutionFixture {
+ 		if err != nil {
+ 			t.Fatal(err)
+ 		}
+-		archivePath := filepath.Join(t.TempDir(), pkg.name+"-1.0.0.zip")
++		archivePath := filepath.Join(writableTempDir(t), pkg.name+"-1.0.0.zip")
+ 		if err = os.WriteFile(archivePath, zipBytes, 0o600); err != nil {
+ 			t.Fatal(err)
+ 		}
+@@ -1360,7 +1360,7 @@ func newModernRemoteCycleFixture(t *testing.T) modernExecutionFixture {
+ 	lock := "# This file is generated by running \"yarn install\" inside your project.\n# Manual changes might be lost - proceed with caution!\n\n__metadata:\n  version: 8\n  cacheKey: 10c0\n\n" + entry("a", "b") + "\n" + entry("b", "a") + "\n\"root@workspace:.\":\n  version: 0.0.0-use.local\n  resolution: \"root@workspace:.\"\n  dependencies:\n    a: \"npm:1.0.0\"\n  languageName: unknown\n  linkType: soft\n"
+ 	manifest := []byte(`{"name":"root","version":"1.0.0","private":true,"packageManager":"yarn@4.9.2","dependencies":{"a":"npm:1.0.0"}}`)
+ 	rc := []byte(baseRC())
+-	root := filepath.Join(t.TempDir(), "remote-cycle-project")
++	root := filepath.Join(writableTempDir(t), "remote-cycle-project")
+ 	for name, payload := range map[string][]byte{"package.json": manifest, "yarn.lock": []byte(lock), ".yarnrc.yml": rc, "index.js": []byte("require('a')\n"), ".pnp.cjs": []byte("poison\n"), ".yarn/install-state.gz": []byte("poison\n")} {
+ 		mustWrite(t, root, name, payload)
+ 	}
+@@ -1376,12 +1376,12 @@ func newModernRemoteCycleFixture(t *testing.T) modernExecutionFixture {
+ 		}
+ 		archives[key] = RawArchive{Path: record.path, Format: "zip", SHA256: string(digestID(payload)), YarnChecksum: record.checksum, CacheName: record.cacheName}
+ 	}
+-	return modernExecutionFixture{root: root, work: t.TempDir(), graph: graph, archives: archives}
++	return modernExecutionFixture{root: root, work: writableTempDir(t), graph: graph, archives: archives}
+ }
+ 
+ func newModernPeerWorkspaceFixture(t *testing.T) modernExecutionFixture {
+ 	t.Helper()
+-	root := filepath.Join(t.TempDir(), "peer-project")
++	root := filepath.Join(writableTempDir(t), "peer-project")
+ 	if err := os.MkdirAll(root, 0o700); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -1402,7 +1402,7 @@ func newModernPeerWorkspaceFixture(t *testing.T) modernExecutionFixture {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	return modernExecutionFixture{root: root, work: t.TempDir(), graph: graph, archives: map[string]RawArchive{}}
++	return modernExecutionFixture{root: root, work: writableTempDir(t), graph: graph, archives: map[string]RawArchive{}}
+ }
+ 
+ func newModernTwoRemotePeerContextsFixture(t *testing.T) modernExecutionFixture {
+@@ -1435,7 +1435,7 @@ func newModernTwoRemotePeerContextsFixture(t *testing.T) modernExecutionFixture
+ 		if err != nil {
+ 			t.Fatal(err)
+ 		}
+-		archivePath := filepath.Join(t.TempDir(), strings.ReplaceAll(pkg.name+"-"+pkg.version, "/", "-")+".zip")
++		archivePath := filepath.Join(writableTempDir(t), strings.ReplaceAll(pkg.name+"-"+pkg.version, "/", "-")+".zip")
+ 		if err = os.WriteFile(archivePath, zipBytes, 0o600); err != nil {
+ 			t.Fatal(err)
+ 		}
+@@ -1454,7 +1454,7 @@ func newModernTwoRemotePeerContextsFixture(t *testing.T) modernExecutionFixture
+ 	lock += "\"root@workspace:.\":\n  version: 0.0.0-use.local\n  resolution: \"root@workspace:.\"\n  dependencies:\n    consumer-one: \"npm:1.0.0\"\n    consumer-two: \"npm:1.0.0\"\n  languageName: unknown\n  linkType: soft\n"
+ 	rootManifest := []byte(`{"name":"root","version":"1.0.0","private":true,"packageManager":"yarn@4.9.2","dependencies":{"consumer-one":"npm:1.0.0","consumer-two":"npm:1.0.0"}}`)
+ 	rc := []byte(baseRC())
+-	root := filepath.Join(t.TempDir(), "remote-peer-project")
++	root := filepath.Join(writableTempDir(t), "remote-peer-project")
+ 	for name, payload := range map[string][]byte{"package.json": rootManifest, "yarn.lock": []byte(lock), ".yarnrc.yml": rc, "index.js": []byte("require('consumer-one'); require('consumer-two')\n"), ".pnp.cjs": []byte("poison\n"), ".yarn/install-state.gz": []byte("poison\n")} {
+ 		mustWrite(t, root, name, payload)
+ 	}
+@@ -1470,7 +1470,7 @@ func newModernTwoRemotePeerContextsFixture(t *testing.T) modernExecutionFixture
+ 		}
+ 		archives[key] = RawArchive{Path: record.path, Format: "zip", SHA256: string(digestID(payload)), YarnChecksum: record.checksum, CacheName: record.cacheName}
+ 	}
+-	return modernExecutionFixture{root: root, work: t.TempDir(), graph: graph, archives: archives}
++	return modernExecutionFixture{root: root, work: writableTempDir(t), graph: graph, archives: archives}
+ }
+ func captureModernFixture(t *testing.T, fixture modernExecutionFixture) *Capture {
+ 	t.Helper()
+@@ -1482,12 +1482,12 @@ func captureModernFixture(t *testing.T, fixture modernExecutionFixture) *Capture
+ }
+ func captureModernFixtureError(t *testing.T, fixture modernExecutionFixture) (*Capture, error) {
+ 	t.Helper()
+-	storeRoot := filepath.Join(t.TempDir(), "store")
++	storeRoot := filepath.Join(writableTempDir(t), "store")
+ 	store, err := closureexec.NewCaptureStore(storeRoot)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	t.Cleanup(func() { _ = makeTestTreeWritable(storeRoot) })
++
+ 	capture, err := CaptureAndAdmit(t.Context(), CaptureRequest{Graph: fixture.graph, ProjectRoot: fixture.root, Archives: fixture.archives, WorkRoot: fixture.work, Store: store, Policy: artifactpolicy.NewService(), PreviousCausalHead: "test-head"})
+ 	return capture, err
+ }
+@@ -1551,7 +1551,7 @@ func newModernConcreteRunner(t *testing.T, yarnJS string) *modernConcreteRunner
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	executionRoot := filepath.Join(t.TempDir(), "execution")
++	executionRoot := filepath.Join(writableTempDir(t), "execution")
+ 	for _, logical := range []string{"toolchain/node/bin", "toolchain/yarn/bin", "work", "output"} {
+ 		if err = os.MkdirAll(filepath.Join(executionRoot, filepath.FromSlash(logical)), 0o700); err != nil {
+ 			t.Fatal(err)
+@@ -1852,7 +1852,7 @@ func extractModernCache(payload []byte, packageName, destination string) error {
+ }
+ func makeModernExecutionContext(t *testing.T, capture *Capture, runner modernTestRunner) *ExecutionContext {
+ 	t.Helper()
+-	executionRoot := filepath.Join(t.TempDir(), "execution")
++	executionRoot := filepath.Join(writableTempDir(t), "execution")
+ 	if concrete, ok := runner.(*modernConcreteRunner); ok {
+ 		executionRoot = concrete.executionRoot
+ 	}
+@@ -2011,14 +2011,18 @@ func copyWritableTestTree(source, destination string) error {
+ 	})
+ }
+ func makeTestTreeWritable(root string) error {
+-	return filepath.WalkDir(root, func(current string, entry fs.DirEntry, walkErr error) error {
+-		if walkErr != nil {
+-			return walkErr
++	return filepath.WalkDir(root, func(current string, entry os.DirEntry, err error) error {
++		if err != nil {
++			return err
+ 		}
+-		if entry.IsDir() {
+-			return os.Chmod(current, 0o700)
++		if entry.Type()&os.ModeSymlink != 0 {
++			return nil
++		}
++		info, err := entry.Info()
++		if err != nil {
++			return err
+ 		}
+-		return os.Chmod(current, 0o600)
++		return os.Chmod(current, info.Mode().Perm()|0o200)
+ 	})
+ }
+ func containsStrings(values []string, wanted ...string) bool {
+@@ -2110,3 +2114,16 @@ func mustWrite(t *testing.T, root, relative string, payload []byte) {
+ 		t.Fatal(err)
+ 	}
+ }
++
++// writableTempDir registers restoration before callers can seal any child tree.
++// TempDir's removal is registered first, so restoration runs before removal.
++func writableTempDir(t *testing.T) string {
++	t.Helper()
++	root := t.TempDir()
++	t.Cleanup(func() {
++		if err := makeTestTreeWritable(root); err != nil && !os.IsNotExist(err) {
++			t.Errorf("restore temporary tree permissions: %v", err)
++		}
++	})
++	return root
++}
+diff --git a/internal/yarnmodernsource/tmp_hygiene_test.go b/internal/yarnmodernsource/tmp_hygiene_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..b87c03ad24c1e791b76f25b85a774a4d335475af
+--- /dev/null
++++ b/internal/yarnmodernsource/tmp_hygiene_test.go
+@@ -0,0 +1,53 @@
++package yarnmodernsource
++
++import (
++	"os"
++	"path/filepath"
++	"runtime"
++	"testing"
++)
++
++// Nested sealed fixture trees are owner-writable before removal, preserving executability and external symlink targets.
++func TestWritableTempDirRestoresNestedTrees(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("POSIX permission fixture is exercised on Linux and macOS")
++	}
++	outside := filepath.Join(t.TempDir(), "outside")
++	if err := os.WriteFile(outside, []byte("outside"), 0o400); err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = os.Chmod(outside, 0o600) })
++	t.Run("sealed", func(t *testing.T) {
++		_ = t.TempDir() // Register TempDir removal before the audit.
++		var root string
++		t.Cleanup(func() {
++			for _, path := range []string{root, filepath.Join(root, "nested"), filepath.Join(root, "nested", "executable")} {
++				info, err := os.Stat(path)
++				if err != nil || info.Mode().Perm()&0o200 == 0 {
++					t.Errorf("tree not restored: %s: %v", path, err)
++				}
++			}
++			info, err := os.Stat(filepath.Join(root, "nested", "executable"))
++			if err != nil || info.Mode().Perm()&0o100 == 0 {
++				t.Error("executable bit lost")
++			}
++		})
++		root = writableTempDir(t)
++		dir := filepath.Join(root, "nested")
++		if err := os.Mkdir(dir, 0o700); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(dir, "executable"), []byte("x"), 0o500); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Symlink(outside, filepath.Join(dir, "link")); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Chmod(dir, 0o500); err != nil {
++			t.Fatal(err)
++		}
++	})
++	if info, err := os.Stat(outside); err != nil || info.Mode().Perm()&0o200 != 0 {
++		t.Errorf("outside target changed: %v", err)
++	}
++}
+diff --git a/scripts/restore-runner-tmp.sh b/scripts/restore-runner-tmp.sh
+new file mode 100644
+index 0000000000000000000000000000000000000000..d60e6f7cfc42e6719ab2846dba0bd3a4ddd67e4c
+--- /dev/null
++++ b/scripts/restore-runner-tmp.sh
+@@ -0,0 +1,22 @@
++#!/usr/bin/env bash
++# The Linux runner's job-completed hook removes TMPDIR, not RUNNER_TEMP.
++# Restore permissions only; leave removal to the runner owner.
++set -u
++root=${TMPDIR-}
++if [[ -z "$root" || ! -d "$root" || -L "$root" ]]; then
++  echo 'runner tmp restore: refusing unset, empty, non-directory or symlink TMPDIR'
++  exit 0
++fi
++# Resolve aliases such as /tmp/.. before checking for the filesystem root.
++# A sentinel preserves pathname newlines that command substitution would strip.
++root=$(cd -- "$root" && pwd -P && printf '.') || { echo 'runner tmp restore: cannot resolve TMPDIR'; exit 0; }
++root=${root%$'\n.'}
++if [[ "$root" == / || "$root" -ef / ]]; then
++  echo 'runner tmp restore: refusing filesystem root TMPDIR'
++  exit 0
++fi
++# GNU chmod does not traverse symlinks encountered recursively. No -L and no
++# trailing slash on the resolved root: targets outside TMPDIR stay untouched.
++echo "runner tmp restore: runner=${RUNNER_NAME:-unknown}; restoring owner write permission"
++chmod -R u+w -- "$root" || echo 'runner tmp restore: chmod could not restore every entry'
++exit 0
+diff --git a/tools/ciworkflow/isolation_test.go b/tools/ciworkflow/isolation_test.go
+index 4de33dcda645c771a1d81b3547548e72ddfeacc9..d44e838819f71ed2a84e7f250a1cd24cc1d79f33 100644
+--- a/tools/ciworkflow/isolation_test.go
++++ b/tools/ciworkflow/isolation_test.go
+@@ -34,11 +34,13 @@ func checkInlineGoState(body string) error {
+ }
+ 
+ type step struct {
+-	Uses string            `yaml:"uses"`
+-	Run  string            `yaml:"run"`
+-	If   string            `yaml:"if"`
+-	Env  map[string]string `yaml:"env"`
+-	With map[string]string `yaml:"with"`
++	Shell    string            `yaml:"shell"`
++	Continue bool              `yaml:"continue-on-error"`
++	Uses     string            `yaml:"uses"`
++	Run      string            `yaml:"run"`
++	If       string            `yaml:"if"`
++	Env      map[string]string `yaml:"env"`
++	With     map[string]string `yaml:"with"`
+ }
+ 
+ type workflow struct {
+diff --git a/tools/ciworkflow/tmp_hygiene_test.go b/tools/ciworkflow/tmp_hygiene_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..4d89466f936e698bb20ca9864089a1f20d4ef2bd
+--- /dev/null
++++ b/tools/ciworkflow/tmp_hygiene_test.go
+@@ -0,0 +1,306 @@
++package ciworkflow
++
++import (
++	"fmt"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++
++	"gopkg.in/yaml.v3"
++)
++
++const restoreCommand = "bash scripts/restore-runner-tmp.sh"
++const restoreCondition = "always() && runner.environment == 'self-hosted' && runner.os == 'Linux'"
++
++func checkTemporaryTreeRestore(data []byte) error {
++	var wf workflow
++	if err := yaml.Unmarshal(data, &wf); err != nil {
++		return err
++	}
++	count := 0
++	for name, job := range wf.Jobs {
++		route := fmt.Sprint(job.RunsOn)
++		if !strings.Contains(route, "LINUX_SELF_HOSTED") && !strings.Contains(route, "relux-linux") {
++			continue
++		}
++		count++
++		if len(job.Steps) == 0 {
++			return fmt.Errorf("%s: missing final tmp restore", name)
++		}
++		last := job.Steps[len(job.Steps)-1]
++		if last.Run != restoreCommand || last.If != restoreCondition || last.Shell != "bash" || !last.Continue {
++			return fmt.Errorf("%s: missing guarded final tmp restore", name)
++		}
++	}
++	if count != 7 {
++		return fmt.Errorf("expected seven Linux-routable jobs, got %d", count)
++	}
++	return nil
++}
++
++// Every current Linux-routable job ends with the guarded non-blocking shared script call.
++func TestLinuxCIWorkflowTemporaryTreeRestore(t *testing.T) {
++	if err := checkTemporaryTreeRestore(workflowBytes(t)); err != nil {
++		t.Fatal(err)
++	}
++}
++
++// Per-job removal and token-preserving invocation/condition/order plants are refused by the live workflow gate.
++func TestLinuxCIWorkflowTemporaryTreeRestorePlants(t *testing.T) {
++	data := workflowBytes(t)
++	if err := checkTemporaryTreeRestore(data); err != nil {
++		t.Fatal(err)
++	}
++	var wf workflow
++	if err := yaml.Unmarshal(data, &wf); err != nil {
++		t.Fatal(err)
++	}
++	for name, job := range wf.Jobs {
++		if !strings.Contains(fmt.Sprint(job.RunsOn), "LINUX_SELF_HOSTED") {
++			continue
++		}
++		t.Run(name, func(t *testing.T) {
++			for _, plant := range []string{"remove", "echo", "success-only", "hosted", "not-final", "blocking", "wrong-shell"} {
++				t.Run(plant, func(t *testing.T) {
++					var mutant workflow
++					if err := yaml.Unmarshal(data, &mutant); err != nil {
++						t.Fatal(err)
++					}
++					j := mutant.Jobs[name]
++					n := len(j.Steps) - 1
++					switch plant {
++					case "remove":
++						j.Steps = j.Steps[:n]
++					case "echo":
++						j.Steps[n].Run = "echo '" + restoreCommand + "'"
++					case "success-only":
++						j.Steps[n].If = strings.Replace(restoreCondition, "always()", "success()", 1)
++					case "hosted":
++						j.Steps[n].If = strings.Replace(restoreCondition, "self-hosted", "github-hosted", 1)
++					case "not-final":
++						j.Steps = append(j.Steps, step{Run: "echo later"})
++					case "blocking":
++						j.Steps[n].Continue = false
++					case "wrong-shell":
++						j.Steps[n].Shell = "sh"
++					}
++					mutant.Jobs[name] = j
++					raw, err := yaml.Marshal(mutant)
++					if err != nil {
++						t.Fatal(err)
++					}
++					if err := checkTemporaryTreeRestore(raw); err == nil || !strings.Contains(err.Error(), name+":") {
++						t.Fatalf("plant admitted: %v", err)
++					}
++				})
++			}
++		})
++	}
++}
++
++func restoreScript() string {
++	if path := os.Getenv("CI_TMP_SCRIPT_UNDER_TEST"); path != "" {
++		return path
++	}
++	return "../../scripts/restore-runner-tmp.sh"
++}
++
++func runRestore(script string, env []string) ([]byte, error) {
++	cmd := exec.Command("bash", script)
++	for _, entry := range os.Environ() {
++		if !strings.HasPrefix(entry, "TMPDIR=") {
++			cmd.Env = append(cmd.Env, entry)
++		}
++	}
++	cmd.Env = append(cmd.Env, env...)
++	return cmd.CombinedOutput()
++}
++
++// The real script heals both current and stale read-only trees without deleting or following external links.
++func TestRunnerTemporaryTreeSelfHeal(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("Linux chmod contract is exercised on Linux and macOS")
++	}
++	root := t.TempDir()
++	outside := filepath.Join(t.TempDir(), "outside")
++	if err := os.WriteFile(outside, []byte("untouched"), 0o400); err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = os.Chmod(outside, 0o600) })
++	for _, name := range []string{"current", "stale"} {
++		dir := filepath.Join(root, name, "nested")
++		if err := os.MkdirAll(dir, 0o700); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(dir, "payload"), []byte(name), 0o400); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Chmod(dir, 0o500); err != nil {
++			t.Fatal(err)
++		}
++		t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
++	}
++	if err := os.Symlink(outside, filepath.Join(root, "link")); err != nil {
++		t.Fatal(err)
++	}
++	out, err := runRestore(restoreScript(), []string{"TMPDIR=" + root})
++	if err != nil {
++		t.Fatalf("restore exit: %v: %s", err, out)
++	}
++	for _, name := range []string{"current", "stale"} {
++		dir := filepath.Join(root, name, "nested")
++		for _, path := range []string{dir, filepath.Join(dir, "payload")} {
++			info, err := os.Stat(path)
++			if err != nil || info.Mode().Perm()&0o200 == 0 {
++				t.Errorf("not restored: %s: %v", path, err)
++			}
++		}
++		data, err := os.ReadFile(filepath.Join(dir, "payload"))
++		if err != nil || string(data) != name {
++			t.Errorf("file deleted or changed: %v", err)
++		}
++	}
++	if info, err := os.Stat(outside); err != nil || info.Mode().Perm()&0o200 != 0 {
++		t.Errorf("external symlink target changed: %v", err)
++	}
++	if info, err := os.Lstat(filepath.Join(root, "link")); err != nil || info.Mode()&os.ModeSymlink == 0 {
++		t.Error("link deleted")
++	}
++	if err := os.RemoveAll(root); err != nil {
++		t.Fatalf("tree not removable: %v", err)
++	}
++}
++
++// Unsafe roots log refusal and exit zero before chmod; a chmod spy keeps filesystem-root plants harmless.
++func TestRunnerTemporaryTreeRefusals(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("Linux shell contract is exercised on Linux and macOS")
++	}
++	root := t.TempDir()
++	spy := t.TempDir()
++	record := filepath.Join(t.TempDir(), "called")
++	if err := os.WriteFile(filepath.Join(spy, "chmod"), []byte("#!/bin/sh\nprintf called > \"$CHMOD_RECORD\"\n"), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	file := filepath.Join(root, "file")
++	if err := os.WriteFile(file, []byte("x"), 0o400); err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = os.Chmod(file, 0o600) })
++	link := filepath.Join(root, "link")
++	if err := os.Symlink(root, link); err != nil {
++		t.Fatal(err)
++	}
++	for _, tc := range []struct {
++		name  string
++		value *string
++	}{
++		{"unset", nil}, {"empty", stringPointer("")}, {"root", stringPointer("/")}, {"root-alias", stringPointer("/tmp/..")},
++		{"double-slash-root", stringPointer("//")},
++		{"file", &file}, {"missing", stringPointer(filepath.Join(root, "absent"))}, {"symlink", &link},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			env := []string{"PATH=" + spy + string(os.PathListSeparator) + os.Getenv("PATH"), "CHMOD_RECORD=" + record}
++			if tc.value != nil {
++				env = append(env, "TMPDIR="+*tc.value)
++			}
++			out, err := runRestore(restoreScript(), env)
++			if err != nil || !strings.Contains(string(out), "refusing") {
++				t.Fatalf("refusal exit/log: %v: %s", err, out)
++			}
++			if _, err := os.Stat(record); !os.IsNotExist(err) {
++				t.Fatal("refused root reached chmod")
++			}
++			if info, err := os.Stat(file); err != nil || info.Mode().Perm()&0o200 != 0 {
++				t.Fatal("refusal changed fixture")
++			}
++		})
++	}
++}
++func stringPointer(s string) *string { return &s }
++
++// Canonicalization preserves a trailing pathname newline and never chmods the adjacent trimmed path.
++func TestRunnerTemporaryTreeRootTrailingNewline(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("Linux shell contract is exercised on Linux and macOS")
++	}
++	base := t.TempDir()
++	root := filepath.Join(base, "runner-tmp\n")
++	outside := strings.TrimSuffix(root, "\n")
++	t.Cleanup(func() {
++		for _, path := range []string{root, outside} {
++			_ = os.Chmod(path, 0o700)
++		}
++	})
++	for _, path := range []string{root, outside} {
++		if err := os.Mkdir(path, 0o500); err != nil {
++			t.Fatal(err)
++		}
++	}
++	out, err := runRestore(restoreScript(), []string{"TMPDIR=" + root})
++	if err != nil {
++		t.Fatalf("restore: %v: %s", err, out)
++	}
++	if info, err := os.Stat(root); err != nil || info.Mode().Perm()&0o200 == 0 {
++		t.Fatalf("newline root not restored: %v: %s", err, out)
++	}
++	if info, err := os.Stat(outside); err != nil || info.Mode().Perm()&0o200 != 0 {
++		t.Fatalf("trimmed sibling changed: %v", err)
++	}
++	if err := os.RemoveAll(root); err != nil {
++		t.Fatal(err)
++	}
++}
++
++// Permission errors are observable but cannot turn the best-effort final step into a job failure.
++func TestRunnerTemporaryTreeChmodFailure(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("Linux shell contract is exercised on Linux and macOS")
++	}
++	spy := t.TempDir()
++	if err := os.WriteFile(filepath.Join(spy, "chmod"), []byte("#!/bin/sh\nexit 13\n"), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	out, err := runRestore(restoreScript(), []string{"TMPDIR=" + t.TempDir(), "PATH=" + spy + string(os.PathListSeparator) + os.Getenv("PATH")})
++	if err != nil || !strings.Contains(string(out), "could not restore") {
++		t.Fatalf("chmod error handling: %v: %s", err, out)
++	}
++}
++
++// Each script plant retains chmod and its root gate but weakens one boundary; the behavioral test must fail by name.
++func TestRunnerTemporaryTreeNarrowingControls(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("Linux shell contract is exercised on Linux and macOS")
++	}
++	raw, err := os.ReadFile("../../scripts/restore-runner-tmp.sh")
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, p := range []struct{ name, old, replacement, test, finding string }{
++		{"current-only", `chmod -R u+w -- "$root"`, `chmod -R u+w -- "$root/current"`, "TestRunnerTemporaryTreeSelfHeal", "not restored"},
++		{"admit-root-alias", `if [[ "$root" == / || "$root" -ef / ]]; then`, `if [[ "$root" == / && "${TMPDIR-}" == / ]]; then`, "TestRunnerTemporaryTreeRefusals/root-alias", "refusal exit/log"},
++		{"admit-double-slash-root", `if [[ "$root" == / || "$root" -ef / ]]; then`, `if [[ "$root" == / ]]; then`, "TestRunnerTemporaryTreeRefusals/double-slash-root", "refusal exit/log"},
++		{"trim-path-newline", `root=$(cd -- "$root" && pwd -P && printf '.')`, `root=$(cd -- "$root" && pwd -P)`, "TestRunnerTemporaryTreeRootTrailingNewline", "newline root not restored"},
++	} {
++		t.Run(p.name, func(t *testing.T) {
++			if strings.Count(string(raw), p.old) != 1 {
++				t.Fatal("plant target absent or ambiguous")
++			}
++			script := filepath.Join(t.TempDir(), "restore.sh")
++			if err := os.WriteFile(script, []byte(strings.Replace(string(raw), p.old, p.replacement, 1)), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			cmd := exec.Command(os.Args[0], "-test.run=^"+p.test+"$", "-test.v")
++			cmd.Env = append(os.Environ(), "CI_TMP_SCRIPT_UNDER_TEST="+script)
++			out, runErr := cmd.CombinedOutput()
++			exit, ok := runErr.(*exec.ExitError)
++			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(out), "--- FAIL: "+strings.Split(p.test, "/")[0]) || !strings.Contains(string(out), p.finding) {
++				t.Fatalf("survivor or invalid plant: %v: %s", runErr, out)
++			}
++			t.Logf("%s killed by %s; behavioral child exit 1 (expected red)", p.name, p.test)
++		})
++	}
++}
