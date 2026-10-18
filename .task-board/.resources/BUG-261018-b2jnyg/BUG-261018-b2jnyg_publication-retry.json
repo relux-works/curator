@@ -1,0 +1,39 @@
+{
+  "candidate": "2836a70138afcfb99f7f2e41a6f299725903aa5c",
+  "signature": "G",
+  "candidate_tree": "d1d16a8b497530c1c5ddca460fab693daf3bd069",
+  "full_tree_matches": true,
+  "head": "2e5ab6dab61fc78a525cbcb0de6c5fcc9f5ae882",
+  "upstream": "b9caa20901ee859eec20e649940693033e6297d4",
+  "upstream_overlap": [],
+  "task_paths": [
+    "docs/claude-seed-repair.md",
+    "internal/envprofile/claude_seed_mutants_test.go",
+    "internal/envprofile/claude_seed_test.go",
+    "internal/envprofile/managed.go"
+  ],
+  "blob_oids": {
+    "docs/claude-seed-repair.md": "a2938550be46f24479179085d0a6daf862dbfe2f",
+    "internal/envprofile/claude_seed_mutants_test.go": "84544a6c62966fea6630e30be0dad378e36b56da",
+    "internal/envprofile/claude_seed_test.go": "caa1b636c70ac54f8e4fadaf4780c118d960bf6a",
+    "internal/envprofile/managed.go": "49d07a095bc7339b7ecabe72c04efab9d20548dd"
+  },
+  "changed_files": "M internal/envprofile/managed.go\n?? docs/claude-seed-repair.md\n?? internal/envprofile/claude_seed_mutants_test.go\n?? internal/envprofile/claude_seed_test.go",
+  "scope": "publication retry only; no source, test, documentation or configuration delta",
+  "commands": [
+    {
+      "command": "git fetch origin main",
+      "exit_code": 0
+    },
+    {
+      "command": "full-tree blob and signature comparison",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "tests": "existing exact-tree evidence reused; no suite rerun this turn",
+  "post_handoff_validation": "not yet run; no passing claim"
+}

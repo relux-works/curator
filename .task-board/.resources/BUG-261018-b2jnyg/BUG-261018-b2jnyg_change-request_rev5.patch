@@ -1,0 +1,461 @@
+diff --git a/docs/claude-seed-repair.md b/docs/claude-seed-repair.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..a2938550be46f24479179085d0a6daf862dbfe2f
+--- /dev/null
++++ b/docs/claude-seed-repair.md
+@@ -0,0 +1,35 @@
++# Claude provisioning seed and tool state
++
++Environments §7.4 defines `.claude.json` as a provisioning seed owned by
++Claude after the first run. Repair owns only the launch directory's
++`projects` entry: `hasTrustDialogAccepted`, plus
++`hasClaudeMdExternalIncludesApproved` for the referenced form.
++
++An absent file retains the original CCJ-1 seed encoding and trailing LF.
++For an existing file, repair reads ordinary JSON with `UseNumber` and
++preserves number text, including fractions, exponents and integers beyond
++the floating-point precision range. It preserves unknown values and merges
++only the required flags into the launch entry. As before, a missing or
++non-object `projects` member becomes an object, and a non-object launch
++entry becomes an object. A satisfied entry leaves the file bytes, inode
++and mtime unchanged even if other managed surfaces need repair.
++
++A necessary merge may reorder keys, compact whitespace and normalize
++string escapes through the standard JSON encoder. Number lexemes and
++decoded values are preserved. This is a semantic merge, not a lossless
++JSON text editor. Verification uses the same number-preserving reader.
++Existing invalid-object, symlink, non-regular and unreadable-file refusals
++remain in force.
++
++Run the regression and overlay plant controls with:
++
++```sh
++go test ./internal/envprofile -count=1 -v -run 'TestClaude(Repair|Absent|SeedNarrowing)'
++```
++
++`claude_seed_test.go` drives `Resolve` with temporary homes for both forms.
++`claude_seed_mutants_test.go` uses Go source overlays, without editing the
++candidate, to require a named behavioral failure and exit code 1 for each
++plant. Controls cover whole-object CCJ-1 encoding, number normalization,
++incorrect flag satisfaction, rewriting satisfied state and admitting a
++null object. Test output can be captured under `.temp/`.
+diff --git a/internal/envprofile/claude_seed_mutants_test.go b/internal/envprofile/claude_seed_mutants_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..84544a6c62966fea6630e30be0dad378e36b56da
+--- /dev/null
++++ b/internal/envprofile/claude_seed_mutants_test.go
+@@ -0,0 +1,88 @@
++package envprofile
++
++import (
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// Overlay plants must fail the named Resolve behavioral test with exit 1 and the intended diagnostic; setup/build failures do not count as kills.
++func TestClaudeSeedNarrowingMutants(t *testing.T) {
++	root, err := filepath.Abs("../..")
++	if err != nil {
++		t.Fatal(err)
++	}
++	original := filepath.Join(root, "internal", "envprofile", "managed.go")
++	payload, err := os.ReadFile(original)
++	if err != nil {
++		t.Fatal(err)
++	}
++	source := strings.ReplaceAll(string(payload), "\r\n", "\n")
++	for _, mutant := range []struct{ name, before, after, run, fails, message string }{
++		{
++			"whole-object-ccj", "payload, err = json.Marshal(object)", "payload, err = protocoljsonMarshal(object)",
++			"^TestClaudeRepairPreservesNumberText$/^referenced$/^new-launch$",
++			"TestClaudeRepairPreservesNumberText/referenced/new-launch", "CCJ-1 numbers must be shortest-form base-10 integers",
++		},
++		{
++			"normalize-numbers", "decoder.UseNumber()", "// decoder.UseNumber() retained as a token; behavior deliberately normalizes numbers.",
++			"^TestClaudeRepairPreservesNumberText$/^referenced$/^new-launch$",
++			"TestClaudeRepairPreservesNumberText/referenced/new-launch", "repair changed unowned values or number texts",
++		},
++		{
++			"admit-untrusted-approved-entry",
++			"satisfied := trusted && (form != envregistry.FormReferenced || approved)",
++			"satisfied := (trusted || approved) && (form != envregistry.FormReferenced || approved)",
++			"^TestClaudeRepairPreservesNumberText$/^referenced$/^missing-trust$",
++			"TestClaudeRepairPreservesNumberText/referenced/missing-trust", "repair changed unowned values or number texts",
++		},
++		{
++			"admit-trusted-unapproved-entry",
++			"satisfied := trusted && (form != envregistry.FormReferenced || approved)",
++			"satisfied := trusted && (form != envregistry.FormReferenced || approved || trusted)",
++			"^TestClaudeRepairPreservesNumberText$/^referenced$/^missing-approval$",
++			"TestClaudeRepairPreservesNumberText/referenced/missing-approval", "has no external-includes approval",
++		},
++		{
++			"rewrite-satisfied-referenced-entry", "if present && satisfied {", "if present && satisfied && form == envregistry.FormMonolithic {",
++			"^TestClaudeRepairSatisfiedIsNoOp$/^referenced$",
++			"TestClaudeRepairSatisfiedIsNoOp/referenced", "satisfied .claude.json was rewritten",
++		},
++		{
++			"admit-null-object", "if err := decoder.Decode(&object); err != nil || object == nil {",
++			"decodeErr := decoder.Decode(&object)\nif decodeErr == nil && object == nil { object = map[string]any{} }\nif decodeErr != nil || object == nil {",
++			"^TestClaudeRepairRefusesUnsafeState$/^null$",
++			"TestClaudeRepairRefusesUnsafeState/null", "want environment_seed_unreadable refusal",
++		},
++	} {
++		t.Run(mutant.name, func(t *testing.T) {
++			if strings.Count(source, mutant.before) != 1 {
++				t.Fatal("mutation anchor is not unique")
++			}
++			dir := t.TempDir()
++			replacement := filepath.Join(dir, "replacement.go")
++			if err := os.WriteFile(replacement, []byte(strings.Replace(source, mutant.before, mutant.after, 1)), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			overlay, err := json.Marshal(map[string]any{"Replace": map[string]string{original: replacement}})
++			if err != nil {
++				t.Fatal(err)
++			}
++			overlayPath := filepath.Join(dir, "overlay.json")
++			if err := os.WriteFile(overlayPath, overlay, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			command := exec.Command("go", "test", "-overlay", overlayPath, "-count=1", "-timeout=2m", "-v", "-run", mutant.run, "./internal/envprofile")
++			command.Dir = root
++			output, err := command.CombinedOutput()
++			exit, ok := err.(*exec.ExitError)
++			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "--- FAIL: "+mutant.fails+" ") || !strings.Contains(string(output), mutant.message) {
++				t.Fatalf("mutant survived or lacked the intended behavioral failure: %v\n%s", err, output)
++			}
++			t.Logf("expected-red go test exit %d:\n%s", exit.ExitCode(), output)
++		})
++	}
++}
+diff --git a/internal/envprofile/claude_seed_test.go b/internal/envprofile/claude_seed_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..caa1b636c70ac54f8e4fadaf4780c118d960bf6a
+--- /dev/null
++++ b/internal/envprofile/claude_seed_test.go
+@@ -0,0 +1,274 @@
++package envprofile
++
++import (
++	"bytes"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"reflect"
++	"runtime"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++func claudeRepairFixture(t *testing.T, form string) (*managedFixture, ResolveRequest, string) {
++	t.Helper()
++	requireLinkCapability(t)
++	fx := writeManagedFixture(t, "acme")
++	seedLiveNativeCredentials(t, fx)
++	req := fx.request(envregistry.ClaudeCode)
++	req.Machine.Forms = map[string]string{envregistry.ClaudeCode: form}
++	req.Repair = true
++	if _, err := Resolve(req); err != nil {
++		t.Fatal(err)
++	}
++	return fx, req, filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.ClaudeCode), ".claude.json")
++}
++
++func claudeNumberObject(t *testing.T, payload []byte) map[string]any {
++	t.Helper()
++	decoder := json.NewDecoder(bytes.NewReader(payload))
++	decoder.UseNumber()
++	var object map[string]any
++	if err := decoder.Decode(&object); err != nil {
++		t.Fatal(err)
++	}
++	return object
++}
++
++func readClaudeState(t *testing.T, path string) []byte {
++	t.Helper()
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return payload
++}
++
++// Resolve repairs real-world numeric tool state, preserving every unowned value and number lexeme, then verifies it without repair.
++func TestClaudeRepairPreservesNumberText(t *testing.T) {
++	for _, form := range []string{envregistry.FormReferenced, envregistry.FormMonolithic} {
++		for _, variant := range []string{"new-launch", "existing-launch", "missing-trust", "missing-approval", "missing-projects", "non-object-projects", "overflow"} {
++			t.Run(form+"/"+variant, func(t *testing.T) {
++				_, req, path := claudeRepairFixture(t, form)
++				// Force repair even for monolithic, whose project entry is not a freshness condition.
++				if err := os.Remove(filepath.Join(filepath.Dir(path), "CLAUDE.md")); err != nil {
++					t.Fatal(err)
++				}
++				object := claudeNumberObject(t, []byte(`{
++					"cachedGrowthBookFeatures":{"probability":0.125,"rollout":1e-7},
++					"projects":{"/other":{"lastCost":0.000123,"lastFpsAverage":59.9400,"costUSD":-1.25}},
++					"large":9007199254740993123456789,"negative":-42,"minusZero":-0,
++					"exponent":1E+09,"nested":[0.25,[-2.5,1e-7],{"unknown":null}],
++					"unknown":{"text":"tool state","enabled":false}
++				}`))
++				switch variant {
++				case "overflow":
++					object["overflow"] = json.Number("1e999")
++				case "existing-launch", "missing-trust", "missing-approval":
++					entry := map[string]any{
++						"lastCost": json.Number("0.000000125"), "hasTrustDialogAccepted": false,
++						"hasClaudeMdExternalIncludesApproved": "pending", "unknown": []any{json.Number("1e-7"), nil},
++					}
++					if variant == "missing-trust" {
++						entry["hasClaudeMdExternalIncludesApproved"] = true
++					}
++					if variant == "missing-approval" {
++						entry["hasTrustDialogAccepted"] = true
++					}
++					object["projects"].(map[string]any)[req.LaunchDir] = entry
++				case "missing-projects":
++					delete(object, "projects")
++				case "non-object-projects":
++					object["projects"] = []any{json.Number("0.5")}
++				}
++				before, err := json.Marshal(object)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(path, before, 0o600); err != nil {
++					t.Fatal(err)
++				}
++				// Independent expected merge: legacy non-object projects are replaced; all other values survive.
++				want := claudeNumberObject(t, before)
++				projects, ok := want["projects"].(map[string]any)
++				if !ok {
++					projects = map[string]any{}
++					want["projects"] = projects
++				}
++				entry, ok := projects[req.LaunchDir].(map[string]any)
++				if !ok {
++					entry = map[string]any{}
++					projects[req.LaunchDir] = entry
++				}
++				entry["hasTrustDialogAccepted"] = true
++				if form == envregistry.FormReferenced {
++					entry["hasClaudeMdExternalIncludesApproved"] = true
++				}
++				if _, err := Resolve(req); err != nil {
++					t.Fatalf("repair numeric tool state: %v", err)
++				}
++				got := claudeNumberObject(t, readClaudeState(t, path))
++				if !reflect.DeepEqual(got, want) {
++					t.Fatalf("repair changed unowned values or number texts:\ngot  %#v\nwant %#v", got, want)
++				}
++				req.Repair = false
++				if _, err := Resolve(req); err != nil {
++					t.Fatalf("verify numeric tool state: %v", err)
++				}
++			})
++		}
++	}
++}
++
++// Resolve's repair path leaves satisfied Claude state byte-identical and retains its inode and mtime even when another surface needs repair.
++func TestClaudeRepairSatisfiedIsNoOp(t *testing.T) {
++	for _, form := range []string{envregistry.FormReferenced, envregistry.FormMonolithic} {
++		t.Run(form, func(t *testing.T) {
++			_, req, path := claudeRepairFixture(t, form)
++			key, err := json.Marshal(req.LaunchDir)
++			if err != nil {
++				t.Fatal(err)
++			}
++			// A monolithic home does not require or overwrite external-includes approval.
++			approval := "false"
++			if form == envregistry.FormReferenced {
++				approval = "true"
++			}
++			before := []byte("{\n  \"unknown\": 1e-7, \"projects\": {" + string(key) + ": {\"hasTrustDialogAccepted\":true,\"hasClaudeMdExternalIncludesApproved\":" + approval + ",\"lastCost\":0.125}}\n}\n")
++			if err := os.WriteFile(path, before, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			stamp := time.Unix(1234567890, 0)
++			if err := os.Chtimes(path, stamp, stamp); err != nil {
++				t.Fatal(err)
++			}
++			old, err := os.Stat(path)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if err := os.Remove(filepath.Join(filepath.Dir(path), "CLAUDE.md")); err != nil {
++				t.Fatal(err)
++			}
++			if _, err := Resolve(req); err != nil {
++				t.Fatal(err)
++			}
++			current, err := os.Stat(path)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if !bytes.Equal(readClaudeState(t, path), before) || !current.ModTime().Equal(old.ModTime()) || !os.SameFile(old, current) {
++				t.Fatal("satisfied .claude.json was rewritten")
++			}
++		})
++	}
++}
++
++// Resolve provisioning retains the pre-fix CCJ-1 seed bytes for both forms (the launch path is the only dynamic value).
++func TestClaudeAbsentSeedGolden(t *testing.T) {
++	for _, form := range []string{envregistry.FormReferenced, envregistry.FormMonolithic} {
++		t.Run(form, func(t *testing.T) {
++			_, req, path := claudeRepairFixture(t, form)
++			key, err := json.Marshal(req.LaunchDir)
++			if err != nil {
++				t.Fatal(err)
++			}
++			entry := `{"hasTrustDialogAccepted":true}`
++			if form == envregistry.FormReferenced {
++				entry = `{"hasClaudeMdExternalIncludesApproved":true,"hasTrustDialogAccepted":true}`
++			}
++			want := "{\"hasCompletedOnboarding\":true,\"projects\":{" + string(key) + ":" + entry + "}}\n"
++			if got := string(readClaudeState(t, path)); got != want {
++				t.Fatalf("seed bytes changed: got %q, want %q", got, want)
++			}
++		})
++	}
++}
++
++// Resolve refuses invalid/unreadable seed state without replacing the leaf or changing its bytes/target; chmod and symlink cases require host support.
++func TestClaudeRepairRefusesUnsafeState(t *testing.T) {
++	for _, variant := range []string{"array", "null", "scalar", "malformed", "symlink", "directory", "unreadable"} {
++		t.Run(variant, func(t *testing.T) {
++			if variant == "unreadable" && runtime.GOOS == "windows" {
++				t.Skip("POSIX mode-bit unreadability")
++			}
++			if variant == "unreadable" && os.Geteuid() == 0 {
++				t.Skip("this environment can read a mode-000 file")
++			}
++			_, req, path := claudeRepairFixture(t, envregistry.FormReferenced)
++			before := []byte(`{"toolState":0.125}`)
++			diagnostic := envregistry.DiagSeedUnreadable
++			switch variant {
++			case "array":
++				before = []byte(`[]`)
++			case "null":
++				before = []byte(`null`)
++			case "scalar":
++				before = []byte(`42`)
++			case "malformed":
++				before = []byte(`{"broken":`)
++			case "symlink", "directory":
++				if err := os.Remove(path); err != nil {
++					t.Fatal(err)
++				}
++				if variant == "directory" {
++					if err := os.Mkdir(path, 0o700); err != nil {
++						t.Fatal(err)
++					}
++				} else {
++					target := filepath.Join(t.TempDir(), "tool-state.json")
++					if err := os.WriteFile(target, before, 0o600); err != nil {
++						t.Fatal(err)
++					}
++					if err := os.Symlink(target, path); err != nil {
++						t.Fatal(err)
++					}
++					diagnostic = DiagWriteWouldFollowLink
++				}
++			}
++			if variant != "symlink" && variant != "directory" {
++				if err := os.WriteFile(path, before, 0o600); err != nil {
++					t.Fatal(err)
++				}
++			}
++			if variant == "unreadable" {
++				// The transaction backup refuses the read before claudeSeed runs.
++				diagnostic = "environment_repair_failed: permission denied"
++				if err := os.Chmod(path, 0); err != nil {
++					t.Fatal(err)
++				}
++			}
++			old, err := os.Lstat(path)
++			if err != nil {
++				t.Fatal(err)
++			}
++			_, repairErr := Resolve(req)
++			if repairErr == nil || !strings.Contains(repairErr.Error(), diagnostic) {
++				t.Fatalf("Resolve = %v, want %s refusal", repairErr, diagnostic)
++			}
++			current, err := os.Lstat(path)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if !os.SameFile(old, current) || old.Mode() != current.Mode() || !old.ModTime().Equal(current.ModTime()) {
++				t.Fatal("refusal changed the tool-owned leaf")
++			}
++			if variant == "unreadable" {
++				if err := os.Chmod(path, 0o600); err != nil {
++					t.Fatal(err)
++				}
++			}
++			if variant == "directory" {
++				entries, err := os.ReadDir(path)
++				if err != nil || len(entries) != 0 {
++					t.Fatalf("refusal changed directory: %v, %v", entries, err)
++				}
++			} else if !bytes.Equal(readClaudeState(t, path), before) {
++				t.Fatal("refusal changed tool bytes (or the symlink target)")
++			}
++		})
++	}
++}
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index a34c9b421ee2c75db4c4b55c634a988a94892a70..49d07a095bc7339b7ecabe72c04efab9d20548dd 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -841,6 +841,9 @@ func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err err
+ 	if entry == nil {
+ 		entry = map[string]any{}
+ 	}
++	trusted, _ := entry["hasTrustDialogAccepted"].(bool)
++	approved, _ := entry["hasClaudeMdExternalIncludesApproved"].(bool)
++	satisfied := trusted && (form != envregistry.FormReferenced || approved)
+ 	entry["hasTrustDialogAccepted"] = true
+ 	if form == envregistry.FormReferenced {
+ 		entry["hasClaudeMdExternalIncludesApproved"] = true
+@@ -856,7 +859,17 @@ func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err err
+ 		seeded = append(seeded, launchDir)
+ 	}
+ 	sort.Strings(seeded)
+-	payload, err = protocoljsonMarshal(object)
++	if present && satisfied {
++		return seeded, nil
++	}
++	if present {
++		// Tool-owned state is ordinary JSON, not CCJ-1. UseNumber in the
++		// reader keeps all number lexemes intact through this merge.
++		payload, err = json.Marshal(object)
++		payload = append(payload, '\n')
++	} else {
++		payload, err = protocoljsonMarshal(object)
++	}
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -866,9 +879,11 @@ func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err err
+ 	return seeded, nil
+ }
+ 
+-// decodeJSONObject decodes one JSON object value.
++// decodeJSONObject decodes one JSON object value without rounding numbers or
++// changing their textual representation in tool-owned state.
+ func decodeJSONObject(payload []byte) (map[string]any, bool) {
+ 	decoder := json.NewDecoder(bytes.NewReader(payload))
++	decoder.UseNumber()
+ 	var object map[string]any
+ 	if err := decoder.Decode(&object); err != nil || object == nil {
+ 		return nil, false
