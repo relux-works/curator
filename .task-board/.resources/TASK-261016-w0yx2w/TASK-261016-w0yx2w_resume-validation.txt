@@ -1,0 +1,331 @@
+
+## admission-01.log
+
+=== RUN   TestDestinationKernelACL
+--- PASS: TestDestinationKernelACL (0.02s)
+=== RUN   TestDestinationPriorKernelACL
+--- PASS: TestDestinationPriorKernelACL (0.07s)
+=== RUN   TestDestinationReadOnlyAdmission
+--- PASS: TestDestinationReadOnlyAdmission (0.01s)
+=== RUN   TestDestinationBoundary
+=== RUN   TestDestinationBoundary/linked-ancestor
+=== RUN   TestDestinationBoundary/linked-before-parent
+=== RUN   TestDestinationBoundary/linked-target
+=== RUN   TestDestinationBoundary/file-target
+=== RUN   TestDestinationBoundary/missing-parent
+=== RUN   TestDestinationBoundary/shared-ancestor
+=== RUN   TestDestinationBoundary/shared-target
+=== RUN   TestDestinationBoundary/public-target
+=== RUN   TestDestinationBoundary/unrelated
+=== RUN   TestDestinationBoundary/missing-protected
+=== RUN   TestDestinationBoundary/no-policy
+--- PASS: TestDestinationBoundary (0.10s)
+    --- PASS: TestDestinationBoundary/linked-ancestor (0.02s)
+    --- PASS: TestDestinationBoundary/linked-before-parent (0.03s)
+    --- PASS: TestDestinationBoundary/linked-target (0.01s)
+    --- PASS: TestDestinationBoundary/file-target (0.02s)
+    --- PASS: TestDestinationBoundary/missing-parent (0.00s)
+    --- PASS: TestDestinationBoundary/shared-ancestor (0.01s)
+    --- PASS: TestDestinationBoundary/shared-target (0.01s)
+    --- PASS: TestDestinationBoundary/public-target (0.00s)
+    --- PASS: TestDestinationBoundary/unrelated (0.00s)
+    --- PASS: TestDestinationBoundary/missing-protected (0.00s)
+    --- PASS: TestDestinationBoundary/no-policy (0.00s)
+=== RUN   TestDestinationOwnershipAndReadFailure
+--- PASS: TestDestinationOwnershipAndReadFailure (0.00s)
+=== RUN   TestDestinationProtectedIdentity
+=== RUN   TestDestinationProtectedIdentity/manager
+    destination_unix_test.go:246: refusal = environment_materialize_destination_invalid: directory-permissions, want environment_materialize_destination_invalid/protected-destination
+=== RUN   TestDestinationProtectedIdentity/store
+    destination_unix_test.go:246: refusal = environment_materialize_destination_invalid: directory-permissions, want environment_materialize_destination_invalid/protected-destination
+=== RUN   TestDestinationProtectedIdentity/managed-home
+    destination_unix_test.go:246: refusal = environment_materialize_destination_invalid: directory-permissions, want environment_materialize_destination_invalid/protected-destination
+=== RUN   TestDestinationProtectedIdentity/native-home
+    destination_unix_test.go:246: refusal = environment_materialize_destination_invalid: directory-permissions, want environment_materialize_destination_invalid/protected-destination
+=== RUN   TestDestinationProtectedIdentity/credentials
+    destination_unix_test.go:246: refusal = environment_materialize_destination_invalid: directory-permissions, want environment_materialize_destination_invalid/protected-destination
+=== RUN   TestDestinationProtectedIdentity/repository-admin
+    destination_unix_test.go:246: refusal = environment_materialize_destination_invalid: directory-permissions, want environment_materialize_destination_invalid/protected-destination
+=== RUN   TestDestinationProtectedIdentity/workspace
+    destination_unix_test.go:246: refusal = environment_materialize_destination_invalid: directory-permissions, want environment_materialize_destination_invalid/protected-destination
+--- FAIL: TestDestinationProtectedIdentity (0.03s)
+    --- FAIL: TestDestinationProtectedIdentity/manager (0.00s)
+    --- FAIL: TestDestinationProtectedIdentity/store (0.00s)
+    --- FAIL: TestDestinationProtectedIdentity/managed-home (0.00s)
+    --- FAIL: TestDestinationProtectedIdentity/native-home (0.00s)
+    --- FAIL: TestDestinationProtectedIdentity/credentials (0.01s)
+    --- FAIL: TestDestinationProtectedIdentity/repository-admin (0.00s)
+    --- FAIL: TestDestinationProtectedIdentity/workspace (0.00s)
+=== RUN   TestDestinationReplacementRaces
+=== RUN   TestDestinationReplacementRaces/ancestor-link
+=== RUN   TestDestinationReplacementRaces/ancestor-directory
+=== RUN   TestDestinationReplacementRaces/target-link
+=== RUN   TestDestinationReplacementRaces/target-directory
+=== RUN   TestDestinationReplacementRaces/target-empty
+=== RUN   TestDestinationReplacementRaces/target-identical
+=== RUN   TestDestinationReplacementRaces/competing-target
+=== RUN   TestDestinationReplacementRaces/empty-filled
+=== RUN   TestDestinationReplacementRaces/permission-change
+=== RUN   TestDestinationReplacementRaces/protected-moved
+--- PASS: TestDestinationReplacementRaces (0.10s)
+    --- PASS: TestDestinationReplacementRaces/ancestor-link (0.02s)
+    --- PASS: TestDestinationReplacementRaces/ancestor-directory (0.02s)
+    --- PASS: TestDestinationReplacementRaces/target-link (0.01s)
+    --- PASS: TestDestinationReplacementRaces/target-directory (0.01s)
+    --- PASS: TestDestinationReplacementRaces/target-empty (0.01s)
+    --- PASS: TestDestinationReplacementRaces/target-identical (0.01s)
+    --- PASS: TestDestinationReplacementRaces/competing-target (0.00s)
+    --- PASS: TestDestinationReplacementRaces/empty-filled (0.01s)
+    --- PASS: TestDestinationReplacementRaces/permission-change (0.01s)
+    --- PASS: TestDestinationReplacementRaces/protected-moved (0.01s)
+=== RUN   TestDestinationPrivateParent
+--- PASS: TestDestinationPrivateParent (0.00s)
+=== RUN   TestDestinationPriorIdentity
+=== RUN   TestDestinationPriorIdentity/identical
+=== RUN   TestDestinationPriorIdentity/bytes
+=== RUN   TestDestinationPriorIdentity/mode
+=== RUN   TestDestinationPriorIdentity/extra
+=== RUN   TestDestinationPriorIdentity/unreadable
+=== RUN   TestDestinationPriorIdentity/unknown-version
+=== RUN   TestDestinationPriorIdentity/new-generation
+--- PASS: TestDestinationPriorIdentity (0.05s)
+    --- PASS: TestDestinationPriorIdentity/identical (0.01s)
+    --- PASS: TestDestinationPriorIdentity/bytes (0.01s)
+    --- PASS: TestDestinationPriorIdentity/mode (0.01s)
+    --- PASS: TestDestinationPriorIdentity/extra (0.01s)
+    --- PASS: TestDestinationPriorIdentity/unreadable (0.01s)
+    --- PASS: TestDestinationPriorIdentity/unknown-version (0.01s)
+    --- PASS: TestDestinationPriorIdentity/new-generation (0.01s)
+=== RUN   TestDestinationPriorMissingMetadata
+--- PASS: TestDestinationPriorMissingMetadata (0.01s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/envsnapshot	0.842s
+FAIL
+
+
+## package-race-02.log
+
+ok  	github.com/relux-works/curator/internal/envsnapshot	3.404s
+
+
+## package-race-03.log
+
+ok  	github.com/relux-works/curator/internal/envsnapshot	3.504s
+
+
+## package-race-04.log
+
+ok  	github.com/relux-works/curator/internal/envsnapshot	3.863s
+
+
+## destination-controls-01.log
+
+=== RUN   TestDestinationNarrowingControls
+=== RUN   TestDestinationNarrowingControls/M2-linked-ancestor
+    destination_controls_test.go:112: M2-linked-ancestor: killed by TestDestinationBoundary/linked-ancestor; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/M6-saved-manifest-bytes
+    destination_controls_test.go:112: M6-saved-manifest-bytes: killed by TestDestinationPriorIdentity/bytes; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/owner-root-parent
+    destination_controls_test.go:112: owner-root-parent: killed by TestDestinationOwnershipAndReadFailure; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/mode-group-writable-ancestor
+    destination_controls_test.go:110: survivor or invalid plant: <nil>
+        {"Time":"2026-10-17T21:05:16.609742+04:00","Action":"start","Package":"github.com/relux-works/curator/.temp/destination-control-1700598163"}
+        {"Time":"2026-10-17T21:05:16.914427+04:00","Action":"run","Package":"github.com/relux-works/curator/.temp/destination-control-1700598163","Test":"TestDestinationBoundary"}
+        {"Time":"2026-10-17T21:05:16.914472+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-1700598163","Test":"TestDestinationBoundary","Output":"=== RUN   TestDestinationBoundary\n"}
+        {"Time":"2026-10-17T21:05:16.91449+04:00","Action":"run","Package":"github.com/relux-works/curator/.temp/destination-control-1700598163","Test":"TestDestinationBoundary/shared-ancestor"}
+        {"Time":"2026-10-17T21:05:16.914494+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-1700598163","Test":"TestDestinationBoundary/shared-ancestor","Output":"=== RUN   TestDestinationBoundary/shared-ancestor\n"}
+        {"Time":"2026-10-17T21:05:16.925511+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-1700598163","Test":"TestDestinationBoundary/shared-ancestor","Output":"--- PASS: TestDestinationBoundary/shared-ancestor (0.01s)\n"}
+        {"Time":"2026-10-17T21:05:16.925538+04:00","Action":"pass","Package":"github.com/relux-works/curator/.temp/destination-control-1700598163","Test":"TestDestinationBoundary/shared-ancestor","Elapsed":0.01}
+        {"Time":"2026-10-17T21:05:16.925558+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-1700598163","Test":"TestDestinationBoundary","Output":"--- PASS: TestDestinationBoundary (0.01s)\n"}
+        {"Time":"2026-10-17T21:05:16.925566+04:00","Action":"pass","Package":"github.com/relux-works/curator/.temp/destination-control-1700598163","Test":"TestDestinationBoundary","Elapsed":0.01}
+        {"Time":"2026-10-17T21:05:16.925568+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-1700598163","Output":"PASS\n"}
+        {"Time":"2026-10-17T21:05:16.926054+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-1700598163","Output":"ok  \tgithub.com/relux-works/curator/.temp/destination-control-1700598163\t0.316s\n"}
+        {"Time":"2026-10-17T21:05:16.926063+04:00","Action":"pass","Package":"github.com/relux-works/curator/.temp/destination-control-1700598163","Elapsed":0.316}
+=== RUN   TestDestinationNarrowingControls/protected-equal-identity
+    destination_controls_test.go:112: protected-equal-identity: killed by TestDestinationProtectedIdentity; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/ancestor-directory-replacement
+    destination_controls_test.go:112: ancestor-directory-replacement: killed by TestDestinationReplacementRaces/ancestor-directory; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/target-identical-replacement
+    destination_controls_test.go:112: target-identical-replacement: killed by TestDestinationReplacementRaces/target-identical; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/empty-target
+    destination_controls_test.go:112: empty-target: killed by TestDestinationReadOnlyAdmission; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/private-parent
+    destination_controls_test.go:112: private-parent: killed by TestDestinationPrivateParent; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/unrelated-one-entry
+    destination_controls_test.go:112: unrelated-one-entry: killed by TestDestinationBoundary/unrelated; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/acl-one-permit-kind
+    destination_controls_test.go:112: acl-one-permit-kind: killed by TestDestinationKernelACL; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/prior-acl-one-member
+    destination_controls_test.go:112: prior-acl-one-member: killed by TestDestinationPriorKernelACL; child exit 1 (expected failing command)
+--- FAIL: TestDestinationNarrowingControls (12.73s)
+    --- PASS: TestDestinationNarrowingControls/M2-linked-ancestor (1.41s)
+    --- PASS: TestDestinationNarrowingControls/M6-saved-manifest-bytes (3.27s)
+    --- PASS: TestDestinationNarrowingControls/owner-root-parent (1.18s)
+    --- FAIL: TestDestinationNarrowingControls/mode-group-writable-ancestor (1.13s)
+    --- PASS: TestDestinationNarrowingControls/protected-equal-identity (0.74s)
+    --- PASS: TestDestinationNarrowingControls/ancestor-directory-replacement (0.70s)
+    --- PASS: TestDestinationNarrowingControls/target-identical-replacement (0.72s)
+    --- PASS: TestDestinationNarrowingControls/empty-target (0.77s)
+    --- PASS: TestDestinationNarrowingControls/private-parent (0.70s)
+    --- PASS: TestDestinationNarrowingControls/unrelated-one-entry (0.68s)
+    --- PASS: TestDestinationNarrowingControls/acl-one-permit-kind (0.72s)
+    --- PASS: TestDestinationNarrowingControls/prior-acl-one-member (0.71s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/envsnapshot	13.030s
+FAIL
+
+
+## destination-controls-02.log
+
+=== RUN   TestDestinationNarrowingControls
+=== RUN   TestDestinationNarrowingControls/M2-linked-ancestor
+    destination_controls_test.go:112: M2-linked-ancestor: killed by TestDestinationBoundary/linked-ancestor; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/M6-saved-manifest-bytes
+    destination_controls_test.go:112: M6-saved-manifest-bytes: killed by TestDestinationPriorIdentity/bytes; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/owner-root-parent
+    destination_controls_test.go:112: owner-root-parent: killed by TestDestinationOwnershipAndReadFailure; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/mode-group-writable-ancestor
+    destination_controls_test.go:112: mode-group-writable-ancestor: killed by TestDestinationBoundary/shared-ancestor; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/protected-equal-identity
+    destination_controls_test.go:112: protected-equal-identity: killed by TestDestinationProtectedIdentity; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/ancestor-directory-replacement
+    destination_controls_test.go:112: ancestor-directory-replacement: killed by TestDestinationReplacementRaces/ancestor-directory; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/target-identical-replacement
+    destination_controls_test.go:112: target-identical-replacement: killed by TestDestinationReplacementRaces/target-identical; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/empty-target
+    destination_controls_test.go:112: empty-target: killed by TestDestinationReadOnlyAdmission; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/private-parent
+    destination_controls_test.go:112: private-parent: killed by TestDestinationPrivateParent; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/unrelated-one-entry
+    destination_controls_test.go:112: unrelated-one-entry: killed by TestDestinationBoundary/unrelated; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/acl-one-permit-kind
+    destination_controls_test.go:112: acl-one-permit-kind: killed by TestDestinationKernelACL; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/prior-acl-one-member
+    destination_controls_test.go:112: prior-acl-one-member: killed by TestDestinationPriorKernelACL; child exit 1 (expected failing command)
+--- PASS: TestDestinationNarrowingControls (8.13s)
+    --- PASS: TestDestinationNarrowingControls/M2-linked-ancestor (0.66s)
+    --- PASS: TestDestinationNarrowingControls/M6-saved-manifest-bytes (0.64s)
+    --- PASS: TestDestinationNarrowingControls/owner-root-parent (0.61s)
+    --- PASS: TestDestinationNarrowingControls/mode-group-writable-ancestor (0.62s)
+    --- PASS: TestDestinationNarrowingControls/protected-equal-identity (0.72s)
+    --- PASS: TestDestinationNarrowingControls/ancestor-directory-replacement (0.81s)
+    --- PASS: TestDestinationNarrowingControls/target-identical-replacement (0.62s)
+    --- PASS: TestDestinationNarrowingControls/empty-target (0.72s)
+    --- PASS: TestDestinationNarrowingControls/private-parent (0.66s)
+    --- PASS: TestDestinationNarrowingControls/unrelated-one-entry (0.72s)
+    --- PASS: TestDestinationNarrowingControls/acl-one-permit-kind (0.67s)
+    --- PASS: TestDestinationNarrowingControls/prior-acl-one-member (0.67s)
+PASS
+ok  	github.com/relux-works/curator/internal/envsnapshot	8.501s
+
+
+## destination-controls-03.log
+
+=== RUN   TestDestinationNarrowingControls
+=== RUN   TestDestinationNarrowingControls/M2-linked-ancestor
+    destination_controls_test.go:112: M2-linked-ancestor: killed by TestDestinationBoundary/linked-ancestor; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/M6-saved-manifest-bytes
+    destination_controls_test.go:112: M6-saved-manifest-bytes: killed by TestDestinationPriorIdentity/bytes; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/owner-root-parent
+    destination_controls_test.go:112: owner-root-parent: killed by TestDestinationOwnershipAndReadFailure; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/mode-group-writable-ancestor
+    destination_controls_test.go:112: mode-group-writable-ancestor: killed by TestDestinationBoundary/shared-ancestor; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/protected-equal-identity
+    destination_controls_test.go:112: protected-equal-identity: killed by TestDestinationProtectedIdentity; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/ancestor-directory-replacement
+    destination_controls_test.go:112: ancestor-directory-replacement: killed by TestDestinationReplacementRaces/ancestor-directory; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/target-identical-replacement
+    destination_controls_test.go:112: target-identical-replacement: killed by TestDestinationReplacementRaces/target-identical; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/empty-target
+    destination_controls_test.go:112: empty-target: killed by TestDestinationReadOnlyAdmission; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/private-parent
+    destination_controls_test.go:112: private-parent: killed by TestDestinationPrivateParent; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/unrelated-one-entry
+    destination_controls_test.go:112: unrelated-one-entry: killed by TestDestinationBoundary/unrelated; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/acl-one-permit-kind
+    destination_controls_test.go:112: acl-one-permit-kind: killed by TestDestinationKernelACL; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/prior-acl-one-member
+    destination_controls_test.go:112: prior-acl-one-member: killed by TestDestinationPriorKernelACL; child exit 1 (expected failing command)
+--- PASS: TestDestinationNarrowingControls (9.86s)
+    --- PASS: TestDestinationNarrowingControls/M2-linked-ancestor (0.64s)
+    --- PASS: TestDestinationNarrowingControls/M6-saved-manifest-bytes (0.83s)
+    --- PASS: TestDestinationNarrowingControls/owner-root-parent (0.84s)
+    --- PASS: TestDestinationNarrowingControls/mode-group-writable-ancestor (0.96s)
+    --- PASS: TestDestinationNarrowingControls/protected-equal-identity (0.95s)
+    --- PASS: TestDestinationNarrowingControls/ancestor-directory-replacement (0.79s)
+    --- PASS: TestDestinationNarrowingControls/target-identical-replacement (1.00s)
+    --- PASS: TestDestinationNarrowingControls/empty-target (0.75s)
+    --- PASS: TestDestinationNarrowingControls/private-parent (0.76s)
+    --- PASS: TestDestinationNarrowingControls/unrelated-one-entry (0.78s)
+    --- PASS: TestDestinationNarrowingControls/acl-one-permit-kind (0.75s)
+    --- PASS: TestDestinationNarrowingControls/prior-acl-one-member (0.82s)
+PASS
+ok  	github.com/relux-works/curator/internal/envsnapshot	10.185s
+
+
+## lint-01.log
+
+0 issues.
+
+
+## lint-02.log
+
+0 issues.
+
+
+## lint-03.log
+
+0 issues.
+
+
+## build-01.log
+
+
+
+## diff-check-01.log
+
+
+
+## staging-probe-01.log
+
+=== RUN   TestProbeUnlinkUsesCurrentEntry
+=== RUN   TestProbeUnlinkUsesCurrentEntry/file
+=== RUN   TestProbeUnlinkUsesCurrentEntry/directory
+=== RUN   TestProbeUnlinkUsesCurrentEntry/link
+--- PASS: TestProbeUnlinkUsesCurrentEntry (0.00s)
+    --- PASS: TestProbeUnlinkUsesCurrentEntry/file (0.00s)
+    --- PASS: TestProbeUnlinkUsesCurrentEntry/directory (0.00s)
+    --- PASS: TestProbeUnlinkUsesCurrentEntry/link (0.00s)
+=== RUN   TestProbeNoReplaceDestination
+=== RUN   TestProbeNoReplaceDestination/absent
+=== RUN   TestProbeNoReplaceDestination/competitor
+--- PASS: TestProbeNoReplaceDestination (0.00s)
+    --- PASS: TestProbeNoReplaceDestination/absent (0.00s)
+    --- PASS: TestProbeNoReplaceDestination/competitor (0.00s)
+=== RUN   TestProbeNoReplaceSourceSubstitution
+--- PASS: TestProbeNoReplaceSourceSubstitution (0.00s)
+=== RUN   TestProbeUnlinkHandleOnly
+    probe_test.go:194: name="" errno=no such file or directory
+    probe_test.go:194: name="." errno=invalid argument
+--- PASS: TestProbeUnlinkHandleOnly (0.00s)
+PASS
+ok  	github.com/relux-works/curator/.temp/TASK-261016-w0yx2w/staging-probe	0.350s
+
+
+## staging-invariant-red-01.log
+
+=== RUN   TestRequestedCleanupInvariant
+=== RUN   TestRequestedCleanupInvariant/file
+    probe_test.go:110: VIOLATION: cleanup removed substituted staging entry
+=== RUN   TestRequestedCleanupInvariant/directory
+    probe_test.go:110: VIOLATION: cleanup removed substituted staging entry
+=== RUN   TestRequestedCleanupInvariant/link
+    probe_test.go:110: VIOLATION: cleanup removed substituted staging entry
+--- FAIL: TestRequestedCleanupInvariant (0.00s)
+    --- FAIL: TestRequestedCleanupInvariant/file (0.00s)
+    --- FAIL: TestRequestedCleanupInvariant/directory (0.00s)
+    --- FAIL: TestRequestedCleanupInvariant/link (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator/.temp/TASK-261016-w0yx2w/staging-probe	0.179s
+FAIL
+

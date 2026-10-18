@@ -1,0 +1,2597 @@
+{
+  "headSha": "57de425979331d8fc21d91a7f7b349d5af2b5840",
+  "tree": "2e20b225f2794c9e524ee69332ed156424c612d8",
+  "signature": "G",
+  "status": "completed",
+  "conclusion": "success",
+  "url": "https://github.com/relux-works/curator/actions/runs/39075205524",
+  "gate_exit": 0,
+  "job_counts": {
+    "success": 20,
+    "skipped": 2
+  },
+  "jobs": [
+    {
+      "id": 117520827959,
+      "name": "Race (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify pnpm pin matches Go constant",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned pnpm via npm",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify rust pin matches Go constant",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Rust toolchain via rustup",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "go test -race + platform-case gate",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload race evidence",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520827987,
+      "name": "Gate self-test (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "success"
+        },
+        {
+          "name": "Self-test the CI gates",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520827993,
+      "name": "Go 1.26.0 driver (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828001,
+      "name": "Gate self-test (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Self-test the CI gates",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828014,
+      "name": "Gate self-test (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Self-test the CI gates",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828016,
+      "name": "Naming gate",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "success"
+        },
+        {
+          "name": "Employer name gate",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828018,
+      "name": "Go 1.26.0 driver (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828021,
+      "name": "Race (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify pnpm pin matches Go constant",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned pnpm via npm",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify rust pin matches Go constant",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Rust toolchain via rustup",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "go test -race + platform-case gate",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload race evidence",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828022,
+      "name": "Lint",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run golangci/golangci-lint-action@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Linux CI isolation",
+          "conclusion": "success"
+        },
+        {
+          "name": "No broad suppression",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify GoReleaser rc channel values",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run golangci/golangci-lint-action@v7",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828037,
+      "name": "Go 1.27.1 driver (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828039,
+      "name": "Test (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify pnpm pin matches Go constant",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned pnpm via npm",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify rust pin matches Go constant",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Rust toolchain via rustup",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify versioned Go install compatibility",
+          "conclusion": "success"
+        },
+        {
+          "name": "gofmt check",
+          "conclusion": "success"
+        },
+        {
+          "name": "go vet",
+          "conclusion": "success"
+        },
+        {
+          "name": "Ledger consistency",
+          "conclusion": "success"
+        },
+        {
+          "name": "go test + platform-case gate",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload gate evidence",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828045,
+      "name": "Test (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify pnpm pin matches Go constant",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned pnpm via npm",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify rust pin matches Go constant",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Rust toolchain via rustup",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify versioned Go install compatibility",
+          "conclusion": "success"
+        },
+        {
+          "name": "gofmt check",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "go vet",
+          "conclusion": "success"
+        },
+        {
+          "name": "Ledger consistency",
+          "conclusion": "success"
+        },
+        {
+          "name": "go test + platform-case gate",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload gate evidence",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828047,
+      "name": "Test (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify pnpm pin matches Go constant",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned pnpm via npm",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify rust pin matches Go constant",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Rust toolchain via rustup",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify versioned Go install compatibility",
+          "conclusion": "success"
+        },
+        {
+          "name": "gofmt check",
+          "conclusion": "success"
+        },
+        {
+          "name": "go vet",
+          "conclusion": "success"
+        },
+        {
+          "name": "Ledger consistency",
+          "conclusion": "success"
+        },
+        {
+          "name": "go test + platform-case gate",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload gate evidence",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828065,
+      "name": "Go 1.27.1 driver (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828073,
+      "name": "Interop conformance gate",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "Shared protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828084,
+      "name": "Go 1.25.5 driver (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828103,
+      "name": "Go 1.25.5 driver (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828149,
+      "name": "Go 1.26.0 driver (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828172,
+      "name": "Go 1.27.1 driver (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828175,
+      "name": "Go 1.25.5 driver (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117520828692,
+      "name": "Test (self-hosted macOS)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "steps": []
+    },
+    {
+      "id": 117520828766,
+      "name": "Candidate suite (${{ matrix.os }})",
+      "status": "completed",
+      "conclusion": "skipped",
+      "steps": []
+    }
+  ],
+  "linux_race_route": {
+    "job_id": 117520828021,
+    "labels": [
+      "self-hosted",
+      "relux-linux",
+      "curator"
+    ],
+    "conclusion": "success"
+  },
+  "snapshot_and_routing_artifacts": {
+    "test-linux": {
+      "package_verdicts": [
+        "pass"
+      ],
+      "test_verdicts": {
+        "pass": 254
+      },
+      "required_tests": {
+        "TestReviewerNullChannel": "pass",
+        "TestReviewerManifestOnly": "pass",
+        "TestReviewerPortableLeftDrift": "pass",
+        "TestReviewerRecapture": "pass",
+        "TestReviewerFreeHunt": "pass",
+        "TestReviewerUnicodePositive": "pass",
+        "TestReviewerGreekCollision": "pass"
+      },
+      "non_json_download_banner_lines": [],
+      "skipped_tests": [],
+      "tests": {
+        "TestPinnedSchemaCheckoutBytes/protected": "pass",
+        "TestPinnedSchemaCheckoutBytes/unprotected-witness": "pass",
+        "TestPinnedSchemaCheckoutBytes": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-valid.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-codex.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-claude_code.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-pi.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-muse.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-opencode.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-snapshot.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-adapter.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-profile.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-curator_version.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-fragment_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-launch_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-files.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-snapshot.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-extra.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-adapter.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-fragment_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-launch_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-curator_version.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-profile.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-parent.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-dot.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-absolute.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-drive.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-unc.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-empty-segment.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-backslash.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-nul.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-outside-home.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-reserved.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-size-30.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-size-31.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-mode-32.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-sha256-33.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-extra-34.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-descriptor.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-environment.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-profile.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-precedence.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-env.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-permissions.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-unknown.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-old-fragment.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-version.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-path-prepend.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-wrong-env.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-absolute-env.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-root-on-codex.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-bad-permissions.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-mcp-absolute.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-mcp-parent.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-mcp-extra.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-false.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-null.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-empty.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-extra.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-mcp.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-system_prompt.json": "pass",
+        "TestPinnedSchemaCases": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/no_LF": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/two_LF": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/CRLF": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/space": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/BOM": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/duplicate": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/unknown": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/unknown": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/no_LF": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/two_LF": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/CRLF": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/space": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/BOM": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/duplicate": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json": "pass",
+        "TestMetadataFramingAndHashDomains": "pass",
+        "TestPinnedMetadataSemantics/exact-content": "pass",
+        "TestPinnedMetadataSemantics/extra-entry": "pass",
+        "TestPinnedMetadataSemantics/missing-entry": "pass",
+        "TestPinnedMetadataSemantics/changed-bytes": "pass",
+        "TestPinnedMetadataSemantics/execute-mode": "pass",
+        "TestPinnedMetadataSemantics/wrong-size": "pass",
+        "TestPinnedMetadataSemantics/wrong-hash": "pass",
+        "TestPinnedMetadataSemantics/launch-digest": "pass",
+        "TestPinnedMetadataSemantics/adapter-binding": "pass",
+        "TestPinnedMetadataSemantics/profile-binding": "pass",
+        "TestPinnedMetadataSemantics/path-order": "pass",
+        "TestPinnedMetadataSemantics/duplicate-path": "pass",
+        "TestPinnedMetadataSemantics/case-collision": "pass",
+        "TestPinnedMetadataSemantics/directory-case-collision": "pass",
+        "TestPinnedMetadataSemantics/unicode-collision": "pass",
+        "TestPinnedMetadataSemantics/file-ancestor": "pass",
+        "TestPinnedMetadataSemantics/channel-reference": "pass",
+        "TestPinnedMetadataSemantics/channel-semantics": "pass",
+        "TestPinnedMetadataSemantics/metadata-lf": "pass",
+        "TestPinnedMetadataSemantics": "pass",
+        "TestCorpusPins": "pass",
+        "TestTypedEncodingRejectsInvalidUTF8": "pass",
+        "TestDestinationKernelACL/system.posix_acl_access": "pass",
+        "TestDestinationKernelACL/system.posix_acl_default": "pass",
+        "TestDestinationKernelACL": "pass",
+        "TestDestinationPriorKernelACL": "pass",
+        "TestDestinationReadOnlyAdmission": "pass",
+        "TestDestinationBoundary/linked-ancestor": "pass",
+        "TestDestinationBoundary/linked-before-parent": "pass",
+        "TestDestinationBoundary/linked-target": "pass",
+        "TestDestinationBoundary/file-target": "pass",
+        "TestDestinationBoundary/missing-parent": "pass",
+        "TestDestinationBoundary/shared-ancestor": "pass",
+        "TestDestinationBoundary/shared-target": "pass",
+        "TestDestinationBoundary/public-target": "pass",
+        "TestDestinationBoundary/unrelated": "pass",
+        "TestDestinationBoundary/missing-protected": "pass",
+        "TestDestinationBoundary/no-policy": "pass",
+        "TestDestinationBoundary": "pass",
+        "TestDestinationOwnershipAndReadFailure": "pass",
+        "TestDestinationProtectedIdentity/manager": "pass",
+        "TestDestinationProtectedIdentity/store": "pass",
+        "TestDestinationProtectedIdentity/managed-home": "pass",
+        "TestDestinationProtectedIdentity/native-home": "pass",
+        "TestDestinationProtectedIdentity/credentials": "pass",
+        "TestDestinationProtectedIdentity/repository-admin": "pass",
+        "TestDestinationProtectedIdentity/workspace": "pass",
+        "TestDestinationProtectedIdentity": "pass",
+        "TestDestinationReplacementRaces/ancestor-link": "pass",
+        "TestDestinationReplacementRaces/ancestor-directory": "pass",
+        "TestDestinationReplacementRaces/target-link": "pass",
+        "TestDestinationReplacementRaces/target-directory": "pass",
+        "TestDestinationReplacementRaces/target-empty": "pass",
+        "TestDestinationReplacementRaces/target-identical": "pass",
+        "TestDestinationReplacementRaces/competing-target": "pass",
+        "TestDestinationReplacementRaces/empty-filled": "pass",
+        "TestDestinationReplacementRaces/permission-change": "pass",
+        "TestDestinationReplacementRaces/protected-moved": "pass",
+        "TestDestinationReplacementRaces": "pass",
+        "TestDestinationPrivateParent": "pass",
+        "TestDestinationPriorIdentity/identical": "pass",
+        "TestDestinationPriorIdentity/bytes": "pass",
+        "TestDestinationPriorIdentity/mode": "pass",
+        "TestDestinationPriorIdentity/extra": "pass",
+        "TestDestinationPriorIdentity/unreadable": "pass",
+        "TestDestinationPriorIdentity/unknown-version": "pass",
+        "TestDestinationPriorIdentity/new-generation": "pass",
+        "TestDestinationPriorIdentity": "pass",
+        "TestDestinationPriorMissingMetadata": "pass",
+        "TestPublicationPrivateAndPrior": "pass",
+        "TestPublicationCapturedIdentity/bytes": "pass",
+        "TestPublicationCapturedIdentity/missing": "pass",
+        "TestPublicationCapturedIdentity/extra": "pass",
+        "TestPublicationCapturedIdentity/metadata": "pass",
+        "TestPublicationCapturedIdentity/mode": "pass",
+        "TestPublicationCapturedIdentity": "pass",
+        "TestPublicationNoReplaceRace/empty": "pass",
+        "TestPublicationNoReplaceRace/snapshot": "pass",
+        "TestPublicationNoReplaceRace/file": "pass",
+        "TestPublicationNoReplaceRace/link": "pass",
+        "TestPublicationNoReplaceRace": "pass",
+        "TestPublicationRetainedParentRace": "pass",
+        "TestPublicationStagingOnlyCleanup/before-start": "pass",
+        "TestPublicationStagingOnlyCleanup/stage-created": "pass",
+        "TestPublicationStagingOnlyCleanup/file-staged": "pass",
+        "TestPublicationStagingOnlyCleanup/before-rename": "pass",
+        "TestPublicationStagingOnlyCleanup/io-failure": "pass",
+        "TestPublicationStagingOnlyCleanup": "pass",
+        "TestPublicationKernelStagingFailure": "pass",
+        "TestPublicationPostVerification/bytes": "pass",
+        "TestPublicationPostVerification/size": "pass",
+        "TestPublicationPostVerification/mode": "pass",
+        "TestPublicationPostVerification/extra": "pass",
+        "TestPublicationPostVerification/manifest": "pass",
+        "TestPublicationPostVerification/target-link": "pass",
+        "TestPublicationPostVerification/cancel": "pass",
+        "TestPublicationPostVerification": "pass",
+        "TestPublicationCleanupSubstitutedRoot": "pass",
+        "TestReviewerNullChannel": "pass",
+        "TestReviewerManifestOnly": "pass",
+        "TestReviewerPortableLeftDrift": "pass",
+        "TestReviewerRecapture": "pass",
+        "TestReviewerFreeHunt/launch-hardlink": "pass",
+        "TestReviewerFreeHunt/sticky-content": "pass",
+        "TestReviewerFreeHunt/missing-metadata": "pass",
+        "TestReviewerFreeHunt": "pass",
+        "TestReviewerUnicodePositive/home/caf\u00e9/asset": "pass",
+        "TestReviewerUnicodePositive/home/cafe\u0301/asset": "pass",
+        "TestReviewerUnicodePositive/home/\u65e5\u672c\u8a9e/asset": "pass",
+        "TestReviewerUnicodePositive/home/\ud83d\ude00/asset": "pass",
+        "TestReviewerUnicodePositive": "pass",
+        "TestReviewerGreekCollision/iota/directory": "pass",
+        "TestReviewerGreekCollision/iota/file": "pass",
+        "TestReviewerGreekCollision/upsilon/directory": "pass",
+        "TestReviewerGreekCollision/upsilon/file": "pass",
+        "TestReviewerGreekCollision": "pass",
+        "TestEmbeddedSchemasCompile": "pass",
+        "TestPinnedTrees/exact-content": "pass",
+        "TestPinnedTrees/extra-entry": "pass",
+        "TestPinnedTrees/missing-entry": "pass",
+        "TestPinnedTrees/changed-bytes": "pass",
+        "TestPinnedTrees/execute-mode": "pass",
+        "TestPinnedTrees/wrong-size": "pass",
+        "TestPinnedTrees/wrong-hash": "pass",
+        "TestPinnedTrees/launch-digest": "pass",
+        "TestPinnedTrees/adapter-binding": "pass",
+        "TestPinnedTrees/profile-binding": "pass",
+        "TestPinnedTrees/path-order": "pass",
+        "TestPinnedTrees/duplicate-path": "pass",
+        "TestPinnedTrees/case-collision": "pass",
+        "TestPinnedTrees/directory-case-collision": "pass",
+        "TestPinnedTrees/unicode-collision": "pass",
+        "TestPinnedTrees/file-ancestor": "pass",
+        "TestPinnedTrees/channel-reference": "pass",
+        "TestPinnedTrees/channel-semantics": "pass",
+        "TestPinnedTrees/metadata-lf": "pass",
+        "TestPinnedTrees": "pass",
+        "TestActualTreeRefusals/extra-file": "pass",
+        "TestActualTreeRefusals/extra-directory": "pass",
+        "TestActualTreeRefusals/missing-file": "pass",
+        "TestActualTreeRefusals/execute-mode": "pass",
+        "TestActualTreeRefusals/private-mode": "pass",
+        "TestActualTreeRefusals/symlink": "pass",
+        "TestActualTreeRefusals/hardlink-outside": "pass",
+        "TestActualTreeRefusals/hardlink-inside": "pass",
+        "TestActualTreeRefusals/fifo": "pass",
+        "TestActualTreeRefusals/unreadable": "pass",
+        "TestActualTreeRefusals/unreadable-directory": "pass",
+        "TestActualTreeRefusals/linked-directory": "pass",
+        "TestActualTreeRefusals/metadata-alias": "pass",
+        "TestActualTreeRefusals": "pass",
+        "TestPortableIdentity/version": "pass",
+        "TestPortableIdentity/profile-name": "pass",
+        "TestPortableIdentity/profile-lock": "pass",
+        "TestPortableIdentity/descriptor": "pass",
+        "TestPortableIdentity/file": "pass",
+        "TestPortableIdentity/mode": "pass",
+        "TestPortableIdentity": "pass",
+        "TestBaselineNeverRecaptured": "pass",
+        "TestMuseDerivedDirectoriesAndRootFact": "pass",
+        "TestMetadataNeighbors/sharp-s-casefold": "pass",
+        "TestMetadataNeighbors/NFD-components": "pass",
+        "TestMetadataNeighbors/wrong-fixed-layer": "pass",
+        "TestMetadataNeighbors/reserved-env": "pass",
+        "TestMetadataNeighbors/unsorted-env": "pass",
+        "TestMetadataNeighbors/duplicate-env": "pass",
+        "TestMetadataNeighbors/system-empty": "pass",
+        "TestMetadataNeighbors": "pass",
+        "TestLaunchHashIncludesLF": "pass",
+        "TestNoFollowSnapshotRoot": "pass",
+        "TestNoFollowBeforeParentSegment": "pass",
+        "TestPortableComponentSuffixes/.": "pass",
+        "TestPortableComponentSuffixes/_": "pass",
+        "TestPortableComponentSuffixes": "pass",
+        "TestPiAlternativeChannels": "pass"
+      },
+      "routing_package_verdicts": [
+        "pass"
+      ],
+      "routing_tests": {
+        "TestLinuxRoutingKeepsForksHosted/race": "pass",
+        "TestLinuxRoutingRejectsRacePlants/LF/positive": "pass",
+        "TestLinuxRoutingRejectsRacePlants/LF/fork_admitted": "pass",
+        "TestLinuxRoutingRejectsRacePlants/LF/dispatch_hosted": "pass",
+        "TestLinuxRoutingRejectsRacePlants/CRLF/positive": "pass",
+        "TestLinuxRoutingRejectsRacePlants/CRLF/fork_admitted": "pass",
+        "TestLinuxRoutingRejectsRacePlants/CRLF/dispatch_hosted": "pass"
+      }
+    },
+    "race-linux": {
+      "package_verdicts": [
+        "pass"
+      ],
+      "test_verdicts": {
+        "pass": 254
+      },
+      "required_tests": {
+        "TestReviewerNullChannel": "pass",
+        "TestReviewerManifestOnly": "pass",
+        "TestReviewerPortableLeftDrift": "pass",
+        "TestReviewerRecapture": "pass",
+        "TestReviewerFreeHunt": "pass",
+        "TestReviewerUnicodePositive": "pass",
+        "TestReviewerGreekCollision": "pass"
+      },
+      "non_json_download_banner_lines": [
+        1
+      ],
+      "skipped_tests": [],
+      "tests": {
+        "TestPinnedSchemaCheckoutBytes/protected": "pass",
+        "TestPinnedSchemaCheckoutBytes/unprotected-witness": "pass",
+        "TestPinnedSchemaCheckoutBytes": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-valid.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-codex.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-claude_code.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-pi.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-muse.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-opencode.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-snapshot.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-adapter.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-profile.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-curator_version.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-fragment_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-launch_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-files.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-snapshot.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-extra.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-adapter.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-fragment_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-launch_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-curator_version.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-profile.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-parent.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-dot.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-absolute.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-drive.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-unc.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-empty-segment.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-backslash.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-nul.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-outside-home.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-reserved.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-size-30.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-size-31.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-mode-32.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-sha256-33.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-extra-34.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-descriptor.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-environment.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-profile.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-precedence.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-env.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-permissions.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-unknown.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-old-fragment.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-version.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-path-prepend.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-wrong-env.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-absolute-env.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-root-on-codex.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-bad-permissions.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-mcp-absolute.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-mcp-parent.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-mcp-extra.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-false.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-null.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-empty.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-extra.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-mcp.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-system_prompt.json": "pass",
+        "TestPinnedSchemaCases": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/unknown": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/no_LF": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/two_LF": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/CRLF": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/space": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/BOM": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/duplicate": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/unknown": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/no_LF": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/two_LF": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/CRLF": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/space": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/BOM": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/duplicate": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json": "pass",
+        "TestMetadataFramingAndHashDomains": "pass",
+        "TestPinnedMetadataSemantics/exact-content": "pass",
+        "TestPinnedMetadataSemantics/extra-entry": "pass",
+        "TestPinnedMetadataSemantics/missing-entry": "pass",
+        "TestPinnedMetadataSemantics/changed-bytes": "pass",
+        "TestPinnedMetadataSemantics/execute-mode": "pass",
+        "TestPinnedMetadataSemantics/wrong-size": "pass",
+        "TestPinnedMetadataSemantics/wrong-hash": "pass",
+        "TestPinnedMetadataSemantics/launch-digest": "pass",
+        "TestPinnedMetadataSemantics/adapter-binding": "pass",
+        "TestPinnedMetadataSemantics/profile-binding": "pass",
+        "TestPinnedMetadataSemantics/path-order": "pass",
+        "TestPinnedMetadataSemantics/duplicate-path": "pass",
+        "TestPinnedMetadataSemantics/case-collision": "pass",
+        "TestPinnedMetadataSemantics/directory-case-collision": "pass",
+        "TestPinnedMetadataSemantics/unicode-collision": "pass",
+        "TestPinnedMetadataSemantics/file-ancestor": "pass",
+        "TestPinnedMetadataSemantics/channel-reference": "pass",
+        "TestPinnedMetadataSemantics/channel-semantics": "pass",
+        "TestPinnedMetadataSemantics/metadata-lf": "pass",
+        "TestPinnedMetadataSemantics": "pass",
+        "TestCorpusPins": "pass",
+        "TestTypedEncodingRejectsInvalidUTF8": "pass",
+        "TestDestinationKernelACL/system.posix_acl_access": "pass",
+        "TestDestinationKernelACL/system.posix_acl_default": "pass",
+        "TestDestinationKernelACL": "pass",
+        "TestDestinationPriorKernelACL": "pass",
+        "TestDestinationReadOnlyAdmission": "pass",
+        "TestDestinationBoundary/linked-ancestor": "pass",
+        "TestDestinationBoundary/linked-before-parent": "pass",
+        "TestDestinationBoundary/linked-target": "pass",
+        "TestDestinationBoundary/file-target": "pass",
+        "TestDestinationBoundary/missing-parent": "pass",
+        "TestDestinationBoundary/shared-ancestor": "pass",
+        "TestDestinationBoundary/shared-target": "pass",
+        "TestDestinationBoundary/public-target": "pass",
+        "TestDestinationBoundary/unrelated": "pass",
+        "TestDestinationBoundary/missing-protected": "pass",
+        "TestDestinationBoundary/no-policy": "pass",
+        "TestDestinationBoundary": "pass",
+        "TestDestinationOwnershipAndReadFailure": "pass",
+        "TestDestinationProtectedIdentity/manager": "pass",
+        "TestDestinationProtectedIdentity/store": "pass",
+        "TestDestinationProtectedIdentity/managed-home": "pass",
+        "TestDestinationProtectedIdentity/native-home": "pass",
+        "TestDestinationProtectedIdentity/credentials": "pass",
+        "TestDestinationProtectedIdentity/repository-admin": "pass",
+        "TestDestinationProtectedIdentity/workspace": "pass",
+        "TestDestinationProtectedIdentity": "pass",
+        "TestDestinationReplacementRaces/ancestor-link": "pass",
+        "TestDestinationReplacementRaces/ancestor-directory": "pass",
+        "TestDestinationReplacementRaces/target-link": "pass",
+        "TestDestinationReplacementRaces/target-directory": "pass",
+        "TestDestinationReplacementRaces/target-empty": "pass",
+        "TestDestinationReplacementRaces/target-identical": "pass",
+        "TestDestinationReplacementRaces/competing-target": "pass",
+        "TestDestinationReplacementRaces/empty-filled": "pass",
+        "TestDestinationReplacementRaces/permission-change": "pass",
+        "TestDestinationReplacementRaces/protected-moved": "pass",
+        "TestDestinationReplacementRaces": "pass",
+        "TestDestinationPrivateParent": "pass",
+        "TestDestinationPriorIdentity/identical": "pass",
+        "TestDestinationPriorIdentity/bytes": "pass",
+        "TestDestinationPriorIdentity/mode": "pass",
+        "TestDestinationPriorIdentity/extra": "pass",
+        "TestDestinationPriorIdentity/unreadable": "pass",
+        "TestDestinationPriorIdentity/unknown-version": "pass",
+        "TestDestinationPriorIdentity/new-generation": "pass",
+        "TestDestinationPriorIdentity": "pass",
+        "TestDestinationPriorMissingMetadata": "pass",
+        "TestPublicationPrivateAndPrior": "pass",
+        "TestPublicationCapturedIdentity/bytes": "pass",
+        "TestPublicationCapturedIdentity/missing": "pass",
+        "TestPublicationCapturedIdentity/extra": "pass",
+        "TestPublicationCapturedIdentity/metadata": "pass",
+        "TestPublicationCapturedIdentity/mode": "pass",
+        "TestPublicationCapturedIdentity": "pass",
+        "TestPublicationNoReplaceRace/empty": "pass",
+        "TestPublicationNoReplaceRace/snapshot": "pass",
+        "TestPublicationNoReplaceRace/file": "pass",
+        "TestPublicationNoReplaceRace/link": "pass",
+        "TestPublicationNoReplaceRace": "pass",
+        "TestPublicationRetainedParentRace": "pass",
+        "TestPublicationStagingOnlyCleanup/before-start": "pass",
+        "TestPublicationStagingOnlyCleanup/stage-created": "pass",
+        "TestPublicationStagingOnlyCleanup/file-staged": "pass",
+        "TestPublicationStagingOnlyCleanup/before-rename": "pass",
+        "TestPublicationStagingOnlyCleanup/io-failure": "pass",
+        "TestPublicationStagingOnlyCleanup": "pass",
+        "TestPublicationKernelStagingFailure": "pass",
+        "TestPublicationPostVerification/bytes": "pass",
+        "TestPublicationPostVerification/size": "pass",
+        "TestPublicationPostVerification/mode": "pass",
+        "TestPublicationPostVerification/extra": "pass",
+        "TestPublicationPostVerification/manifest": "pass",
+        "TestPublicationPostVerification/target-link": "pass",
+        "TestPublicationPostVerification/cancel": "pass",
+        "TestPublicationPostVerification": "pass",
+        "TestPublicationCleanupSubstitutedRoot": "pass",
+        "TestReviewerNullChannel": "pass",
+        "TestReviewerManifestOnly": "pass",
+        "TestReviewerPortableLeftDrift": "pass",
+        "TestReviewerRecapture": "pass",
+        "TestReviewerFreeHunt/launch-hardlink": "pass",
+        "TestReviewerFreeHunt/sticky-content": "pass",
+        "TestReviewerFreeHunt/missing-metadata": "pass",
+        "TestReviewerFreeHunt": "pass",
+        "TestReviewerUnicodePositive/home/caf\u00e9/asset": "pass",
+        "TestReviewerUnicodePositive/home/cafe\u0301/asset": "pass",
+        "TestReviewerUnicodePositive/home/\u65e5\u672c\u8a9e/asset": "pass",
+        "TestReviewerUnicodePositive/home/\ud83d\ude00/asset": "pass",
+        "TestReviewerUnicodePositive": "pass",
+        "TestReviewerGreekCollision/iota/directory": "pass",
+        "TestReviewerGreekCollision/iota/file": "pass",
+        "TestReviewerGreekCollision/upsilon/directory": "pass",
+        "TestReviewerGreekCollision/upsilon/file": "pass",
+        "TestReviewerGreekCollision": "pass",
+        "TestEmbeddedSchemasCompile": "pass",
+        "TestPinnedTrees/exact-content": "pass",
+        "TestPinnedTrees/extra-entry": "pass",
+        "TestPinnedTrees/missing-entry": "pass",
+        "TestPinnedTrees/changed-bytes": "pass",
+        "TestPinnedTrees/execute-mode": "pass",
+        "TestPinnedTrees/wrong-size": "pass",
+        "TestPinnedTrees/wrong-hash": "pass",
+        "TestPinnedTrees/launch-digest": "pass",
+        "TestPinnedTrees/adapter-binding": "pass",
+        "TestPinnedTrees/profile-binding": "pass",
+        "TestPinnedTrees/path-order": "pass",
+        "TestPinnedTrees/duplicate-path": "pass",
+        "TestPinnedTrees/case-collision": "pass",
+        "TestPinnedTrees/directory-case-collision": "pass",
+        "TestPinnedTrees/unicode-collision": "pass",
+        "TestPinnedTrees/file-ancestor": "pass",
+        "TestPinnedTrees/channel-reference": "pass",
+        "TestPinnedTrees/channel-semantics": "pass",
+        "TestPinnedTrees/metadata-lf": "pass",
+        "TestPinnedTrees": "pass",
+        "TestActualTreeRefusals/extra-file": "pass",
+        "TestActualTreeRefusals/extra-directory": "pass",
+        "TestActualTreeRefusals/missing-file": "pass",
+        "TestActualTreeRefusals/execute-mode": "pass",
+        "TestActualTreeRefusals/private-mode": "pass",
+        "TestActualTreeRefusals/symlink": "pass",
+        "TestActualTreeRefusals/hardlink-outside": "pass",
+        "TestActualTreeRefusals/hardlink-inside": "pass",
+        "TestActualTreeRefusals/fifo": "pass",
+        "TestActualTreeRefusals/unreadable": "pass",
+        "TestActualTreeRefusals/unreadable-directory": "pass",
+        "TestActualTreeRefusals/linked-directory": "pass",
+        "TestActualTreeRefusals/metadata-alias": "pass",
+        "TestActualTreeRefusals": "pass",
+        "TestPortableIdentity/version": "pass",
+        "TestPortableIdentity/profile-name": "pass",
+        "TestPortableIdentity/profile-lock": "pass",
+        "TestPortableIdentity/descriptor": "pass",
+        "TestPortableIdentity/file": "pass",
+        "TestPortableIdentity/mode": "pass",
+        "TestPortableIdentity": "pass",
+        "TestBaselineNeverRecaptured": "pass",
+        "TestMuseDerivedDirectoriesAndRootFact": "pass",
+        "TestMetadataNeighbors/sharp-s-casefold": "pass",
+        "TestMetadataNeighbors/NFD-components": "pass",
+        "TestMetadataNeighbors/wrong-fixed-layer": "pass",
+        "TestMetadataNeighbors/reserved-env": "pass",
+        "TestMetadataNeighbors/unsorted-env": "pass",
+        "TestMetadataNeighbors/duplicate-env": "pass",
+        "TestMetadataNeighbors/system-empty": "pass",
+        "TestMetadataNeighbors": "pass",
+        "TestLaunchHashIncludesLF": "pass",
+        "TestNoFollowSnapshotRoot": "pass",
+        "TestNoFollowBeforeParentSegment": "pass",
+        "TestPortableComponentSuffixes/.": "pass",
+        "TestPortableComponentSuffixes/_": "pass",
+        "TestPortableComponentSuffixes": "pass",
+        "TestPiAlternativeChannels": "pass"
+      },
+      "routing_package_verdicts": [
+        "pass"
+      ],
+      "routing_tests": {
+        "TestLinuxRoutingKeepsForksHosted/race": "pass",
+        "TestLinuxRoutingRejectsRacePlants/LF/positive": "pass",
+        "TestLinuxRoutingRejectsRacePlants/LF/fork_admitted": "pass",
+        "TestLinuxRoutingRejectsRacePlants/LF/dispatch_hosted": "pass",
+        "TestLinuxRoutingRejectsRacePlants/CRLF/positive": "pass",
+        "TestLinuxRoutingRejectsRacePlants/CRLF/fork_admitted": "pass",
+        "TestLinuxRoutingRejectsRacePlants/CRLF/dispatch_hosted": "pass"
+      }
+    },
+    "test-macos": {
+      "package_verdicts": [
+        "pass"
+      ],
+      "test_verdicts": {
+        "pass": 252
+      },
+      "required_tests": {
+        "TestReviewerNullChannel": "pass",
+        "TestReviewerManifestOnly": "pass",
+        "TestReviewerPortableLeftDrift": "pass",
+        "TestReviewerRecapture": "pass",
+        "TestReviewerFreeHunt": "pass",
+        "TestReviewerUnicodePositive": "pass",
+        "TestReviewerGreekCollision": "pass"
+      },
+      "non_json_download_banner_lines": [],
+      "skipped_tests": [],
+      "tests": {
+        "TestPinnedSchemaCheckoutBytes/protected": "pass",
+        "TestPinnedSchemaCheckoutBytes/unprotected-witness": "pass",
+        "TestPinnedSchemaCheckoutBytes": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-valid.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-codex.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-claude_code.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-pi.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-muse.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-opencode.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-snapshot.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-adapter.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-profile.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-curator_version.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-fragment_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-launch_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-files.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-snapshot.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-extra.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-adapter.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-fragment_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-launch_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-curator_version.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-profile.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-parent.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-dot.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-absolute.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-drive.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-unc.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-empty-segment.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-backslash.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-nul.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-outside-home.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-reserved.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-size-30.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-size-31.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-mode-32.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-sha256-33.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-extra-34.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-descriptor.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-environment.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-profile.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-precedence.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-env.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-permissions.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-unknown.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-old-fragment.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-version.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-path-prepend.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-wrong-env.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-absolute-env.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-root-on-codex.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-bad-permissions.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-mcp-absolute.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-mcp-parent.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-mcp-extra.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-false.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-null.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-empty.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-extra.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-mcp.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-system_prompt.json": "pass",
+        "TestPinnedSchemaCases": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/unknown": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/no_LF": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/two_LF": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/CRLF": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/space": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/BOM": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/duplicate": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/unknown": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/no_LF": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/two_LF": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/CRLF": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/space": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/BOM": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/duplicate": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json": "pass",
+        "TestMetadataFramingAndHashDomains": "pass",
+        "TestPinnedMetadataSemantics/exact-content": "pass",
+        "TestPinnedMetadataSemantics/extra-entry": "pass",
+        "TestPinnedMetadataSemantics/missing-entry": "pass",
+        "TestPinnedMetadataSemantics/changed-bytes": "pass",
+        "TestPinnedMetadataSemantics/execute-mode": "pass",
+        "TestPinnedMetadataSemantics/wrong-size": "pass",
+        "TestPinnedMetadataSemantics/wrong-hash": "pass",
+        "TestPinnedMetadataSemantics/launch-digest": "pass",
+        "TestPinnedMetadataSemantics/adapter-binding": "pass",
+        "TestPinnedMetadataSemantics/profile-binding": "pass",
+        "TestPinnedMetadataSemantics/path-order": "pass",
+        "TestPinnedMetadataSemantics/duplicate-path": "pass",
+        "TestPinnedMetadataSemantics/case-collision": "pass",
+        "TestPinnedMetadataSemantics/directory-case-collision": "pass",
+        "TestPinnedMetadataSemantics/unicode-collision": "pass",
+        "TestPinnedMetadataSemantics/file-ancestor": "pass",
+        "TestPinnedMetadataSemantics/channel-reference": "pass",
+        "TestPinnedMetadataSemantics/channel-semantics": "pass",
+        "TestPinnedMetadataSemantics/metadata-lf": "pass",
+        "TestPinnedMetadataSemantics": "pass",
+        "TestCorpusPins": "pass",
+        "TestTypedEncodingRejectsInvalidUTF8": "pass",
+        "TestDestinationKernelACL": "pass",
+        "TestDestinationPriorKernelACL": "pass",
+        "TestDestinationReadOnlyAdmission": "pass",
+        "TestDestinationBoundary/linked-ancestor": "pass",
+        "TestDestinationBoundary/linked-before-parent": "pass",
+        "TestDestinationBoundary/linked-target": "pass",
+        "TestDestinationBoundary/file-target": "pass",
+        "TestDestinationBoundary/missing-parent": "pass",
+        "TestDestinationBoundary/shared-ancestor": "pass",
+        "TestDestinationBoundary/shared-target": "pass",
+        "TestDestinationBoundary/public-target": "pass",
+        "TestDestinationBoundary/unrelated": "pass",
+        "TestDestinationBoundary/missing-protected": "pass",
+        "TestDestinationBoundary/no-policy": "pass",
+        "TestDestinationBoundary": "pass",
+        "TestDestinationOwnershipAndReadFailure": "pass",
+        "TestDestinationProtectedIdentity/manager": "pass",
+        "TestDestinationProtectedIdentity/store": "pass",
+        "TestDestinationProtectedIdentity/managed-home": "pass",
+        "TestDestinationProtectedIdentity/native-home": "pass",
+        "TestDestinationProtectedIdentity/credentials": "pass",
+        "TestDestinationProtectedIdentity/repository-admin": "pass",
+        "TestDestinationProtectedIdentity/workspace": "pass",
+        "TestDestinationProtectedIdentity": "pass",
+        "TestDestinationReplacementRaces/ancestor-link": "pass",
+        "TestDestinationReplacementRaces/ancestor-directory": "pass",
+        "TestDestinationReplacementRaces/target-link": "pass",
+        "TestDestinationReplacementRaces/target-directory": "pass",
+        "TestDestinationReplacementRaces/target-empty": "pass",
+        "TestDestinationReplacementRaces/target-identical": "pass",
+        "TestDestinationReplacementRaces/competing-target": "pass",
+        "TestDestinationReplacementRaces/empty-filled": "pass",
+        "TestDestinationReplacementRaces/permission-change": "pass",
+        "TestDestinationReplacementRaces/protected-moved": "pass",
+        "TestDestinationReplacementRaces": "pass",
+        "TestDestinationPrivateParent": "pass",
+        "TestDestinationPriorIdentity/identical": "pass",
+        "TestDestinationPriorIdentity/bytes": "pass",
+        "TestDestinationPriorIdentity/mode": "pass",
+        "TestDestinationPriorIdentity/extra": "pass",
+        "TestDestinationPriorIdentity/unreadable": "pass",
+        "TestDestinationPriorIdentity/unknown-version": "pass",
+        "TestDestinationPriorIdentity/new-generation": "pass",
+        "TestDestinationPriorIdentity": "pass",
+        "TestDestinationPriorMissingMetadata": "pass",
+        "TestPublicationPrivateAndPrior": "pass",
+        "TestPublicationCapturedIdentity/bytes": "pass",
+        "TestPublicationCapturedIdentity/missing": "pass",
+        "TestPublicationCapturedIdentity/extra": "pass",
+        "TestPublicationCapturedIdentity/metadata": "pass",
+        "TestPublicationCapturedIdentity/mode": "pass",
+        "TestPublicationCapturedIdentity": "pass",
+        "TestPublicationNoReplaceRace/empty": "pass",
+        "TestPublicationNoReplaceRace/snapshot": "pass",
+        "TestPublicationNoReplaceRace/file": "pass",
+        "TestPublicationNoReplaceRace/link": "pass",
+        "TestPublicationNoReplaceRace": "pass",
+        "TestPublicationRetainedParentRace": "pass",
+        "TestPublicationStagingOnlyCleanup/before-start": "pass",
+        "TestPublicationStagingOnlyCleanup/stage-created": "pass",
+        "TestPublicationStagingOnlyCleanup/file-staged": "pass",
+        "TestPublicationStagingOnlyCleanup/before-rename": "pass",
+        "TestPublicationStagingOnlyCleanup/io-failure": "pass",
+        "TestPublicationStagingOnlyCleanup": "pass",
+        "TestPublicationKernelStagingFailure": "pass",
+        "TestPublicationPostVerification/bytes": "pass",
+        "TestPublicationPostVerification/size": "pass",
+        "TestPublicationPostVerification/mode": "pass",
+        "TestPublicationPostVerification/extra": "pass",
+        "TestPublicationPostVerification/manifest": "pass",
+        "TestPublicationPostVerification/target-link": "pass",
+        "TestPublicationPostVerification/cancel": "pass",
+        "TestPublicationPostVerification": "pass",
+        "TestPublicationCleanupSubstitutedRoot": "pass",
+        "TestReviewerNullChannel": "pass",
+        "TestReviewerManifestOnly": "pass",
+        "TestReviewerPortableLeftDrift": "pass",
+        "TestReviewerRecapture": "pass",
+        "TestReviewerFreeHunt/launch-hardlink": "pass",
+        "TestReviewerFreeHunt/sticky-content": "pass",
+        "TestReviewerFreeHunt/missing-metadata": "pass",
+        "TestReviewerFreeHunt": "pass",
+        "TestReviewerUnicodePositive/home/caf\u00e9/asset": "pass",
+        "TestReviewerUnicodePositive/home/cafe\u0301/asset": "pass",
+        "TestReviewerUnicodePositive/home/\u65e5\u672c\u8a9e/asset": "pass",
+        "TestReviewerUnicodePositive/home/\ud83d\ude00/asset": "pass",
+        "TestReviewerUnicodePositive": "pass",
+        "TestReviewerGreekCollision/iota/directory": "pass",
+        "TestReviewerGreekCollision/iota/file": "pass",
+        "TestReviewerGreekCollision/upsilon/directory": "pass",
+        "TestReviewerGreekCollision/upsilon/file": "pass",
+        "TestReviewerGreekCollision": "pass",
+        "TestEmbeddedSchemasCompile": "pass",
+        "TestPinnedTrees/exact-content": "pass",
+        "TestPinnedTrees/extra-entry": "pass",
+        "TestPinnedTrees/missing-entry": "pass",
+        "TestPinnedTrees/changed-bytes": "pass",
+        "TestPinnedTrees/execute-mode": "pass",
+        "TestPinnedTrees/wrong-size": "pass",
+        "TestPinnedTrees/wrong-hash": "pass",
+        "TestPinnedTrees/launch-digest": "pass",
+        "TestPinnedTrees/adapter-binding": "pass",
+        "TestPinnedTrees/profile-binding": "pass",
+        "TestPinnedTrees/path-order": "pass",
+        "TestPinnedTrees/duplicate-path": "pass",
+        "TestPinnedTrees/case-collision": "pass",
+        "TestPinnedTrees/directory-case-collision": "pass",
+        "TestPinnedTrees/unicode-collision": "pass",
+        "TestPinnedTrees/file-ancestor": "pass",
+        "TestPinnedTrees/channel-reference": "pass",
+        "TestPinnedTrees/channel-semantics": "pass",
+        "TestPinnedTrees/metadata-lf": "pass",
+        "TestPinnedTrees": "pass",
+        "TestActualTreeRefusals/extra-file": "pass",
+        "TestActualTreeRefusals/extra-directory": "pass",
+        "TestActualTreeRefusals/missing-file": "pass",
+        "TestActualTreeRefusals/execute-mode": "pass",
+        "TestActualTreeRefusals/private-mode": "pass",
+        "TestActualTreeRefusals/symlink": "pass",
+        "TestActualTreeRefusals/hardlink-outside": "pass",
+        "TestActualTreeRefusals/hardlink-inside": "pass",
+        "TestActualTreeRefusals/fifo": "pass",
+        "TestActualTreeRefusals/unreadable": "pass",
+        "TestActualTreeRefusals/unreadable-directory": "pass",
+        "TestActualTreeRefusals/linked-directory": "pass",
+        "TestActualTreeRefusals/metadata-alias": "pass",
+        "TestActualTreeRefusals": "pass",
+        "TestPortableIdentity/version": "pass",
+        "TestPortableIdentity/profile-name": "pass",
+        "TestPortableIdentity/profile-lock": "pass",
+        "TestPortableIdentity/descriptor": "pass",
+        "TestPortableIdentity/file": "pass",
+        "TestPortableIdentity/mode": "pass",
+        "TestPortableIdentity": "pass",
+        "TestBaselineNeverRecaptured": "pass",
+        "TestMuseDerivedDirectoriesAndRootFact": "pass",
+        "TestMetadataNeighbors/sharp-s-casefold": "pass",
+        "TestMetadataNeighbors/NFD-components": "pass",
+        "TestMetadataNeighbors/wrong-fixed-layer": "pass",
+        "TestMetadataNeighbors/reserved-env": "pass",
+        "TestMetadataNeighbors/unsorted-env": "pass",
+        "TestMetadataNeighbors/duplicate-env": "pass",
+        "TestMetadataNeighbors/system-empty": "pass",
+        "TestMetadataNeighbors": "pass",
+        "TestLaunchHashIncludesLF": "pass",
+        "TestNoFollowSnapshotRoot": "pass",
+        "TestNoFollowBeforeParentSegment": "pass",
+        "TestPortableComponentSuffixes/.": "pass",
+        "TestPortableComponentSuffixes/_": "pass",
+        "TestPortableComponentSuffixes": "pass",
+        "TestPiAlternativeChannels": "pass"
+      },
+      "routing_package_verdicts": [
+        "pass"
+      ],
+      "routing_tests": {
+        "TestLinuxRoutingKeepsForksHosted/race": "pass",
+        "TestLinuxRoutingRejectsRacePlants/LF/positive": "pass",
+        "TestLinuxRoutingRejectsRacePlants/LF/fork_admitted": "pass",
+        "TestLinuxRoutingRejectsRacePlants/LF/dispatch_hosted": "pass",
+        "TestLinuxRoutingRejectsRacePlants/CRLF/positive": "pass",
+        "TestLinuxRoutingRejectsRacePlants/CRLF/fork_admitted": "pass",
+        "TestLinuxRoutingRejectsRacePlants/CRLF/dispatch_hosted": "pass"
+      }
+    },
+    "race-macos": {
+      "package_verdicts": [
+        "pass"
+      ],
+      "test_verdicts": {
+        "pass": 252
+      },
+      "required_tests": {
+        "TestReviewerNullChannel": "pass",
+        "TestReviewerManifestOnly": "pass",
+        "TestReviewerPortableLeftDrift": "pass",
+        "TestReviewerRecapture": "pass",
+        "TestReviewerFreeHunt": "pass",
+        "TestReviewerUnicodePositive": "pass",
+        "TestReviewerGreekCollision": "pass"
+      },
+      "non_json_download_banner_lines": [],
+      "skipped_tests": [],
+      "tests": {
+        "TestPinnedSchemaCheckoutBytes/protected": "pass",
+        "TestPinnedSchemaCheckoutBytes/unprotected-witness": "pass",
+        "TestPinnedSchemaCheckoutBytes": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-valid.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-codex.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-claude_code.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-pi.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-muse.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-opencode.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-snapshot.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-adapter.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-profile.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-curator_version.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-fragment_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-launch_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-files.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-snapshot.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-extra.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-adapter.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-fragment_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-launch_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-curator_version.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-profile.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-parent.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-dot.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-absolute.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-drive.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-unc.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-empty-segment.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-backslash.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-nul.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-outside-home.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-reserved.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-size-30.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-size-31.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-mode-32.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-sha256-33.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-extra-34.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-descriptor.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-environment.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-profile.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-precedence.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-env.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-permissions.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-unknown.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-old-fragment.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-version.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-path-prepend.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-wrong-env.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-absolute-env.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-root-on-codex.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-bad-permissions.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-mcp-absolute.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-mcp-parent.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-mcp-extra.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-false.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-null.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-empty.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-extra.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-mcp.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-system_prompt.json": "pass",
+        "TestPinnedSchemaCases": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/duplicate": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/unknown": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/no_LF": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/two_LF": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/CRLF": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/space": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/BOM": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/BOM": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/duplicate": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/unknown": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/no_LF": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/two_LF": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/CRLF": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/space": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json": "pass",
+        "TestMetadataFramingAndHashDomains": "pass",
+        "TestPinnedMetadataSemantics/exact-content": "pass",
+        "TestPinnedMetadataSemantics/extra-entry": "pass",
+        "TestPinnedMetadataSemantics/missing-entry": "pass",
+        "TestPinnedMetadataSemantics/changed-bytes": "pass",
+        "TestPinnedMetadataSemantics/execute-mode": "pass",
+        "TestPinnedMetadataSemantics/wrong-size": "pass",
+        "TestPinnedMetadataSemantics/wrong-hash": "pass",
+        "TestPinnedMetadataSemantics/launch-digest": "pass",
+        "TestPinnedMetadataSemantics/adapter-binding": "pass",
+        "TestPinnedMetadataSemantics/profile-binding": "pass",
+        "TestPinnedMetadataSemantics/path-order": "pass",
+        "TestPinnedMetadataSemantics/duplicate-path": "pass",
+        "TestPinnedMetadataSemantics/case-collision": "pass",
+        "TestPinnedMetadataSemantics/directory-case-collision": "pass",
+        "TestPinnedMetadataSemantics/unicode-collision": "pass",
+        "TestPinnedMetadataSemantics/file-ancestor": "pass",
+        "TestPinnedMetadataSemantics/channel-reference": "pass",
+        "TestPinnedMetadataSemantics/channel-semantics": "pass",
+        "TestPinnedMetadataSemantics/metadata-lf": "pass",
+        "TestPinnedMetadataSemantics": "pass",
+        "TestCorpusPins": "pass",
+        "TestTypedEncodingRejectsInvalidUTF8": "pass",
+        "TestDestinationKernelACL": "pass",
+        "TestDestinationPriorKernelACL": "pass",
+        "TestDestinationReadOnlyAdmission": "pass",
+        "TestDestinationBoundary/linked-ancestor": "pass",
+        "TestDestinationBoundary/linked-before-parent": "pass",
+        "TestDestinationBoundary/linked-target": "pass",
+        "TestDestinationBoundary/file-target": "pass",
+        "TestDestinationBoundary/missing-parent": "pass",
+        "TestDestinationBoundary/shared-ancestor": "pass",
+        "TestDestinationBoundary/shared-target": "pass",
+        "TestDestinationBoundary/public-target": "pass",
+        "TestDestinationBoundary/unrelated": "pass",
+        "TestDestinationBoundary/missing-protected": "pass",
+        "TestDestinationBoundary/no-policy": "pass",
+        "TestDestinationBoundary": "pass",
+        "TestDestinationOwnershipAndReadFailure": "pass",
+        "TestDestinationProtectedIdentity/manager": "pass",
+        "TestDestinationProtectedIdentity/store": "pass",
+        "TestDestinationProtectedIdentity/managed-home": "pass",
+        "TestDestinationProtectedIdentity/native-home": "pass",
+        "TestDestinationProtectedIdentity/credentials": "pass",
+        "TestDestinationProtectedIdentity/repository-admin": "pass",
+        "TestDestinationProtectedIdentity/workspace": "pass",
+        "TestDestinationProtectedIdentity": "pass",
+        "TestDestinationReplacementRaces/ancestor-link": "pass",
+        "TestDestinationReplacementRaces/ancestor-directory": "pass",
+        "TestDestinationReplacementRaces/target-link": "pass",
+        "TestDestinationReplacementRaces/target-directory": "pass",
+        "TestDestinationReplacementRaces/target-empty": "pass",
+        "TestDestinationReplacementRaces/target-identical": "pass",
+        "TestDestinationReplacementRaces/competing-target": "pass",
+        "TestDestinationReplacementRaces/empty-filled": "pass",
+        "TestDestinationReplacementRaces/permission-change": "pass",
+        "TestDestinationReplacementRaces/protected-moved": "pass",
+        "TestDestinationReplacementRaces": "pass",
+        "TestDestinationPrivateParent": "pass",
+        "TestDestinationPriorIdentity/identical": "pass",
+        "TestDestinationPriorIdentity/bytes": "pass",
+        "TestDestinationPriorIdentity/mode": "pass",
+        "TestDestinationPriorIdentity/extra": "pass",
+        "TestDestinationPriorIdentity/unreadable": "pass",
+        "TestDestinationPriorIdentity/unknown-version": "pass",
+        "TestDestinationPriorIdentity/new-generation": "pass",
+        "TestDestinationPriorIdentity": "pass",
+        "TestDestinationPriorMissingMetadata": "pass",
+        "TestPublicationPrivateAndPrior": "pass",
+        "TestPublicationCapturedIdentity/bytes": "pass",
+        "TestPublicationCapturedIdentity/missing": "pass",
+        "TestPublicationCapturedIdentity/extra": "pass",
+        "TestPublicationCapturedIdentity/metadata": "pass",
+        "TestPublicationCapturedIdentity/mode": "pass",
+        "TestPublicationCapturedIdentity": "pass",
+        "TestPublicationNoReplaceRace/empty": "pass",
+        "TestPublicationNoReplaceRace/snapshot": "pass",
+        "TestPublicationNoReplaceRace/file": "pass",
+        "TestPublicationNoReplaceRace/link": "pass",
+        "TestPublicationNoReplaceRace": "pass",
+        "TestPublicationRetainedParentRace": "pass",
+        "TestPublicationStagingOnlyCleanup/before-start": "pass",
+        "TestPublicationStagingOnlyCleanup/stage-created": "pass",
+        "TestPublicationStagingOnlyCleanup/file-staged": "pass",
+        "TestPublicationStagingOnlyCleanup/before-rename": "pass",
+        "TestPublicationStagingOnlyCleanup/io-failure": "pass",
+        "TestPublicationStagingOnlyCleanup": "pass",
+        "TestPublicationKernelStagingFailure": "pass",
+        "TestPublicationPostVerification/bytes": "pass",
+        "TestPublicationPostVerification/size": "pass",
+        "TestPublicationPostVerification/mode": "pass",
+        "TestPublicationPostVerification/extra": "pass",
+        "TestPublicationPostVerification/manifest": "pass",
+        "TestPublicationPostVerification/target-link": "pass",
+        "TestPublicationPostVerification/cancel": "pass",
+        "TestPublicationPostVerification": "pass",
+        "TestPublicationCleanupSubstitutedRoot": "pass",
+        "TestReviewerNullChannel": "pass",
+        "TestReviewerManifestOnly": "pass",
+        "TestReviewerPortableLeftDrift": "pass",
+        "TestReviewerRecapture": "pass",
+        "TestReviewerFreeHunt/launch-hardlink": "pass",
+        "TestReviewerFreeHunt/sticky-content": "pass",
+        "TestReviewerFreeHunt/missing-metadata": "pass",
+        "TestReviewerFreeHunt": "pass",
+        "TestReviewerUnicodePositive/home/caf\u00e9/asset": "pass",
+        "TestReviewerUnicodePositive/home/cafe\u0301/asset": "pass",
+        "TestReviewerUnicodePositive/home/\u65e5\u672c\u8a9e/asset": "pass",
+        "TestReviewerUnicodePositive/home/\ud83d\ude00/asset": "pass",
+        "TestReviewerUnicodePositive": "pass",
+        "TestReviewerGreekCollision/iota/directory": "pass",
+        "TestReviewerGreekCollision/iota/file": "pass",
+        "TestReviewerGreekCollision/upsilon/directory": "pass",
+        "TestReviewerGreekCollision/upsilon/file": "pass",
+        "TestReviewerGreekCollision": "pass",
+        "TestEmbeddedSchemasCompile": "pass",
+        "TestPinnedTrees/exact-content": "pass",
+        "TestPinnedTrees/extra-entry": "pass",
+        "TestPinnedTrees/missing-entry": "pass",
+        "TestPinnedTrees/changed-bytes": "pass",
+        "TestPinnedTrees/execute-mode": "pass",
+        "TestPinnedTrees/wrong-size": "pass",
+        "TestPinnedTrees/wrong-hash": "pass",
+        "TestPinnedTrees/launch-digest": "pass",
+        "TestPinnedTrees/adapter-binding": "pass",
+        "TestPinnedTrees/profile-binding": "pass",
+        "TestPinnedTrees/path-order": "pass",
+        "TestPinnedTrees/duplicate-path": "pass",
+        "TestPinnedTrees/case-collision": "pass",
+        "TestPinnedTrees/directory-case-collision": "pass",
+        "TestPinnedTrees/unicode-collision": "pass",
+        "TestPinnedTrees/file-ancestor": "pass",
+        "TestPinnedTrees/channel-reference": "pass",
+        "TestPinnedTrees/channel-semantics": "pass",
+        "TestPinnedTrees/metadata-lf": "pass",
+        "TestPinnedTrees": "pass",
+        "TestActualTreeRefusals/extra-file": "pass",
+        "TestActualTreeRefusals/extra-directory": "pass",
+        "TestActualTreeRefusals/missing-file": "pass",
+        "TestActualTreeRefusals/execute-mode": "pass",
+        "TestActualTreeRefusals/private-mode": "pass",
+        "TestActualTreeRefusals/symlink": "pass",
+        "TestActualTreeRefusals/hardlink-outside": "pass",
+        "TestActualTreeRefusals/hardlink-inside": "pass",
+        "TestActualTreeRefusals/fifo": "pass",
+        "TestActualTreeRefusals/unreadable": "pass",
+        "TestActualTreeRefusals/unreadable-directory": "pass",
+        "TestActualTreeRefusals/linked-directory": "pass",
+        "TestActualTreeRefusals/metadata-alias": "pass",
+        "TestActualTreeRefusals": "pass",
+        "TestPortableIdentity/version": "pass",
+        "TestPortableIdentity/profile-name": "pass",
+        "TestPortableIdentity/profile-lock": "pass",
+        "TestPortableIdentity/descriptor": "pass",
+        "TestPortableIdentity/file": "pass",
+        "TestPortableIdentity/mode": "pass",
+        "TestPortableIdentity": "pass",
+        "TestBaselineNeverRecaptured": "pass",
+        "TestMuseDerivedDirectoriesAndRootFact": "pass",
+        "TestMetadataNeighbors/sharp-s-casefold": "pass",
+        "TestMetadataNeighbors/NFD-components": "pass",
+        "TestMetadataNeighbors/wrong-fixed-layer": "pass",
+        "TestMetadataNeighbors/reserved-env": "pass",
+        "TestMetadataNeighbors/unsorted-env": "pass",
+        "TestMetadataNeighbors/duplicate-env": "pass",
+        "TestMetadataNeighbors/system-empty": "pass",
+        "TestMetadataNeighbors": "pass",
+        "TestLaunchHashIncludesLF": "pass",
+        "TestNoFollowSnapshotRoot": "pass",
+        "TestNoFollowBeforeParentSegment": "pass",
+        "TestPortableComponentSuffixes/.": "pass",
+        "TestPortableComponentSuffixes/_": "pass",
+        "TestPortableComponentSuffixes": "pass",
+        "TestPiAlternativeChannels": "pass"
+      },
+      "routing_package_verdicts": [
+        "pass"
+      ],
+      "routing_tests": {
+        "TestLinuxRoutingKeepsForksHosted/race": "pass",
+        "TestLinuxRoutingRejectsRacePlants/LF/positive": "pass",
+        "TestLinuxRoutingRejectsRacePlants/LF/fork_admitted": "pass",
+        "TestLinuxRoutingRejectsRacePlants/LF/dispatch_hosted": "pass",
+        "TestLinuxRoutingRejectsRacePlants/CRLF/positive": "pass",
+        "TestLinuxRoutingRejectsRacePlants/CRLF/fork_admitted": "pass",
+        "TestLinuxRoutingRejectsRacePlants/CRLF/dispatch_hosted": "pass"
+      }
+    },
+    "test-windows": {
+      "package_verdicts": [
+        "pass"
+      ],
+      "test_verdicts": {
+        "pass": 104
+      },
+      "required_tests": {
+        "TestDestinationUnqualifiedPlatform": "pass"
+      },
+      "non_json_download_banner_lines": [],
+      "skipped_tests": [],
+      "tests": {
+        "TestPinnedSchemaCheckoutBytes/protected": "pass",
+        "TestPinnedSchemaCheckoutBytes/unprotected-witness": "pass",
+        "TestPinnedSchemaCheckoutBytes": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-valid.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-codex.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-claude_code.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-pi.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-muse.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-valid-opencode.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-snapshot.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-adapter.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-profile.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-curator_version.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-fragment_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-launch_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-files.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-snapshot.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-extra.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-adapter.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-fragment_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-launch_sha256.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-curator_version.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-profile.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-parent.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-dot.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-absolute.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-drive.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-unc.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-empty-segment.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-backslash.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-nul.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-outside-home.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-path-reserved.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-size-30.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-size-31.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-mode-32.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-sha256-33.json": "pass",
+        "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-extra-34.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-descriptor.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-environment.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-profile.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-precedence.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-env.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-missing-permissions.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-unknown.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-old-fragment.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-version.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-path-prepend.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-wrong-env.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-absolute-env.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-root-on-codex.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-invalid-bad-permissions.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-mcp-absolute.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-mcp-parent.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-mcp-extra.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-false.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-null.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-empty.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-extra.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-mcp.json": "pass",
+        "TestPinnedSchemaCases/cases/snapshot-launch-muse-system_prompt.json": "pass",
+        "TestPinnedSchemaCases": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/unknown": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/no_LF": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/two_LF": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/CRLF": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/space": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/BOM": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json/duplicate": "pass",
+        "TestMetadataFramingAndHashDomains/manifest.json": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/duplicate": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/unknown": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/no_LF": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/two_LF": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/CRLF": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/space": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json/BOM": "pass",
+        "TestMetadataFramingAndHashDomains/launch.json": "pass",
+        "TestMetadataFramingAndHashDomains": "pass",
+        "TestPinnedMetadataSemantics/exact-content": "pass",
+        "TestPinnedMetadataSemantics/extra-entry": "pass",
+        "TestPinnedMetadataSemantics/missing-entry": "pass",
+        "TestPinnedMetadataSemantics/changed-bytes": "pass",
+        "TestPinnedMetadataSemantics/execute-mode": "pass",
+        "TestPinnedMetadataSemantics/wrong-size": "pass",
+        "TestPinnedMetadataSemantics/wrong-hash": "pass",
+        "TestPinnedMetadataSemantics/launch-digest": "pass",
+        "TestPinnedMetadataSemantics/adapter-binding": "pass",
+        "TestPinnedMetadataSemantics/profile-binding": "pass",
+        "TestPinnedMetadataSemantics/path-order": "pass",
+        "TestPinnedMetadataSemantics/duplicate-path": "pass",
+        "TestPinnedMetadataSemantics/case-collision": "pass",
+        "TestPinnedMetadataSemantics/directory-case-collision": "pass",
+        "TestPinnedMetadataSemantics/unicode-collision": "pass",
+        "TestPinnedMetadataSemantics/file-ancestor": "pass",
+        "TestPinnedMetadataSemantics/channel-reference": "pass",
+        "TestPinnedMetadataSemantics/channel-semantics": "pass",
+        "TestPinnedMetadataSemantics/metadata-lf": "pass",
+        "TestPinnedMetadataSemantics": "pass",
+        "TestCorpusPins": "pass",
+        "TestTypedEncodingRejectsInvalidUTF8": "pass",
+        "TestDestinationUnqualifiedPlatform": "pass",
+        "TestEmbeddedSchemasCompile": "pass",
+        "TestUnqualifiedPlatformRefuses": "pass"
+      },
+      "routing_package_verdicts": [
+        "pass"
+      ],
+      "routing_tests": {
+        "TestLinuxRoutingKeepsForksHosted/race": "pass",
+        "TestLinuxRoutingRejectsRacePlants/LF/positive": "pass",
+        "TestLinuxRoutingRejectsRacePlants/LF/fork_admitted": "pass",
+        "TestLinuxRoutingRejectsRacePlants/LF/dispatch_hosted": "pass",
+        "TestLinuxRoutingRejectsRacePlants/CRLF/positive": "pass",
+        "TestLinuxRoutingRejectsRacePlants/CRLF/fork_admitted": "pass",
+        "TestLinuxRoutingRejectsRacePlants/CRLF/dispatch_hosted": "pass"
+      }
+    }
+  },
+  "bounds": [
+    "Windows proves explicit platform-unqualified refusal, not publication qualification.",
+    "Conditional skipped jobs are declared, not counted as passes.",
+    "Same-user mutation inside private staging is excluded by the normative contract.",
+    "SNAP-CLI is separate; only library production entry points are qualified here.",
+    "The earlier source-caused Windows harness failure remains recorded in the first-run evidence resource.",
+    "One gate snapshot does not establish the separate three-green-main runner rollout qualification."
+  ]
+}

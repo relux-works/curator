@@ -1,0 +1,1460 @@
+diff --git a/internal/envsnapshot/README.md b/internal/envsnapshot/README.md
+index 2bbc558e..61bf6adf 100644
+--- a/internal/envsnapshot/README.md
++++ b/internal/envsnapshot/README.md
+@@ -5,6 +5,37 @@ It does not materialize, repair, authorize a launch, select a source closure,
+ transport archives, or persist a new baseline. Capture, publication and hosted
+ consumers must call it; those integrations are separate implementation leaves.
+ 
++The first destination-admission unit adds `OpenDestination(path, policy)` on
++macOS and Linux. It retains all supplied ancestor/target and protected-root
++handles, checks owner/ACL evidence without writes, and refuses physical
++equal/inside/containing protected roots. `DestinationPolicy.ProtectedRoots`
++must be the coordinator's complete existing inventory (manager, stores,
++managed/native homes, credential roots, repository administration, workspace).
++This library does not discover that inventory. A missing or unreadable supplied
++root refuses rather than becoming an empty inventory. `Revalidate` detects
++changed retained entries and security evidence; `MatchPrior` rereads the actual
++snapshot and compares exact manifest bytes, including the source binding.
++Call `Close` to release every retained handle; it performs no cleanup writes.
++
++Admission is an observation, not an atomic publication capability. No
++materialize CLI calls it yet. Staging, no-replace publication, empty-target
++replacement, interruption handling and publication cleanup remain unimplemented.
++An admission followed by `os.Rename` would not satisfy the publication contract.
++The separate Windows backend is also outstanding: unsupported platforms refuse
++with `environment_materialize_destination_invalid`, without filesystem writes.
++
++Destination ancestors may belong to the caller or root and must not be writable
++by group/other; the immediate parent and target must belong to the caller.
++Existing targets must have mode 0700. Linux refuses extended access/default
++POSIX ACLs, including unreadable or unsupported ACL evidence. macOS uses
++`fgetattrlist` on retained descriptors and permits only absent/deny-only ACLs;
++permit and unknown entries refuse conservatively. The direct macOS syscall has
++no x/sys wrapper; its two narrowly named lint exceptions document the ABI and
++pointer bounds. Real kernel ACL tests qualify the exercised runtime, not future
++OS versions. Prior-snapshot admission supplements SNAP-ID with owner/ACL checks
++on every actual member. It does not claim protection against subsequent writes
++by another process with the same user's authority.
++
+ - `EncodeManifest` / `DecodeManifest` and `EncodeDescriptor` / `DecodeDescriptor`
+   enforce the embedded, closed schemas and CCJ-1 plus exactly one LF. Decoding
+   metadata alone never verifies an existing snapshot directory.
+@@ -56,6 +87,8 @@ go test -count=1 -race -coverprofile=.temp/snapshot-coverage.out ./internal/envs
+ go test -count=1 -run '^TestPinnedSchemaCheckoutBytes$' -v ./internal/envsnapshot
+ go test -tags snapshotcontrols -count=1 -run '^TestNarrowingControls$' -v ./internal/envsnapshot
+ golangci-lint run ./internal/envsnapshot/...
++go test -count=1 -run '^TestDestination' -v ./internal/envsnapshot
++go test -tags snapshotcontrols -count=1 -run '^TestDestinationNarrowingControls$' -v ./internal/envsnapshot
+ go build -o .temp/curator-snapshot-check ./cmd/curator
+ sh scripts/remote-gate.sh
+ ```
+@@ -67,6 +100,15 @@ rather than a build/setup error, and remove only their own scratch allocations.
+ They never mutate the original package. Each child failure is expected exit 1;
+ the control harness succeeds only when every planted weakening is killed.
+ 
++The destination controls exercise the real `OpenDestination`, `Revalidate` and
++`MatchPrior` library entry points in isolated package copies. They narrow linked
++ancestor refusal (M2), saved-manifest byte trust (M6), owner/mode/ACL admission,
++protected-root equality, ancestor/target identity and unrelated-target refusal.
++They do not claim the still-absent `MaterializeCLI_*` production-entry tests.
++Destination syscall fixtures use private `.temp/destination-test-*` allocations
++because shared temporary ancestors must refuse. The owner mutant requires an
++unprivileged process. Windows tests qualify refusal only.
++
+ The retained `TestReviewerGreekCollision` regression exercises `Verify` with
+ iota and upsilon spellings as files and directory components, singleton positive
+ controls and unchanged-manifest assertions. M12 restores the former
+diff --git a/internal/envsnapshot/destination.go b/internal/envsnapshot/destination.go
+new file mode 100644
+index 00000000..324f5a08
+--- /dev/null
++++ b/internal/envsnapshot/destination.go
+@@ -0,0 +1,26 @@
++package envsnapshot
++
++// DestinationInvalid is the normative destination refusal, distinct from a
++// malformed or changed prior snapshot (Mismatch).
++const DestinationInvalid = "environment_materialize_destination_invalid"
++
++func invalidDestination(reason string) error { return &Error{DestinationInvalid, reason} }
++
++// DestinationPolicy supplies the complete existing protected-root inventory.
++// The materialize coordinator must supply manager roots, stores, managed/native
++// homes, credential roots, repository administration and the active workspace.
++// Unreadable or missing supplied roots refuse; they are never silently omitted.
++// Inventory discovery and capture authorization are separate from admission.
++type DestinationPolicy struct {
++	ProtectedRoots []string
++}
++
++// DestinationKind describes an observation, never permission to rename a path.
++type DestinationKind string
++
++// Admitted destination states; none authorizes publication by pathname.
++const (
++	DestinationAbsent   DestinationKind = "absent"
++	DestinationEmpty    DestinationKind = "empty"
++	DestinationSnapshot DestinationKind = "snapshot"
++)
+diff --git a/internal/envsnapshot/destination_acl_darwin.go b/internal/envsnapshot/destination_acl_darwin.go
+new file mode 100644
+index 00000000..5e9ae2b2
+--- /dev/null
++++ b/internal/envsnapshot/destination_acl_darwin.go
+@@ -0,0 +1,63 @@
++//go:build darwin
++
++package envsnapshot
++
++import (
++	"encoding/binary"
++	"os"
++	"unsafe"
++
++	"golang.org/x/sys/unix"
++)
++
++// fgetattrlist reads the ACL of the retained object, not its pathname. Layouts
++// and bounds are from sys/attr.h and sys/kauth.h (128 ACEs, 24 bytes each).
++// A deny-only ACL on an ancestor cannot broaden Unix permissions. All grants,
++// unknown ACE kinds and malformed/unreadable evidence refuse conservatively.
++func destinationACL(f *os.File) error {
++	attrs := unix.Attrlist{Bitmapcount: 5, Commonattr: unix.ATTR_CMN_EXTENDED_SECURITY}
++	var buf [4096]byte
++	// #nosec G103 -- synchronous kernel ABI: fixed, live attrlist/buffer;
++	// no pointers escape and every returned offset/length is checked below.
++	_, _, errno := unix.Syscall6(unix.SYS_FGETATTRLIST, f.Fd(), uintptr(unsafe.Pointer(&attrs)), uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)), unix.FSOPT_REPORT_FULLSIZE, 0) //nolint:staticcheck // SA1019: x/sys has no wrapper; qualified by kernel ACL tests, failure refuses closed.
++	if errno != 0 {
++		return errno
++	}
++	n := int(binary.NativeEndian.Uint32(buf[:4]))
++	if n < 12 || n > len(buf) {
++		return os.ErrPermission
++	}
++	rawOffset := binary.NativeEndian.Uint32(buf[4:8])
++	if rawOffset > uint32(len(buf)-4) {
++		return os.ErrPermission
++	}
++	offset := int(rawOffset) + 4
++	length := int(binary.NativeEndian.Uint32(buf[8:12]))
++	if length == 0 {
++		return nil
++	}
++	if offset < 12 || length < 44 || offset > n || length > n-offset {
++		return os.ErrPermission
++	}
++	sec := buf[offset : offset+length]
++	if binary.NativeEndian.Uint32(sec[:4]) != 0x012cc16d {
++		return os.ErrPermission
++	}
++	count := binary.NativeEndian.Uint32(sec[36:40])
++	if count == 0xffffffff {
++		return nil
++	}
++	if count > 128 || int(count)*24 > len(sec)-44 {
++		return os.ErrPermission
++	}
++	for i := 0; i < int(count); i++ {
++		flags := binary.NativeEndian.Uint32(sec[44+i*24+16 : 44+i*24+20])
++		if flags&^uint32(0x1ff) != 0 {
++			return os.ErrPermission
++		}
++		if flags&0xf != 2 { // KAUTH_ACE_DENY; a permit never qualifies.
++			return os.ErrPermission
++		}
++	}
++	return nil
++}
+diff --git a/internal/envsnapshot/destination_acl_darwin_test.go b/internal/envsnapshot/destination_acl_darwin_test.go
+new file mode 100644
+index 00000000..c7263ebb
+--- /dev/null
++++ b/internal/envsnapshot/destination_acl_darwin_test.go
+@@ -0,0 +1,64 @@
++//go:build darwin
++
++package envsnapshot
++
++import (
++	"os"
++	"os/exec"
++	"path/filepath"
++	"testing"
++)
++
++// A real kernel deny-only ancestor ACL cannot broaden mode permissions; a
++// kernel permit ACE does broaden them and must refuse even with mode 0700.
++func TestDestinationKernelACL(t *testing.T) {
++	root, policy := destinationSandbox(t)
++	parent := filepath.Join(root, "acl-parent")
++	if err := os.Mkdir(parent, 0700); err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() {
++		if out, err := exec.Command("/bin/chmod", "-N", parent).CombinedOutput(); err != nil {
++			t.Errorf("ACL fixture cleanup failed: %v %s", err, out)
++		}
++	})
++	chmod := func(acl string) {
++		t.Helper()
++		if out, err := exec.Command("/bin/chmod", "+a", acl, parent).CombinedOutput(); err != nil {
++			t.Fatalf("ACL setup failed: %v %s", err, out)
++		}
++	}
++	chmod("everyone deny delete")
++	d := admitDestination(t, filepath.Join(parent, "child"), policy, DestinationAbsent)
++	chmod("everyone allow add_file,add_subdirectory")
++	_, err := OpenDestination(filepath.Join(parent, "child"), policy)
++	requireDestinationError(t, err, DestinationInvalid, "directory-acl")
++	requireDestinationError(t, d.Revalidate(), DestinationInvalid, "directory-acl")
++	assertAbsent(t, filepath.Join(parent, "child"))
++}
++
++// SNAP-ID's mode/byte checks alone cannot detect a file ACL granting another
++// principal read access. Prior admission and later MatchPrior both refuse it.
++func TestDestinationPriorKernelACL(t *testing.T) {
++	root, policy := destinationSandbox(t)
++	path := filepath.Join(root, "snapshot")
++	snapshotAtDestination(t, path)
++	d := admitDestination(t, path, policy, DestinationSnapshot)
++	member := filepath.Join(path, "home/AGENTS.md")
++	t.Cleanup(func() {
++		if out, err := exec.Command("/bin/chmod", "-N", member).CombinedOutput(); err != nil {
++			t.Errorf("ACL fixture cleanup failed: %v %s", err, out)
++		}
++	})
++	if out, err := exec.Command("/bin/chmod", "+a", "everyone allow read", member).CombinedOutput(); err != nil {
++		t.Fatalf("ACL setup failed: %v %s", err, out)
++	}
++	_, err := d.MatchPrior(read(t, "golden/manifest.json"))
++	requireDestinationError(t, err, Mismatch, "snapshot-owner-acl")
++	_, err = OpenDestination(path, policy)
++	requireDestinationError(t, err, Mismatch, "snapshot-owner-acl")
++	b, err := os.ReadFile(member)
++	if err != nil || Digest(b) != Digest(read(t, "golden/home/AGENTS.md")) {
++		t.Fatal("prior ACL refusal changed file bytes", err)
++	}
++}
+diff --git a/internal/envsnapshot/destination_acl_linux.go b/internal/envsnapshot/destination_acl_linux.go
+new file mode 100644
+index 00000000..919173ed
+--- /dev/null
++++ b/internal/envsnapshot/destination_acl_linux.go
+@@ -0,0 +1,22 @@
++//go:build linux
++
++package envsnapshot
++
++import (
++	"errors"
++	"os"
++
++	"golang.org/x/sys/unix"
++)
++
++// Refuse extended access and inherited/default ACLs. ENODATA is evidence of
++// absence; an unsupported filesystem or a failed ACL read is not absence.
++func destinationACL(f *os.File) error {
++	for _, name := range []string{"system.posix_acl_access", "system.posix_acl_default"} {
++		_, err := unix.Fgetxattr(int(f.Fd()), name, nil)
++		if !errors.Is(err, unix.ENODATA) {
++			return os.ErrPermission
++		}
++	}
++	return nil
++}
+diff --git a/internal/envsnapshot/destination_acl_linux_test.go b/internal/envsnapshot/destination_acl_linux_test.go
+new file mode 100644
+index 00000000..a2e8763f
+--- /dev/null
++++ b/internal/envsnapshot/destination_acl_linux_test.go
+@@ -0,0 +1,73 @@
++//go:build linux
++
++package envsnapshot
++
++import (
++	"encoding/binary"
++	"os"
++	"path/filepath"
++	"testing"
++
++	"golang.org/x/sys/unix"
++)
++
++// Real access/default POSIX ACLs refuse even when Unix mode bits alone grant
++// no group/other write. Tests require an ACL-capable filesystem, never skip a
++// failed ACL operation as if it were evidence of absence.
++func TestDestinationKernelACL(t *testing.T) {
++	for _, attr := range []string{"system.posix_acl_access", "system.posix_acl_default"} {
++		t.Run(attr, func(t *testing.T) {
++			root, policy := destinationSandbox(t)
++			parent := filepath.Join(root, "acl-parent")
++			if err := os.Mkdir(parent, 0700); err != nil {
++				t.Fatal(err)
++			}
++			d := admitDestination(t, filepath.Join(parent, "child"), policy, DestinationAbsent)
++			setDestinationKernelACL(t, parent, attr)
++			_, err := OpenDestination(filepath.Join(parent, "child"), policy)
++			requireDestinationError(t, err, DestinationInvalid, "directory-acl")
++			requireDestinationError(t, d.Revalidate(), DestinationInvalid, "directory-acl")
++			assertAbsent(t, filepath.Join(parent, "child"))
++		})
++	}
++}
++
++func setDestinationKernelACL(t *testing.T, parent, attr string) {
++	t.Helper()
++	// Linux posix_acl_xattr_header(version=2) + five tagged entries.
++	acl := make([]byte, 4+5*8)
++	binary.LittleEndian.PutUint32(acl, 2)
++	entries := []struct {
++		tag, perm uint16
++		id        uint32
++	}{
++		{1, 7, 0xffffffff}, {2, 4, 65534}, {4, 0, 0xffffffff},
++		{16, 4, 0xffffffff}, {32, 0, 0xffffffff},
++	}
++	for i, e := range entries {
++		binary.LittleEndian.PutUint16(acl[4+i*8:], e.tag)
++		binary.LittleEndian.PutUint16(acl[6+i*8:], e.perm)
++		binary.LittleEndian.PutUint32(acl[8+i*8:], e.id)
++	}
++	if err := unix.Setxattr(parent, attr, acl, 0); err != nil {
++		t.Fatal("kernel ACL setup failed", err)
++	}
++}
++
++// A default ACL on a prior home directory can affect future children without
++// changing its 0700 mode; actual prior admission must still reject it.
++func TestDestinationPriorKernelACL(t *testing.T) {
++	root, policy := destinationSandbox(t)
++	path := filepath.Join(root, "snapshot")
++	snapshotAtDestination(t, path)
++	d := admitDestination(t, path, policy, DestinationSnapshot)
++	setDestinationKernelACL(t, filepath.Join(path, "home"), "system.posix_acl_default")
++	_, err := d.MatchPrior(read(t, "golden/manifest.json"))
++	requireDestinationError(t, err, Mismatch, "snapshot-owner-acl")
++	_, err = OpenDestination(path, policy)
++	requireDestinationError(t, err, Mismatch, "snapshot-owner-acl")
++	b, err := os.ReadFile(filepath.Join(path, "manifest.json"))
++	if err != nil || Digest(b) != Digest(read(t, "golden/manifest.json")) {
++		t.Fatal("prior ACL refusal changed metadata", err)
++	}
++}
+diff --git a/internal/envsnapshot/destination_controls_test.go b/internal/envsnapshot/destination_controls_test.go
+new file mode 100644
+index 00000000..d373198d
+--- /dev/null
++++ b/internal/envsnapshot/destination_controls_test.go
+@@ -0,0 +1,113 @@
++//go:build snapshotcontrols && (darwin || linux)
++
++package envsnapshot
++
++import (
++	"bytes"
++	"encoding/json"
++	"io/fs"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strconv"
++	"strings"
++	"testing"
++)
++
++// Each isolated narrowing plant must produce a named behavioral failure with
++// exit 1. Compilation/setup errors, skips and missing results are not kills.
++// These are library-admission controls, not materialize CLI qualification.
++func TestDestinationNarrowingControls(t *testing.T) {
++	root, err := filepath.Abs("../..")
++	if err != nil {
++		t.Fatal(err)
++	}
++	corpusPath, err := filepath.Abs(corpus)
++	if err != nil {
++		t.Fatal(err)
++	}
++	type plant struct{ name, file, old, new, test string }
++	plants := []plant{
++		{"M2-linked-ancestor", "fs_unix.go", "if directory {\n\t\tflags |= unix.O_DIRECTORY\n\t}", "if directory { flags |= unix.O_DIRECTORY }; if directory && name == \"target\" { flags &^= unix.O_NOFOLLOW }", "TestDestinationBoundary/linked-ancestor"},
++		{"M6-saved-manifest-bytes", "destination_unix.go", "v, err := verifyDirectory(verifyHandle, \"\")", "v, err := verifyDirectory(verifyHandle, \"\"); if e, ok := err.(*Error); ok && e.Reason == \"file-identity\" { raw, readErr := readMetadata(target, \"manifest.json\"); v = &Verified{manifest: raw}; err = readErr }", "TestDestinationPriorIdentity/bytes"},
++		{"owner-root-parent", "destination_unix.go", "int64(stat.Uid) != int64(os.Geteuid()) && (caller || stat.Uid != 0)", "int64(stat.Uid) != int64(os.Geteuid()) && stat.Uid != 0", "TestDestinationOwnershipAndReadFailure"},
++		{"mode-group-writable-ancestor", "destination_unix.go", "info.Mode().Perm()&0022 != 0", "(info.Mode().Perm()&0022 != 0 && info.Mode().Perm() != 0770)", "TestDestinationBoundary/shared-ancestor"},
++		{"protected-equal-identity", "destination_unix.go", "if e != nil || os.SameFile(info, other) {", "if e != nil || (os.SameFile(info, other) && ancestor != lineage[0]) {", "TestDestinationProtectedIdentity"},
++		{"ancestor-directory-replacement", "destination_unix.go", "err != nil || closeErr != nil || !os.SameFile(retained.info, info)", "err != nil || closeErr != nil || (!os.SameFile(retained.info, info) && retained.name != \"parent\")", "TestDestinationReplacementRaces/ancestor-directory"},
++		{"target-empty-replacement", "destination_unix.go", "aerr != nil || berr != nil || !os.SameFile(a, b)", "aerr != nil || berr != nil || (!os.SameFile(a, b) && b.Mode() != os.ModeDir|0700)", "TestDestinationReplacementRaces/target-empty"},
++		{"unrelated-one-entry", "destination_unix.go", "if !hasManifest {", "if !hasManifest && len(entries) != 1 {", "TestDestinationBoundary/unrelated"},
++	}
++	// The unrelated-target plant must admit just the one-entry case without
++	// accidentally dying in SNAP-ID. All other nonempty targets still verify.
++	plants[len(plants)-1].new = "if !hasManifest && len(entries) == 1 { return DestinationEmpty, nil, nil }; if !hasManifest {"
++	if runtime.GOOS == "darwin" {
++		plants = append(plants, plant{"acl-one-permit-kind", "destination_acl_darwin.go", "flags&0xf != 2", "flags&0xf != 2 && !(flags&0xf == 1 && binary.NativeEndian.Uint32(sec[44+i*24+20:44+i*24+24]) == 0x24)", "TestDestinationKernelACL"})
++		plants = append(plants, plant{"prior-acl-one-member", "destination_unix.go", "if err == nil {\n\t\t\terr = destinationACL(f)", "if err == nil && entry.Name() != \"AGENTS.md\" {\n\t\t\terr = destinationACL(f)", "TestDestinationPriorKernelACL"})
++	} else {
++		plants = append(plants, plant{"acl-default-only", "destination_acl_linux.go", "!errors.Is(err, unix.ENODATA)", "!errors.Is(err, unix.ENODATA) && name != \"system.posix_acl_default\"", "TestDestinationKernelACL/system.posix_acl_default"})
++		plants = append(plants, plant{"prior-acl-one-member", "destination_unix.go", "if err == nil {\n\t\t\terr = destinationACL(f)", "if err == nil && entry.Name() != \"home\" {\n\t\t\terr = destinationACL(f)", "TestDestinationPriorKernelACL"})
++	}
++	for _, p := range plants {
++		t.Run(p.name, func(t *testing.T) {
++			if p.name == "owner-root-parent" && os.Geteuid() == 0 {
++				t.Fatal("owner plant unqualified under effective root; use an unprivileged test process")
++			}
++			scratch, err := os.MkdirTemp(filepath.Join(root, ".temp"), "destination-control-")
++			if err != nil {
++				t.Fatal(err)
++			}
++			defer func() {
++				if err := os.RemoveAll(scratch); err != nil {
++					t.Error(err)
++				}
++			}()
++			if err := filepath.WalkDir(".", func(path string, entry fs.DirEntry, walkErr error) error {
++				if walkErr != nil {
++					return walkErr
++				}
++				if entry.IsDir() {
++					if path != "." && strings.HasPrefix(entry.Name(), ".") {
++						return filepath.SkipDir
++					}
++					return os.MkdirAll(filepath.Join(scratch, path), 0700)
++				}
++				if path != ".gitattributes" && !strings.HasSuffix(path, ".go") && !strings.HasPrefix(path, "schemas/") {
++					return nil
++				}
++				raw, err := os.ReadFile(path)
++				if err != nil {
++					return err
++				}
++				if path == "codec_test.go" {
++					raw = bytes.ReplaceAll(raw, []byte(strconv.Quote(corpus)), []byte(strconv.Quote(corpusPath)))
++				}
++				if path == p.file {
++					if bytes.Count(raw, []byte(p.old)) != 1 {
++						t.Fatalf("control target count %d", bytes.Count(raw, []byte(p.old)))
++					}
++					raw = bytes.Replace(raw, []byte(p.old), []byte(p.new), 1)
++				}
++				return os.WriteFile(filepath.Join(scratch, path), raw, 0600)
++			}); err != nil {
++				t.Fatal(err)
++			}
++			cmd := exec.Command("go", "test", "-count=1", "-json", "-run", "^"+p.test+"$", scratch)
++			cmd.Dir = root
++			output, runErr := cmd.CombinedOutput()
++			exitErr, expectedExit := runErr.(*exec.ExitError)
++			killed := false
++			for _, line := range bytes.Split(output, []byte{10}) {
++				var event struct{ Action, Test string }
++				if json.Unmarshal(line, &event) == nil && event.Action == "fail" && (event.Test == p.test || strings.HasPrefix(event.Test, p.test+"/")) {
++					killed = true
++				}
++			}
++			if !expectedExit || exitErr.ExitCode() != 1 || !killed {
++				sanitized := strings.ReplaceAll(strings.ReplaceAll(string(output), scratch, "<control>"), root, "<repository>")
++				t.Fatalf("survivor or invalid plant: %v\n%s", runErr, sanitized)
++			}
++			t.Logf("%s: killed by %s; child exit 1 (expected failing command)", p.name, p.test)
++		})
++	}
++}
+diff --git a/internal/envsnapshot/destination_other.go b/internal/envsnapshot/destination_other.go
+new file mode 100644
+index 00000000..6201d2c5
+--- /dev/null
++++ b/internal/envsnapshot/destination_other.go
+@@ -0,0 +1,27 @@
++//go:build !darwin && !linux
++
++package envsnapshot
++
++// Destination is unavailable until the platform's retained-handle owner/ACL
++// backend is qualified. In particular, Unix mode synthesis is not Windows ACL
++// evidence. This is a refusal, not a Windows support claim.
++type Destination struct{}
++
++// OpenDestination refuses without probing or modifying the supplied path.
++func OpenDestination(string, DestinationPolicy) (*Destination, error) {
++	return nil, invalidDestination("platform-unqualified")
++}
++
++// Kind returns no observation on an unqualified platform.
++func (*Destination) Kind() DestinationKind { return "" }
++
++// Revalidate refuses on an unqualified platform.
++func (*Destination) Revalidate() error { return invalidDestination("platform-unqualified") }
++
++// MatchPrior refuses on an unqualified platform.
++func (*Destination) MatchPrior([]byte) (bool, error) {
++	return false, invalidDestination("platform-unqualified")
++}
++
++// Close has no resources to release on an unqualified platform.
++func (*Destination) Close() error { return nil }
+diff --git a/internal/envsnapshot/destination_other_test.go b/internal/envsnapshot/destination_other_test.go
+new file mode 100644
+index 00000000..1645cc4d
+--- /dev/null
++++ b/internal/envsnapshot/destination_other_test.go
+@@ -0,0 +1,25 @@
++//go:build !darwin && !linux
++
++package envsnapshot
++
++import (
++	"errors"
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++// Unqualified platforms refuse without creating a destination. This is not
++// owner/ACL/reparse or publication qualification for Windows.
++func TestDestinationUnqualifiedPlatform(t *testing.T) {
++	root := t.TempDir()
++	path := filepath.Join(root, "absent")
++	d, err := OpenDestination(path, DestinationPolicy{ProtectedRoots: []string{root}})
++	var refusal *Error
++	if d != nil || !errors.As(err, &refusal) || refusal.Code != DestinationInvalid || refusal.Reason != "platform-unqualified" {
++		t.Fatal("unqualified platform accepted destination", d, err)
++	}
++	if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
++		t.Fatal("unqualified platform changed destination", err)
++	}
++}
+diff --git a/internal/envsnapshot/destination_unix.go b/internal/envsnapshot/destination_unix.go
+new file mode 100644
+index 00000000..5d3a1188
+--- /dev/null
++++ b/internal/envsnapshot/destination_unix.go
+@@ -0,0 +1,456 @@
++//go:build darwin || linux
++
++package envsnapshot
++
++import (
++	"bytes"
++	"errors"
++	"os"
++	"path/filepath"
++	"strings"
++	"sync"
++	"syscall"
++)
++
++type retainedDirectory struct {
++	file *os.File
++	info os.FileInfo
++	name string
++}
++
++// Destination retains every supplied ancestor, protected root and target until
++// Close. It performs no writes and exposes no pathname or raw file descriptor.
++// Revalidate is an observation, not an atomic publication primitive or a lease
++// against another process with the same user's authority. Do not publish with
++// os.Rename after calling it: publication needs its own no-replace backend.
++type Destination struct {
++	mu        sync.Mutex
++	chain     []retainedDirectory
++	protected [][]retainedDirectory
++	lineage   []*os.File
++	target    *os.File
++	name      string
++	kind      DestinationKind
++	prior     []byte
++	closed    bool
++}
++
++// OpenDestination validates without writes, retaining no-follow handles for
++// every component as supplied (including components before '..'). The final
++// parent must exist and belong to the caller. ProtectedRoots must be complete
++// and nonempty; this API does not discover machine configuration or authorize
++// source capture. An intact prior snapshot is fully verified before admission.
++func OpenDestination(path string, policy DestinationPolicy) (_ *Destination, err error) {
++	d := &Destination{}
++	defer func() {
++		if err != nil {
++			_ = d.Close()
++		}
++	}()
++	if len(policy.ProtectedRoots) == 0 {
++		return nil, invalidDestination("protected-roots-required")
++	}
++	parts, err := destinationParts(path)
++	if err != nil || len(parts) == 0 || parts[len(parts)-1] == "." || parts[len(parts)-1] == ".." {
++		return nil, invalidDestination("path-invalid")
++	}
++	d.name = parts[len(parts)-1]
++	d.chain, err = retainDirectories(parts[:len(parts)-1])
++	if err != nil {
++		return nil, err
++	}
++	parent := d.chain[len(d.chain)-1].file
++	if err = destinationDirectory(parent, true, false); err != nil {
++		return nil, err
++	}
++	for _, root := range policy.ProtectedRoots {
++		rootParts, e := destinationParts(root)
++		if e != nil {
++			return nil, invalidDestination("protected-root-unreadable")
++		}
++		chain, e := retainDirectories(rootParts)
++		if e != nil {
++			return nil, invalidDestination("protected-root-unreadable")
++		}
++		d.protected = append(d.protected, chain)
++	}
++	d.target, err = openMember(parent, d.name, true)
++	if err != nil && !errors.Is(err, syscall.ENOENT) {
++		return nil, invalidDestination("target-unreadable")
++	}
++	if d.target != nil {
++		if err = destinationDirectory(d.target, true, true); err != nil {
++			return nil, err
++		}
++	}
++	d.lineage, err = retainLineage(parent)
++	if err != nil {
++		return nil, invalidDestination("ancestry-unreadable")
++	}
++	if err = d.excludeProtected(); err != nil {
++		return nil, err
++	}
++	d.kind, d.prior, err = inspectDestination(d.target)
++	if err != nil {
++		return nil, err
++	}
++	if err = d.revalidate(); err != nil {
++		return nil, err
++	}
++	return d, nil
++}
++
++// Kind returns the admitted observation, including after Close.
++func (d *Destination) Kind() DestinationKind { return d.kind }
++
++// Revalidate rejects changed ancestor/target entries, permissions, protected
++// roots and prior contents through retained handles. It never writes or repairs.
++func (d *Destination) Revalidate() error {
++	d.mu.Lock()
++	defer d.mu.Unlock()
++	return d.revalidate()
++}
++
++// MatchPrior verifies the actual tree again and compares exact manifest bytes.
++// Portable equivalence is deliberately insufficient for idempotence. For an
++// absent or empty target this returns false, without granting publication rights.
++func (d *Destination) MatchPrior(manifest []byte) (bool, error) {
++	d.mu.Lock()
++	defer d.mu.Unlock()
++	if err := d.revalidate(); err != nil {
++		return false, err
++	}
++	if d.kind != DestinationSnapshot {
++		return false, nil
++	}
++	if !bytes.Equal(d.prior, manifest) {
++		return false, refuse("generation-mismatch")
++	}
++	return true, nil
++}
++
++func (d *Destination) revalidate() error {
++	if d.closed || len(d.chain) == 0 {
++		return invalidDestination("destination-closed")
++	}
++	if err := recheckDirectories(d.chain); err != nil {
++		return err
++	}
++	for _, chain := range d.protected {
++		if err := recheckDirectories(chain); err != nil {
++			return invalidDestination("protected-root-changed")
++		}
++	}
++	parent := d.chain[len(d.chain)-1].file
++	if err := destinationDirectory(parent, true, false); err != nil {
++		return err
++	}
++	fresh, err := openMember(parent, d.name, true)
++	if d.target == nil {
++		if fresh != nil {
++			_ = fresh.Close()
++		}
++		if !errors.Is(err, syscall.ENOENT) {
++			return invalidDestination("target-changed")
++		}
++		return nil
++	}
++	if err != nil {
++		return invalidDestination("target-changed")
++	}
++	defer func() { _ = fresh.Close() }()
++	a, aerr := d.target.Stat()
++	b, berr := fresh.Stat()
++	if aerr != nil || berr != nil || !os.SameFile(a, b) {
++		return invalidDestination("target-changed")
++	}
++	if err := destinationDirectory(fresh, true, true); err != nil {
++		return err
++	}
++	kind, prior, err := inspectDestination(fresh)
++	if err != nil {
++		var refusal *Error
++		if d.kind == DestinationSnapshot && errors.As(err, &refusal) && refusal.Code == DestinationInvalid {
++			return refuse("prior-unreadable")
++		}
++		return err
++	}
++	if kind != d.kind || !bytes.Equal(prior, d.prior) {
++		return refuse("generation-mismatch")
++	}
++	return nil
++}
++
++func inspectDestination(target *os.File) (DestinationKind, []byte, error) {
++	if target == nil {
++		return DestinationAbsent, nil, nil
++	}
++	// A fresh open file description avoids sharing ReadDir's cursor with a
++	// previous inspection or SNAP-ID traversal.
++	fresh, err := openMember(target, ".", true)
++	if err != nil {
++		return "", nil, invalidDestination("target-unreadable")
++	}
++	defer func() { _ = fresh.Close() }()
++	entries, err := fresh.ReadDir(-1)
++	if err != nil {
++		return "", nil, invalidDestination("target-unreadable")
++	}
++	if len(entries) == 0 {
++		return DestinationEmpty, nil, nil
++	}
++	hasManifest := false
++	for _, entry := range entries {
++		if entry.Name() == "manifest.json" {
++			hasManifest = true
++		}
++	}
++	if !hasManifest {
++		return "", nil, invalidDestination("unrelated-target")
++	}
++	verifyHandle, err := openMember(target, ".", true)
++	if err != nil {
++		return "", nil, refuse("tree-unreadable")
++	}
++	defer func() { _ = verifyHandle.Close() }()
++	v, err := verifyDirectory(verifyHandle, "")
++	if err != nil {
++		return "", nil, err
++	}
++	if err := priorOwnershipACL(target); err != nil {
++		return "", nil, refuse("snapshot-owner-acl")
++	}
++	return DestinationSnapshot, v.ManifestBytes(), nil
++}
++
++// SNAP-ID covers bytes, modes and the complete entry set. Admission additionally
++// checks each prior object's owner/ACL through fresh no-follow handles.
++func priorOwnershipACL(dir *os.File) error {
++	fresh, err := openMember(dir, ".", true)
++	if err != nil {
++		return err
++	}
++	defer func() { _ = fresh.Close() }()
++	entries, err := fresh.ReadDir(-1)
++	if err != nil {
++		return err
++	}
++	for _, entry := range entries {
++		f, err := openMember(dir, entry.Name(), entry.IsDir())
++		if err != nil {
++			return err
++		}
++		info, err := f.Stat()
++		if err == nil {
++			stat, ok := info.Sys().(*syscall.Stat_t)
++			if !ok || int64(stat.Uid) != int64(os.Geteuid()) {
++				err = os.ErrPermission
++			}
++		}
++		if err == nil {
++			err = destinationACL(f)
++		}
++		if err == nil && info.IsDir() {
++			err = priorOwnershipACL(f)
++		}
++		closeErr := f.Close()
++		if err != nil {
++			return err
++		}
++		if closeErr != nil {
++			return closeErr
++		}
++	}
++	return nil
++}
++
++func destinationParts(path string) ([]string, error) {
++	if path == "" || strings.ContainsRune(path, 0) {
++		return nil, os.ErrInvalid
++	}
++	if !filepath.IsAbs(path) {
++		cwd, err := os.Getwd()
++		if err != nil {
++			return nil, err
++		}
++		path = cwd + "/" + path
++	}
++	var parts []string
++	for _, part := range strings.Split(path, "/") {
++		if part != "" {
++			parts = append(parts, part)
++		}
++	}
++	return parts, nil
++}
++
++func retainDirectories(parts []string) (_ []retainedDirectory, err error) {
++	root, err := os.Open("/")
++	if err != nil {
++		return nil, invalidDestination("ancestor-unreadable")
++	}
++	chain := []retainedDirectory{{file: root}}
++	defer func() {
++		if err != nil {
++			closeDirectories(chain)
++		}
++	}()
++	for i := 0; ; i++ {
++		current := &chain[len(chain)-1]
++		if err = destinationDirectory(current.file, false, false); err != nil {
++			return nil, err
++		}
++		current.info, err = current.file.Stat()
++		if err != nil {
++			return nil, invalidDestination("ancestor-unreadable")
++		}
++		if i == len(parts) {
++			return chain, nil
++		}
++		child, e := openMember(current.file, parts[i], true)
++		if e != nil {
++			return nil, invalidDestination("ancestor-unreadable")
++		}
++		chain = append(chain, retainedDirectory{file: child, name: parts[i]})
++	}
++}
++
++func recheckDirectories(chain []retainedDirectory) error {
++	for i, retained := range chain {
++		if err := destinationDirectory(retained.file, false, false); err != nil {
++			return err
++		}
++		if i == 0 {
++			continue
++		}
++		fresh, err := openMember(chain[i-1].file, retained.name, true)
++		if err != nil {
++			return invalidDestination("ancestor-changed")
++		}
++		info, err := fresh.Stat()
++		closeErr := fresh.Close()
++		if err != nil || closeErr != nil || !os.SameFile(retained.info, info) {
++			return invalidDestination("ancestor-changed")
++		}
++	}
++	return nil
++}
++
++func destinationDirectory(f *os.File, caller, private bool) error {
++	info, err := f.Stat()
++	if err != nil || !info.IsDir() {
++		return invalidDestination("directory-unreadable")
++	}
++	stat, ok := info.Sys().(*syscall.Stat_t)
++	if !ok || (int64(stat.Uid) != int64(os.Geteuid()) && (caller || stat.Uid != 0)) {
++		return invalidDestination("directory-owner")
++	}
++	if info.Mode().Perm()&0022 != 0 || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 || (private && info.Mode().Perm() != 0700) {
++		return invalidDestination("directory-permissions")
++	}
++	if err := destinationACL(f); err != nil {
++		return invalidDestination("directory-acl")
++	}
++	return nil
++}
++
++// retainLineage follows physical parents from the retained handle. It does not
++// mistake a spelling visited before '..' for a physical ancestor of the target.
++func retainLineage(start *os.File) (_ []*os.File, err error) {
++	current, err := openMember(start, ".", true)
++	if err != nil {
++		return nil, err
++	}
++	lineage := []*os.File{current}
++	defer func() {
++		if err != nil {
++			for _, f := range lineage {
++				_ = f.Close()
++			}
++		}
++	}()
++	for len(lineage) < 4096 {
++		parent, e := openMember(current, "..", true)
++		if e != nil {
++			return nil, e
++		}
++		a, ae := current.Stat()
++		b, be := parent.Stat()
++		if ae != nil || be != nil {
++			_ = parent.Close()
++			return nil, os.ErrInvalid
++		}
++		if os.SameFile(a, b) {
++			_ = parent.Close()
++			return lineage, nil
++		}
++		lineage = append(lineage, parent)
++		current = parent
++	}
++	return nil, os.ErrInvalid
++}
++
++func (d *Destination) excludeProtected() error {
++	for _, chain := range d.protected {
++		protected := chain[len(chain)-1].info
++		for _, ancestor := range d.lineage {
++			info, err := ancestor.Stat()
++			if err != nil || os.SameFile(info, protected) {
++				return invalidDestination("protected-destination")
++			}
++		}
++		if d.target != nil {
++			info, err := d.target.Stat()
++			if err != nil {
++				return invalidDestination("target-unreadable")
++			}
++			// Equal/containing checks use the protected root's physical lineage,
++			// not string prefixes (including case-folded filesystem aliases).
++			lineage, err := retainLineage(chain[len(chain)-1].file)
++			if err != nil {
++				return invalidDestination("ancestry-unreadable")
++			}
++			found := false
++			for _, ancestor := range lineage {
++				other, e := ancestor.Stat()
++				if e != nil || os.SameFile(info, other) {
++					found = true
++				}
++				_ = ancestor.Close()
++			}
++			if found {
++				return invalidDestination("protected-destination")
++			}
++		}
++	}
++	return nil
++}
++
++func closeDirectories(chain []retainedDirectory) {
++	for i := len(chain) - 1; i >= 0; i-- {
++		_ = chain[i].file.Close()
++	}
++}
++
++// Close releases all retained handles, without cleanup or any filesystem write.
++func (d *Destination) Close() error {
++	d.mu.Lock()
++	defer d.mu.Unlock()
++	if d.closed {
++		return nil
++	}
++	d.closed = true
++	closeDirectories(d.chain)
++	for _, chain := range d.protected {
++		closeDirectories(chain)
++	}
++	for _, f := range d.lineage {
++		_ = f.Close()
++	}
++	if d.target != nil {
++		if err := d.target.Close(); err != nil {
++			return invalidDestination("handle-close")
++		}
++	}
++	return nil
++}
+diff --git a/internal/envsnapshot/destination_unix_test.go b/internal/envsnapshot/destination_unix_test.go
+new file mode 100644
+index 00000000..de704637
+--- /dev/null
++++ b/internal/envsnapshot/destination_unix_test.go
+@@ -0,0 +1,431 @@
++//go:build darwin || linux
++
++package envsnapshot
++
++import (
++	"bytes"
++	"errors"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// Admission rejects shared temporary ancestors, so these real syscall fixtures
++// live in a caller-owned repository scratch allocation, outside protected roots.
++func destinationSandbox(t *testing.T) (string, DestinationPolicy) {
++	t.Helper()
++	base, err := filepath.Abs("../../.temp")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.MkdirAll(base, 0700); err != nil {
++		t.Fatal(err)
++	}
++	base, err = filepath.EvalSymlinks(base)
++	if err != nil {
++		t.Fatal(err)
++	}
++	root, err := os.MkdirTemp(base, "destination-test-")
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() {
++		if err := os.RemoveAll(root); err != nil {
++			t.Error(err)
++		}
++	})
++	protected := filepath.Join(root, "protected")
++	if err := os.Mkdir(protected, 0700); err != nil {
++		t.Fatal(err)
++	}
++	return root, DestinationPolicy{ProtectedRoots: []string{protected}}
++}
++
++func admitDestination(t *testing.T, path string, policy DestinationPolicy, kind DestinationKind) *Destination {
++	t.Helper()
++	d, err := OpenDestination(path, policy)
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() {
++		if err := d.Close(); err != nil {
++			t.Error(err)
++		}
++	})
++	if d.Kind() != kind {
++		t.Fatalf("kind = %s, want %s", d.Kind(), kind)
++	}
++	if err := d.Revalidate(); err != nil {
++		t.Fatal(err)
++	}
++	return d
++}
++
++func requireDestinationError(t *testing.T, err error, code, reason string) {
++	t.Helper()
++	var e *Error
++	if !errors.As(err, &e) || e.Code != code || (reason != "" && e.Reason != reason) {
++		t.Fatalf("refusal = %v, want %s/%s", err, code, reason)
++	}
++}
++
++func snapshotAtDestination(t *testing.T, root string) {
++	t.Helper()
++	if err := os.Mkdir(root, 0700); err != nil {
++		t.Fatal(err)
++	}
++	m := manifest(t)
++	for _, f := range m.Files {
++		mode := os.FileMode(0600)
++		if f.Mode == "0700" {
++			mode = 0700
++		}
++		write(t, root, f.Path, read(t, "golden/"+f.Path), mode)
++	}
++	write(t, root, "manifest.json", read(t, "golden/manifest.json"), 0600)
++	write(t, root, "launch.json", read(t, "golden/launch.json"), 0600)
++}
++
++func assertAbsent(t *testing.T, path string) {
++	t.Helper()
++	if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
++		t.Fatalf("expected absent destination, got %v", err)
++	}
++}
++
++// OpenDestination admits absent/empty private destinations without creating,
++// chmodding or deleting entries. Close is idempotent and revokes observations.
++func TestDestinationReadOnlyAdmission(t *testing.T) {
++	var zero Destination
++	requireDestinationError(t, zero.Revalidate(), DestinationInvalid, "destination-closed")
++	root, policy := destinationSandbox(t)
++	absent := filepath.Join(root, "absent")
++	d := admitDestination(t, absent, policy, DestinationAbsent)
++	if yes, err := d.MatchPrior(read(t, "golden/manifest.json")); err != nil || yes {
++		t.Fatal("absent target reported prior snapshot", yes, err)
++	}
++	assertAbsent(t, absent)
++	cwd, err := os.Getwd()
++	if err != nil {
++		t.Fatal(err)
++	}
++	relative, err := filepath.Rel(cwd, root)
++	if err != nil {
++		t.Fatal(err)
++	}
++	admitDestination(t, relative+"/relative", policy, DestinationAbsent)
++	assertAbsent(t, filepath.Join(root, "relative"))
++	for _, invalid := range []string{"", "/", "\x00", root + "/.", root + "/.."} {
++		_, err := OpenDestination(invalid, policy)
++		requireDestinationError(t, err, DestinationInvalid, "path-invalid")
++	}
++	empty := filepath.Join(root, "empty")
++	if err := os.Mkdir(empty, 0700); err != nil {
++		t.Fatal(err)
++	}
++	before, err := os.Stat(empty)
++	if err != nil {
++		t.Fatal(err)
++	}
++	e := admitDestination(t, empty, policy, DestinationEmpty)
++	if yes, err := e.MatchPrior(read(t, "golden/manifest.json")); err != nil || yes {
++		t.Fatal("empty target reported prior snapshot", yes, err)
++	}
++	if err := e.Close(); err != nil {
++		t.Fatal(err)
++	}
++	requireDestinationError(t, e.Revalidate(), DestinationInvalid, "destination-closed")
++	after, err := os.Stat(empty)
++	if err != nil || !os.SameFile(before, after) || !before.ModTime().Equal(after.ModTime()) || before.Mode() != after.Mode() {
++		t.Fatal("admission changed empty target", err)
++	}
++	entries, err := os.ReadDir(root)
++	if err != nil || len(entries) != 2 {
++		t.Fatal("admission wrote scratch entries", entries, err)
++	}
++}
++
++// Every supplied component is no-follow, including a linked ancestor before
++// '..'. Invalid reads and unrelated content refuse without altering sentinels.
++func TestDestinationBoundary(t *testing.T) {
++	for _, name := range []string{"linked-ancestor", "linked-before-parent", "linked-target", "file-target", "missing-parent", "shared-ancestor", "shared-target", "public-target", "unrelated", "missing-protected", "no-policy"} {
++		t.Run(name, func(t *testing.T) {
++			root, policy := destinationSandbox(t)
++			admitDestination(t, filepath.Join(root, "control"), policy, DestinationAbsent)
++			safe := filepath.Join(root, "safe")
++			if err := os.Mkdir(safe, 0700); err != nil {
++				t.Fatal(err)
++			}
++			write(t, safe, "sentinel", []byte("preserved"), 0600)
++			path := filepath.Join(root, "target")
++			switch name {
++			case "linked-ancestor", "linked-before-parent":
++				if err := os.Symlink(safe, path); err != nil {
++					t.Fatal(err)
++				}
++				if name == "linked-before-parent" {
++					path += "/../new"
++				} else {
++					path += "/new"
++				}
++			case "linked-target":
++				if err := os.Symlink(safe, path); err != nil {
++					t.Fatal(err)
++				}
++			case "file-target", "unrelated":
++				if name == "unrelated" {
++					write(t, path, "foreign", []byte("preserved"), 0600)
++				} else if err := os.WriteFile(path, []byte("preserved"), 0600); err != nil {
++					t.Fatal(err)
++				}
++			case "missing-parent":
++				path += "/child"
++			case "shared-ancestor", "shared-target", "public-target":
++				if err := os.Mkdir(path, 0700); err != nil {
++					t.Fatal(err)
++				}
++				mode := os.FileMode(0770)
++				if name == "public-target" {
++					mode = 0755
++				}
++				if err := os.Chmod(path, mode); err != nil {
++					t.Fatal(err)
++				}
++				if name == "shared-ancestor" {
++					path += "/child"
++				}
++			case "missing-protected":
++				policy.ProtectedRoots = append(policy.ProtectedRoots, filepath.Join(root, "missing"))
++			case "no-policy":
++				policy.ProtectedRoots = nil
++			}
++			_, err := OpenDestination(path, policy)
++			requireDestinationError(t, err, DestinationInvalid, "")
++			b, err := os.ReadFile(filepath.Join(safe, "sentinel"))
++			if err != nil || string(b) != "preserved" {
++				t.Fatal("outside sentinel changed", err)
++			}
++			assertAbsent(t, filepath.Join(safe, "new"))
++			assertAbsent(t, filepath.Join(root, "new"))
++		})
++	}
++}
++
++// Root-owned system parents are not caller-owned publication parents for an
++// unprivileged caller. A closed retained handle is a read failure, not absence.
++func TestDestinationOwnershipAndReadFailure(t *testing.T) {
++	root, policy := destinationSandbox(t)
++	d := admitDestination(t, filepath.Join(root, "control"), policy, DestinationAbsent)
++	if os.Geteuid() == 0 {
++		t.Log("foreign-owner control unrun: effective root owns system parent")
++	} else {
++		_, err := OpenDestination("/snapshot-owner-control", policy)
++		requireDestinationError(t, err, DestinationInvalid, "directory-owner")
++		assertAbsent(t, "/snapshot-owner-control")
++	}
++	if err := d.chain[len(d.chain)-1].file.Close(); err != nil {
++		t.Fatal(err)
++	}
++	requireDestinationError(t, d.Revalidate(), DestinationInvalid, "directory-unreadable")
++	assertAbsent(t, filepath.Join(root, "control"))
++}
++
++// Handle identity excludes equal, descendant and containing destinations for
++// every protected-root class. Similar lexical prefixes remain valid siblings.
++func TestDestinationProtectedIdentity(t *testing.T) {
++	for _, class := range []string{"manager", "store", "managed-home", "native-home", "credentials", "repository-admin", "workspace"} {
++		t.Run(class, func(t *testing.T) {
++			root, policy := destinationSandbox(t)
++			protected := filepath.Join(root, class)
++			if err := os.Mkdir(protected, 0700); err != nil {
++				t.Fatal(err)
++			}
++			policy.ProtectedRoots = append(policy.ProtectedRoots, protected)
++			admitDestination(t, protected+"-sibling", policy, DestinationAbsent)
++			for _, path := range []string{protected, protected + "/child", root} {
++				_, err := OpenDestination(path, policy)
++				requireDestinationError(t, err, DestinationInvalid, "protected-destination")
++			}
++			upper := filepath.Join(root, strings.ToUpper(class))
++			if _, err := os.Stat(upper); err == nil {
++				_, err := OpenDestination(upper, policy)
++				requireDestinationError(t, err, DestinationInvalid, "protected-destination")
++			} // A folding filesystem exercises a physical alias; Linux does not.
++			assertAbsent(t, protected+"/child")
++		})
++	}
++}
++
++// Kernel directory substitutions after admission refuse through Revalidate;
++// neither moved originals nor competing targets/links are cleaned or replaced.
++func TestDestinationReplacementRaces(t *testing.T) {
++	for _, name := range []string{"ancestor-link", "ancestor-directory", "target-link", "target-directory", "target-empty", "competing-target", "empty-filled", "permission-change", "protected-moved"} {
++		t.Run(name, func(t *testing.T) {
++			root, policy := destinationSandbox(t)
++			parent := filepath.Join(root, "parent")
++			if err := os.Mkdir(parent, 0700); err != nil {
++				t.Fatal(err)
++			}
++			path := filepath.Join(parent, "target")
++			kind := DestinationAbsent
++			if name != "competing-target" {
++				if err := os.Mkdir(path, 0700); err != nil {
++					t.Fatal(err)
++				}
++				kind = DestinationEmpty
++			}
++			d := admitDestination(t, path, policy, kind)
++			sentinel := filepath.Join(root, "outside")
++			write(t, sentinel, "sentinel", []byte("preserved"), 0600)
++			switch name {
++			case "ancestor-link", "ancestor-directory", "target-link", "target-directory", "target-empty":
++				replaced := path
++				if strings.HasPrefix(name, "ancestor") {
++					replaced = parent
++				}
++				if err := os.Rename(replaced, replaced+"-original"); err != nil {
++					t.Fatal(err)
++				}
++				if strings.HasSuffix(name, "link") {
++					if err := os.Symlink(sentinel, replaced); err != nil {
++						t.Fatal(err)
++					}
++				} else if name == "target-empty" {
++					if err := os.Mkdir(replaced, 0700); err != nil {
++						t.Fatal(err)
++					}
++				} else {
++					write(t, replaced, "competitor", []byte("preserved"), 0600)
++				}
++			case "competing-target", "empty-filled":
++				write(t, path, "competitor", []byte("preserved"), 0600)
++			case "permission-change":
++				if err := os.Chmod(parent, 0770); err != nil {
++					t.Fatal(err)
++				}
++			case "protected-moved":
++				if err := os.Rename(policy.ProtectedRoots[0], policy.ProtectedRoots[0]+"-original"); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Mkdir(policy.ProtectedRoots[0], 0700); err != nil {
++					t.Fatal(err)
++				}
++			}
++			requireDestinationError(t, d.Revalidate(), DestinationInvalid, "")
++			if err := d.Close(); err != nil {
++				t.Fatal(err)
++			}
++			b, err := os.ReadFile(filepath.Join(sentinel, "sentinel"))
++			if err != nil || string(b) != "preserved" {
++				t.Fatal("outside content changed", err)
++			}
++			if strings.HasSuffix(name, "directory") || name == "competing-target" || name == "empty-filled" {
++				p := path
++				if name == "ancestor-directory" {
++					p = parent
++				}
++				b, err := os.ReadFile(filepath.Join(p, "competitor"))
++				if err != nil || string(b) != "preserved" {
++					t.Fatal("competing target changed", err)
++				}
++			}
++		})
++	}
++}
++
++// Intact exact generations match without writes. Actual byte/mode/entry/version
++// drift refuses despite unchanged saved manifests; different source binding is
++// not portable idempotence. Both initial admission and revalidation exercise it.
++func TestDestinationPriorIdentity(t *testing.T) {
++	for _, name := range []string{"identical", "bytes", "mode", "extra", "unreadable", "unknown-version", "new-generation"} {
++		t.Run(name, func(t *testing.T) {
++			root, policy := destinationSandbox(t)
++			path := filepath.Join(root, "snapshot")
++			snapshotAtDestination(t, path)
++			d := admitDestination(t, path, policy, DestinationSnapshot)
++			original := read(t, "golden/manifest.json")
++			requested := bytes.Clone(original)
++			reason := ""
++			switch name {
++			case "bytes":
++				p := filepath.Join(path, "home/AGENTS.md")
++				b, err := os.ReadFile(p)
++				if err != nil {
++					t.Fatal(err)
++				}
++				b[0] ^= 1
++				write(t, path, "home/AGENTS.md", b, 0600)
++				reason = "file-identity"
++			case "mode", "unreadable":
++				mode := os.FileMode(0700)
++				if name == "unreadable" {
++					mode = 0000
++				}
++				if err := os.Chmod(filepath.Join(path, "home/AGENTS.md"), mode); err != nil {
++					t.Fatal(err)
++				}
++				reason = "file-mode"
++				if name == "unreadable" {
++					reason = "file-unreadable"
++				}
++			case "extra":
++				write(t, path, "extra", []byte("preserved"), 0600)
++				reason = "entry-set"
++			case "unknown-version":
++				write(t, path, "manifest.json", bytes.Replace(original, []byte(ManifestVersion), []byte("managed-home-snapshot-v0"), 1), 0600)
++			case "new-generation":
++				requested = read(t, "golden/other-source-manifest.json")
++				reason = "generation-mismatch"
++			}
++			before, err := os.ReadFile(filepath.Join(path, "manifest.json"))
++			if err != nil {
++				t.Fatal(err)
++			}
++			beforeInfo, err := os.Stat(filepath.Join(path, "manifest.json"))
++			if err != nil {
++				t.Fatal(err)
++			}
++			match, err := d.MatchPrior(requested)
++			if name == "identical" {
++				if !match || err != nil {
++					t.Fatal("intact prior rejected", err)
++				}
++			} else {
++				requireDestinationError(t, err, Mismatch, reason)
++				if match {
++					t.Fatal("mismatched snapshot admitted")
++				}
++				if name != "new-generation" {
++					_, err := OpenDestination(path, policy)
++					requireDestinationError(t, err, Mismatch, reason)
++				}
++			}
++			after, err := os.ReadFile(filepath.Join(path, "manifest.json"))
++			afterInfo, statErr := os.Stat(filepath.Join(path, "manifest.json"))
++			if err != nil || statErr != nil || !bytes.Equal(before, after) || !os.SameFile(beforeInfo, afterInfo) || !beforeInfo.ModTime().Equal(afterInfo.ModTime()) {
++				t.Fatal("prior manifest changed during admission", err, statErr)
++			}
++		})
++	}
++}
++
++// Once admitted as a prior snapshot, lost metadata is a snapshot mismatch,
++// rather than unrelated content or an absent target. No metadata is recreated.
++func TestDestinationPriorMissingMetadata(t *testing.T) {
++	root, policy := destinationSandbox(t)
++	path := filepath.Join(root, "snapshot")
++	snapshotAtDestination(t, path)
++	d := admitDestination(t, path, policy, DestinationSnapshot)
++	manifestPath := filepath.Join(path, "manifest.json")
++	if err := os.Rename(manifestPath, manifestPath+".saved"); err != nil {
++		t.Fatal(err)
++	}
++	_, err := d.MatchPrior(read(t, "golden/manifest.json"))
++	requireDestinationError(t, err, Mismatch, "prior-unreadable")
++	assertAbsent(t, manifestPath)
++	b, err := os.ReadFile(manifestPath + ".saved")
++	if err != nil || !bytes.Equal(b, read(t, "golden/manifest.json")) {
++		t.Fatal("refusal rewrote moved metadata", err)
++	}
++}
+diff --git a/UNRESOLVED_QUESTIONS.md b/UNRESOLVED_QUESTIONS.md
+new file mode 100644
+--- /dev/null
++++ b/UNRESOLVED_QUESTIONS.md
+@@ -0,0 +1,28 @@
++# Unresolved questions
++
++## Existing empty snapshot destinations under competing replacement
++
++TASK-261016-w0yx2w is blocked on the publication mechanism in
++[managed-home snapshots section 2](https://github.com/relux-works/curator-spec/blob/15d970111277b1f68b3f7a4ddd63bc339b2c0a3f/protocol/managed-home-snapshots.md#2-destination-and-publication).
++The contract accepts existing empty caller-owned directories, requires their
++directory-entry replacement and forbids overwriting a competing replacement.
++
++The isolated macOS syscall witnesses attached to the task show that no-replace
++rename refuses an existing empty target, ordinary rename replaces a substituted
++empty entry, and exchange moves a substituted nonempty entry before verification.
++A retained descriptor and advisory flock do not make parent/name removal
++conditional on the retained target identity. Recheck followed by rmdir can remove
++a competing empty entry. These observations qualify only the exercised APIs;
++Linux runtime and Windows qualification remain outstanding.
++
++Owner decision required: revise new publication to require an absent destination
++(recommended, preserving exact-prior verified no-op), or define a qualified
++exclusive-writer authority/protocol that can safely support existing empty
++targets. A different in-place protocol would require an explicit contract
++revision covering atomicity, interruption and preservation. No such alternative
++is implemented or implicitly authorized here.
++
++The uncommitted read-only admission candidate remains separate from publication.
++The task's outcome, coverage map, reproducible witnesses and exact validation
++results are attached as TASK-261016-w0yx2w outcome resources. The hosted full gate
++was intentionally cancelled after this blocker; it is not passing evidence.

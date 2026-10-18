@@ -1,0 +1,2755 @@
+{
+  "candidate": {
+    "candidate_sha": "b5a21d362c27956aaef1da5d8ec4cb389665593e",
+    "candidate_tree": "2e1811a9302b6d040adff5cf0a4692fa09b3ffb0",
+    "changed_identity_members": [],
+    "candidate_unchanged": true
+  },
+  "hosted_attempt": {
+    "status": "completed",
+    "conclusion": "cancelled",
+    "attempt": 2,
+    "headSha": "b5a21d362c27956aaef1da5d8ec4cb389665593e",
+    "url": "https://github.com/relux-works/curator/actions/runs/39067688154",
+    "jobs": [
+      {
+        "databaseId": 117501715766,
+        "name": "Lint",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501715851,
+        "name": "Test (windows-latest)",
+        "status": "completed",
+        "conclusion": "cancelled"
+      },
+      {
+        "databaseId": 117501715863,
+        "name": "Race (macos-latest)",
+        "status": "completed",
+        "conclusion": "cancelled"
+      },
+      {
+        "databaseId": 117501715864,
+        "name": "Gate self-test (windows-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501715920,
+        "name": "Interop conformance gate",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501715933,
+        "name": "Naming gate",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501715943,
+        "name": "Go 1.27.1 driver (ubuntu-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501715945,
+        "name": "Go 1.26.0 driver (macos-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501715954,
+        "name": "Gate self-test (macos-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501715973,
+        "name": "Test (macos-latest)",
+        "status": "completed",
+        "conclusion": "cancelled"
+      },
+      {
+        "databaseId": 117501715977,
+        "name": "Race (ubuntu-latest)",
+        "status": "completed",
+        "conclusion": "failure"
+      },
+      {
+        "databaseId": 117501715996,
+        "name": "Go 1.27.1 driver (macos-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501715998,
+        "name": "Test (ubuntu-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501716030,
+        "name": "Go 1.25.5 driver (ubuntu-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501716045,
+        "name": "Go 1.26.0 driver (windows-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501716083,
+        "name": "Gate self-test (ubuntu-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501716105,
+        "name": "Go 1.27.1 driver (windows-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501716116,
+        "name": "Go 1.25.5 driver (windows-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501716117,
+        "name": "Go 1.26.0 driver (ubuntu-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501716140,
+        "name": "Go 1.25.5 driver (macos-latest)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "databaseId": 117501716661,
+        "name": "Candidate suite (${{ matrix.os }})",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "databaseId": 117501716737,
+        "name": "Test (self-hosted macOS)",
+        "status": "completed",
+        "conclusion": "skipped"
+      }
+    ]
+  },
+  "diagnostic_run": {
+    "status": "completed",
+    "conclusion": "failure",
+    "headSha": "d12ce1c3f5b80f2fffb3e94d663ec3533df06996",
+    "url": "https://github.com/relux-works/curator/actions/runs/39070224888"
+  },
+  "acl_probes": [
+    "depth=0 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=0 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=1 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=1 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=2 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=2 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=3 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=3 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=4 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=4 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=5 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=5 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=6 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=6 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=7 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=7 attr=system.posix_acl_default bytes=44 errno=<nil> fs=ef53 fs-error=<nil>",
+    "depth=8 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=8 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=0 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=0 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=1 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=1 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=2 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=2 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=3 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=3 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=4 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=4 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=5 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=5 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=6 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=6 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=7 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=7 attr=system.posix_acl_default bytes=44 errno=<nil> fs=ef53 fs-error=<nil>",
+    "depth=8 attr=system.posix_acl_access bytes=-1 errno=no data available fs=ef53 fs-error=<nil>",
+    "depth=8 attr=system.posix_acl_default bytes=-1 errno=no data available fs=ef53 fs-error=<nil>"
+  ],
+  "package_results": {
+    "Linux test": {
+      "results": [
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCheckoutBytes/protected",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCheckoutBytes/unprotected-witness",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCheckoutBytes",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-valid.json",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-valid-codex.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-valid-claude_code.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-valid-pi.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-valid-muse.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-valid-opencode.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-snapshot.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-adapter.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-profile.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-curator_version.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-fragment_sha256.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-launch_sha256.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-files.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-snapshot.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-extra.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-adapter.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-fragment_sha256.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-launch_sha256.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-curator_version.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-profile.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-parent.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-dot.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-absolute.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-drive.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-unc.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-empty-segment.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-backslash.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-nul.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-outside-home.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-reserved.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-size-30.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-size-31.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-mode-32.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-sha256-33.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-extra-34.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-missing-descriptor.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-missing-environment.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-missing-profile.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-missing-precedence.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-missing-env.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-missing-permissions.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-unknown.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-old-fragment.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-version.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-path-prepend.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-wrong-env.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-absolute-env.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-root-on-codex.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-bad-permissions.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-mcp-absolute.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-mcp-parent.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-mcp-extra.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-false.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-null.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-empty.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-extra.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-muse-mcp.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-muse-system_prompt.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json/CRLF",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json/space",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json/BOM",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json/duplicate",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json/unknown",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json/no_LF",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json/two_LF",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json/no_LF",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json/two_LF",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json/CRLF",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json/space",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json/BOM",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json/duplicate",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json/unknown",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/exact-content",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/extra-entry",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/missing-entry",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/changed-bytes",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/execute-mode",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/wrong-size",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/wrong-hash",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/launch-digest",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/adapter-binding",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/profile-binding",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/path-order",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/duplicate-path",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/case-collision",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/directory-case-collision",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/unicode-collision",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/file-ancestor",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/channel-reference",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/channel-semantics",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/metadata-lf",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestCorpusPins",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestTypedEncodingRejectsInvalidUTF8",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationKernelACL/system.posix_acl_access",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationKernelACL/system.posix_acl_default",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationKernelACL",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationPriorKernelACL",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationReadOnlyAdmission",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationBoundary/linked-ancestor",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationBoundary/linked-before-parent",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationBoundary/linked-target",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationBoundary/file-target",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationBoundary/missing-parent",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationBoundary/shared-ancestor",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationBoundary/shared-target",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationBoundary/public-target",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationBoundary/unrelated",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationBoundary/missing-protected",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationBoundary/no-policy",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationBoundary",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationOwnershipAndReadFailure",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationProtectedIdentity/manager",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationProtectedIdentity/store",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationProtectedIdentity/managed-home",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationProtectedIdentity/native-home",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationProtectedIdentity/credentials",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationProtectedIdentity/repository-admin",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationProtectedIdentity/workspace",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationProtectedIdentity",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationReplacementRaces/ancestor-link",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationReplacementRaces/ancestor-directory",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationReplacementRaces/target-link",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationReplacementRaces/target-directory",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationReplacementRaces/target-empty",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationReplacementRaces/target-identical",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationReplacementRaces/competing-target",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationReplacementRaces/empty-filled",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationReplacementRaces/permission-change",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationReplacementRaces/protected-moved",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationReplacementRaces",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationPrivateParent",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationPriorIdentity/identical",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationPriorIdentity/bytes",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationPriorIdentity/mode",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationPriorIdentity/extra",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationPriorIdentity/unreadable",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationPriorIdentity/unknown-version",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationPriorIdentity/new-generation",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationPriorIdentity",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDestinationPriorMissingMetadata",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationPrivateAndPrior",
+          "Elapsed": 0.12
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationCapturedIdentity/bytes",
+          "Elapsed": 0.13
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationCapturedIdentity/missing",
+          "Elapsed": 0.13
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationCapturedIdentity/extra",
+          "Elapsed": 0.13
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationCapturedIdentity/metadata",
+          "Elapsed": 0.12
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationCapturedIdentity/mode",
+          "Elapsed": 0.12
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationCapturedIdentity",
+          "Elapsed": 0.64
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationNoReplaceRace/empty",
+          "Elapsed": 0.25
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationNoReplaceRace/snapshot",
+          "Elapsed": 0.28
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationNoReplaceRace/file",
+          "Elapsed": 0.28
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationNoReplaceRace/link",
+          "Elapsed": 0.29
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationNoReplaceRace",
+          "Elapsed": 1.1
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationRetainedParentRace",
+          "Elapsed": 0.29
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationStagingOnlyCleanup/before-start",
+          "Elapsed": 0.2
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationStagingOnlyCleanup/stage-created",
+          "Elapsed": 0.15
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationStagingOnlyCleanup/file-staged",
+          "Elapsed": 0.17
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationStagingOnlyCleanup/before-rename",
+          "Elapsed": 0.26
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationStagingOnlyCleanup/io-failure",
+          "Elapsed": 0.17
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationStagingOnlyCleanup",
+          "Elapsed": 0.96
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationKernelStagingFailure",
+          "Elapsed": 0.16
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationPostVerification/bytes",
+          "Elapsed": 0.3
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationPostVerification/size",
+          "Elapsed": 0.27
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationPostVerification/mode",
+          "Elapsed": 0.32
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationPostVerification/extra",
+          "Elapsed": 0.24
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationPostVerification/manifest",
+          "Elapsed": 0.28
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationPostVerification/target-link",
+          "Elapsed": 0.25
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationPostVerification/cancel",
+          "Elapsed": 0.3
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationPostVerification",
+          "Elapsed": 1.95
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPublicationCleanupSubstitutedRoot",
+          "Elapsed": 0.2
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerNullChannel",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerManifestOnly",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerPortableLeftDrift",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerRecapture",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerFreeHunt/launch-hardlink",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerFreeHunt/sticky-content",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerFreeHunt/missing-metadata",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerFreeHunt",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerUnicodePositive/home/café/asset",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerUnicodePositive/home/café/asset",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerUnicodePositive/home/日本語/asset",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerUnicodePositive/home/😀/asset",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerUnicodePositive",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerGreekCollision/iota/directory",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerGreekCollision/iota/file",
+          "Elapsed": 0.1
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerGreekCollision/upsilon/directory",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerGreekCollision/upsilon/file",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerGreekCollision",
+          "Elapsed": 0.14
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEmbeddedSchemasCompile",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/exact-content",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/extra-entry",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/missing-entry",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/changed-bytes",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/execute-mode",
+          "Elapsed": 0.05
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/wrong-size",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/wrong-hash",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/launch-digest",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/adapter-binding",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/profile-binding",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/path-order",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/duplicate-path",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/case-collision",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/directory-case-collision",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/unicode-collision",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/file-ancestor",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/channel-reference",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/channel-semantics",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/metadata-lf",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees",
+          "Elapsed": 0.17
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/extra-file",
+          "Elapsed": 0.06
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/extra-directory",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/missing-file",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/execute-mode",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/private-mode",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/symlink",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/hardlink-outside",
+          "Elapsed": 0.06
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/hardlink-inside",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/fifo",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/unreadable",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/unreadable-directory",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/linked-directory",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/metadata-alias",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals",
+          "Elapsed": 0.23
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableIdentity/version",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableIdentity/profile-name",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableIdentity/profile-lock",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableIdentity/descriptor",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableIdentity/file",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableIdentity/mode",
+          "Elapsed": 0.06
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableIdentity",
+          "Elapsed": 0.2
+        },
+        {
+          "Action": "pass",
+          "Test": "TestBaselineNeverRecaptured",
+          "Elapsed": 0.06
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMuseDerivedDirectoriesAndRootFact",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors/sharp-s-casefold",
+          "Elapsed": 0.07
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors/NFD-components",
+          "Elapsed": 0.09
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors/wrong-fixed-layer",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors/reserved-env",
+          "Elapsed": 0.08
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors/unsorted-env",
+          "Elapsed": 0.05
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors/duplicate-env",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors/system-empty",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors",
+          "Elapsed": 0.33
+        },
+        {
+          "Action": "pass",
+          "Test": "TestLaunchHashIncludesLF",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestNoFollowSnapshotRoot",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestNoFollowBeforeParentSegment",
+          "Elapsed": 0.05
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableComponentSuffixes/.",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableComponentSuffixes/_",
+          "Elapsed": 0.06
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableComponentSuffixes",
+          "Elapsed": 0.06
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPiAlternativeChannels",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Elapsed": 6.944
+        }
+      ],
+      "non_json_download_banner_lines": []
+    },
+    "Linux race": {
+      "results": [
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCheckoutBytes/protected",
+          "Elapsed": 0.07
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCheckoutBytes/unprotected-witness",
+          "Elapsed": 0.06
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCheckoutBytes",
+          "Elapsed": 0.13
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-valid.json",
+          "Elapsed": 0.11
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-valid-codex.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-valid-claude_code.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-valid-pi.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-valid-muse.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-valid-opencode.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-snapshot.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-adapter.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-profile.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-curator_version.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-fragment_sha256.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-launch_sha256.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-missing-files.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-snapshot.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-extra.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-adapter.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-fragment_sha256.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-launch_sha256.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-curator_version.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-invalid-profile.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-parent.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-dot.json",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-absolute.json",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-drive.json",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-unc.json",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-empty-segment.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-backslash.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-nul.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-outside-home.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-path-reserved.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-size-30.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-size-31.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-mode-32.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-sha256-33.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/managed-home-snapshot-entry-extra-34.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-missing-descriptor.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-missing-environment.json",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-missing-profile.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-missing-precedence.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-missing-env.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-missing-permissions.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-unknown.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-old-fragment.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-version.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-path-prepend.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-wrong-env.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-absolute-env.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-root-on-codex.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-invalid-bad-permissions.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-mcp-absolute.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-mcp-parent.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-mcp-extra.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-false.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-null.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-empty.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-muse-root-extra.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-muse-mcp.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases/cases/snapshot-launch-muse-system_prompt.json",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedSchemaCases",
+          "Elapsed": 0.29
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json/no_LF",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json/two_LF",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json/CRLF",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json/space",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json/BOM",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json/duplicate",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json/unknown",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/manifest.json",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json/CRLF",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json/space",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json/BOM",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json/duplicate",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json/unknown",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json/no_LF",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json/two_LF",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains/launch.json",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataFramingAndHashDomains",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/exact-content",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/extra-entry",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/missing-entry",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/changed-bytes",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/execute-mode",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/wrong-size",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/wrong-hash",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/launch-digest",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/adapter-binding",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/profile-binding",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/path-order",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/duplicate-path",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/case-collision",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/directory-case-collision",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/unicode-collision",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/file-ancestor",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/channel-reference",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/channel-semantics",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics/metadata-lf",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedMetadataSemantics",
+          "Elapsed": 0.08
+        },
+        {
+          "Action": "pass",
+          "Test": "TestCorpusPins",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestTypedEncodingRejectsInvalidUTF8",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationKernelACL/system.posix_acl_access",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationKernelACL/system.posix_acl_default",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationKernelACL",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationPriorKernelACL",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationReadOnlyAdmission",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationBoundary/linked-ancestor",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationBoundary/linked-before-parent",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationBoundary/linked-target",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationBoundary/file-target",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationBoundary/missing-parent",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationBoundary/shared-ancestor",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationBoundary/shared-target",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationBoundary/public-target",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationBoundary/unrelated",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationBoundary/missing-protected",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationBoundary/no-policy",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationBoundary",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationOwnershipAndReadFailure",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationProtectedIdentity/manager",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationProtectedIdentity/store",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationProtectedIdentity/managed-home",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationProtectedIdentity/native-home",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationProtectedIdentity/credentials",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationProtectedIdentity/repository-admin",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationProtectedIdentity/workspace",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationProtectedIdentity",
+          "Elapsed": 0.06
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationReplacementRaces/ancestor-link",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationReplacementRaces/ancestor-directory",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationReplacementRaces/target-link",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationReplacementRaces/target-directory",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationReplacementRaces/target-empty",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationReplacementRaces/target-identical",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationReplacementRaces/competing-target",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationReplacementRaces/empty-filled",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationReplacementRaces/permission-change",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationReplacementRaces/protected-moved",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationReplacementRaces",
+          "Elapsed": 0.05
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationPrivateParent",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationPriorIdentity/identical",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationPriorIdentity/bytes",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationPriorIdentity/mode",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationPriorIdentity/extra",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationPriorIdentity/unreadable",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationPriorIdentity/unknown-version",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationPriorIdentity/new-generation",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationPriorIdentity",
+          "Elapsed": 0.09
+        },
+        {
+          "Action": "fail",
+          "Test": "TestDestinationPriorMissingMetadata",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationPrivateAndPrior",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationCapturedIdentity/bytes",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationCapturedIdentity/missing",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationCapturedIdentity/extra",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationCapturedIdentity/metadata",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationCapturedIdentity/mode",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationCapturedIdentity",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationNoReplaceRace/empty",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationNoReplaceRace/snapshot",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationNoReplaceRace/file",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationNoReplaceRace/link",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationNoReplaceRace",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationRetainedParentRace",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationStagingOnlyCleanup/before-start",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationStagingOnlyCleanup/stage-created",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationStagingOnlyCleanup/file-staged",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationStagingOnlyCleanup/before-rename",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationStagingOnlyCleanup/io-failure",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationStagingOnlyCleanup",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationKernelStagingFailure",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationPostVerification/bytes",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationPostVerification/size",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationPostVerification/mode",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationPostVerification/extra",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationPostVerification/manifest",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationPostVerification/target-link",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationPostVerification/cancel",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationPostVerification",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "fail",
+          "Test": "TestPublicationCleanupSubstitutedRoot",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerNullChannel",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerManifestOnly",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerPortableLeftDrift",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerRecapture",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerFreeHunt/launch-hardlink",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerFreeHunt/sticky-content",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerFreeHunt/missing-metadata",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerFreeHunt",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerUnicodePositive/home/café/asset",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerUnicodePositive/home/café/asset",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerUnicodePositive/home/日本語/asset",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerUnicodePositive/home/😀/asset",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerUnicodePositive",
+          "Elapsed": 0.08
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerGreekCollision/iota/directory",
+          "Elapsed": 0.06
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerGreekCollision/iota/file",
+          "Elapsed": 0.05
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerGreekCollision/upsilon/directory",
+          "Elapsed": 0.06
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerGreekCollision/upsilon/file",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestReviewerGreekCollision",
+          "Elapsed": 0.21
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEmbeddedSchemasCompile",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/exact-content",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/extra-entry",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/missing-entry",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/changed-bytes",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/execute-mode",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/wrong-size",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/wrong-hash",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/launch-digest",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/adapter-binding",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/profile-binding",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/path-order",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/duplicate-path",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/case-collision",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/directory-case-collision",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/unicode-collision",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/file-ancestor",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/channel-reference",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/channel-semantics",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees/metadata-lf",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPinnedTrees",
+          "Elapsed": 0.11
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/extra-file",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/extra-directory",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/missing-file",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/execute-mode",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/private-mode",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/symlink",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/hardlink-outside",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/hardlink-inside",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/fifo",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/unreadable",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/unreadable-directory",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/linked-directory",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals/metadata-alias",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestActualTreeRefusals",
+          "Elapsed": 0.19
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableIdentity/version",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableIdentity/profile-name",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableIdentity/profile-lock",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableIdentity/descriptor",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableIdentity/file",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableIdentity/mode",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableIdentity",
+          "Elapsed": 0.28
+        },
+        {
+          "Action": "pass",
+          "Test": "TestBaselineNeverRecaptured",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMuseDerivedDirectoriesAndRootFact",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors/sharp-s-casefold",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors/NFD-components",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors/wrong-fixed-layer",
+          "Elapsed": 0.05
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors/reserved-env",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors/unsorted-env",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors/duplicate-env",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors/system-empty",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestMetadataNeighbors",
+          "Elapsed": 0.22
+        },
+        {
+          "Action": "pass",
+          "Test": "TestLaunchHashIncludesLF",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestNoFollowSnapshotRoot",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestNoFollowBeforeParentSegment",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableComponentSuffixes/.",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableComponentSuffixes/_",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPortableComponentSuffixes",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestPiAlternativeChannels",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "fail",
+          "Elapsed": 2.368
+        }
+      ],
+      "non_json_download_banner_lines": [
+        1
+      ]
+    }
+  }
+}

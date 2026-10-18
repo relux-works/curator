@@ -1,0 +1,674 @@
+=== Current package/race test; actual exit 0 ===
+command log: package-05.log
+ok  	github.com/relux-works/curator/internal/envsnapshot	3.031s	coverage: 87.9% of statements
+
+=== Current narrowing controls; harness exit 0, each killed child exit 1 ===
+command log: controls-03.log
+=== RUN   TestDestinationNarrowingControls
+=== RUN   TestDestinationNarrowingControls/M2-linked-ancestor
+    destination_controls_test.go:110: M2-linked-ancestor: killed by TestDestinationBoundary/linked-ancestor; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/M6-saved-manifest-bytes
+    destination_controls_test.go:110: M6-saved-manifest-bytes: killed by TestDestinationPriorIdentity/bytes; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/owner-root-parent
+    destination_controls_test.go:110: owner-root-parent: killed by TestDestinationOwnershipAndReadFailure; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/mode-group-writable-ancestor
+    destination_controls_test.go:110: mode-group-writable-ancestor: killed by TestDestinationBoundary/shared-ancestor; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/protected-equal-identity
+    destination_controls_test.go:110: protected-equal-identity: killed by TestDestinationProtectedIdentity; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/ancestor-directory-replacement
+    destination_controls_test.go:110: ancestor-directory-replacement: killed by TestDestinationReplacementRaces/ancestor-directory; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/target-empty-replacement
+    destination_controls_test.go:110: target-empty-replacement: killed by TestDestinationReplacementRaces/target-empty; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/unrelated-one-entry
+    destination_controls_test.go:110: unrelated-one-entry: killed by TestDestinationBoundary/unrelated; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/acl-one-permit-kind
+    destination_controls_test.go:110: acl-one-permit-kind: killed by TestDestinationKernelACL; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/prior-acl-one-member
+    destination_controls_test.go:110: prior-acl-one-member: killed by TestDestinationPriorKernelACL; child exit 1 (expected failing command)
+--- PASS: TestDestinationNarrowingControls (6.34s)
+    --- PASS: TestDestinationNarrowingControls/M2-linked-ancestor (0.64s)
+    --- PASS: TestDestinationNarrowingControls/M6-saved-manifest-bytes (0.65s)
+    --- PASS: TestDestinationNarrowingControls/owner-root-parent (0.61s)
+    --- PASS: TestDestinationNarrowingControls/mode-group-writable-ancestor (0.63s)
+    --- PASS: TestDestinationNarrowingControls/protected-equal-identity (0.67s)
+    --- PASS: TestDestinationNarrowingControls/ancestor-directory-replacement (0.67s)
+    --- PASS: TestDestinationNarrowingControls/target-empty-replacement (0.69s)
+    --- PASS: TestDestinationNarrowingControls/unrelated-one-entry (0.60s)
+    --- PASS: TestDestinationNarrowingControls/acl-one-permit-kind (0.62s)
+    --- PASS: TestDestinationNarrowingControls/prior-acl-one-member (0.58s)
+PASS
+ok  	github.com/relux-works/curator/internal/envsnapshot	6.614s
+
+=== Current lint; actual exit 0 ===
+command log: lint-05.log
+0 issues.
+
+=== Linux static lint; actual exit 0 ===
+command log: linux-lint-01.log
+0 issues.
+
+=== Current command build; actual exit 0 ===
+command log: build-02.log
+(no output)
+
+=== Linux test compile only; actual exit 0 ===
+command log: linux-compile-01.log
+(no output)
+
+=== Windows test compile only; actual exit 0 ===
+command log: windows-compile-01.log
+(no output)
+
+=== Publication platform probes; actual exit 0 ===
+command log: publication-constraint-01.log
+=== RUN   TestNoReplaceCannotReplaceRetainedEmptyTarget
+    constraint_test.go:86: existing empty target: EEXIST; absent target: success
+--- PASS: TestNoReplaceCannotReplaceRetainedEmptyTarget (0.00s)
+=== RUN   TestNoReplaceAndExchangeAreIncompatible
+    constraint_test.go:97: RENAME_EXCL | RENAME_SWAP: EINVAL
+--- PASS: TestNoReplaceAndExchangeAreIncompatible (0.00s)
+=== RUN   TestRecheckThenRmdirLosesCompetingEmptyEntry
+    constraint_test.go:132: retained identity checked; directory flock held; replacement allowed; rmdir removed competitor; no-replace then succeeded
+--- PASS: TestRecheckThenRmdirLosesCompetingEmptyEntry (0.00s)
+=== RUN   TestOrdinaryRenameOverwritesCompetingEmptyEntry
+    constraint_test.go:152: renameat succeeded over a different empty target inode
+--- PASS: TestOrdinaryRenameOverwritesCompetingEmptyEntry (0.00s)
+=== RUN   TestExchangeMovesCompetingNonemptyUserEntry
+    constraint_test.go:179: RENAME_SWAP moved the competing nonempty user entry to stage; this is already a forbidden namespace mutation
+--- PASS: TestExchangeMovesCompetingNonemptyUserEntry (0.00s)
+=== RUN   TestNoHandleConditionalDirectoryRemoval
+    constraint_test.go:194: unlinkat(retained target, empty): ENOENT; dot: EINVAL
+--- PASS: TestNoHandleConditionalDirectoryRemoval (0.00s)
+PASS
+ok  	github.com/relux-works/curator/.temp/TASK-261016-w0yx2w/publicationprobe	0.296s
+
+=== First narrowing-control attempt; actual exit 1; includes survivor child exit 0 ===
+command log: controls-01.log
+=== RUN   TestDestinationNarrowingControls
+=== RUN   TestDestinationNarrowingControls/M2-linked-ancestor
+    destination_controls_test.go:108: M2-linked-ancestor: killed by TestDestinationBoundary/linked-ancestor; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/M6-saved-manifest-bytes
+    destination_controls_test.go:108: M6-saved-manifest-bytes: killed by TestDestinationPriorIdentity/bytes; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/owner-root-parent
+    destination_controls_test.go:108: owner-root-parent: killed by TestDestinationOwnershipAndReadFailure; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/mode-group-writable-ancestor
+    destination_controls_test.go:108: mode-group-writable-ancestor: killed by TestDestinationBoundary/shared-ancestor; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/protected-equal-identity
+    destination_controls_test.go:108: protected-equal-identity: killed by TestDestinationProtectedIdentity; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/ancestor-directory-replacement
+    destination_controls_test.go:108: ancestor-directory-replacement: killed by TestDestinationReplacementRaces/ancestor-directory; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/target-empty-replacement
+    destination_controls_test.go:108: target-empty-replacement: killed by TestDestinationReplacementRaces/target-empty; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/unrelated-one-entry
+    destination_controls_test.go:108: unrelated-one-entry: killed by TestDestinationBoundary/unrelated; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/acl-one-permit-kind
+    destination_controls_test.go:106: survivor or invalid plant: <nil>
+        {"Time":"2026-10-16T14:55:19.388554+04:00","Action":"start","Package":"github.com/relux-works/curator/.temp/destination-control-2611747343"}
+        {"Time":"2026-10-16T14:55:19.668212+04:00","Action":"run","Package":"github.com/relux-works/curator/.temp/destination-control-2611747343","Test":"TestDestinationKernelACL"}
+        {"Time":"2026-10-16T14:55:19.66825+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-2611747343","Test":"TestDestinationKernelACL","Output":"=== RUN   TestDestinationKernelACL\n"}
+        {"Time":"2026-10-16T14:55:19.69285+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-2611747343","Test":"TestDestinationKernelACL","Output":"--- PASS: TestDestinationKernelACL (0.02s)\n"}
+        {"Time":"2026-10-16T14:55:19.692883+04:00","Action":"pass","Package":"github.com/relux-works/curator/.temp/destination-control-2611747343","Test":"TestDestinationKernelACL","Elapsed":0.02}
+        {"Time":"2026-10-16T14:55:19.692895+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-2611747343","Output":"PASS\n"}
+        {"Time":"2026-10-16T14:55:19.693383+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-2611747343","Output":"ok  \tgithub.com/relux-works/curator/.temp/destination-control-2611747343\t0.305s\n"}
+        {"Time":"2026-10-16T14:55:19.693391+04:00","Action":"pass","Package":"github.com/relux-works/curator/.temp/destination-control-2611747343","Elapsed":0.305}
+--- FAIL: TestDestinationNarrowingControls (7.76s)
+    --- PASS: TestDestinationNarrowingControls/M2-linked-ancestor (0.77s)
+    --- PASS: TestDestinationNarrowingControls/M6-saved-manifest-bytes (1.01s)
+    --- PASS: TestDestinationNarrowingControls/owner-root-parent (0.81s)
+    --- PASS: TestDestinationNarrowingControls/mode-group-writable-ancestor (0.80s)
+    --- PASS: TestDestinationNarrowingControls/protected-equal-identity (0.96s)
+    --- PASS: TestDestinationNarrowingControls/ancestor-directory-replacement (0.85s)
+    --- PASS: TestDestinationNarrowingControls/target-empty-replacement (0.83s)
+    --- PASS: TestDestinationNarrowingControls/unrelated-one-entry (0.89s)
+    --- FAIL: TestDestinationNarrowingControls/acl-one-permit-kind (0.84s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/envsnapshot	8.035s
+FAIL
+
+Remote gate: sh scripts/remote-gate.sh; actual local exit 137 (intentionally stopped), hosted conclusion cancelled, no passing or runtime qualification claim.
+Gate commit 6d1a905a88e111eda227886581eff3d3b9011902; the 11 original candidate files match the signed gate tree; Story HEAD unchanged. One later UNRESOLVED_QUESTIONS.md records the blocker without executable/test/configuration changes; it is separately hashed.
+git apply --reverse --check .temp/TASK-261016-w0yx2w/TASK-261016-w0yx2w_admission.patch: actual exit 0; all 12 patch files match retained working tree.
+
+
+# Round 2
+
+# Round 2 — SNAP-PUBLISH implementation; external validation blocker
+
+Task: TASK-261016-w0yx2w — implement retained-handle snapshot destination publication.
+
+The library implementation is retained uncommitted. This is a blocked producer outcome, not a review handoff or accepted delivery. The full remote gate is not green. No product/platform decision remains open: curator-spec main `15d2fc2be22c2b013faa8f637101947b1ff20830` resolves the staging boundary and is the normative source read for this round (snapshots sections 2/4/5, environments section 5, CIP-0014 destination/idempotence rows).
+
+## External blocker and recovery
+
+[Hosted run 39067688154](https://github.com/relux-works/curator/actions/runs/39067688154) used signed snapshot `b5a21d362c27956aaef1da5d8ec4cb389665593e`, tree `2e1811a9302b6d040adff5cf0a4692fa09b3ffb0`. Its Linux vet, lint, interop and driver jobs failed with `no space left on device`, before qualifying the candidate. This is explicit provider evidence, not an inference from missing status. The failed build/vet stages and failing driver fixtures name the same storage error. No repository-caused diagnostic was established from these failures; that does not qualify the unexecuted tests.
+
+Failed job IDs: interop `117498647115`; lint `117498647121`; default Linux test/vet `117498647173`; Go 1.25.5 driver/vet `117498647291`; Go 1.27.1 driver fixtures `117498647424`.
+
+An individual-job retry was attempted using `gh run rerun 39067688154 --job 117498647115`. The CLI exited 0 but reported `job 117498647115 cannot be rerun`; no retry execution or green verdict is claimed. The overall run was still active. Repeating the entire matrix against exhausted shared storage would not resolve the external condition.
+
+The local gate process was stopped by its recorded exact PID (exit 137); its TERM handler performs cleanup but does not exit, so TERM alone did not stop it. Cancellation was requested for this run only. The temporary gate branch is confirmed absent. Hosted readback is terminal `completed/cancelled`; no required full-gate success is claimed. No validation process is being left for a subsequent turn.
+
+**Input needed:** the runner operator must restore sufficient free temporary/build storage without deleting active jobs' data, then rerun the failed/cancelled jobs on the exact signed snapshot or execute `sh scripts/remote-gate.sh` against the retained candidate. Reuse genuine green jobs only for unchanged source/test/configuration/environment identity. The full gate and missing Linux/Windows runtime evidence remain blocking; no local mirror substitutes for hosted requirements. This work does not authorize shared-runner cleanup, service interruption, unrelated data deletion or a weakened CI configuration.
+
+Alternatives considered: rerunning a single failed job (not admitted while active); local focused checks (executed, narrower OS/contract); a full local mirror (cannot satisfy required remote statuses or Linux/Windows runtime identity). Recommendation: repair runner capacity and rerun the exact candidate, without changing the product implementation or required deadlines. No additional product decision is required.
+
+## Implementation and boundary
+
+- `OpenDestination`, `Revalidate`, `MatchPrior`: retained no-follow admission, caller owner/private mode/ACL checks, physical protected identity/ancestry, absent-only new destinations, full actual-tree prior verification. Existing empty directories refuse.
+- `Destination.Publish(context.Context, Publication)`: clones and validates captured manifest/descriptor/content bytes before writing, stages beside the absent name using an unpredictable invocation-created private directory, creates independent 0700 directories and 0600/verified-0700 files through retained descriptors, syncs files/directories, then calls `publishNoReplace`.
+- macOS backend: `renameatx_np(RENAME_EXCL)`; Linux backend: `renameat2(RENAME_NOREPLACE)`. No overwrite/copy fallback. Every kind of competing name refuses and is preserved, including an empty directory created after the final revalidation.
+- Published success is gated by retained target identity and SNAP-ID verification against the captured manifest, plus owner/ACL and retained-chain rechecks. Byte/size/mode/metadata/entry-set mismatches and post-rename cancellation return no `Verified` result and leave the published entry for the operator. No destructive rollback.
+- Cleanup walks only the invocation's recorded staging objects in reverse through retained parent handles. It does not enumerate an arbitrary tree, match a filename prefix, clean the destination, follow a substituted link, or recursively delete a path. Observed substitutions refuse cleanup. Same-user mutation inside private staging remains outside the normative guarantee; no conditional-unlink claim is made. Cooperative context interruption cleans unpublished staging; abrupt process death may leave a private partial stage and emits no success.
+- Unsupported platforms, including Windows, explicitly refuse admission/publication. Windows owner/ACL/reparse support is not claimed.
+
+The capture coordinator remains responsible for source authorization, complete protected-root inventory and verified execute metadata. Publication accepts captured bytes, not source filesystem paths or authority inferred from a self-minted manifest. Source capture/closure and SNAP-CLI integration are separate leaves, explicitly excluded by the current brief. This library does not emit CLI output, discover inventory, mutate native/managed sources, or authorize launch.
+
+## Round 2 acceptance matrix
+
+**5 of 5 leaf AC rows driven through the production library API on macOS**, with the OS bounds below. **0 of 5 rows driven through the materialize CLI**; SNAP-CLI is expressly separate. This is measured library coverage, not full cross-platform acceptance. Tests are present in the uncommitted managed candidate for the Change Request snapshot; they are not represented as committed on the Story branch.
+
+All rows below use `go test -count=1 -race -coverprofile=.temp/TASK-261016-w0yx2w/coverage.out ./internal/envsnapshot`, exit **0**, on macOS 27.0 arm64 / Go 1.25.5. Narrowing controls use `go test -tags snapshotcontrols -count=1 -run '^TestDestinationNarrowingControls$' -v ./internal/envsnapshot`, corrected run exit **0** (16 killed plants; each named child command exits **1**, intentionally red).
+
+| AC row | Production call site and named tests | Result and bounds |
+|---|---|---|
+| 1. No-write validation; retained ancestors/target; owner/ACL/no-follow refusal | `OpenDestination` -> `retainDirectories` / `destinationDirectory`; `TestDestinationReadOnlyAdmission`, `TestDestinationBoundary`, `TestDestinationOwnershipAndReadFailure`, `TestDestinationKernelACL`, `TestDestinationPriorKernelACL` | Local exit 0. Real macOS ACLs and read failures; foreign-owner case executed as an unprivileged caller. Linux ACL runtime not qualified by the failed gate; Windows refuses. |
+| 2. Protected equal/inside/containing identity | `OpenDestination` -> `excludeProtected`; `TestDestinationProtectedIdentity` | Local exit 0 for every supplied root class and similar-prefix positive siblings. Case aliases are exercised only on a folding filesystem. Inventory discovery/session allocator remain coordinator work. |
+| 3. Absent/private-parent or exact-prior only; no-replace publication and replacement races | `OpenDestination` / `Revalidate` / `Publish` -> `publishNoReplace`; `TestDestinationPrivateParent`, `TestDestinationReplacementRaces`, `TestPublicationNoReplaceRace`, `TestPublicationRetainedParentRace`, `TestPublicationPrivateAndPrior` | Local exit 0. Empty target is negative under the owner decision. Four real competing creations run between final validation and rename. Moved-ancestor test demonstrates retained-parent writes and refusal of success without outside traversal. Linux backend compiled/static-linted; runtime gate not green. |
+| 4. SNAP-ID actual prior verification and exact-generation no-op | `MatchPrior` -> `revalidate` -> `inspectDestination` -> `verifyDirectory`; `Publish` prior branch; `TestDestinationPriorIdentity`, `TestDestinationPriorMissingMetadata`, `TestDestinationPriorKernelACL`, `TestPublicationPrivateAndPrior` | Local exit 0. Bytes/mode/extras/unreadable/unknown version/new generation refuse; no-op and generation refusal preserve manifest inode/mtime. Observation does not lease against subsequent same-user mutation. |
+| 5. Private independent copies, execute modes, failure/interruption and staging-only cleanup | `Publish` -> `createStagingDirectory` / `createStagingFile` / `cleanupStaging` / `verifyDirectory`; all `TestPublication*`, especially `TestPublicationCapturedIdentity`, `TestPublicationStagingOnlyCleanup`, `TestPublicationKernelStagingFailure`, `TestPublicationCleanupSubstitutedRoot`, `TestPublicationPostVerification` | Local exit 0. Kernel permission failure, context cancellation, outside sibling/link preservation and post-publication mismatch are exercised. SNAP-ID checks exact semantic modes/nlink. Fresh macOS provenance is OS-created, not imported; no other xattrs admitted by the test. Execute authorization belongs to capture. No process-kill recovery, Windows private-ACL qualification or CLI success-output qualification claimed. |
+
+## Coverage map
+
+The brief has a paired-test table but no catalog-keyed surface table: this is a **brief gap**, not a waived map. The following map preserves all four supplied paired rows, in order, following the coverage-map template. Relevant catalog surfaces are destination conflicts, managed-output pruning, read boundary, identity and error surface.
+
+| Supplied surface / paired row | Attacking tests | Killed narrowing mutants | Out-of-contract inputs / exact clause |
+|---|---|---|---|
+| Absent private destination versus links, owner/ACL, protected identity aliases | `TestDestinationReadOnlyAdmission`, `TestDestinationBoundary`, `TestDestinationKernelACL`, `TestDestinationOwnershipAndReadFailure`, `TestDestinationProtectedIdentity`, `TestDestinationPrivateParent` | M2; owner-root-parent; mode-group-writable-ancestor; protected-equal-identity; empty-target; private-parent; acl-one-permit-kind | Existing empty destination explicitly refuses under owner decision 2026-10-17; unqualified platforms refuse under Round 2 Windows qualification clause. |
+| Stable retained parent versus ancestor/target replacement and competing creation | `TestDestinationReplacementRaces`, `TestPublicationNoReplaceRace`, `TestPublicationRetainedParentRace` | ancestor-directory-replacement; target-identical-replacement; publication-replaces-empty | No target competition waived. Windows support remains explicit refusal under Round 2. |
+| Exact prior versus altered actual bytes/modes/extras/unreadable/version/generation | `TestDestinationPriorIdentity`, `TestDestinationPriorMissingMetadata`, `TestDestinationPriorKernelACL`, `TestPublicationPrivateAndPrior` | M6-saved-manifest-bytes; prior-acl-one-member; unrelated-one-entry | No prior-verification cases waived. |
+| Staging failure versus unsafe cleanup, interruption and partial published output | `TestPublicationStagingOnlyCleanup`, `TestPublicationKernelStagingFailure`, `TestPublicationCleanupSubstitutedRoot`, `TestPublicationPostVerification` | cleanup-foreign-stage-link; cleanup-omits-one-file (corrected test); post-verify-one-byte-mismatch | Same-user mutation **inside private staging** is outside snapshots section 2's guarantee (Round 2). Process death may retain private staging; no crash-recovery/CLI-emission claim. |
+
+## Mutant evidence
+
+Every current listed plant below is killed on macOS with a named behavioral failure and child exit **1**. The harness itself exits **0** only after verifying those failures. Build/setup failure and a missing/skipped test cannot count. Linux-specific ACL/no-replace plants are present but **not executed**; no Linux mutant kill is claimed.
+
+| Mutant | What the gate is narrowed to admit | Named failing test | Result / surviving bound |
+|---|---|---|---|
+| cleanup-foreign-stage-link | Cleanup removes exactly one foreign stage-looking sibling link in addition to recorded objects | `TestPublicationStagingOnlyCleanup/io-failure` | Killed, exit 1 |
+| cleanup-omits-one-file, initial test selection | Leave only the recorded AGENTS.md cleanup member behind | None; `TestPublicationStagingOnlyCleanup/io-failure` passed | **Survivor**, child exit 0: interruption occurred before AGENTS.md was staged. This selection proves nothing about that member. |
+| cleanup-omits-one-file, corrected test selection | Same weakening; interrupt after the entire stage is populated | `TestPublicationStagingOnlyCleanup/before-rename` | Killed, exit 1 |
+| post-verify-one-byte-mismatch | Only `file-identity` mismatch may return success after publication; other verification refusals remain | `TestPublicationPostVerification/bytes` | Killed, exit 1 |
+| publication-replaces-empty | Weaken no-replace to ordinary rename, retaining refusal of a nonempty competing directory but admitting replacement of an empty one | `TestPublicationNoReplaceRace/empty` | Killed, exit 1; macOS backend only executed |
+| M2-linked-ancestor | Allow only a directory component named target to follow a link | `TestDestinationBoundary/linked-ancestor` | Killed, exit 1 |
+| M6-saved-manifest-bytes | Trust saved manifest only after an actual-file identity failure | `TestDestinationPriorIdentity/bytes` | Killed, exit 1 |
+| owner-root-parent | Admit root-owned immediate parent for an unprivileged caller | `TestDestinationOwnershipAndReadFailure` | Killed, exit 1 |
+| mode-group-writable-ancestor | Admit only mode 0770 as an otherwise forbidden writable ancestor | `TestDestinationBoundary/shared-ancestor` | Killed, exit 1 |
+| protected-equal-identity | Allow equality while other ancestry checks remain | `TestDestinationProtectedIdentity` | Killed, exit 1 |
+| ancestor-directory-replacement | Permit replacement only for retained component parent | `TestDestinationReplacementRaces/ancestor-directory` | Killed, exit 1 |
+| target-identical-replacement | Permit changed target inode only when replacement mode is 0700 | `TestDestinationReplacementRaces/target-identical` | Killed, exit 1 |
+| empty-target | Treat just an empty existing target as absent | `TestDestinationReadOnlyAdmission` | Killed, exit 1 |
+| private-parent | Additionally admit mode 0755 immediate parent | `TestDestinationPrivateParent` | Killed, exit 1 |
+| unrelated-one-entry | Admit only an unrelated single-entry target | `TestDestinationBoundary/unrelated` | Killed, exit 1 |
+| acl-one-permit-kind | Admit only the real kernel permit ACE with rights mask 0x24 | `TestDestinationKernelACL` | Killed, exit 1 |
+| prior-acl-one-member | Skip only AGENTS.md prior-member ACL check | `TestDestinationPriorKernelACL` | Killed, exit 1; Linux variant is unrun |
+
+## Command ledger
+
+All validation commands ran directly, without tee or a status-masking pipe. Paths below are repository-relative. No full prior-run evidence was reused as current qualification: this round changes source/tests, so focused checks ran anew. Unchanged reviewer tests were included in the package run under their original names (`TestReviewerNullChannel`, `TestReviewerManifestOnly`, `TestReviewerPortableLeftDrift`, `TestReviewerRecapture`, `TestReviewerFreeHunt`, `TestReviewerUnicodePositive`, `TestReviewerGreekCollision`). Their source is unchanged.
+
+| Exact command | Actual exit | Scope / evidence |
+|---|---:|---|
+| `go test -count=1 -run '^TestPublication' -v ./internal/envsnapshot` | 1 | Initial diagnostic run failed only because a fresh macOS object carried OS-generated provenance; corrected the test's imported-metadata assertion. |
+| `go test -count=1 -race -coverprofile=.temp/TASK-261016-w0yx2w/coverage.out ./internal/envsnapshot` | 0 | macOS full package, original reviewer tests included; 86.9% statement coverage. |
+| `go test -tags snapshotcontrols -count=1 -run '^TestDestinationNarrowingControls$' -v ./internal/envsnapshot` (initial) | 1 | Harness truthfully rejects the surviving cleanup plant described above. |
+| Same control command (corrected selection) | 0 | 16 named macOS mutant kills, each nested command expected-red exit 1. |
+| `golangci-lint run ./internal/envsnapshot/...` | 0 | macOS, 0 issues. |
+| `GOOS=linux GOARCH=amd64 golangci-lint run ./internal/envsnapshot/...` | 0 | Linux static analysis only, 0 issues. |
+| `go build -o .temp/TASK-261016-w0yx2w/curator ./cmd/curator` | 0 | Local production command compiles; not materialize CLI execution. |
+| `GOOS=linux GOARCH=amd64 go test -c -o .temp/TASK-261016-w0yx2w/envsnapshot-linux.test ./internal/envsnapshot` | 0 | Linux compilation only; no runtime verdict. |
+| `GOOS=windows GOARCH=amd64 go test -c -o .temp/TASK-261016-w0yx2w/envsnapshot-windows.test.exe ./internal/envsnapshot` | 0 | Windows compilation only; no runtime verdict. |
+| `sh scripts/remote-gate.sh` | 137 | Intentionally stopped after confirmed remote storage failures; not green, not an expected-red product control. Hosted run cancellation is separately recorded. |
+| `git apply --check --reverse .temp/TASK-261016-w0yx2w/TASK-261016-w0yx2w_round2-candidate.patch` | 0 | Exported patch corresponds to current uncommitted candidate. |
+| `git diff --check` | 0 | Whitespace check. |
+| `git log -1 --format='%H %G?' b5a21d362c27956aaef1da5d8ec4cb389665593e` | 0 | Signature reports G; detached validation commit only. |
+
+`go test -tags snapshotcontrols -run '^TestNarrowingControls$'` for unchanged SNAP-ID controls was not rerun; this outcome claims only the executed destination/publication control command. No local full repository suite, full Linux runtime suite, Windows runtime suite or new CLI integration was executed. Cancelled/partial logs are not passing evidence.
+
+## Scope, state and logbook
+
+HEAD stays at `1724b4a5` (recorded in the attached source identity); no Story commit, switch, rebase, merge or index staging was performed. A temporary separate index exports the patch and confirms that the candidate tree equals the signed gate tree. `HEAD..main` is 0 against the local main ref; that is not a fresh remote-main attestation. The orchestrator owns convergence and integration.
+
+Code/tests stay under `internal/envsnapshot/destination*.go` and `publication*.go`, with module README updates. The sole additional changed path is root `README.md`, required by the repository's tools-documentation rule to explain focused publication/control commands and link the platform bounds. `UNRESOLVED_QUESTIONS.md`'s previous task-specific staging question was removed because the owner resolved it; that restores its tracked bytes and leaves no diff there. No existing SNAP-ID source, reviewer test, consumer or workflow configuration changes.
+
+Logbook: Round 2 applies owner option A and the absent-only rule. The initial metadata test was corrected for OS-created provenance; the initially surviving cleanup plant's selection was corrected and re-executed, retaining both observations. Required hosted validation was attempted and halted on independently logged shared-storage exhaustion. The candidate and all local evidence are preserved; cross-platform/full-gate obligations remain open. The signed-commit sentence in the attached Round 2 brief conflicts with the managed Story assignment's explicit no-commit/handoff checkpoint rule, so the Story candidate remains uncommitted; only the gate creates a signed detached snapshot.
+
+Next lifecycle: restore runner storage, run/reuse exact-identity hosted evidence as appropriate, update this outcome/validation, satisfy the full gate and OS bounds, then `task-board handoff TASK-261016-w0yx2w --role developer`. No handoff is attempted while those preconditions are unmet.
+
+
+## Round 2 local command output
+
+### publication-01.log
+
+=== RUN   TestPublicationPrivateAndPrior
+    publication_unix_test.go:100: imported xattr on snapshot
+--- FAIL: TestPublicationPrivateAndPrior (0.11s)
+=== RUN   TestPublicationCapturedIdentity
+=== RUN   TestPublicationCapturedIdentity/bytes
+=== RUN   TestPublicationCapturedIdentity/missing
+=== RUN   TestPublicationCapturedIdentity/extra
+=== RUN   TestPublicationCapturedIdentity/metadata
+=== RUN   TestPublicationCapturedIdentity/mode
+--- PASS: TestPublicationCapturedIdentity (0.51s)
+    --- PASS: TestPublicationCapturedIdentity/bytes (0.08s)
+    --- PASS: TestPublicationCapturedIdentity/missing (0.07s)
+    --- PASS: TestPublicationCapturedIdentity/extra (0.13s)
+    --- PASS: TestPublicationCapturedIdentity/metadata (0.11s)
+    --- PASS: TestPublicationCapturedIdentity/mode (0.12s)
+=== RUN   TestPublicationNoReplaceRace
+=== RUN   TestPublicationNoReplaceRace/empty
+=== RUN   TestPublicationNoReplaceRace/snapshot
+=== RUN   TestPublicationNoReplaceRace/file
+=== RUN   TestPublicationNoReplaceRace/link
+--- PASS: TestPublicationNoReplaceRace (0.53s)
+    --- PASS: TestPublicationNoReplaceRace/empty (0.11s)
+    --- PASS: TestPublicationNoReplaceRace/snapshot (0.14s)
+    --- PASS: TestPublicationNoReplaceRace/file (0.15s)
+    --- PASS: TestPublicationNoReplaceRace/link (0.13s)
+=== RUN   TestPublicationRetainedParentRace
+--- PASS: TestPublicationRetainedParentRace (0.16s)
+=== RUN   TestPublicationStagingOnlyCleanup
+=== RUN   TestPublicationStagingOnlyCleanup/before-start
+=== RUN   TestPublicationStagingOnlyCleanup/stage-created
+=== RUN   TestPublicationStagingOnlyCleanup/file-staged
+=== RUN   TestPublicationStagingOnlyCleanup/before-rename
+=== RUN   TestPublicationStagingOnlyCleanup/io-failure
+--- PASS: TestPublicationStagingOnlyCleanup (0.48s)
+    --- PASS: TestPublicationStagingOnlyCleanup/before-start (0.07s)
+    --- PASS: TestPublicationStagingOnlyCleanup/stage-created (0.08s)
+    --- PASS: TestPublicationStagingOnlyCleanup/file-staged (0.09s)
+    --- PASS: TestPublicationStagingOnlyCleanup/before-rename (0.14s)
+    --- PASS: TestPublicationStagingOnlyCleanup/io-failure (0.11s)
+=== RUN   TestPublicationKernelStagingFailure
+--- PASS: TestPublicationKernelStagingFailure (0.12s)
+=== RUN   TestPublicationPostVerification
+=== RUN   TestPublicationPostVerification/bytes
+=== RUN   TestPublicationPostVerification/size
+=== RUN   TestPublicationPostVerification/mode
+=== RUN   TestPublicationPostVerification/extra
+=== RUN   TestPublicationPostVerification/manifest
+=== RUN   TestPublicationPostVerification/target-link
+=== RUN   TestPublicationPostVerification/cancel
+--- PASS: TestPublicationPostVerification (1.08s)
+    --- PASS: TestPublicationPostVerification/bytes (0.23s)
+    --- PASS: TestPublicationPostVerification/size (0.14s)
+    --- PASS: TestPublicationPostVerification/mode (0.14s)
+    --- PASS: TestPublicationPostVerification/extra (0.18s)
+    --- PASS: TestPublicationPostVerification/manifest (0.15s)
+    --- PASS: TestPublicationPostVerification/target-link (0.13s)
+    --- PASS: TestPublicationPostVerification/cancel (0.12s)
+=== RUN   TestPublicationCleanupSubstitutedRoot
+--- PASS: TestPublicationCleanupSubstitutedRoot (0.08s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/envsnapshot	3.331s
+FAIL
+
+
+### focused-02.log
+
+ok  	github.com/relux-works/curator/internal/envsnapshot	6.597s	coverage: 86.9% of statements
+
+
+### controls-01.log
+
+=== RUN   TestDestinationNarrowingControls
+=== RUN   TestDestinationNarrowingControls/cleanup-foreign-stage-link
+    destination_controls_test.go:117: cleanup-foreign-stage-link: killed by TestPublicationStagingOnlyCleanup/io-failure; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/cleanup-omits-one-file
+    destination_controls_test.go:115: survivor or invalid plant: <nil>
+        {"Time":"2026-10-18T00:39:09.698255+04:00","Action":"start","Package":"github.com/relux-works/curator/.temp/destination-control-1445132986"}
+        {"Time":"2026-10-18T00:39:10.004418+04:00","Action":"run","Package":"github.com/relux-works/curator/.temp/destination-control-1445132986","Test":"TestPublicationStagingOnlyCleanup"}
+        {"Time":"2026-10-18T00:39:10.004568+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-1445132986","Test":"TestPublicationStagingOnlyCleanup","Output":"=== RUN   TestPublicationStagingOnlyCleanup\n"}
+        {"Time":"2026-10-18T00:39:10.004599+04:00","Action":"run","Package":"github.com/relux-works/curator/.temp/destination-control-1445132986","Test":"TestPublicationStagingOnlyCleanup/io-failure"}
+        {"Time":"2026-10-18T00:39:10.004608+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-1445132986","Test":"TestPublicationStagingOnlyCleanup/io-failure","Output":"=== RUN   TestPublicationStagingOnlyCleanup/io-failure\n"}
+        {"Time":"2026-10-18T00:39:10.084925+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-1445132986","Test":"TestPublicationStagingOnlyCleanup/io-failure","Output":"--- PASS: TestPublicationStagingOnlyCleanup/io-failure (0.08s)\n"}
+        {"Time":"2026-10-18T00:39:10.084941+04:00","Action":"pass","Package":"github.com/relux-works/curator/.temp/destination-control-1445132986","Test":"TestPublicationStagingOnlyCleanup/io-failure","Elapsed":0.08}
+        {"Time":"2026-10-18T00:39:10.084968+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-1445132986","Test":"TestPublicationStagingOnlyCleanup","Output":"--- PASS: TestPublicationStagingOnlyCleanup (0.08s)\n"}
+        {"Time":"2026-10-18T00:39:10.08497+04:00","Action":"pass","Package":"github.com/relux-works/curator/.temp/destination-control-1445132986","Test":"TestPublicationStagingOnlyCleanup","Elapsed":0.08}
+        {"Time":"2026-10-18T00:39:10.084971+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-1445132986","Output":"PASS\n"}
+        {"Time":"2026-10-18T00:39:10.085588+04:00","Action":"output","Package":"github.com/relux-works/curator/.temp/destination-control-1445132986","Output":"ok  \tgithub.com/relux-works/curator/.temp/destination-control-1445132986\t0.387s\n"}
+        {"Time":"2026-10-18T00:39:10.085599+04:00","Action":"pass","Package":"github.com/relux-works/curator/.temp/destination-control-1445132986","Elapsed":0.387}
+=== RUN   TestDestinationNarrowingControls/post-verify-one-byte-mismatch
+    destination_controls_test.go:117: post-verify-one-byte-mismatch: killed by TestPublicationPostVerification/bytes; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/M2-linked-ancestor
+    destination_controls_test.go:117: M2-linked-ancestor: killed by TestDestinationBoundary/linked-ancestor; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/M6-saved-manifest-bytes
+    destination_controls_test.go:117: M6-saved-manifest-bytes: killed by TestDestinationPriorIdentity/bytes; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/owner-root-parent
+    destination_controls_test.go:117: owner-root-parent: killed by TestDestinationOwnershipAndReadFailure; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/mode-group-writable-ancestor
+    destination_controls_test.go:117: mode-group-writable-ancestor: killed by TestDestinationBoundary/shared-ancestor; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/protected-equal-identity
+    destination_controls_test.go:117: protected-equal-identity: killed by TestDestinationProtectedIdentity; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/ancestor-directory-replacement
+    destination_controls_test.go:117: ancestor-directory-replacement: killed by TestDestinationReplacementRaces/ancestor-directory; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/target-identical-replacement
+    destination_controls_test.go:117: target-identical-replacement: killed by TestDestinationReplacementRaces/target-identical; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/empty-target
+    destination_controls_test.go:117: empty-target: killed by TestDestinationReadOnlyAdmission; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/private-parent
+    destination_controls_test.go:117: private-parent: killed by TestDestinationPrivateParent; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/unrelated-one-entry
+    destination_controls_test.go:117: unrelated-one-entry: killed by TestDestinationBoundary/unrelated; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/publication-replaces-empty
+    destination_controls_test.go:117: publication-replaces-empty: killed by TestPublicationNoReplaceRace/empty; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/acl-one-permit-kind
+    destination_controls_test.go:117: acl-one-permit-kind: killed by TestDestinationKernelACL; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/prior-acl-one-member
+    destination_controls_test.go:117: prior-acl-one-member: killed by TestDestinationPriorKernelACL; child exit 1 (expected failing command)
+--- FAIL: TestDestinationNarrowingControls (12.31s)
+    --- PASS: TestDestinationNarrowingControls/cleanup-foreign-stage-link (0.95s)
+    --- FAIL: TestDestinationNarrowingControls/cleanup-omits-one-file (0.80s)
+    --- PASS: TestDestinationNarrowingControls/post-verify-one-byte-mismatch (1.03s)
+    --- PASS: TestDestinationNarrowingControls/M2-linked-ancestor (0.76s)
+    --- PASS: TestDestinationNarrowingControls/M6-saved-manifest-bytes (0.66s)
+    --- PASS: TestDestinationNarrowingControls/owner-root-parent (0.63s)
+    --- PASS: TestDestinationNarrowingControls/mode-group-writable-ancestor (0.74s)
+    --- PASS: TestDestinationNarrowingControls/protected-equal-identity (0.73s)
+    --- PASS: TestDestinationNarrowingControls/ancestor-directory-replacement (0.69s)
+    --- PASS: TestDestinationNarrowingControls/target-identical-replacement (0.81s)
+    --- PASS: TestDestinationNarrowingControls/empty-target (0.75s)
+    --- PASS: TestDestinationNarrowingControls/private-parent (0.68s)
+    --- PASS: TestDestinationNarrowingControls/unrelated-one-entry (0.69s)
+    --- PASS: TestDestinationNarrowingControls/publication-replaces-empty (0.91s)
+    --- PASS: TestDestinationNarrowingControls/acl-one-permit-kind (0.75s)
+    --- PASS: TestDestinationNarrowingControls/prior-acl-one-member (0.74s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/envsnapshot	12.604s
+FAIL
+
+
+### controls-02.log
+
+=== RUN   TestDestinationNarrowingControls
+=== RUN   TestDestinationNarrowingControls/cleanup-foreign-stage-link
+    destination_controls_test.go:117: cleanup-foreign-stage-link: killed by TestPublicationStagingOnlyCleanup/io-failure; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/cleanup-omits-one-file
+    destination_controls_test.go:117: cleanup-omits-one-file: killed by TestPublicationStagingOnlyCleanup/before-rename; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/post-verify-one-byte-mismatch
+    destination_controls_test.go:117: post-verify-one-byte-mismatch: killed by TestPublicationPostVerification/bytes; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/M2-linked-ancestor
+    destination_controls_test.go:117: M2-linked-ancestor: killed by TestDestinationBoundary/linked-ancestor; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/M6-saved-manifest-bytes
+    destination_controls_test.go:117: M6-saved-manifest-bytes: killed by TestDestinationPriorIdentity/bytes; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/owner-root-parent
+    destination_controls_test.go:117: owner-root-parent: killed by TestDestinationOwnershipAndReadFailure; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/mode-group-writable-ancestor
+    destination_controls_test.go:117: mode-group-writable-ancestor: killed by TestDestinationBoundary/shared-ancestor; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/protected-equal-identity
+    destination_controls_test.go:117: protected-equal-identity: killed by TestDestinationProtectedIdentity; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/ancestor-directory-replacement
+    destination_controls_test.go:117: ancestor-directory-replacement: killed by TestDestinationReplacementRaces/ancestor-directory; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/target-identical-replacement
+    destination_controls_test.go:117: target-identical-replacement: killed by TestDestinationReplacementRaces/target-identical; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/empty-target
+    destination_controls_test.go:117: empty-target: killed by TestDestinationReadOnlyAdmission; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/private-parent
+    destination_controls_test.go:117: private-parent: killed by TestDestinationPrivateParent; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/unrelated-one-entry
+    destination_controls_test.go:117: unrelated-one-entry: killed by TestDestinationBoundary/unrelated; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/publication-replaces-empty
+    destination_controls_test.go:117: publication-replaces-empty: killed by TestPublicationNoReplaceRace/empty; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/acl-one-permit-kind
+    destination_controls_test.go:117: acl-one-permit-kind: killed by TestDestinationKernelACL; child exit 1 (expected failing command)
+=== RUN   TestDestinationNarrowingControls/prior-acl-one-member
+    destination_controls_test.go:117: prior-acl-one-member: killed by TestDestinationPriorKernelACL; child exit 1 (expected failing command)
+--- PASS: TestDestinationNarrowingControls (13.14s)
+    --- PASS: TestDestinationNarrowingControls/cleanup-foreign-stage-link (0.87s)
+    --- PASS: TestDestinationNarrowingControls/cleanup-omits-one-file (0.84s)
+    --- PASS: TestDestinationNarrowingControls/post-verify-one-byte-mismatch (1.16s)
+    --- PASS: TestDestinationNarrowingControls/M2-linked-ancestor (0.80s)
+    --- PASS: TestDestinationNarrowingControls/M6-saved-manifest-bytes (0.71s)
+    --- PASS: TestDestinationNarrowingControls/owner-root-parent (0.74s)
+    --- PASS: TestDestinationNarrowingControls/mode-group-writable-ancestor (0.77s)
+    --- PASS: TestDestinationNarrowingControls/protected-equal-identity (0.87s)
+    --- PASS: TestDestinationNarrowingControls/ancestor-directory-replacement (0.79s)
+    --- PASS: TestDestinationNarrowingControls/target-identical-replacement (0.84s)
+    --- PASS: TestDestinationNarrowingControls/empty-target (0.75s)
+    --- PASS: TestDestinationNarrowingControls/private-parent (0.74s)
+    --- PASS: TestDestinationNarrowingControls/unrelated-one-entry (0.70s)
+    --- PASS: TestDestinationNarrowingControls/publication-replaces-empty (0.94s)
+    --- PASS: TestDestinationNarrowingControls/acl-one-permit-kind (0.79s)
+    --- PASS: TestDestinationNarrowingControls/prior-acl-one-member (0.84s)
+PASS
+ok  	github.com/relux-works/curator/internal/envsnapshot	13.405s
+
+
+### lint-01.log
+
+0 issues.
+
+
+### linux-lint-01.log
+
+0 issues.
+
+
+### build-01.log
+
+
+
+### linux-compile-01.log
+
+
+
+### windows-compile-01.log
+
+
+
+## Round 2 hosted failure excerpts
+
+These are excerpts, not a full log and not a passing test record. The hosted job IDs and failed stages are in the outcome above.
+
+### Job 117498647115
+
+2026-10-17T20:40:26.9481009Z can't create $WORK/b166/_pkg_.a: open $WORK/b166/_pkg_.a: no space left on device
+
+### Job 117498647121
+
+2026-10-17T20:40:31.0418056Z can't create $WORK/b352/_pkg_.a: open $WORK/b352/_pkg_.a: no space left on device (typecheck)
+
+### Job 117498647173
+
+2026-10-17T20:40:26.8574607Z path/filepath: open <temporary-path>: no space left on device
+2026-10-17T20:40:26.8661177Z vendor/golang.org/x/sys/cpu: mkdir <temporary-path>: no space left on device
+2026-10-17T20:40:26.8741664Z internal/sysinfo: mkdir <temporary-path>: no space left on device
+2026-10-17T20:40:26.8794514Z internal/lazyregexp: mkdir <temporary-path>: no space left on device
+2026-10-17T20:40:26.8800937Z os/signal: mkdir <temporary-path>: no space left on device
+
+### Job 117498647291
+
+2026-10-17T20:40:43.8367386Z internal/sync: open <temporary-path>: no space left on device
+2026-10-17T20:40:43.8367945Z internal/runtime/maps: open <temporary-path>: no space left on device
+2026-10-17T20:40:43.8453999Z vet: failed to export analysis facts: open $WORK/b055/vet.out: no space left on device
+2026-10-17T20:40:43.9828612Z vet: failed to export analysis facts: open $WORK/b110/vet.out: no space left on device
+2026-10-17T20:40:43.9829283Z vet: failed to export analysis facts: open $WORK/b038/vet.out: no space left on device
+
+### Job 117498647424
+
+2026-10-17T20:40:43.8344474Z     family_qualification_test.go:20: open <temporary-path>: no space left on device
+2026-10-17T20:40:43.8365859Z     family_qualification_test.go:20: mkdir <temporary-path>: no space left on device
+2026-10-17T20:40:43.8385635Z     family_qualification_test.go:20: open <temporary-path>: no space left on device
+2026-10-17T20:40:43.8396822Z     family_qualification_test.go:45: open <temporary-path>: no space left on device
+2026-10-17T20:40:43.8417872Z     family_qualification_test.go:45: open <temporary-path>: no space left on device
+
+Hosted readback: completed/cancelled. Gate process exit 137; cancellation request exit 0. Temporary branch readback is empty (exit 0). No pending validation process remains.
+
+
+# Round 2 hosted-gate retry — blocked by hosted Linux ACL baseline
+
+Task: TASK-261016-w0yx2w — implement retained-handle snapshot destination publication.
+
+No implementation change is delivered by this retry. The candidate remains uncommitted at the managed Story checkpoint. Candidate signed snapshot `b5a21d362c27956aaef1da5d8ec4cb389665593e`, tree `2e1811a9302b6d040adff5cf0a4692fa09b3ffb0`, signature **G**, matches the current complete worktree tree. Every recorded source/test/configuration identity member is unchanged. Local environment remains macOS 27.0 arm64 / Go 1.25.5. No Story commit, checkout, rebase, merge, Story-index staging or CI-configuration change was made.
+
+## Actual hosted result
+
+[Full hosted run 39067688154, attempt 2](https://github.com/relux-works/curator/actions/runs/39067688154/attempts/2) reran the entire original matrix on the exact signed candidate. `gh run rerun 39067688154` exited **0**, which admits the trigger only. The full gate is **not green**: **16 successful jobs, 1 failed job, 3 cancelled jobs, 2 conditional skipped jobs**. The remaining three long suites were cancelled only after the Linux race failure and its bounded diagnostic established the blocker; they are not passing evidence. Terminal status is `completed/cancelled`; terminal `gh run watch 39067688154 --exit-status` exited **1**.
+
+| Job | Actual verdict | Job ID |
+|---|---|---:|
+| Lint | success | 117501715766 |
+| Test (windows-latest) | cancelled | 117501715851 |
+| Race (macos-latest) | cancelled | 117501715863 |
+| Gate self-test (windows-latest) | success | 117501715864 |
+| Interop conformance gate | success | 117501715920 |
+| Naming gate | success | 117501715933 |
+| Go 1.27.1 driver (ubuntu-latest) | success | 117501715943 |
+| Go 1.26.0 driver (macos-latest) | success | 117501715945 |
+| Gate self-test (macos-latest) | success | 117501715954 |
+| Test (macos-latest) | cancelled | 117501715973 |
+| Race (ubuntu-latest) | failure | 117501715977 |
+| Go 1.27.1 driver (macos-latest) | success | 117501715996 |
+| Test (ubuntu-latest) | success | 117501715998 |
+| Go 1.25.5 driver (ubuntu-latest) | success | 117501716030 |
+| Go 1.26.0 driver (windows-latest) | success | 117501716045 |
+| Gate self-test (ubuntu-latest) | success | 117501716083 |
+| Go 1.27.1 driver (windows-latest) | success | 117501716105 |
+| Go 1.25.5 driver (windows-latest) | success | 117501716116 |
+| Go 1.26.0 driver (ubuntu-latest) | success | 117501716117 |
+| Go 1.25.5 driver (macos-latest) | success | 117501716140 |
+| Candidate suite (${{ matrix.os }}) | skipped | 117501716661 |
+| Test (self-hosted macOS) | skipped | 117501716737 |
+
+The self-hosted Linux Test job passed `bash .github/ci/test-gate.sh .temp/ci-evidence/test`, exit **0**. The GitHub-hosted Linux Race job failed `bash .github/ci/test-gate.sh .temp/ci-evidence/race`, exit **1**, with `GO_TEST_FLAGS=-race` and `GO_TEST_TIMEOUT=60m`. Its snapshot valid controls refuse with `environment_materialize_destination_invalid: directory-acl` before publication. This is a real failing required gate, not an expected-red mutant and not a race-detector success.
+
+The normal Linux artifact has **254 test/subtest pass verdicts, 0 failures, 0 skips** in `internal/envsnapshot`, plus the passing package verdict. The Linux race artifact has **178 test/subtest pass verdicts, 76 failures, 0 skips**, plus the failing package verdict. Its one non-JSON leading line is a Go dependency-download banner; every remaining event parses and the terminal package failure is present. All original seven reviewer test names remain in the candidate, unchanged, and pass in both Linux artifacts. Named Linux successes include access/default ACL rejection, prior ACL rejection, and all four `TestPublicationNoReplaceRace` competing-entry variants in the regular Test job.
+
+## Bounded diagnosis and external blocker
+
+The unchanged workflow routes the normal Linux Test job through the configured self-hosted Linux runner, but its `race` job uses `runs-on: matrix.os` directly. Job API labels confirm the failed job used GitHub-hosted `ubuntu-latest` (Ubuntu 24.04 image), while the green normal Test job used self-hosted Linux. No runner storage error recurred in this attempt.
+
+[Diagnostic run 39070224888](https://github.com/relux-works/curator/actions/runs/39070224888) uses signed detached diagnostic commit `d12ce1c3f5b80f2fffb3e94d663ec3533df06996` (signature **G**). Relative to the candidate, it adds only ACL metadata logging in the existing Linux test and replaces the workflow with one focused hosted-Linux diagnostic job. **This is not a candidate or full-gate qualification.** It executes `go test -race -count=1 -run '^TestDestinationKernelACL$' -v ./internal/envsnapshot`, actual exit **1**. Both positive controls reproduce the intended `directory-acl` refusal. The diagnostic reports a readable **44-byte `system.posix_acl_default` on a retained ancestor above the workspace**, depth 7 from the fixture, filesystem type `0xef53`; the other probed ACL attributes report `ENODATA`. It logs sizes/errno/filesystem metadata only, never ACL payloads or host pathnames. This establishes actual extended/default ACL evidence in that runner baseline; it is neither an unreadable-result-as-absence inference nor a storage-failure inference.
+
+The current Linux admission policy intentionally refuses extended access/default ACLs rather than treating their presence as absent. The existing candidate test contract specifically rejects a default ACL even when the directory mode remains private. This retry does not broaden that policy to fit an image. The diagnostic branch was deleted and absence verified. Temporary diagnostic test bytes were restored before constructing the diagnostic tree; the complete current worktree tree and every stored identity member are again exactly the original candidate.
+
+**Input required:** the CI owner supplies a Linux race execution environment whose retained ancestry satisfies this boundary. Preferred option: route the Linux race job to the same qualified self-hosted Linux configuration as the regular Test job, with the normal configuration review and subsequent full candidate gate. Alternative: qualify an operator-owned ephemeral runner image with an appropriate ACL baseline before tests. Both retain actual syscall/ACL/race testing. This leaf does not authorize editing global runner ACLs, changing another owner's CI configuration, weakening the product ACL gate, skipping positive controls or accepting a failed hosted status. Such configuration is outside this leaf's declared module paths. No unresolved product model is being papered over.
+
+After that input, rerun the full required gate on the appropriate exact candidate/configuration identity, inspect every job, update evidence and checklist, then invoke developer handoff. There is no developer handoff in this blocked retry.
+
+## Round 2 AC evidence and bounds
+
+Coverage remains **5 of 5 leaf AC rows driven through production library calls** by unchanged local macOS evidence and the green Linux Test job. **0 of 5 materialize CLI rows driven**: SNAP-CLI is explicitly separate. This ratio does not claim a passing full gate, Linux race acceptance, cancelled macOS/Windows full-suite acceptance, Windows publication support or source authorization. The earlier Round 2 outcome retains the complete four-row paired-test coverage map and out-of-contract clauses; the brief still lacks a catalog-keyed surface table, a declared brief gap.
+
+All five AC rows below reuse the previously attached local command `go test -count=1 -race -coverprofile=.temp/TASK-261016-w0yx2w/coverage.out ./internal/envsnapshot`, exit **0**, on the unchanged macOS identity; this retry did not rerun it. All five also execute in the fresh Linux Test job's command above, exit **0**. The full Linux race job exits **1** and its positive admission refusal blocks acceptance; no row is silently promoted to full-gate success.
+
+| AC row | Production call and named tests | New command/result and limit |
+|---|---|---|
+| 1. Read-only retained no-follow owner/ACL admission | `OpenDestination` -> `retainDirectories` / `destinationDirectory`; `TestDestinationReadOnlyAdmission`, `TestDestinationBoundary`, `TestDestinationOwnershipAndReadFailure`, `TestDestinationKernelACL`, `TestDestinationPriorKernelACL` | Linux Test gate **0**; access/default ACL cases execute. Linux Race gate **1**, valid ancestry refuses due actual default ACL. Windows runtime admission refusal was not newly qualified because its suite was cancelled. |
+| 2. Protected identity/ancestry exclusion | `OpenDestination` -> `excludeProtected`; `TestDestinationProtectedIdentity` | Linux Test gate **0** for every supplied protected-root class. Inventory discovery remains the coordinator's responsibility; Linux Race gate **1** before these valid controls can admit. |
+| 3. Absent/private-parent admission, retained-parent no-replace publication | `OpenDestination`, `Revalidate`, `Publish` -> `publishNoReplace`; `TestDestinationPrivateParent`, `TestDestinationReplacementRaces`, `TestPublicationNoReplaceRace`, `TestPublicationRetainedParentRace` | Linux Test gate **0**, real Linux renameat2 competition cases pass; existing empty destinations refuse per the owner decision. Linux Race gate **1** before publication. |
+| 4. Actual prior tree identity and exact-generation no-op | `MatchPrior` / `Publish` prior branch -> `verifyDirectory`; `TestDestinationPriorIdentity`, `TestDestinationPriorMissingMetadata`, `TestDestinationPriorKernelACL`, `TestPublicationPrivateAndPrior` | Linux Test gate **0**, prior byte/mode/extra/version/generation refusals and unchanged no-op execute. Linux Race gate **1** due baseline admission. |
+| 5. Private captured copies, post-verification and staging-only cleanup | `Publish` -> `createStagingDirectory`, `createStagingFile`, `cleanupStaging`, `verifyDirectory`; `TestPublicationCapturedIdentity`, `TestPublicationStagingOnlyCleanup`, `TestPublicationKernelStagingFailure`, `TestPublicationCleanupSubstitutedRoot`, `TestPublicationPostVerification` | Linux Test gate **0**, failure/interruption/cleanup/no-success cases execute. Linux Race gate **1** before staging. Same-user mutation inside private staging remains outside snapshots section 2; abrupt-death recovery and CLI output are not claimed. |
+
+## Narrowing controls — exact-identity evidence reused
+
+No product gate, behavioral test or mutant definition changed. The previous corrected macOS control command `go test -tags snapshotcontrols -count=1 -run '^TestDestinationNarrowingControls$' -v ./internal/envsnapshot` remains exact-identity green evidence (harness **0**, sixteen intended child failures **1**). It was **not rerun** in this retry; no Linux mutant execution is claimed. The following table is retained from the attached Round 2 outcome, including its historical survivor and precise bound; that survivor is not recast as a kill.
+
+
+Every current listed plant below is killed on macOS with a named behavioral failure and child exit **1**. The harness itself exits **0** only after verifying those failures. Build/setup failure and a missing/skipped test cannot count. Linux-specific ACL/no-replace plants are present but **not executed**; no Linux mutant kill is claimed.
+
+| Mutant | What the gate is narrowed to admit | Named failing test | Result / surviving bound |
+|---|---|---|---|
+| cleanup-foreign-stage-link | Cleanup removes exactly one foreign stage-looking sibling link in addition to recorded objects | `TestPublicationStagingOnlyCleanup/io-failure` | Killed, exit 1 |
+| cleanup-omits-one-file, initial test selection | Leave only the recorded AGENTS.md cleanup member behind | None; `TestPublicationStagingOnlyCleanup/io-failure` passed | **Survivor**, child exit 0: interruption occurred before AGENTS.md was staged. This selection proves nothing about that member. |
+| cleanup-omits-one-file, corrected test selection | Same weakening; interrupt after the entire stage is populated | `TestPublicationStagingOnlyCleanup/before-rename` | Killed, exit 1 |
+| post-verify-one-byte-mismatch | Only `file-identity` mismatch may return success after publication; other verification refusals remain | `TestPublicationPostVerification/bytes` | Killed, exit 1 |
+| publication-replaces-empty | Weaken no-replace to ordinary rename, retaining refusal of a nonempty competing directory but admitting replacement of an empty one | `TestPublicationNoReplaceRace/empty` | Killed, exit 1; macOS backend only executed |
+| M2-linked-ancestor | Allow only a directory component named target to follow a link | `TestDestinationBoundary/linked-ancestor` | Killed, exit 1 |
+| M6-saved-manifest-bytes | Trust saved manifest only after an actual-file identity failure | `TestDestinationPriorIdentity/bytes` | Killed, exit 1 |
+| owner-root-parent | Admit root-owned immediate parent for an unprivileged caller | `TestDestinationOwnershipAndReadFailure` | Killed, exit 1 |
+| mode-group-writable-ancestor | Admit only mode 0770 as an otherwise forbidden writable ancestor | `TestDestinationBoundary/shared-ancestor` | Killed, exit 1 |
+| protected-equal-identity | Allow equality while other ancestry checks remain | `TestDestinationProtectedIdentity` | Killed, exit 1 |
+| ancestor-directory-replacement | Permit replacement only for retained component parent | `TestDestinationReplacementRaces/ancestor-directory` | Killed, exit 1 |
+| target-identical-replacement | Permit changed target inode only when replacement mode is 0700 | `TestDestinationReplacementRaces/target-identical` | Killed, exit 1 |
+| empty-target | Treat just an empty existing target as absent | `TestDestinationReadOnlyAdmission` | Killed, exit 1 |
+| private-parent | Additionally admit mode 0755 immediate parent | `TestDestinationPrivateParent` | Killed, exit 1 |
+| unrelated-one-entry | Admit only an unrelated single-entry target | `TestDestinationBoundary/unrelated` | Killed, exit 1 |
+| acl-one-permit-kind | Admit only the real kernel permit ACE with rights mask 0x24 | `TestDestinationKernelACL` | Killed, exit 1 |
+| prior-acl-one-member | Skip only AGENTS.md prior-member ACL check | `TestDestinationPriorKernelACL` | Killed, exit 1; Linux variant is unrun |
+
+
+
+## Command ledger and scope
+
+| Command or observation | Real exit | Bound |
+|---|---:|---|
+| `gh run rerun 39067688154` | 0 | Full-matrix trigger admitted, not a green verdict. |
+| Linux Test: `bash .github/ci/test-gate.sh .temp/ci-evidence/test` | 0 | Self-hosted Linux, full required job and snapshot runtime evidence. |
+| Linux Race: `bash .github/ci/test-gate.sh .temp/ci-evidence/race` | 1 | GitHub-hosted Linux, actual ACL-positive-control failures. |
+| `gh run watch 39067688154 --exit-status --interval 55` | 143 | Local observer deliberately stopped after a bounded interval; does not cancel or attest the hosted gate. |
+| `GOOS=linux GOARCH=amd64 go test -c -o .temp/TASK-261016-w0yx2w/gate-rerun/envsnapshot-diagnostic-linux.test ./internal/envsnapshot` | 0 | Diagnostic test compiles only; no Linux execution claim. |
+| Diagnostic: `go test -race -count=1 -run '^TestDestinationKernelACL$' -v ./internal/envsnapshot` | 1 | Reproduced ACL baseline refusal; diagnostic only, not a green control. |
+| `gh run cancel 39067688154` | 0 | Cancellation request for this attempt only. Terminal cancellation separately read back. |
+| `gh run watch 39067688154 --exit-status` | 1 | Terminal failed/cancelled gate, not success. |
+| Complete candidate-tree equality check and recorded SHA256-member comparison | 0 | No retained candidate changes. |
+| Signature verification for original and diagnostic snapshots | 0 | Both report G; detached snapshots only. |
+| Diagnostic branch deletion and fresh `git ls-remote --heads` readback | 0 | No diagnostic branch remains. |
+
+The first raw job-log fetch exited **1** because the CLI refused terminal escape sequences; the explicit `--allow-escape-sequences` retry exited **0**. An initial generic JSON reader exited **1** on the dependency-download banner; the bounded reader identified that single banner and parsed all subsequent events. An initial diagnostic push had an invalid shell-expanded refspec and published nothing; the corrected explicit refspec push exited **0**. None of these are represented as passing validation commands. No status-masking test pipeline was used.
+
+There is **no retained rework diff**. The diagnostic-only exception was the temporary detached workflow override used solely to probe a hosted runner, plus logging in the existing Linux test. Neither is in the candidate. Root README and module README exceptions remain exactly as justified in the earlier implementation outcome. No full local mirror, review waiver, remote status override, relaxed ACL gate, test skip or infrastructure mutation was used.
+
+Logbook: the reported storage repair permits the self-hosted Linux suite to pass. The exact-candidate rerun exposed a different baseline on the workflow's GitHub-hosted Linux race job: a real default ACL above the workspace. A signed isolated diagnostic reproduced it without changing product behavior or the candidate. The full gate remains red/unverified; required checklist rows remain unchecked. Persisted evidence is `TASK-261016-w0yx2w_gate-retry-evidence.json`, this outcome, and the updated validation history. No local process or hosted run is left pending.
+
+
+=== Round 3: routing change, source-caused first failure, green exact retry ===
+First full command: sh scripts/remote-gate.sh; actual exit 1. Run https://github.com/relux-works/curator/actions/runs/39071503518 on 0c9a7d1f0b7a18867a9c926897e8df10cd46cb84. Windows routing plant harness failed before applying plants because of LF-only header matching; no kill claimed. Other 19 jobs passed, 2 conditional skips.
+Correction: tools/ciworkflow/isolation_test.go accepts LF/CRLF and independently exercises both positive controls plus four narrowing controls. Snapshot source and tests unchanged. go test -count=1 -v ./tools/ciworkflow/ exit 0; golangci-lint run ./tools/ciworkflow/... exit 0.
+Workflow self-test first invocation exit 1 (fixture signing environment absent); retry with configured agent Git environment exit 0, 267 passed, 0 failed, 2 explicit local rustup capability skips.
+Second full command: sh scripts/remote-gate.sh; actual exit 0. Run https://github.com/relux-works/curator/actions/runs/39075205524 on signed snapshot 57de425979331d8fc21d91a7f7b349d5af2b5840; signature G; tree 2e20b225f2794c9e524ee69332ed156424c612d8. 20 successful jobs, 2 declared conditional skips.
+
+
+### Round 3 retry terminal hosted evidence
+
+[Run 39075205524](https://github.com/relux-works/curator/actions/runs/39075205524) reports **20 successful jobs and 2 conditional skips** on the exact signed retry snapshot. Every job and step verdict was inspected. The remote-gate process exited **0**; no local mirror or synthetic status is used. The skipped optional self-hosted macOS and candidate-suite jobs are not passes.
+
+| Hosted job | Terminal result |
+|---|---|
+| Race (macos-latest) | success |
+| Gate self-test (ubuntu-latest) | success |
+| Go 1.26.0 driver (ubuntu-latest) | success |
+| Gate self-test (macos-latest) | success |
+| Gate self-test (windows-latest) | success |
+| Naming gate | success |
+| Go 1.26.0 driver (macos-latest) | success |
+| Race (ubuntu-latest) | success |
+| Lint | success |
+| Go 1.27.1 driver (ubuntu-latest) | success |
+| Test (ubuntu-latest) | success |
+| Test (windows-latest) | success |
+| Test (macos-latest) | success |
+| Go 1.27.1 driver (windows-latest) | success |
+| Interop conformance gate | success |
+| Go 1.25.5 driver (macos-latest) | success |
+| Go 1.25.5 driver (windows-latest) | success |
+| Go 1.26.0 driver (windows-latest) | success |
+| Go 1.27.1 driver (macos-latest) | success |
+| Go 1.25.5 driver (ubuntu-latest) | success |
+| Test (self-hosted macOS) | skipped |
+| Candidate suite (${{ matrix.os }}) | skipped |
+
+| Snapshot stream | Passing test/subtest verdicts | Failures / skips | Runtime bound |
+|---|---:|---:|---|
+| test-linux | 254 | 0 / 0 | Qualified platform publication and all seven original reviewer names |
+| race-linux | 254 | 0 / 0 | Qualified platform publication and all seven original reviewer names |
+| test-macos | 252 | 0 / 0 | Qualified platform publication and all seven original reviewer names |
+| race-macos | 252 | 0 / 0 | Qualified platform publication and all seven original reviewer names |
+| test-windows | 104 | 0 / 0 | Explicit unqualified-platform refusal only |
+
+The exact hosted commands were `bash .github/ci/test-gate.sh .temp/ci-evidence/test` on Linux, macOS and Windows, and `bash .github/ci/test-gate.sh .temp/ci-evidence/race` with `GO_TEST_FLAGS=-race` on Linux/macOS; each corresponding hosted step exited **0**. The artifact parser `python3 .temp/TASK-261016-w0yx2w/round3-read-retry-evidence.py test-linux race-linux test-macos race-macos test-windows` exited **0** after checking complete terminal JSON package results, no snapshot failures/skips, required reviewer names and all named LF/CRLF routing controls. Linux race has one classified dependency-download banner; every later line parses.
+
+On all five streams, `TestLinuxRoutingKeepsForksHosted/race` and both LF/CRLF positive controls pass. All four named LF/CRLF `fork_admitted`/`dispatch_hosted` controls pass by requiring the intended behavioral child failure and child exit **1**. The current routing plants have no survivor on Linux, macOS or Windows; the first candidate's unapplied Windows plants remain historical survivors above. Snapshot mutation controls were reused only under their unchanged recorded macOS source/test/configuration/toolchain identity; Linux snapshot mutation runs are not claimed.
+
+The source-identity check, full temporary-index tree comparison, signature verification, reverse-patch check and `git diff --check` all exit **0**. Story HEAD remains `1724b4a52b4c2d163c0a3e6ab7c2ad2bbe54ac0c`, with the 21-path candidate uncommitted. The detached signed tree is `2e20b225f2794c9e524ee69332ed156424c612d8`. The canonical outcome, validation ledger, current patch, source identity and current hosted evidence are attached before handoff.
+
+Logbook: CI-owner routing applied without weakening destination ACL admission. CRLF regression found by first full gate was corrected with named LF/CRLF positive and narrowing controls; exact retry passed. No CLI integration or Windows publication qualification claimed.
