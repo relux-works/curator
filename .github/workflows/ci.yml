@@ -138,6 +138,12 @@ jobs:
         run: go vet ./internal/godriver
       - name: Build manager
         run: go build ./cmd/curator
+      - name: Restore runner temporary tree permissions
+        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/restore-runner-tmp.sh
+
 
   # ---------------------------------------------------------------------------
   # The default lane, against the committed conformance pin, on all three runners.
@@ -294,6 +300,12 @@ jobs:
           name: test-evidence-${{ matrix.os }}
           path: .temp/ci-evidence/
           if-no-files-found: warn
+      - name: Restore runner temporary tree permissions
+        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/restore-runner-tmp.sh
+
 
   # ---------------------------------------------------------------------------
   # The same default lane on the organisation's self-hosted macOS ARM64
@@ -536,6 +548,11 @@ jobs:
           name: race-evidence-${{ matrix.os }}
           path: .temp/ci-evidence/
           if-no-files-found: warn
+      - name: Restore runner temporary tree permissions
+        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/restore-runner-tmp.sh
 
   lint:
     name: Lint
@@ -598,6 +615,12 @@ jobs:
       - name: Verify GoReleaser rc channel values
         shell: bash
         run: go test -count=1 ./tools/goreleaserconfig/
+      - name: Restore runner temporary tree permissions
+        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/restore-runner-tmp.sh
+
 
   # The gates are only worth their exit codes if they reject what they claim
   # to reject. This runs on all three runners because the gate scripts must
@@ -625,6 +648,11 @@ jobs:
       - name: Self-test the CI gates
         shell: bash
         run: bash .github/ci/gate-selftest.sh
+      - name: Restore runner temporary tree permissions
+        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/restore-runner-tmp.sh
 
   interop:
     name: Interop conformance gate
@@ -664,6 +692,11 @@ jobs:
         env:
           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
         run: go test -count=1 -timeout 30m ./internal/interop/ -v
+      - name: Restore runner temporary tree permissions
+        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/restore-runner-tmp.sh
 
   naming-gate:
     name: Naming gate
@@ -687,6 +720,12 @@ jobs:
         # Rules, the binary-patch exemption and the assembled-from-parts
         # patterns live in the script; gate-selftest.sh drives its rows.
         run: bash .github/ci/naming-gate.sh
+      - name: Restore runner temporary tree permissions
+        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/restore-runner-tmp.sh
+
   candidate-conformance:
     name: Candidate suite (${{ matrix.os }})
     if: >-

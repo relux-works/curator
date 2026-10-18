@@ -163,3 +163,15 @@ Use `sh scripts/remote-gate.sh` for actual runner evidence. Keep logs in
 linker failure. Require three consecutive green `main` runs on the self-hosted
 pool before declaring the pool qualified; a green `gate/**` snapshot alone
 does not satisfy that rollout requirement.
+
+### Temporary tree self-heal
+
+Each Linux-routable job ends with `scripts/restore-runner-tmp.sh`, guarded by
+`always() && runner.environment == 'self-hosted' && runner.os == 'Linux'`.
+The host job-completed hook removes the runner's `TMPDIR` tree (including
+stale test trees from previous jobs); `RUNNER_TEMP` holds Actions state and
+is not a substitute for that root. The script restores owner write permission
+with `chmod -R u+w`, never removes files, and always exits successfully.
+Unset, empty, non-directory, symlink and filesystem-root values are refused.
+Recursive chmod does not follow links inside the tree. Run
+`go test -count=1 ./tools/ciworkflow/` for workflow, refusal and behavior checks.

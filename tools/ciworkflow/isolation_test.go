@@ -34,11 +34,13 @@ func checkInlineGoState(body string) error {
 }
 
 type step struct {
-	Uses string            `yaml:"uses"`
-	Run  string            `yaml:"run"`
-	If   string            `yaml:"if"`
-	Env  map[string]string `yaml:"env"`
-	With map[string]string `yaml:"with"`
+	Shell    string            `yaml:"shell"`
+	Continue bool              `yaml:"continue-on-error"`
+	Uses     string            `yaml:"uses"`
+	Run      string            `yaml:"run"`
+	If       string            `yaml:"if"`
+	Env      map[string]string `yaml:"env"`
+	With     map[string]string `yaml:"with"`
 }
 
 type workflow struct {
