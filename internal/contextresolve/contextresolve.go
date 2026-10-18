@@ -34,7 +34,7 @@ const (
 	DiagWeightUnknown        = "context_weight_unknown"
 	DiagCompositionInvalid   = "environment_composition_invalid"
 	DiagMCPPackageNotAllowed = "mcp_package_not_allowed"
-	DiagSourceMismatch       = "context_source_mismatch"
+	DiagSourceMismatch       = DiagRangeConflict
 	DiagSourceUnsigned       = "context_source_unsigned"
 	DiagSourceSignerRejected = "context_source_signer_rejected"
 	DiagSourceSignersMissing = "context_source_signers_missing"
@@ -46,6 +46,8 @@ const MachineRequirer = "machine"
 
 // Requirement is one constraint-contributing declaration.
 type Requirement struct {
+	Mode      string
+	Commands  []string
 	Kind      string
 	Name      string
 	Source    string // canonical network identity, or "" to take the source's own
@@ -76,10 +78,12 @@ func (r Requirement) exact() bool { return r.Range == "" }
 // Package is the manifest of one package at one commit as resolution reads
 // it. Version is empty for a skill.
 type Package struct {
-	Version  string
-	Weight   int64
-	Weights  map[string]int64
-	Requires []Requirement
+	SchemaVersion int
+	SkillCommands map[string]bool
+	Version       string
+	Weight        int64
+	Weights       map[string]int64
+	Requires      []Requirement
 }
 
 // Candidate is one version tag of a source peeled to its commit.
@@ -157,6 +161,7 @@ type Overlay struct {
 
 // Input is one resolution request.
 type Input struct {
+	Precedence contextlock.Precedence
 	// Root is the install declaration: kind context.
 	Root Requirement
 	// RootState is set for a path or local root; Root then carries only Name.
@@ -180,6 +185,8 @@ type Input struct {
 type RequirerConstraint struct {
 	Requirer   string `json:"requirer"`
 	Constraint string `json:"constraint"`
+	Source     string `json:"source"`
+	Directory  string `json:"directory"`
 }
 
 // RequirerWeight is one requirer's edge weight in a weight-conflict detail.
@@ -208,7 +215,7 @@ func (e *Error) Error() string {
 		parts = append(parts, e.Name)
 	}
 	for _, requirer := range e.Requirers {
-		parts = append(parts, fmt.Sprintf("%s requires %s", requirer.Requirer, requirer.Constraint))
+		parts = append(parts, fmt.Sprintf("%s requires %s source %s directory %q", requirer.Requirer, requirer.Constraint, requirer.Source, requirer.Directory))
 	}
 	for _, requirer := range e.WeightRequirers {
 		parts = append(parts, fmt.Sprintf("%s declares weight %d", requirer.Requirer, requirer.Weight))
@@ -476,28 +483,29 @@ func (r *resolver) selectName(name string) error {
 	// Source identity and directory must agree across every requirer.
 	// Comparison is over the core §6.1 canonical identity (environments
 	// §1.4): two spellings of one repository are one identity and never a
-	// spurious context_source_mismatch. File:// remotes (no network
+	// spurious context_range_conflict. File:// remotes (no network
 	// identity) compare as their raw URLs so distinct test remotes stay
 	// distinct.
 	declaredSource, directory := "", ""
 	declaredCanonical := ""
+	directorySeen := false
 	for _, c := range constraints {
 		if c.requirement.Source != "" {
 			canonical := canonicalForAgreement(c.requirement.Source)
 			if declaredSource != "" && declaredCanonical != canonical {
-				return &Error{Diagnostic: DiagSourceMismatch, Name: name,
-					Detail: fmt.Sprintf("requirers disagree on the source identity (%s vs %s)", declaredSource, c.requirement.Source)}
+				conflict := r.conflict(name, []string{})
+				conflict.Detail = "requirers disagree on source identity"
+				return conflict
 			}
 			declaredSource = c.requirement.Source
 			declaredCanonical = canonical
 		}
-		if c.requirement.Directory != "" {
-			if directory != "" && directory != c.requirement.Directory {
-				return &Error{Diagnostic: DiagSourceMismatch, Name: name,
-					Detail: fmt.Sprintf("requirers disagree on the directory (%s vs %s)", directory, c.requirement.Directory)}
-			}
-			directory = c.requirement.Directory
+		if directorySeen && directory != c.requirement.Directory {
+			conflict := r.conflict(name, []string{})
+			conflict.Detail = "requirers disagree on directory"
+			return conflict
 		}
+		directory, directorySeen = c.requirement.Directory, true
 	}
 
 	// A path or local package has exactly one candidate: its state.
@@ -593,8 +601,8 @@ func (r *resolver) selectName(name string) error {
 				return r.conflict(name, considered)
 			}
 		}
-		if current != nil && current.commit == exactCommit {
-			return nil
+		if current != nil && current.commit == exactCommit && current.directory == directory && current.source == source {
+			return r.validateSkillRequirements(name, current)
 		}
 		if r.hasCeiling[name] && chosen.hasVer && pkgversion.Compare(chosen.version, r.ceiling[name]) > 0 {
 			return r.conflict(name, []string{chosen.version.String()})
@@ -635,12 +643,18 @@ func (r *resolver) selectName(name string) error {
 		}
 		return r.conflict(name, considered)
 	}
-	if current != nil && current.commit == best.Commit {
+	if current != nil && current.commit == best.Commit && current.directory == directory && current.source == source {
+		if err := r.validateSkillRequirements(name, current); err != nil {
+			return err
+		}
 		return r.verifyCandidate(current)
 	}
 	if current != nil && pkgversion.Compare(best.Version, current.version) > 0 {
 		// Rule 3: a selection never increases; keep the current one while it
 		// still satisfies every constraint.
+		if err := r.validateSkillRequirements(name, current); err != nil {
+			return err
+		}
 		return r.verifyCandidate(current)
 	}
 	chosen = &selection{kind: kind, name: name, source: source, directory: directory, commit: best.Commit,
@@ -820,6 +834,10 @@ func (r *resolver) admits(requirement Requirement, sel *selection) bool {
 
 // install records a selection, dropping and re-expanding as rule 3 requires.
 func (r *resolver) install(name string, sel *selection) error {
+	if err := r.validateSkillRequirements(name, sel); err != nil {
+		return err
+	}
+
 	if previous := r.selected[name]; previous != nil {
 		for _, changed := range r.drop(previous.key()) {
 			if _, still := r.constraints[changed]; !still {
@@ -861,7 +879,7 @@ func (r *resolver) conflict(name string, candidates []string) *Error {
 		err.Candidates = []string{}
 	}
 	for _, c := range constraints {
-		err.Requirers = append(err.Requirers, RequirerConstraint{Requirer: c.requirer, Constraint: c.requirement.Form()})
+		err.Requirers = append(err.Requirers, RequirerConstraint{Requirer: c.requirer, Constraint: c.requirement.Form(), Source: c.requirement.Source, Directory: c.requirement.Directory})
 	}
 	return err
 }
@@ -906,7 +924,19 @@ func (r *resolver) build() (*Result, error) {
 		lockSchema = contextlock.SchemaVersion2
 		lockHashVersion = 2
 	}
-	lock := &contextlock.Lock{SchemaVersion: lockSchema, HashVersion: lockHashVersion, Root: rootName}
+	for _, sel := range r.selected {
+		if (sel.pkg != nil && sel.pkg.SchemaVersion == 2) || (sel.kind == contextlock.KindSkill && sel.directory != "") {
+			lockSchema, lockHashVersion = contextlock.SchemaVersion4, 2
+		}
+	}
+	precedence := r.input.Precedence
+	if precedence.Winner == "" {
+		precedence.Winner = "higher-weight"
+	}
+	if precedence.Placement == "" {
+		precedence.Placement = "winner-last"
+	}
+	lock := &contextlock.Lock{SchemaVersion: lockSchema, HashVersion: lockHashVersion, Root: rootName, Precedence: precedence}
 	names := make([]string, 0, len(r.selected))
 	for name := range r.selected {
 		names = append(names, name)
@@ -977,7 +1007,7 @@ func (r *resolver) build() (*Result, error) {
 		member.Weight = weight
 		lock.Members = append(lock.Members, member)
 		result.Members[Key(sel.kind, name)] = Resolved{Kind: sel.kind, Name: name, Source: sel.source, Directory: sel.directory,
-			Commit: sel.commit, StateHash: member.StateHash, HashVersion: hashVersion, Version: member.Version, Package: sel.pkg}
+			Commit: sel.commit, StateHash: member.StateHash, HashVersion: hashing.Version(lockHashVersion), Version: member.Version, Package: sel.pkg}
 	}
 	lock.Sort()
 	hash, err := lock.Hash()
@@ -986,4 +1016,18 @@ func (r *resolver) build() (*Result, error) {
 	}
 	result.Lock, result.LockHash, result.Warnings = lock, hash, warnings
 	return result, nil
+}
+
+func (r *resolver) validateSkillRequirements(name string, sel *selection) error {
+	if sel.kind == contextlock.KindSkill && sel.pkg != nil && sel.pkg.SkillCommands != nil {
+		for _, constraint := range r.constraints[name] {
+			for _, command := range constraint.requirement.Commands {
+				if !sel.pkg.SkillCommands[command] {
+					return fmt.Errorf("manifest_invalid: skill %s has no requested command %s", name, command)
+				}
+			}
+		}
+	}
+
+	return nil
 }

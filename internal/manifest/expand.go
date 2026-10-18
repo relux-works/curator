@@ -390,6 +390,12 @@ func generatedPath(candidate string, outputs []string) bool {
 	return false
 }
 
+// ReadSkillPackage validates a selected package's core section 3 frontmatter
+// and section 4 manifest using the same reader as source expansion.
+func ReadSkillPackage(dir string) (string, *skillspec.Spec, error) {
+	return selectedPackage(dir)
+}
+
 func selectedPackage(dir string) (string, *skillspec.Spec, error) {
 	file := filepath.Join(dir, "SKILL.md")
 	info, err := os.Lstat(file)

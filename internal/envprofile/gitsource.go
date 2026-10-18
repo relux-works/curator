@@ -16,7 +16,9 @@ import (
 	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/gitops"
+	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/identity"
+	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/pkgversion"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -248,13 +250,27 @@ func (m *gitManager) Manifest(kind, name, source, directory, commit string) (*co
 	if err := gitops.Extract(dir, commit, snapshot); err != nil {
 		return nil, fmt.Errorf("%s: extract %s at %s: %v", DiagSourceInvalid, name, commit, err)
 	}
-	root := snapshot
-	if directory != "" {
-		root = filepath.Join(snapshot, filepath.FromSlash(directory))
+	root, err := selectedPackageRoot(snapshot, directory)
+	if err != nil {
+		return nil, err
 	}
 	switch kind {
 	case contextlock.KindSkill:
-		return &contextresolve.Package{}, nil
+		if directory == "" {
+			return &contextresolve.Package{}, nil
+		} // Legacy root-addressed migration is unchanged.
+		skillName, spec, err := manifest.ReadSkillPackage(root)
+		if err != nil {
+			return nil, fmt.Errorf("manifest_invalid: %w", err)
+		}
+		if skillName != name {
+			return nil, fmt.Errorf("manifest_invalid: SKILL.md name %s differs from required skill %s", skillName, name)
+		}
+		commands := map[string]bool{}
+		for command := range spec.Commands {
+			commands[command] = true
+		}
+		return &contextresolve.Package{SkillCommands: commands}, nil
 	case contextlock.KindMCP:
 		manifest, err := contextpkg.LoadMCP(root)
 		if err != nil {
@@ -612,9 +628,9 @@ func (m *gitManager) contextManifestAt(dir, commit, directory string) (*contextp
 	if err := gitops.Extract(dir, commit, snapshot); err != nil {
 		return nil, fmt.Errorf("%s: extract at %s: %v", DiagSourceInvalid, commit, err)
 	}
-	root := snapshot
-	if directory != "" {
-		root = filepath.Join(snapshot, filepath.FromSlash(directory))
+	root, err := selectedPackageRoot(snapshot, directory)
+	if err != nil {
+		return nil, err
 	}
 	manifest, err := contextpkg.LoadManifest(root)
 	if err != nil {
@@ -629,6 +645,29 @@ func (m *gitManager) contextManifestAt(dir, commit, directory string) (*contextp
 // directory when one is declared. A third call site must reuse this helper
 // rather than re-spelling the join, so directory-addressed packages cannot
 // drift out of any consumer's scope (environments §9.1).
+// selectedPackageRoot validates every selector component before package reads.
+// Extract rejects symlink entries too; this check also protects stored snapshots.
+func selectedPackageRoot(entry, directory string) (string, error) {
+	if directory == "" {
+		return entry, nil
+	}
+	if !identifiers.PortablePath(directory) {
+		return "", fmt.Errorf("%s: invalid directory %q", DiagSourceInvalid, directory)
+	}
+	root := entry
+	for _, component := range strings.Split(directory, "/") {
+		root = filepath.Join(root, component)
+		info, err := stateread.Lstat(root)
+		if err != nil {
+			return "", fmt.Errorf("%s: selected directory: %w", DiagSourceInvalid, err)
+		}
+		if info.Kind != stateread.KindPresent || info.Info == nil || info.Info.Mode()&os.ModeSymlink != 0 || !info.Info.IsDir() {
+			return "", fmt.Errorf("%s: selected directory traverses a link or non-directory", DiagSourceInvalid)
+		}
+	}
+	return root, nil
+}
+
 func packageRoot(entry, directory string) string {
 	if directory != "" {
 		return filepath.Join(entry, filepath.FromSlash(directory))
@@ -719,7 +758,7 @@ func (m *gitManager) inspectEntry(home string, resolved contextresolve.Resolved)
 // and is rejected at the Identity boundary with profile_source_invalid, as
 // is a file:// requirement source, which carries no network identity.
 func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
-	pkg := &contextresolve.Package{Version: manifest.Version, Weight: manifest.Weight, Weights: manifest.Weights}
+	pkg := &contextresolve.Package{SchemaVersion: manifest.SchemaVersion, Version: manifest.Version, Weight: manifest.Weight, Weights: manifest.Weights}
 	for _, name := range contextpkg.SortedNames(manifest.Contexts) {
 		requirement := manifest.Contexts[name]
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
@@ -733,6 +772,7 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
 			Kind: contextlock.KindSkill, Name: name, Source: canonicalRequirementSource(requirement.Git),
 			Range: requirement.Range, Tag: requirement.Tag, Revision: requirement.Revision,
+			Directory: requirement.Directory, Mode: requirement.Mode, Commands: requirement.Commands,
 		})
 	}
 	for _, name := range contextpkg.SortedNames(manifest.MCP) {
