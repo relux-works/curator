@@ -280,58 +280,39 @@ func (c cli) run(args []string) int {
 		_, _ = fmt.Fprint(c.stderr, usage)
 		return exitUsage
 	}
-	switch args[0] {
-	case "--version", "version":
-		_, _ = fmt.Fprintln(c.stdout, "curator "+version.String())
-		return exitOK
-	case "init":
-		return c.cmdInit(args[1:])
-	case "bootstrap":
-		return c.cmdBootstrap(args[1:])
-	case "add":
-		return c.cmdAdd(args[1:])
-	case "remove":
-		return c.cmdRemove(args[1:])
-	case "install":
-		return c.cmdInstall(args[1:])
-	case "update":
-		return c.cmdUpdate()
-	case "upgrade":
-		return c.cmdInstallMode(args[1:], true)
-	case "status":
-		return c.cmdStatus(args[1:])
-	case "list":
-		return c.cmdList()
-	case "project":
-		return c.cmdProject(args[1:])
-	case "skill":
-		if len(args) >= 2 && args[1] == "check" {
-			return c.cmdSkillCheck(args[2:])
-		}
-	case "global":
-		return c.cmdGlobal(args[1:])
-	case "profile":
-		return c.cmdProfile(args[1:])
-	case "env":
-		return c.cmdEnv(args[1:])
-	case "hybrid":
-		return c.cmdHybrid(args[1:])
-	case "audit":
-		return c.cmdAudit(args[1:])
-	case "gc":
-		return c.cmdGC()
-	case "shell-init":
-		return c.cmdShellInit(args[1:])
-	case "hook":
-		return c.cmdHook(args[1:])
-	case "ui":
-		return c.cmdUI()
-	case "config":
-		return c.cmdConfig(args[1:])
-	case "-h", "--help", "help":
+	if args[0] == "-h" || args[0] == "--help" {
 		_, _ = fmt.Fprint(c.stdout, usage)
 		return exitOK
 	}
+	if args[0] == "--version" {
+		_, _ = fmt.Fprintln(c.stdout, "curator "+version.String())
+		return exitOK
+	}
+	if args[0] == "help" {
+		if len(args) == 1 {
+			_, _ = fmt.Fprint(c.stdout, usage)
+			return exitOK
+		}
+		if command, _ := registeredCommand(args[1:]); command != nil {
+			_, _ = fmt.Fprint(c.stdout, command.helpText())
+			return exitOK
+		}
+		_, _ = fmt.Fprintf(c.stderr, "curator: unknown help topic %q\n", strings.Join(args[1:], " "))
+		return exitUsage
+	}
+	if command, _ := registeredCommand(args); command != nil && hasHelpFlag(args[1:]) {
+		_, _ = fmt.Fprint(c.stdout, command.helpText())
+		return exitOK
+	}
+	for _, command := range commandRegistry {
+		if command.name == args[0] && command.run != nil {
+			return command.run(c, args[1:])
+		}
+	}
+	return c.runProvider(args)
+}
+
+func (c cli) runProvider(args []string) int {
 	// Umbrella subcommand discovery (environments §11): an implemented
 	// subcommand always wins and discovery runs only for unknown names.
 	// The name must match the identifier grammar; anything else is a

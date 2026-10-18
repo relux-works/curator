@@ -306,6 +306,12 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+Run `go test ./cmd/curator -run 'Test(RegisteredSubcommandHelpNoWrites|CommandHelp)'`
+for built-in and nested command help, zero-write snapshots, the init positive
+control, provider passthrough, and narrowing mutants. Keep logs under `.temp/`.
+Command help is available as `curator <command> -h`, `--help`, or
+`curator help <command>`; a help-looking argument after `--` remains an operand.
+
 Run `go test -count=1 ./tools/ciworkflow/` to validate Linux CI cache isolation,
 workflow concurrency, and fork routing. CI initializes private Go state with
 `bash .github/ci/isolate-go-state.sh`; its environment records go to

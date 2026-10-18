@@ -6,6 +6,13 @@ Every synopsis and flag in this reference was verified verbatim against `./bin/c
 
 Curator flags use consistent names and behavior across command groups.
 
+For every built-in command (including nested verbs), `-h` or `--help` anywhere
+before `--` prints dedicated command help and exits 0 without modifying files or
+loading machine configuration. `curator help <command>` prints the same help.
+For example, `curator init -h` and `curator help env config set` are read-only.
+Arguments after `--` are operands; `curator run codex -- -h` forwards the literal
+`-h` to the run provider.
+
 - `--all`: operate on all configured projects.
 - `--audit`: run the audit gate in advisory or strict mode.
 - `--dry-run`: plan work without modifying files.
