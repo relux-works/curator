@@ -38,8 +38,8 @@ type pnpmFixture struct {
 
 func newPNPMFixture(t *testing.T) pnpmFixture {
 	t.Helper()
-	root := filepath.Join(t.TempDir(), "project")
-	work := filepath.Join(t.TempDir(), "work")
+	root := filepath.Join(writableTempDir(t), "project")
+	work := filepath.Join(writableTempDir(t), "work")
 	if err := os.MkdirAll(filepath.Join(root, "packages", "cli"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func newPNPMFixture(t *testing.T) pnpmFixture {
 		payloads[key] = payload
 		sum := sha512.Sum512(payload)
 		integrities[key] = "sha512-" + base64.StdEncoding.EncodeToString(sum[:])
-		file := filepath.Join(t.TempDir(), pkg.name+".tgz")
+		file := filepath.Join(writableTempDir(t), pkg.name+".tgz")
 		if err := os.WriteFile(file, payload, 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -158,7 +158,7 @@ func newTwoPeerContextFixture(t *testing.T) pnpmFixture {
 	fixture.request.Manifests = cloneBytesMap(fixture.request.Manifests)
 	fixture.request.Manifests["packages/cli/package.json"] = workspaceManifest
 	fixture.graph = mustParse(t, fixture.request)
-	file := filepath.Join(t.TempDir(), "peer-2.1.0.tgz")
+	file := filepath.Join(writableTempDir(t), "peer-2.1.0.tgz")
 	if err := os.WriteFile(file, payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +188,7 @@ func newHostPNPMFixture(t *testing.T) pnpmFixture {
 	fixture.request.Target.OS = runtime.GOOS
 	fixture.request.Target.Architecture = runtime.GOARCH
 	fixture.graph = mustParse(t, fixture.request)
-	file := filepath.Join(t.TempDir(), "optional-host.tgz")
+	file := filepath.Join(writableTempDir(t), "optional-host.tgz")
 	if err := os.WriteFile(file, payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -245,11 +245,11 @@ func newTargetPrunedSnapshotDependencyFixture(t *testing.T) pnpmFixture {
 	fixture.request.Target.OS = runtime.GOOS
 	fixture.request.Target.Architecture = runtime.GOARCH
 	fixture.graph = mustParse(t, fixture.request)
-	optionalFile := filepath.Join(t.TempDir(), "optional-pruned.tgz")
+	optionalFile := filepath.Join(writableTempDir(t), "optional-pruned.tgz")
 	if err := os.WriteFile(optionalFile, optionalPayload, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	aFile := filepath.Join(t.TempDir(), "a-with-optional.tgz")
+	aFile := filepath.Join(writableTempDir(t), "a-with-optional.tgz")
 	if err := os.WriteFile(aFile, aPayload, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -293,7 +293,7 @@ func newUnreachableSnapshotDependencyTargetFixture(t *testing.T, selector, unsup
 	lock = strings.Replace(lock, "  peer@2.0.0: {}\n", "  peer@2.0.0: {}\n  dormant@1.0.0:\n    dependencies:\n      b: 1.0.0\n", 1)
 	fixture.request.LockBytes = []byte(lock)
 	fixture.graph = mustParse(t, fixture.request)
-	file := filepath.Join(t.TempDir(), "dormant.tgz")
+	file := filepath.Join(writableTempDir(t), "dormant.tgz")
 	if err := os.WriteFile(file, payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -311,13 +311,13 @@ func materializeFixture(t *testing.T, capture *Capture, mutate func(string) erro
 	runner := &fakePNPMRunner{capture: capture, mutateInstall: mutate}
 	authority := makeExecutionContext(t, capture, runner)
 	runner.authority = authority
-	storeRoot := filepath.Join(t.TempDir(), "store")
+	storeRoot := filepath.Join(writableTempDir(t), "store")
 	store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
 	if err != nil {
 		return nil, err
 	}
-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
-	return Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, authority)
+
+	return Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, authority)
 }
 
 func snapshotDependencyLink(root, snapshot, dependency string) string {
@@ -539,13 +539,13 @@ func TestClosedParserAndInvocationBoundaryVariants(t *testing.T) {
 	runner := &fakePNPMRunner{capture: capture}
 	authority := makeExecutionContext(t, capture, runner)
 	runner.authority = authority
-	storeRoot := filepath.Join(t.TempDir(), "store")
+	storeRoot := filepath.Join(writableTempDir(t), "store")
 	store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
-	materialized, err := Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "out"), WorkRoot: t.TempDir()}, authority)
+
+	materialized, err := Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "out"), WorkRoot: writableTempDir(t)}, authority)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -593,13 +593,13 @@ func TestOverridesAndDeclaredPatchAreBoundAndAdmitted(t *testing.T) {
 	runner := &fakePNPMRunner{capture: capture}
 	authority := makeExecutionContext(t, capture, runner)
 	runner.authority = authority
-	storeRoot := filepath.Join(t.TempDir(), "store")
+	storeRoot := filepath.Join(writableTempDir(t), "store")
 	store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
-	materialized, err := Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, authority)
+
+	materialized, err := Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, authority)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -653,7 +653,7 @@ func TestS02N06N12IntegrityNativeAndAmbientStoreVectors(t *testing.T) {
 		fixture := newPNPMFixture(t)
 		variant := fixture
 		variant.tarballs = cloneTarballs(fixture.tarballs)
-		file := filepath.Join(t.TempDir(), "bad.tgz")
+		file := filepath.Join(writableTempDir(t), "bad.tgz")
 		_ = os.WriteFile(file, []byte("tampered"), 0o600)
 		variant.tarballs["b@1.0.0"] = RawTarball{Path: file}
 		_, err := captureFixtureError(t, variant)
@@ -694,20 +694,20 @@ func TestS03S08N01PrivateStoreAndFrozenOfflineMaterialization(t *testing.T) {
 	runner := &fakePNPMRunner{capture: capture}
 	authority := makeExecutionContext(t, capture, runner)
 	runner.authority = authority
-	storeRoot := filepath.Join(t.TempDir(), "private-store")
+	storeRoot := filepath.Join(writableTempDir(t), "private-store")
 	store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
+
 	if runner.starts != 1 || !store.Receipt.ID.Valid() || len(store.Receipt.Files) == 0 {
 		t.Fatalf("private store evidence missing: starts=%d receipt=%+v", runner.starts, store.Receipt)
 	}
 	if !containsAll(runner.storePermit.Argv, "store", "add", "--config.side-effects-cache=false") || runner.storePermit.Environment["NPM_CONFIG_OFFLINE"] != "true" || runner.storePermit.Environment["NPM_CONFIG_IGNORE_SCRIPTS"] != "true" {
 		t.Fatalf("store argv is not closed: %v", runner.storePermit.Argv)
 	}
-	materializedRoot := filepath.Join(t.TempDir(), "materialized")
-	materialized, err := Materialize(context.Background(), store, MaterializeRequest{Destination: materializedRoot, WorkRoot: t.TempDir()}, authority)
+	materializedRoot := filepath.Join(writableTempDir(t), "materialized")
+	materialized, err := Materialize(context.Background(), store, MaterializeRequest{Destination: materializedRoot, WorkRoot: writableTempDir(t)}, authority)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -793,13 +793,13 @@ func TestUnreachableLockSupersetSnapshotRejectsBeforeInstall(t *testing.T) {
 	runner := &fakePNPMRunner{capture: capture}
 	authority := makeExecutionContext(t, capture, runner)
 	runner.authority = authority
-	storeRoot := filepath.Join(t.TempDir(), "store")
+	storeRoot := filepath.Join(writableTempDir(t), "store")
 	store, err := DerivePrivateStore(t.Context(), capture, storeRoot, authority)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
-	_, err = Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, authority)
+
+	_, err = Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, authority)
 	assertCode(t, err, CodeGraphIncomplete)
 	if runner.starts != 1 {
 		t.Fatalf("unreachable snapshot started install: starts=%d", runner.starts)
@@ -826,13 +826,13 @@ func TestTargetPrunedUnreachableSnapshotRejectsBeforeInstall(t *testing.T) {
 			runner := &fakePNPMRunner{capture: capture}
 			authority := makeExecutionContext(t, capture, runner)
 			runner.authority = authority
-			storeRoot := filepath.Join(t.TempDir(), "store")
+			storeRoot := filepath.Join(writableTempDir(t), "store")
 			store, err := DerivePrivateStore(t.Context(), capture, storeRoot, authority)
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
-			_, err = Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, authority)
+
+			_, err = Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, authority)
 			assertCode(t, err, CodeGraphIncomplete)
 			if runner.starts != 1 {
 				t.Fatalf("target-pruned unreachable snapshot started install: starts=%d", runner.starts)
@@ -849,14 +849,14 @@ func TestRealPinnedPNPMTargetPrunedUnreachableRejectsBeforeInstall(t *testing.T)
 	capture := captureFixture(t, fixture)
 	runner := newConcretePNPMRunner(t)
 	runner.context = makeExecutionContext(t, capture, runner)
-	storeRoot := filepath.Join(t.TempDir(), "store")
+	storeRoot := filepath.Join(writableTempDir(t), "store")
 	store, err := DerivePrivateStore(t.Context(), capture, storeRoot, runner.context)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
+
 	launchesBeforeInstall := len(runner.launches)
-	_, err = Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "work")}, runner.context)
+	_, err = Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "work")}, runner.context)
 	assertCode(t, err, CodeGraphIncomplete)
 	if len(runner.launches) != launchesBeforeInstall {
 		t.Fatalf("target-pruned unreachable snapshot started install: launches=%d before=%d", len(runner.launches), launchesBeforeInstall)
@@ -871,13 +871,13 @@ func TestRealPinnedPNPMLockSupersetSnapshotDependencies(t *testing.T) {
 	capture := captureFixture(t, fixture)
 	runner := newConcretePNPMRunner(t)
 	runner.context = makeExecutionContext(t, capture, runner)
-	storeRoot := filepath.Join(t.TempDir(), "store")
+	storeRoot := filepath.Join(writableTempDir(t), "store")
 	store, err := DerivePrivateStore(t.Context(), capture, storeRoot, runner.context)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
-	materialized, err := Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "work")}, runner.context)
+
+	materialized, err := Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "work")}, runner.context)
 	if err != nil {
 		if diagnostic, ok := err.(*Error); ok {
 			t.Fatalf("%v fields=%v", err, diagnostic.Fields)
@@ -896,17 +896,17 @@ func TestN04N11N12MaterializationSideEffectsMissingStoreAndAmbientFallbackFailCl
 		runner := &fakePNPMRunner{capture: capture}
 		authority := makeExecutionContext(t, capture, runner)
 		runner.authority = authority
-		storeRoot := filepath.Join(t.TempDir(), "store")
+		storeRoot := filepath.Join(writableTempDir(t), "store")
 		store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
+
 		_ = makeTreeWritable(storeRoot)
 		if err = os.Remove(filepath.Join(storeRoot, filepath.FromSlash(store.Receipt.Files[0].Path))); err != nil {
 			t.Fatal(err)
 		}
-		_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "out"), WorkRoot: t.TempDir()}, authority)
+		_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "out"), WorkRoot: writableTempDir(t)}, authority)
 		assertCode(t, err, CodeIntegrityMismatch)
 		if runner.starts != 1 {
 			t.Fatalf("install started after store drift: %d", runner.starts)
@@ -918,7 +918,7 @@ func TestN04N11N12MaterializationSideEffectsMissingStoreAndAmbientFallbackFailCl
 		runner := &fakePNPMRunner{capture: capture, emitSideEffects: true}
 		authority := makeExecutionContext(t, capture, runner)
 		runner.authority = authority
-		storeRoot := filepath.Join(t.TempDir(), "store")
+		storeRoot := filepath.Join(writableTempDir(t), "store")
 		_, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
 		assertCode(t, err, CodeHookUndeclared)
 	})
@@ -928,17 +928,17 @@ func TestN04N11N12MaterializationSideEffectsMissingStoreAndAmbientFallbackFailCl
 		runner := &fakePNPMRunner{capture: capture}
 		authority := makeExecutionContext(t, capture, runner)
 		runner.authority = authority
-		storeRoot := filepath.Join(t.TempDir(), "store")
+		storeRoot := filepath.Join(writableTempDir(t), "store")
 		store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
+
 		runner.omitPackage = "b@1.0.0"
-		ambient := filepath.Join(t.TempDir(), "ambient-store")
+		ambient := filepath.Join(writableTempDir(t), "ambient-store")
 		_ = os.MkdirAll(ambient, 0o700)
 		_ = os.WriteFile(filepath.Join(ambient, "b"), fixture.payloads["b@1.0.0"], 0o600)
-		_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "out"), WorkRoot: t.TempDir()}, authority)
+		_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "out"), WorkRoot: writableTempDir(t)}, authority)
 		assertCode(t, err, CodeGraphIncomplete)
 	})
 	t.Run("local root drift", func(t *testing.T) {
@@ -949,13 +949,13 @@ func TestN04N11N12MaterializationSideEffectsMissingStoreAndAmbientFallbackFailCl
 		}}
 		authority := makeExecutionContext(t, capture, runner)
 		runner.authority = authority
-		storeRoot := filepath.Join(t.TempDir(), "store")
+		storeRoot := filepath.Join(writableTempDir(t), "store")
 		store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
-		_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "out"), WorkRoot: t.TempDir()}, authority)
+
+		_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "out"), WorkRoot: writableTempDir(t)}, authority)
 		assertCode(t, err, CodeIntegrityMismatch)
 	})
 }
@@ -994,13 +994,13 @@ func TestMaterializedVirtualStoreRejectsEveryUnclaimedOrInvalidPackageRoot(t *te
 			runner := &fakePNPMRunner{capture: capture, mutateInstall: variant.mutate}
 			authority := makeExecutionContext(t, capture, runner)
 			runner.authority = authority
-			storeRoot := filepath.Join(t.TempDir(), "store")
+			storeRoot := filepath.Join(writableTempDir(t), "store")
 			store, err := DerivePrivateStore(context.Background(), capture, storeRoot, authority)
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
-			_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "out"), WorkRoot: t.TempDir()}, authority)
+
+			_, err = Materialize(context.Background(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "out"), WorkRoot: writableTempDir(t)}, authority)
 			assertCode(t, err, variant.code)
 		})
 	}
@@ -1059,7 +1059,7 @@ func TestUnsupportedPNPMManagerVersionIsZeroStart(t *testing.T) {
 	authority := makeExecutionContext(t, capture, runner)
 	runner.authority = authority
 	authority.Runtime.Manager.VersionOutput = "10.32.1"
-	_, err := DerivePrivateStore(t.Context(), capture, filepath.Join(t.TempDir(), "store"), authority)
+	_, err := DerivePrivateStore(t.Context(), capture, filepath.Join(writableTempDir(t), "store"), authority)
 	assertCode(t, err, CodeRuntimeIdentityChanged)
 	if runner.starts != 0 {
 		t.Fatalf("unsupported pnpm release started %d processes", runner.starts)
@@ -1069,8 +1069,8 @@ func TestUnsupportedPNPMManagerVersionIsZeroStart(t *testing.T) {
 func TestWritableStoreOverlayAllowsOnlyExactProjectRegistration(t *testing.T) {
 	makeFixture := func(t *testing.T) (string, string, []StoreFile) {
 		t.Helper()
-		store := filepath.Join(t.TempDir(), "store")
-		project := filepath.Join(t.TempDir(), "project")
+		store := filepath.Join(writableTempDir(t), "store")
+		project := filepath.Join(writableTempDir(t), "project")
 		if err := os.MkdirAll(filepath.Join(store, "v10", "files"), 0o700); err != nil {
 			t.Fatal(err)
 		}
@@ -1132,13 +1132,13 @@ func TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization(t *testing.T) {
 	capture := captureFixture(t, fixture)
 	runner := newConcretePNPMRunner(t)
 	runner.context = makeExecutionContext(t, capture, runner)
-	storeRoot := filepath.Join(t.TempDir(), "store")
+	storeRoot := filepath.Join(writableTempDir(t), "store")
 	store, err := DerivePrivateStore(t.Context(), capture, storeRoot, runner.context)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
-	materialized, err := Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "work")}, runner.context)
+
+	materialized, err := Materialize(t.Context(), store, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "work")}, runner.context)
 	if err != nil {
 		if diagnostic, ok := err.(*Error); ok {
 			t.Fatalf("%v fields=%v\nlaunches=%+v", err, diagnostic.Fields, runner.launches)
@@ -1273,7 +1273,7 @@ func TestResolveWindowsPNPMEntrypoint(t *testing.T) {
 	})
 	t.Run("windows launcher resolves to the adjacent package entry point", func(t *testing.T) {
 		for _, launcherName := range []string{"pnpm.cmd", "pnpm.bat", "pnpm.ps1", "pnpm.CMD"} {
-			prefix := t.TempDir()
+			prefix := writableTempDir(t)
 			launcher := filepath.Join(prefix, launcherName)
 			entrypoint := filepath.Join(prefix, "node_modules", "pnpm", "bin", "pnpm.cjs")
 			if err := os.MkdirAll(filepath.Dir(entrypoint), 0o700); err != nil {
@@ -1311,7 +1311,7 @@ func newConcretePNPMRunner(t *testing.T) *concretePNPMRunner {
 		t.Fatal(err)
 	}
 	pnpmRoot := filepath.Dir(filepath.Dir(pnpmPath))
-	executionRoot := filepath.Join(t.TempDir(), "execution")
+	executionRoot := filepath.Join(writableTempDir(t), "execution")
 	// The portable runner privacy-validates OutputRoot before every operation
 	// (closureexec ensureEmptyDirectory), so the harness creates it the way
 	// production does. os.MkdirAll(0o700) passes that check on unix but fails
@@ -1593,7 +1593,7 @@ func makeExecutionContext(t *testing.T, capture *Capture, runner interface {
 	if concrete, ok := runner.(*concretePNPMRunner); ok {
 		executionRoot = concrete.executionRoot
 	} else {
-		executionRoot = filepath.Join(t.TempDir(), "execution")
+		executionRoot = filepath.Join(writableTempDir(t), "execution")
 		for _, dir := range []string{"bin", "work", "output"} {
 			if err := os.MkdirAll(filepath.Join(executionRoot, dir), 0o700); err != nil {
 				t.Fatal(err)
@@ -1734,12 +1734,12 @@ func captureFixture(t *testing.T, fixture pnpmFixture) *Capture {
 }
 func captureFixtureError(t *testing.T, fixture pnpmFixture) (*Capture, error) {
 	t.Helper()
-	storeRoot := filepath.Join(t.TempDir(), "capture-store")
+	storeRoot := filepath.Join(writableTempDir(t), "capture-store")
 	store, err := closureexec.NewCaptureStore(storeRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
+
 	return CaptureAndAdmit(context.Background(), CaptureRequest{Graph: fixture.graph, ProjectRoot: fixture.root, Tarballs: fixture.tarballs, WorkRoot: fixture.work, Store: store, Policy: artifactpolicy.NewService(), PreviousCausalHead: "test-head"})
 }
 func replacePackage(t *testing.T, fixture *pnpmFixture, key string, pkg fixturePackage) {
@@ -1749,7 +1749,7 @@ func replacePackage(t *testing.T, fixture *pnpmFixture, key string, pkg fixtureP
 	integrity := "sha512-" + base64.StdEncoding.EncodeToString(sum[:])
 	fixture.request.LockBytes = []byte(strings.Replace(string(fixture.request.LockBytes), fixture.graph.Packages[fixture.graph.packageIndex[key]].Integrity, integrity, 1))
 	fixture.graph = mustParse(t, fixture.request)
-	file := filepath.Join(t.TempDir(), "replacement.tgz")
+	file := filepath.Join(writableTempDir(t), "replacement.tgz")
 	_ = os.WriteFile(file, payload, 0o600)
 	fixture.tarballs = cloneTarballs(fixture.tarballs)
 	fixture.tarballs[key] = RawTarball{Path: file}
@@ -1841,9 +1841,26 @@ func makeTreeWritable(root string) error {
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() {
-			return os.Chmod(current, 0o700)
+		if entry.Type()&os.ModeSymlink != 0 {
+			return nil
 		}
-		return os.Chmod(current, 0o600)
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		return os.Chmod(current, info.Mode().Perm()|0o200)
 	})
+}
+
+// writableTempDir registers restoration before callers can seal any child tree.
+// TempDir's removal is registered first, so restoration runs before removal.
+func writableTempDir(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	t.Cleanup(func() {
+		if err := makeTreeWritable(root); err != nil && !os.IsNotExist(err) {
+			t.Errorf("restore temporary tree permissions: %v", err)
+		}
+	})
+	return root
 }
