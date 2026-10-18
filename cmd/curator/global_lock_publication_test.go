@@ -96,7 +96,7 @@ func (fixture globalLockCLIFixture) requireSkillLockAndStore(t *testing.T) (*con
 
 func (fixture globalLockCLIFixture) requireNativeSkill(t *testing.T) {
 	t.Helper()
-	payload, err := os.ReadFile(filepath.Join(fixture.codex, ".agent-context", "skills", "new-skill", "SKILL.md"))
+	payload, err := os.ReadFile(filepath.Join(fixture.codex, "skills", "new-skill", "SKILL.md"))
 	if err != nil {
 		t.Fatalf("read materialized native skill: %v", err)
 	}
@@ -109,6 +109,10 @@ func (fixture globalLockCLIFixture) requireNativeSkill(t *testing.T) {
 	}
 	if marker == nil || marker.Profile.Name != "default" || marker.Surfaces[envmarker.SurfaceSkills].Paths == nil {
 		t.Fatalf("native marker does not record the profile skill surface: %+v", marker)
+	}
+	paths := marker.Surfaces[envmarker.SurfaceSkills].Paths
+	if len(paths) != 1 || paths[0] != "skills/new-skill" {
+		t.Fatalf("native skill paths = %v", paths)
 	}
 	_, lockHash := fixture.lock(t)
 	if marker.Profile.LockSHA256 != strings.TrimPrefix(lockHash, "sha256:") {
@@ -125,6 +129,7 @@ func requireGlobalCommand(t *testing.T, fixture globalLockCLIFixture, want int, 
 	return stdout, stderr
 }
 
+// Global add publishes its exact lock before native and managed skill links become current.
 func TestGlobalAddPublishesProfileLockBeforeNativeMaterialization(t *testing.T) {
 	fixture := newGlobalLockCLIFixture(t)
 	_, stderr := requireGlobalCommand(t, fixture, exitOK, "global", "add", "new-skill", "--git", fixture.gitURL, "--tag", "v1")
@@ -136,11 +141,12 @@ func TestGlobalAddPublishesProfileLockBeforeNativeMaterialization(t *testing.T) 
 	}
 }
 
+// A native conflict retains the new lock and prior surfaces; consented sync preserves the preimage in backup.
 func TestGlobalAddConflictRetainsLockAndProfileSyncTakeoverRecovers(t *testing.T) {
 	fixture := newGlobalLockCLIFixture(t)
 	requireGlobalCommand(t, fixture, exitOK, "profile", "sync")
 	_, beforeHash := fixture.lock(t)
-	conflictDir := filepath.Join(fixture.codex, ".agent-context", "skills", "new-skill")
+	conflictDir := filepath.Join(fixture.codex, "skills", "new-skill")
 	conflictFile := filepath.Join(conflictDir, "SKILL.md")
 	writeFile(t, conflictFile, "operator-owned preimage\n")
 	manifestPath := filepath.Join(fixture.home, "global", "Skillfile.json")
@@ -155,7 +161,7 @@ func TestGlobalAddConflictRetainsLockAndProfileSyncTakeoverRecovers(t *testing.T
 	}
 
 	_, stderr := requireGlobalCommand(t, fixture, exitFail, "global", "add", "new-skill", "--git", fixture.gitURL, "--tag", "v1")
-	if !strings.Contains(stderr, envprofile.DiagUnmanagedConflict) || !strings.Contains(stderr, ".agent-context/skills/new-skill/SKILL.md") {
+	if !strings.Contains(stderr, envprofile.DiagUnmanagedConflict) || !strings.Contains(stderr, "skills/new-skill/SKILL.md") {
 		t.Fatalf("global add conflict stderr = %q", stderr)
 	}
 	_, afterHash := fixture.requireSkillLockAndStore(t)
@@ -179,7 +185,7 @@ func TestGlobalAddConflictRetainsLockAndProfileSyncTakeoverRecovers(t *testing.T
 	}
 
 	requireGlobalCommand(t, fixture, exitOK, "profile", "sync", "--takeover")
-	backup := filepath.Join(fixture.codex, ".agent-environment-backup", "1", ".agent-context", "skills", "new-skill", "SKILL.md")
+	backup := filepath.Join(fixture.codex, ".agent-environment-backup", "1", "skills", "new-skill", "SKILL.md")
 	backupBytes, err := os.ReadFile(backup)
 	if err != nil || string(backupBytes) != "operator-owned preimage\n" {
 		t.Fatalf("takeover backup = %q, %v", backupBytes, err)
@@ -189,6 +195,7 @@ func TestGlobalAddConflictRetainsLockAndProfileSyncTakeoverRecovers(t *testing.T
 	fixture.requireNativeSkill(t)
 }
 
+// Global install publishes its migrated lock before native skill materialization.
 func TestGlobalInstallPublishesMigratedLockBeforeNativeMaterialization(t *testing.T) {
 	fixture := newGlobalLockCLIFixture(t)
 	fixture.writeLegacyGlobalDeclaration(t)
@@ -197,10 +204,11 @@ func TestGlobalInstallPublishesMigratedLockBeforeNativeMaterialization(t *testin
 	fixture.requireNativeSkill(t)
 }
 
+// A migrated native conflict preserves its declaration and preimage until consented recovery.
 func TestGlobalInstallConflictRetainsMigratedLockAndTakeoverRecovers(t *testing.T) {
 	fixture := newGlobalLockCLIFixture(t)
 	fixture.writeLegacyGlobalDeclaration(t)
-	conflictDir := filepath.Join(fixture.codex, ".agent-context", "skills", "new-skill")
+	conflictDir := filepath.Join(fixture.codex, "skills", "new-skill")
 	conflictFile := filepath.Join(conflictDir, "SKILL.md")
 	writeFile(t, conflictFile, "operator-owned preimage\n")
 	manifestPath := filepath.Join(fixture.home, "global", "Skillfile.json")
@@ -209,7 +217,7 @@ func TestGlobalInstallConflictRetainsMigratedLockAndTakeoverRecovers(t *testing.
 		t.Fatal(err)
 	}
 	_, stderr := requireGlobalCommand(t, fixture, exitFail, "global", "install")
-	if !strings.Contains(stderr, envprofile.DiagUnmanagedConflict) || !strings.Contains(stderr, ".agent-context/skills/new-skill/SKILL.md") {
+	if !strings.Contains(stderr, envprofile.DiagUnmanagedConflict) || !strings.Contains(stderr, "skills/new-skill/SKILL.md") {
 		t.Fatalf("global install conflict stderr = %q", stderr)
 	}
 	fixture.requireSkillLockAndStore(t)
@@ -223,7 +231,7 @@ func TestGlobalInstallConflictRetainsMigratedLockAndTakeoverRecovers(t *testing.
 	}
 
 	requireGlobalCommand(t, fixture, exitOK, "profile", "sync", "--takeover")
-	backup := filepath.Join(fixture.codex, ".agent-environment-backup", "1", ".agent-context", "skills", "new-skill", "SKILL.md")
+	backup := filepath.Join(fixture.codex, ".agent-environment-backup", "1", "skills", "new-skill", "SKILL.md")
 	backupBytes, err := os.ReadFile(backup)
 	if err != nil || string(backupBytes) != "operator-owned preimage\n" {
 		t.Fatalf("takeover backup = %q, %v", backupBytes, err)

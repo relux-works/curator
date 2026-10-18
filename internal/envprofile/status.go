@@ -77,6 +77,7 @@ type HomeState struct {
 // ScopeHome carries both doors of a current profile (§8.1): the native
 // home and the managed home with its provisioning state.
 type ScopeHome struct {
+	NativeSkills     *SurfaceState    `json:"native_skills,omitempty"`
 	Scope            string           `json:"scope"`
 	Profile          string           `json:"profile"`
 	Environment      string           `json:"environment"`
@@ -397,7 +398,7 @@ func StatusOf(req StatusRequest) (*Status, error) {
 		}
 	}
 	for _, scope := range status.Scopes {
-		if scope.Diagnostic != nil {
+		if scope.Diagnostic != nil || (scope.NativeSkills != nil && scope.NativeSkills.State != "current") {
 			status.NonCurrent = true
 		}
 	}
@@ -1061,6 +1062,17 @@ func scopeHomes(req StatusRequest, installed map[string]bool) ([]ScopeHome, []St
 				scope.Diagnostic = &diagnostic
 			} else if marker != nil {
 				scope.Provisioned = true
+			}
+
+			// A machine row shadowed by an environment scope does not own
+			// that native surface; nativeSkillsState selects the effective current.
+			row, nativeErr := nativeSkillsState(req.Home, item.profile, adapter.ID, req.NativeHomeOf)
+			if nativeErr != nil {
+				row = &SurfaceState{Key: envmarker.SurfaceSkills, State: DiagSurfaceUnreadable, Detail: nativeErr.Error()}
+			}
+			scope.NativeSkills = row
+			if row != nil && row.State != "current" && scope.Diagnostic == nil {
+				scope.Diagnostic = &StateDiagnostic{Code: row.State, Path: native, Detail: row.Detail}
 			}
 			out = append(out, scope)
 		}
