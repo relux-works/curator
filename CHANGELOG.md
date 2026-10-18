@@ -4,6 +4,15 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+### Added
+
+- Profile manifest schema 2 can select skills within Git repositories using
+  `directory` (CIP-0021). Schema-4 locks bind selection and precedence; audit
+  and managed/in-place links use the selected package. Explicit skill directories
+  validate frontmatter and the declared name before publication. Schema 1 still refuses
+  skill directories, and legacy migration stays root-addressed. Network audit
+  includes Markdown guidance and invalidates earlier detector-cache records.
+
 ## v0.15.0-rc.7 — 2026-10-18
 
 ### Added

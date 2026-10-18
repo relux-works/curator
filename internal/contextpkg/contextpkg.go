@@ -103,10 +103,11 @@ func (m Module) Applies(environment string) bool {
 
 // Manifest is a validated agent-context.json.
 type Manifest struct {
-	Name    string
-	Version string
-	Weight  int64
-	Weights map[string]int64
+	SchemaVersion int
+	Name          string
+	Version       string
+	Weight        int64
+	Weights       map[string]int64
 	// HasContext is true when the "context" member is present; a package
 	// without it is a pure umbrella and declares no root-context surface.
 	HasContext bool
@@ -171,13 +172,25 @@ func ParseManifest(payload []byte) (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := requireKeys(object, DiagManifestInvalid, "", "schema_version", "name", "version", "weight", "weights", "context", "requires"); err != nil {
+	schema, ok := object["schema_version"].(json.Number)
+	if !ok || (schema.String() != "1" && schema.String() != "2") {
+		return nil, invalid(DiagManifestInvalid, "schema_version must be 1 or 2")
+	}
+	version, _ := strconv.Atoi(schema.String())
+	allowed := []string{"schema_version", "name", "version", "weight", "weights", "context", "requires"}
+	if version == 2 {
+		allowed = append(allowed, "codex_settings")
+	}
+	if err := requireKeys(object, DiagManifestInvalid, "", allowed...); err != nil {
 		return nil, err
 	}
-	if err := requireSchemaVersion(object, DiagManifestInvalid); err != nil {
-		return nil, err
+	if raw, present := object["codex_settings"]; present {
+		settings, ok := raw.(map[string]any)
+		if !ok || len(settings) != 0 {
+			return nil, invalid(DiagManifestInvalid, "codex_settings must be an empty object")
+		}
 	}
-	manifest := &Manifest{}
+	manifest := &Manifest{SchemaVersion: version}
 	if manifest.Name, err = requireIdentifier(object, "name", DiagManifestInvalid); err != nil {
 		return nil, err
 	}
@@ -243,13 +256,13 @@ func ParseManifest(payload []byte) (*Manifest, error) {
 		if err := requireKeys(requires, DiagManifestInvalid, "requires.", "contexts", "skills", "mcp"); err != nil {
 			return nil, err
 		}
-		if manifest.Contexts, err = parseRequirements(requires["contexts"], "contexts"); err != nil {
+		if manifest.Contexts, err = parseRequirements(requires["contexts"], "contexts", version); err != nil {
 			return nil, err
 		}
-		if manifest.Skills, err = parseRequirements(requires["skills"], "skills"); err != nil {
+		if manifest.Skills, err = parseRequirements(requires["skills"], "skills", version); err != nil {
 			return nil, err
 		}
-		if manifest.MCP, err = parseRequirements(requires["mcp"], "mcp"); err != nil {
+		if manifest.MCP, err = parseRequirements(requires["mcp"], "mcp", version); err != nil {
 			return nil, err
 		}
 	}
@@ -286,7 +299,7 @@ func parseModule(entry any, index int) (Module, error) {
 	return module, nil
 }
 
-func parseRequirements(raw any, family string) (map[string]Requirement, error) {
+func parseRequirements(raw any, family string, schemaVersion int) (map[string]Requirement, error) {
 	if raw == nil {
 		return nil, nil
 	}
@@ -310,6 +323,9 @@ func parseRequirements(raw any, family string) (map[string]Requirement, error) {
 			allowed = append(allowed, "directory", "weight")
 		case "skills":
 			allowed = append(allowed, "mode", "commands")
+			if schemaVersion == 2 {
+				allowed = append(allowed, "directory")
+			}
 		case "mcp":
 			allowed = append(allowed, "directory")
 		}

@@ -862,6 +862,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 	}
 	input.Overlays = overlays
 	input.MCPAllowlist = options.Policy.MCPAllowlist
+	input.Precedence = contextlock.Precedence{Winner: options.Policy.Precedence().Winner, Placement: options.Policy.Precedence().Placement}
 	overlayInputDefaults(&input, options.Policy)
 	result, err := contextresolve.Resolve(manager, input)
 	if err != nil {
@@ -965,6 +966,7 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 	}
 	input.Overlays = overlays
 	input.MCPAllowlist = policy.MCPAllowlist
+	input.Precedence = contextlock.Precedence{Winner: policy.Precedence().Winner, Placement: policy.Precedence().Placement}
 	overlayInputDefaults(&input, policy)
 	result, err := contextresolve.Resolve(manager, input)
 	if err != nil {
@@ -1274,6 +1276,7 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 	}
 	input.Overlays = overlays
 	input.MCPAllowlist = policy.MCPAllowlist
+	input.Precedence = contextlock.Precedence{Winner: policy.Precedence().Winner, Placement: policy.Precedence().Placement}
 	overlayInputDefaults(&input, policy)
 	result, err := contextresolve.Resolve(manager, input)
 	if err != nil {
@@ -1505,6 +1508,19 @@ func overlayOwner(home, name string) (string, bool, error) {
 // blocking), revocation, and the deterministic detectors — regardless of any
 // enabled flag. An advisory profile install does not exist.
 func auditAndStore(home string, manager *gitManager, result *contextresolve.Result, policy Policy) ([]string, error) {
+	// Successor installs validate the entire closure before publishing stores.
+	if result.Lock.SchemaVersion == contextlock.SchemaVersion4 {
+		warnings, err := auditCandidates(home, manager, result, policy)
+		if err != nil {
+			return nil, err
+		}
+		for _, member := range result.Lock.Members {
+			if _, err := manager.ensureEntry(home, result.Members[contextresolve.Key(member.Kind, member.Name)]); err != nil {
+				return nil, err
+			}
+		}
+		return warnings, nil
+	}
 	return auditMembers(home, manager, result, policy, true)
 }
 

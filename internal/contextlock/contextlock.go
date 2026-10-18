@@ -1,5 +1,5 @@
 // Package contextlock is the profile lock of the agent-environments
-// capability, context-lock-v1/v2 (environments §1.3): the strict schema
+// capability, context-lock-v1/v2/v4 (environments §1.3): the strict schema
 // object naming the root and every closure member, its canonical CCJ-1 bytes,
 // and the lock hash that is the profile's effective pin.
 package contextlock
@@ -30,6 +30,15 @@ const SchemaVersion = 1
 // SchemaVersion2 is the additive reader/writer shape carrying hash_version
 // 2. Production writes select it only when the shared v2 writer switch is on.
 const SchemaVersion2 = 2
+
+// SchemaVersion4 is the closed rc.7 successor admitting skill directories.
+const SchemaVersion4 = 4
+
+// Precedence binds the effective composition policy into a schema-4 lock.
+type Precedence struct {
+	Winner    string `json:"winner"`
+	Placement string `json:"placement"`
+}
 
 // Member kinds, in their bytewise order.
 const (
@@ -71,8 +80,9 @@ func (m Member) PinKey() string {
 	return m.StateHash
 }
 
-// Lock is one context-lock-v1 object.
+// Lock is one versioned context-lock object.
 type Lock struct {
+	Precedence    Precedence
 	SchemaVersion int
 	HashVersion   int
 	Root          string
@@ -131,7 +141,7 @@ func ResolvedDelta(oldLock, newLock *Lock) []Delta {
 		case !hasNew:
 			copyMember := oldMember
 			deltas = append(deltas, Delta{Old: &copyMember})
-		case oldMember.Version != newMember.Version || deltaMemberPin(oldMember) != deltaMemberPin(newMember) ||
+		case oldMember.Directory != newMember.Directory || oldMember.Source != newMember.Source || oldMember.Version != newMember.Version || deltaMemberPin(oldMember) != deltaMemberPin(newMember) ||
 			(oldMember.StateHash != "" && newMember.StateHash != "" && lockHashVersion(oldLock) != lockHashVersion(newLock)):
 			oldCopy, newCopy := oldMember, newMember
 			deltas = append(deltas, Delta{Old: &oldCopy, New: &newCopy})
@@ -219,11 +229,14 @@ var (
 	hex256RE = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
-// Validate applies the context-lock-v1/v2 schema rules.
+// Validate applies the context-lock-v1/v2/v4 schema rules.
 func (lock *Lock) Validate() error {
 	schemaVersion, hashVersion := lockVersions(lock)
-	if (schemaVersion != SchemaVersion || hashVersion != 1) && (schemaVersion != SchemaVersion2 || hashVersion != 2) {
+	if (schemaVersion != SchemaVersion || hashVersion != 1) && (schemaVersion != SchemaVersion2 || hashVersion != 2) && (schemaVersion != SchemaVersion4 || hashVersion != 2) {
 		return fmt.Errorf("lock schema_version %d and hash_version %d are incompatible", schemaVersion, hashVersion)
+	}
+	if schemaVersion == SchemaVersion4 && ((lock.Precedence.Winner != "higher-weight" && lock.Precedence.Winner != "lower-weight") || (lock.Precedence.Placement != "winner-last" && lock.Precedence.Placement != "winner-first")) {
+		return fmt.Errorf("schema-4 lock has invalid precedence")
 	}
 	if !identifiers.Valid(lock.Root) {
 		return fmt.Errorf("lock root %q is not a portable identifier", lock.Root)
@@ -280,7 +293,7 @@ func (lock *Lock) Validate() error {
 			return fmt.Errorf("member %s directory %q is not a portable path", member.Name, member.Directory)
 		}
 		if member.Kind == KindSkill {
-			if member.Directory != "" {
+			if member.Directory != "" && schemaVersion != SchemaVersion4 {
 				return fmt.Errorf("skill member %s carries a directory", member.Name)
 			}
 		} else if member.Version == "" {
@@ -350,8 +363,13 @@ func (lock *Lock) Object() map[string]any {
 		"root":           lock.Root,
 		"members":        members,
 	}
-	if schemaVersion == SchemaVersion2 {
+	if schemaVersion == SchemaVersion2 || schemaVersion == SchemaVersion4 {
 		object["hash_version"] = hashVersion
+	}
+	if schemaVersion == SchemaVersion4 {
+		object["codex_settings"] = map[string]any{}
+		object["codex_settings_contributions"] = []any{}
+		object["precedence"] = map[string]any{"winner": lock.Precedence.Winner, "placement": lock.Precedence.Placement}
 	}
 	return object
 }
@@ -417,20 +435,23 @@ func Parse(payload []byte) (*Lock, error) {
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.UseNumber()
 	var raw struct {
-		SchemaVersion json.Number `json:"schema_version"`
-		HashVersion   json.Number `json:"hash_version"`
-		Root          string      `json:"root"`
+		SchemaVersion json.Number     `json:"schema_version"`
+		HashVersion   json.Number     `json:"hash_version"`
+		CodexSettings json.RawMessage `json:"codex_settings"`
+		Contributions json.RawMessage `json:"codex_settings_contributions"`
+		Precedence    *Precedence     `json:"precedence"`
+		Root          string          `json:"root"`
 		Members       []struct {
-			Kind       string      `json:"kind"`
-			Name       string      `json:"name"`
-			Source     string      `json:"source"`
-			Directory  string      `json:"directory"`
-			Version    string      `json:"version"`
-			Commit     string      `json:"commit"`
-			StateHash  string      `json:"state_sha256"`
-			Weight     json.Number `json:"weight"`
-			RequiredBy []string    `json:"required_by"`
-			Overlay    *bool       `json:"overlay"`
+			Kind       string          `json:"kind"`
+			Name       string          `json:"name"`
+			Source     string          `json:"source"`
+			Directory  json.RawMessage `json:"directory"`
+			Version    string          `json:"version"`
+			Commit     string          `json:"commit"`
+			StateHash  string          `json:"state_sha256"`
+			Weight     json.Number     `json:"weight"`
+			RequiredBy []string        `json:"required_by"`
+			Overlay    *bool           `json:"overlay"`
 		} `json:"members"`
 	}
 	decoder.DisallowUnknownFields()
@@ -438,20 +459,34 @@ func Parse(payload []byte) (*Lock, error) {
 		return nil, fmt.Errorf("invalid lock: %w", err)
 	}
 	schemaVersion, err := strconv.Atoi(raw.SchemaVersion.String())
-	if err != nil || (schemaVersion != SchemaVersion && schemaVersion != SchemaVersion2) {
-		return nil, fmt.Errorf("invalid lock: schema_version must be %d or %d", SchemaVersion, SchemaVersion2)
+	if err != nil || (schemaVersion != SchemaVersion && schemaVersion != SchemaVersion2 && schemaVersion != SchemaVersion4) {
+		return nil, fmt.Errorf("invalid lock: schema_version must be %d, %d or %d", SchemaVersion, SchemaVersion2, SchemaVersion4)
 	}
 	hashVersion := 1
-	if schemaVersion == SchemaVersion2 {
+	if schemaVersion == SchemaVersion2 || schemaVersion == SchemaVersion4 {
 		parsed, parseErr := strconv.Atoi(raw.HashVersion.String())
 		if parseErr != nil || parsed != 2 {
-			return nil, fmt.Errorf("invalid lock: schema_version 2 requires hash_version 2")
+			return nil, fmt.Errorf("invalid lock: schema_version %d requires hash_version 2", schemaVersion)
 		}
 		hashVersion = parsed
 	} else if raw.HashVersion.String() != "" {
 		return nil, fmt.Errorf("invalid lock: schema_version 1 does not carry hash_version")
 	}
+	var present map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &present); err != nil {
+		return nil, fmt.Errorf("invalid lock: %w", err)
+	}
 	lock := &Lock{SchemaVersion: schemaVersion, HashVersion: hashVersion, Root: raw.Root}
+	if schemaVersion == SchemaVersion4 {
+		var settings map[string]any
+		var contributions []any
+		if json.Unmarshal(raw.CodexSettings, &settings) != nil || settings == nil || len(settings) != 0 || json.Unmarshal(raw.Contributions, &contributions) != nil || contributions == nil || len(contributions) != 0 || raw.Precedence == nil {
+			return nil, fmt.Errorf("invalid lock: schema 4 requires empty settings, empty contributions and precedence")
+		}
+		lock.Precedence = *raw.Precedence
+	} else if raw.CodexSettings != nil || raw.Contributions != nil || present["precedence"] != nil {
+		return nil, fmt.Errorf("invalid lock: successor fields on legacy schema")
+	}
 	for _, member := range raw.Members {
 		weight, err := strconv.ParseInt(member.Weight.String(), 10, 64)
 		if err != nil {
@@ -460,8 +495,14 @@ func Parse(payload []byte) (*Lock, error) {
 		if member.RequiredBy == nil || member.Overlay == nil {
 			return nil, fmt.Errorf("invalid lock: member %s lacks required_by or overlay", member.Name)
 		}
+		var directory string
+		if member.Directory != nil {
+			if err := json.Unmarshal(member.Directory, &directory); err != nil || !identifiers.PortablePath(directory) {
+				return nil, fmt.Errorf("invalid lock: member %s directory must be a portable path", member.Name)
+			}
+		}
 		lock.Members = append(lock.Members, Member{
-			Kind: member.Kind, Name: member.Name, Source: member.Source, Directory: member.Directory,
+			Kind: member.Kind, Name: member.Name, Source: member.Source, Directory: directory,
 			Version: member.Version, Commit: member.Commit, StateHash: member.StateHash, Weight: weight,
 			RequiredBy: member.RequiredBy, Overlay: *member.Overlay,
 		})

@@ -192,7 +192,7 @@ func globalSkillInput(home, profile string, source Source, oldLock *contextlock.
 			return contextresolve.Input{}, fmt.Errorf("%s: skill %q in profile %q lock has no replayable Git pin", DiagSourceInvalid, member.Name, profile)
 		}
 		input.Direct = append(input.Direct, contextresolve.Requirement{
-			Kind: contextlock.KindSkill, Name: member.Name, Source: member.Source, Revision: member.Commit,
+			Kind: contextlock.KindSkill, Name: member.Name, Source: member.Source, Revision: member.Commit, Directory: member.Directory,
 		})
 	}
 	if addition != nil {

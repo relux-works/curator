@@ -47,7 +47,7 @@ var severityRank = map[string]int{
 // backend and model (Spec §12.1).
 const (
 	PromptVersion  = "1"
-	RulesetVersion = "3"
+	RulesetVersion = "4"
 )
 
 // findingOpaqueNUL is the shared opaque-NUL finding id: every v1
@@ -826,7 +826,9 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
 			return nil
 		}
 		posix := filepath.ToSlash(rel)
-		if !strings.HasPrefix(posix, "scripts/") && posix != manifestName {
+		// Markdown is package source too: URLs in SKILL.md and guidance
+		// files must not bypass network declarations (CIP-0021 vectors).
+		if !strings.HasPrefix(posix, "scripts/") && posix != manifestName && !strings.EqualFold(filepath.Ext(posix), ".md") {
 			return nil
 		}
 		payload, readErr := os.ReadFile(path) // #nosec G304 -- walked snapshot
