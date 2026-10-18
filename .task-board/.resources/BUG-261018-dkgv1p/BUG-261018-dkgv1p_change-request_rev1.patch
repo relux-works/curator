@@ -1,0 +1,711 @@
+diff --git a/README.md b/README.md
+index 8ba42268be0106b4110f1c071d3c37d5f159ee20..17e9f67d0d9fb85d62d2ab1479e615d46003a2b8 100644
+--- a/README.md
++++ b/README.md
+@@ -306,6 +306,12 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run
+ 
+ ### Tools
+ 
++Run `go test ./cmd/curator -run 'Test(RegisteredSubcommandHelpNoWrites|CommandHelp)'`
++for built-in and nested command help, zero-write snapshots, the init positive
++control, provider passthrough, and narrowing mutants. Keep logs under `.temp/`.
++Command help is available as `curator <command> -h`, `--help`, or
++`curator help <command>`; a help-looking argument after `--` remains an operand.
++
+ Run `go test -count=1 ./tools/ciworkflow/` to validate Linux CI cache isolation,
+ workflow concurrency, and fork routing. CI initializes private Go state with
+ `bash .github/ci/isolate-go-state.sh`; its environment records go to
+diff --git a/cmd/curator/command_help.go b/cmd/curator/command_help.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..61da5a19975e49e54a83574aac884448e4851e92
+--- /dev/null
++++ b/cmd/curator/command_help.go
+@@ -0,0 +1,157 @@
++package main
++
++import (
++	"fmt"
++	"strings"
++
++	"github.com/relux-works/curator/internal/version"
++)
++
++// commandRegistry owns the built-in command dispatch and its help topics. Child
++// topics describe the verbs dispatched by their parent; external umbrella
++// providers own their own help. Help never calls a handler or loads config.
++type commandSpec struct {
++	name     string
++	synopsis string
++	summary  string
++	detail   string
++	run      func(cli, []string) int
++}
++
++var commandRegistry = []commandSpec{
++	{"bootstrap", "[--skills-root <dir>] [--default-agents <ids>] [--preferred-locale <locale>] [--force] [--if-missing] [--non-interactive]", "Create the machine configuration and default directories.", "", cli.cmdBootstrap},
++	{"init", "[path]", "Create Skillfile.json and the managed .gitignore block in the project directory.", "", cli.cmdInit},
++	{"add", "<name> [--git <url>] [--branch <ref>] [--tag <ref>] [--revision <ref>] [--source <dir>] [--project <path>]", "Add or replace a skill declaration, then install it.", "", cli.cmdAdd},
++	{"remove", "<name> [path] [--project <path>]", "Remove a skill declaration.", "", cli.cmdRemove},
++	{"install", "[path] [--all] [--dry-run] [--fix-gitignore] [--strict-tags] [--verbose] [--audit[=advisory|strict]] [--build-ssh-identity <path>] [--build-ssh-agent <socket>] [--build-ssh-known-hosts <path>]", "Apply Skillfile.json to the selected project.", draftWorkflowSection, cli.cmdInstall},
++	{"update", "", "Fetch all source repositories under skills_root.", "", func(c cli, _ []string) int { return c.cmdUpdate() }},
++	{"upgrade", "[path] [--all] [--dry-run] [--fix-gitignore] [--strict-tags] [--verbose] [--audit[=advisory|strict]] [--build-ssh-identity <path>] [--build-ssh-agent <socket>] [--build-ssh-known-hosts <path>]", "Fetch the selected dependency closure, then install it.", draftWorkflowSection, func(c cli, args []string) int { return c.cmdInstallMode(args, true) }},
++	{"status", "[path] [--all] [--check] [--json] [--attest]", "Report manifest, installed, and compiled state.", draftWorkflowSection, cli.cmdStatus},
++	{"list", "", "List configured projects and declared skills.", "", func(c cli, _ []string) int { return c.cmdList() }},
++	{"project", "<add|resolve|refresh> [arguments]", "Register projects or resolve their dependency closures.", "", cli.cmdProject},
++	{"project add", "<alias> <path> [--agents <ids>]", "Register a project and initialize its declarative files.", "", nil},
++	{"project resolve", "[path]", "Resolve transitive dependencies for a project closure.", projectResolveUsage, nil},
++	{"project refresh", "[path]", "Refresh the frozen project source lock.", projectResolveUsage, nil},
++	{"skill", "check <dir> [--locale <locale>] [--json]", "Validate a skill package.", "", func(c cli, args []string) int {
++		if len(args) > 0 && args[0] == "check" {
++			return c.cmdSkillCheck(args[1:])
++		}
++		return c.runProvider(append([]string{"skill"}, args...))
++	}},
++	{"skill check", "<dir> [--locale <locale>] [--json]", "Validate one skill package.", "", nil},
++	{"global", "<init|add|remove|list|status|install|adopt|update|upgrade> [arguments]", "Manage machine-wide skill installations.", globalHelp, cli.cmdGlobal},
++	{"global init", "", "Create the global Skillfile.json and managed directories.", "", nil},
++	{"global add", "<name> [--git <url>] [--branch <ref>] [--tag <ref>] [--revision <ref>] [--source <dir>]", "Add a global skill declaration and install it.", "", nil},
++	{"global remove", "<name>", "Remove a global skill declaration.", "", nil},
++	{"global list", "", "List global skill declarations.", "", nil},
++	{"global status", "[--check] [--json]", "Report global installed and compiled state.", "", nil},
++	{"global install", "[--dry-run] [--audit[=advisory|strict]]", "Install global skill declarations.", "", nil},
++	{"global adopt", "<command> [--dry-run]", "Adopt an existing global command.", "", nil},
++	{"global update", "", "Fetch global source repositories.", "", nil},
++	{"global upgrade", "[--dry-run] [--audit[=advisory|strict]]", "Fetch the global dependency closure and install it.", "", nil},
++	{"profile", "<install|import|list|use|update|remove|sync|compose> [arguments]", "Manage environment profiles.", "Requires the global config: " + configNotFoundHint + ".\n", cli.cmdProfile},
++	{"profile install", "<source> [--directory <dir>] [--range <range>|--tag <tag>|--revision <ref>] [--as <name>] [--use] [--takeover] [--confirm-system-delta]", "Install an environment profile from a source package.", "", nil},
++	{"profile import", "[--as <name>] [--allow-lossy] [--use]", "Import the managed home as an environment profile.", "", nil},
++	{"profile list", "", "List installed environment profiles.", "", nil},
++	{"profile use", "<name> [--env <env-id>] [--target <target-id>] [--clear] [--takeover]", "Activate or clear an environment profile.", envAliasUsage + "\n", nil},
++	{"profile update", "[<name>] [--all] [--takeover] [--confirm-system-delta]", "Update installed environment profiles.", "", nil},
++	{"profile remove", "<name> [--purge]", "Remove an installed environment profile.", "", nil},
++	{"profile sync", "[--takeover]", "Synchronize active environment profiles.", "", nil},
++	{"profile compose", "<profile> <add|remove|list> [arguments]", "Compose an environment profile from installed profiles.", "", nil},
++	{"profile compose <profile> add", "<source> [--range <range>|--tag <tag>|--revision <ref>] [--directory <dir>] [--weight <n>]", "Add an overlay to a composed profile.", "", nil},
++	{"profile compose <profile> remove", "<source>", "Remove an overlay from a composed profile.", "", nil},
++	{"profile compose <profile> list", "", "List members of a composed profile.", "", nil},
++	{"env", "<resolve|status|config|migrate|unmanage> [arguments]", "Inspect and manage environment homes.", "Requires the global config: " + configNotFoundHint + ".\n", cli.cmdEnv},
++	{"env resolve", "<env-id> [--profile <name>] [--repair [--preserve-lock] [--dry-run]] [--takeover] [--format json|env|shell]", "Resolve an environment fragment; --repair provisions or repairs the managed home.", envAliasUsage + "\n", nil},
++	{"env status", "[--check] [--json]", "Report environment home state.", envAliasUsage + "\n", nil},
++	{"env config", "<show|set|unset> [<knob> [<value>]]", "Inspect or edit machine environment configuration.", envKnobAliasUsage + "\n", nil},
++	{"env config show", "[<knob>]", "Print effective environment configuration.", envKnobAliasUsage + "\n", nil},
++	{"env config set", "<knob> <value>", "Set a machine environment configuration knob.", envKnobAliasUsage + "\n", nil},
++	{"env config unset", "<knob>", "Unset a machine environment configuration knob.", envKnobAliasUsage + "\n", nil},
++	{"env migrate", "--inspect|--plan|--apply [--profile <name>] [--env <env-id>] [--expect <plan-hash>]", "Migrate existing environment installations.", "", nil},
++	{"env unmanage", "[--restore-backups] [--env <env-id>] [--target <target-id>]", "Restore files from managed home backups.", envAliasUsage + "\n", nil},
++	{"run", "<env-id> [arguments] [-- <passthrough arguments>]", "Dispatch to the installed curator-run provider; arguments after -- are passed unchanged.", envAliasUsage + "\n", func(c cli, args []string) int { return c.runProvider(append([]string{"run"}, args...)) }},
++	{"hybrid", "<add|remove|list|status> [arguments]", "Manage hybrid-scope skill declarations.", "", cli.cmdHybrid},
++	{"hybrid add", "<name> [--git <url>] [--branch <ref>|--tag <ref>|--revision <ref>] --target <target>|--targets <targets>", "Add a hybrid skill declaration.", "", nil},
++	{"hybrid remove", "<name>", "Remove a hybrid skill declaration.", "", nil},
++	{"hybrid list", "", "List hybrid skill declarations.", "", nil},
++	{"hybrid status", "", "Report hybrid installed state.", "", nil},
++	{"audit", "[target] [--all] [--global] [--json] [--allow <hash> --reason <reason>] [--publish <file> --registry <url> --token <token>]", "Audit skills, pin trust, or publish a signed record.", "", cli.cmdAudit},
++	{"gc", "", "Remove unreferenced runtime entries.", "", func(c cli, _ []string) int { return c.cmdGC() }},
++	{"shell-init", "[auto|zsh|bash|powershell] [--install] [--no-global]", "Print or cache an optional shell hook.", "", cli.cmdShellInit},
++	{"hook", "<approve|approvals|revoke> [arguments]", "Manage trust approvals for project environment files.", "", cli.cmdHook},
++	{"hook approve", "<path>", "Approve a project environment file.", "", nil},
++	{"hook approvals", "", "List recorded project environment file approvals.", "", nil},
++	{"hook revoke", "<path>", "Revoke a project environment file approval.", "", nil},
++	{"ui", "", "Open the terminal view of installed state.", "", func(c cli, _ []string) int { return c.cmdUI() }},
++	{"config", "<show|build-ssh|build-https> [arguments]", "Inspect and edit the machine configuration.", configUsage, cli.cmdConfig},
++	{"config show", "", "Print the effective machine configuration.", "", nil},
++	{"config build-ssh", "<add|list|remove> [arguments]", "Manage SSH credentials for external build repositories.", buildSSHUsage, nil},
++	{"config build-ssh add", "<scope> [--agent [SOCKET]] [--identity PATH] [--known-hosts PATH]", "Add or replace SSH credentials for a repository scope.", buildSSHUsage, nil},
++	{"config build-ssh list", "", "List configured SSH credential scopes.", buildSSHUsage, nil},
++	{"config build-ssh remove", "<scope>", "Remove an SSH credential scope.", buildSSHUsage, nil},
++	{"config build-https", "<add|login|list|remove> [arguments]", "Manage HTTPS credentials for external build repositories.", buildHTTPSUsage, nil},
++	{"config build-https add", "<scope> [--git-credentials] [--keyring] [--token-env NAME] [--username <name>]", "Configure HTTPS credentials for a repository scope.", buildHTTPSUsage, nil},
++	{"config build-https login", "<scope> [--username <name>]", "Store HTTPS credentials interactively for a repository scope.", buildHTTPSUsage, nil},
++	{"config build-https list", "", "List configured HTTPS credential scopes.", buildHTTPSUsage, nil},
++	{"config build-https remove", "<scope>", "Remove an HTTPS credential scope.", buildHTTPSUsage, nil},
++	{"version", "", "Print the curator version.", "", func(c cli, _ []string) int {
++		_, _ = fmt.Fprintln(c.stdout, "curator "+version.String())
++		return exitOK
++	}},
++}
++
++func (command commandSpec) helpText() string {
++	text := "usage: curator " + command.name
++	if command.synopsis != "" {
++		text += " " + command.synopsis
++	}
++	return text + "\n\n" + command.summary + "\n\n" + command.detail
++}
++
++// hasHelpFlag stops at the argument boundary, leaving provider operands intact.
++func hasHelpFlag(args []string) bool {
++	for _, arg := range args {
++		if arg == "--" {
++			break
++		}
++		if arg == "-h" || arg == "--help" {
++			return true
++		}
++	}
++	return false
++}
++
++// registeredCommand selects the deepest contiguous command path. Help flags
++// may precede a child verb; ordinary operands and -- end command discovery.
++func registeredCommand(args []string) (*commandSpec, int) {
++	var words []string
++	for _, arg := range args {
++		if arg == "--" {
++			break
++		}
++		if arg != "-h" && arg != "--help" {
++			words = append(words, arg)
++		}
++	}
++	var selected *commandSpec
++	depth := 0
++	for i := range commandRegistry {
++		command := &commandRegistry[i]
++		path := strings.Fields(command.name)
++		if len(path) > len(words) || len(path) <= depth {
++			continue
++		}
++		matches := true
++		for index, part := range path {
++			if part != words[index] && (!strings.HasPrefix(part, "<") || !strings.HasSuffix(part, ">")) {
++				matches = false
++				break
++			}
++		}
++		if matches {
++			selected, depth = command, len(path)
++		}
++	}
++	return selected, depth
++}
+diff --git a/cmd/curator/command_help_mutants_test.go b/cmd/curator/command_help_mutants_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..0dbb965ccddf2e736806f999d02a5a8241365f0b
+--- /dev/null
++++ b/cmd/curator/command_help_mutants_test.go
+@@ -0,0 +1,63 @@
++package main
++
++import (
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strconv"
++	"strings"
++	"testing"
++)
++
++// Each overlay weakens one help boundary while leaving the guard present.
++// Only exit 1 plus a named behavioral test failure counts as a killed mutant;
++// compilation errors, setup failures and timeouts cannot satisfy this control.
++func TestCommandHelpNarrowingMutants(t *testing.T) {
++	for _, mutant := range []struct {
++		name, file, before, after, test, failure string
++	}{
++		{"init-bypasses-help", "main.go", `command != nil && hasHelpFlag(args[1:])`, `command != nil && args[0] != "init" && hasHelpFlag(args[1:])`, "^TestRegisteredSubcommandHelpNoWrites$/^init$", "--- FAIL: TestRegisteredSubcommandHelpNoWrites/init/1"},
++		{"only-leading-flags", "command_help.go", `if arg == "-h" || arg == "--help" {`, `if (arg == "-h" || arg == "--help") && (args[0] == "-h" || args[0] == "--help") {`, "^TestRegisteredSubcommandHelpNoWrites$/^init$", "--- FAIL: TestRegisteredSubcommandHelpNoWrites/init/2"},
++		{"help-crosses-separator", "command_help.go", "if arg == \"--\" {\n\t\t\tbreak\n\t\t}\n\t\tif arg == \"-h\"", "if arg == \"--\" {\n\t\t\tcontinue\n\t\t}\n\t\tif arg == \"-h\"", "^TestCommandHelpRunPassthrough$", "--- FAIL: TestCommandHelpRunPassthrough"},
++	} {
++		t.Run(mutant.name, func(t *testing.T) {
++			original, err := filepath.Abs(mutant.file)
++			if err != nil {
++				t.Fatal(err)
++			}
++			data, err := os.ReadFile(original)
++			if err != nil {
++				t.Fatal(err)
++			}
++			source := strings.ReplaceAll(string(data), "\r\n", "\n")
++			if strings.Count(source, mutant.before) != 1 {
++				t.Fatal("mutation anchor is not unique")
++			}
++			dir := t.TempDir()
++			replacement := filepath.Join(dir, "replacement.go")
++			if err := os.WriteFile(replacement, []byte(strings.Replace(source, mutant.before, mutant.after, 1)), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			data, err = json.Marshal(map[string]any{"Replace": map[string]string{original: replacement}})
++			if err != nil {
++				t.Fatal(err)
++			}
++			overlay := filepath.Join(dir, "overlay.json")
++			if err := os.WriteFile(overlay, data, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			command := exec.Command("go", "test", "-count=1", "-timeout=3m", "-v", "-run", mutant.test, ".")
++			// GOFLAGS carries the overlay into the real CLI binary built by the
++			// behavioral suite too. These child tests do not fingerprint GOROOT;
++			// reuse the repository's helper protocol to avoid taking its lock twice.
++			command.Env = append(os.Environ(), cliHelperProcess+"=1", "GOFLAGS="+os.Getenv("GOFLAGS")+" "+strconv.Quote("-overlay="+overlay))
++			output, err := command.CombinedOutput()
++			exit, ok := err.(*exec.ExitError)
++			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), mutant.failure) || strings.Contains(string(output), "build failed") {
++				t.Fatalf("mutant lacks intended behavioral exit 1: %v\n%s", err, output)
++			}
++			t.Logf("mutant %s: go test -run %q . exit=1; killed by %s", mutant.name, mutant.test, mutant.failure)
++		})
++	}
++}
+diff --git a/cmd/curator/command_help_test.go b/cmd/curator/command_help_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..d5a0969b9a34bbbf9bc72146b88031c1c40fde11
+--- /dev/null
++++ b/cmd/curator/command_help_test.go
+@@ -0,0 +1,250 @@
++package main
++
++import (
++	"context"
++	"crypto/sha256"
++	"encoding/json"
++	"fmt"
++	"io/fs"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++	"time"
++)
++
++func buildHelpCLI(t *testing.T) string {
++	t.Helper()
++	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
++	command := exec.Command("go", "build", "-o", binary, ".")
++	if out, err := command.CombinedOutput(); err != nil {
++		t.Fatalf("build CLI: %v\n%s", err, out)
++	}
++	return binary
++}
++
++type helpSandbox struct {
++	root string
++	cwd  string
++	env  []string
++}
++
++func newHelpSandbox(t *testing.T) helpSandbox {
++	t.Helper()
++	root := t.TempDir()
++	sandbox := helpSandbox{root: root, cwd: filepath.Join(root, "cwd")}
++	for _, name := range []string{"cwd", "home", "curator", "tmp", "xdg"} {
++		dir := filepath.Join(root, name)
++		if err := os.Mkdir(dir, 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(dir, "sentinel"), []byte("preserve existing bytes\n"), 0o640); err != nil {
++			t.Fatal(err)
++		}
++	}
++	for _, entry := range os.Environ() {
++		key, _, _ := strings.Cut(entry, "=")
++		if strings.HasPrefix(key, "CURATOR_") || strings.HasPrefix(key, "XDG_") {
++			continue
++		}
++		switch key {
++		case "HOME", "USERPROFILE", "TMPDIR", "TMP", "TEMP", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM":
++			continue
++		}
++		sandbox.env = append(sandbox.env, entry)
++	}
++	sandbox.env = append(sandbox.env,
++		"HOME="+filepath.Join(root, "home"), "USERPROFILE="+filepath.Join(root, "home"),
++		"CURATOR_HOME="+filepath.Join(root, "curator"), "CURATOR_CONFIG="+filepath.Join(root, "curator", "config.json"),
++		"XDG_CONFIG_HOME="+filepath.Join(root, "xdg"), "TMPDIR="+filepath.Join(root, "tmp"),
++		"TMP="+filepath.Join(root, "tmp"), "TEMP="+filepath.Join(root, "tmp"),
++		"GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
++	command := exec.Command("git", "init", "--quiet")
++	command.Dir, command.Env = sandbox.cwd, sandbox.env
++	if out, err := command.CombinedOutput(); err != nil {
++		t.Fatalf("empty git repo: %v\n%s", err, out)
++	}
++	return sandbox
++}
++
++type helpTreeEntry struct {
++	Size int64
++	Mode fs.FileMode
++	Hash [sha256.Size]byte
++}
++
++func snapshotHelpTree(t *testing.T, root string) map[string]helpTreeEntry {
++	t.Helper()
++	entries := make(map[string]helpTreeEntry)
++	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
++		if err != nil {
++			return err
++		}
++		info, err := entry.Info()
++		if err != nil {
++			return err
++		}
++		rel, err := filepath.Rel(root, path)
++		if err != nil {
++			return err
++		}
++		value := helpTreeEntry{Size: info.Size(), Mode: info.Mode()}
++		if info.Mode().IsRegular() {
++			data, err := os.ReadFile(path)
++			if err != nil {
++				return err
++			}
++			value.Hash = sha256.Sum256(data)
++		}
++		entries[rel] = value
++		return nil
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	return entries
++}
++
++func (sandbox helpSandbox) invoke(t *testing.T, binary string, args ...string) (int, string, string) {
++	t.Helper()
++	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
++	defer cancel()
++	command := exec.CommandContext(ctx, binary, args...)
++	command.Dir, command.Env = sandbox.cwd, sandbox.env
++	var stdout, stderr strings.Builder
++	command.Stdout, command.Stderr = &stdout, &stderr
++	err := command.Run()
++	if ctx.Err() != nil {
++		t.Fatalf("CLI %v timed out", args)
++	}
++	code := 0
++	if err != nil {
++		if exit, ok := err.(*exec.ExitError); ok {
++			code = exit.ExitCode()
++		} else {
++			t.Fatal(err)
++		}
++	}
++	return code, stdout.String(), stderr.String()
++}
++
++// Every registered built-in and child topic answers both help flags at each
++// command-path position and after operands, plus help <command>, via main().
++// Persistent tree paths, sizes, modes and file bytes must remain unchanged;
++// snapshots cannot observe a transient write that is removed before exit.
++func TestRegisteredSubcommandHelpNoWrites(t *testing.T) {
++	binary := buildHelpCLI(t)
++	seen := make(map[string]bool)
++	for _, command := range commandRegistry {
++		t.Run(strings.ReplaceAll(command.name, " ", "/"), func(t *testing.T) {
++			if seen[command.name] {
++				t.Fatalf("duplicate registry entry %q", command.name)
++			}
++			seen[command.name] = true
++			path := strings.Fields(command.name)
++			cases := [][]string{append([]string{"help"}, path...)}
++			for _, flag := range []string{"-h", "--help"} {
++				for position := 1; position <= len(path); position++ {
++					args := append([]string{}, path[:position]...)
++					args = append(args, flag)
++					args = append(args, path[position:]...)
++					cases = append(cases, args)
++				}
++				cases = append(cases, append(append([]string{}, path...), "operand", "--invalid-option", flag, "--", "--help"))
++			}
++			sandbox := newHelpSandbox(t)
++			var dedicated string
++			for index, args := range cases {
++				t.Run(fmt.Sprint(index), func(t *testing.T) {
++					before := snapshotHelpTree(t, sandbox.root)
++					code, stdout, stderr := sandbox.invoke(t, binary, args...)
++					after := snapshotHelpTree(t, sandbox.root)
++					if !reflect.DeepEqual(before, after) {
++						t.Errorf("%v wrote to the isolated tree: before=%v after=%v", args, before, after)
++					}
++					if code != 0 || stderr != "" || !strings.Contains(stdout, "curator "+command.name) {
++						t.Fatalf("%v: exit=%d stdout=%q stderr=%q; want dedicated help and exit 0", args, code, stdout, stderr)
++					}
++					if index == 0 {
++						dedicated = stdout
++					} else if stdout != dedicated {
++						t.Fatalf("%v differs from help %s", args, command.name)
++					}
++				})
++			}
++		})
++	}
++}
++
++// The no-help positive control reaches cmdInit through main() and creates both
++// project files; top-level help/version controls still preserve the tree.
++func TestCommandHelpInitPositiveControl(t *testing.T) {
++	binary := buildHelpCLI(t)
++	sandbox := newHelpSandbox(t)
++	for _, args := range [][]string{{"-h"}, {"--help"}, {"help"}, {"--version"}} {
++		before := snapshotHelpTree(t, sandbox.root)
++		if code, _, stderr := sandbox.invoke(t, binary, args...); code != 0 || stderr != "" {
++			t.Fatalf("%v: exit=%d stderr=%q", args, code, stderr)
++		}
++		if !reflect.DeepEqual(before, snapshotHelpTree(t, sandbox.root)) {
++			t.Fatalf("%v changed the tree", args)
++		}
++	}
++	if code, stdout, stderr := sandbox.invoke(t, binary, "init"); code != 0 {
++		t.Fatalf("init: exit=%d stdout=%q stderr=%q", code, stdout, stderr)
++	}
++	for _, name := range []string{"Skillfile.json", ".gitignore"} {
++		if info, err := os.Stat(filepath.Join(sandbox.cwd, name)); err != nil || info.Size() == 0 {
++			t.Fatalf("init did not create nonempty %s: %v", name, err)
++		}
++	}
++}
++
++// The real run provider receives -- and help-looking operands byte-for-byte;
++// a help flag before -- instead prevents provider execution (no JSON output).
++func TestCommandHelpRunPassthrough(t *testing.T) {
++	binary := buildHelpCLI(t)
++	sandbox := newHelpSandbox(t)
++	providerDir := t.TempDir()
++	provider := filepath.Join(providerDir, "curator-run"+productionBinarySuffix())
++	source := filepath.Join(providerDir, "main.go")
++	if err := os.WriteFile(source, []byte(`package main
++import ("encoding/json"; "os")
++func main() { _ = json.NewEncoder(os.Stdout).Encode(os.Args[1:]) }
++`), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	build := exec.Command("go", "build", "-o", provider, source)
++	if out, err := build.CombinedOutput(); err != nil {
++		t.Fatalf("build provider: %v\n%s", err, out)
++	}
++	// Revision A accepts this PATH-only fixture with a warning. A future
++	// enforcing revision must configure it in provider_directories instead.
++	for i, entry := range sandbox.env {
++		if strings.HasPrefix(entry, "PATH=") {
++			sandbox.env[i] = "PATH=" + providerDir + string(os.PathListSeparator) + os.Getenv("PATH")
++		}
++	}
++	for _, operands := range [][]string{{"example", "--", "-h"}, {"example", "--", "--help", "-h"}, {"--", "-h"}} {
++		code, stdout, stderr := sandbox.invoke(t, binary, append([]string{"run"}, operands...)...)
++		var got []string
++		if code != 0 || json.Unmarshal([]byte(stdout), &got) != nil || !reflect.DeepEqual(got, operands) {
++			t.Fatalf("run %v: exit=%d stdout=%q stderr=%q", operands, code, stdout, stderr)
++		}
++	}
++	code, stdout, stderr := sandbox.invoke(t, binary, "run", "example", "-h", "--", "--help")
++	if code != 0 || stderr != "" || !strings.HasPrefix(stdout, "usage: curator run ") {
++		t.Fatalf("run help: exit=%d stdout=%q stderr=%q", code, stdout, stderr)
++	}
++}
++
++// Unknown explicit help topics are usage errors and never execute a command.
++func TestCommandHelpUnknownTopic(t *testing.T) {
++	var stdout, stderr strings.Builder
++	code := run([]string{"help", "unknown-topic"}, stubConfigSource{}, &stdout, &stderr)
++	if code != exitUsage || stdout.Len() != 0 || !strings.Contains(stderr.String(), "unknown help topic") {
++		t.Fatalf("unknown topic: exit=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
++	}
++}
+diff --git a/cmd/curator/draft_diagnostics_test.go b/cmd/curator/draft_diagnostics_test.go
+index a69a4da85f84c3387cadb4d842225eccd51b772b..ac9f70db73a0b1e6d7e8fb5384f29ad4d21b123c 100644
+--- a/cmd/curator/draft_diagnostics_test.go
++++ b/cmd/curator/draft_diagnostics_test.go
+@@ -201,7 +201,7 @@ func TestDraftProjectResolveHelp(t *testing.T) {
+ 	for _, verb := range []string{"resolve", "refresh"} {
+ 		for _, spelling := range []string{"-h", "--help"} {
+ 			code, stdout, stderr := capture(t, configPath, "project", verb, spelling)
+-			if code != exitOK || stdout != projectResolveUsage || stderr != "" {
++			if code != exitOK || !strings.HasPrefix(stdout, "usage: curator project "+verb+" [path]\n") || !strings.Contains(stdout, projectResolveUsage) || stderr != "" {
+ 				t.Fatalf("project %s %s = code %d, stdout %d bytes, stderr %q; want the help golden on stdout", verb, spelling, code, len(stdout), stderr)
+ 			}
+ 		}
+@@ -235,12 +235,12 @@ func TestDraftProjectResolveHelp(t *testing.T) {
+ func TestDraftInstallStatusHelpIncludesSchema2Workflow(t *testing.T) {
+ 	configPath := filepath.Join(t.TempDir(), "config.json")
+ 	for _, command := range []string{"install", "status"} {
+-		code, _, stderr := capture(t, configPath, command, "-h")
+-		if code != exitUsage {
+-			t.Fatalf("%s -h = %d, want %d", command, code, exitUsage)
++		code, stdout, stderr := capture(t, configPath, command, "-h")
++		if code != exitOK || stderr != "" {
++			t.Fatalf("%s -h = %d, stderr %q, want exit 0", command, code, stderr)
+ 		}
+-		if !strings.Contains(stderr, "Usage of "+command+":") || !strings.Contains(stderr, draftWorkflowSection) {
+-			t.Fatalf("%s -h misses usage or schema-2 workflow help:\n%s", command, stderr)
++		if !strings.Contains(stdout, "usage: curator "+command) || !strings.Contains(stdout, draftWorkflowSection) {
++			t.Fatalf("%s -h misses usage or schema-2 workflow help:\n%s", command, stdout)
+ 		}
+ 	}
+ }
+diff --git a/cmd/curator/firstrun_ux_test.go b/cmd/curator/firstrun_ux_test.go
+index 285e23c12d1b661866c462821ff6f69b166cd66d..8931a2a76aa45b6f0b0ab305f35c21397187b01e 100644
+--- a/cmd/curator/firstrun_ux_test.go
++++ b/cmd/curator/firstrun_ux_test.go
+@@ -77,6 +77,8 @@ func TestGlobalInitHelpWithoutConfig(t *testing.T) {
+ 	}
+ }
+ 
++// Child help now succeeds before configuration loading, preserving this test's
++// original name as a regression witness for the previous refusal contract.
+ func TestGlobalInitSubcommandHelpWithoutConfigRefuses(t *testing.T) {
+ 	configPath := filepath.Join(t.TempDir(), "config.json")
+ 	for _, args := range [][]string{
+@@ -85,34 +87,34 @@ func TestGlobalInitSubcommandHelpWithoutConfigRefuses(t *testing.T) {
+ 		{"profile", "install", "--help"},
+ 	} {
+ 		code, stdout, stderr := runFile(t, configPath, args...)
+-		want := "curator: global config not found: " + configPath + "\n" + wantConfigHint + "\n"
+-		if code != exitFail || stdout != "" || stderr != want {
+-			t.Fatalf("%v = %d stdout %q stderr %q; want refusal %q", args, code, stdout, stderr, want)
++		if code != exitOK || stderr != "" || !strings.Contains(stdout, "curator "+strings.Join(args[:2], " ")) {
++			t.Fatalf("%v = %d stdout %q stderr %q; want dedicated help without config", args, code, stdout, stderr)
+ 		}
+ 	}
+ }
+ 
+ const wantPostureWarning = "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults\n"
+ 
++// Dedicated help preserves the documented options while avoiding config
++// warnings, command execution and the old FlagSet exit-2 behavior.
+ func TestGlobalInitEnvResolveSubcommandHelpPreservesFlagSet(t *testing.T) {
+-	home := t.TempDir()
+-	configPath := filepath.Join(home, "config.json")
+-	t.Setenv(postureWarnedEnv, "")
+-	if code, _, stderr := runFile(t, configPath, "bootstrap", "--non-interactive", "--skills-root", filepath.Join(home, "skills")); code != exitOK {
+-		t.Fatalf("bootstrap = %d\n%s", code, stderr)
+-	}
++	configPath := bootstrapConfig(t)
+ 	for _, row := range []struct {
+-		name  string
+-		args  []string
+-		usage string
++		args    []string
++		options []string
+ 	}{
+-		{"env resolve", []string{"env", "resolve", "--help"}, "Usage of env resolve:\n  -dry-run\n    \treport store rebuilds without modifying state (requires --repair)\n  -format string\n    \tfragment format: json | env | shell (default \"json\")\n  -preserve-lock\n    \trefuse repair that would change the lock hash (requires --repair)\n  -profile string\n    \tprofile name (default: the current profile)\n  -repair\n    \tprovision or repair the managed home under the mutation lock\n  -takeover\n    \ttake over the unmanaged files the repair would write (only with --repair)\ncurator: env resolve <env-id> [--profile <name>] [--repair [--preserve-lock] [--dry-run]] [--takeover] [--format json|env|shell]\n" + envAliasUsage + "\n"},
+-		{"global add", []string{"global", "add", "--help"}, "Usage of global add:\n  -branch string\n    \tgit branch\n  -git string\n    \tgit clone URL\n  -revision string\n    \tgit revision\n  -source string\n    \tsource directory under skills_root\n  -tag string\n    \tgit tag\n"},
++		{[]string{"env", "resolve", "--help"}, []string{"--dry-run", "--format json|env|shell", "--preserve-lock", "--profile", "--repair", "--takeover", envAliasUsage}},
++		{[]string{"global", "add", "--help"}, []string{"--branch", "--git", "--revision", "--source", "--tag"}},
+ 	} {
+-		t.Run(row.name, func(t *testing.T) {
++		t.Run(strings.Join(row.args[:2], " "), func(t *testing.T) {
+ 			code, stdout, stderr := runFile(t, configPath, row.args...)
+-			if code != exitUsage || stdout != "" || stderr != wantPostureWarning+row.usage {
+-				t.Fatalf("subcommand help = %d stdout %q stderr %q; want exit 2 stderr %q", code, stdout, stderr, wantPostureWarning+row.usage)
++			if code != exitOK || stderr != "" {
++				t.Fatalf("subcommand help = %d stdout %q stderr %q", code, stdout, stderr)
++			}
++			for _, option := range row.options {
++				if !strings.Contains(stdout, option) {
++					t.Errorf("%v help misses %q", row.args, option)
++				}
+ 			}
+ 		})
+ 	}
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index 73deadbdd459fcc8bf6a29163d335bf24cb401c2..74e460d434562cca7c540bfa7bc1f024a54e9c05 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -280,58 +280,39 @@ func (c cli) run(args []string) int {
+ 		_, _ = fmt.Fprint(c.stderr, usage)
+ 		return exitUsage
+ 	}
+-	switch args[0] {
+-	case "--version", "version":
++	if args[0] == "-h" || args[0] == "--help" {
++		_, _ = fmt.Fprint(c.stdout, usage)
++		return exitOK
++	}
++	if args[0] == "--version" {
+ 		_, _ = fmt.Fprintln(c.stdout, "curator "+version.String())
+ 		return exitOK
+-	case "init":
+-		return c.cmdInit(args[1:])
+-	case "bootstrap":
+-		return c.cmdBootstrap(args[1:])
+-	case "add":
+-		return c.cmdAdd(args[1:])
+-	case "remove":
+-		return c.cmdRemove(args[1:])
+-	case "install":
+-		return c.cmdInstall(args[1:])
+-	case "update":
+-		return c.cmdUpdate()
+-	case "upgrade":
+-		return c.cmdInstallMode(args[1:], true)
+-	case "status":
+-		return c.cmdStatus(args[1:])
+-	case "list":
+-		return c.cmdList()
+-	case "project":
+-		return c.cmdProject(args[1:])
+-	case "skill":
+-		if len(args) >= 2 && args[1] == "check" {
+-			return c.cmdSkillCheck(args[2:])
+-		}
+-	case "global":
+-		return c.cmdGlobal(args[1:])
+-	case "profile":
+-		return c.cmdProfile(args[1:])
+-	case "env":
+-		return c.cmdEnv(args[1:])
+-	case "hybrid":
+-		return c.cmdHybrid(args[1:])
+-	case "audit":
+-		return c.cmdAudit(args[1:])
+-	case "gc":
+-		return c.cmdGC()
+-	case "shell-init":
+-		return c.cmdShellInit(args[1:])
+-	case "hook":
+-		return c.cmdHook(args[1:])
+-	case "ui":
+-		return c.cmdUI()
+-	case "config":
+-		return c.cmdConfig(args[1:])
+-	case "-h", "--help", "help":
+-		_, _ = fmt.Fprint(c.stdout, usage)
++	}
++	if args[0] == "help" {
++		if len(args) == 1 {
++			_, _ = fmt.Fprint(c.stdout, usage)
++			return exitOK
++		}
++		if command, _ := registeredCommand(args[1:]); command != nil {
++			_, _ = fmt.Fprint(c.stdout, command.helpText())
++			return exitOK
++		}
++		_, _ = fmt.Fprintf(c.stderr, "curator: unknown help topic %q\n", strings.Join(args[1:], " "))
++		return exitUsage
++	}
++	if command, _ := registeredCommand(args); command != nil && hasHelpFlag(args[1:]) {
++		_, _ = fmt.Fprint(c.stdout, command.helpText())
+ 		return exitOK
+ 	}
++	for _, command := range commandRegistry {
++		if command.name == args[0] && command.run != nil {
++			return command.run(c, args[1:])
++		}
++	}
++	return c.runProvider(args)
++}
++
++func (c cli) runProvider(args []string) int {
+ 	// Umbrella subcommand discovery (environments §11): an implemented
+ 	// subcommand always wins and discovery runs only for unknown names.
+ 	// The name must match the identifier grammar; anything else is a
+diff --git a/docs/cli.md b/docs/cli.md
+index 117a52f617a66edca4a97e75d3a2acef54565f1b..8eefe27124269772877aeb8b17ba967439443fe9 100644
+--- a/docs/cli.md
++++ b/docs/cli.md
+@@ -6,6 +6,13 @@ Every synopsis and flag in this reference was verified verbatim against `./bin/c
+ 
+ Curator flags use consistent names and behavior across command groups.
+ 
++For every built-in command (including nested verbs), `-h` or `--help` anywhere
++before `--` prints dedicated command help and exits 0 without modifying files or
++loading machine configuration. `curator help <command>` prints the same help.
++For example, `curator init -h` and `curator help env config set` are read-only.
++Arguments after `--` are operands; `curator run codex -- -h` forwards the literal
++`-h` to the run provider.
++
+ - `--all`: operate on all configured projects.
+ - `--audit`: run the audit gate in advisory or strict mode.
+ - `--dry-run`: plan work without modifying files.
