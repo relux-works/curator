@@ -2,6 +2,7 @@ package install
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,6 +21,7 @@ import (
 	"github.com/relux-works/curator/internal/scriptworker"
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/staging"
+	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/whitelist"
 )
 
@@ -44,6 +46,9 @@ type nodeInstall struct {
 func stageNode(stageRoot string, install nodeInstall, clock Clock) (staging.Plan, string, error) {
 	var plan staging.Plan
 	live := filepath.Join(install.store, install.node.Name)
+	if err := marker.CheckOwnership(live); err != nil {
+		return staging.Plan{}, "", err
+	}
 	current, err := marker.Current(live, install.expected)
 	if err != nil {
 		return staging.Plan{}, "", err
@@ -559,34 +564,30 @@ func enforcedDerivationMessages(skill string, command skillspec.Command, declare
 }
 
 // stageStaleSkillRemovals turns installed skills that the next closure does not
-// keep into removal targets. The store is manager-owned and holds only context
-// directories, so every visible entry is claimed — except a link or special
-// file, which this store never produces and which is therefore reported as
-// unexpected state rather than silently deleted.
+// keep into removal targets. Only valid preceding install markers authorize
+// removal; being inside the store grants no ownership. Collect every conflict
+// before refusing, without returning a partial removal plan.
 func stageStaleSkillRemovals(store, kind string, expected map[string]bool) (staging.Plan, error) {
 	var plan staging.Plan
-	entries, err := os.ReadDir(store)
-	if os.IsNotExist(err) {
-		return plan, nil
-	}
+	inventory, err := stateread.ReadDir(store)
 	if err != nil {
 		return staging.Plan{}, err
 	}
 	var names []string
-	for _, entry := range entries {
+	var conflicts []error
+	for _, entry := range inventory.Entries {
 		name := entry.Name()
 		if strings.HasPrefix(name, ".") || expected[name] {
 			continue
 		}
-		info, err := os.Lstat(filepath.Join(store, name))
-		if err != nil {
-			return staging.Plan{}, err
-		}
-		if !info.IsDir() && !info.Mode().IsRegular() {
-			return staging.Plan{}, fmt.Errorf(
-				"stale entry %s in %s is a link or special file, which this store never installs", name, store)
+		if err := marker.CheckOwnership(filepath.Join(store, name)); err != nil {
+			conflicts = append(conflicts, err)
+			continue
 		}
 		names = append(names, name)
+	}
+	if len(conflicts) != 0 {
+		return staging.Plan{}, errors.Join(conflicts...)
 	}
 	sort.Strings(names)
 	for _, name := range names {
@@ -621,4 +622,36 @@ func (staged runtimeStaging) referencedKeys() []string {
 		}
 	}
 	return keys
+}
+
+// checkCanonicalStore checks selected destinations and, when requested, all
+// stale siblings together so diagnostics name every unproven publication path.
+func checkCanonicalStore(store string, selected map[string]bool, prune bool) error {
+	names := map[string]bool{}
+	for name := range selected {
+		names[name] = true
+	}
+	var conflicts []error
+	if prune {
+		inventory, err := stateread.ReadDir(store)
+		if err != nil {
+			return err
+		}
+		for _, entry := range inventory.Entries {
+			if !strings.HasPrefix(entry.Name(), ".") {
+				names[entry.Name()] = true
+			}
+		}
+	}
+	ordered := make([]string, 0, len(names))
+	for name := range names {
+		ordered = append(ordered, name)
+	}
+	sort.Strings(ordered)
+	for _, name := range ordered {
+		if err := marker.CheckOwnership(filepath.Join(store, name)); err != nil {
+			conflicts = append(conflicts, err)
+		}
+	}
+	return errors.Join(conflicts...)
 }

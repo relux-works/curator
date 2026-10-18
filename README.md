@@ -82,6 +82,8 @@ Curator binds persisted rollback and equivocation state to the canonical registr
 
 Registry requests use bounded per-attempt and total deadlines. GET requests retry network failures, `429`, and `503` at most twice after the first attempt. Publication retries the exact body only with its deterministic `Idempotency-Key`; other client errors and unsafe requests are never retried. Redirects are rejected so a registry cannot move a request or bearer token to another endpoint.
 
+Canonical skill stores preserve unmanaged content. Install refuses named stale siblings or selected destinations without proven preceding ownership before publishing installation targets. Source ownership requires a readable regular marker, reached without links, whose JSON object carries recognized schema 5 or 6 and names that node. Invalid build evidence remains repairable; missing, unreadable or mismatching ownership evidence refuses with `source_ownership_unproven`. Owned content can still be updated or removed. Adapter takeover and backup rules remain unchanged.
+
 ## Commands without profile setup
 
 Shell profile changes are not required. After `curator install`, agents can invoke project commands through `.agents/bin/<command>` on Unix and `.agents\bin\<command>.cmd` on Windows. Global installation publishes non-destructive forwarding shims to a safe user directory already on `PATH` when one is available; otherwise Curator reports the canonical global bin location. Installed launchers carry the project command directory and resolved system dependency directories themselves, preserve the inherited `PATH`, and return the child command status.

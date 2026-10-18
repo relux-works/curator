@@ -1966,6 +1966,11 @@ func findProviderState(t *testing.T, rows []envprofile.ProviderState, name strin
 func TestStatusAcceptsAnUnchangedLegacyMarkerSchema(t *testing.T) {
 	t.Parallel()
 	project, home := legacyProject(t)
+	// A present manifest selects the legacy carrier this test rewrites.
+	// Manifest absence now requires source v6 and cannot be relabelled v1.
+	addCLISkillFilesAndRetag(t, filepath.Join(cliSkillsRoot(home), "skill-a"), map[string]string{
+		"agent-skill.json": `{"schema_version":4,"capabilities":{},"commands":{},"dependencies":{"skills":{}}}`,
+	})
 	if code, _, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
 		t.Fatalf("install = %d\n%s", code, stderr)
 	}

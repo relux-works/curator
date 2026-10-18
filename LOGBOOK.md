@@ -3,6 +3,29 @@
 > Institutional memory. Concise, factual, high-signal.
 > Newest entries first. One block per insight.
 
+## 2026-10-18 — Canonical ownership is separate from build validity
+
+BUG-261017-47xdyt: a field report exposed deletion of unowned stale siblings
+and replacement of unowned selected destinations. Curator-spec `3ca4b84f`
+section 4.1 resolves the ownership/repair conflict: the preceding regular,
+readable, no-follow source marker must parse as an object, carry recognized
+schema 5 or 6, and name the node. Invalid build evidence requires re-derivation;
+unproven ownership refuses with `source_ownership_unproven`. Legacy global
+markers retain their existing full validation rule. Project and global stagers
+collect selected and stale conflicts together under serialization. Hybrid
+selected nodes use the same gate without introducing shared-store pruning.
+Native ledgers, takeover backups, transaction ordering and GC retain their
+contracts. Draft writer cases additionally require manifestless pure context
+markers to use v6 with JSON null; integer zero remains invalid. Both Skillfile
+lanes preserve existing marker bytes on clean reinstall. Row mappings,
+mutation bounds and validation evidence travel in the task outcome.
+
+The first round-2 hosted run exposed three legacy CLI fixtures that implicitly
+used manifest absence to select a legacy carrier. The new writer contract makes
+that input a source-v6 package instead. Those named tests retain every assertion
+and now declare valid manifests to exercise the legacy hash/marker lanes; the
+separate published writer cases retain manifestless coverage.
+
 ## 2026-10-17 — Migrated skill capability declarations
 
 BUG-261014-3oeu7d: profile strict audit now loads each skill's own package
