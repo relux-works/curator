@@ -308,6 +308,25 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+The [user-level runtime path probe](.research/261018-user-runtime-path-probe/README.md)
+uses Python 3 standard-library fixture/process tooling, macOS `sandbox-exec`,
+and explicitly supplied Codex/Claude native binaries. It invokes only local
+prompt rendering, initialization and read-only plugin discovery, with network
+access denied and writes confined to new scratch directories. Run it with:
+
+```sh
+python3 .research/261018-user-runtime-path-probe/probe.py \
+  --codex 0.162.0=/absolute/path/to/codex-0.162.0 \
+  --codex 0.163.0=/absolute/path/to/codex-0.163.0 \
+  --claude /absolute/path/to/claude-2.1.302 \
+  --output .temp/BUG-261018-k2tn36/results.json
+```
+
+Keep invocation logs and JSON outputs under `.temp/BUG-261018-k2tn36/`.
+Fixture configurations and owned PID records stay at the printed scratch
+location under `/private/tmp`; the report documents provenance, controls and
+the limits of each observation. No global installation is needed.
+
 Run `go test ./cmd/curator -run 'Test(RegisteredSubcommandHelpNoWrites|CommandHelp)'`
 for built-in and nested command help, zero-write snapshots, the init positive
 control, provider passthrough, and narrowing mutants. Keep logs under `.temp/`.
