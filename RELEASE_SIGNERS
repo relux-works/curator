@@ -1,0 +1,9 @@
+# Curator release signers (git allowed_signers format).
+# Verify a release tag with: git -c gpg.ssh.allowedSignersFile=RELEASE_SIGNERS verify-tag <tag>
+# Ivan Oparin, release key (2026-10-18)
+ivan@relux.works namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO4J/In1dOL3NAnf+OAvxHg56/HKkMY3vqiH7XS5vgjU
+# ivmbp agent release key (2026-10-18): signs tags from v0.15.0-rc.8 on
+ivan@relux.works namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF78aQWisJvEInj43zlVAGDUrzLpj36KEd6FPNqe4BvK
+# ivmbp agent commit key: signed v0.15.0-rc.7 only; not used for new releases
+ivan@relux.works namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOZGXWazfNwZqHl7TqTq9MZ35JM3SQ3SIIky4LUTPO+r
+# Alexis's release key: to be added when it exists
