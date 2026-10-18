@@ -1,5 +1,5 @@
 ## Status
-to-review
+done
 
 ## Review
 required
@@ -32,11 +32,11 @@ estimated(fibonacci(5))
 - [x] Relevant build/validation commands run after changes and build not broken
 - [x] New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables
 - [x] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant
-- [ ] Implementation matches AC
-- [ ] Solution fits project architecture
-- [ ] Tests green
-- [ ] Gate, refusal, validation, authorization, and attestation behavior attacked, not read — positive-path-only evidence is not accepted
-- [ ] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
+- [x] Implementation matches AC
+- [x] Solution fits project architecture
+- [x] Tests green
+- [x] Gate, refusal, validation, authorization, and attestation behavior attacked, not read — positive-path-only evidence is not accepted
+- [x] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
 
 ## Notes
 spawn selection rationale tuple: {"role":"developer","pair":"gpt-6.1-sol/high","text":"Wave 7 OWNPRES producer: docs-only, codex gpt-6.1-sol high (R80), owner go 2026-10-13"}
@@ -67,16 +67,45 @@ spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/medium",
 spawn selection rationale for gpt-6-astra/medium: Deciding review B on codex gpt-6-astra medium: owner spawn policy 2026-10-16 (Codex only; reviewers astra medium)
 spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[codex,claude], config: spawn.preferred_agentic_system)
 spawn queued: [reviewer] reviewer (codex) (run=RUN-261018-80ae8a, max_parallel=4)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-261018-80ae8a)
+Review rev1: changes_requested. Six of six bounded AC rows held; seven of seven narrowing mutants killed; independent CLI A/C2 and cross-scope/transaction checks passed. Sole finding stale-candidate-path-overlap (repeat-of: none): README.md changed upstream before reviewer launch. Exact authority 5d8e6b07 and CR base/candidate path sets reproduce the required pre-review freshness refusal. Refresh through producer workflow, preserve upstream changes, validate and hand off a new revision. Verdict, complete sanitized evidence and executable probes attached. No ownership product defect reproduced; no human decision needed.
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-261018-80ae8a, pid=74225, exit=0)
+loop-detector rev1: S2/S3/S5 not evaluable — runtime-recorded verdict carries no stamped findings array
+spawn selection rationale tuple: {"role":"developer","pair":"gpt-6.1-sol/high","text":"OWNPRES round 3: combination check after converge (codex gpt-6.1-sol high per owner spawn policy)"}
+spawn selection rationale for gpt-6.1-sol/high: OWNPRES round 3: combination check after converge (codex gpt-6.1-sol high per owner spawn policy)
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[codex,claude], config: spawn.preferred_agentic_system)
+spawn queued: [implementer] developer (codex) (run=RUN-261018-ce6980, max_parallel=4)
+spawn run started: [implementer] developer (codex) (run=RUN-261018-ce6980)
+spawn run RUN-261018-ce6980 cancelled by operator; operator action required; reason: Orchestrator cancel: SNAPPUB (curator PR #136) is landing and also changes README.md, so this recheck on 5d8e6b07 would go stale on landing. The Story is converged again after SNAPPUB lands and the recheck is respawned once on the final trunk.
+agent completed: [implementer] developer (codex) (exit=-1)
+spawn run completed: codex (run=RUN-261018-ce6980, pid=99980, exit=-1)
+spawn selection rationale tuple: {"role":"developer","pair":"gpt-6.1-sol/high","text":"OWNPRES round 3: combination check on trunk 402fdbc9 (codex gpt-6.1-sol high per owner spawn policy)"}
+spawn selection rationale for gpt-6.1-sol/high: OWNPRES round 3: combination check on trunk 402fdbc9 (codex gpt-6.1-sol high per owner spawn policy)
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[codex,claude], config: spawn.preferred_agentic_system)
+spawn queued: [implementer] developer (codex) (run=RUN-261018-183993, max_parallel=4)
+spawn run started: [implementer] developer (codex) (run=RUN-261018-183993)
+Round 3: converged README preserves all trunk bytes plus exactly one ownership paragraph; no candidate edit required. New signed detached candidate db030e1faca9dfc0506876e14e724414ac563030 on checkpoint 402fdbc9. Build, lint, seven expected-red narrowing controls and snapshot-publication controls verified. Full local suite and hosted run 39090264021 still running; no pending result is counted as green. Story delta remains uncommitted.
+Round 3 refresh onto 402fdbc9: README combination inspected, no repository edit required. Signed candidate db030e1faca9dfc0506876e14e724414ac563030; Story checkpoint unchanged and candidate uncommitted. Local 85/85 packages, 3504/3504 top-level tests driven; all 98 selected bounded commands exit 0. Seven narrowing mutants killed at named assertions (expected exit 1). Full hosted gate 39090264021 success: 20 executed jobs green, 2 conditional skips; all five test/race reports verified. Updated implementation and gaps outcomes; new refresh_evidence.md records archive locator, SHA-256, size and structured evidence. Binary attach refused by board policy; archive retained outside Git per CLI instruction. No refresh-candidate required. Ready for review.
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-261018-183993, pid=79992, exit=0)
+spawn selection rationale for gpt-6-astra/medium: Deciding review B on codex gpt-6-astra medium: owner spawn policy 2026-10-16 (Codex only; reviewers astra medium)
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[codex,claude], config: spawn.preferred_agentic_system)
+spawn queued: [reviewer] reviewer (codex) (run=RUN-261018-15b289, max_parallel=4)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-261018-15b289)
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-261018-15b289, pid=23089, exit=0)
 
 ## Precondition Resources
 - [gw-OWNPRES-brief.md](file://BUG-261017-47xdyt/gw-OWNPRES-brief.md)
 - [TASK-261017-yyg01d_triage.md](file://BUG-261017-47xdyt/TASK-261017-yyg01d_triage.md)
 - [gw-OWNPRES-r2-brief.md](file://BUG-261017-47xdyt/gw-OWNPRES-r2-brief.md)
 - [gw-OWNPRES-review-B-brief.md](file://BUG-261017-47xdyt/gw-OWNPRES-review-B-brief.md)
+- [gw-OWNPRES-r3-brief.md](file://BUG-261017-47xdyt/gw-OWNPRES-r3-brief.md)
 
 ## Outcome Resources
 - [BUG-261017-47xdyt_spawn-log_-implementer--developer--codex-_RUN-261017-8304dd.log](file://BUG-261017-47xdyt/BUG-261017-47xdyt_spawn-log_-implementer--developer--codex-_RUN-261017-8304dd.log) — System spawn log captured by task-board
-- [BUG-261017-47xdyt_implementation.md](file://BUG-261017-47xdyt/BUG-261017-47xdyt_implementation.md) — Round 2 ready for review: 6/6 AC rows, 21 ownership and 10 writer mappings, seven killed mutants, full local and signed-candidate hosted gates green
+- [BUG-261017-47xdyt_implementation.md](file://BUG-261017-47xdyt/BUG-261017-47xdyt_implementation.md) — Round 3 refreshed candidate, caller and control maps, local and hosted validation
 - [BUG-261017-47xdyt_evidence.txt](file://BUG-261017-47xdyt/BUG-261017-47xdyt_evidence.txt) — Sanitized green controls, five killed mutants, blocking reviewer failure and terminal CI readback
 - [BUG-261017-47xdyt_spawn-log_-implementer--developer--codex-_RUN-261017-561d7e.log](file://BUG-261017-47xdyt/BUG-261017-47xdyt_spawn-log_-implementer--developer--codex-_RUN-261017-561d7e.log) — System spawn log captured by task-board
 - [BUG-261017-47xdyt_spawn-log_-implementer--developer--codex-_RUN-261017-1a0e08.log](file://BUG-261017-47xdyt/BUG-261017-47xdyt_spawn-log_-implementer--developer--codex-_RUN-261017-1a0e08.log) — System spawn log captured by task-board
@@ -84,12 +113,26 @@ spawn queued: [reviewer] reviewer (codex) (run=RUN-261018-80ae8a, max_parallel=4
 - [BUG-261017-47xdyt_change-request_rev1.patch](file://BUG-261017-47xdyt/BUG-261017-47xdyt_change-request_rev1.patch) — Change Request CR-BUG-261017-47xdyt-1 revision 1 candidate patch (repository_delta=present, 20 changed paths)
 - [BUG-261017-47xdyt_change-request_rev1-validation.log](file://BUG-261017-47xdyt/BUG-261017-47xdyt_change-request_rev1-validation.log) — Change Request CR-BUG-261017-47xdyt-1 revision 1 bounded validation log
 - [BUG-261017-47xdyt_spawn-log_-reviewer--reviewer--codex-_RUN-261018-80ae8a.log](file://BUG-261017-47xdyt/BUG-261017-47xdyt_spawn-log_-reviewer--reviewer--codex-_RUN-261018-80ae8a.log) — System spawn log captured by task-board
+- [BUG-261017-47xdyt_review-evidence-rev1.txt](file://BUG-261017-47xdyt/BUG-261017-47xdyt_review-evidence-rev1.txt) — Independent review commands, complete sanitized logs, mutant deltas and exact candidate/hosted identity
+- [BUG-261017-47xdyt_review-cli-probe.py](file://BUG-261017-47xdyt/BUG-261017-47xdyt_review-cli-probe.py) — Independent private-HOME CLI preservation and malformed ownership attacks
+- [BUG-261017-47xdyt_freshness-probe.py](file://BUG-261017-47xdyt/BUG-261017-47xdyt_freshness-probe.py) — Pinned executable reproduction of the pre-review README path overlap
+- [BUG-261017-47xdyt_review-verdict-rev1.md](file://BUG-261017-47xdyt/BUG-261017-47xdyt_review-verdict-rev1.md) — Changes requested: ownership sweep held, but pre-review freshness requires producer refresh
+- [BUG-261017-47xdyt_spawn-log_-implementer--developer--codex-_RUN-261018-ce6980.log](file://BUG-261017-47xdyt/BUG-261017-47xdyt_spawn-log_-implementer--developer--codex-_RUN-261018-ce6980.log) — System spawn log captured by task-board
+- [BUG-261017-47xdyt_spawn-log_-implementer--developer--codex-_RUN-261018-183993.log](file://BUG-261017-47xdyt/BUG-261017-47xdyt_spawn-log_-implementer--developer--codex-_RUN-261018-183993.log) — System spawn log captured by task-board
+- [BUG-261017-47xdyt_gaps.md](file://BUG-261017-47xdyt/BUG-261017-47xdyt_gaps.md) — Refresh onto 402fdbc9: command exits, declared bounds and plain-text evidence locator
+- [BUG-261017-47xdyt_refresh_evidence.md](file://BUG-261017-47xdyt/BUG-261017-47xdyt_refresh_evidence.md) — Round 3 exact candidate: archive locator, digest, validation and mutant summaries
+- [BUG-261017-47xdyt_change-request_rev2.patch](file://BUG-261017-47xdyt/BUG-261017-47xdyt_change-request_rev2.patch) — Change Request CR-BUG-261017-47xdyt-2 revision 2 candidate patch (repository_delta=present, 20 changed paths)
+- [BUG-261017-47xdyt_change-request_rev2-validation.log](file://BUG-261017-47xdyt/BUG-261017-47xdyt_change-request_rev2-validation.log) — Change Request CR-BUG-261017-47xdyt-2 revision 2 bounded validation log
+- [BUG-261017-47xdyt_spawn-log_-reviewer--reviewer--codex-_RUN-261018-15b289.log](file://BUG-261017-47xdyt/BUG-261017-47xdyt_spawn-log_-reviewer--reviewer--codex-_RUN-261018-15b289.log) — System spawn log captured by task-board
+- [BUG-261017-47xdyt_review-evidence-rev2.txt](file://BUG-261017-47xdyt/BUG-261017-47xdyt_review-evidence-rev2.txt) — Revision 2 independent production attacks, exact-candidate validation and sanitized logs
+- [BUG-261017-47xdyt_review-verdict-rev2.md](file://BUG-261017-47xdyt/BUG-261017-47xdyt_review-verdict-rev2.md) — Accepted revision 2: six AC rows held, empty findings, reviewed converged README
+- [BUG-261017-47xdyt_review-acceptance-rev2.md](file://BUG-261017-47xdyt/BUG-261017-47xdyt_review-acceptance-rev2.md) — Acceptance readback and write-boundary warning recorded without changing the review verdict
 
 ## Created
 2026-10-17T18:19:08Z
 
 ## Last Update
-2026-10-18T01:14:49Z
+2026-10-18T08:05:15Z
 
 ## Assigned To
 [reviewer] reviewer (codex)

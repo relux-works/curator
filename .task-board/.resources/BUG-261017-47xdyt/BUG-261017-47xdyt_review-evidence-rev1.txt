@@ -1,0 +1,453 @@
+
+===== readiness.log =====
+git version 2.54.0 (Apple Git-157)
+go version go1.25.5 darwin/arm64
+task-board version dev
+
+===== identity.txt =====
+20/20 candidate changed paths match CR blobs; signed hosted tree 54bffdc4a8460c329fd5d68cd4dd412458720c4d.
+
+===== hosted.json =====
+{"conclusion":"success","headSha":"1c85e638c92edfe1bd87a593b40bb524766c3824","jobs":[{"conclusion":"success","name":"Lint"},{"conclusion":"success","name":"Test (ubuntu-latest)"},{"conclusion":"success","name":"Gate self-test (windows-latest)"},{"conclusion":"success","name":"Interop conformance gate"},{"conclusion":"success","name":"Test (macos-latest)"},{"conclusion":"success","name":"Gate self-test (ubuntu-latest)"},{"conclusion":"success","name":"Naming gate"},{"conclusion":"success","name":"Go 1.26.0 driver (macos-latest)"},{"conclusion":"success","name":"Race (macos-latest)"},{"conclusion":"success","name":"Gate self-test (macos-latest)"},{"conclusion":"success","name":"Test (windows-latest)"},{"conclusion":"success","name":"Go 1.27.1 driver (windows-latest)"},{"conclusion":"success","name":"Go 1.25.5 driver (ubuntu-latest)"},{"conclusion":"success","name":"Go 1.27.1 driver (macos-latest)"},{"conclusion":"success","name":"Go 1.25.5 driver (macos-latest)"},{"conclusion":"success","name":"Go 1.27.1 driver (ubuntu-latest)"},{"conclusion":"success","name":"Race (ubuntu-latest)"},{"conclusion":"success","name":"Go 1.25.5 driver (windows-latest)"},{"conclusion":"success","name":"Go 1.26.0 driver (ubuntu-latest)"},{"conclusion":"success","name":"Go 1.26.0 driver (windows-latest)"},{"conclusion":"skipped","name":"Candidate suite (${{ matrix.os }})"},{"conclusion":"skipped","name":"Test (rose-air)"}],"status":"completed"}
+
+===== advertised.txt =====
+ref: refs/heads/main	HEAD
+5d8e6b07f7f485557d9bbb065c9692348ca065c2	HEAD
+
+===== freshness.txt =====
+base=1724b4a52b4c2d163c0a3e6ab7c2ad2bbe54ac0c
+candidate=54bffdc4a8460c329fd5d68cd4dd412458720c4d
+authority=5d8e6b07f7f485557d9bbb065c9692348ca065c2
+overlap=['README.md']
+
+===== freshness-probe.log =====
+base: 1724b4a52b4c2d163c0a3e6ab7c2ad2bbe54ac0c candidate: 54bffdc4a8460c329fd5d68cd4dd412458720c4d authority: 5d8e6b07f7f485557d9bbb065c9692348ca065c2
+pre_review_path_overlap: README.md
+Traceback (most recent call last):
+  File "$WORKTREE/.temp/BUG-261017-47xdyt-review/freshness_probe.py", line 10, in <module>
+    assert not overlap, 'pre_review_path_overlap: '+', '.join(overlap)
+           ^^^^^^^^^^^
+AssertionError: pre_review_path_overlap: README.md
+
+===== preservation-01.log =====
+=== RUN   TestInstallDraftOwnershipCases
+=== RUN   TestInstallDraftOwnershipCases/unowned-sibling-preserved-and-named
+=== RUN   TestInstallDraftOwnershipCases/unowned-selected-destination-no-partial-change
+=== RUN   TestInstallDraftOwnershipCases/all-unowned-paths-named
+=== RUN   TestInstallDraftOwnershipCases/unreadable-marker
+=== RUN   TestInstallDraftOwnershipCases/unparseable-marker
+=== RUN   TestInstallDraftOwnershipCases/nonobject-marker
+=== RUN   TestInstallDraftOwnershipCases/wrong-name-marker
+=== RUN   TestInstallDraftOwnershipCases/missing-schema-identity
+=== RUN   TestInstallDraftOwnershipCases/unknown-schema-identity
+=== RUN   TestInstallDraftOwnershipCases/string-schema-version
+=== RUN   TestInstallDraftOwnershipCases/symlink-marker
+=== RUN   TestInstallDraftOwnershipCases/special-marker
+=== RUN   TestInstallDraftOwnershipCases/symlink-canonical-node
+=== RUN   TestInstallDraftOwnershipCases/symlink-canonical-parent
+=== RUN   TestInstallDraftOwnershipCases/special-canonical-entry
+=== RUN   TestInstallDraftOwnershipCases/v6-reader-unaware
+=== RUN   TestInstallDraftOwnershipCases/ownership-changed-before-publication
+=== RUN   TestInstallDraftOwnershipCases/owned-stale-cleanup
+=== RUN   TestInstallDraftOwnershipCases/new-destination-without-preceding-marker
+=== RUN   TestInstallDraftOwnershipCases/owned-v5-invalid-execution-policy-rederived
+=== RUN   TestInstallDraftOwnershipCases/owned-v6-invalid-execution-policy-rederived
+--- PASS: TestInstallDraftOwnershipCases (55.78s)
+    --- PASS: TestInstallDraftOwnershipCases/unowned-sibling-preserved-and-named (2.81s)
+    --- PASS: TestInstallDraftOwnershipCases/unowned-selected-destination-no-partial-change (3.02s)
+    --- PASS: TestInstallDraftOwnershipCases/all-unowned-paths-named (4.30s)
+    --- PASS: TestInstallDraftOwnershipCases/unreadable-marker (2.00s)
+    --- PASS: TestInstallDraftOwnershipCases/unparseable-marker (2.40s)
+    --- PASS: TestInstallDraftOwnershipCases/nonobject-marker (2.52s)
+    --- PASS: TestInstallDraftOwnershipCases/wrong-name-marker (2.22s)
+    --- PASS: TestInstallDraftOwnershipCases/missing-schema-identity (2.53s)
+    --- PASS: TestInstallDraftOwnershipCases/unknown-schema-identity (2.32s)
+    --- PASS: TestInstallDraftOwnershipCases/string-schema-version (2.17s)
+    --- PASS: TestInstallDraftOwnershipCases/symlink-marker (2.08s)
+    --- PASS: TestInstallDraftOwnershipCases/special-marker (2.57s)
+    --- PASS: TestInstallDraftOwnershipCases/symlink-canonical-node (2.07s)
+    --- PASS: TestInstallDraftOwnershipCases/symlink-canonical-parent (2.01s)
+    --- PASS: TestInstallDraftOwnershipCases/special-canonical-entry (2.52s)
+    --- PASS: TestInstallDraftOwnershipCases/v6-reader-unaware (2.39s)
+    --- PASS: TestInstallDraftOwnershipCases/ownership-changed-before-publication (2.40s)
+    --- PASS: TestInstallDraftOwnershipCases/owned-stale-cleanup (2.53s)
+    --- PASS: TestInstallDraftOwnershipCases/new-destination-without-preceding-marker (3.30s)
+    --- PASS: TestInstallDraftOwnershipCases/owned-v5-invalid-execution-policy-rederived (3.76s)
+    --- PASS: TestInstallDraftOwnershipCases/owned-v6-invalid-execution-policy-rederived (3.85s)
+=== RUN   TestInstallPreservesUnownedStaleStoreEntries
+--- PASS: TestInstallPreservesUnownedStaleStoreEntries (4.28s)
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/manual
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/notes-only
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/invalid
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/unreadable
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name-partial
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/marker-link
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/canonical-link
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/loose-file
+--- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination (24.48s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/manual (2.55s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/notes-only (2.46s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/invalid (2.42s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/unreadable (2.21s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name (1.89s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name-partial (2.24s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/marker-link (2.88s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/canonical-link (3.59s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/loose-file (4.25s)
+=== RUN   TestInstallRefusesUnprovenStaleOwnership
+=== RUN   TestInstallRefusesUnprovenStaleOwnership/invalid
+=== RUN   TestInstallRefusesUnprovenStaleOwnership/unreadable
+=== RUN   TestInstallRefusesUnprovenStaleOwnership/wrong-name
+=== RUN   TestInstallRefusesUnprovenStaleOwnership/marker-link
+=== RUN   TestInstallRefusesUnprovenStaleOwnership/canonical-link
+--- PASS: TestInstallRefusesUnprovenStaleOwnership (27.47s)
+    --- PASS: TestInstallRefusesUnprovenStaleOwnership/invalid (6.05s)
+    --- PASS: TestInstallRefusesUnprovenStaleOwnership/unreadable (5.88s)
+    --- PASS: TestInstallRefusesUnprovenStaleOwnership/wrong-name (4.92s)
+    --- PASS: TestInstallRefusesUnprovenStaleOwnership/marker-link (5.92s)
+    --- PASS: TestInstallRefusesUnprovenStaleOwnership/canonical-link (4.70s)
+=== RUN   TestInstallOwnedCanonicalPositiveControls
+--- PASS: TestInstallOwnedCanonicalPositiveControls (10.82s)
+=== RUN   TestInstallDraftMarkerWriterCases
+=== RUN   TestInstallDraftMarkerWriterCases/manifestless-schema1
+=== RUN   TestInstallDraftMarkerWriterCases/manifestless-schema2
+=== RUN   TestInstallDraftMarkerWriterCases/schema9-schema1
+=== RUN   TestInstallDraftMarkerWriterCases/manifest8-schema2
+=== RUN   TestInstallDraftMarkerWriterCases/manifestless-declares-command
+=== RUN   TestInstallDraftMarkerWriterCases/manifestless-declares-runtime
+=== RUN   TestInstallDraftMarkerWriterCases/manifestless-declares-build
+=== RUN   TestInstallDraftMarkerWriterCases/manifestless-declares-legacy-agents-runtime
+=== RUN   TestInstallDraftMarkerWriterCases/invalid-manifest-is-not-absence
+=== RUN   TestInstallDraftMarkerWriterCases/unreadable-manifest-is-not-absence
+--- PASS: TestInstallDraftMarkerWriterCases (18.35s)
+    --- PASS: TestInstallDraftMarkerWriterCases/manifestless-schema1 (3.50s)
+    --- PASS: TestInstallDraftMarkerWriterCases/manifestless-schema2 (5.98s)
+    --- PASS: TestInstallDraftMarkerWriterCases/schema9-schema1 (5.87s)
+    --- PASS: TestInstallDraftMarkerWriterCases/manifest8-schema2 (2.59s)
+    --- PASS: TestInstallDraftMarkerWriterCases/manifestless-declares-command (0.02s)
+    --- PASS: TestInstallDraftMarkerWriterCases/manifestless-declares-runtime (0.02s)
+    --- PASS: TestInstallDraftMarkerWriterCases/manifestless-declares-build (0.01s)
+    --- PASS: TestInstallDraftMarkerWriterCases/manifestless-declares-legacy-agents-runtime (0.01s)
+    --- PASS: TestInstallDraftMarkerWriterCases/invalid-manifest-is-not-absence (0.19s)
+    --- PASS: TestInstallDraftMarkerWriterCases/unreadable-manifest-is-not-absence (0.16s)
+PASS
+ok  	github.com/relux-works/curator/internal/install	141.520s
+
+===== callers-01.log =====
+=== RUN   TestDraftUnmanagedAdapterDestinationRefuses
+--- PASS: TestDraftUnmanagedAdapterDestinationRefuses (1.00s)
+=== RUN   TestRemovedSkillCleanedUp
+=== PAUSE TestRemovedSkillCleanedUp
+=== RUN   TestGlobalCanonicalOwnershipPreservation
+--- PASS: TestGlobalCanonicalOwnershipPreservation (6.77s)
+=== RUN   TestHybridCanonicalOwnershipPreservation
+--- PASS: TestHybridCanonicalOwnershipPreservation (6.92s)
+=== CONT  TestRemovedSkillCleanedUp
+--- PASS: TestRemovedSkillCleanedUp (9.24s)
+PASS
+ok  	github.com/relux-works/curator/internal/install	24.161s
+
+===== support-01.log =====
+ok  	github.com/relux-works/curator/internal/marker	14.397s
+ok  	github.com/relux-works/curator/internal/staging	1.263s
+ok  	github.com/relux-works/curator/internal/transaction	71.529s
+ok  	github.com/relux-works/curator/internal/scopes	5.413s
+
+===== build.log =====
+
+===== cli-probe.log =====
+{"args": ["git", "init", "-q", "-b", "main"], "exit": 0, "output": ""}
+{"args": ["$REVIEW/curator", "bootstrap", "-non-interactive", "--skills-root", "$FIXTURE/sources"], "exit": 0, "output": "wrote $FIXTURE/home/.curator/config.json\nshell profile changes are not required: agent skills can invoke project and global command shims directly\noptional bare commands for interactive use: curator shell-init --install\n"}
+{"args": ["$REVIEW/curator", "project", "resolve", "."], "exit": 0, "output": "resolve project: 2 skills\nlock: $FIXTURE/project/Skillfile.lock.json\nbindings: $FIXTURE/home/.curator/source-bindings/0d53ad1011ac0882.json\nlock_sha256: sha256:19bcf03bc703c76e4a2c8b3d2ce92a27c99410ecdd96184f8ad470aff7d66b4f\nwarning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults\n"}
+{"args": ["$REVIEW/curator", "install", "."], "exit": 0, "output": "project: sample    context=yes commands=[] via=<project> installed\nproject: stale    context=yes commands=[] via=<project> installed\nproject: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained\nwarning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults\n"}
+{"args": ["$REVIEW/curator", "project", "refresh", "."], "exit": 0, "output": "refresh project: 1 skills\nlock: $FIXTURE/project/Skillfile.lock.json\nbindings: $FIXTURE/home/.curator/source-bindings/0d53ad1011ac0882.json\nlock_sha256: sha256:27b34d7fc61ae4e57e6e1115a2fcc17455c9933744b2e0e5b5c14ca8edcc5d90\nwarning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults\n"}
+{"args": ["$REVIEW/curator", "install", "."], "exit": 1, "output": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults\nerror: source_ownership_unproven: $FIXTURE/project/.agents/skills/loose.txt: manager_state_unreadable: canonical component $FIXTURE/project/.agents/skills/loose.txt must be a directory without links\nsource_ownership_unproven: $FIXTURE/project/.agents/skills/manual: ownership marker must be a regular readable file\nsource_ownership_unproven: $FIXTURE/project/.agents/skills/notes: ownership marker must be a regular readable file\n"}
+{"args": ["$REVIEW/curator", "install", "."], "exit": 0, "output": "project: sample    context=yes commands=[] via=<project> installed\nproject: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained\nwarning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults\n"}
+{"args": ["$REVIEW/curator", "install", "."], "exit": 1, "output": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults\nerror: source_ownership_unproven: $FIXTURE/project/.agents/skills/sample: ownership marker must be a regular readable file\n"}
+HELD missing
+{"args": ["$REVIEW/curator", "install", "."], "exit": 1, "output": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults\nerror: source_ownership_unproven: $FIXTURE/project/.agents/skills/sample: duplicate JSON object key \"name\"\n"}
+HELD duplicate-name
+{"args": ["$REVIEW/curator", "install", "."], "exit": 1, "output": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults\nerror: source_ownership_unproven: $FIXTURE/project/.agents/skills/sample: ownership schema identity must be an integer\n"}
+HELD string-schema
+{"args": ["$REVIEW/curator", "install", "."], "exit": 1, "output": "warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults\nerror: source_ownership_unproven: $FIXTURE/project/.agents/skills/sample: protocol JSON has trailing data\n"}
+HELD trailing-document
+{"args": ["$REVIEW/curator", "install", "."], "exit": 0, "output": "project: sample    context=yes commands=[] via=<project> installed\nproject: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained\nwarning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults\n"}
+{"args": ["$REVIEW/curator", "install", "."], "exit": 0, "output": "project: sample    context=yes commands=[] via=<project> installed\nproject: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained\nwarning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults\n"}
+PASS CLI A/C2, mixed stale cleanup, owned repair, clean reinstall, duplicate identity and trailing-document attacks
+
+===== mutant-results.json =====
+[
+  {
+    "name": "stale-loose-file",
+    "command": [
+      "go",
+      "test",
+      "-overlay",
+      ".temp/BUG-261017-47xdyt/mutants-r2/stale-loose-file.json",
+      "./internal/install",
+      "-run",
+      "^TestInstallPreservesUnownedStaleStoreEntries",
+      "-count=1",
+      "-v"
+    ],
+    "pid": 8258,
+    "exit": 1
+  },
+  {
+    "name": "selected-notes-only",
+    "command": [
+      "go",
+      "test",
+      "-overlay",
+      ".temp/BUG-261017-47xdyt/mutants-r2/selected-notes-only.json",
+      "./internal/install",
+      "-run",
+      "^TestInstallRefusesUnownedSelectedCanonicalDestination/notes-only",
+      "-count=1",
+      "-v"
+    ],
+    "pid": 9690,
+    "exit": 1
+  },
+  {
+    "name": "selected-invalid-marker",
+    "command": [
+      "go",
+      "test",
+      "-overlay",
+      ".temp/BUG-261017-47xdyt/mutants-r2/selected-invalid-marker.json",
+      "./internal/install",
+      "-run",
+      "^TestInstallRefusesUnownedSelectedCanonicalDestination/invalid",
+      "-count=1",
+      "-v"
+    ],
+    "pid": 11721,
+    "exit": 1
+  },
+  {
+    "name": "wrong-name-marker",
+    "command": [
+      "go",
+      "test",
+      "-overlay",
+      ".temp/BUG-261017-47xdyt/mutants-r2/wrong-name-marker.json",
+      "./internal/install",
+      "-run",
+      "^TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name$",
+      "-count=1",
+      "-v"
+    ],
+    "pid": 13937,
+    "exit": 1
+  },
+  {
+    "name": "stale-unreadable-marker",
+    "command": [
+      "go",
+      "test",
+      "-overlay",
+      ".temp/BUG-261017-47xdyt/mutants-r2/stale-unreadable-marker.json",
+      "./internal/install",
+      "-run",
+      "^TestInstallRefusesUnprovenStaleOwnership/unreadable",
+      "-count=1",
+      "-v"
+    ],
+    "pid": 15251,
+    "exit": 1
+  },
+  {
+    "name": "parseable-wrong-name",
+    "command": [
+      "go",
+      "test",
+      "-overlay",
+      ".temp/BUG-261017-47xdyt/mutants-r2/parseable-wrong-name.json",
+      "./internal/install",
+      "-run",
+      "^TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name-partial",
+      "-count=1",
+      "-v"
+    ],
+    "pid": 16455,
+    "exit": 1
+  },
+  {
+    "name": "manifestless-runtime",
+    "command": [
+      "go",
+      "test",
+      "-overlay",
+      ".temp/BUG-261017-47xdyt/mutants-r2/manifestless-runtime.json",
+      "./internal/install",
+      "-run",
+      "^TestInstallDraftMarkerWriterCases/manifestless-declares-runtime",
+      "-count=1",
+      "-v"
+    ],
+    "pid": 19278,
+    "exit": 1
+  }
+]
+===== mutant-manifestless-runtime.log =====
+=== RUN   TestInstallDraftMarkerWriterCases
+=== RUN   TestInstallDraftMarkerWriterCases/manifestless-declares-runtime
+    ownership_writer_test.go:68: manifestless declaration admitted
+--- FAIL: TestInstallDraftMarkerWriterCases (0.00s)
+    --- FAIL: TestInstallDraftMarkerWriterCases/manifestless-declares-runtime (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	0.346s
+FAIL
+
+===== mutant-parseable-wrong-name.log =====
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name-partial
+    ownership_preservation_test.go:121: want named canonical refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationwrong-name1181203439/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: scan: warning: script-command-declared-only (commands.stool.execution_policy): command 'stool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: scan: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: scan    context=yes commands=[stool] via=<project> up-to-date test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationwrong-name1181203439/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 16357: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+--- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination (7.78s)
+    --- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name-partial (7.78s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	8.156s
+FAIL
+
+===== mutant-selected-invalid-marker.log =====
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/invalid
+    ownership_preservation_test.go:121: want named canonical refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationinvalid3452377007/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: scan: warning: script-command-declared-only (commands.stool.execution_policy): command 'stool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: scan: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: scan    context=yes commands=[stool] via=<project> up-to-date test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationinvalid3452377007/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+--- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination (11.11s)
+    --- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination/invalid (11.11s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	11.457s
+FAIL
+
+===== mutant-selected-notes-only.log =====
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/notes-only
+    ownership_preservation_test.go:121: want named canonical refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationnotes-only709416653/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: scan: warning: script-command-declared-only (commands.stool.execution_policy): command 'stool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: scan: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: scan    context=yes commands=[stool] via=<project> up-to-date test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationnotes-only709416653/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+--- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination (11.89s)
+    --- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination/notes-only (11.89s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	12.408s
+FAIL
+
+===== mutant-stale-loose-file.log =====
+=== RUN   TestInstallPreservesUnownedStaleStoreEntries
+    ownership_preservation_test.go:39: missing conflict loose.txt: [source_ownership_unproven: $SYSTEM_TEMP/TestInstallPreservesUnownedStaleStoreEntries3752839690/001/.agents/skills/unmanaged-notes: ownership marker must be a regular readable file
+        source_ownership_unproven: $SYSTEM_TEMP/TestInstallPreservesUnownedStaleStoreEntries3752839690/001/.agents/skills/unmanaged-skill: ownership marker must be a regular readable file]
+--- FAIL: TestInstallPreservesUnownedStaleStoreEntries (9.57s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	9.922s
+FAIL
+
+===== mutant-stale-unreadable-marker.log =====
+=== RUN   TestInstallRefusesUnprovenStaleOwnership
+=== RUN   TestInstallRefusesUnprovenStaleOwnership/unreadable
+    ownership_preservation_test.go:180: want named stale refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnprovenStaleOwnershipunreadable1022794654/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnprovenStaleOwnershipunreadable1022794654/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 16357: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+--- FAIL: TestInstallRefusesUnprovenStaleOwnership (3.86s)
+    --- FAIL: TestInstallRefusesUnprovenStaleOwnership/unreadable (3.86s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	4.189s
+FAIL
+
+===== mutant-wrong-name-marker.log =====
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name
+    ownership_preservation_test.go:121: want named canonical refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationwrong-name559153128/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: scan: warning: script-command-declared-only (commands.stool.execution_policy): command 'stool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: scan: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: scan    context=yes commands=[stool] via=<project> up-to-date test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationwrong-name559153128/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+--- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination (3.60s)
+    --- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name (3.60s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	3.941s
+FAIL
+
+===== manifestless-runtime-delta.txt =====
+--- $WORKTREE/internal/marker/marker.go	2026-10-18 02:50:16
++++ $WORKTREE/.temp/BUG-261017-47xdyt/mutants-r2/manifestless-runtime.go	2026-10-18 02:53:06
+@@ -376,7 +376,7 @@
+ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
+ 	if m.Manifestless {
+ 		if m.SchemaVersion != SchemaV6 || m.SkillSchemaVersion != 0 || !bytes.Equal(bytes.TrimSpace(raw["skill_schema_version"]), []byte("null")) ||
+-			len(m.Commands) != 0 || len(m.Dependencies) != 0 || len(m.RuntimeRoots) != 0 || len(m.BuildRoots) != 0 || len(m.Builds) != 0 || m.BuildSource != nil ||
++			len(m.Commands) != 0 || len(m.Dependencies) != 0 || len(m.BuildRoots) != 0 || len(m.Builds) != 0 || m.BuildSource != nil ||
+ 			raw["requirements"] != nil || raw["mcp_servers"] != nil || (m.Activation != nil && len(m.Activation.Commands) != 0) {
+ 			return false
+ 		}
+
+===== parseable-wrong-name-delta.txt =====
+--- $WORKTREE/internal/marker/ownership.go	2026-10-18 02:47:30
++++ $WORKTREE/.temp/BUG-261017-47xdyt/mutants-r2/parseable-wrong-name.go	2026-10-18 02:50:40
+@@ -84,7 +84,7 @@
+ 	if err := json.Unmarshal(object["schema_version"], &version); err != nil {
+ 		return fmt.Errorf("ownership schema identity must be an integer")
+ 	}
+-	if err := json.Unmarshal(object["name"], &name); err != nil || name != filepath.Base(installedDir) {
++	if err := json.Unmarshal(object["name"], &name); err != nil || (name != filepath.Base(installedDir) && !(name == "other" && len(object) == 2)) {
+ 		return fmt.Errorf("ownership marker must name this node")
+ 	}
+ 	if version == SchemaV5 || version == SchemaV6 {
+
+===== selected-invalid-marker-delta.txt =====
+--- $WORKTREE/internal/marker/ownership.go	2026-10-18 02:47:30
++++ $WORKTREE/.temp/BUG-261017-47xdyt/mutants-r2/selected-invalid-marker.go	2026-10-18 02:50:40
+@@ -79,7 +79,8 @@
+ 	if err := json.Unmarshal(payload, &object); err != nil || object == nil {
+ 		return fmt.Errorf("ownership marker must be a JSON object")
+ 	}
+-	var version int
++	if len(object) == 0 { return nil }
++ var version int
+ 	var name string
+ 	if err := json.Unmarshal(object["schema_version"], &version); err != nil {
+ 		return fmt.Errorf("ownership schema identity must be an integer")
+
+===== selected-notes-only-delta.txt =====
+--- $WORKTREE/internal/marker/ownership.go	2026-10-18 02:47:30
++++ $WORKTREE/.temp/BUG-261017-47xdyt/mutants-r2/selected-notes-only.go	2026-10-18 02:50:40
+@@ -20,6 +20,7 @@
+ // Source markers prove ownership through their object/schema/name subset, not
+ // build validity. Legacy markers retain their full preceding validation rule.
+ func CheckOwnership(installedDir string) error {
++ if _, err := os.Lstat(filepath.Join(installedDir,"SKILL.md")); os.IsNotExist(err) { if _,err := os.Lstat(filepath.Join(installedDir,Name)); os.IsNotExist(err) { return nil } }
+ 	if err := checkOwnership(installedDir); err != nil {
+ 		return fmt.Errorf("%s: %s: %w", DiagOwnershipUnproven, installedDir, err)
+ 	}
+
+===== stale-loose-file-delta.txt =====
+--- $WORKTREE/internal/marker/ownership.go	2026-10-18 02:47:30
++++ $WORKTREE/.temp/BUG-261017-47xdyt/mutants-r2/stale-loose-file.go	2026-10-18 02:50:40
+@@ -20,6 +20,7 @@
+ // Source markers prove ownership through their object/schema/name subset, not
+ // build validity. Legacy markers retain their full preceding validation rule.
+ func CheckOwnership(installedDir string) error {
++ if filepath.Base(installedDir) == "loose.txt" { return nil }
+ 	if err := checkOwnership(installedDir); err != nil {
+ 		return fmt.Errorf("%s: %s: %w", DiagOwnershipUnproven, installedDir, err)
+ 	}
+
+===== stale-unreadable-marker-delta.txt =====
+--- $WORKTREE/internal/marker/ownership.go	2026-10-18 02:47:30
++++ $WORKTREE/.temp/BUG-261017-47xdyt/mutants-r2/stale-unreadable-marker.go	2026-10-18 02:50:40
+@@ -53,7 +53,8 @@
+ 	if err != nil {
+ 		return err
+ 	}
+-	if evidence.Kind == stateread.KindAbsent || !evidence.Info.Mode().IsRegular() {
++	if evidence.Kind == stateread.KindPresent && evidence.Info.IsDir() { return nil }
++ if evidence.Kind == stateread.KindAbsent || !evidence.Info.Mode().IsRegular() {
+ 		return fmt.Errorf("ownership marker must be a regular readable file")
+ 	}
+ 	file, err := pathboundary.OpenReadNoFollow(path)
+
+===== wrong-name-marker-delta.txt =====
+--- $WORKTREE/internal/marker/ownership.go	2026-10-18 02:47:30
++++ $WORKTREE/.temp/BUG-261017-47xdyt/mutants-r2/wrong-name-marker.go	2026-10-18 02:50:40
+@@ -84,7 +84,7 @@
+ 	if err := json.Unmarshal(object["schema_version"], &version); err != nil {
+ 		return fmt.Errorf("ownership schema identity must be an integer")
+ 	}
+-	if err := json.Unmarshal(object["name"], &name); err != nil || name != filepath.Base(installedDir) {
++	if err := json.Unmarshal(object["name"], &name); err != nil || (name != filepath.Base(installedDir) && !(name == "other" && Read(installedDir) != nil)) {
+ 		return fmt.Errorf("ownership marker must name this node")
+ 	}
+ 	if version == SchemaV5 || version == SchemaV6 {

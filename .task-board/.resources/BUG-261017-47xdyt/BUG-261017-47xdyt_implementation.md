@@ -1,10 +1,10 @@
 # BUG-261017-47xdyt — canonical ownership preservation
 
-Developer candidate: **Round 2 ready for review; full local suite and exact signed-candidate hosted gate green**.
+Developer candidate: **Refresh onto 402fdbc9 ready for review; current local suite and exact signed-candidate hosted gate green**.
 
-The following Round 1 record is historical. The current implementation, normative
-source, checkpoint, candidate and evidence are in "Round 2 against curator-spec
-3ca4b84f" below. The owner resolved the earlier contract blocker.
+Round 1 and Round 2 validation records below are historical. The unchanged
+implementation and normative ownership rule are described in Round 2; the current
+checkpoint, candidate and validation evidence are in "Refresh onto 402fdbc9" below.
 Source: a field report. No operator product material is included.
 
 ## Candidate and governing source
@@ -371,3 +371,76 @@ Ownership mutants preserve the searched `stateread.ReadDir` token and execute
 the behavioral suite, including the narrowed loose-file refusal control.
 
 Measured: **6 of 6 AC rows driven; 6 of 6 green** within the explicit per-row bounds. Seven of seven narrowing mutants are killed; no survivor. Full local and hosted gate requirements are satisfied. The developer candidate is ready for review; acceptance and integration remain the review lifecycle.
+
+
+## Refresh onto 402fdbc9
+
+### Commands and actual verdicts
+
+| Command / lane | Exit / verdict | Bound |
+| --- | --- | --- |
+| README byte comparison against `HEAD:README.md` | 0 | Removing the single ownership paragraph reproduces trunk bytes exactly. |
+| `go build -o .temp/BUG-261017-47xdyt/r3-refresh/curator ./cmd/curator` | 0 | Fresh darwin/arm64 build of this tree. |
+| `golangci-lint run ./internal/install/... ./internal/marker/... ./cmd/curator/...` | 0 | Changed modules and supporting CLI fixtures. |
+| `go test -count=1 -timeout=5m -json -p 4 <packages> -run <mask>`; remaining consolidated CLI calls use `-timeout=7m` | 0 for all 98 selected commands | **85/85 packages; 3504/3504 top-level tests driven.** Every exact argv, PID, exit and complete log is in the evidence archive and `local-suite-coverage.json`. |
+| Three `go test` source-shape masks of `TestProfileInstallActivationMatrix` | 0 each | **36/36 matrix combinations pass**; included in the full-suite denominator. |
+| Seven `go test -overlay ...` behavioral controls | 1 each, expected red | **7/7 killed**, named assertions recorded; no survivor. |
+| `go test -tags snapshotcontrols -count=1 -timeout=5m -run TestDestinationNarrowingControls ./internal/envsnapshot` | 0 | Trunk README's retained snapshot-publication controls. |
+| `git diff --check` | 0 | Whitespace. |
+| `python3 verify-coverage-checker.py` | 0; inner intact check 0 / truncated-log check 1 | Isolated missing-package-verdict plant is rejected for the intended reason; expected-red inner exit is not green product evidence. |
+| Full hosted CI on `db030e1faca9dfc0506876e14e724414ac563030` | success | [https://github.com/relux-works/curator/actions/runs/39090264021](https://github.com/relux-works/curator/actions/runs/39090264021): 20 executed jobs green, 2 conditional skips. All five test/race artifacts verified; no fail action or deferred package. |
+
+Python uses only the standard library for task-specific command orchestration, byte inventories and evidence reporting, as in the triage; no product test or dependency is added.
+
+Local environment: Go 1.25.5 darwin/arm64, exact rc.14 manifest digest verified;
+provider PATH and external Git injection are isolated as in Round 2. Optional
+real-driver flags are unset locally; hosted qualification supplies them. Upstream
+platform/optional skips are explicitly listed in the coverage JSON, not counted
+as executed successes. The prior cancelled scratch CI on `5d8e6b07` supplies no
+current-tree evidence.
+
+Diagnostic `suite-048` has real exit **1**: its process reached the 360s kill
+boundary after shared host-GOROOT lock contention, while the activation matrix
+was still running; there is no named failing assertion. It is not green evidence.
+All four neighbouring tests are rerun in a successful consolidated mask, and all
+36 matrix cases are rerun in the three successful source-shape masks. Eighteen
+unrun masks were consolidated into eight bounded CLI calls without omitting any
+test. An initial lint wrapper exited 1 before launching the binary because PATH
+isolation excluded its directory; the standalone replacement above exits 0.
+No product or test was modified to address either command-environment issue.
+
+**6 of 6 AC rows driven and green**, at the production entries and within the
+explicit bounds of the retained implementation control map. All 3676 prior test
+names are retained; the twelve named preservation, repair and scanner controls
+pass directly in this run. No reviewer test is deleted, renamed or weakened.
+
+Brief gap retained: no attack-surface-catalog surface table was supplied. No
+catalog-complete claim. No new out-of-contract row is introduced: the Round 2
+v6-unaware conditional substitution, marker-writer-only declaration controls,
+Windows permission/FIFO substitutions, hostile concurrent filesystem-race bound,
+and triage D/E exclusion remain explicit in the implementation note. Project,
+global and hybrid caller contracts and native takeover/backup behavior remain as
+reviewed. No `refresh-candidate` was needed: this run already starts at the
+requested converged checkpoint. Story HEAD and its real index remain at that
+checkpoint; the candidate stays uncommitted for handoff.
+
+### Task-scoped logbook
+
+The README combination is coherent and requires no edit. This refresh changes
+no repository source, tests, configuration or documentation bytes. Existing
+producer changes are preserved. The full local suite, seven narrowing mutants
+and full signed-candidate hosted gate were rerun; no local mirror or synthetic
+hosted status is used. The candidate is ready for review; acceptance and
+integration remain the orchestrator's lifecycle.
+
+### Replayed narrowing controls
+
+| Mutant | Gate narrowed to | Named failing test | Verdict / survivor bound |
+| --- | --- | --- | --- |
+| manifestless-runtime | Permit a runtime root in the null-form marker | `TestInstallDraftMarkerWriterCases/manifestless-declares-runtime` | Killed, exit 1; no survivor |
+| parseable-wrong-name | Admit a two-member schema/name object naming other | `TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name-partial` | Killed, exit 1; no survivor |
+| selected-invalid-marker | Admit exactly an empty parsed marker object | `TestInstallRefusesUnownedSelectedCanonicalDestination/invalid` | Killed, exit 1; no survivor |
+| selected-notes-only | Admit markerless notes-only directories | `TestInstallRefusesUnownedSelectedCanonicalDestination/notes-only` | Killed, exit 1; no survivor |
+| stale-loose-file | Admit only loose.txt without ownership; other stale checks remain | `TestInstallPreservesUnownedStaleStoreEntries` | Killed, exit 1; no survivor; mixed-fixture diagnostic witness |
+| stale-unreadable-marker | Admit a directory as the ownership marker | `TestInstallRefusesUnprovenStaleOwnership/unreadable` | Killed, exit 1; no survivor |
+| wrong-name-marker | Admit other only for an otherwise fully valid marker | `TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name` | Killed, exit 1; no survivor |
