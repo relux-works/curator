@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -38,6 +39,7 @@ var profileInstallShapes = []string{"path-root", "git-root", "git-collection"}
 // same-source reinstall, with every --use/--takeover combination. A new
 // unmanaged Claude file makes --use alone prove that activation was attempted,
 // while the combined flags prove notice, backup, and activation.
+// Takeover without --use is a usage error before any profile state is written.
 func TestProfileInstallActivationMatrix(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("no git on PATH")
@@ -49,7 +51,7 @@ func TestProfileInstallActivationMatrix(t *testing.T) {
 			for _, flagCase := range profileInstallFlagCases {
 				name := strings.Join([]string{shape, kind, flagCase.name}, "/")
 				t.Run(name, func(t *testing.T) {
-					source, _ := profileHome(t)
+					source, home := profileHome(t)
 					pinOperatorHome(t)
 
 					other := t.TempDir()
@@ -74,7 +76,21 @@ func TestProfileInstallActivationMatrix(t *testing.T) {
 					}
 
 					args := append(profileInstallArgs(fixture), flagCase.args...)
+					before := snapshotHelpTree(t, home)
 					code, stdout, stderr := runProfile(t, source, args...)
+					if flagCase.takeover && !flagCase.use {
+						if code != exitUsage || !strings.Contains(stderr, "--takeover") || stdout != "" {
+							t.Fatalf("takeover without activation = %d, want usage refusal\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+						}
+						if !reflect.DeepEqual(before, snapshotHelpTree(t, home)) {
+							t.Fatal("refused consent changed profile state")
+						}
+						if got := profileInstallCurrent(t, source); got != "other" {
+							t.Fatalf("current=%q after refused consent, want other", got)
+						}
+						assertProfileInstallNoTakeover(t, blocker)
+						return
+					}
 					currentHash := profileInstallLockHash(t, source)
 					switch kind {
 					case "same-source-unchanged-lock":

@@ -280,6 +280,10 @@ func (c cli) run(args []string) int {
 		_, _ = fmt.Fprint(c.stderr, usage)
 		return exitUsage
 	}
+	if rejectsTakeover(args) {
+		_, _ = fmt.Fprintln(c.stderr, "curator: --takeover applies only with --repair for env resolve; also available for profile install --use, profile use, profile sync, and profile update")
+		return exitUsage
+	}
 	if args[0] == "-h" || args[0] == "--help" {
 		_, _ = fmt.Fprint(c.stdout, usage)
 		return exitOK
