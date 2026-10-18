@@ -493,7 +493,7 @@ func materializeScopeWithNativeHome(home, profile, environment string, policy Po
 	}
 	var results []EntryResult
 	for _, adapter := range adapters {
-		results = append(results, materializeOne(home, source, profile, lock, hash, precedence, order, packages, skills, adapter, policy.Takeover, nativeHomeOf))
+		results = append(results, materializeOne(home, source, profile, lock, hash, precedence, order, packages, skills, adapter, policy, nativeHomeOf))
 	}
 	return results, nil
 }
@@ -581,9 +581,24 @@ func preflightInPlaceScope(home, profile, environment string, policy Policy, nat
 			want[adapter.Target] = true
 		}
 		for _, skill := range skills {
-			want[filepath.ToSlash(filepath.Join(profileSkillsSurfaceDir, skill.name))] = true
+			want[filepath.ToSlash(filepath.Join(inPlaceSkillsDir(adapter.ID), skill.name))] = true
+		}
+		ledger, err := inPlaceSkillsLedger(native, adapter, skills, recorded)
+		if err != nil {
+			return err
+		}
+		for path := range recorded {
+			if _, err := managedPath(native, path, false); err != nil {
+				return err
+			}
 		}
 		for path := range want {
+			if _, err := managedPath(native, path, false); err != nil {
+				return err
+			}
+			if ledgerSkillPath(adapter, path, ledger) {
+				continue
+			}
 			if recorded[path] {
 				continue
 			}
@@ -606,7 +621,7 @@ func preflightInPlaceScope(home, profile, environment string, policy Policy, nat
 				if err != nil || link.Kind != stateread.KindPresent {
 					return fmt.Errorf("%s: inspect symlink %s: %v", DiagUnmanagedConflict, inPlaceConflictPath(path), err)
 				}
-				if !sameStoreTree(link.Target, contextstore.Root(home)) && !policy.Takeover {
+				if !inPlaceLinkInStore(full, link.Target, contextstore.Root(home)) && !policy.Takeover {
 					return fmt.Errorf("%s: %s is a symlink outside the manager store; abort or take over with backup", DiagForeignManager, inPlaceConflictPath(path))
 				}
 			}
@@ -619,7 +634,7 @@ func preflightInPlaceScope(home, profile, environment string, policy Policy, nat
 }
 
 func inPlaceConflictPath(path string) string {
-	if strings.HasPrefix(path, profileSkillsSurfaceDir+"/") {
+	if strings.HasPrefix(path, profileSkillsSurfaceDir+"/") || strings.HasPrefix(path, "skills/") {
 		return filepath.ToSlash(filepath.Join(path, "SKILL.md"))
 	}
 	return path
@@ -672,7 +687,8 @@ func loadMaterial(home string, manager *gitManager, lock *contextlock.Lock) (map
 // environment_surface_unmanaged_conflict (or
 // environment_foreign_manager_detected for a foreign-manager symlink)
 // rather than overwrite.
-func materializeOne(home string, source Source, profile string, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, packages map[string]contextmaterialize.Package, skills []skillOf, adapter Adapter, takeover bool, nativeHomeOf func(string) (string, error)) EntryResult {
+func materializeOne(home string, source Source, profile string, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, packages map[string]contextmaterialize.Package, skills []skillOf, adapter Adapter, policy Policy, nativeHomeOf func(string) (string, error)) EntryResult {
+	takeover := policy.Takeover
 	native, err := resolveNativeHome(adapter, nativeHomeOf)
 	if err != nil {
 		return EntryResult{Adapter: adapter.ID, OK: false, Detail: err.Error()}
@@ -703,11 +719,28 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	if written {
 		want[adapter.Target] = true
 	}
+	ledger, err := inPlaceSkillsLedger(native, adapter, skills, recorded)
+	if err != nil {
+		return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
+	}
+	for path := range recorded {
+		if _, err := managedPath(native, path, false); err != nil {
+			return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
+		}
+		if ledgerSkillPath(adapter, path, ledger) {
+			delete(recorded, path)
+		}
+	}
+	var ledgerDetails []string
 	skillLinks := map[string]string{}
 	skillHashes := map[string][]byte{}
 	skillPaths := make([]string, 0, len(skills))
 	for _, skill := range skills {
-		path := filepath.ToSlash(filepath.Join(profileSkillsSurfaceDir, skill.name))
+		path := filepath.ToSlash(filepath.Join(inPlaceSkillsDir(adapter.ID), skill.name))
+		if ledgerSkillPath(adapter, path, ledger) {
+			ledgerDetails = append(ledgerDetails, path+" belongs to legacy global scope (adapter ledger); left in place")
+			continue
+		}
 		skillLinks[path] = skill.root
 		skillHashes[path] = []byte(skill.hash)
 		skillPaths = append(skillPaths, path)
@@ -725,7 +758,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	// its link text) before replacement; §8.3.1 requires that backup and each
 	// managed write to avoid following the link. Other unrecorded targets
 	// fail with environment_surface_unmanaged_conflict without takeover.
-	result := EntryResult{Adapter: adapter.ID, Home: native}
+	result := EntryResult{Adapter: adapter.ID, Home: native, Detail: strings.Join(ledgerDetails, "; "), Warnings: append([]string{}, ledgerDetails...)}
 	var taken []string
 	for path := range want {
 		if recorded[path] {
@@ -759,7 +792,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 				result.Detail = fmt.Sprintf("%s: inspect symlink %s: %v", DiagUnmanagedConflict, inPlaceConflictPath(path), readErr)
 				return result
 			}
-			if !sameStoreTree(link.Target, contextstore.Root(home)) {
+			if !inPlaceLinkInStore(full, link.Target, contextstore.Root(home)) {
 				if !takeover {
 					result.OK = false
 					result.Detail = DiagForeignManager + ": " + inPlaceConflictPath(path) + " is a symlink outside the manager store; abort, or take over with backup"
@@ -806,7 +839,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 			}
 		}
 		if len(backupWant) > 0 {
-			generation, err = openBackup(native, "", backupWant)
+			generation, err = openBackupWithDirectoryRead(native, "", backupWant, policy.backupReadDirectory)
 			if err != nil {
 				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 			}
@@ -816,7 +849,9 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	if prior != nil {
 		for path := range recorded {
 			if !want[path] {
-				_ = removeManagedTree(native, path)
+				if err := removeManagedTree(native, path); err != nil {
+					return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
+				}
 			}
 		}
 	}
@@ -972,12 +1007,19 @@ func removeManagedTree(root, rel string) error {
 // versioned generation and prunes beyond the retention count. A next
 // generation that already exists fails with environment_backup_exists.
 func openBackup(root, homeRel string, want map[string]bool) (int, error) {
+	return openBackupWithDirectoryRead(root, homeRel, want, nil)
+}
+
+func openBackupWithDirectoryRead(root, homeRel string, want map[string]bool, readDirectory func(string) (stateread.Directory, error)) (int, error) {
+	if readDirectory == nil {
+		readDirectory = stateread.ReadDir
+	}
 	baseRel := managedJoin(homeRel, ".agent-environment-backup")
 	base, err := managedDirectory(root, baseRel)
 	if err != nil {
 		return 0, err
 	}
-	listing, err := stateread.ReadDir(base)
+	listing, err := readDirectory(base)
 	highest := 0
 	if err != nil {
 		return 0, err
