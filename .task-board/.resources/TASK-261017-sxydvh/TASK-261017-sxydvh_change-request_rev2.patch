@@ -1,0 +1,1434 @@
+diff --git a/README.md b/README.md
+index a33d0bfdc7a1534e23597db41d7de41fa0396a89..d8d97d9574deccda59b8f74d1b911c8b018d9cd7 100644
+--- a/README.md
++++ b/README.md
+@@ -327,11 +327,13 @@ for both cache orders, v1/v2 framing, and behavioral narrowing mutants. Run
+ for schema-3-through-9 capability-object and purpose-statement validation.
+ Run `go test ./internal/envprofile -run 'Test(StrictAuditMemberCapabilityCacheIsolation|MigratedGlobalSkillNetworkCapabilities)'`
+ for migration admission and cache isolation between skill, context and MCP
+-members. Cache ruleset 3 separates these verdicts from ruleset 2 without
++members. Cache ruleset 4 separates these verdicts from rulesets 2 and 3 without
+ deleting old records. All effective capability fields participate in cache
+ equality; representation differences conservatively cause a miss. Keep
+ local validation logs under `.temp/`.
+ 
++The 40 network-contact vectors from curator-spec `c1a2bb25` are pinned in `internal/audit/testdata/network-contacts.json`; run `go test ./internal/audit ./internal/envprofile -run 'Test(NetworkContact|ProfileNetworkContact)'` for classification, cache, member-install and migration coverage. Fixture paths are placed under `scripts/`, the existing detector surface; save execution logs under `.temp/`.
++
+ For the rc.7 Muse policy and v4 slice, run `go test ./internal/envfragment ./internal/envprofile ./cmd/curator -run TestMuse`; this includes synthetic fixtures and narrowing controls, not runtime qualification. For the credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run 'TestCredential(Store|Projection)'`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
+ 
+ The [Muse 1.4.8 qualification record](docs/qualification/muse-1.4.8-R6256.1.md)
+diff --git a/go.mod b/go.mod
+index 9f4d0d29dc4e4c42f652b60e26bbb9e734be530d..88268dfc5df72ce9b45eb3ed82e326007774231e 100644
+--- a/go.mod
++++ b/go.mod
+@@ -10,8 +10,9 @@ require (
+ 	github.com/dlclark/regexp2 v1.11.0
+ 	github.com/relux-works/skill-go-testing-tools/tuitestkit v0.1.1
+ 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
+-	golang.org/x/sys v0.36.0
+-	golang.org/x/text v0.14.0
++	golang.org/x/net v0.47.0
++	golang.org/x/sys v0.38.0
++	golang.org/x/text v0.31.0
+ 	gopkg.in/yaml.v3 v3.0.1
+ )
+ 
+diff --git a/go.sum b/go.sum
+index aa73410831fcdb38e3d7393ea72d75819a2d6528..30387f73ead8d995fd37aef92397f0c2cf4bd882 100644
+--- a/go.sum
++++ b/go.sum
+@@ -43,12 +43,18 @@ github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e h1:JVG44RsyaB9T2KIHavM
+ github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e/go.mod h1:RbqR21r5mrJuqunuUZ/Dhy/avygyECGrLceyNeo4LiM=
+ golang.org/x/exp v0.0.0-20220909182711-5c715a9e8561 h1:MDc5xs78ZrZr3HMQugiXOAkSZtfTpbJLDr/lwfgO53E=
+ golang.org/x/exp v0.0.0-20220909182711-5c715a9e8561/go.mod h1:cyybsKvd6eL0RnXn6p/Grxp8F5bW7iYuBgsNCOHpMYE=
++golang.org/x/net v0.47.0 h1:Mx+4dIFzqraBXUugkia1OOvlD6LemFo1ALMHjrXDOhY=
++golang.org/x/net v0.47.0/go.mod h1:/jNxtkgq5yWUGYkaZGqo27cfGZ1c5Nen03aYrrKpVRU=
+ golang.org/x/sys v0.0.0-20210809222454-d867a43fc93e/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+ golang.org/x/sys v0.6.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+ golang.org/x/sys v0.36.0 h1:KVRy2GtZBrk1cBYA7MKu5bEZFxQk4NIDV6RLVcC8o0k=
+ golang.org/x/sys v0.36.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
++golang.org/x/sys v0.38.0 h1:3yZWxaJjBmCWXqhN1qh02AkOnCQ1poK6oF+a7xWL6Gc=
++golang.org/x/sys v0.38.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
+ golang.org/x/text v0.14.0 h1:ScX5w1eTa3QqT8oi6+ziP7dTV1S2+ALU0bI+0zXKWiQ=
+ golang.org/x/text v0.14.0/go.mod h1:18ZOQIKpY8NJVqYksKHtTdi31H5itFRjB5/qKTNYzSU=
++golang.org/x/text v0.31.0 h1:aC8ghyu4JhP8VojJ2lEHBnochRno1sgL6nEi9WGFGMM=
++golang.org/x/text v0.31.0/go.mod h1:tKRAlv61yKIjGGHX/4tP1LTbc13YSec1pxVEWXzfoeM=
+ gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
+ gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+ gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+diff --git a/internal/audit/audit.go b/internal/audit/audit.go
+index 9ff19c287f4d21415dcbf1c71afa1bb97393f520..abf78d2117990716bd47cff59b819f1712342bf4 100644
+--- a/internal/audit/audit.go
++++ b/internal/audit/audit.go
+@@ -9,6 +9,7 @@ package audit
+ import (
+ 	"encoding/json"
+ 	"fmt"
++	"net/url"
+ 	"os"
+ 	"path/filepath"
+ 	"reflect"
+@@ -17,6 +18,8 @@ import (
+ 	"strings"
+ 	"time"
+ 
++	"golang.org/x/net/idna"
++
+ 	"github.com/relux-works/curator/internal/capabilities"
+ 	"github.com/relux-works/curator/internal/config"
+ 	"github.com/relux-works/curator/internal/hashing"
+@@ -47,7 +50,7 @@ var severityRank = map[string]int{
+ // backend and model (Spec §12.1).
+ const (
+ 	PromptVersion  = "1"
+-	RulesetVersion = "3"
++	RulesetVersion = "4"
+ )
+ 
+ // findingOpaqueNUL is the shared opaque-NUL finding id: every v1
+@@ -786,7 +789,7 @@ func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject
+ 
+ // Deterministic detectors: observed behavior vs declared capabilities.
+ var (
+-	urlRE  = regexp.MustCompile(`https?://([A-Za-z0-9.-]+)`)
++	urlRE  = regexp.MustCompile("https?://[^\\s\"'`<>()\\\\/?#]+")
+ 	execRE = regexp.MustCompile(`(?m)(?:subprocess|exec\.Command|os\.system|shutil\.which)\(\s*["']([A-Za-z0-9._-]+)["']`)
+ )
+ 
+@@ -834,9 +837,13 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
+ 			return nil
+ 		}
+ 		text := string(payload)
+-		for _, match := range urlRE.FindAllStringSubmatch(text, -1) {
+-			host := strings.ToLower(match[1])
+-			if host == "localhost" || host == "127.0.0.1" || declaredHost(declaredHosts, host) {
++		for _, rawURL := range urlRE.FindAllString(text, -1) {
++			parsed, err := url.Parse(rawURL)
++			if err != nil || parsed.Hostname() == "" {
++				continue
++			}
++			host, exempt := classifyNetworkHost(parsed.Hostname())
++			if exempt || declaredHost(declaredHosts, host) {
+ 				continue
+ 			}
+ 			findings = append(findings, Finding{
+@@ -867,6 +874,31 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
+ 	return findings
+ }
+ 
++// classifyNetworkHost implements environments §9.1 and §9.4. An invalid
++// IDNA name remains a contact; normalization failure never grants an exemption.
++func classifyNetworkHost(raw string) (host string, exempt bool) {
++	if raw == "::1" {
++		return raw, true
++	}
++	ascii, err := idna.Lookup.ToASCII(raw)
++	if err != nil {
++		return strings.ToLower(strings.TrimSuffix(raw, ".")), false
++	}
++	host = strings.TrimSuffix(strings.ToLower(ascii), ".")
++	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
++		return host, true
++	}
++	lastDot := strings.LastIndexByte(host, '.')
++	if lastDot <= 0 {
++		return host, false
++	}
++	switch host[lastDot+1:] {
++	case "test", "example", "invalid", "localhost":
++		return host, true
++	}
++	return host, false
++}
++
+ func opaqueNULFindings(paths []string) []Finding {
+ 	findings := make([]Finding, 0, len(paths))
+ 	for _, path := range paths {
+diff --git a/internal/audit/capability_cache_mutants_test.go b/internal/audit/capability_cache_mutants_test.go
+index 496ba183102207d5721f0a5f76300b7b0871fb8d..0bbe286d64c9174cb3c8b9775a91b5bcf63fcfd7 100644
+--- a/internal/audit/capability_cache_mutants_test.go
++++ b/internal/audit/capability_cache_mutants_test.go
+@@ -45,7 +45,7 @@ func TestCapabilityCacheNarrowingMutants(t *testing.T) {
+ 		}
+ 	}
+ 	mutants = append(mutants,
+-		mutation{"reuse-ruleset-two", "internal/audit/audit.go", `RulesetVersion = "3"`, `RulesetVersion = "2"`, "./internal/audit", "^TestCapabilityCacheRulesetRetainsOldRecords$", "TestCapabilityCacheRulesetRetainsOldRecords", "want block, cache hit=false"},
++		mutation{"reuse-ruleset-two", "internal/audit/audit.go", `RulesetVersion = "4"`, `RulesetVersion = "2"`, "./internal/audit", "^TestCapabilityCacheRulesetRetainsOldRecords$", "TestCapabilityCacheRulesetRetainsOldRecords", "want block, cache hit=false"},
+ 		mutation{"accept-null-scope", "internal/capabilities/capabilities.go", `if rawScope, present := obj["prompt_scope"]; present {`, `if rawScope, present := obj["prompt_scope"]; present && rawScope != nil {`, "./internal/skillspec", "^TestCapabilitiesNullRejectedFromV3$", "TestCapabilitiesNullRejectedFromV3/v3/agent-skill.json/null-scope", "want refusal naming capabilities.prompt_scope"},
+ 		mutation{"accept-null-schema-three", "internal/skillspec/parse.go", `if data["capabilities"] == nil {`, `if data["capabilities"] == nil && schema != 3 {`, "./internal/skillspec", "^TestCapabilitiesNullRejectedFromV3$", "TestCapabilitiesNullRejectedFromV3/v3/agent-skill.json/null ", "want refusal naming capabilities"},
+ 	)
+diff --git a/internal/audit/directory_test.go b/internal/audit/directory_test.go
+index 9167bf74f7da0e30cda5f7ed8d934ea0ced7733c..4ef804661cb6e1a53f18cb9eadf6d3bd798c89b2 100644
+--- a/internal/audit/directory_test.go
++++ b/internal/audit/directory_test.go
+@@ -16,7 +16,7 @@ import (
+ // repository and commit match.
+ func TestVerdictCacheBindsSelectedDirectory(t *testing.T) {
+ 	root := t.TempDir()
+-	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
++	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example.com/")})
+ 	digest, err := hashing.ContentSHA256(root, nil)
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -51,7 +51,7 @@ func TestVerdictCacheBindsSelectedDirectory(t *testing.T) {
+ // a root subject still hits them, a subdirectory subject misses.
+ func TestVerdictCacheLegacyRecordWithoutDirectoryBindsRoot(t *testing.T) {
+ 	root := t.TempDir()
+-	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
++	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example.com/")})
+ 	digest, err := hashing.ContentSHA256(root, nil)
+ 	if err != nil {
+ 		t.Fatal(err)
+diff --git a/internal/audit/network_contacts_mutants_test.go b/internal/audit/network_contacts_mutants_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..ae8a72ee0318abc3decff6d78edfa2559b67bb48
+--- /dev/null
++++ b/internal/audit/network_contacts_mutants_test.go
+@@ -0,0 +1,62 @@
++package audit
++
++import (
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// Each overlay keeps the classifier gate but admits a forbidden host/cache
++// class. Only exit 1 with the named behavioral assertion counts as a kill.
++func TestNetworkContactNarrowingMutants(t *testing.T) {
++	root, err := filepath.Abs("../..")
++	if err != nil {
++		t.Fatal(err)
++	}
++	type mutation struct{ name, file, before, after, pkg, run, fails, message string }
++	mutants := []mutation{
++		{"full-url-percent-path", "internal/audit/audit.go", `\\\\/?#`, `\\\\`, "./internal/audit", "^TestNetworkContactNormalizationBoundaries$/^percent-path-real$", "TestNetworkContactNormalizationBoundaries/percent-path-real", "URL classification: []"},
++		{"contains-test", "internal/audit/audit.go", `switch host[lastDot+1:] {`, `if strings.Contains(host, ".test") { return host, true }; switch host[lastDot+1:] {`, "./internal/audit", "^TestNetworkContactVectors$/^lookalike-nested-test$", "TestNetworkContactVectors/lookalike-nested-test", "Gate pass=false"},
++		{"exempt-example-com", "internal/audit/audit.go", `switch host[lastDot+1:] {`, `if host == "example.com" { return host, true }; switch host[lastDot+1:] {`, "./internal/audit", "^TestNetworkContactVectors$/^documentation-com$", "TestNetworkContactVectors/documentation-com", "Gate pass=false"},
++		{"exempt-bare-test", "internal/audit/audit.go", `if lastDot <= 0 {`, `if host == "test" { return host, true }; if lastDot <= 0 {`, "./internal/audit", "^TestNetworkContactVectors$/^bare-test$", "TestNetworkContactVectors/bare-test", "Gate pass=false"},
++		{"reserved-clears-file", "internal/audit/audit.go", `if exempt || declaredHost(declaredHosts, host) {`, `if exempt { return nil }; if exempt || declaredHost(declaredHosts, host) {`, "./internal/audit", "^TestNetworkContactVectors$/^mixed-reserved-first$", "TestNetworkContactVectors/mixed-reserved-first", "Gate pass=false"},
++		{"reuse-ruleset-three", "internal/audit/audit.go", `RulesetVersion = "4"`, `RulesetVersion = "3"`, "./internal/audit", "^TestNetworkContactCacheInvalidatesRulesetThree$", "TestNetworkContactCacheInvalidatesRulesetThree/", "stale ruleset reused"},
++	}
++	for _, mutant := range mutants {
++		t.Run(mutant.name, func(t *testing.T) {
++			original := filepath.Join(root, filepath.FromSlash(mutant.file))
++			payload, err := os.ReadFile(original)
++			if err != nil {
++				t.Fatal(err)
++			}
++			source := strings.ReplaceAll(string(payload), "\r\n", "\n")
++			if strings.Count(source, mutant.before) != 1 {
++				t.Fatal("mutation anchor is not unique")
++			}
++			dir := t.TempDir()
++			replacement := filepath.Join(dir, "replacement.go")
++			if err := os.WriteFile(replacement, []byte(strings.Replace(source, mutant.before, mutant.after, 1)), 0600); err != nil {
++				t.Fatal(err)
++			}
++			overlay, err := json.Marshal(map[string]any{"Replace": map[string]string{original: replacement}})
++			if err != nil {
++				t.Fatal(err)
++			}
++			overlayPath := filepath.Join(dir, "overlay.json")
++			if err := os.WriteFile(overlayPath, overlay, 0600); err != nil {
++				t.Fatal(err)
++			}
++			command := exec.Command("go", "test", "-overlay", overlayPath, "-count=1", "-timeout=2m", "-v", "-run", mutant.run, mutant.pkg)
++			command.Dir = root
++			output, err := command.CombinedOutput()
++			exit, ok := err.(*exec.ExitError)
++			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "--- FAIL: "+mutant.fails) || !strings.Contains(string(output), mutant.message) {
++				t.Fatalf("mutant survived or lacked intended behavioral failure: %v\n%s", err, output)
++			}
++			t.Logf("expected-red go test exit %d:\n%s", exit.ExitCode(), output)
++		})
++	}
++}
+diff --git a/internal/audit/network_contacts_test.go b/internal/audit/network_contacts_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..2854d125bb0660462fdcf05a809a82302ccb6d46
+--- /dev/null
++++ b/internal/audit/network_contacts_test.go
+@@ -0,0 +1,200 @@
++package audit
++
++import (
++	"bytes"
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/capabilities"
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++// The 40 pinned §9.1/§9.4 vectors drive Gate and GateReadOnly, including
++// fresh/cache decisions and exact host/file findings. Fixture files live in
++// scripts/, the existing detector surface; no broader extraction is claimed.
++func TestNetworkContactVectors(t *testing.T) {
++	payload, err := os.ReadFile("testdata/network-contacts.json")
++	if err != nil {
++		t.Fatal(err)
++	}
++	type finding struct{ Class, Host, File string }
++	var corpus struct {
++		Cases []struct {
++			Name     string
++			Files    map[string]string
++			Manifest map[string]any
++			Expected struct {
++				Findings []finding
++				Passes   bool `json:"capability_check_passes"`
++				Canary   bool `json:"static_canary_blocks"`
++			}
++		}
++	}
++	if err := json.Unmarshal(payload, &corpus); err != nil {
++		t.Fatal(err)
++	}
++	if len(corpus.Cases) != 40 {
++		t.Fatalf("vectors = %d, want 40", len(corpus.Cases))
++	}
++	for _, tc := range corpus.Cases {
++		t.Run(tc.Name, func(t *testing.T) {
++			caps, err := capabilities.Parse(tc.Manifest["capabilities"])
++			if err != nil {
++				t.Fatal(err)
++			}
++			subject := subjectWith(t, "", caps, 3)
++			for file, text := range tc.Files {
++				if err := os.WriteFile(filepath.Join(subject.Snapshot, "scripts", file), []byte(text), 0600); err != nil {
++					t.Fatal(err)
++				}
++			}
++			cfg := newCfg(t, "strict", "high")
++			for _, wantHit := range []bool{false, true} {
++				before, err := auditSubject(cfg, subject, false)
++				if err != nil || before.CacheHit != wantHit {
++					t.Fatalf("before Gate: hit=%v, want=%v, error=%v", before.CacheHit, wantHit, err)
++				}
++				warnings, errs := Gate(cfg, []Subject{subject})
++				if (len(errs) == 0) != tc.Expected.Passes || len(warnings) != 0 {
++					t.Fatalf("Gate pass=%v: warnings=%v errors=%v", tc.Expected.Passes, warnings, errs)
++				}
++				report, err := auditSubject(cfg, subject, false)
++				if err != nil || !report.CacheHit {
++					t.Fatalf("persisted report = %+v, error=%v", report, err)
++				}
++				var got []finding
++				for _, f := range report.Findings {
++					host := strings.TrimSuffix(strings.TrimPrefix(f.Evidence, "contacts "), ", which no capabilities.network entry covers")
++					got = append(got, finding{f.ID, host, strings.TrimPrefix(f.File, "scripts/")})
++				}
++				want := tc.Expected.Findings
++				if len(want) == 0 {
++					want = nil
++				}
++				if !reflect.DeepEqual(got, want) {
++					t.Fatalf("findings = %+v, want %+v (repeat=%v)", got, want, wantHit)
++				}
++				_, readErrs := GateReadOnly(cfg, []Subject{subject})
++				if !reflect.DeepEqual(errs, readErrs) {
++					t.Fatalf("read-only changed verdict: %v != %v", readErrs, errs)
++				}
++			}
++			// Canary detection is independent of a subject's declaration: its
++			// production fixture must still yield a blocking network finding.
++			if tc.Expected.Canary {
++				subject.Capabilities = capabilities.ImplicitNone()
++				_, errs := Gate(newCfg(t, "strict", "high"), []Subject{subject})
++				if len(errs) != 1 || !strings.Contains(errs[0], "contacts exfiltrate.example.com") {
++					t.Fatalf("static canary did not block: %v", errs)
++				}
++			}
++			if !CanaryPasses() {
++				t.Fatal("production static canary failed")
++			}
++		})
++	}
++}
++
++// A genuine ruleset-3 refusal (or stale allow for a real host) cannot mask
++// ruleset-4 classification in either hash framing; old bytes are retained.
++func TestNetworkContactCacheInvalidatesRulesetThree(t *testing.T) {
++	for _, version := range []hashing.Version{hashing.VersionV1, hashing.VersionV2} {
++		for _, host := range []string{"api.test", "api.example.com"} {
++			t.Run(fmt.Sprintf("v%d/%s", version, host), func(t *testing.T) {
++				cfg := newCfg(t, "strict", "high")
++				subject := subjectWith(t, "https://"+host+"/fixture\n", capabilities.ImplicitNone(), 3)
++				subject.HashVersion = version
++				digest, err := hashing.ContentSHA256WithVersion(subject.Snapshot, nil, version)
++				if err != nil {
++					t.Fatal(err)
++				}
++				oldFindings := []Finding{{ID: "audit.capability.network-undeclared", Severity: SeverityHigh, File: "scripts/tool", Evidence: "contacts api.test, which no capabilities.network entry covers", Verifiable: true}}
++				if host != "api.test" {
++					oldFindings = nil
++				}
++				storeCachedFindings(cfg, digest, subject, oldFindings, nil)
++				currentPath := verdictPath(cfg, digest)
++				oldPath := filepath.Join(filepath.Dir(currentPath), "verdict-"+strings.Join([]string{cfg.Audit.Backend, cfg.Audit.Model, PromptVersion, "3"}, "-")+".json")
++				old, err := os.ReadFile(currentPath)
++				if err != nil {
++					t.Fatal(err)
++				}
++				var record map[string]any
++				if err := json.Unmarshal(old, &record); err != nil {
++					t.Fatal(err)
++				}
++				record["ruleset_version"] = "3"
++				old, err = json.Marshal(record)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Remove(currentPath); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.WriteFile(oldPath, old, 0600); err != nil {
++					t.Fatal(err)
++				}
++				for _, wantHit := range []bool{false, true} {
++					report, err := auditSubject(cfg, subject, true)
++					wantDecision := DecisionBlock
++					if host == "api.test" {
++						wantDecision = DecisionAllow
++					}
++					if err != nil || report.CacheHit != wantHit || report.Decision != wantDecision {
++						t.Fatalf("stale ruleset reused: report=%+v error=%v, want hit=%v decision=%s", report, err, wantHit, wantDecision)
++					}
++					_, errs := Gate(cfg, []Subject{subject})
++					if (len(errs) == 0) != (host == "api.test") {
++						t.Fatalf("Gate stale verdict: %v", errs)
++					}
++				}
++				retained, err := os.ReadFile(oldPath)
++				if err != nil || !bytes.Equal(retained, old) {
++					t.Fatalf("old record changed: %v", err)
++				}
++			})
++		}
++	}
++}
++
++// URL authority parsing excludes credentials, brackets, ports and paths.
++// A malformed path escape cannot hide a real host. A second trailing dot
++// and a non-loopback IPv6 host cannot gain an exemption;
++// exempt network hosts do not erase an independent exec finding.
++func TestNetworkContactNormalizationBoundaries(t *testing.T) {
++	for _, tc := range []struct {
++		name, raw, want string
++		passes          bool
++	}{
++		{"reserved-port", "https://api.test:8443/x", "", true},
++		{"percent-path-real", "https://api.example.com/%zz", "api.example.com", false},
++		{"percent-path-reserved", "https://api.test/%zz", "", true},
++		{"loopback-port", "http://[::1]:8080/x", "", true},
++		{"real-ipv6", "http://[2001:db8::2]:8080/x", "2001:db8::2", false},
++		{"credentials-are-not-host", "https://api.test@evil.com:443/x", "evil.com", false},
++		{"port-is-not-host", "https://EXAMPLE.COM.:443/x", "example.com", false},
++		{"one-dot-only", "https://api.test../x", "api.test.", false},
++		{"invalid-idna", "https://bad_label.test/x", "bad_label.test", false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			subject := subjectWith(t, tc.raw+"\n", capabilities.ImplicitNone(), 3)
++			_, errs := Gate(newCfg(t, "strict", "high"), []Subject{subject})
++			if (len(errs) == 0) != tc.passes {
++				t.Fatalf("URL classification: %v", errs)
++			}
++			if !tc.passes && (len(errs) != 1 || !strings.Contains(errs[0], "contacts "+tc.want+",")) {
++				t.Fatalf("host evidence: %v", errs)
++			}
++		})
++	}
++	subject := subjectWith(t, "https://api.test/x\nsubprocess(\"nc\")\n", capabilities.ImplicitNone(), 3)
++	_, errs := Gate(newCfg(t, "strict", "medium"), []Subject{subject})
++	if len(errs) != 1 || !strings.Contains(errs[0], "audit.capability.exec-undeclared") {
++		t.Fatalf("reserved host cleared exec gate: %v", errs)
++	}
++}
+diff --git a/internal/audit/opaque_v1_rework_test.go b/internal/audit/opaque_v1_rework_test.go
+index de73fff836562dfe5999651685848fabd84e8bd6..647ee2e4844d7ffdf796c29bbc3105a60bcb4fe1 100644
+--- a/internal/audit/opaque_v1_rework_test.go
++++ b/internal/audit/opaque_v1_rework_test.go
+@@ -111,7 +111,7 @@ func TestV2VerdictCarrierRecordsHashVersion(t *testing.T) {
+ // digest text is a synthetic version-pair fixture, not a hash collision.
+ func TestV2RejectsLegacyUnversionedVerdict(t *testing.T) {
+ 	root := t.TempDir()
+-	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
++	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example.com/")})
+ 	digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV2)
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -134,7 +134,7 @@ func TestV2RejectsLegacyUnversionedVerdict(t *testing.T) {
+ // allow at the v1 digest must not authorize the v1 read.
+ func TestV1IgnoresV2VerdictCarrier(t *testing.T) {
+ 	root := t.TempDir()
+-	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
++	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example.com/")})
+ 	digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV1)
+ 	if err != nil {
+ 		t.Fatal(err)
+@@ -157,7 +157,7 @@ func TestV1IgnoresV2VerdictCarrier(t *testing.T) {
+ // reads, and the script-policy backfill preserves their frozen shape.
+ func TestV1HonorsLegacySchema1Verdict(t *testing.T) {
+ 	root := t.TempDir()
+-	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example/")})
++	writeFiles(t, root, map[string][]byte{"scripts/tool": []byte("contact https://unlisted.example.com/")})
+ 	digest, err := hashing.ContentSHA256WithVersion(root, nil, hashing.VersionV1)
+ 	if err != nil {
+ 		t.Fatal(err)
+diff --git a/internal/audit/testdata/network-contacts.json b/internal/audit/testdata/network-contacts.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..64d4a7ae1ecd48fb276063732527b9769706a262
+--- /dev/null
++++ b/internal/audit/testdata/network-contacts.json
+@@ -0,0 +1,811 @@
++{
++  "schema_version": 1,
++  "capability": "agent-environments",
++  "capability_revision": 1,
++  "status": "unreleased",
++  "normative_sections": [
++    "protocol/environments.md §9.1",
++    "protocol/environments.md §9.4"
++  ],
++  "execution": {
++    "operations": [
++      "profile install (strict member audit)",
++      "legacy global skill migration (strict member audit)"
++    ],
++    "input": "UTF-8 file contents and the skill manifest capability projection; absent manifest or network declaration means no covering declaration",
++    "projection": "Compare every normalized undeclared network contact by host and file. Exempt hosts do not clear other findings. static_canary_blocks is independent of capability_check_passes; a true value always blocks the static canary gate.",
++    "fixture_extraction_bound": "HTTP(S) URL hosts only; this corpus does not constrain other source-code detection syntax or claim a manager consumed the vectors."
++  },
++  "cases": [
++    {
++      "name": "loopback-localhost",
++      "files": {
++        "fixture.txt": "https://localhost/fixture\n"
++      },
++      "expected": {
++        "findings": [],
++        "capability_check_passes": true,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "loopback-ipv4",
++      "files": {
++        "fixture.txt": "https://127.0.0.1/fixture\n"
++      },
++      "expected": {
++        "findings": [],
++        "capability_check_passes": true,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "loopback-ipv6",
++      "files": {
++        "fixture.txt": "https://[::1]/fixture\n"
++      },
++      "expected": {
++        "findings": [],
++        "capability_check_passes": true,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "loopback-case-dot",
++      "files": {
++        "fixture.txt": "https://LOCALHOST./fixture\n"
++      },
++      "expected": {
++        "findings": [],
++        "capability_check_passes": true,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "reserved-test",
++      "files": {
++        "fixture.txt": "https://api.test/fixture\n"
++      },
++      "expected": {
++        "findings": [],
++        "capability_check_passes": true,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "reserved-example",
++      "files": {
++        "fixture.txt": "https://api.example/fixture\n"
++      },
++      "expected": {
++        "findings": [],
++        "capability_check_passes": true,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "reserved-invalid",
++      "files": {
++        "fixture.txt": "https://api.invalid/fixture\n"
++      },
++      "expected": {
++        "findings": [],
++        "capability_check_passes": true,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "reserved-localhost",
++      "files": {
++        "fixture.txt": "https://api.localhost/fixture\n"
++      },
++      "expected": {
++        "findings": [],
++        "capability_check_passes": true,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "reserved-nested",
++      "files": {
++        "fixture.txt": "https://a.b.test/fixture\n"
++      },
++      "expected": {
++        "findings": [],
++        "capability_check_passes": true,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "reserved-case-dot",
++      "files": {
++        "fixture.txt": "https://API.TeSt./fixture\n"
++      },
++      "expected": {
++        "findings": [],
++        "capability_check_passes": true,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "reserved-idn",
++      "files": {
++        "fixture.txt": "https://é.test/fixture\n"
++      },
++      "expected": {
++        "findings": [],
++        "capability_check_passes": true,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "reserved-punycode",
++      "files": {
++        "fixture.txt": "https://xn--9ca.test/fixture\n"
++      },
++      "expected": {
++        "findings": [],
++        "capability_check_passes": true,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "lookalike-nested-test",
++      "files": {
++        "fixture.txt": "https://x.test.evil.com/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "x.test.evil.com",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "lookalike-nested-example",
++      "files": {
++        "fixture.txt": "https://test.example.com.evil.org/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "test.example.com.evil.org",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "lookalike-hyphen",
++      "files": {
++        "fixture.txt": "https://test-example.com/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "test-example.com",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "bare-test",
++      "files": {
++        "fixture.txt": "https://test/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "test",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "bare-example",
++      "files": {
++        "fixture.txt": "https://example/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "example",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "bare-invalid",
++      "files": {
++        "fixture.txt": "https://invalid/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "invalid",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "bare-test-dot",
++      "files": {
++        "fixture.txt": "https://TEST./fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "test",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "lookalike-idn-label",
++      "files": {
++        "fixture.txt": "https://api.tеst/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "api.xn--tst-rdd",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "lookalike-punycode-label",
++      "files": {
++        "fixture.txt": "https://api.xn--tst-rdd/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "api.xn--tst-rdd",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "lookalike-idn-real-tld",
++      "files": {
++        "fixture.txt": "https://tést.example.com/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "xn--tst-bma.example.com",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "lookalike-case-dot",
++      "files": {
++        "fixture.txt": "https://X.TeSt.EVIL.COM./fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "x.test.evil.com",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "documentation-com",
++      "files": {
++        "fixture.txt": "https://example.com/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "example.com",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "documentation-net",
++      "files": {
++        "fixture.txt": "https://example.net/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "example.net",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "documentation-org",
++      "files": {
++        "fixture.txt": "https://example.org/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "example.org",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "documentation-subdomain-com",
++      "files": {
++        "fixture.txt": "https://api.example.com/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "api.example.com",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "documentation-subdomain-net",
++      "files": {
++        "fixture.txt": "https://api.example.net/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "api.example.net",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "documentation-subdomain-org",
++      "files": {
++        "fixture.txt": "https://api.example.org/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "api.example.org",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "documentation-case-dot",
++      "files": {
++        "fixture.txt": "https://API.EXAMPLE.COM./fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "api.example.com",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "canary-undeclared",
++      "files": {
++        "fixture.txt": "https://exfiltrate.example.com/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "exfiltrate.example.com",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": true
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "canary-declared",
++      "files": {
++        "fixture.txt": "https://exfiltrate.example.com/fixture\n"
++      },
++      "expected": {
++        "findings": [],
++        "capability_check_passes": true,
++        "static_canary_blocks": true
++      },
++      "manifest": {
++        "capabilities": {
++          "network": [
++            "*.example.com"
++          ]
++        }
++      }
++    },
++    {
++      "name": "mixed-reserved-first",
++      "files": {
++        "fixture.txt": "https://api.test/fixture\nhttps://api.example.com/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "api.example.com",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "mixed-real-first",
++      "files": {
++        "fixture.txt": "https://api.example.com/fixture\nhttps://api.test/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "api.example.com",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "mixed-cross-file",
++      "files": {
++        "fixture.txt": "https://api.test/fixture\n",
++        "real.txt": "https://api.example.com/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "api.example.com",
++            "file": "real.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": "none"
++        }
++      }
++    },
++    {
++      "name": "declared-exact",
++      "files": {
++        "fixture.txt": "https://api.example.com/fixture\n"
++      },
++      "expected": {
++        "findings": [],
++        "capability_check_passes": true,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": [
++            "api.example.com"
++          ]
++        }
++      }
++    },
++    {
++      "name": "declared-glob",
++      "files": {
++        "fixture.txt": "https://api.example.com/fixture\n"
++      },
++      "expected": {
++        "findings": [],
++        "capability_check_passes": true,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": [
++            "*.example.com"
++          ]
++        }
++      }
++    },
++    {
++      "name": "declared-other-host",
++      "files": {
++        "fixture.txt": "https://api.example.com/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "api.example.com",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {
++        "capabilities": {
++          "network": [
++            "other.example.com"
++          ]
++        }
++      }
++    },
++    {
++      "name": "missing-manifest",
++      "files": {
++        "fixture.txt": "https://api.test/fixture\nhttps://api.example.com/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "api.example.com",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      }
++    },
++    {
++      "name": "missing-network-declaration",
++      "files": {
++        "fixture.txt": "https://api.test/fixture\nhttps://api.example.com/fixture\n"
++      },
++      "expected": {
++        "findings": [
++          {
++            "class": "audit.capability.network-undeclared",
++            "host": "api.example.com",
++            "file": "fixture.txt"
++          }
++        ],
++        "capability_check_passes": false,
++        "static_canary_blocks": false
++      },
++      "manifest": {}
++    }
++  ]
++}
+diff --git a/internal/envprofile/network_contacts_test.go b/internal/envprofile/network_contacts_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..bf53b354a31e9638c8bf4c423f7cca93195ad0ee
+--- /dev/null
++++ b/internal/envprofile/network_contacts_test.go
+@@ -0,0 +1,125 @@
++package envprofile
++
++import (
++	"encoding/json"
++	"os"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++)
++
++// Every pinned network-contact vector runs through the public Install and
++// EnsureDefaultWithPolicy entries. Refusals retain exact host/file evidence
++// and publish no profile; successful migration retains the pinned skill.
++// Fixture paths are prefixed by scripts/, the current extraction surface.
++func TestProfileNetworkContactVectors(t *testing.T) {
++	payload, err := os.ReadFile("../audit/testdata/network-contacts.json")
++	if err != nil {
++		t.Fatal(err)
++	}
++	var corpus struct {
++		Cases []struct {
++			Name     string
++			Files    map[string]string
++			Manifest map[string]any
++			Expected struct {
++				Findings []struct{ Class, Host, File string }
++				Passes   bool `json:"capability_check_passes"`
++			}
++		}
++	}
++	if err := json.Unmarshal(payload, &corpus); err != nil {
++		t.Fatal(err)
++	}
++	if len(corpus.Cases) != 40 {
++		t.Fatalf("vectors=%d, want 40", len(corpus.Cases))
++	}
++	for _, tc := range corpus.Cases {
++		t.Run(tc.Name, func(t *testing.T) {
++			files := map[string]string{"README.md": "network fixture\n"}
++			for file, text := range tc.Files {
++				files["scripts/"+file] = text
++			}
++			if tc.Manifest != nil {
++				// A manifest without capabilities uses the valid legacy schema;
++				// schema 3 requires that member independently of network checks.
++				tc.Manifest["schema_version"] = 2
++				if _, present := tc.Manifest["capabilities"]; present {
++					tc.Manifest["schema_version"] = 3
++				}
++				manifest, err := json.Marshal(tc.Manifest)
++				if err != nil {
++					t.Fatal(err)
++				}
++				files["agent-skill.json"] = string(manifest)
++			}
++			t.Run("migration", func(t *testing.T) {
++				home, commit := migrationRevisionFixture(t, files)
++				err := EnsureDefaultWithPolicy(home, Policy{})
++				if !tc.Expected.Passes {
++					if err == nil {
++						t.Fatal("migration admitted undeclared network contact")
++					}
++					for _, f := range tc.Expected.Findings {
++						for _, want := range []string{f.Class, "contacts " + f.Host + ",", "scripts/" + f.File, "capabilities.network", "leave the skill unmigrated"} {
++							if !strings.Contains(err.Error(), want) {
++								t.Fatalf("migration refusal=%v, missing %q", err, want)
++							}
++						}
++					}
++					assertMigrationUnpublished(t, home)
++					return
++				}
++				if err != nil {
++					t.Fatal(err)
++				}
++				lock, _, err := readLock(home, DefaultProfile)
++				if err != nil {
++					t.Fatal(err)
++				}
++				member, ok := lock.Find(contextlock.KindSkill, "binary-skill")
++				if !ok || member.Commit != commit {
++					t.Fatalf("migrated skill=%+v, found=%v", member, ok)
++				}
++			})
++			t.Run("install", func(t *testing.T) {
++				ids := newGitIdentities(t)
++				skill := gitRepo(t, files, "v1.0.0")
++				operand := ids.serve(skill, "https://example.com/skills/network-fixture")
++				profile := gitRepo(t, map[string]string{
++					"agent-context.json": `{"schema_version":1,"name":"network-profile","version":"1.0.0","requires":{"skills":{"network-fixture":{"git":"` + operand + `","range":"*"}}}}`,
++					"README.md":          "network profile\n",
++				}, "v1.0.0")
++				home := t.TempDir()
++				pinHomes(t)
++				info, _, _, err := Install(home, InstallOptions{Operand: ids.serve(profile, "https://example.com/profiles/network-profile")})
++				if !tc.Expected.Passes {
++					if err == nil {
++						t.Fatal("Install admitted undeclared network contact")
++					}
++					for _, f := range tc.Expected.Findings {
++						for _, want := range []string{f.Class, "contacts " + f.Host + ",", "scripts/" + f.File} {
++							if !strings.Contains(err.Error(), want) {
++								t.Fatalf("Install refusal=%v, missing %q", err, want)
++							}
++						}
++					}
++					if _, err := os.Stat(sourcePath(home, "network-profile")); !os.IsNotExist(err) {
++						t.Fatalf("refused install published source: %v", err)
++					}
++					if _, err := os.Stat(lockPath(home, "network-profile")); !os.IsNotExist(err) {
++						t.Fatalf("refused install published lock: %v", err)
++					}
++					return
++				}
++				if err != nil {
++					t.Fatal(err)
++				}
++				if _, ok := info.Lock.Find(contextlock.KindSkill, "network-fixture"); !ok {
++					t.Fatal("installed skill missing")
++				}
++			})
++		})
++	}
++}
