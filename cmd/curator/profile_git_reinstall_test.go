@@ -158,14 +158,14 @@ func TestProfileGitReinstallHonoursUseAndTakeover(t *testing.T) {
 	})
 
 	t.Run("not-current/takeover without use switches nothing", func(t *testing.T) {
+		// Consent without activation is refused before updating or switching the non-current root.
 		source, fresh := setupBlockedReinstall(t, false)
 		code, stdout, stderr := runProfile(t, source, "profile", "install", operand, "--takeover")
-		if code != exitOK {
+		if code != exitUsage || !strings.Contains(stderr, "--takeover") {
 			t.Fatalf("install --takeover = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 		}
-		updatedLine(t, stdout)
-		if strings.Contains(stdout, "switched") {
-			t.Fatalf("a reinstall without --use must not switch:\n%s", stdout)
+		if stdout != "" {
+			t.Fatalf("refused consent must not report an update or switch:\n%s", stdout)
 		}
 		if got := currentOf(t, source); got != "other" {
 			t.Fatalf("current=%q, want other: --takeover without --use activates nothing", got)
@@ -247,12 +247,15 @@ func TestProfileGitReinstallHonoursUseAndTakeover(t *testing.T) {
 	})
 
 	t.Run("current/takeover without use stays current and writes nothing", func(t *testing.T) {
+		// Consent without activation is refused while preserving the current root and unmanaged files.
 		source, fresh := setupBlockedReinstall(t, true)
 		code, stdout, stderr := runProfile(t, source, "profile", "install", operand, "--takeover")
-		if code != exitOK {
+		if code != exitUsage || !strings.Contains(stderr, "--takeover") {
 			t.Fatalf("reinstall --takeover = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 		}
-		updatedLine(t, stdout)
+		if stdout != "" {
+			t.Fatalf("refused consent must not report an update:\n%s", stdout)
+		}
 		if got := currentOf(t, source); got != "groot" {
 			t.Fatalf("current=%q, want groot still current", got)
 		}

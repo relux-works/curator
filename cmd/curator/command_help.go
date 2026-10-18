@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/relux-works/curator/internal/version"
@@ -120,6 +121,51 @@ func hasHelpFlag(args []string) bool {
 		}
 	}
 	return false
+}
+
+// Validate consent before dispatch: argument-free wrappers and providers must
+// not silently discard it. Arguments after -- belong to the invoked program.
+func rejectsTakeover(args []string) bool {
+	var takeover, use, repair, dryRun bool
+	for _, arg := range args {
+		if arg == "--" {
+			break
+		}
+		name, value, assigned := strings.Cut(arg, "=")
+		enabled := !assigned
+		if assigned {
+			enabled, _ = strconv.ParseBool(value)
+		}
+		switch name {
+		case "--takeover", "-takeover":
+			takeover = true
+		case "--use", "-use":
+			use = enabled
+		case "--repair", "-repair":
+			repair = enabled
+		case "--dry-run", "-dry-run":
+			dryRun = enabled
+		}
+	}
+	if !takeover {
+		return false
+	}
+	// Help topics use the same command and activation admission as dispatch.
+	if len(args) > 0 && args[0] == "help" {
+		args = args[1:]
+	}
+	command, _ := registeredCommand(args)
+	if command != nil {
+		switch command.name {
+		case "profile use", "profile sync", "profile update":
+			return false
+		case "env resolve":
+			return !repair || dryRun
+		case "profile install":
+			return !use
+		}
+	}
+	return true
 }
 
 // registeredCommand selects the deepest contiguous command path. Help flags
