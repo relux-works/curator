@@ -1,0 +1,21 @@
+# Round 7 logbook
+
+The reviewer witness reproduced all three help bypasses (real exit 1). The shared pre-dispatch admission now requires true repair for env resolve, including help topics. The redundant handler guard was removed and the existing claude-only narrowing plant moved to the shared guard with its original test name retained. The helper-only plant survived while the early guard protected the entry point; that exploratory suite exited 1 and is not passing evidence. The relocated plant now produces the intended named behavioral failure.
+
+Rework touches three CLI files and the existing row-12 mutant definition in internal/envprofile; accepted native surface behavior is unchanged. Root README and CHANGELOG are unchanged. All product calls use temporary HOME and native-home fixtures.
+
+Candidate 90b7c12ec715275a8063caaec31df3b865450ca1; tree 3571d14af31de33e239a9ca9a4b77da5fd0952ac; signature G. Story HEAD remains at the recorded checkpoint and all task changes remain uncommitted. Hosted run 39157190410 is pending. Two earlier scratch hosted snapshots were cancelled by this worker after lint/guard cleanup; neither counts as green. Initial lint exited 1 (a new test style issue plus stale shared cache); style corrected and isolated-cache lint exits 0. Latest build/vet exit 0. Full CLI replay is running in bounded groups; unchanged evidence reuse will be explicitly identity-checked.
+
+## Activating-repair correction (supersedes the earlier pending snapshot)
+
+The help cross-product additionally reproduced true repair + true dry-run takeover help returning success. dry-run-witness-before.log exited 1. Shared admission now requires true repair and false dry-run; the late takeover/dry-run guard is removed too. Two help-specific narrowing plants each observe forbidden successful help and are killed by the permanent reviewer witness. regression-04.log exits 0.
+
+Current candidate is 8c5043959ce201bacb9ee73ce8d66d0d3a1f10e4, signature G; source is frozen. Hosted run 39158440563 replaces the cancelled earlier scratch snapshots. Full local CLI replay restarted from group 1 for this new production identity; groups 1-4 are green, group 5 is running. Both current envprofile groups (8 and 11), all twelve native/activation controls, build-04, vet-04 and lint-05 are green. The matrix is now 72 topics, 595 help/activation rows, 2975 consent calls and 595 successful no-consent controls. Compiled-entry smoke drove eleven real process invocations with expected exits (usage refusals are real exit 2) and unchanged fixture state. No hosted/full-suite success is claimed while they remain pending.
+
+## Local validation checkpoint
+
+All 15 CLI groups passed on candidate 8c5043959ce201bacb9ee73ce8d66d0d3a1f10e4. The composed suite covers 85/85 served packages and 3497 unique top-level pass/skip names. Fresh consumers: complete scriptworker, scriptpolicy and crossconformance packages; three install binary tests; envprofile groups 8/11. Reuse is bounded to 79 unchanged packages and unchanged envprofile/install tests, correcting the earlier preliminary 83-package reuse count. Raw and sanitized platform-case gates exited 0; all 36 local case skips were explicitly classified. Removing the group-15 green receipt made the merger refuse with exit 1 and the intended missing-group assertion; actual evidence was preserved. Build, vet, lint and signed-tree integrity remain green. Hosted run 39158440563 still has macOS race and Windows test jobs in progress; no success is claimed yet.
+
+## Hosted gate and review handoff
+
+Full hosted run https://github.com/relux-works/curator/actions/runs/39158440563 has conclusion success on exact signed candidate 8c5043959ce201bacb9ee73ce8d66d0d3a1f10e4: 20 successful jobs and 2 workflow-conditional skips. Windows Test and both race jobs are green. Final fetch and integrity check exited 0: tree 769581956b4fd7bfd02c2567d7465b60335f5b4b, signature G, Story checkpoint unchanged, actual index empty, no overlap with current protected trunk, root README/CHANGELOG unchanged. Candidate source and tests remain uncommitted for handoff snapshot. Final round-7 validation, coverage map, gaps, full sanitized logs, skip reasons and hash manifest are attached before the developer handoff. Configured post-turn validation is a subsequent gate; no advance success or independent acceptance is claimed.

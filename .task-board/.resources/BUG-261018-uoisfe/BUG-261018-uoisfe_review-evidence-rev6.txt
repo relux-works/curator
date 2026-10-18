@@ -1,0 +1,642 @@
+
+===== readiness.log =====
+git version 2.54.0 (Apple Git-157)
+task-board version dev
+go version go1.25.5 darwin/arm64
+
+===== identity.json =====
+{
+  "tree": "2fe068da665b203ed48e52cfcb7fba74de96e37e",
+  "mismatches": [],
+  "tracked_files_checked": 11762
+}
+===== reuse-check.json =====
+{
+  "sections": 121,
+  "hash_mismatches": []
+}
+===== rework.log =====
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/bootstrap
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/init
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/add
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/remove
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/install
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/update
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/upgrade
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/status
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/list
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/project
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/project/add
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/project/resolve
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/project/refresh
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/skill
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/skill/check
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/init
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/add
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/remove
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/list
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/status
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/install
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/adopt
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/update
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/upgrade
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile/import
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile/list
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile/remove
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose/<profile>/add
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose/<profile>/remove
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose/<profile>/list
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env/status
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env/config
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env/config/show
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env/config/set
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env/config/unset
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env/migrate
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env/unmanage
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/run
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/add
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/remove
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/list
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/status
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/audit
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/gc
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/shell-init
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hook
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hook/approve
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hook/approvals
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hook/revoke
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/ui
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/show
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh/add
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh/list
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh/remove
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/add
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/login
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/list
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/remove
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/version
+--- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand (0.36s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/bootstrap (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/init (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/add (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/remove (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/install (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/update (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/upgrade (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/status (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/list (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/project (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/project/add (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/project/resolve (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/project/refresh (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/skill (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/skill/check (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/init (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/add (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/remove (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/list (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/status (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/install (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/adopt (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/update (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/upgrade (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile (0.02s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile/import (0.03s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile/list (0.02s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile/remove (0.02s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose/<profile>/add (0.02s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose/<profile>/remove (0.02s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose/<profile>/list (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env (0.02s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env/status (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env/config (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env/config/show (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env/config/set (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env/config/unset (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env/migrate (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env/unmanage (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/run (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/add (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/remove (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/list (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/status (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/audit (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/gc (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/shell-init (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hook (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hook/approve (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hook/approvals (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hook/revoke (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/ui (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/show (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh/add (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh/list (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh/remove (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/add (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/login (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/list (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/remove (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/version (0.00s)
+=== RUN   TestNativeSkillsTakeoverArgumentDiscardRegression
+=== RUN   TestNativeSkillsTakeoverArgumentDiscardRegression/list
+=== RUN   TestNativeSkillsTakeoverArgumentDiscardRegression/update
+=== RUN   TestNativeSkillsTakeoverArgumentDiscardRegression/gc
+=== RUN   TestNativeSkillsTakeoverArgumentDiscardRegression/version
+=== RUN   TestNativeSkillsTakeoverArgumentDiscardRegression/--version
+--- PASS: TestNativeSkillsTakeoverArgumentDiscardRegression (0.04s)
+    --- PASS: TestNativeSkillsTakeoverArgumentDiscardRegression/list (0.00s)
+    --- PASS: TestNativeSkillsTakeoverArgumentDiscardRegression/update (0.00s)
+    --- PASS: TestNativeSkillsTakeoverArgumentDiscardRegression/gc (0.01s)
+    --- PASS: TestNativeSkillsTakeoverArgumentDiscardRegression/version (0.01s)
+    --- PASS: TestNativeSkillsTakeoverArgumentDiscardRegression/--version (0.03s)
+=== RUN   TestNativeSkillsTakeoverActivationBoundary
+--- PASS: TestNativeSkillsTakeoverActivationBoundary (0.03s)
+=== RUN   TestNativeSkillsTakeoverRegistryNarrowingMutant
+    native_skills_flags_test.go:139: list-only-consent-bypass: child exit=1; killed by TestNativeSkillsTakeoverEveryRegisteredCommand/list and TestNativeSkillsTakeoverArgumentDiscardRegression/list
+--- PASS: TestNativeSkillsTakeoverRegistryNarrowingMutant (2.34s)
+PASS
+ok  	github.com/relux-works/curator/cmd/curator	3.285s
+
+===== rows.jsonl =====
+{"row": 1, "command": ["go", "test", "./internal/envprofile", "-count=1", "-timeout=3m", "-v", "-run", "^TestNativeSkills(UseAndSync)$"], "exit": 0, "result": "held"}
+{"row": 2, "command": ["go", "test", "./internal/envprofile", "-count=1", "-timeout=3m", "-v", "-run", "^TestNativeSkills(Repair)$"], "exit": 0, "result": "held"}
+{"row": 3, "command": ["go", "test", "./internal/envprofile", "-count=1", "-timeout=3m", "-v", "-run", "^TestNativeSkillsTakeover$/^foreign$"], "exit": 0, "result": "held"}
+{"row": 4, "command": ["go", "test", "./internal/envprofile", "-count=1", "-timeout=3m", "-v", "-run", "^TestNativeSkillsTakeover$/^(directory|file|store|relative-store)$"], "exit": 0, "result": "held"}
+{"row": 5, "command": ["go", "test", "./internal/envprofile", "-count=1", "-timeout=3m", "-v", "-run", "^TestNativeSkills(LinkedParent)$"], "exit": 0, "result": "held"}
+{"row": 6, "command": ["go", "test", "./internal/envprofile", "-count=1", "-timeout=3m", "-v", "-run", "^TestNativeSkills(ConvergenceAndSwitch|EmptyProfileLeavesUnnamedParent)$"], "exit": 0, "result": "held"}
+{"row": 7, "command": ["go", "test", "./internal/envprofile", "-count=1", "-timeout=3m", "-v", "-run", "^TestNativeSkills(Ledger|UnrecordedLedger)$"], "exit": 0, "result": "held"}
+{"row": 8, "command": ["go", "test", "./internal/envprofile", "-count=1", "-timeout=3m", "-v", "-run", "^TestNativeSkills(ConvergenceAndSwitch)$"], "exit": 0, "result": "held"}
+{"row": 9, "command": ["go", "test", "./internal/envprofile", "-count=1", "-timeout=3m", "-v", "-run", "^TestNativeSkills(InstallAndUpdate|ConvergenceAndSwitch)$"], "exit": 0, "result": "held"}
+{"row": 10, "command": ["go", "test", "./internal/envprofile", "-count=1", "-timeout=3m", "-v", "-run", "^TestNativeSkills(BackupCollision)$"], "exit": 0, "result": "held"}
+{"row": 11, "command": ["go", "test", "./internal/envprofile", "-count=1", "-timeout=3m", "-v", "-run", "^TestNativeSkills(UnreadableMarker)$"], "exit": 0, "result": "held"}
+{"row": 12, "command": ["go", "test", "./cmd/curator", "-count=1", "-timeout=3m", "-v", "-run", "^TestNativeSkills(CLIOperations|TakeoverFlagBoundary|TakeoverEveryRegisteredCommand|TakeoverArgumentDiscardRegression|TakeoverActivationBoundary)$"], "exit": 0, "result": "held"}
+
+===== row1.log =====
+=== RUN   TestNativeSkillsUseAndSync
+--- PASS: TestNativeSkillsUseAndSync (1.17s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	1.535s
+
+===== row2.log =====
+=== RUN   TestNativeSkillsRepair
+--- PASS: TestNativeSkillsRepair (2.17s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	2.427s
+
+===== row3.log =====
+=== RUN   TestNativeSkillsTakeover
+=== RUN   TestNativeSkillsTakeover/foreign
+--- PASS: TestNativeSkillsTakeover (1.27s)
+    --- PASS: TestNativeSkillsTakeover/foreign (1.27s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	1.517s
+
+===== row4.log =====
+=== RUN   TestNativeSkillsTakeover
+=== RUN   TestNativeSkillsTakeover/directory
+=== RUN   TestNativeSkillsTakeover/file
+=== RUN   TestNativeSkillsTakeover/store
+=== RUN   TestNativeSkillsTakeover/relative-store
+--- PASS: TestNativeSkillsTakeover (6.63s)
+    --- PASS: TestNativeSkillsTakeover/directory (2.04s)
+    --- PASS: TestNativeSkillsTakeover/file (1.75s)
+    --- PASS: TestNativeSkillsTakeover/store (1.62s)
+    --- PASS: TestNativeSkillsTakeover/relative-store (1.22s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	6.843s
+
+===== row5.log =====
+=== RUN   TestNativeSkillsLinkedParent
+=== RUN   TestNativeSkillsLinkedParent/ordinary
+=== RUN   TestNativeSkillsLinkedParent/takeover
+--- PASS: TestNativeSkillsLinkedParent (2.78s)
+    --- PASS: TestNativeSkillsLinkedParent/ordinary (1.47s)
+    --- PASS: TestNativeSkillsLinkedParent/takeover (1.31s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	3.041s
+
+===== row6.log =====
+=== RUN   TestNativeSkillsConvergenceAndSwitch
+--- PASS: TestNativeSkillsConvergenceAndSwitch (1.37s)
+=== RUN   TestNativeSkillsEmptyProfileLeavesUnnamedParent
+--- PASS: TestNativeSkillsEmptyProfileLeavesUnnamedParent (1.28s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	2.882s
+
+===== row7.log =====
+=== RUN   TestNativeSkillsLedger
+--- PASS: TestNativeSkillsLedger (1.40s)
+=== RUN   TestNativeSkillsUnrecordedLedger
+=== RUN   TestNativeSkillsUnrecordedLedger/ledgered
+=== RUN   TestNativeSkillsUnrecordedLedger/unreadable-ledger
+--- PASS: TestNativeSkillsUnrecordedLedger (2.38s)
+    --- PASS: TestNativeSkillsUnrecordedLedger/ledgered (1.30s)
+    --- PASS: TestNativeSkillsUnrecordedLedger/unreadable-ledger (1.08s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	4.106s
+
+===== row8.log =====
+=== RUN   TestNativeSkillsConvergenceAndSwitch
+--- PASS: TestNativeSkillsConvergenceAndSwitch (1.28s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	1.637s
+
+===== row9.log =====
+=== RUN   TestNativeSkillsConvergenceAndSwitch
+--- PASS: TestNativeSkillsConvergenceAndSwitch (1.45s)
+=== RUN   TestNativeSkillsInstallAndUpdate
+--- PASS: TestNativeSkillsInstallAndUpdate (3.12s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	4.884s
+
+===== row10.log =====
+=== RUN   TestNativeSkillsBackupCollision
+--- PASS: TestNativeSkillsBackupCollision (1.22s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	1.474s
+
+===== row11.log =====
+=== RUN   TestNativeSkillsUnreadableMarker
+--- PASS: TestNativeSkillsUnreadableMarker (0.97s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	1.224s
+
+===== row12.log =====
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/bootstrap
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/init
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/add
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/remove
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/install
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/update
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/upgrade
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/status
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/list
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/project
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/project/add
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/project/resolve
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/project/refresh
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/skill
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/skill/check
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/init
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/add
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/remove
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/list
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/status
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/install
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/adopt
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/update
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/global/upgrade
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile/import
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile/list
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile/remove
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose/<profile>/add
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose/<profile>/remove
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose/<profile>/list
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env/status
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env/config
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env/config/show
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env/config/set
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env/config/unset
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env/migrate
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/env/unmanage
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/run
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/add
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/remove
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/list
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/status
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/audit
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/gc
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/shell-init
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hook
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hook/approve
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hook/approvals
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/hook/revoke
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/ui
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/show
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh/add
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh/list
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh/remove
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/add
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/login
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/list
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/remove
+=== RUN   TestNativeSkillsTakeoverEveryRegisteredCommand/version
+--- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand (0.15s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/bootstrap (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/init (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/add (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/remove (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/install (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/update (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/upgrade (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/status (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/list (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/project (0.02s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/project/add (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/project/resolve (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/project/refresh (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/skill (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/skill/check (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/init (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/add (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/remove (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/list (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/status (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/install (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/adopt (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/update (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/global/upgrade (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile/import (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile/list (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile/remove (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose/<profile>/add (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose/<profile>/remove (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose/<profile>/list (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env/status (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env/config (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env/config/show (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env/config/set (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env/config/unset (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env/migrate (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/env/unmanage (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/run (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/add (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/remove (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/list (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/status (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/audit (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/gc (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/shell-init (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hook (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hook/approve (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hook/approvals (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/hook/revoke (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/ui (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/show (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh/add (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh/list (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh/remove (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https (0.01s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/add (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/login (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/list (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/remove (0.00s)
+    --- PASS: TestNativeSkillsTakeoverEveryRegisteredCommand/version (0.00s)
+=== RUN   TestNativeSkillsTakeoverArgumentDiscardRegression
+=== RUN   TestNativeSkillsTakeoverArgumentDiscardRegression/list
+=== RUN   TestNativeSkillsTakeoverArgumentDiscardRegression/update
+=== RUN   TestNativeSkillsTakeoverArgumentDiscardRegression/gc
+=== RUN   TestNativeSkillsTakeoverArgumentDiscardRegression/version
+=== RUN   TestNativeSkillsTakeoverArgumentDiscardRegression/--version
+--- PASS: TestNativeSkillsTakeoverArgumentDiscardRegression (0.01s)
+    --- PASS: TestNativeSkillsTakeoverArgumentDiscardRegression/list (0.00s)
+    --- PASS: TestNativeSkillsTakeoverArgumentDiscardRegression/update (0.00s)
+    --- PASS: TestNativeSkillsTakeoverArgumentDiscardRegression/gc (0.00s)
+    --- PASS: TestNativeSkillsTakeoverArgumentDiscardRegression/version (0.00s)
+    --- PASS: TestNativeSkillsTakeoverArgumentDiscardRegression/--version (0.00s)
+=== RUN   TestNativeSkillsTakeoverActivationBoundary
+--- PASS: TestNativeSkillsTakeoverActivationBoundary (0.00s)
+=== RUN   TestNativeSkillsCLIOperations
+=== RUN   TestNativeSkillsCLIOperations/install
+=== RUN   TestNativeSkillsCLIOperations/use
+=== RUN   TestNativeSkillsCLIOperations/sync
+=== RUN   TestNativeSkillsCLIOperations/update
+=== RUN   TestNativeSkillsCLIOperations/repair
+--- PASS: TestNativeSkillsCLIOperations (44.88s)
+    --- PASS: TestNativeSkillsCLIOperations/install (2.36s)
+    --- PASS: TestNativeSkillsCLIOperations/use (2.21s)
+    --- PASS: TestNativeSkillsCLIOperations/sync (35.41s)
+    --- PASS: TestNativeSkillsCLIOperations/update (2.65s)
+    --- PASS: TestNativeSkillsCLIOperations/repair (2.26s)
+=== RUN   TestNativeSkillsTakeoverFlagBoundary
+=== RUN   TestNativeSkillsTakeoverFlagBoundary/profile-list
+=== RUN   TestNativeSkillsTakeoverFlagBoundary/profile-remove-default
+=== RUN   TestNativeSkillsTakeoverFlagBoundary/profile-import
+=== RUN   TestNativeSkillsTakeoverFlagBoundary/env-status
+=== RUN   TestNativeSkillsTakeoverFlagBoundary/env-resolve-claude_code
+=== RUN   TestNativeSkillsTakeoverFlagBoundary/env-resolve-claude_code---repair---dry-run
+=== RUN   TestNativeSkillsTakeoverFlagBoundary/env-unmanage-claude_code
+=== RUN   TestNativeSkillsTakeoverFlagBoundary/status
+--- PASS: TestNativeSkillsTakeoverFlagBoundary (0.02s)
+    --- PASS: TestNativeSkillsTakeoverFlagBoundary/profile-list (0.00s)
+    --- PASS: TestNativeSkillsTakeoverFlagBoundary/profile-remove-default (0.00s)
+    --- PASS: TestNativeSkillsTakeoverFlagBoundary/profile-import (0.00s)
+    --- PASS: TestNativeSkillsTakeoverFlagBoundary/env-status (0.00s)
+    --- PASS: TestNativeSkillsTakeoverFlagBoundary/env-resolve-claude_code (0.00s)
+    --- PASS: TestNativeSkillsTakeoverFlagBoundary/env-resolve-claude_code---repair---dry-run (0.01s)
+    --- PASS: TestNativeSkillsTakeoverFlagBoundary/env-unmanage-claude_code (0.00s)
+    --- PASS: TestNativeSkillsTakeoverFlagBoundary/status (0.00s)
+PASS
+ok  	github.com/relux-works/curator/cmd/curator	45.333s
+
+===== mutants.log =====
+=== RUN   TestNativeSkillsNarrowingMutants
+=== RUN   TestNativeSkillsNarrowingMutants/pi-native-only
+    native_skills_mutants_test.go:79: expected-red exit 1; killed by TestNativeSkillsUseAndSync:
+        === RUN   TestNativeSkillsUseAndSync
+            native_skills_test.go:61: native skill link missing or outside store: "" readlink <temporary-fixture> no such file or directory
+        --- FAIL: TestNativeSkillsUseAndSync (2.96s)
+        FAIL
+        FAIL	github.com/relux-works/curator/internal/envprofile	3.308s
+        FAIL
+=== RUN   TestNativeSkillsNarrowingMutants/codex-link-drift
+    native_skills_mutants_test.go:79: expected-red exit 1; killed by TestNativeSkillsRepair:
+        === RUN   TestNativeSkillsRepair
+            native_skills_test.go:283: drift status = &{Homes:[{markerState:absent Profile:default Environment:claude_code Mode:managed-home Form: Home:<temporary-fixture> Provisioned:false Current:false LockHash:sha256:06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4 MarkerHash: Surfaces:[] Passthrough:[] Seeds:[] SeedLinks:[] SeededProjects:[] CodexSeedRecord:<nil> NativeMCPServers:[] NativeMCPServersDisposition:none BackupsKnown:true Backups:0 BackupsOldest:- BackupsNewest:- Findings:[home unprovisioned] Warnings:[]} {markerState:absent Profile:default Environment:codex_cli Mode:managed-home Form: Home:<temporary-fixture> Provisioned:false Current:false LockHash:sha256:06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4 MarkerHash: Surfaces:[] Passthrough:[] Seeds:[] SeedLinks:[] SeededProjects:[] CodexSeedRecord:<nil> NativeMCPServers:[] NativeMCPServersDisposition: BackupsKnown:true Backups:0 BackupsOldest:- BackupsNewest:- Findings:[home unprovisioned] Warnings:[]} {markerState:absent Profile:default Environment:muse Mode:managed-home Form: Home:<temporary-fixture> Provisioned:false Current:false LockHash:sha256:06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4 MarkerHash: Surfaces:[] Passthrough:[] Seeds:[] SeedLinks:[] SeededProjects:[] CodexSeedRecord:<nil> NativeMCPServers:[] NativeMCPServersDisposition:none BackupsKnown:true Backups:0 BackupsOldest:- BackupsNewest:- Findings:[home unprovisioned] Warnings:[]} {markerState:absent Profile:default Environment:opencode Mode:managed-home Form: Home:<temporary-fixture> Provisioned:false Current:false LockHash:sha256:06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4 MarkerHash: Surfaces:[] Passthrough:[] Seeds:[] SeedLinks:[] SeededProjects:[] CodexSeedRecord:<nil> NativeMCPServers:[] NativeMCPServersDisposition:none BackupsKnown:true Backups:0 BackupsOldest:- BackupsNewest:- Findings:[home unprovisioned] Warnings:[]} {markerState:absent Profile:default Environment:pi Mode:managed-home Form: Home:<temporary-fixture> Provisioned:false Current:false LockHash:sha256:06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4 MarkerHash: Surfaces:[] Passthrough:[] Seeds:[] SeedLinks:[] SeededProjects:[] CodexSeedRecord:<nil> NativeMCPServers:[] NativeMCPServersDisposition:none BackupsKnown:true Backups:0 BackupsOldest:- BackupsNewest:- Findings:[home unprovisioned] Warnings:[]} {markerState:absent Profile:native-skills Environment:claude_code Mode:managed-home Form: Home:<temporary-fixture> Provisioned:false Current:false LockHash:sha256:6112b952ab23f6565d4eae5ca6f05317d9258e731495a66c2b5b5252aee27cdd MarkerHash: Surfaces:[] Passthrough:[] Seeds:[] SeedLinks:[] SeededProjects:[] CodexSeedRecord:<nil> NativeMCPServers:[] NativeMCPServersDisposition:none BackupsKnown:true Backups:0 BackupsOldest:- BackupsNewest:- Findings:[home unprovisioned] Warnings:[]} {markerState:present Profile:native-skills Environment:codex_cli Mode:managed-home Form:monolithic Home:<temporary-fixture> Provisioned:true Current:true LockHash:sha256:6112b952ab23f6565d4eae5ca6f05317d9258e731495a66c2b5b5252aee27cdd MarkerHash:6112b952ab23f6565d4eae5ca6f05317d9258e731495a66c2b5b5252aee27cdd Surfaces:[{Key:mcp Paths:[curator-mcp.config.toml] Form: State:current Detail:current} {Key:root-context Paths:[AGENTS.md] Form:monolithic State:current Detail:current} {Key:skills Paths:[skills/myskill] Form: State:current Detail:current} {Key:system-prompt Paths:[.agent-context/system-prompt.md] Form: State:current Detail:current}] Passthrough:[auth.json (keyring-preferred)] Seeds:[] SeedLinks:[] SeededProjects:[] CodexSeedRecord:0x1400028d3b0 NativeMCPServers:[] NativeMCPServersDisposition:none BackupsKnown:true Backups:0 BackupsOldest:- BackupsNewest:- Findings:[] Warnings:[]} {markerState:absent Profile:native-skills Environment:muse Mode:managed-home Form: Home:<temporary-fixture> Provisioned:false Current:false LockHash:sha256:6112b952ab23f6565d4eae5ca6f05317d9258e731495a66c2b5b5252aee27cdd MarkerHash: Surfaces:[] Passthrough:[] Seeds:[] SeedLinks:[] SeededProjects:[] CodexSeedRecord:<nil> NativeMCPServers:[] NativeMCPServersDisposition:none BackupsKnown:true Backups:0 BackupsOldest:- BackupsNewest:- Findings:[home unprovisioned] Warnings:[]} {markerState:absent Profile:native-skills Environment:opencode Mode:managed-home Form: Home:<temporary-fixture> Provisioned:false Current:false LockHash:sha256:6112b952ab23f6565d4eae5ca6f05317d9258e731495a66c2b5b5252aee27cdd MarkerHash: Surfaces:[] Passthrough:[] Seeds:[] SeedLinks:[] SeededProjects:[] CodexSeedRecord:<nil> NativeMCPServers:[] NativeMCPServersDisposition:none BackupsKnown:true Backups:0 BackupsOldest:- BackupsNewest:- Findings:[home unprovisioned] Warnings:[]} {markerState:absent Profile:native-skills Environment:pi Mode:managed-home Form: Home:<temporary-fixture> Provisioned:false Current:false LockHash:sha256:6112b952ab23f6565d4eae5ca6f05317d9258e731495a66c2b5b5252aee27cdd MarkerHash: Surfaces:[] Passthrough:[] Seeds:[] SeedLinks:[] SeededProjects:[] CodexSeedRecord:<nil> NativeMCPServers:[] NativeMCPServersDisposition:none BackupsKnown:true Backups:0 BackupsOldest:- BackupsNewest:- Findings:[home unprovisioned] Warnings:[]}] Scopes:[{NativeSkills:0x140001d77a0 Scope:machine Profile:native-skills Environment:claude_code Native:<temporary-fixture> Managed:<temporary-fixture> Provisioned:false ProvisionedKnown:true Diagnostic:0x140001970e0} {NativeSkills:0x140001d7a40 Scope:machine Profile:native-skills Environment:codex_cli Native:<temporary-fixture> Managed:<temporary-fixture> Provisioned:true ProvisionedKnown:true Diagnostic:<nil>} {NativeSkills:<nil> Scope:machine Profile:native-skills Environment:muse Native: Managed:<temporary-fixture> Provisioned:false ProvisionedKnown:true Diagnostic:<nil>} {NativeSkills:<nil> Scope:machine Profile:native-skills Environment:opencode Native:<temporary-fixture> Managed:<temporary-fixture> Provisioned:false ProvisionedKnown:true Diagnostic:<nil>} {NativeSkills:0x140001d7ce0 Scope:machine Profile:native-skills Environment:pi Native:<temporary-fixture> Managed:<temporary-fixture> Provisioned:false ProvisionedKnown:true Diagnostic:0x1400047aa50}] Adapters:[{ID:muse Recorded:1.4.7 Detected:unknown Supported:[monolithic]} {ID:claude_code Recorded:2.1.261 Detected:unknown Supported:[monolithic referenced]} {ID:codex_cli Recorded:0.153.2 Detected:unknown Supported:[monolithic]} {ID:opencode Recorded:unrecorded Detected:unknown Supported:[monolithic referenced]} {ID:pi Recorded:0.84.2 Detected:unknown Supported:[monolithic]}] Targets:[{ID:xcode-coding-assistant Adapter:claude_code Participating:false Consented:false Detail:auto: probe path absent, nothing materialized Ungoverned:the embedded host's MCP configuration and commands/ are present, unaudited, and outside this capability} {ID:xcode-coding-assistant Adapter:codex_cli Participating:false Consented:false Detail:auto: probe path absent, nothing materialized Ungoverned:the embedded host's MCP configuration and commands/ are present, unaudited, and outside this capability}] Profiles:[{Profile:default LockHash:sha256:06fb1543fb69055047d8f34bbac2901f06b4da1374cdbbbc47a26d22126362a4 Members:[{Kind:context Name:default Weight:0}] Precedence:{Winner:higher-weight Placement:winner-last} TransitiveSystemModules:drop DroppedSystemModules:[]} {Profile:native-skills LockHash:sha256:6112b952ab23f6565d4eae5ca6f05317d9258e731495a66c2b5b5252aee27cdd Members:[{Kind:context Name:native-skills Weight:100} {Kind:mcp Name:figma-devmode Weight:0} {Kind:skill Name:myskill Weight:0}] Precedence:{Winner:higher-weight Placement:winner-last} TransitiveSystemModules:drop DroppedSystemModules:[]}] Providers:[] UnregisteredEnvironments:[] Orphans:[] Diagnostics:[] Notes:[Muse: monolithic root context delivered at config/muse/AGENTS.md (verified on 1.4.7, 1.4.7-R6101.1); native root suppresses foreign personal rules fallback, but foreign personal skills persist; managed exec requires --no-foreign-personal-context when the target is materialized; interactive requires -c context.foreign_personal_skills=false (JSON boolean) when the target is materialized; serve cannot exclude foreign personal context (foreign-personal-context isolation gap), so required serve exclusion refuses; workspace AGENTS.md prevailed in observed conflicts (recorded residual, not a general precedence guarantee); 1.4.8 on macOS 27: file backend login, subsequent file backend with zero Keychain access, and shared file link verified; 1.4.8 exclusion qualification unknown until the exact build replays P1–P4 on both forms, root present/absent, foreign rules/skills separately, each exclusion spelling, Curator link and regular-file snapshot, and workspace conflict; record loader observations separately from model-visible behavior; model-visible foreign removal, skills discovery, system-prompt discovery, refresh semantics, and state/cache internal layouts remain unverified; Linux and Windows native Muse login and refresh remain unqualified opencode skills come from the machine-current profile, split-brain by construction (§7.1)] NonCurrent:true ShellHookTrust:[] ShellHookTrustWarnings:[] S4Profile:s4-warn PassableEnvNames:[] Warnings:[mcp_package_allowlist_empty: the MCP package allowlist is empty; every declaration package in the closure is admitted] CodexSeedRule:{Revision:B Provenance:shipped} MCPDeclarations:[{Scope:machine Profile:native-skills Rows:[mcp-declaration figma-devmode 1.2.0 stdio command=npx args=["-y","figma-developer-mcp","--stdio"] env_names=["FIGMA_API_KEY"]]}] RequireCurrentProfile:<nil> RequireCurrentLocked:false RegistryPosture:[] RequireSourceSigners:false SourceSignerPosture:[{Profile:native-skills Kind:mcp Name:figma-devmode Source:github.com/example/mcp-figma State:unconfigured Signer:unknown Current:true} {Profile:native-skills Kind:skill Name:myskill Source:github.com/example/skill-my State:unconfigured Signer:unknown Current:true}] UpdateConfirmationRevision:B-flip UpdateConfirmationBehavior:a triggered update delta refuses profile_update_confirmation_required unless --confirm-system-delta is given SecurityPostureRows:[]} <nil>
+        --- FAIL: TestNativeSkillsRepair (1.29s)
+        FAIL
+        FAIL	github.com/relux-works/curator/internal/envprofile	1.649s
+        FAIL
+=== RUN   TestNativeSkillsNarrowingMutants/dangling-foreign-consent
+    native_skills_mutants_test.go:79: expected-red exit 1; killed by TestNativeSkillsTakeover/foreign:
+        === RUN   TestNativeSkillsTakeover
+        === RUN   TestNativeSkillsTakeover/foreign
+            native_skills_test.go:118: switch error = nil, want diagnostic environment_foreign_manager_detected
+        --- FAIL: TestNativeSkillsTakeover (1.13s)
+            --- FAIL: TestNativeSkillsTakeover/foreign (1.13s)
+        FAIL
+        FAIL	github.com/relux-works/curator/internal/envprofile	1.485s
+        FAIL
+=== RUN   TestNativeSkillsNarrowingMutants/plain-file-consent
+    native_skills_mutants_test.go:79: expected-red exit 1; killed by TestNativeSkillsTakeover/file:
+        === RUN   TestNativeSkillsTakeover
+        === RUN   TestNativeSkillsTakeover/file
+            native_skills_test.go:118: switch error = nil, want diagnostic environment_surface_unmanaged_conflict
+        --- FAIL: TestNativeSkillsTakeover (0.89s)
+            --- FAIL: TestNativeSkillsTakeover/file (0.89s)
+        FAIL
+        FAIL	github.com/relux-works/curator/internal/envprofile	1.251s
+        FAIL
+=== RUN   TestNativeSkillsNarrowingMutants/skills-parent-traversal
+    native_skills_mutants_test.go:79: expected-red exit 1; killed by TestNativeSkillsLinkedParent:
+        === RUN   TestNativeSkillsLinkedParent
+        === RUN   TestNativeSkillsLinkedParent/ordinary
+            native_skills_test.go:191: switch error = nil, want diagnostic environment_write_would_follow_link
+        === RUN   TestNativeSkillsLinkedParent/takeover
+            native_skills_test.go:191: switch error = nil, want diagnostic environment_write_would_follow_link
+        --- FAIL: TestNativeSkillsLinkedParent (2.51s)
+            --- FAIL: TestNativeSkillsLinkedParent/ordinary (1.43s)
+            --- FAIL: TestNativeSkillsLinkedParent/takeover (1.07s)
+        FAIL
+        FAIL	github.com/relux-works/curator/internal/envprofile	2.848s
+        FAIL
+=== RUN   TestNativeSkillsNarrowingMutants/unnamed-takeover-directory
+    native_skills_mutants_test.go:79: expected-red exit 1; killed by TestNativeSkillsConvergenceAndSwitch:
+        === RUN   TestNativeSkillsConvergenceAndSwitch
+            native_skills_test.go:364: unnamed skill changed
+        --- FAIL: TestNativeSkillsConvergenceAndSwitch (1.49s)
+        FAIL
+        FAIL	github.com/relux-works/curator/internal/envprofile	1.840s
+        FAIL
+=== RUN   TestNativeSkillsNarrowingMutants/one-ledger-name
+    native_skills_mutants_test.go:79: expected-red exit 1; killed by TestNativeSkillsLedger:
+        === RUN   TestNativeSkillsLedger
+            native_skills_test.go:219: ledger entry not reported: [{Adapter:claude_code Home:<temporary-fixture> OK:true Detail: Notice: Warnings:[]}]
+        --- FAIL: TestNativeSkillsLedger (1.35s)
+        FAIL
+        FAIL	github.com/relux-works/curator/internal/envprofile	1.871s
+        FAIL
+=== RUN   TestNativeSkillsNarrowingMutants/one-old-staging-name
+    native_skills_mutants_test.go:79: expected-red exit 1; killed by TestNativeSkillsConvergenceAndSwitch:
+        === RUN   TestNativeSkillsConvergenceAndSwitch
+            native_skills_test.go:355: old staging entry retained
+        --- FAIL: TestNativeSkillsConvergenceAndSwitch (1.08s)
+        FAIL
+        FAIL	github.com/relux-works/curator/internal/envprofile	1.592s
+        FAIL
+=== RUN   TestNativeSkillsNarrowingMutants/one-retired-name
+    native_skills_mutants_test.go:79: expected-red exit 1; killed by TestNativeSkillsConvergenceAndSwitch:
+        === RUN   TestNativeSkillsConvergenceAndSwitch
+            native_skills_test.go:361: retired recorded skill retained
+        --- FAIL: TestNativeSkillsConvergenceAndSwitch (1.80s)
+        FAIL
+        FAIL	github.com/relux-works/curator/internal/envprofile	2.134s
+        FAIL
+=== RUN   TestNativeSkillsNarrowingMutants/backup-directory-collision
+    native_skills_mutants_test.go:79: expected-red exit 1; killed by TestNativeSkillsBackupCollision:
+        === RUN   TestNativeSkillsBackupCollision
+            native_skills_test.go:437: switch error = nil, want diagnostic environment_backup_exists
+        --- FAIL: TestNativeSkillsBackupCollision (0.86s)
+        FAIL
+        FAIL	github.com/relux-works/curator/internal/envprofile	1.344s
+        FAIL
+=== RUN   TestNativeSkillsNarrowingMutants/directory-marker-is-absence
+    native_skills_mutants_test.go:79: expected-red exit 1; killed by TestNativeSkillsUnreadableMarker:
+        === RUN   TestNativeSkillsUnreadableMarker
+            native_skills_test.go:259: switch error = nil, want diagnostic environment_marker_unreadable
+        --- FAIL: TestNativeSkillsUnreadableMarker (1.19s)
+        FAIL
+        FAIL	github.com/relux-works/curator/internal/envprofile	1.570s
+        FAIL
+=== RUN   TestNativeSkillsNarrowingMutants/claude-takeover-without-repair
+    native_skills_mutants_test.go:79: expected-red exit 1; killed by TestNativeSkillsTakeoverFlagBoundary/env-resolve-claude_code:
+        === RUN   TestNativeSkillsTakeoverFlagBoundary
+        === RUN   TestNativeSkillsTakeoverFlagBoundary/env-resolve-claude_code
+            native_skills_test.go:123: takeover admitted or unrelated failure = 1: warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+                curator: profile_unknown: no profile is current
+        --- FAIL: TestNativeSkillsTakeoverFlagBoundary (0.01s)
+            --- FAIL: TestNativeSkillsTakeoverFlagBoundary/env-resolve-claude_code (0.01s)
+        FAIL
+        FAIL	github.com/relux-works/curator/cmd/curator	0.395s
+        FAIL
+--- PASS: TestNativeSkillsNarrowingMutants (48.04s)
+    --- PASS: TestNativeSkillsNarrowingMutants/pi-native-only (5.39s)
+    --- PASS: TestNativeSkillsNarrowingMutants/codex-link-drift (3.60s)
+    --- PASS: TestNativeSkillsNarrowingMutants/dangling-foreign-consent (3.50s)
+    --- PASS: TestNativeSkillsNarrowingMutants/plain-file-consent (2.98s)
+    --- PASS: TestNativeSkillsNarrowingMutants/skills-parent-traversal (5.16s)
+    --- PASS: TestNativeSkillsNarrowingMutants/unnamed-takeover-directory (3.92s)
+    --- PASS: TestNativeSkillsNarrowingMutants/one-ledger-name (4.01s)
+    --- PASS: TestNativeSkillsNarrowingMutants/one-old-staging-name (4.30s)
+    --- PASS: TestNativeSkillsNarrowingMutants/one-retired-name (4.46s)
+    --- PASS: TestNativeSkillsNarrowingMutants/backup-directory-collision (3.84s)
+    --- PASS: TestNativeSkillsNarrowingMutants/directory-marker-is-absence (4.03s)
+    --- PASS: TestNativeSkillsNarrowingMutants/claude-takeover-without-repair (2.86s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	48.260s
+
+===== help-probe.log =====
+=== RUN   TestReviewNativeTakeoverHelpBoundary
+    review_native_probe_test.go:13: [env resolve claude_code --takeover --help]: takeover without repair admitted: exit 0, want 2; 
+    review_native_probe_test.go:13: [env resolve claude_code --repair=false --takeover --help]: takeover without repair admitted: exit 0, want 2; 
+    review_native_probe_test.go:13: [env resolve claude_code --repair=0 --takeover --help]: takeover without repair admitted: exit 0, want 2; 
+--- FAIL: TestReviewNativeTakeoverHelpBoundary (0.02s)
+FAIL
+FAIL	github.com/relux-works/curator/cmd/curator	0.431s
+FAIL
+
+===== exclusions.log =====
+=== RUN   TestMuseDirectoriesAndIsolation
+--- PASS: TestMuseDirectoriesAndIsolation (0.68s)
+=== RUN   TestMusePublishedRegistryLayout
+    muse_test.go:477: CURATOR_CONFORMANCE_ROOT is not set
+--- SKIP: TestMusePublishedRegistryLayout (0.00s)
+=== RUN   TestOpencodeFormFallback
+--- PASS: TestOpencodeFormFallback (0.62s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	1.536s
+
+===== validation.log =====
+$ sh scripts/remote-gate.sh
+remote gate: attempt 1/3: pushing eecf6ae84dac3e03b70b0b031b947c0f550426b5 as gate/STORY-261018-k5yd2n/261018-175338-4196-1
+remote: 
+remote: Create a pull request for 'gate/STORY-261018-k5yd2n/261018-175338-4196-1' on GitHub by visiting:        
+remote:      https://github.com/relux-works/curator/pull/new/gate/STORY-261018-k5yd2n/261018-175338-4196-1        
+remote: 
+remote gate: run 39151661272 (https://github.com/relux-works/curator/actions/runs/39151661272)
+remote gate: run 39151661272 finished: success
+  Interop conformance gate: success  
+  Naming gate: success  
+  Test (windows-latest): success  
+  Gate self-test (ubuntu-latest): success  
+  Test (ubuntu-latest): success  
+  Test (macos-latest): success  
+  Go 1.25.5 driver (ubuntu-latest): success  
+  Go 1.25.5 driver (windows-latest): success  
+  Gate self-test (windows-latest): success  
+  Race (macos-latest): success  
+  Gate self-test (macos-latest): success  
+  Go 1.27.1 driver (windows-latest): success  
+  Go 1.25.5 driver (macos-latest): success  
+  Go 1.26.0 driver (windows-latest): success  
+  Go 1.27.1 driver (ubuntu-latest): success  
+  Go 1.27.1 driver (macos-latest): success  
+  Go 1.26.0 driver (macos-latest): success  
+  Race (ubuntu-latest): success  
+  Lint: success  
+  Go 1.26.0 driver (ubuntu-latest): success  
+  Test (rose-air): skipped  
+  Candidate suite (${{ matrix.os }}): skipped  
+[exit 0]
+coverage_unit=exact_command_shard required=1 green=1 failed=0 missing=0 test_case_coverage=unknown

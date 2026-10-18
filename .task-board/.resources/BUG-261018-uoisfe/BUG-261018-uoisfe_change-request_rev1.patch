@@ -1,0 +1,1382 @@
+diff --git a/cmd/curator/global_lock_publication_test.go b/cmd/curator/global_lock_publication_test.go
+index 75924926f943c9f921afeec34d922a407d40b7f0..b99f6d60763f724808dfdafbbf853fc97c42322c 100644
+--- a/cmd/curator/global_lock_publication_test.go
++++ b/cmd/curator/global_lock_publication_test.go
+@@ -96,7 +96,7 @@ func (fixture globalLockCLIFixture) requireSkillLockAndStore(t *testing.T) (*con
+ 
+ func (fixture globalLockCLIFixture) requireNativeSkill(t *testing.T) {
+ 	t.Helper()
+-	payload, err := os.ReadFile(filepath.Join(fixture.codex, ".agent-context", "skills", "new-skill", "SKILL.md"))
++	payload, err := os.ReadFile(filepath.Join(fixture.codex, "skills", "new-skill", "SKILL.md"))
+ 	if err != nil {
+ 		t.Fatalf("read materialized native skill: %v", err)
+ 	}
+@@ -110,6 +110,10 @@ func (fixture globalLockCLIFixture) requireNativeSkill(t *testing.T) {
+ 	if marker == nil || marker.Profile.Name != "default" || marker.Surfaces[envmarker.SurfaceSkills].Paths == nil {
+ 		t.Fatalf("native marker does not record the profile skill surface: %+v", marker)
+ 	}
++	paths := marker.Surfaces[envmarker.SurfaceSkills].Paths
++	if len(paths) != 1 || paths[0] != "skills/new-skill" {
++		t.Fatalf("native skill paths = %v", paths)
++	}
+ 	_, lockHash := fixture.lock(t)
+ 	if marker.Profile.LockSHA256 != strings.TrimPrefix(lockHash, "sha256:") {
+ 		t.Fatalf("native marker lock = %s, profile lock = %s", marker.Profile.LockSHA256, lockHash)
+@@ -125,6 +129,7 @@ func requireGlobalCommand(t *testing.T, fixture globalLockCLIFixture, want int,
+ 	return stdout, stderr
+ }
+ 
++// Global add publishes its exact lock before native and managed skill links become current.
+ func TestGlobalAddPublishesProfileLockBeforeNativeMaterialization(t *testing.T) {
+ 	fixture := newGlobalLockCLIFixture(t)
+ 	_, stderr := requireGlobalCommand(t, fixture, exitOK, "global", "add", "new-skill", "--git", fixture.gitURL, "--tag", "v1")
+@@ -136,11 +141,12 @@ func TestGlobalAddPublishesProfileLockBeforeNativeMaterialization(t *testing.T)
+ 	}
+ }
+ 
++// A native conflict retains the new lock and prior surfaces; consented sync preserves the preimage in backup.
+ func TestGlobalAddConflictRetainsLockAndProfileSyncTakeoverRecovers(t *testing.T) {
+ 	fixture := newGlobalLockCLIFixture(t)
+ 	requireGlobalCommand(t, fixture, exitOK, "profile", "sync")
+ 	_, beforeHash := fixture.lock(t)
+-	conflictDir := filepath.Join(fixture.codex, ".agent-context", "skills", "new-skill")
++	conflictDir := filepath.Join(fixture.codex, "skills", "new-skill")
+ 	conflictFile := filepath.Join(conflictDir, "SKILL.md")
+ 	writeFile(t, conflictFile, "operator-owned preimage\n")
+ 	manifestPath := filepath.Join(fixture.home, "global", "Skillfile.json")
+@@ -155,7 +161,7 @@ func TestGlobalAddConflictRetainsLockAndProfileSyncTakeoverRecovers(t *testing.T
+ 	}
+ 
+ 	_, stderr := requireGlobalCommand(t, fixture, exitFail, "global", "add", "new-skill", "--git", fixture.gitURL, "--tag", "v1")
+-	if !strings.Contains(stderr, envprofile.DiagUnmanagedConflict) || !strings.Contains(stderr, ".agent-context/skills/new-skill/SKILL.md") {
++	if !strings.Contains(stderr, envprofile.DiagUnmanagedConflict) || !strings.Contains(stderr, "skills/new-skill/SKILL.md") {
+ 		t.Fatalf("global add conflict stderr = %q", stderr)
+ 	}
+ 	_, afterHash := fixture.requireSkillLockAndStore(t)
+@@ -179,7 +185,7 @@ func TestGlobalAddConflictRetainsLockAndProfileSyncTakeoverRecovers(t *testing.T
+ 	}
+ 
+ 	requireGlobalCommand(t, fixture, exitOK, "profile", "sync", "--takeover")
+-	backup := filepath.Join(fixture.codex, ".agent-environment-backup", "1", ".agent-context", "skills", "new-skill", "SKILL.md")
++	backup := filepath.Join(fixture.codex, ".agent-environment-backup", "1", "skills", "new-skill", "SKILL.md")
+ 	backupBytes, err := os.ReadFile(backup)
+ 	if err != nil || string(backupBytes) != "operator-owned preimage\n" {
+ 		t.Fatalf("takeover backup = %q, %v", backupBytes, err)
+@@ -189,6 +195,7 @@ func TestGlobalAddConflictRetainsLockAndProfileSyncTakeoverRecovers(t *testing.T
+ 	fixture.requireNativeSkill(t)
+ }
+ 
++// Global install publishes its migrated lock before native skill materialization.
+ func TestGlobalInstallPublishesMigratedLockBeforeNativeMaterialization(t *testing.T) {
+ 	fixture := newGlobalLockCLIFixture(t)
+ 	fixture.writeLegacyGlobalDeclaration(t)
+@@ -197,10 +204,11 @@ func TestGlobalInstallPublishesMigratedLockBeforeNativeMaterialization(t *testin
+ 	fixture.requireNativeSkill(t)
+ }
+ 
++// A migrated native conflict preserves its declaration and preimage until consented recovery.
+ func TestGlobalInstallConflictRetainsMigratedLockAndTakeoverRecovers(t *testing.T) {
+ 	fixture := newGlobalLockCLIFixture(t)
+ 	fixture.writeLegacyGlobalDeclaration(t)
+-	conflictDir := filepath.Join(fixture.codex, ".agent-context", "skills", "new-skill")
++	conflictDir := filepath.Join(fixture.codex, "skills", "new-skill")
+ 	conflictFile := filepath.Join(conflictDir, "SKILL.md")
+ 	writeFile(t, conflictFile, "operator-owned preimage\n")
+ 	manifestPath := filepath.Join(fixture.home, "global", "Skillfile.json")
+@@ -209,7 +217,7 @@ func TestGlobalInstallConflictRetainsMigratedLockAndTakeoverRecovers(t *testing.
+ 		t.Fatal(err)
+ 	}
+ 	_, stderr := requireGlobalCommand(t, fixture, exitFail, "global", "install")
+-	if !strings.Contains(stderr, envprofile.DiagUnmanagedConflict) || !strings.Contains(stderr, ".agent-context/skills/new-skill/SKILL.md") {
++	if !strings.Contains(stderr, envprofile.DiagUnmanagedConflict) || !strings.Contains(stderr, "skills/new-skill/SKILL.md") {
+ 		t.Fatalf("global install conflict stderr = %q", stderr)
+ 	}
+ 	fixture.requireSkillLockAndStore(t)
+@@ -223,7 +231,7 @@ func TestGlobalInstallConflictRetainsMigratedLockAndTakeoverRecovers(t *testing.
+ 	}
+ 
+ 	requireGlobalCommand(t, fixture, exitOK, "profile", "sync", "--takeover")
+-	backup := filepath.Join(fixture.codex, ".agent-environment-backup", "1", ".agent-context", "skills", "new-skill", "SKILL.md")
++	backup := filepath.Join(fixture.codex, ".agent-environment-backup", "1", "skills", "new-skill", "SKILL.md")
+ 	backupBytes, err := os.ReadFile(backup)
+ 	if err != nil || string(backupBytes) != "operator-owned preimage\n" {
+ 		t.Fatalf("takeover backup = %q, %v", backupBytes, err)
+diff --git a/cmd/curator/native_skills_test.go b/cmd/curator/native_skills_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..727a4da22c5e14dfd74961a4ff61ee1d4f33b214
+--- /dev/null
++++ b/cmd/curator/native_skills_test.go
+@@ -0,0 +1,127 @@
++package main
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/envmarker"
++)
++
++// All five CLI operations carry takeover to native skills, preserve unnamed entries, and back up exact foreign link text.
++func TestNativeSkillsCLIOperations(t *testing.T) {
++	for _, op := range []string{"install", "use", "sync", "update", "repair"} {
++		t.Run(op, func(t *testing.T) {
++			source, _ := profileHome(t)
++			pinOperatorHome(t)
++			writeNativeCredentials(t)
++			repo := t.TempDir()
++			if err := os.WriteFile(filepath.Join(repo, "SKILL.md"), []byte("# myskill\n"), 0644); err != nil {
++				t.Fatal(err)
++			}
++			profileInstallGit(t, repo, "init", "--quiet")
++			profileInstallGit(t, repo, "add", ".")
++			profileInstallGit(t, repo, "commit", "--quiet", "-m", "fixture")
++			profileInstallGit(t, repo, "tag", "v1.0.0")
++			gitconfig := filepath.Join(t.TempDir(), "gitconfig")
++			if err := os.WriteFile(gitconfig, []byte("[url \""+gitFileURL(repo)+"\"]\n\tinsteadOf = https://example.com/native-skill\n"), 0644); err != nil {
++				t.Fatal(err)
++			}
++			t.Setenv("GIT_CONFIG_GLOBAL", gitconfig)
++			t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
++			pkg := t.TempDir()
++			writeContextPackage(t, pkg, "native-profile", "1.0.0", "native\n")
++			manifest := `{"schema_version":1,"name":"native-profile","version":"1.0.0","context":{"modules":[{"path":"a.md"}]},"requires":{"skills":{"myskill":{"git":"https://example.com/native-skill","tag":"v1.0.0"}}}}`
++			if err := os.WriteFile(filepath.Join(pkg, "agent-context.json"), []byte(manifest), 0644); err != nil {
++				t.Fatal(err)
++			}
++			if op != "install" {
++				if code, _, stderr := runProfile(t, source, "profile", "install", pkg, "--use"); code != exitOK {
++					t.Fatal(stderr)
++				}
++			}
++			native := t.TempDir()
++			t.Setenv("CLAUDE_CONFIG_DIR", native)
++			if err := os.Mkdir(filepath.Join(native, "skills"), 0755); err != nil {
++				t.Fatal(err)
++			}
++			target := filepath.Join(native, "skills", "myskill")
++			if err := os.Symlink("../../retired/missing", target); err != nil {
++				t.Fatal(err)
++			}
++			originalLink, err := os.Readlink(target)
++			if err != nil {
++				t.Fatal(err)
++			}
++			unnamed := filepath.Join(native, "skills", "unnamed")
++			if err := os.WriteFile(unnamed, []byte("untouched\n"), 0644); err != nil {
++				t.Fatal(err)
++			}
++			var args []string
++			switch op {
++			case "install":
++				args = []string{"profile", "install", pkg, "--use"}
++			case "use":
++				args = []string{"profile", "use", "native-profile"}
++			case "sync":
++				args = []string{"profile", "sync"}
++			case "update":
++				if err := os.WriteFile(filepath.Join(pkg, "context", "a.md"), []byte("updated\n"), 0644); err != nil {
++					t.Fatal(err)
++				}
++				args = []string{"profile", "update", "native-profile"}
++			case "repair":
++				args = []string{"env", "resolve", "claude_code", "--profile", "native-profile", "--repair"}
++			}
++			// Retry with consent is the nearby positive control for the same target.
++			if code, _, stderr := runProfile(t, source, args...); code != exitFail || !strings.Contains(stderr, "environment_foreign_manager_detected") {
++				t.Fatalf("without takeover = %d: %s", code, stderr)
++			}
++			if got, err := os.Readlink(target); err != nil || got != originalLink {
++				t.Fatal("refusal replaced link")
++			}
++			if _, err := os.Lstat(filepath.Join(native, ".agent-environment-backup")); !os.IsNotExist(err) {
++				t.Fatal("refusal created backup")
++			}
++			if code, _, stderr := runProfile(t, source, append(args, "--takeover")...); code != exitOK {
++				t.Fatalf("takeover = %d: %s", code, stderr)
++			}
++			if link, err := os.Readlink(target); err != nil || !filepath.IsAbs(link) {
++				t.Fatalf("native link missing: %q %v", link, err)
++			}
++			marker, err := envmarker.Read(native)
++			if err != nil || marker == nil {
++				t.Fatalf("native marker: %v", err)
++			}
++			paths := marker.Surfaces[envmarker.SurfaceSkills].Paths
++			if len(paths) != 1 || paths[0] != "skills/myskill" {
++				t.Fatalf("native record = %v", paths)
++			}
++			if link, err := os.Readlink(filepath.Join(native, ".agent-environment-backup", "1", "skills", "myskill")); err != nil || link != originalLink {
++				t.Fatalf("backup link = %q %v", link, err)
++			}
++			if got, err := os.ReadFile(unnamed); err != nil || string(got) != "untouched\n" {
++				t.Fatal("unnamed entry changed")
++			}
++		})
++	}
++}
++
++// Non-mutating and unrelated CLI rows refuse takeover; resolve additionally requires repair and forbids dry-run takeover.
++func TestNativeSkillsTakeoverFlagBoundary(t *testing.T) {
++	for _, args := range [][]string{
++		{"profile", "list"}, {"profile", "remove", "default"}, {"profile", "import"},
++		{"env", "status"}, {"env", "resolve", "claude_code"}, {"env", "resolve", "claude_code", "--repair", "--dry-run"},
++		{"env", "unmanage", "claude_code"}, {"status"},
++	} {
++		t.Run(strings.Join(args, "-"), func(t *testing.T) {
++			source, _ := profileHome(t)
++			pinOperatorHome(t)
++			code, _, stderr := runProfile(t, source, append(args, "--takeover")...)
++			if code != exitUsage || (!strings.Contains(stderr, "takeover") && !strings.Contains(stderr, "profile list takes no arguments")) {
++				t.Fatalf("takeover admitted or unrelated failure = %d: %s", code, stderr)
++			}
++		})
++	}
++}
+diff --git a/docs/native-profile-skills.md b/docs/native-profile-skills.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..e689fc5d93e58c69bcbfbc8b56cf92eab95ab883
+--- /dev/null
++++ b/docs/native-profile-skills.md
+@@ -0,0 +1,28 @@
++# Native profile skills
++
++For the effective current profile of each scope, `profile install --use`,
++`profile use`, `profile sync`, `profile update`, and `env resolve --repair`
++materialize Claude Code, Codex CLI, and pi skills at `<native home>/skills/<name>`.
++The links point to immutable profile store entries and the environment marker
++records their paths. Status reports native skill drift alongside the scope;
++repair restores the current profile's native entries. Repair of an explicit
++non-current profile only affects its managed home. A dry-run never writes.
++
++Unrecorded foreign links require `--takeover`; unrecorded files, directories,
++and links into the store also require consent. Takeover backs up each entry
++before replacement, preserving a symlink's original link text. A symlinked
++parent below the native home always refuses traversal. Names outside the
++profile remain untouched. Previously recorded `.agent-context/skills` entries
++are removed during the next materialization.
++
++An entry named by the native adapter ledger remains owned by the legacy global
++scope. Profile switching leaves it in place, excludes it from environment
++ownership, and reports it as non-current. A failed ownership-state read refuses
++writes. Muse, opencode, and managed-home discovery paths retain their existing
++behavior. Muse multi-root ownership, opencode's machine-global surface, and
++adapter-ledger precedence require separate specification clarification.
++
++Tests run only against temporary homes. Run the behavioral and mutation controls
++with `go test ./internal/envprofile ./cmd/curator -run '^TestNativeSkills' -count=1`.
++Build with `go build -o .temp/curator ./cmd/curator`. Gate commands and evidence
++locations are documented in [ci-gates.md](ci-gates.md).
+diff --git a/internal/envprofile/envprofile.go b/internal/envprofile/envprofile.go
+index d085cde8ad7f9b38e6016db4c86ae03d57333067..ed97bbb4dc18213a3a5e80032c7df6efbe966115 100644
+--- a/internal/envprofile/envprofile.go
++++ b/internal/envprofile/envprofile.go
+@@ -476,6 +476,9 @@ type Policy struct {
+ 	// the operation fails rather than overwrite. It is operation-scoped
+ 	// and never set from machine configuration.
+ 	Takeover bool
++	// backupReadDirectory injects a stale backup listing for collision tests.
++	// Production leaves it nil and reads the actual directory.
++	backupReadDirectory func(string) (stateread.Directory, error)
+ }
+ 
+ // checkHardenedProfileMutation enforces the hardened install/update
+@@ -1314,6 +1317,9 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
+ 		// the rows still print exactly once.
+ 		surfacing = carrySurfacing(sink, surfacing)
+ 		writeUpdateWarnings(warningSink, name, warnings)
++		if err := syncCurrentNativeSkills(home, name, policy); err != nil {
++			return Info{}, false, err
++		}
+ 		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, false, nil
+ 	}
+ 	warnings := resolutionWarnings(result)
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index a34c9b421ee2c75db4c4b55c634a988a94892a70..d4112bfe4b4f9eb159b78265ed9cbc94e82be6bf 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -2564,6 +2564,18 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
+ 	if req.Repair && !req.DryRun && repairWouldChangeLockHash(lock) {
+ 		return repairUnderLock(&req, adapter, source)
+ 	}
++	if req.Repair {
++		row, err := nativeSkillsState(req.Home, profile, adapter.ID, req.NativeHomeOf)
++		if err != nil {
++			return nil, err
++		}
++		if row != nil && row.State != "current" {
++			if req.DryRun {
++				return &ResolveResult{StaleReasons: []string{row.Detail}}, fmt.Errorf("%s: %s", DiagHomeStale, row.Detail)
++			}
++			return repairUnderLock(&req, adapter, source)
++		}
++	}
+ 	verdict := verify(&req, adapter, source, lock, hash)
+ 	if verdict.markerReadFailed {
+ 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
+@@ -2660,6 +2672,15 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 			return nil, err
+ 		}
+ 	}
++	row, err := nativeSkillsState(req.Home, req.Profile, adapter.ID, req.NativeHomeOf)
++	if err != nil {
++		return nil, err
++	}
++	if row != nil && row.State != "current" {
++		if err := preflightInPlaceScope(req.Home, req.Profile, adapter.ID, req.Policy, req.NativeHomeOf); err != nil {
++			return nil, err
++		}
++	}
+ 	verdict := verifyHome(req, adapter, source, lock, hash)
+ 	if verdict.markerReadFailed {
+ 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
+@@ -2668,6 +2689,9 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))
+ 	}
+ 	if verdict.current {
++		if err := repairNativeSkills(req); err != nil {
++			return nil, err
++		}
+ 		fragment, err := buildFragment(req, adapter, verdict)
+ 		if err != nil {
+ 			return nil, err
+@@ -2808,6 +2832,9 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
+ 	if !after.current {
+ 		return nil, fmt.Errorf("%s: %s", DiagRepairFailed, strings.Join(after.reasons, "; "))
+ 	}
++	if err := repairNativeSkills(req); err != nil {
++		return nil, err
++	}
+ 	fragment, err := buildFragment(req, adapter, after)
+ 	if err != nil {
+ 		return nil, err
+diff --git a/internal/envprofile/native_skills.go b/internal/envprofile/native_skills.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..ba80238c069104d6d737c5db9592f38fd4f6ac22
+--- /dev/null
++++ b/internal/envprofile/native_skills.go
+@@ -0,0 +1,220 @@
++package envprofile
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++	"sort"
++	"strings"
++
++	"github.com/relux-works/curator/internal/contextmaterialize"
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++// inPlaceSkillsDir preserves opencode staging; only the single-home native
++// adapters participate in the native skills ownership contract.
++func inPlaceSkillsDir(id string) string {
++	switch id {
++	case envregistry.ClaudeCode, envregistry.CodexCLI, envregistry.Pi:
++		adapter, _ := envregistry.ByID(id)
++		return adapter.SkillsDir
++	default:
++		return profileSkillsSurfaceDir
++	}
++}
++
++// inPlaceSkillsLedger checks the parent before reading ownership state. A
++// failed ledger read is never evidence that an entry is unowned.
++func inPlaceSkillsLedger(native string, adapter Adapter, skills []skillOf, recorded map[string]bool) (map[string]bool, error) {
++	needed := len(skills) > 0
++	for path := range recorded {
++		if strings.HasPrefix(path, inPlaceSkillsDir(adapter.ID)+"/") {
++			needed = true
++		}
++	}
++	if !needed {
++		return map[string]bool{}, nil
++	}
++	if inPlaceSkillsDir(adapter.ID) == profileSkillsSurfaceDir {
++		return map[string]bool{}, nil
++	}
++	path, err := managedPath(native, filepath.ToSlash(filepath.Join(inPlaceSkillsDir(adapter.ID), ".csk-managed.json")), false)
++	if err != nil {
++		return nil, err
++	}
++	return readSkillsLedger(filepath.Dir(path))
++}
++
++func ledgerSkillPath(adapter Adapter, path string, ledger map[string]bool) bool {
++	dir := inPlaceSkillsDir(adapter.ID)
++	return dir != profileSkillsSurfaceDir && ledger[strings.TrimPrefix(path, dir+"/")] && strings.HasPrefix(path, dir+"/")
++}
++
++func inPlaceLinkInStore(full, target, store string) bool {
++	if !filepath.IsAbs(target) {
++		target = filepath.Join(filepath.Dir(full), target)
++	}
++	return sameStoreTree(target, store)
++}
++
++// nativeSkillsState is read-only and checks only the effective current
++// profile. It never inventories or adopts names outside the profile.
++func nativeSkillsState(home, profile, id string, nativeHomeOf func(string) (string, error)) (*SurfaceState, error) {
++	if inPlaceSkillsDir(id) == profileSkillsSurfaceDir {
++		return nil, nil
++	}
++	scoped, err := ScopedCurrents(home)
++	if err != nil {
++		return nil, err
++	}
++	current := scoped["env:"+id]
++	if current == "" {
++		current, err = Current(home)
++		if err != nil {
++			return nil, err
++		}
++	}
++	if current != profile {
++		return nil, nil
++	}
++	lock, hash, err := readLock(home, profile)
++	if err != nil {
++		return nil, err
++	}
++	skills, err := skillsOf(home, newGitManager(home), lock)
++	if err != nil {
++		return nil, err
++	}
++	adapter, _ := adapterByID(id)
++	native, err := resolveNativeHome(adapter, nativeHomeOf)
++	if err != nil {
++		return nil, err
++	}
++	root, err := stateread.Stat(native)
++	if err != nil {
++		return nil, err
++	}
++	row := &SurfaceState{Key: envmarker.SurfaceSkills, State: "current", Detail: "current", Paths: []string{}}
++	if root.Kind == stateread.KindAbsent {
++		if len(skills) == 0 {
++			return nil, nil
++		}
++		row.State = DiagSurfaceMissing
++		row.Detail = "native skills home missing"
++		return row, nil
++	}
++	if err := checkManagedPrivateTarget(native, envmarker.Name); err != nil {
++		return nil, err
++	}
++	marker, err := envmarker.Read(native)
++	if err != nil {
++		return nil, err
++	}
++	ledger, err := inPlaceSkillsLedger(native, adapter, skills, map[string]bool{})
++	if err != nil {
++		return nil, err
++	}
++	expected := map[string][]byte{}
++	var reasons []string
++	for _, skill := range skills {
++		path := filepath.ToSlash(filepath.Join(inPlaceSkillsDir(id), skill.name))
++		row.Paths = append(row.Paths, path)
++		if ledger[skill.name] {
++			reasons = append(reasons, path+" belongs to legacy global scope (adapter ledger); left in place")
++			continue
++		}
++		expected[path] = []byte(skill.hash)
++		if marker == nil {
++			reasons = append(reasons, path+" is not recorded")
++			continue
++		}
++		full, err := managedPath(native, path, false)
++		if err != nil {
++			return nil, err
++		}
++		link, err := stateread.Readlink(full)
++		if err != nil || link.Kind != stateread.KindPresent || link.Target != skill.root {
++			// Retain the existing recorded symlink-unavailable fallback contract.
++			fallback := false
++			surface := marker.Surfaces[envmarker.SurfaceSkills]
++			if surface.Copies != nil {
++				for _, copy := range *surface.Copies {
++					if copy.Path == path && copy.Reason == envmarker.ReasonSymlinkFallback {
++						fallback = true
++					}
++				}
++			}
++			info, statErr := os.Lstat(full)
++			if fallback && statErr == nil && info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
++				digest, err := hashing.ContentSHA256WithVersion(full, map[string]bool{}, lock.ContentHashVersion())
++				if err == nil && digest == skill.hash {
++					continue
++				}
++			}
++			reasons = append(reasons, path+" native skill link drifted or missing")
++		}
++	}
++	if marker != nil {
++		surface, ok := marker.Surfaces[envmarker.SurfaceSkills]
++		if len(expected) > 0 {
++			digest, _ := contextmaterialize.SurfaceHashWithVersion(expected, lock.ContentHashVersion())
++			if !ok || digest != surface.ContentSHA256 || marker.Profile.Name != profile || marker.Profile.LockSHA256 != strings.TrimPrefix(hash, "sha256:") {
++				reasons = append(reasons, "native skills record differs from current profile")
++			}
++		}
++		paths := make([]string, 0, len(expected))
++		for path := range expected {
++			paths = append(paths, path)
++		}
++		sort.Strings(paths)
++		if strings.Join(paths, "\n") != strings.Join(surface.Paths, "\n") {
++			reasons = append(reasons, "native skills paths differ from current profile (old staging must converge)")
++		}
++	}
++	if len(skills) == 0 && marker == nil {
++		return nil, nil
++	}
++	if len(reasons) > 0 {
++		row.State = DiagSurfaceDrift
++		row.Detail = strings.Join(reasons, "; ")
++	}
++	return row, nil
++}
++
++func repairNativeSkills(req *ResolveRequest) error {
++	row, err := nativeSkillsState(req.Home, req.Profile, req.EnvID, req.NativeHomeOf)
++	if err != nil {
++		return err
++	}
++	if row == nil || row.State == "current" {
++		return nil
++	}
++	results, err := materializeScopeWithNativeHome(req.Home, req.Profile, req.EnvID, req.Policy, req.NativeHomeOf)
++	if err != nil {
++		return err
++	}
++	for _, result := range results {
++		if !result.OK {
++			return fmt.Errorf("%s", result.Detail)
++		}
++	}
++	return nil
++}
++
++// An unchanged lock does not imply current native discovery surfaces. Update
++// repairs participating effective-current homes without re-resolving path bytes.
++func syncCurrentNativeSkills(home, profile string, policy Policy) error {
++	for _, adapter := range Adapters {
++		if inPlaceSkillsDir(adapter.ID) == profileSkillsSurfaceDir {
++			continue
++		}
++		req := &ResolveRequest{Home: home, Profile: profile, EnvID: adapter.ID, Policy: policy}
++		if err := repairNativeSkills(req); err != nil {
++			return err
++		}
++	}
++	return nil
++}
+diff --git a/internal/envprofile/native_skills_mutants_test.go b/internal/envprofile/native_skills_mutants_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..899fb17228b4bd07dfa454a242339d443125bc8b
+--- /dev/null
++++ b/internal/envprofile/native_skills_mutants_test.go
+@@ -0,0 +1,82 @@
++package envprofile
++
++import (
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// Each plant narrows one behavior to a named exception while retaining the
++// neighboring gates. A kill requires exit 1 and the named behavioral failure;
++// compilation, setup errors, and missing tests are harness failures.
++func TestNativeSkillsNarrowingMutants(t *testing.T) {
++	root, err := filepath.Abs("../..")
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, m := range []struct{ name, file, before, after, pkg, run, fails, message string }{
++		{"pi-native-only", "native_skills.go", "return adapter.SkillsDir", "if id == envregistry.Pi { return profileSkillsSurfaceDir }; return adapter.SkillsDir", "envprofile", "TestNativeSkillsUseAndSync", "TestNativeSkillsUseAndSync", "native skill link missing"},
++		{"codex-link-drift", "native_skills.go", "link.Target != skill.root", "(link.Target != skill.root && id != envregistry.CodexCLI)", "envprofile", "TestNativeSkillsRepair", "TestNativeSkillsRepair", "drift status"},
++		{"dangling-foreign-consent", "switch.go", "if !takeover {\n\t\t\t\t\tresult.OK", "if !takeover && !strings.HasPrefix(filepath.ToSlash(link.Target), \"../../retired/\") {\n\t\t\t\t\tresult.OK", "envprofile", "TestNativeSkillsTakeover/foreign", "TestNativeSkillsTakeover/foreign", "environment_foreign_manager_detected"},
++		{"plain-file-consent", "switch.go", "if !takeover {\n\t\t\tresult.OK", "if !takeover && !info.Mode().IsRegular() {\n\t\t\tresult.OK", "envprofile", "TestNativeSkillsTakeover/file", "TestNativeSkillsTakeover/file", "environment_surface_unmanaged_conflict"},
++		{"skills-parent-traversal", "nofollow.go", "if info.Mode()&os.ModeSymlink != 0 {", "if info.Mode()&os.ModeSymlink != 0 { if component == \"skills\" { continue };", "envprofile", "TestNativeSkillsLinkedParent", "TestNativeSkillsLinkedParent", "environment_write_would_follow_link"},
++		{"unnamed-takeover-directory", "switch.go", "// Remove recorded files the new profile no longer wants.", "if takeover { if info, err := os.Lstat(filepath.Join(native, \"skills\", \"unnamed\")); err == nil && info.IsDir() { recorded[\"skills/unnamed\"] = true } }\n// Remove recorded files the new profile no longer wants.", "envprofile", "TestNativeSkillsConvergenceAndSwitch", "TestNativeSkillsConvergenceAndSwitch", "unnamed skill changed"},
++		{"one-ledger-name", "native_skills.go", "return dir != profileSkillsSurfaceDir && ledger[", "return path != \"skills/myskill\" && dir != profileSkillsSurfaceDir && ledger[", "envprofile", "TestNativeSkillsLedger", "TestNativeSkillsLedger", "ledger entry not reported"},
++		{"one-old-staging-name", "switch.go", "if !want[path] {", "if !want[path] && path != \".agent-context/skills/myskill\" {", "envprofile", "TestNativeSkillsConvergenceAndSwitch", "TestNativeSkillsConvergenceAndSwitch", "old staging entry retained"},
++		{"one-retired-name", "switch.go", "if !want[path] {", "if !want[path] && path != \"skills/myskill\" {", "envprofile", "TestNativeSkillsConvergenceAndSwitch", "TestNativeSkillsConvergenceAndSwitch", "retired recorded skill retained"},
++		{"backup-directory-collision", "switch.go", "} else if generationState.Kind == stateread.KindPresent {", "} else if generationState.Kind == stateread.KindPresent && !generationState.Info.IsDir() {", "envprofile", "TestNativeSkillsBackupCollision", "TestNativeSkillsBackupCollision", "environment_backup_exists"},
++		{"directory-marker-is-absence", "switch.go", "prior, err := envmarker.Read(native)\n\tif err != nil {\n\t\treturn EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}\n\t}", "prior, err := envmarker.Read(native)\n\tif err != nil {\n if info, e := os.Lstat(filepath.Join(native,envmarker.Name)); e != nil || !info.IsDir() { return EntryResult{Adapter:adapter.ID,Home:native,Detail:err.Error()} }\n }", "envprofile", "TestNativeSkillsUnreadableMarker", "TestNativeSkillsUnreadableMarker", "environment_marker_unreadable"},
++		{"claude-takeover-without-repair", "../../cmd/curator/env.go", "if *takeover && !*repair {", "if *takeover && !*repair && positional[0] != \"claude_code\" {", "curator", "TestNativeSkillsTakeoverFlagBoundary/env-resolve-claude_code", "TestNativeSkillsTakeoverFlagBoundary/env-resolve-claude_code", "takeover admitted or unrelated failure"},
++	} {
++		t.Run(m.name, func(t *testing.T) {
++			original := filepath.Join(root, "internal", "envprofile", m.file)
++			if m.pkg == "curator" {
++				original = filepath.Join(root, "cmd", "curator", "env.go")
++			}
++			payload, err := os.ReadFile(original)
++			if err != nil {
++				t.Fatal(err)
++			}
++			source := strings.ReplaceAll(string(payload), "\r\n", "\n")
++			// nofollow has the same guard in both walkers; weaken only managedPath.
++			count := strings.Count(source, m.before)
++			if count != 1 && (m.name != "skills-parent-traversal" || count != 4) {
++				t.Fatalf("mutation anchor count = %d", count)
++			}
++			dir := t.TempDir()
++			replacement := filepath.Join(dir, "replacement.go")
++			if err := os.WriteFile(replacement, []byte(strings.Replace(source, m.before, m.after, 1)), 0600); err != nil {
++				t.Fatal(err)
++			}
++			overlay, err := json.Marshal(map[string]any{"Replace": map[string]string{original: replacement}})
++			if err != nil {
++				t.Fatal(err)
++			}
++			overlayPath := filepath.Join(dir, "overlay.json")
++			if err := os.WriteFile(overlayPath, overlay, 0600); err != nil {
++				t.Fatal(err)
++			}
++			pkg := "./internal/envprofile"
++			if m.pkg == "curator" {
++				pkg = "./cmd/curator"
++			}
++			run := "^" + strings.ReplaceAll(m.run, "/", "$/^") + "$"
++			cmd := exec.Command("go", "test", "-overlay", overlayPath, "-count=1", "-timeout=2m", "-v", "-run", run, pkg)
++			cmd.Dir = root
++			if m.pkg == "curator" {
++				// These flag-only cases do not fingerprint GOROOT. Use the CLI's
++				// existing helper lane so a full CLI package run cannot block them.
++				cmd.Env = append(os.Environ(), "CURATOR_TEST_CLI_HELPER=1")
++			}
++			output, err := cmd.CombinedOutput()
++			exit, ok := err.(*exec.ExitError)
++			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "--- FAIL: "+m.fails+" ") || !strings.Contains(string(output), m.message) {
++				t.Fatalf("mutant survived or lacked intended behavioral failure: %v\n%s", err, output)
++			}
++			t.Logf("expected-red exit %d; killed by %s:\n%s", exit.ExitCode(), m.fails, output)
++		})
++	}
++}
+diff --git a/internal/envprofile/native_skills_test.go b/internal/envprofile/native_skills_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef42df86f1d188f711868f0e2cd2a417d1b71cee
+--- /dev/null
++++ b/internal/envprofile/native_skills_test.go
+@@ -0,0 +1,514 @@
++package envprofile
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/stateread"
++)
++
++func nativeSkillsFixture(t *testing.T) (*managedFixture, map[string]string) {
++	t.Helper()
++	pinOperatorHome(t, t.TempDir())
++	fx := writeManagedFixture(t, "native-skills")
++	homes := pinHomes(t)
++	for _, dir := range homes {
++		if err := os.MkdirAll(dir, 0755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	homes["opencode-native"] = homes["opencode"]
++	fx.native = homes
++	if err := EnsureDefaultWithPolicy(fx.home, Policy{}); err != nil {
++		t.Fatal(err)
++	}
++	seedLiveNativeCredentials(t, fx)
++	return fx, homes
++}
++
++func requireNativeSkill(t *testing.T, home, native string) {
++	t.Helper()
++	target := filepath.Join(native, "skills", "myskill")
++	link, err := os.Readlink(target)
++	if err != nil || !sameStoreTree(link, filepath.Join(home, "contexts")) {
++		t.Fatalf("native skill link missing or outside store: %q %v", link, err)
++	}
++	marker := homeMarker(t, native)
++	paths := marker.Surfaces[envmarker.SurfaceSkills].Paths
++	if len(paths) != 1 || paths[0] != "skills/myskill" {
++		t.Fatalf("native skill record = %v", paths)
++	}
++}
++
++// Use and sync create and record native links for all three in-place adapters; opencode retains staging.
++func TestNativeSkillsUseAndSync(t *testing.T) {
++	fx, homes := nativeSkillsFixture(t)
++	for _, op := range []string{"use", "sync"} {
++		var err error
++		if op == "use" {
++			_, err = UseWithPolicy(fx.home, fx.profile, "", "", false, Policy{})
++		} else {
++			_, err = SyncWithPolicy(fx.home, Policy{})
++		}
++		if err != nil {
++			t.Fatal(err)
++		}
++		for _, id := range []string{envregistry.ClaudeCode, envregistry.CodexCLI, envregistry.Pi} {
++			requireNativeSkill(t, fx.home, homes[id])
++		}
++	}
++	if _, err := os.Readlink(filepath.Join(homes["opencode"], ".agent-context", "skills", "myskill")); err != nil {
++		t.Fatal(err)
++	}
++}
++
++// Foreign links require takeover and preserve exact relative link text in backup; all unrecorded plain/store entries require consent too.
++func TestNativeSkillsTakeover(t *testing.T) {
++	for _, kind := range []string{"foreign", "directory", "file", "store", "relative-store"} {
++		t.Run(kind, func(t *testing.T) {
++			fx, homes := nativeSkillsFixture(t)
++			native := homes["claude_code"]
++			target := filepath.Join(native, "skills", "myskill")
++			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
++				t.Fatal(err)
++			}
++			link := "../../retired/missing"
++			if kind == "store" {
++				link = filepath.Join(fx.home, "contexts", "missing")
++			}
++			if kind == "relative-store" {
++				var err error
++				link, err = filepath.Rel(filepath.Dir(target), filepath.Join(fx.home, "contexts", "missing"))
++				if err != nil {
++					t.Fatal(err)
++				}
++			}
++			switch kind {
++			case "directory":
++				if err := os.Mkdir(target, 0755); err != nil {
++					t.Fatal(err)
++				}
++				writeGitFile(t, target, "keep", "original")
++			case "file":
++				if err := os.WriteFile(target, []byte("original"), 0644); err != nil {
++					t.Fatal(err)
++				}
++			default:
++				if err := os.Symlink(link, target); err != nil {
++					t.Fatal(err)
++				}
++				// Windows normalizes separators when creating a link. Preserve
++				// the actual original entry text, without normalizing the backup.
++				original, err := os.Readlink(target)
++				if err != nil {
++					t.Fatal(err)
++				}
++				link = original
++			}
++			before := nativeSnapshot(t, native)
++			results, err := UseWithPolicy(fx.home, fx.profile, "claude_code", "", false, Policy{})
++			diagnostic := DiagUnmanagedConflict
++			if kind == "foreign" {
++				diagnostic = DiagForeignManager
++			}
++			assertSwitchDiagnostic(t, err, results, &diagnostic)
++			if after := nativeSnapshot(t, native); after != before {
++				t.Fatal("refusal wrote native home or backup")
++			}
++			if _, err := UseWithPolicy(fx.home, fx.profile, "claude_code", "", false, Policy{Takeover: true}); err != nil {
++				t.Fatal(err)
++			}
++			backup := filepath.Join(native, ".agent-environment-backup", "1", "skills", "myskill")
++			if kind == "directory" {
++				if got := homeBytes(t, backup, "keep"); got != "original" {
++					t.Fatal(got)
++				}
++			} else if kind == "file" {
++				if got := homeBytes(t, filepath.Dir(backup), "myskill"); got != "original" {
++					t.Fatal(got)
++				}
++			} else if got, err := os.Readlink(backup); err != nil || got != link {
++				t.Fatalf("backup link text = %q %v; want %q", got, err, link)
++			}
++			requireNativeSkill(t, fx.home, native)
++		})
++	}
++}
++
++func nativeSnapshot(t *testing.T, root string) string {
++	t.Helper()
++	var out strings.Builder
++	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
++		if err != nil {
++			if os.IsNotExist(err) && path == root {
++				return nil
++			}
++			return err
++		}
++		rel, err := filepath.Rel(root, path)
++		if err != nil {
++			return err
++		}
++		out.WriteString(rel + ":" + entry.Type().String() + ":")
++		if entry.Type()&os.ModeSymlink != 0 {
++			value, err := os.Readlink(path)
++			if err != nil {
++				return err
++			}
++			out.WriteString(value)
++		} else if !entry.IsDir() {
++			value, err := os.ReadFile(path)
++			if err != nil {
++				return err
++			}
++			out.Write(value)
++		}
++		out.WriteByte('\n')
++		return nil
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	return out.String()
++}
++
++// Neither takeover setting may traverse a linked skills directory or modify its external destination.
++func TestNativeSkillsLinkedParent(t *testing.T) {
++	for _, takeover := range []bool{false, true} {
++		t.Run(map[bool]string{false: "ordinary", true: "takeover"}[takeover], func(t *testing.T) {
++			fx, homes := nativeSkillsFixture(t)
++			native, outside := homes["claude_code"], t.TempDir()
++			if err := os.Symlink(outside, filepath.Join(native, "skills")); err != nil {
++				t.Fatal(err)
++			}
++			before := nativeSnapshot(t, native)
++			results, err := UseWithPolicy(fx.home, fx.profile, "claude_code", "", false, Policy{Takeover: takeover})
++			diagnostic := DiagWriteWouldFollowLink
++			assertSwitchDiagnostic(t, err, results, &diagnostic)
++			if nativeSnapshot(t, native) != before || nativeSnapshot(t, outside) != ".:d---------:\n" {
++				t.Fatal("linked parent received writes")
++			}
++		})
++	}
++}
++
++// Ledger ownership overrides even an old environment record; the entry and ledger survive takeover and status reports non-current.
++func TestNativeSkillsLedger(t *testing.T) {
++	fx, homes := nativeSkillsFixture(t)
++	if _, err := UseWithPolicy(fx.home, fx.profile, "claude_code", "", false, Policy{}); err != nil {
++		t.Fatal(err)
++	}
++	native := homes["claude_code"]
++	ledger := filepath.Join(native, "skills", ".csk-managed.json")
++	if err := os.WriteFile(ledger, []byte(`{"schema_version":1,"entries":["myskill"]}`), 0644); err != nil {
++		t.Fatal(err)
++	}
++	before, err := os.Readlink(filepath.Join(native, "skills", "myskill"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	results, err := UseWithPolicy(fx.home, fx.profile, "claude_code", "", false, Policy{Takeover: true})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !strings.Contains(results[0].Detail, "legacy global scope") {
++		t.Fatalf("ledger entry not reported: %+v", results)
++	}
++	if got, err := os.Readlink(filepath.Join(native, "skills", "myskill")); err != nil || got != before {
++		t.Fatal("ledger entry changed")
++	}
++	if got := homeBytes(t, native, "skills/.csk-managed.json"); got != `{"schema_version":1,"entries":["myskill"]}` {
++		t.Fatal("ledger changed")
++	}
++	if paths := homeMarker(t, native).Surfaces[envmarker.SurfaceSkills].Paths; len(paths) != 0 {
++		t.Fatalf("environment claimed ledger entry: %v", paths)
++	}
++	status, err := StatusOf(StatusRequest{Home: fx.home, NativeHomeOf: func(id string) (string, error) { return homes[id], nil }})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !status.NonCurrent || !strings.Contains(statusNativeDetails(status), "legacy global scope") {
++		t.Fatalf("ledger status not non-current: %+v", status.Scopes)
++	}
++}
++
++func statusNativeDetails(status *Status) string {
++	var out strings.Builder
++	for _, scope := range status.Scopes {
++		if scope.NativeSkills != nil {
++			out.WriteString(scope.NativeSkills.Detail)
++		}
++	}
++	return out.String()
++}
++
++// An unreadable native marker fails closed before replacement or backup even with takeover.
++func TestNativeSkillsUnreadableMarker(t *testing.T) {
++	fx, homes := nativeSkillsFixture(t)
++	native := homes["claude_code"]
++	if err := os.Mkdir(filepath.Join(native, envmarker.Name), 0755); err != nil {
++		t.Fatal(err)
++	}
++	before := nativeSnapshot(t, native)
++	results, err := UseWithPolicy(fx.home, fx.profile, "claude_code", "", false, Policy{Takeover: true})
++	diagnostic := envmarker.DiagMarkerUnreadable
++	assertSwitchDiagnostic(t, err, results, &diagnostic)
++	if nativeSnapshot(t, native) != before {
++		t.Fatal("unreadable marker allowed writes")
++	}
++}
++
++// Current-profile repair restores a drifted native entry while explicit non-current repair leaves native state alone.
++func TestNativeSkillsRepair(t *testing.T) {
++	fx, homes := nativeSkillsFixture(t)
++	req := fx.request("codex_cli")
++	req.Repair = true
++	if _, err := Resolve(req); err != nil {
++		t.Fatal(err)
++	}
++	requireNativeSkill(t, fx.home, homes["codex_cli"])
++	target := filepath.Join(homes["codex_cli"], "skills", "myskill")
++	if err := os.Remove(target); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink("../../drift", target); err != nil {
++		t.Fatal(err)
++	}
++	status, err := StatusOf(StatusRequest{Home: fx.home, NativeHomeOf: req.NativeHomeOf})
++	if err != nil || !strings.Contains(statusNativeDetails(status), "drift") {
++		t.Fatalf("drift status = %+v %v", status, err)
++	}
++	if _, err := Resolve(req); err != nil {
++		t.Fatal(err)
++	}
++	requireNativeSkill(t, fx.home, homes["codex_cli"])
++	if err := os.Remove(target); err != nil {
++		t.Fatal(err)
++	}
++	beforeDryRun := nativeSnapshot(t, homes["codex_cli"])
++	dry := req
++	dry.DryRun = true
++	if _, err := Resolve(dry); err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
++		t.Fatalf("dry-run missed native drift: %v", err)
++	}
++	if nativeSnapshot(t, homes["codex_cli"]) != beforeDryRun {
++		t.Fatal("dry-run wrote native home")
++	}
++	if _, err := Resolve(req); err != nil {
++		t.Fatal(err)
++	}
++	if err := SetCurrent(fx.home, DefaultProfile); err != nil {
++		t.Fatal(err)
++	}
++	before := nativeSnapshot(t, homes["codex_cli"])
++	if _, err := Resolve(req); err != nil {
++		t.Fatal(err)
++	}
++	if nativeSnapshot(t, homes["codex_cli"]) != before {
++		t.Fatal("non-current repair rewrote native home")
++	}
++}
++
++// Recorded staging paths converge and profile switching removes only recorded skills, preserving unnamed foreign bytes and links.
++func TestNativeSkillsConvergenceAndSwitch(t *testing.T) {
++	fx, homes := nativeSkillsFixture(t)
++	if _, err := UseWithPolicy(fx.home, fx.profile, "claude_code", "", false, Policy{}); err != nil {
++		t.Fatal(err)
++	}
++	native := homes["claude_code"]
++	target, old := filepath.Join(native, "skills", "myskill"), filepath.Join(native, ".agent-context", "skills", "myskill")
++	if err := os.MkdirAll(filepath.Dir(old), 0755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Rename(target, old); err != nil {
++		t.Fatal(err)
++	}
++	marker := homeMarker(t, native)
++	surface := marker.Surfaces[envmarker.SurfaceSkills]
++	surface.Paths = []string{".agent-context/skills/myskill"}
++	marker.Surfaces[envmarker.SurfaceSkills] = surface
++	payload, err := marker.Marshal()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(native, envmarker.Name), payload, 0644); err != nil {
++		t.Fatal(err)
++	}
++	writeGitFile(t, native, "skills/unnamed/keep", "untouched")
++	if err := os.Symlink("../missing", filepath.Join(native, "skills", "unnamed-link")); err != nil {
++		t.Fatal(err)
++	}
++	unnamedLink, err := os.Readlink(filepath.Join(native, "skills", "unnamed-link"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	untouched := nativeSnapshot(t, filepath.Join(native, "skills", "unnamed"))
++	if _, err := SyncWithPolicy(fx.home, Policy{Takeover: true}); err != nil {
++		t.Fatal(err)
++	}
++	requireNativeSkill(t, fx.home, native)
++	if _, err := os.Lstat(old); !os.IsNotExist(err) {
++		t.Fatal("old staging entry retained")
++	}
++	if _, err := UseWithPolicy(fx.home, DefaultProfile, "claude_code", "", false, Policy{Takeover: true}); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := os.Lstat(target); !os.IsNotExist(err) {
++		t.Fatal("retired recorded skill retained")
++	}
++	if nativeSnapshot(t, filepath.Join(native, "skills", "unnamed")) != untouched {
++		t.Fatal("unnamed skill changed")
++	}
++	if got, err := os.Readlink(filepath.Join(native, "skills", "unnamed-link")); err != nil || got != unnamedLink {
++		t.Fatal("unnamed link changed")
++	}
++}
++
++// Install --use and update replace native skill links for every participating adapter and preserve unnamed entries.
++func TestNativeSkillsInstallAndUpdate(t *testing.T) {
++	pinOperatorHome(t, t.TempDir())
++	homes := pinHomes(t)
++	home := t.TempDir()
++	ids := newGitIdentities(t)
++	repo := gitRepo(t, map[string]string{"SKILL.md": "# myskill\n"}, "v1.0.0")
++	operand := ids.serve(repo, "https://example.com/native-skill")
++	source := t.TempDir()
++	writeManifestPackage(t, source, `{"schema_version":1,"name":"native-profile","version":"1.0.0","context":{"modules":[{"path":"a.md"}]},"requires":{"skills":{"myskill":{"git":"`+operand+`","range":"*"}}}}`, map[string]string{"a.md": "original\n"})
++	if _, _, _, err := Install(home, InstallOptions{Operand: source, Use: true}); err != nil {
++		t.Fatal(err)
++	}
++	for _, id := range []string{"claude_code", "codex_cli", "pi"} {
++		requireNativeSkill(t, home, homes[id])
++		writeGitFile(t, homes[id], "skills/unnamed/keep", "untouched")
++	}
++	if err := os.WriteFile(filepath.Join(source, "context", "a.md"), []byte("updated\n"), 0644); err != nil {
++		t.Fatal(err)
++	}
++	if _, _, err := UpdateWithPolicy(home, "native-profile", Policy{Takeover: true}); err != nil {
++		t.Fatal(err)
++	}
++	for _, id := range []string{"claude_code", "codex_cli", "pi"} {
++		requireNativeSkill(t, home, homes[id])
++		if got := homeBytes(t, homes[id], "skills/unnamed/keep"); got != "untouched" {
++			t.Fatal("update changed unnamed entry")
++		}
++	}
++	second := t.TempDir()
++	writeManifestPackage(t, second, `{"schema_version":1,"name":"second-profile","version":"1.0.0","requires":{"skills":{"another":{"git":"`+operand+`","range":"*"}}}}`, nil)
++	if _, _, _, err := Install(home, InstallOptions{Operand: second}); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := UseWithPolicy(home, "second-profile", "codex_cli", "", false, Policy{}); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := UseWithPolicy(home, "native-profile", "", "", false, Policy{}); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := os.Readlink(filepath.Join(homes["codex_cli"], "skills", "another")); err != nil {
++		t.Fatalf("new scoped skill missing: %v", err)
++	}
++	if _, err := os.Lstat(filepath.Join(homes["codex_cli"], "skills", "myskill")); !os.IsNotExist(err) {
++		t.Fatal("scope retained old skill")
++	}
++	for _, id := range []string{"claude_code", "pi"} {
++		requireNativeSkill(t, home, homes[id])
++	}
++
++}
++
++// A stale directory listing cannot authorize reuse of an existing next backup generation; Use leaves every native byte unchanged.
++func TestNativeSkillsBackupCollision(t *testing.T) {
++	fx, homes := nativeSkillsFixture(t)
++	native := homes["claude_code"]
++	writeGitFile(t, native, "skills/myskill/keep", "operator")
++	writeGitFile(t, native, ".agent-environment-backup/1/keep", "existing generation")
++	before := nativeSnapshot(t, native)
++	policy := Policy{Takeover: true, backupReadDirectory: func(path string) (stateread.Directory, error) {
++		listing, err := stateread.ReadDir(path)
++		listing.Entries = nil
++		return listing, err
++	}}
++	results, err := UseWithPolicy(fx.home, fx.profile, "claude_code", "", false, policy)
++	diagnostic := DiagBackupExists
++	assertSwitchDiagnostic(t, err, results, &diagnostic)
++	if nativeSnapshot(t, native) != before {
++		t.Fatal("backup collision partially wrote native home")
++	}
++	// The same real entry point accepts the unchanged fixture when it observes generation 1 and selects generation 2.
++	if _, err := UseWithPolicy(fx.home, fx.profile, "claude_code", "", false, Policy{Takeover: true}); err != nil {
++		t.Fatal(err)
++	}
++	requireNativeSkill(t, fx.home, native)
++	if got := homeBytes(t, native, ".agent-environment-backup/2/skills/myskill/keep"); got != "operator" {
++		t.Fatal(got)
++	}
++}
++
++// A ledgered unrecorded foreign link is neither adopted nor backed up; unreadable ownership state refuses before native writes.
++func TestNativeSkillsUnrecordedLedger(t *testing.T) {
++	for _, unreadable := range []bool{false, true} {
++		t.Run(map[bool]string{false: "ledgered", true: "unreadable-ledger"}[unreadable], func(t *testing.T) {
++			fx, homes := nativeSkillsFixture(t)
++			native := homes["claude_code"]
++			writeGitFile(t, native, "skills/.csk-managed.json", `{"schema_version":1,"entries":["myskill"]}`)
++			ledger := filepath.Join(native, "skills", ".csk-managed.json")
++			if unreadable {
++				if err := os.Remove(ledger); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Mkdir(ledger, 0755); err != nil {
++					t.Fatal(err)
++				}
++			}
++			target := filepath.Join(native, "skills", "myskill")
++			if err := os.Symlink("../../legacy/missing", target); err != nil {
++				t.Fatal(err)
++			}
++			originalLink, err := os.Readlink(target)
++			if err != nil {
++				t.Fatal(err)
++			}
++			before := nativeSnapshot(t, native)
++			results, err := UseWithPolicy(fx.home, fx.profile, "claude_code", "", false, Policy{Takeover: true})
++			if unreadable {
++				if err == nil || !strings.Contains(results[0].Detail, stateread.DiagUnreadable) {
++					t.Fatalf("ownership read did not refuse: %v %+v", err, results)
++				}
++				if nativeSnapshot(t, native) != before {
++					t.Fatal("unreadable ledger allowed writes")
++				}
++				return
++			}
++			if err != nil || !strings.Contains(results[0].Detail, "legacy global scope") {
++				t.Fatalf("ledger entry not reported: %v %+v", err, results)
++			}
++			if got, err := os.Readlink(target); err != nil || got != originalLink {
++				t.Fatal("ledger entry changed")
++			}
++			if _, err := os.Lstat(filepath.Join(native, ".agent-environment-backup")); !os.IsNotExist(err) {
++				t.Fatal("ledger entry backed up")
++			}
++		})
++	}
++}
++
++// A skills-free profile never traverses or modifies an unnamed native skills directory, even if that directory is a link.
++func TestNativeSkillsEmptyProfileLeavesUnnamedParent(t *testing.T) {
++	fx, homes := nativeSkillsFixture(t)
++	native, outside := homes["claude_code"], t.TempDir()
++	writeGitFile(t, outside, "keep", "untouched")
++	if err := os.Symlink(outside, filepath.Join(native, "skills")); err != nil {
++		t.Fatal(err)
++	}
++	before := nativeSnapshot(t, outside)
++	if _, err := UseWithPolicy(fx.home, DefaultProfile, "claude_code", "", false, Policy{Takeover: true}); err != nil {
++		t.Fatal(err)
++	}
++	if nativeSnapshot(t, outside) != before {
++		t.Fatal("unnamed native directory changed")
++	}
++}
+diff --git a/internal/envprofile/status.go b/internal/envprofile/status.go
+index 04d7891ae3034eaca742a12a7780e1d2483790a0..938e52db63e17ae4255363de827fc040bd2547d6 100644
+--- a/internal/envprofile/status.go
++++ b/internal/envprofile/status.go
+@@ -77,6 +77,7 @@ type HomeState struct {
+ // ScopeHome carries both doors of a current profile (§8.1): the native
+ // home and the managed home with its provisioning state.
+ type ScopeHome struct {
++	NativeSkills     *SurfaceState    `json:"native_skills,omitempty"`
+ 	Scope            string           `json:"scope"`
+ 	Profile          string           `json:"profile"`
+ 	Environment      string           `json:"environment"`
+@@ -397,7 +398,7 @@ func StatusOf(req StatusRequest) (*Status, error) {
+ 		}
+ 	}
+ 	for _, scope := range status.Scopes {
+-		if scope.Diagnostic != nil {
++		if scope.Diagnostic != nil || (scope.NativeSkills != nil && scope.NativeSkills.State != "current") {
+ 			status.NonCurrent = true
+ 		}
+ 	}
+@@ -1062,6 +1063,17 @@ func scopeHomes(req StatusRequest, installed map[string]bool) ([]ScopeHome, []St
+ 			} else if marker != nil {
+ 				scope.Provisioned = true
+ 			}
++
++			// A machine row shadowed by an environment scope does not own
++			// that native surface; nativeSkillsState selects the effective current.
++			row, nativeErr := nativeSkillsState(req.Home, item.profile, adapter.ID, req.NativeHomeOf)
++			if nativeErr != nil {
++				row = &SurfaceState{Key: envmarker.SurfaceSkills, State: DiagSurfaceUnreadable, Detail: nativeErr.Error()}
++			}
++			scope.NativeSkills = row
++			if row != nil && row.State != "current" && scope.Diagnostic == nil {
++				scope.Diagnostic = &StateDiagnostic{Code: row.State, Path: native, Detail: row.Detail}
++			}
+ 			out = append(out, scope)
+ 		}
+ 	}
+diff --git a/internal/envprofile/switch.go b/internal/envprofile/switch.go
+index 4479a70ae510db3a89a71e28c5d2087ff87246ba..39cb1f0b4c69145cb1a79561a5b81350236e6134 100644
+--- a/internal/envprofile/switch.go
++++ b/internal/envprofile/switch.go
+@@ -493,7 +493,7 @@ func materializeScopeWithNativeHome(home, profile, environment string, policy Po
+ 	}
+ 	var results []EntryResult
+ 	for _, adapter := range adapters {
+-		results = append(results, materializeOne(home, source, profile, lock, hash, precedence, order, packages, skills, adapter, policy.Takeover, nativeHomeOf))
++		results = append(results, materializeOne(home, source, profile, lock, hash, precedence, order, packages, skills, adapter, policy, nativeHomeOf))
+ 	}
+ 	return results, nil
+ }
+@@ -581,9 +581,24 @@ func preflightInPlaceScope(home, profile, environment string, policy Policy, nat
+ 			want[adapter.Target] = true
+ 		}
+ 		for _, skill := range skills {
+-			want[filepath.ToSlash(filepath.Join(profileSkillsSurfaceDir, skill.name))] = true
++			want[filepath.ToSlash(filepath.Join(inPlaceSkillsDir(adapter.ID), skill.name))] = true
++		}
++		ledger, err := inPlaceSkillsLedger(native, adapter, skills, recorded)
++		if err != nil {
++			return err
++		}
++		for path := range recorded {
++			if _, err := managedPath(native, path, false); err != nil {
++				return err
++			}
+ 		}
+ 		for path := range want {
++			if _, err := managedPath(native, path, false); err != nil {
++				return err
++			}
++			if ledgerSkillPath(adapter, path, ledger) {
++				continue
++			}
+ 			if recorded[path] {
+ 				continue
+ 			}
+@@ -606,7 +621,7 @@ func preflightInPlaceScope(home, profile, environment string, policy Policy, nat
+ 				if err != nil || link.Kind != stateread.KindPresent {
+ 					return fmt.Errorf("%s: inspect symlink %s: %v", DiagUnmanagedConflict, inPlaceConflictPath(path), err)
+ 				}
+-				if !sameStoreTree(link.Target, contextstore.Root(home)) && !policy.Takeover {
++				if !inPlaceLinkInStore(full, link.Target, contextstore.Root(home)) && !policy.Takeover {
+ 					return fmt.Errorf("%s: %s is a symlink outside the manager store; abort or take over with backup", DiagForeignManager, inPlaceConflictPath(path))
+ 				}
+ 			}
+@@ -619,7 +634,7 @@ func preflightInPlaceScope(home, profile, environment string, policy Policy, nat
+ }
+ 
+ func inPlaceConflictPath(path string) string {
+-	if strings.HasPrefix(path, profileSkillsSurfaceDir+"/") {
++	if strings.HasPrefix(path, profileSkillsSurfaceDir+"/") || strings.HasPrefix(path, "skills/") {
+ 		return filepath.ToSlash(filepath.Join(path, "SKILL.md"))
+ 	}
+ 	return path
+@@ -672,7 +687,8 @@ func loadMaterial(home string, manager *gitManager, lock *contextlock.Lock) (map
+ // environment_surface_unmanaged_conflict (or
+ // environment_foreign_manager_detected for a foreign-manager symlink)
+ // rather than overwrite.
+-func materializeOne(home string, source Source, profile string, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, packages map[string]contextmaterialize.Package, skills []skillOf, adapter Adapter, takeover bool, nativeHomeOf func(string) (string, error)) EntryResult {
++func materializeOne(home string, source Source, profile string, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, packages map[string]contextmaterialize.Package, skills []skillOf, adapter Adapter, policy Policy, nativeHomeOf func(string) (string, error)) EntryResult {
++	takeover := policy.Takeover
+ 	native, err := resolveNativeHome(adapter, nativeHomeOf)
+ 	if err != nil {
+ 		return EntryResult{Adapter: adapter.ID, OK: false, Detail: err.Error()}
+@@ -703,11 +719,28 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 	if written {
+ 		want[adapter.Target] = true
+ 	}
++	ledger, err := inPlaceSkillsLedger(native, adapter, skills, recorded)
++	if err != nil {
++		return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
++	}
++	for path := range recorded {
++		if _, err := managedPath(native, path, false); err != nil {
++			return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
++		}
++		if ledgerSkillPath(adapter, path, ledger) {
++			delete(recorded, path)
++		}
++	}
++	var ledgerDetails []string
+ 	skillLinks := map[string]string{}
+ 	skillHashes := map[string][]byte{}
+ 	skillPaths := make([]string, 0, len(skills))
+ 	for _, skill := range skills {
+-		path := filepath.ToSlash(filepath.Join(profileSkillsSurfaceDir, skill.name))
++		path := filepath.ToSlash(filepath.Join(inPlaceSkillsDir(adapter.ID), skill.name))
++		if ledgerSkillPath(adapter, path, ledger) {
++			ledgerDetails = append(ledgerDetails, path+" belongs to legacy global scope (adapter ledger); left in place")
++			continue
++		}
+ 		skillLinks[path] = skill.root
+ 		skillHashes[path] = []byte(skill.hash)
+ 		skillPaths = append(skillPaths, path)
+@@ -725,7 +758,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 	// its link text) before replacement; §8.3.1 requires that backup and each
+ 	// managed write to avoid following the link. Other unrecorded targets
+ 	// fail with environment_surface_unmanaged_conflict without takeover.
+-	result := EntryResult{Adapter: adapter.ID, Home: native}
++	result := EntryResult{Adapter: adapter.ID, Home: native, Detail: strings.Join(ledgerDetails, "; "), Warnings: append([]string{}, ledgerDetails...)}
+ 	var taken []string
+ 	for path := range want {
+ 		if recorded[path] {
+@@ -759,7 +792,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 				result.Detail = fmt.Sprintf("%s: inspect symlink %s: %v", DiagUnmanagedConflict, inPlaceConflictPath(path), readErr)
+ 				return result
+ 			}
+-			if !sameStoreTree(link.Target, contextstore.Root(home)) {
++			if !inPlaceLinkInStore(full, link.Target, contextstore.Root(home)) {
+ 				if !takeover {
+ 					result.OK = false
+ 					result.Detail = DiagForeignManager + ": " + inPlaceConflictPath(path) + " is a symlink outside the manager store; abort, or take over with backup"
+@@ -806,7 +839,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 			}
+ 		}
+ 		if len(backupWant) > 0 {
+-			generation, err = openBackup(native, "", backupWant)
++			generation, err = openBackupWithDirectoryRead(native, "", backupWant, policy.backupReadDirectory)
+ 			if err != nil {
+ 				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+ 			}
+@@ -816,7 +849,9 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
+ 	if prior != nil {
+ 		for path := range recorded {
+ 			if !want[path] {
+-				_ = removeManagedTree(native, path)
++				if err := removeManagedTree(native, path); err != nil {
++					return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
++				}
+ 			}
+ 		}
+ 	}
+@@ -972,12 +1007,19 @@ func removeManagedTree(root, rel string) error {
+ // versioned generation and prunes beyond the retention count. A next
+ // generation that already exists fails with environment_backup_exists.
+ func openBackup(root, homeRel string, want map[string]bool) (int, error) {
++	return openBackupWithDirectoryRead(root, homeRel, want, nil)
++}
++
++func openBackupWithDirectoryRead(root, homeRel string, want map[string]bool, readDirectory func(string) (stateread.Directory, error)) (int, error) {
++	if readDirectory == nil {
++		readDirectory = stateread.ReadDir
++	}
+ 	baseRel := managedJoin(homeRel, ".agent-environment-backup")
+ 	base, err := managedDirectory(root, baseRel)
+ 	if err != nil {
+ 		return 0, err
+ 	}
+-	listing, err := stateread.ReadDir(base)
++	listing, err := readDirectory(base)
+ 	highest := 0
+ 	if err != nil {
+ 		return 0, err
