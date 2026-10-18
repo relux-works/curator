@@ -43,8 +43,8 @@ type yarnFixture struct {
 
 func newYarnFixture(t *testing.T) yarnFixture {
 	t.Helper()
-	root := filepath.Join(t.TempDir(), "project")
-	work := filepath.Join(t.TempDir(), "capture-work")
+	root := filepath.Join(writableTempDir(t), "project")
+	work := filepath.Join(writableTempDir(t), "capture-work")
 	if err := os.MkdirAll(filepath.Join(root, "packages", "workspace"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func newYarnFixture(t *testing.T) yarnFixture {
 		}
 		entries = append(entries, entry)
 		payloadByName[pkg.name] = payload
-		file := filepath.Join(t.TempDir(), pkg.name+"-1.0.0.tgz")
+		file := filepath.Join(writableTempDir(t), pkg.name+"-1.0.0.tgz")
 		if err := os.WriteFile(file, payload, 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -299,16 +299,16 @@ func TestS03S08N12PrivateMirrorEmptyCacheFrozenOfflineMaterialization(t *testing
 	}
 	runner := &fakeYarnRunner{capture: capture}
 	runner.context = makeExecutionContext(t, capture, runner)
-	mirrorRoot := filepath.Join(t.TempDir(), "private-mirror")
-	mirror, err := DerivePrivateMirror(t.Context(), capture, mirrorRoot, filepath.Join(t.TempDir(), "mirror-work"), runner.context)
+	mirrorRoot := filepath.Join(writableTempDir(t), "private-mirror")
+	mirror, err := DerivePrivateMirror(t.Context(), capture, mirrorRoot, filepath.Join(writableTempDir(t), "mirror-work"), runner.context)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTreeWritable(mirrorRoot) })
+
 	if len(mirror.Receipt.Files) != 4 || mirror.Receipt.SchemaID != "yarn-classic-private-mirror-receipt-v1" {
 		t.Fatalf("unexpected mirror receipt: %+v", mirror.Receipt)
 	}
-	materialized, err := Materialize(t.Context(), mirror, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "materialize-work")}, runner.context)
+	materialized, err := Materialize(t.Context(), mirror, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "materialize-work")}, runner.context)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,7 +338,7 @@ func TestS03S08N12PrivateMirrorEmptyCacheFrozenOfflineMaterialization(t *testing
 	if err = os.Remove(filepath.Join(mirror.root, filepath.FromSlash(mirror.Receipt.Files[0].Path))); err != nil {
 		t.Fatal(err)
 	}
-	_, err = Materialize(t.Context(), mirror, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "missing"), WorkRoot: t.TempDir()}, runner.context)
+	_, err = Materialize(t.Context(), mirror, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "missing"), WorkRoot: writableTempDir(t)}, runner.context)
 	assertCode(t, err, CodeOfflineInputMissing)
 }
 
@@ -466,16 +466,16 @@ func TestMaterializationAPIFailsClosedWithoutExactAuthority(t *testing.T) {
 	authority := makeExecutionContext(t, capture, runner)
 	runner.context = authority
 
-	_, err := DerivePrivateMirror(t.Context(), nil, filepath.Join(t.TempDir(), "mirror"), t.TempDir(), authority)
+	_, err := DerivePrivateMirror(t.Context(), nil, filepath.Join(writableTempDir(t), "mirror"), writableTempDir(t), authority)
 	assertCode(t, err, CodeInputUndeclared)
-	_, err = Materialize(t.Context(), nil, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "project"), WorkRoot: t.TempDir()}, authority)
+	_, err = Materialize(t.Context(), nil, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "project"), WorkRoot: writableTempDir(t)}, authority)
 	assertCode(t, err, CodeInputUndeclared)
 	_, err = Invoke(t.Context(), nil, "index.js", nil, authority)
 	assertCode(t, err, CodeInputUndeclared)
 	if _, err = cleanAbsentAbsolute(""); ErrorCode(err) != CodeInputUndeclared {
 		t.Fatalf("empty destination error=%v", err)
 	}
-	existing := t.TempDir()
+	existing := writableTempDir(t)
 	if _, err = cleanAbsentAbsolute(existing); ErrorCode(err) != CodeInputUndeclared {
 		t.Fatalf("existing destination error=%v", err)
 	}
@@ -589,8 +589,8 @@ func TestRealPinnedYarnClassicReadsPrivateMirrorWithEmptyOrdinaryCache(t *testin
 	capture := captureFixture(t, fixture)
 	runner := newConcreteYarnRunner(t)
 	t.Setenv("YARN_RC_FILENAME", "ambient-yarnrc")
-	t.Setenv("YARN_CACHE_FOLDER", filepath.Join(t.TempDir(), "ambient-yarn-cache"))
-	t.Setenv("npm_config_cache", filepath.Join(t.TempDir(), "ambient-npm-cache"))
+	t.Setenv("YARN_CACHE_FOLDER", filepath.Join(writableTempDir(t), "ambient-yarn-cache"))
+	t.Setenv("npm_config_cache", filepath.Join(writableTempDir(t), "ambient-npm-cache"))
 	observe := runner.ProcessLaunchObserver
 	runner.ProcessLaunchObserver = func(launch closureexec.ProcessLaunch) {
 		poison := []byte("--install.modules-folder ambient_modules\n")
@@ -604,13 +604,13 @@ func TestRealPinnedYarnClassicReadsPrivateMirrorWithEmptyOrdinaryCache(t *testin
 	}
 	provider := newVerifiedYarnProvider(runner)
 	authority := makeVerifiedExecutionContext(t, capture, runner, provider)
-	mirrorRoot := filepath.Join(t.TempDir(), "private-mirror")
-	mirror, err := DerivePrivateMirror(t.Context(), capture, mirrorRoot, filepath.Join(t.TempDir(), "mirror-work"), authority)
+	mirrorRoot := filepath.Join(writableTempDir(t), "private-mirror")
+	mirror, err := DerivePrivateMirror(t.Context(), capture, mirrorRoot, filepath.Join(writableTempDir(t), "mirror-work"), authority)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTreeWritable(mirrorRoot) })
-	materialized, err := Materialize(t.Context(), mirror, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: filepath.Join(t.TempDir(), "materialize-work")}, authority)
+
+	materialized, err := Materialize(t.Context(), mirror, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: filepath.Join(writableTempDir(t), "materialize-work")}, authority)
 	if err != nil {
 		t.Fatalf("real frozen offline Yarn replay through protected executor failed: %v", err)
 	}
@@ -654,7 +654,7 @@ type concreteYarnRunner struct {
 
 func newConcreteYarnRunner(t *testing.T) *concreteYarnRunner {
 	t.Helper()
-	executionRoot := filepath.Join(t.TempDir(), "execution")
+	executionRoot := filepath.Join(writableTempDir(t), "execution")
 	for _, dir := range []string{"toolchain/node/bin", "toolchain/yarn", "work"} {
 		if err := os.MkdirAll(filepath.Join(executionRoot, filepath.FromSlash(dir)), 0o700); err != nil {
 			t.Fatal(err)
@@ -755,7 +755,7 @@ func TestYarnClassicPackageRootRecognizesPinnedInstallLayouts(t *testing.T) {
 		{name: "package-root", command: "bin/yarn.js", root: "."},
 	} {
 		t.Run(layout.name, func(t *testing.T) {
-			prefix := t.TempDir()
+			prefix := writableTempDir(t)
 			root := filepath.Clean(filepath.Join(prefix, layout.root))
 			entrypoint := filepath.Join(root, "bin", "yarn.js")
 			if err := os.MkdirAll(filepath.Dir(entrypoint), 0o700); err != nil {
@@ -770,7 +770,7 @@ func TestYarnClassicPackageRootRecognizesPinnedInstallLayouts(t *testing.T) {
 			}
 		})
 	}
-	if _, err := yarnClassicPackageRoot(filepath.Join(t.TempDir(), "bin", "yarn.js")); err == nil {
+	if _, err := yarnClassicPackageRoot(filepath.Join(writableTempDir(t), "bin", "yarn.js")); err == nil {
 		t.Fatal("missing pinned Yarn tool root was accepted")
 	}
 }
@@ -935,7 +935,7 @@ func (runner *fakeYarnRunner) Run(_ context.Context, request closureexec.Executi
 
 func makeExecutionContext(t *testing.T, capture *Capture, runner yarnTestRunner) *ExecutionContext {
 	t.Helper()
-	executionRoot := filepath.Join(t.TempDir(), "execution")
+	executionRoot := filepath.Join(writableTempDir(t), "execution")
 	if concrete, ok := runner.(*concreteYarnRunner); ok {
 		executionRoot = concrete.executionRoot
 	}
@@ -1077,12 +1077,12 @@ func captureFixture(t *testing.T, fixture yarnFixture) *Capture {
 }
 func captureFixtureError(t *testing.T, fixture yarnFixture) (*Capture, error) {
 	t.Helper()
-	storeRoot := filepath.Join(t.TempDir(), "capture-store")
+	storeRoot := filepath.Join(writableTempDir(t), "capture-store")
 	store, err := closureexec.NewCaptureStore(storeRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTreeWritable(storeRoot) })
+
 	return CaptureAndAdmit(t.Context(), CaptureRequest{Graph: fixture.graph, ProjectRoot: fixture.root, Tarballs: fixture.tarballs, WorkRoot: fixture.work, Store: store, Policy: artifactpolicy.NewService(), PreviousCausalHead: "test-head"})
 }
 
@@ -1244,14 +1244,18 @@ func containsAll(values []string, wanted ...string) bool {
 }
 
 func makeTreeWritable(root string) error {
-	return filepath.WalkDir(root, func(current string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
+	return filepath.WalkDir(root, func(current string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		if entry.IsDir() {
-			return os.Chmod(current, 0o700)
+		if entry.Type()&os.ModeSymlink != 0 {
+			return nil
 		}
-		return os.Chmod(current, 0o600)
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		return os.Chmod(current, info.Mode().Perm()|0o200)
 	})
 }
 
@@ -1283,4 +1287,17 @@ func copyWritableTree(source, destination string) error {
 		}
 		return os.WriteFile(target, payload, 0o600)
 	})
+}
+
+// writableTempDir registers restoration before callers can seal any child tree.
+// TempDir's removal is registered first, so restoration runs before removal.
+func writableTempDir(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	t.Cleanup(func() {
+		if err := makeTreeWritable(root); err != nil && !os.IsNotExist(err) {
+			t.Errorf("restore temporary tree permissions: %v", err)
+		}
+	})
+	return root
 }
