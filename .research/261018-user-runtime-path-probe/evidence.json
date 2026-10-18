@@ -1,0 +1,985 @@
+{
+  "schema": 1,
+  "host": {
+    "python": "3.14.7",
+    "macos": "26.5.1",
+    "machine": "arm64"
+  },
+  "harness_sha256": "68e08b9b762ef970faa3e9858878cad7396c7278a63493b82375fa7e7da2bf53",
+  "model_requests_submitted": 0,
+  "overall_exit": 0,
+  "guard_passed": true,
+  "guard_controls": {
+    "write_positive": {
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    "write_negative": {
+      "exit": 1,
+      "timed_out": false,
+      "stdout": "",
+      "stderr": "touch: $SCRATCH/forbidden-write: Operation not permitted\n"
+    },
+    "network_negative": {
+      "exit": 0,
+      "timed_out": false,
+      "stdout": "1\n",
+      "stderr": ""
+    }
+  },
+  "lanes": [
+    {
+      "runtime": "codex",
+      "version": "0.162.0",
+      "mode": "default",
+      "binary_sha256": "8238273076041e55beded03ba1d51e034f997b7d100b0642d36daf036620fe57",
+      "verdict": "passed",
+      "problems": [],
+      "atime_positive": true,
+      "file_reads": {
+        "home/.codex/skills/home-codex/SKILL.md": true,
+        "home/.codex/AGENTS.md": true,
+        "home/.codex/CLAUDE.md": false,
+        "home/.agents/skills/home-agents/SKILL.md": true,
+        "home/.agents/AGENTS.md": false,
+        "home/.agents/CLAUDE.md": false,
+        "home/.claude/skills/home-claude/SKILL.md": false,
+        "home/.claude/AGENTS.md": false,
+        "home/.claude/CLAUDE.md": false,
+        "managed/skills/managed/SKILL.md": false,
+        "managed/AGENTS.md": false,
+        "managed/CLAUDE.md": false,
+        "managed/.agents/skills/managed-agents/SKILL.md": false,
+        "managed/.agents/AGENTS.md": false,
+        "managed/.agents/CLAUDE.md": false,
+        "shifted-home/.agents/skills/shifted-agents/SKILL.md": false,
+        "shifted-home/.agents/AGENTS.md": false,
+        "shifted-home/.agents/CLAUDE.md": false,
+        "project/AGENTS.md": true,
+        "project/CLAUDE.md": false,
+        "home/.codex/config.toml": true,
+        "home/.codex/hooks.json": true,
+        "home/.codex/.agents/plugins/marketplace.json": false,
+        "home/.codex/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "managed/config.toml": false,
+        "managed/hooks.json": false,
+        "managed/.agents/plugins/marketplace.json": false,
+        "managed/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "home/.agents/plugins/marketplace.json": true,
+        "home/plugins/sentinel/.codex-plugin/plugin.json": true,
+        "shifted-home/.agents/plugins/marketplace.json": false,
+        "shifted-home/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "unread-control.txt": false
+      },
+      "commands": {
+        "version_readback": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "prompt": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "plugins": {
+          "exit": 0,
+          "timed_out": false
+        }
+      },
+      "version_readback": "codex-cli 0.162.0",
+      "prompt_sentinels": [
+        "SENTINEL_AGENTS_home-codex",
+        "SENTINEL_CONFIG_default",
+        "SENTINEL_PROJECT_AGENTS",
+        "sentinel-home-agents",
+        "sentinel-home-codex"
+      ],
+      "plugin_result": {
+        "installed": [],
+        "available": [
+          {
+            "pluginId": "sentinel-plugin-home@sentinel-home",
+            "name": "sentinel-plugin-home",
+            "marketplaceName": "sentinel-home",
+            "version": null,
+            "installed": false,
+            "enabled": false,
+            "source": {
+              "source": "local",
+              "path": "$SCRATCH/codex-0.162.0-default/home/plugins/sentinel"
+            },
+            "installPolicy": "AVAILABLE",
+            "authPolicy": "ON_INSTALL"
+          }
+        ]
+      },
+      "hook_marker": null
+    },
+    {
+      "runtime": "codex",
+      "version": "0.162.0",
+      "mode": "override-fixed-home",
+      "binary_sha256": "8238273076041e55beded03ba1d51e034f997b7d100b0642d36daf036620fe57",
+      "verdict": "passed",
+      "problems": [],
+      "atime_positive": true,
+      "file_reads": {
+        "home/.codex/skills/home-codex/SKILL.md": false,
+        "home/.codex/AGENTS.md": false,
+        "home/.codex/CLAUDE.md": false,
+        "home/.agents/skills/home-agents/SKILL.md": true,
+        "home/.agents/AGENTS.md": false,
+        "home/.agents/CLAUDE.md": false,
+        "home/.claude/skills/home-claude/SKILL.md": false,
+        "home/.claude/AGENTS.md": false,
+        "home/.claude/CLAUDE.md": false,
+        "managed/skills/managed/SKILL.md": true,
+        "managed/AGENTS.md": true,
+        "managed/CLAUDE.md": false,
+        "managed/.agents/skills/managed-agents/SKILL.md": false,
+        "managed/.agents/AGENTS.md": false,
+        "managed/.agents/CLAUDE.md": false,
+        "shifted-home/.agents/skills/shifted-agents/SKILL.md": false,
+        "shifted-home/.agents/AGENTS.md": false,
+        "shifted-home/.agents/CLAUDE.md": false,
+        "project/AGENTS.md": true,
+        "project/CLAUDE.md": false,
+        "home/.codex/config.toml": false,
+        "home/.codex/hooks.json": false,
+        "home/.codex/.agents/plugins/marketplace.json": false,
+        "home/.codex/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "managed/config.toml": true,
+        "managed/hooks.json": true,
+        "managed/.agents/plugins/marketplace.json": false,
+        "managed/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "home/.agents/plugins/marketplace.json": true,
+        "home/plugins/sentinel/.codex-plugin/plugin.json": true,
+        "shifted-home/.agents/plugins/marketplace.json": false,
+        "shifted-home/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "unread-control.txt": false
+      },
+      "commands": {
+        "version_readback": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "prompt": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "plugins": {
+          "exit": 0,
+          "timed_out": false
+        }
+      },
+      "version_readback": "codex-cli 0.162.0",
+      "prompt_sentinels": [
+        "SENTINEL_AGENTS_managed",
+        "SENTINEL_CONFIG_managed",
+        "SENTINEL_PROJECT_AGENTS",
+        "sentinel-home-agents",
+        "sentinel-managed"
+      ],
+      "plugin_result": {
+        "installed": [],
+        "available": [
+          {
+            "pluginId": "sentinel-plugin-home@sentinel-home",
+            "name": "sentinel-plugin-home",
+            "marketplaceName": "sentinel-home",
+            "version": null,
+            "installed": false,
+            "enabled": false,
+            "source": {
+              "source": "local",
+              "path": "$SCRATCH/codex-0.162.0-override-fixed-home/home/plugins/sentinel"
+            },
+            "installPolicy": "AVAILABLE",
+            "authPolicy": "ON_INSTALL"
+          }
+        ]
+      },
+      "hook_marker": null
+    },
+    {
+      "runtime": "codex",
+      "version": "0.162.0",
+      "mode": "override-shifted-home",
+      "binary_sha256": "8238273076041e55beded03ba1d51e034f997b7d100b0642d36daf036620fe57",
+      "verdict": "passed",
+      "problems": [],
+      "atime_positive": true,
+      "file_reads": {
+        "home/.codex/skills/home-codex/SKILL.md": false,
+        "home/.codex/AGENTS.md": false,
+        "home/.codex/CLAUDE.md": false,
+        "home/.agents/skills/home-agents/SKILL.md": false,
+        "home/.agents/AGENTS.md": false,
+        "home/.agents/CLAUDE.md": false,
+        "home/.claude/skills/home-claude/SKILL.md": false,
+        "home/.claude/AGENTS.md": false,
+        "home/.claude/CLAUDE.md": false,
+        "managed/skills/managed/SKILL.md": true,
+        "managed/AGENTS.md": true,
+        "managed/CLAUDE.md": false,
+        "managed/.agents/skills/managed-agents/SKILL.md": false,
+        "managed/.agents/AGENTS.md": false,
+        "managed/.agents/CLAUDE.md": false,
+        "shifted-home/.agents/skills/shifted-agents/SKILL.md": true,
+        "shifted-home/.agents/AGENTS.md": false,
+        "shifted-home/.agents/CLAUDE.md": false,
+        "project/AGENTS.md": true,
+        "project/CLAUDE.md": false,
+        "home/.codex/config.toml": false,
+        "home/.codex/hooks.json": false,
+        "home/.codex/.agents/plugins/marketplace.json": false,
+        "home/.codex/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "managed/config.toml": true,
+        "managed/hooks.json": true,
+        "managed/.agents/plugins/marketplace.json": false,
+        "managed/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "home/.agents/plugins/marketplace.json": false,
+        "home/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "shifted-home/.agents/plugins/marketplace.json": true,
+        "shifted-home/plugins/sentinel/.codex-plugin/plugin.json": true,
+        "unread-control.txt": false
+      },
+      "commands": {
+        "version_readback": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "prompt": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "plugins": {
+          "exit": 0,
+          "timed_out": false
+        }
+      },
+      "version_readback": "codex-cli 0.162.0",
+      "prompt_sentinels": [
+        "SENTINEL_AGENTS_managed",
+        "SENTINEL_CONFIG_managed",
+        "SENTINEL_PROJECT_AGENTS",
+        "sentinel-managed",
+        "sentinel-shifted-agents"
+      ],
+      "plugin_result": {
+        "installed": [],
+        "available": [
+          {
+            "pluginId": "sentinel-plugin-shifted@sentinel-shifted",
+            "name": "sentinel-plugin-shifted",
+            "marketplaceName": "sentinel-shifted",
+            "version": null,
+            "installed": false,
+            "enabled": false,
+            "source": {
+              "source": "local",
+              "path": "$SCRATCH/codex-0.162.0-override-shifted-home/shifted-home/plugins/sentinel"
+            },
+            "installPolicy": "AVAILABLE",
+            "authPolicy": "ON_INSTALL"
+          }
+        ]
+      },
+      "hook_marker": null
+    },
+    {
+      "runtime": "codex",
+      "version": "0.162.0",
+      "mode": "override-instructions-precedence",
+      "binary_sha256": "8238273076041e55beded03ba1d51e034f997b7d100b0642d36daf036620fe57",
+      "verdict": "passed",
+      "problems": [],
+      "atime_positive": true,
+      "file_reads": {
+        "home/.codex/skills/home-codex/SKILL.md": false,
+        "home/.codex/AGENTS.md": false,
+        "home/.codex/CLAUDE.md": false,
+        "home/.agents/skills/home-agents/SKILL.md": true,
+        "home/.agents/AGENTS.md": false,
+        "home/.agents/CLAUDE.md": false,
+        "home/.claude/skills/home-claude/SKILL.md": false,
+        "home/.claude/AGENTS.md": false,
+        "home/.claude/CLAUDE.md": false,
+        "managed/skills/managed/SKILL.md": true,
+        "managed/AGENTS.md": false,
+        "managed/CLAUDE.md": false,
+        "managed/.agents/skills/managed-agents/SKILL.md": false,
+        "managed/.agents/AGENTS.md": false,
+        "managed/.agents/CLAUDE.md": false,
+        "shifted-home/.agents/skills/shifted-agents/SKILL.md": false,
+        "shifted-home/.agents/AGENTS.md": false,
+        "shifted-home/.agents/CLAUDE.md": false,
+        "project/AGENTS.md": true,
+        "project/CLAUDE.md": false,
+        "home/.codex/config.toml": false,
+        "home/.codex/hooks.json": false,
+        "home/.codex/.agents/plugins/marketplace.json": false,
+        "home/.codex/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "managed/config.toml": true,
+        "managed/hooks.json": true,
+        "managed/.agents/plugins/marketplace.json": false,
+        "managed/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "home/.agents/plugins/marketplace.json": true,
+        "home/plugins/sentinel/.codex-plugin/plugin.json": true,
+        "shifted-home/.agents/plugins/marketplace.json": false,
+        "shifted-home/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "unread-control.txt": false,
+        "managed/AGENTS.override.md": true
+      },
+      "commands": {
+        "version_readback": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "prompt": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "plugins": {
+          "exit": 0,
+          "timed_out": false
+        }
+      },
+      "version_readback": "codex-cli 0.162.0",
+      "prompt_sentinels": [
+        "SENTINEL_AGENTS_OVERRIDE",
+        "SENTINEL_CONFIG_managed",
+        "SENTINEL_PROJECT_AGENTS",
+        "sentinel-home-agents",
+        "sentinel-managed"
+      ],
+      "plugin_result": {
+        "installed": [],
+        "available": [
+          {
+            "pluginId": "sentinel-plugin-home@sentinel-home",
+            "name": "sentinel-plugin-home",
+            "marketplaceName": "sentinel-home",
+            "version": null,
+            "installed": false,
+            "enabled": false,
+            "source": {
+              "source": "local",
+              "path": "$SCRATCH/codex-0.162.0-override-instructions-precedence/home/plugins/sentinel"
+            },
+            "installPolicy": "AVAILABLE",
+            "authPolicy": "ON_INSTALL"
+          }
+        ]
+      },
+      "hook_marker": null
+    },
+    {
+      "runtime": "codex",
+      "version": "0.163.0",
+      "mode": "default",
+      "binary_sha256": "8813367285524ac798dd96d1b071aea30d58708c7226fd236cd275cf1cfdee31",
+      "verdict": "passed",
+      "problems": [],
+      "atime_positive": true,
+      "file_reads": {
+        "home/.codex/skills/home-codex/SKILL.md": true,
+        "home/.codex/AGENTS.md": true,
+        "home/.codex/CLAUDE.md": false,
+        "home/.agents/skills/home-agents/SKILL.md": true,
+        "home/.agents/AGENTS.md": false,
+        "home/.agents/CLAUDE.md": false,
+        "home/.claude/skills/home-claude/SKILL.md": false,
+        "home/.claude/AGENTS.md": false,
+        "home/.claude/CLAUDE.md": false,
+        "managed/skills/managed/SKILL.md": false,
+        "managed/AGENTS.md": false,
+        "managed/CLAUDE.md": false,
+        "managed/.agents/skills/managed-agents/SKILL.md": false,
+        "managed/.agents/AGENTS.md": false,
+        "managed/.agents/CLAUDE.md": false,
+        "shifted-home/.agents/skills/shifted-agents/SKILL.md": false,
+        "shifted-home/.agents/AGENTS.md": false,
+        "shifted-home/.agents/CLAUDE.md": false,
+        "project/AGENTS.md": true,
+        "project/CLAUDE.md": false,
+        "home/.codex/config.toml": true,
+        "home/.codex/hooks.json": true,
+        "home/.codex/.agents/plugins/marketplace.json": false,
+        "home/.codex/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "managed/config.toml": false,
+        "managed/hooks.json": false,
+        "managed/.agents/plugins/marketplace.json": false,
+        "managed/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "home/.agents/plugins/marketplace.json": true,
+        "home/plugins/sentinel/.codex-plugin/plugin.json": true,
+        "shifted-home/.agents/plugins/marketplace.json": false,
+        "shifted-home/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "unread-control.txt": false
+      },
+      "commands": {
+        "version_readback": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "prompt": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "plugins": {
+          "exit": 0,
+          "timed_out": false
+        }
+      },
+      "version_readback": "codex-cli 0.163.0",
+      "prompt_sentinels": [
+        "SENTINEL_AGENTS_home-codex",
+        "SENTINEL_CONFIG_default",
+        "SENTINEL_PROJECT_AGENTS",
+        "sentinel-home-agents",
+        "sentinel-home-codex"
+      ],
+      "plugin_result": {
+        "installed": [],
+        "available": [
+          {
+            "pluginId": "sentinel-plugin-home@sentinel-home",
+            "name": "sentinel-plugin-home",
+            "marketplaceName": "sentinel-home",
+            "version": null,
+            "installed": false,
+            "enabled": false,
+            "source": {
+              "source": "local",
+              "path": "$SCRATCH/codex-0.163.0-default/home/plugins/sentinel"
+            },
+            "installPolicy": "AVAILABLE",
+            "authPolicy": "ON_INSTALL"
+          }
+        ]
+      },
+      "hook_marker": null
+    },
+    {
+      "runtime": "codex",
+      "version": "0.163.0",
+      "mode": "override-fixed-home",
+      "binary_sha256": "8813367285524ac798dd96d1b071aea30d58708c7226fd236cd275cf1cfdee31",
+      "verdict": "passed",
+      "problems": [],
+      "atime_positive": true,
+      "file_reads": {
+        "home/.codex/skills/home-codex/SKILL.md": false,
+        "home/.codex/AGENTS.md": false,
+        "home/.codex/CLAUDE.md": false,
+        "home/.agents/skills/home-agents/SKILL.md": true,
+        "home/.agents/AGENTS.md": false,
+        "home/.agents/CLAUDE.md": false,
+        "home/.claude/skills/home-claude/SKILL.md": false,
+        "home/.claude/AGENTS.md": false,
+        "home/.claude/CLAUDE.md": false,
+        "managed/skills/managed/SKILL.md": true,
+        "managed/AGENTS.md": true,
+        "managed/CLAUDE.md": false,
+        "managed/.agents/skills/managed-agents/SKILL.md": false,
+        "managed/.agents/AGENTS.md": false,
+        "managed/.agents/CLAUDE.md": false,
+        "shifted-home/.agents/skills/shifted-agents/SKILL.md": false,
+        "shifted-home/.agents/AGENTS.md": false,
+        "shifted-home/.agents/CLAUDE.md": false,
+        "project/AGENTS.md": true,
+        "project/CLAUDE.md": false,
+        "home/.codex/config.toml": false,
+        "home/.codex/hooks.json": false,
+        "home/.codex/.agents/plugins/marketplace.json": false,
+        "home/.codex/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "managed/config.toml": true,
+        "managed/hooks.json": true,
+        "managed/.agents/plugins/marketplace.json": false,
+        "managed/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "home/.agents/plugins/marketplace.json": true,
+        "home/plugins/sentinel/.codex-plugin/plugin.json": true,
+        "shifted-home/.agents/plugins/marketplace.json": false,
+        "shifted-home/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "unread-control.txt": false
+      },
+      "commands": {
+        "version_readback": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "prompt": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "plugins": {
+          "exit": 0,
+          "timed_out": false
+        }
+      },
+      "version_readback": "codex-cli 0.163.0",
+      "prompt_sentinels": [
+        "SENTINEL_AGENTS_managed",
+        "SENTINEL_CONFIG_managed",
+        "SENTINEL_PROJECT_AGENTS",
+        "sentinel-home-agents",
+        "sentinel-managed"
+      ],
+      "plugin_result": {
+        "installed": [],
+        "available": [
+          {
+            "pluginId": "sentinel-plugin-home@sentinel-home",
+            "name": "sentinel-plugin-home",
+            "marketplaceName": "sentinel-home",
+            "version": null,
+            "installed": false,
+            "enabled": false,
+            "source": {
+              "source": "local",
+              "path": "$SCRATCH/codex-0.163.0-override-fixed-home/home/plugins/sentinel"
+            },
+            "installPolicy": "AVAILABLE",
+            "authPolicy": "ON_INSTALL"
+          }
+        ]
+      },
+      "hook_marker": null
+    },
+    {
+      "runtime": "codex",
+      "version": "0.163.0",
+      "mode": "override-shifted-home",
+      "binary_sha256": "8813367285524ac798dd96d1b071aea30d58708c7226fd236cd275cf1cfdee31",
+      "verdict": "passed",
+      "problems": [],
+      "atime_positive": true,
+      "file_reads": {
+        "home/.codex/skills/home-codex/SKILL.md": false,
+        "home/.codex/AGENTS.md": false,
+        "home/.codex/CLAUDE.md": false,
+        "home/.agents/skills/home-agents/SKILL.md": false,
+        "home/.agents/AGENTS.md": false,
+        "home/.agents/CLAUDE.md": false,
+        "home/.claude/skills/home-claude/SKILL.md": false,
+        "home/.claude/AGENTS.md": false,
+        "home/.claude/CLAUDE.md": false,
+        "managed/skills/managed/SKILL.md": true,
+        "managed/AGENTS.md": true,
+        "managed/CLAUDE.md": false,
+        "managed/.agents/skills/managed-agents/SKILL.md": false,
+        "managed/.agents/AGENTS.md": false,
+        "managed/.agents/CLAUDE.md": false,
+        "shifted-home/.agents/skills/shifted-agents/SKILL.md": true,
+        "shifted-home/.agents/AGENTS.md": false,
+        "shifted-home/.agents/CLAUDE.md": false,
+        "project/AGENTS.md": true,
+        "project/CLAUDE.md": false,
+        "home/.codex/config.toml": false,
+        "home/.codex/hooks.json": false,
+        "home/.codex/.agents/plugins/marketplace.json": false,
+        "home/.codex/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "managed/config.toml": true,
+        "managed/hooks.json": true,
+        "managed/.agents/plugins/marketplace.json": false,
+        "managed/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "home/.agents/plugins/marketplace.json": false,
+        "home/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "shifted-home/.agents/plugins/marketplace.json": true,
+        "shifted-home/plugins/sentinel/.codex-plugin/plugin.json": true,
+        "unread-control.txt": false
+      },
+      "commands": {
+        "version_readback": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "prompt": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "plugins": {
+          "exit": 0,
+          "timed_out": false
+        }
+      },
+      "version_readback": "codex-cli 0.163.0",
+      "prompt_sentinels": [
+        "SENTINEL_AGENTS_managed",
+        "SENTINEL_CONFIG_managed",
+        "SENTINEL_PROJECT_AGENTS",
+        "sentinel-managed",
+        "sentinel-shifted-agents"
+      ],
+      "plugin_result": {
+        "installed": [],
+        "available": [
+          {
+            "pluginId": "sentinel-plugin-shifted@sentinel-shifted",
+            "name": "sentinel-plugin-shifted",
+            "marketplaceName": "sentinel-shifted",
+            "version": null,
+            "installed": false,
+            "enabled": false,
+            "source": {
+              "source": "local",
+              "path": "$SCRATCH/codex-0.163.0-override-shifted-home/shifted-home/plugins/sentinel"
+            },
+            "installPolicy": "AVAILABLE",
+            "authPolicy": "ON_INSTALL"
+          }
+        ]
+      },
+      "hook_marker": null
+    },
+    {
+      "runtime": "codex",
+      "version": "0.163.0",
+      "mode": "override-instructions-precedence",
+      "binary_sha256": "8813367285524ac798dd96d1b071aea30d58708c7226fd236cd275cf1cfdee31",
+      "verdict": "passed",
+      "problems": [],
+      "atime_positive": true,
+      "file_reads": {
+        "home/.codex/skills/home-codex/SKILL.md": false,
+        "home/.codex/AGENTS.md": false,
+        "home/.codex/CLAUDE.md": false,
+        "home/.agents/skills/home-agents/SKILL.md": true,
+        "home/.agents/AGENTS.md": false,
+        "home/.agents/CLAUDE.md": false,
+        "home/.claude/skills/home-claude/SKILL.md": false,
+        "home/.claude/AGENTS.md": false,
+        "home/.claude/CLAUDE.md": false,
+        "managed/skills/managed/SKILL.md": true,
+        "managed/AGENTS.md": false,
+        "managed/CLAUDE.md": false,
+        "managed/.agents/skills/managed-agents/SKILL.md": false,
+        "managed/.agents/AGENTS.md": false,
+        "managed/.agents/CLAUDE.md": false,
+        "shifted-home/.agents/skills/shifted-agents/SKILL.md": false,
+        "shifted-home/.agents/AGENTS.md": false,
+        "shifted-home/.agents/CLAUDE.md": false,
+        "project/AGENTS.md": true,
+        "project/CLAUDE.md": false,
+        "home/.codex/config.toml": false,
+        "home/.codex/hooks.json": false,
+        "home/.codex/.agents/plugins/marketplace.json": false,
+        "home/.codex/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "managed/config.toml": true,
+        "managed/hooks.json": true,
+        "managed/.agents/plugins/marketplace.json": false,
+        "managed/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "home/.agents/plugins/marketplace.json": true,
+        "home/plugins/sentinel/.codex-plugin/plugin.json": true,
+        "shifted-home/.agents/plugins/marketplace.json": false,
+        "shifted-home/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "unread-control.txt": false,
+        "managed/AGENTS.override.md": true
+      },
+      "commands": {
+        "version_readback": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "prompt": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "plugins": {
+          "exit": 0,
+          "timed_out": false
+        }
+      },
+      "version_readback": "codex-cli 0.163.0",
+      "prompt_sentinels": [
+        "SENTINEL_AGENTS_OVERRIDE",
+        "SENTINEL_CONFIG_managed",
+        "SENTINEL_PROJECT_AGENTS",
+        "sentinel-home-agents",
+        "sentinel-managed"
+      ],
+      "plugin_result": {
+        "installed": [],
+        "available": [
+          {
+            "pluginId": "sentinel-plugin-home@sentinel-home",
+            "name": "sentinel-plugin-home",
+            "marketplaceName": "sentinel-home",
+            "version": null,
+            "installed": false,
+            "enabled": false,
+            "source": {
+              "source": "local",
+              "path": "$SCRATCH/codex-0.163.0-override-instructions-precedence/home/plugins/sentinel"
+            },
+            "installPolicy": "AVAILABLE",
+            "authPolicy": "ON_INSTALL"
+          }
+        ]
+      },
+      "hook_marker": null
+    },
+    {
+      "runtime": "claude",
+      "version": "installed",
+      "mode": "default",
+      "binary_sha256": "5262ce9de86243fed0d21edc39b271555d56780d0112e2b194439fe1c6662d37",
+      "verdict": "passed",
+      "problems": [],
+      "atime_positive": true,
+      "file_reads": {
+        "home/.codex/skills/home-codex/SKILL.md": false,
+        "home/.codex/AGENTS.md": false,
+        "home/.codex/CLAUDE.md": false,
+        "home/.agents/skills/home-agents/SKILL.md": false,
+        "home/.agents/AGENTS.md": false,
+        "home/.agents/CLAUDE.md": false,
+        "home/.claude/skills/home-claude/SKILL.md": true,
+        "home/.claude/AGENTS.md": false,
+        "home/.claude/CLAUDE.md": true,
+        "managed/skills/managed/SKILL.md": false,
+        "managed/AGENTS.md": false,
+        "managed/CLAUDE.md": false,
+        "managed/.agents/skills/managed-agents/SKILL.md": false,
+        "managed/.agents/AGENTS.md": false,
+        "managed/.agents/CLAUDE.md": false,
+        "shifted-home/.agents/skills/shifted-agents/SKILL.md": false,
+        "shifted-home/.agents/AGENTS.md": false,
+        "shifted-home/.agents/CLAUDE.md": false,
+        "project/AGENTS.md": false,
+        "project/CLAUDE.md": true,
+        "home/.claude/settings.json": true,
+        "home/.claude/plugins/cache/fixture/sentinel-default/1.0.0/.claude-plugin/plugin.json": false,
+        "home/.claude/plugins/cache/fixture/sentinel-default/1.0.0/skills/sentinel/SKILL.md": false,
+        "home/.claude/plugins/marketplaces/fixture/.claude-plugin/marketplace.json": true,
+        "home/.claude/plugins/marketplaces/fixture/plugins/sentinel/.claude-plugin/plugin.json": true,
+        "home/.claude/plugins/marketplaces/fixture/plugins/sentinel/skills/sentinel/SKILL.md": true,
+        "home/.claude/plugins/known_marketplaces.json": true,
+        "home/.claude/plugins/installed_plugins.json": true,
+        "home/.claude/.agents/plugins/marketplace.json": false,
+        "home/.claude/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "managed/settings.json": false,
+        "managed/plugins/cache/fixture/sentinel-managed/1.0.0/.claude-plugin/plugin.json": false,
+        "managed/plugins/cache/fixture/sentinel-managed/1.0.0/skills/sentinel/SKILL.md": false,
+        "managed/plugins/marketplaces/fixture/.claude-plugin/marketplace.json": false,
+        "managed/plugins/marketplaces/fixture/plugins/sentinel/.claude-plugin/plugin.json": false,
+        "managed/plugins/marketplaces/fixture/plugins/sentinel/skills/sentinel/SKILL.md": false,
+        "managed/plugins/known_marketplaces.json": false,
+        "managed/plugins/installed_plugins.json": false,
+        "managed/.agents/plugins/marketplace.json": false,
+        "managed/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "home/.agents/plugins/marketplace.json": false,
+        "home/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "shifted-home/.agents/plugins/marketplace.json": false,
+        "shifted-home/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "unread-control.txt": false
+      },
+      "commands": {
+        "version_readback": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "plugins": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "init": {
+          "exit": 0,
+          "timed_out": false
+        }
+      },
+      "version_readback": "2.1.302 (Claude Code)",
+      "prompt_sentinels": [],
+      "plugin_result": [
+        {
+          "id": "sentinel-default@fixture",
+          "version": "1.0.0",
+          "scope": "user",
+          "enabled": true,
+          "installPath": "$SCRATCH/claude-installed-default/home/.claude/plugins/cache/fixture/sentinel-default/1.0.0",
+          "readFromFolder": "$SCRATCH/claude-installed-default/home/.claude/plugins/marketplaces/fixture/plugins/sentinel",
+          "folderVersion": "1.0.0",
+          "installedAt": "2026-01-01T00:00:00Z",
+          "lastUpdated": "2026-01-01T00:00:00Z",
+          "projectEnabled": false
+        }
+      ],
+      "hook_marker": "SENTINEL_HOOK_default"
+    },
+    {
+      "runtime": "claude",
+      "version": "installed",
+      "mode": "override-fixed-home",
+      "binary_sha256": "5262ce9de86243fed0d21edc39b271555d56780d0112e2b194439fe1c6662d37",
+      "verdict": "passed",
+      "problems": [],
+      "atime_positive": true,
+      "file_reads": {
+        "home/.codex/skills/home-codex/SKILL.md": false,
+        "home/.codex/AGENTS.md": false,
+        "home/.codex/CLAUDE.md": false,
+        "home/.agents/skills/home-agents/SKILL.md": false,
+        "home/.agents/AGENTS.md": false,
+        "home/.agents/CLAUDE.md": false,
+        "home/.claude/skills/home-claude/SKILL.md": false,
+        "home/.claude/AGENTS.md": false,
+        "home/.claude/CLAUDE.md": false,
+        "managed/skills/managed/SKILL.md": true,
+        "managed/AGENTS.md": false,
+        "managed/CLAUDE.md": true,
+        "managed/.agents/skills/managed-agents/SKILL.md": false,
+        "managed/.agents/AGENTS.md": false,
+        "managed/.agents/CLAUDE.md": false,
+        "shifted-home/.agents/skills/shifted-agents/SKILL.md": false,
+        "shifted-home/.agents/AGENTS.md": false,
+        "shifted-home/.agents/CLAUDE.md": false,
+        "project/AGENTS.md": false,
+        "project/CLAUDE.md": true,
+        "home/.claude/settings.json": false,
+        "home/.claude/plugins/cache/fixture/sentinel-default/1.0.0/.claude-plugin/plugin.json": false,
+        "home/.claude/plugins/cache/fixture/sentinel-default/1.0.0/skills/sentinel/SKILL.md": false,
+        "home/.claude/plugins/marketplaces/fixture/.claude-plugin/marketplace.json": false,
+        "home/.claude/plugins/marketplaces/fixture/plugins/sentinel/.claude-plugin/plugin.json": false,
+        "home/.claude/plugins/marketplaces/fixture/plugins/sentinel/skills/sentinel/SKILL.md": false,
+        "home/.claude/plugins/known_marketplaces.json": false,
+        "home/.claude/plugins/installed_plugins.json": false,
+        "home/.claude/.agents/plugins/marketplace.json": false,
+        "home/.claude/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "managed/settings.json": true,
+        "managed/plugins/cache/fixture/sentinel-managed/1.0.0/.claude-plugin/plugin.json": false,
+        "managed/plugins/cache/fixture/sentinel-managed/1.0.0/skills/sentinel/SKILL.md": false,
+        "managed/plugins/marketplaces/fixture/.claude-plugin/marketplace.json": true,
+        "managed/plugins/marketplaces/fixture/plugins/sentinel/.claude-plugin/plugin.json": true,
+        "managed/plugins/marketplaces/fixture/plugins/sentinel/skills/sentinel/SKILL.md": true,
+        "managed/plugins/known_marketplaces.json": true,
+        "managed/plugins/installed_plugins.json": true,
+        "managed/.agents/plugins/marketplace.json": false,
+        "managed/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "home/.agents/plugins/marketplace.json": false,
+        "home/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "shifted-home/.agents/plugins/marketplace.json": false,
+        "shifted-home/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "unread-control.txt": false
+      },
+      "commands": {
+        "version_readback": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "plugins": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "init": {
+          "exit": 0,
+          "timed_out": false
+        }
+      },
+      "version_readback": "2.1.302 (Claude Code)",
+      "prompt_sentinels": [],
+      "plugin_result": [
+        {
+          "id": "sentinel-managed@fixture",
+          "version": "1.0.0",
+          "scope": "user",
+          "enabled": true,
+          "installPath": "$SCRATCH/claude-installed-override-fixed-home/managed/plugins/cache/fixture/sentinel-managed/1.0.0",
+          "readFromFolder": "$SCRATCH/claude-installed-override-fixed-home/managed/plugins/marketplaces/fixture/plugins/sentinel",
+          "folderVersion": "1.0.0",
+          "installedAt": "2026-01-01T00:00:00Z",
+          "lastUpdated": "2026-01-01T00:00:00Z",
+          "projectEnabled": false
+        }
+      ],
+      "hook_marker": "SENTINEL_HOOK_managed"
+    },
+    {
+      "runtime": "claude",
+      "version": "installed",
+      "mode": "override-shifted-home",
+      "binary_sha256": "5262ce9de86243fed0d21edc39b271555d56780d0112e2b194439fe1c6662d37",
+      "verdict": "passed",
+      "problems": [],
+      "atime_positive": true,
+      "file_reads": {
+        "home/.codex/skills/home-codex/SKILL.md": false,
+        "home/.codex/AGENTS.md": false,
+        "home/.codex/CLAUDE.md": false,
+        "home/.agents/skills/home-agents/SKILL.md": false,
+        "home/.agents/AGENTS.md": false,
+        "home/.agents/CLAUDE.md": false,
+        "home/.claude/skills/home-claude/SKILL.md": false,
+        "home/.claude/AGENTS.md": false,
+        "home/.claude/CLAUDE.md": false,
+        "managed/skills/managed/SKILL.md": true,
+        "managed/AGENTS.md": false,
+        "managed/CLAUDE.md": true,
+        "managed/.agents/skills/managed-agents/SKILL.md": false,
+        "managed/.agents/AGENTS.md": false,
+        "managed/.agents/CLAUDE.md": false,
+        "shifted-home/.agents/skills/shifted-agents/SKILL.md": false,
+        "shifted-home/.agents/AGENTS.md": false,
+        "shifted-home/.agents/CLAUDE.md": false,
+        "project/AGENTS.md": false,
+        "project/CLAUDE.md": true,
+        "home/.claude/settings.json": false,
+        "home/.claude/plugins/cache/fixture/sentinel-default/1.0.0/.claude-plugin/plugin.json": false,
+        "home/.claude/plugins/cache/fixture/sentinel-default/1.0.0/skills/sentinel/SKILL.md": false,
+        "home/.claude/plugins/marketplaces/fixture/.claude-plugin/marketplace.json": false,
+        "home/.claude/plugins/marketplaces/fixture/plugins/sentinel/.claude-plugin/plugin.json": false,
+        "home/.claude/plugins/marketplaces/fixture/plugins/sentinel/skills/sentinel/SKILL.md": false,
+        "home/.claude/plugins/known_marketplaces.json": false,
+        "home/.claude/plugins/installed_plugins.json": false,
+        "home/.claude/.agents/plugins/marketplace.json": false,
+        "home/.claude/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "managed/settings.json": true,
+        "managed/plugins/cache/fixture/sentinel-managed/1.0.0/.claude-plugin/plugin.json": false,
+        "managed/plugins/cache/fixture/sentinel-managed/1.0.0/skills/sentinel/SKILL.md": false,
+        "managed/plugins/marketplaces/fixture/.claude-plugin/marketplace.json": true,
+        "managed/plugins/marketplaces/fixture/plugins/sentinel/.claude-plugin/plugin.json": true,
+        "managed/plugins/marketplaces/fixture/plugins/sentinel/skills/sentinel/SKILL.md": true,
+        "managed/plugins/known_marketplaces.json": true,
+        "managed/plugins/installed_plugins.json": true,
+        "managed/.agents/plugins/marketplace.json": false,
+        "managed/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "home/.agents/plugins/marketplace.json": false,
+        "home/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "shifted-home/.agents/plugins/marketplace.json": false,
+        "shifted-home/plugins/sentinel/.codex-plugin/plugin.json": false,
+        "unread-control.txt": false
+      },
+      "commands": {
+        "version_readback": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "plugins": {
+          "exit": 0,
+          "timed_out": false
+        },
+        "init": {
+          "exit": 0,
+          "timed_out": false
+        }
+      },
+      "version_readback": "2.1.302 (Claude Code)",
+      "prompt_sentinels": [],
+      "plugin_result": [
+        {
+          "id": "sentinel-managed@fixture",
+          "version": "1.0.0",
+          "scope": "user",
+          "enabled": true,
+          "installPath": "$SCRATCH/claude-installed-override-shifted-home/managed/plugins/cache/fixture/sentinel-managed/1.0.0",
+          "readFromFolder": "$SCRATCH/claude-installed-override-shifted-home/managed/plugins/marketplaces/fixture/plugins/sentinel",
+          "folderVersion": "1.0.0",
+          "installedAt": "2026-01-01T00:00:00Z",
+          "lastUpdated": "2026-01-01T00:00:00Z",
+          "projectEnabled": false
+        }
+      ],
+      "hook_marker": "SENTINEL_HOOK_managed"
+    }
+  ]
+}
