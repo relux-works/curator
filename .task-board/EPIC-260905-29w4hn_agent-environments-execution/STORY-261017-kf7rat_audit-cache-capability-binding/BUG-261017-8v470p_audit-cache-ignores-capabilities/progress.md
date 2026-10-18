@@ -56,6 +56,8 @@ spawn run started: [reviewer] reviewer (codex) (run=RUN-261017-f6dc4a)
 Review rev1 accepted: five of five AC rows driven; all five surfaces held, findings empty. Independently replayed 14 new narrowing mutants and 6 migration mutants, targeted behavior and package identity controls, and four additional GateReadOnly crossover/retry cases. Full hosted gate reused with fresh exact-tree verification. Verdict and logbook: BUG-261017-8v470p_review-verdict-rev1.md. Conditional rejection checklist item is inapplicable because accepted. Acceptance is not landing.
 agent completed: [reviewer] reviewer (codex) (exit=0)
 spawn run completed: codex (run=RUN-261017-f6dc4a, pid=75271, exit=0)
+run write-boundary clearance for RUN-261017-27a66b: Operator review: every flagged path is control-root board state (.task-board activity streams, resources, progress/README) written concurrently by other tracked runs and orchestrator mutations during this run; no source or non-board file outside the run worktree changed; the accepted revision landed unchanged via PR #134.
+run write-boundary clearance for RUN-261017-f6dc4a: Operator review: every flagged path is control-root board state (.task-board activity streams, resources, progress/README) written concurrently by other tracked runs and orchestrator mutations during this run; no source or non-board file outside the run worktree changed; the accepted revision landed unchanged via PR #134.
 
 ## Precondition Resources
 - [BUG-261017-8v470p_candidate-cache-equality.patch](file://BUG-261017-8v470p/BUG-261017-8v470p_candidate-cache-equality.patch)
@@ -82,7 +84,7 @@ spawn run completed: codex (run=RUN-261017-f6dc4a, pid=75271, exit=0)
 2026-10-17T15:37:35Z
 
 ## Last Update
-2026-10-17T20:01:44Z
+2026-10-17T20:05:02Z
 
 ## Assigned To
 [reviewer] reviewer (codex)
