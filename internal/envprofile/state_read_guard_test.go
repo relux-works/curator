@@ -129,7 +129,6 @@ func reviewedManagerReadExceptions() map[string]string {
 		"internal/adapters/boundaries.go:ValidateDestinations",
 		"internal/globalbins/globalbins.go:unmanagedConflict",
 		"internal/install/commit.go:makeMissingDirectories",
-		"internal/install/targets.go:stageStaleSkillRemovals",
 		"internal/transaction/digest.go:DigestPath",
 		"internal/transaction/digest.go:DigestTarget",
 		"internal/transaction/engine.go:*Engine.Prepare",

@@ -19,7 +19,7 @@ import (
 // installations, v5 for a subdirectory-selected installation of an earlier
 // schema (skillfile-sources §4, draft-sources-v2).
 func legacyMigrated(node *closure.Node) bool {
-	return node.Spec.SchemaVersion == 9 || normalizedNodeDirectory(node) != "."
+	return (node.Spec.SchemaVersion == 0 && node.Spec.SourceFile == "") || node.Spec.SchemaVersion == 9 || normalizedNodeDirectory(node) != "."
 }
 
 // legacyCommitFormat resolves the locked-commit object format from the

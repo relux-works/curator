@@ -946,6 +946,17 @@ type projectTargetRequest struct {
 // the manager-home lock. Nothing here writes a live path: every result is a
 // staged replacement or an explicit managed removal for the transaction layer.
 func stageProjectTargets(request projectTargetRequest) (scopeTargets, error) {
+	projectNames, hybridNames := map[string]bool{}, map[string]bool{}
+	for _, node := range request.nodes {
+		if request.hybridNames[node.Name] {
+			hybridNames[node.Name] = true
+		} else {
+			projectNames[node.Name] = true
+		}
+	}
+	if err := errors.Join(checkCanonicalStore(request.skillsDir, projectNames, true), checkCanonicalStore(request.hybridStore, hybridNames, false)); err != nil {
+		return scopeTargets{}, err
+	}
 	var targets scopeTargets
 	stageRoot := request.scoped.stageRoot
 
@@ -1369,6 +1380,7 @@ func buildMarker(
 		Commands:           commands,
 		Dependencies:       dependencies,
 		SkillSchemaVersion: node.Spec.SchemaVersion,
+		Manifestless:       node.Spec.SchemaVersion == 0 && node.Spec.SourceFile == "",
 		RuntimeRoots:       node.Spec.RuntimeRoots,
 		BuildRoots:         buildRoots,
 		BuildSource:        source,
