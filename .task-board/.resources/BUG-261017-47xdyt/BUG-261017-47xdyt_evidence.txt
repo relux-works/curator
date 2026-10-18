@@ -1,0 +1,2990 @@
+BUG-261017-47xdyt plain-text validation evidence
+
+
+===== regression-red-01.log =====
+--- FAIL: TestInstallPreservesUnownedStaleStoreEntries (3.76s)
+    ownership_preservation_test.go:35: unowned stale entries admitted: {Alias:test Path:$SYSTEM_TEMP/TestInstallPreservesUnownedStaleStoreEntries1925954848/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: commands are installed in $SYSTEM_TEMP/TestInstallPreservesUnownedStaleStoreEntries1925954848/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+--- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination (16.85s)
+    --- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination/manual (3.34s)
+        ownership_preservation_test.go:119: want named canonical refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationmanual237103499/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: scan: warning: script-command-declared-only (commands.stool.execution_policy): command 'stool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: scan: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: scan    context=yes commands=[stool] via=<project> up-to-date test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationmanual237103499/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+    --- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination/notes-only (2.19s)
+        ownership_preservation_test.go:119: want named canonical refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationnotes-only1148482159/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: scan: warning: script-command-declared-only (commands.stool.execution_policy): command 'stool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: scan: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: scan    context=yes commands=[stool] via=<project> up-to-date test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationnotes-only1148482159/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+    --- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination/invalid (2.41s)
+        ownership_preservation_test.go:119: want named canonical refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationinvalid3125885541/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: scan: warning: script-command-declared-only (commands.stool.execution_policy): command 'stool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: scan: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: scan    context=yes commands=[stool] via=<project> up-to-date test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationinvalid3125885541/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 9472: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+    --- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name (2.25s)
+        ownership_preservation_test.go:119: want named canonical refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationwrong-name567461874/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: scan: warning: script-command-declared-only (commands.stool.execution_policy): command 'stool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: scan: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: scan    context=yes commands=[stool] via=<project> up-to-date test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationwrong-name567461874/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 9472: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+--- FAIL: TestInstallRefusesUnprovenStaleOwnership (13.42s)
+    --- FAIL: TestInstallRefusesUnprovenStaleOwnership/invalid (2.69s)
+        ownership_preservation_test.go:178: want named stale refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnprovenStaleOwnershipinvalid388125121/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnprovenStaleOwnershipinvalid388125121/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 9472: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+    --- FAIL: TestInstallRefusesUnprovenStaleOwnership/unreadable (3.50s)
+        ownership_preservation_test.go:178: want named stale refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnprovenStaleOwnershipunreadable3562542883/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnprovenStaleOwnershipunreadable3562542883/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+    --- FAIL: TestInstallRefusesUnprovenStaleOwnership/wrong-name (4.15s)
+        ownership_preservation_test.go:178: want named stale refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnprovenStaleOwnershipwrong-name501346749/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnprovenStaleOwnershipwrong-name501346749/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+    --- FAIL: TestInstallRefusesUnprovenStaleOwnership/canonical-link (1.49s)
+        ownership_preservation_test.go:178: want named stale refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnprovenStaleOwnershipcanonical-link3989873230/001 Status:failed Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional] Errors:[stale entry scan in $SYSTEM_TEMP/TestInstallRefusesUnprovenStaleOwnershipcanonical-link3989873230/001/.agents/skills is a link or special file, which this store never installs] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	38.933s
+FAIL
+
+
+===== regression-green-02.log =====
+=== RUN   TestInstallPreservesUnownedStaleStoreEntries
+--- PASS: TestInstallPreservesUnownedStaleStoreEntries (2.97s)
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/manual
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/notes-only
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/invalid
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/unreadable
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/marker-link
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/canonical-link
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/loose-file
+--- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination (14.19s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/manual (1.80s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/notes-only (1.92s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/invalid (1.85s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/unreadable (1.75s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name (1.68s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/marker-link (1.71s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/canonical-link (1.77s)
+    --- PASS: TestInstallRefusesUnownedSelectedCanonicalDestination/loose-file (1.72s)
+=== RUN   TestInstallRefusesUnprovenStaleOwnership
+=== RUN   TestInstallRefusesUnprovenStaleOwnership/invalid
+=== RUN   TestInstallRefusesUnprovenStaleOwnership/unreadable
+=== RUN   TestInstallRefusesUnprovenStaleOwnership/wrong-name
+=== RUN   TestInstallRefusesUnprovenStaleOwnership/marker-link
+=== RUN   TestInstallRefusesUnprovenStaleOwnership/canonical-link
+--- PASS: TestInstallRefusesUnprovenStaleOwnership (8.94s)
+    --- PASS: TestInstallRefusesUnprovenStaleOwnership/invalid (1.77s)
+    --- PASS: TestInstallRefusesUnprovenStaleOwnership/unreadable (1.75s)
+    --- PASS: TestInstallRefusesUnprovenStaleOwnership/wrong-name (1.68s)
+    --- PASS: TestInstallRefusesUnprovenStaleOwnership/marker-link (1.75s)
+    --- PASS: TestInstallRefusesUnprovenStaleOwnership/canonical-link (2.00s)
+=== RUN   TestInstallOwnedCanonicalPositiveControls
+--- PASS: TestInstallOwnedCanonicalPositiveControls (3.49s)
+PASS
+ok  	github.com/relux-works/curator/internal/install	29.925s
+
+
+===== callers-02.log =====
+=== RUN   TestDraftUnmanagedAdapterDestinationRefuses
+--- PASS: TestDraftUnmanagedAdapterDestinationRefuses (0.16s)
+=== RUN   TestRemovedSkillCleanedUp
+=== PAUSE TestRemovedSkillCleanedUp
+=== RUN   TestGlobalCanonicalOwnershipPreservation
+--- PASS: TestGlobalCanonicalOwnershipPreservation (1.70s)
+=== RUN   TestHybridCanonicalOwnershipPreservation
+--- PASS: TestHybridCanonicalOwnershipPreservation (1.85s)
+=== CONT  TestRemovedSkillCleanedUp
+--- PASS: TestRemovedSkillCleanedUp (2.17s)
+PASS
+ok  	github.com/relux-works/curator/internal/install	6.101s
+
+
+===== support-01.log =====
+ok  	github.com/relux-works/curator/internal/marker	4.991s
+ok  	github.com/relux-works/curator/internal/staging	0.795s
+ok  	github.com/relux-works/curator/internal/transaction	44.672s
+
+
+===== marker-03.log =====
+ok  	github.com/relux-works/curator/internal/marker	0.875s
+
+
+===== cross-scope-01.log =====
+ok  	github.com/relux-works/curator/internal/scopes	1.112s
+ok  	github.com/relux-works/curator/internal/adapters	0.793s
+
+
+===== read-guard-01.log =====
+=== RUN   TestManagerOwnedAbsenceReadsAreGuarded
+    state_read_guard_test.go:211: manager-owned reads: 505/505 covered (100.0%): 399 guarded via seam, 106 allowlisted (465 production files scanned)
+--- PASS: TestManagerOwnedAbsenceReadsAreGuarded (5.99s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	6.336s
+
+
+===== reviewer-contract-red-01.log =====
+=== RUN   TestDraftExternalExecutionPolicyInvalidMarkerReDerives
+    draftsources_semantic_external_test.go:422: repair = {Alias:test Path:$SYSTEM_TEMP/TestDraftExternalExecutionPolicyInvalidMarkerReDerives25357281/001 Status:failed Messages:[test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (project .agents/bin lookup, manager global/bin fallback, validated POSIX and PowerShell bare-command fallbacks, Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review.etool external build key=sha256:89ce863ebfc09eda7151286ff28e8aecf68d781af92023cc3aa0b430b4346dbb outcome=cache-hit] Errors:[build_repository_transaction_failed: review: canonical ownership $SYSTEM_TEMP/TestDraftExternalExecutionPolicyInvalidMarkerReDerives25357281/001/.agents/skills/review: install_marker_invalid: $SYSTEM_TEMP/TestDraftExternalExecutionPolicyInvalidMarkerReDerives25357281/001/.agents/skills/review/.csk-install.json: install marker is not valid for its schema] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}, want re-derivation success
+--- FAIL: TestDraftExternalExecutionPolicyInvalidMarkerReDerives (5.75s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/crossconformance	6.089s
+FAIL
+
+
+===== mutant-stale-01.log =====
+=== RUN   TestInstallPreservesUnownedStaleStoreEntries
+    ownership_preservation_test.go:39: missing conflict loose.txt: [unmanaged canonical destination $SYSTEM_TEMP/TestInstallPreservesUnownedStaleStoreEntries193706476/001/.agents/skills/unmanaged-notes: ownership marker must be a regular file
+        unmanaged canonical destination $SYSTEM_TEMP/TestInstallPreservesUnownedStaleStoreEntries193706476/001/.agents/skills/unmanaged-skill: ownership marker must be a regular file]
+--- FAIL: TestInstallPreservesUnownedStaleStoreEntries (2.96s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	3.331s
+FAIL
+
+
+===== mutant-selected-01.log =====
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/notes-only
+    ownership_preservation_test.go:119: want named canonical refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationnotes-only543978981/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: scan: warning: script-command-declared-only (commands.stool.execution_policy): command 'stool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: scan: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: scan    context=yes commands=[stool] via=<project> up-to-date test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationnotes-only543978981/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+--- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination (2.45s)
+    --- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination/notes-only (2.45s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	2.788s
+FAIL
+
+
+===== mutant-invalid-01.log =====
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/invalid
+    ownership_preservation_test.go:119: want named canonical refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationinvalid984307863/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: scan: warning: script-command-declared-only (commands.stool.execution_policy): command 'stool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: scan: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: scan    context=yes commands=[stool] via=<project> up-to-date test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationinvalid984307863/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+--- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination (3.78s)
+    --- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination/invalid (3.78s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	4.138s
+FAIL
+
+
+===== mutant-name-01.log =====
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination
+=== RUN   TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name
+    ownership_preservation_test.go:119: want named canonical refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationwrong-name1859137078/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: scan: warning: script-command-declared-only (commands.stool.execution_policy): command 'stool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: scan: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: scan    context=yes commands=[stool] via=<project> up-to-date test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnownedSelectedCanonicalDestinationwrong-name1859137078/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+--- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination (3.80s)
+    --- FAIL: TestInstallRefusesUnownedSelectedCanonicalDestination/wrong-name (3.80s)
+=== RUN   TestInstallRefusesUnprovenStaleOwnership
+=== RUN   TestInstallRefusesUnprovenStaleOwnership/wrong-name
+    ownership_preservation_test.go:178: want named stale refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnprovenStaleOwnershipwrong-name3632372356/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnprovenStaleOwnershipwrong-name3632372356/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 37575: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+--- FAIL: TestInstallRefusesUnprovenStaleOwnership (2.92s)
+    --- FAIL: TestInstallRefusesUnprovenStaleOwnership/wrong-name (2.92s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	7.069s
+FAIL
+
+
+===== mutant-unreadable-01.log =====
+=== RUN   TestInstallRefusesUnprovenStaleOwnership
+=== RUN   TestInstallRefusesUnprovenStaleOwnership/unreadable
+    ownership_preservation_test.go:178: want named stale refusal: {Alias:test Path:$SYSTEM_TEMP/TestInstallRefusesUnprovenStaleOwnershipunreadable626840595/001 Status:ok Messages:[test: review: warning: script-command-declared-only (commands.rtool.execution_policy): command 'rtool' is declared-only (no execution_policy); its capabilities bound nothing at run time; adopt execution_policy "script-worker-v1" with an interpreter to enforce containment test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review    context=yes commands=[rtool] via=<project> installed test: commands are installed in $SYSTEM_TEMP/TestInstallRefusesUnprovenStaleOwnershipunreadable626840595/001/.agents/bin; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install test: warning: build cache sweep skipped: live process executables could not be enumerated: read executable of process 83866: invalid argument; all builds retained] Errors:[] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}
+--- FAIL: TestInstallRefusesUnprovenStaleOwnership (2.71s)
+    --- FAIL: TestInstallRefusesUnprovenStaleOwnership/unreadable (2.71s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	3.045s
+FAIL
+
+
+===== build-02.log =====
+
+
+===== lint-04.log =====
+0 issues.
+
+
+===== gate-push-01.log =====
+error: src refspec 73a3874337293e7f70cfe6859aff0c6284cb60f3efs/heads/gate/BUG-261017-47xdyt/261017-182618 does not match any
+error: failed to push some refs to 'github.com:relux-works/curator.git'
+
+
+===== gate-push-02.log =====
+remote: 
+remote: Create a pull request for 'gate/BUG-261017-47xdyt/261017-182618' on GitHub by visiting:        
+remote:      https://github.com/relux-works/curator/pull/new/gate/BUG-261017-47xdyt/261017-182618        
+remote: 
+To github.com:relux-works/curator.git
+ * [new branch]        73a3874337293e7f70cfe6859aff0c6284cb60f3 -> gate/BUG-261017-47xdyt/261017-182618
+
+
+===== gate-status-terminal.json =====
+{"conclusion":"","headSha":"73a3874337293e7f70cfe6859aff0c6284cb60f3","jobs":[{"completedAt":"2026-10-17T18:27:23Z","conclusion":"success","databaseId":117470196974,"name":"Lint","startedAt":"2026-10-17T18:26:45Z","status":"completed","steps":[{"completedAt":"2026-10-17T18:26:47Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:26:46Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:26:47Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Initialize private Go state","number":3,"startedAt":"2026-10-17T18:26:48Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Run actions/setup-go@v5","number":4,"startedAt":"2026-10-17T18:26:48Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Verify Go toolchain identity","number":5,"startedAt":"2026-10-17T18:26:48Z","status":"completed"},{"completedAt":"2026-10-17T18:27:13Z","conclusion":"success","name":"Run golangci/golangci-lint-action@v7","number":6,"startedAt":"2026-10-17T18:26:48Z","status":"completed"},{"completedAt":"2026-10-17T18:27:14Z","conclusion":"success","name":"Run actions/setup-node@v4","number":7,"startedAt":"2026-10-17T18:27:13Z","status":"completed"},{"completedAt":"2026-10-17T18:27:18Z","conclusion":"success","name":"Verify Linux CI isolation","number":8,"startedAt":"2026-10-17T18:27:14Z","status":"completed"},{"completedAt":"2026-10-17T18:27:18Z","conclusion":"success","name":"No broad suppression","number":9,"startedAt":"2026-10-17T18:27:18Z","status":"completed"},{"completedAt":"2026-10-17T18:27:18Z","conclusion":"success","name":"Verify GoReleaser rc channel values","number":10,"startedAt":"2026-10-17T18:27:18Z","status":"completed"},{"completedAt":"2026-10-17T18:27:18Z","conclusion":"success","name":"Post Run actions/setup-node@v4","number":17,"startedAt":"2026-10-17T18:27:18Z","status":"completed"},{"completedAt":"2026-10-17T18:27:18Z","conclusion":"success","name":"Post Run golangci/golangci-lint-action@v7","number":18,"startedAt":"2026-10-17T18:27:18Z","status":"completed"},{"completedAt":"2026-10-17T18:27:18Z","conclusion":"success","name":"Post Run actions/setup-go@v5","number":19,"startedAt":"2026-10-17T18:27:18Z","status":"completed"},{"completedAt":"2026-10-17T18:27:18Z","conclusion":"success","name":"Post Run actions/checkout@v4","number":20,"startedAt":"2026-10-17T18:27:18Z","status":"completed"},{"completedAt":"2026-10-17T18:27:18Z","conclusion":"success","name":"Complete job","number":21,"startedAt":"2026-10-17T18:27:18Z","status":"completed"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470196974"},{"completedAt":"0001-01-01T00:00:00Z","conclusion":"","databaseId":117470197125,"name":"Race (macos-latest)","startedAt":"2026-10-17T18:27:19Z","status":"in_progress","steps":[{"completedAt":"2026-10-17T18:27:22Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:27:20Z","status":"completed"},{"completedAt":"2026-10-17T18:27:37Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:27:22Z","status":"completed"},{"completedAt":"2026-10-17T18:27:40Z","conclusion":"success","name":"Checkout authoritative protocol suite","number":3,"startedAt":"2026-10-17T18:27:37Z","status":"completed"},{"completedAt":"2026-10-17T18:28:20Z","conclusion":"success","name":"Run actions/setup-go@v5","number":4,"startedAt":"2026-10-17T18:27:40Z","status":"completed"},{"completedAt":"2026-10-17T18:28:22Z","conclusion":"success","name":"Run actions/setup-node@v4","number":5,"startedAt":"2026-10-17T18:28:20Z","status":"completed"},{"completedAt":"2026-10-17T18:28:22Z","conclusion":"success","name":"Verify pnpm pin matches Go constant","number":6,"startedAt":"2026-10-17T18:28:22Z","status":"completed"},{"completedAt":"2026-10-17T18:28:25Z","conclusion":"success","name":"Install pinned pnpm via npm","number":7,"startedAt":"2026-10-17T18:28:22Z","status":"completed"},{"completedAt":"2026-10-17T18:28:25Z","conclusion":"success","name":"Verify rust pin matches Go constant","number":8,"startedAt":"2026-10-17T18:28:25Z","status":"completed"},{"completedAt":"2026-10-17T18:28:35Z","conclusion":"success","name":"Install pinned Rust toolchain via rustup","number":9,"startedAt":"2026-10-17T18:28:25Z","status":"completed"},{"completedAt":"2026-10-17T18:28:36Z","conclusion":"success","name":"Verify Go toolchain identity","number":10,"startedAt":"2026-10-17T18:28:35Z","status":"completed"},{"completedAt":"0001-01-01T00:00:00Z","conclusion":"","name":"go test -race + platform-case gate","number":11,"startedAt":"2026-10-17T18:28:36Z","status":"in_progress"},{"completedAt":"0001-01-01T00:00:00Z","conclusion":"","name":"Upload race evidence","number":12,"startedAt":"0001-01-01T00:00:00Z","status":"pending"},{"completedAt":"0001-01-01T00:00:00Z","conclusion":"","name":"Post Run actions/setup-node@v4","number":21,"startedAt":"0001-01-01T00:00:00Z","status":"pending"},{"completedAt":"0001-01-01T00:00:00Z","conclusion":"","name":"Post Run actions/setup-go@v5","number":22,"startedAt":"0001-01-01T00:00:00Z","status":"pending"},{"completedAt":"0001-01-01T00:00:00Z","conclusion":"","name":"Post Checkout authoritative protocol suite","number":23,"startedAt":"0001-01-01T00:00:00Z","status":"pending"},{"completedAt":"0001-01-01T00:00:00Z","conclusion":"","name":"Post Run actions/checkout@v4","number":24,"startedAt":"0001-01-01T00:00:00Z","status":"pending"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197125"},{"completedAt":"2026-10-17T18:31:17Z","conclusion":"cancelled","databaseId":117470197136,"name":"Test (macos-latest)","startedAt":"2026-10-17T18:26:43Z","status":"completed","steps":[],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197136"},{"completedAt":"2026-10-17T18:26:51Z","conclusion":"success","databaseId":117470197145,"name":"Naming gate","startedAt":"2026-10-17T18:26:45Z","status":"completed","steps":[{"completedAt":"2026-10-17T18:26:46Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:26:46Z","status":"completed"},{"completedAt":"2026-10-17T18:26:47Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:26:46Z","status":"completed"},{"completedAt":"2026-10-17T18:26:47Z","conclusion":"success","name":"Initialize private Go state","number":3,"startedAt":"2026-10-17T18:26:47Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Employer name gate","number":4,"startedAt":"2026-10-17T18:26:47Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Post Run actions/checkout@v4","number":8,"startedAt":"2026-10-17T18:26:48Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Complete job","number":9,"startedAt":"2026-10-17T18:26:48Z","status":"completed"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197145"},{"completedAt":"2026-10-17T18:31:33Z","conclusion":"cancelled","databaseId":117470197165,"name":"Race (ubuntu-latest)","startedAt":"2026-10-17T18:26:45Z","status":"completed","steps":[{"completedAt":"2026-10-17T18:26:47Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:26:46Z","status":"completed"},{"completedAt":"2026-10-17T18:26:55Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:26:47Z","status":"completed"},{"completedAt":"2026-10-17T18:26:56Z","conclusion":"success","name":"Checkout authoritative protocol suite","number":3,"startedAt":"2026-10-17T18:26:55Z","status":"completed"},{"completedAt":"2026-10-17T18:27:05Z","conclusion":"success","name":"Run actions/setup-go@v5","number":4,"startedAt":"2026-10-17T18:26:56Z","status":"completed"},{"completedAt":"2026-10-17T18:27:06Z","conclusion":"success","name":"Run actions/setup-node@v4","number":5,"startedAt":"2026-10-17T18:27:05Z","status":"completed"},{"completedAt":"2026-10-17T18:27:06Z","conclusion":"success","name":"Verify pnpm pin matches Go constant","number":6,"startedAt":"2026-10-17T18:27:06Z","status":"completed"},{"completedAt":"2026-10-17T18:27:08Z","conclusion":"success","name":"Install pinned pnpm via npm","number":7,"startedAt":"2026-10-17T18:27:06Z","status":"completed"},{"completedAt":"2026-10-17T18:27:08Z","conclusion":"success","name":"Verify rust pin matches Go constant","number":8,"startedAt":"2026-10-17T18:27:08Z","status":"completed"},{"completedAt":"2026-10-17T18:27:16Z","conclusion":"success","name":"Install pinned Rust toolchain via rustup","number":9,"startedAt":"2026-10-17T18:27:08Z","status":"completed"},{"completedAt":"2026-10-17T18:27:16Z","conclusion":"success","name":"Verify Go toolchain identity","number":10,"startedAt":"2026-10-17T18:27:16Z","status":"completed"},{"completedAt":"2026-10-17T18:31:29Z","conclusion":"cancelled","name":"go test -race + platform-case gate","number":11,"startedAt":"2026-10-17T18:27:16Z","status":"completed"},{"completedAt":"2026-10-17T18:31:30Z","conclusion":"success","name":"Upload race evidence","number":12,"startedAt":"2026-10-17T18:31:29Z","status":"completed"},{"completedAt":"2026-10-17T18:31:30Z","conclusion":"skipped","name":"Post Run actions/setup-node@v4","number":21,"startedAt":"2026-10-17T18:31:30Z","status":"completed"},{"completedAt":"2026-10-17T18:31:30Z","conclusion":"skipped","name":"Post Run actions/setup-go@v5","number":22,"startedAt":"2026-10-17T18:31:30Z","status":"completed"},{"completedAt":"2026-10-17T18:31:31Z","conclusion":"success","name":"Post Checkout authoritative protocol suite","number":23,"startedAt":"2026-10-17T18:31:30Z","status":"completed"},{"completedAt":"2026-10-17T18:31:32Z","conclusion":"success","name":"Post Run actions/checkout@v4","number":24,"startedAt":"2026-10-17T18:31:31Z","status":"completed"},{"completedAt":"2026-10-17T18:31:32Z","conclusion":"success","name":"Complete job","number":25,"startedAt":"2026-10-17T18:31:32Z","status":"completed"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197165"},{"completedAt":"2026-10-17T18:28:53Z","conclusion":"failure","databaseId":117470197170,"name":"Test (ubuntu-latest)","startedAt":"2026-10-17T18:26:53Z","status":"completed","steps":[{"completedAt":"2026-10-17T18:26:58Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:26:54Z","status":"completed"},{"completedAt":"2026-10-17T18:26:59Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:26:58Z","status":"completed"},{"completedAt":"2026-10-17T18:26:59Z","conclusion":"success","name":"Initialize private Go state","number":3,"startedAt":"2026-10-17T18:26:59Z","status":"completed"},{"completedAt":"2026-10-17T18:27:00Z","conclusion":"success","name":"Checkout authoritative protocol suite","number":4,"startedAt":"2026-10-17T18:26:59Z","status":"completed"},{"completedAt":"2026-10-17T18:27:01Z","conclusion":"success","name":"Run actions/setup-go@v5","number":5,"startedAt":"2026-10-17T18:27:00Z","status":"completed"},{"completedAt":"2026-10-17T18:27:02Z","conclusion":"success","name":"Run actions/setup-node@v4","number":6,"startedAt":"2026-10-17T18:27:01Z","status":"completed"},{"completedAt":"2026-10-17T18:27:02Z","conclusion":"success","name":"Verify pnpm pin matches Go constant","number":7,"startedAt":"2026-10-17T18:27:02Z","status":"completed"},{"completedAt":"2026-10-17T18:27:04Z","conclusion":"success","name":"Install pinned pnpm via npm","number":8,"startedAt":"2026-10-17T18:27:02Z","status":"completed"},{"completedAt":"2026-10-17T18:27:04Z","conclusion":"success","name":"Verify rust pin matches Go constant","number":9,"startedAt":"2026-10-17T18:27:04Z","status":"completed"},{"completedAt":"2026-10-17T18:27:04Z","conclusion":"success","name":"Install pinned Rust toolchain via rustup","number":10,"startedAt":"2026-10-17T18:27:04Z","status":"completed"},{"completedAt":"2026-10-17T18:27:04Z","conclusion":"success","name":"Verify Go toolchain identity","number":11,"startedAt":"2026-10-17T18:27:04Z","status":"completed"},{"completedAt":"2026-10-17T18:27:04Z","conclusion":"success","name":"Verify versioned Go install compatibility","number":12,"startedAt":"2026-10-17T18:27:04Z","status":"completed"},{"completedAt":"2026-10-17T18:27:05Z","conclusion":"success","name":"gofmt check","number":13,"startedAt":"2026-10-17T18:27:04Z","status":"completed"},{"completedAt":"2026-10-17T18:27:16Z","conclusion":"success","name":"go vet","number":14,"startedAt":"2026-10-17T18:27:05Z","status":"completed"},{"completedAt":"2026-10-17T18:27:18Z","conclusion":"success","name":"Ledger consistency","number":15,"startedAt":"2026-10-17T18:27:16Z","status":"completed"},{"completedAt":"2026-10-17T18:28:48Z","conclusion":"failure","name":"go test + platform-case gate","number":16,"startedAt":"2026-10-17T18:27:18Z","status":"completed"},{"completedAt":"2026-10-17T18:28:50Z","conclusion":"success","name":"Upload gate evidence","number":17,"startedAt":"2026-10-17T18:28:48Z","status":"completed"},{"completedAt":"2026-10-17T18:28:50Z","conclusion":"skipped","name":"Post Run actions/setup-node@v4","number":31,"startedAt":"2026-10-17T18:28:50Z","status":"completed"},{"completedAt":"2026-10-17T18:28:50Z","conclusion":"skipped","name":"Post Run actions/setup-go@v5","number":32,"startedAt":"2026-10-17T18:28:50Z","status":"completed"},{"completedAt":"2026-10-17T18:28:50Z","conclusion":"success","name":"Post Checkout authoritative protocol suite","number":33,"startedAt":"2026-10-17T18:28:50Z","status":"completed"},{"completedAt":"2026-10-17T18:28:50Z","conclusion":"success","name":"Post Run actions/checkout@v4","number":34,"startedAt":"2026-10-17T18:28:50Z","status":"completed"},{"completedAt":"2026-10-17T18:28:50Z","conclusion":"success","name":"Complete job","number":35,"startedAt":"2026-10-17T18:28:50Z","status":"completed"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197170"},{"completedAt":"2026-10-17T18:27:33Z","conclusion":"success","databaseId":117470197192,"name":"Interop conformance gate","startedAt":"2026-10-17T18:27:16Z","status":"completed","steps":[{"completedAt":"2026-10-17T18:27:18Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:27:17Z","status":"completed"},{"completedAt":"2026-10-17T18:27:19Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:27:18Z","status":"completed"},{"completedAt":"2026-10-17T18:27:19Z","conclusion":"success","name":"Initialize private Go state","number":3,"startedAt":"2026-10-17T18:27:19Z","status":"completed"},{"completedAt":"2026-10-17T18:27:20Z","conclusion":"success","name":"Checkout authoritative protocol suite","number":4,"startedAt":"2026-10-17T18:27:19Z","status":"completed"},{"completedAt":"2026-10-17T18:27:20Z","conclusion":"success","name":"Run actions/setup-go@v5","number":5,"startedAt":"2026-10-17T18:27:20Z","status":"completed"},{"completedAt":"2026-10-17T18:27:20Z","conclusion":"success","name":"Verify Go toolchain identity","number":6,"startedAt":"2026-10-17T18:27:20Z","status":"completed"},{"completedAt":"2026-10-17T18:27:28Z","conclusion":"success","name":"Shared protocol suite","number":7,"startedAt":"2026-10-17T18:27:20Z","status":"completed"},{"completedAt":"2026-10-17T18:27:29Z","conclusion":"success","name":"Post Run actions/setup-go@v5","number":12,"startedAt":"2026-10-17T18:27:28Z","status":"completed"},{"completedAt":"2026-10-17T18:27:29Z","conclusion":"success","name":"Post Checkout authoritative protocol suite","number":13,"startedAt":"2026-10-17T18:27:29Z","status":"completed"},{"completedAt":"2026-10-17T18:27:29Z","conclusion":"success","name":"Post Run actions/checkout@v4","number":14,"startedAt":"2026-10-17T18:27:29Z","status":"completed"},{"completedAt":"2026-10-17T18:27:29Z","conclusion":"success","name":"Complete job","number":15,"startedAt":"2026-10-17T18:27:29Z","status":"completed"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197192"},{"completedAt":"2026-10-17T18:27:10Z","conclusion":"success","databaseId":117470197244,"name":"Gate self-test (macos-latest)","startedAt":"2026-10-17T18:26:50Z","status":"completed","steps":[{"completedAt":"2026-10-17T18:26:51Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:26:50Z","status":"completed"},{"completedAt":"2026-10-17T18:27:00Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:26:51Z","status":"completed"},{"completedAt":"2026-10-17T18:27:00Z","conclusion":"skipped","name":"Initialize private Go state","number":3,"startedAt":"2026-10-17T18:27:00Z","status":"completed"},{"completedAt":"2026-10-17T18:27:07Z","conclusion":"success","name":"Self-test the CI gates","number":4,"startedAt":"2026-10-17T18:27:00Z","status":"completed"},{"completedAt":"2026-10-17T18:27:08Z","conclusion":"success","name":"Post Run actions/checkout@v4","number":8,"startedAt":"2026-10-17T18:27:07Z","status":"completed"},{"completedAt":"2026-10-17T18:27:08Z","conclusion":"success","name":"Complete job","number":9,"startedAt":"2026-10-17T18:27:08Z","status":"completed"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197244"},{"completedAt":"2026-10-17T18:29:24Z","conclusion":"success","databaseId":117470197261,"name":"Go 1.27.1 driver (windows-latest)","startedAt":"2026-10-17T18:26:45Z","status":"completed","steps":[{"completedAt":"2026-10-17T18:26:47Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:26:46Z","status":"completed"},{"completedAt":"2026-10-17T18:27:00Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:26:47Z","status":"completed"},{"completedAt":"2026-10-17T18:27:00Z","conclusion":"skipped","name":"Initialize private Go state","number":3,"startedAt":"2026-10-17T18:27:00Z","status":"completed"},{"completedAt":"2026-10-17T18:27:03Z","conclusion":"success","name":"Checkout authoritative protocol suite","number":4,"startedAt":"2026-10-17T18:27:00Z","status":"completed"},{"completedAt":"2026-10-17T18:27:24Z","conclusion":"success","name":"Run actions/setup-go@v5","number":5,"startedAt":"2026-10-17T18:27:03Z","status":"completed"},{"completedAt":"2026-10-17T18:27:25Z","conclusion":"success","name":"Verify family toolchain identity","number":6,"startedAt":"2026-10-17T18:27:24Z","status":"completed"},{"completedAt":"2026-10-17T18:29:03Z","conclusion":"success","name":"Driver qualification and reproducibility","number":7,"startedAt":"2026-10-17T18:27:25Z","status":"completed"},{"completedAt":"2026-10-17T18:29:05Z","conclusion":"success","name":"Driver vet","number":8,"startedAt":"2026-10-17T18:29:03Z","status":"completed"},{"completedAt":"2026-10-17T18:29:18Z","conclusion":"success","name":"Build manager","number":9,"startedAt":"2026-10-17T18:29:05Z","status":"completed"},{"completedAt":"2026-10-17T18:29:18Z","conclusion":"success","name":"Post Run actions/setup-go@v5","number":16,"startedAt":"2026-10-17T18:29:18Z","status":"completed"},{"completedAt":"2026-10-17T18:29:20Z","conclusion":"success","name":"Post Checkout authoritative protocol suite","number":17,"startedAt":"2026-10-17T18:29:18Z","status":"completed"},{"completedAt":"2026-10-17T18:29:22Z","conclusion":"success","name":"Post Run actions/checkout@v4","number":18,"startedAt":"2026-10-17T18:29:20Z","status":"completed"},{"completedAt":"2026-10-17T18:29:22Z","conclusion":"success","name":"Complete job","number":19,"startedAt":"2026-10-17T18:29:22Z","status":"completed"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197261"},{"completedAt":"2026-10-17T18:27:14Z","conclusion":"success","databaseId":117470197294,"name":"Go 1.25.5 driver (ubuntu-latest)","startedAt":"2026-10-17T18:26:45Z","status":"completed","steps":[{"completedAt":"2026-10-17T18:26:47Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:26:46Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:26:47Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Initialize private Go state","number":3,"startedAt":"2026-10-17T18:26:48Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Checkout authoritative protocol suite","number":4,"startedAt":"2026-10-17T18:26:48Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Run actions/setup-go@v5","number":5,"startedAt":"2026-10-17T18:26:48Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Verify family toolchain identity","number":6,"startedAt":"2026-10-17T18:26:48Z","status":"completed"},{"completedAt":"2026-10-17T18:26:58Z","conclusion":"success","name":"Driver qualification and reproducibility","number":7,"startedAt":"2026-10-17T18:26:48Z","status":"completed"},{"completedAt":"2026-10-17T18:27:00Z","conclusion":"success","name":"Driver vet","number":8,"startedAt":"2026-10-17T18:26:58Z","status":"completed"},{"completedAt":"2026-10-17T18:27:10Z","conclusion":"success","name":"Build manager","number":9,"startedAt":"2026-10-17T18:27:00Z","status":"completed"},{"completedAt":"2026-10-17T18:27:10Z","conclusion":"success","name":"Post Run actions/setup-go@v5","number":16,"startedAt":"2026-10-17T18:27:10Z","status":"completed"},{"completedAt":"2026-10-17T18:27:10Z","conclusion":"success","name":"Post Checkout authoritative protocol suite","number":17,"startedAt":"2026-10-17T18:27:10Z","status":"completed"},{"completedAt":"2026-10-17T18:27:11Z","conclusion":"success","name":"Post Run actions/checkout@v4","number":18,"startedAt":"2026-10-17T18:27:10Z","status":"completed"},{"completedAt":"2026-10-17T18:27:11Z","conclusion":"success","name":"Complete job","number":19,"startedAt":"2026-10-17T18:27:11Z","status":"completed"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197294"},{"completedAt":"2026-10-17T18:31:33Z","conclusion":"cancelled","databaseId":117470197306,"name":"Test (windows-latest)","startedAt":"2026-10-17T18:26:45Z","status":"completed","steps":[{"completedAt":"2026-10-17T18:26:47Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:26:46Z","status":"completed"},{"completedAt":"2026-10-17T18:27:08Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:26:47Z","status":"completed"},{"completedAt":"2026-10-17T18:27:08Z","conclusion":"skipped","name":"Initialize private Go state","number":3,"startedAt":"2026-10-17T18:27:08Z","status":"completed"},{"completedAt":"2026-10-17T18:27:11Z","conclusion":"success","name":"Checkout authoritative protocol suite","number":4,"startedAt":"2026-10-17T18:27:08Z","status":"completed"},{"completedAt":"2026-10-17T18:27:45Z","conclusion":"success","name":"Run actions/setup-go@v5","number":5,"startedAt":"2026-10-17T18:27:11Z","status":"completed"},{"completedAt":"2026-10-17T18:27:50Z","conclusion":"success","name":"Run actions/setup-node@v4","number":6,"startedAt":"2026-10-17T18:27:45Z","status":"completed"},{"completedAt":"2026-10-17T18:27:51Z","conclusion":"success","name":"Verify pnpm pin matches Go constant","number":7,"startedAt":"2026-10-17T18:27:50Z","status":"completed"},{"completedAt":"2026-10-17T18:27:56Z","conclusion":"success","name":"Install pinned pnpm via npm","number":8,"startedAt":"2026-10-17T18:27:51Z","status":"completed"},{"completedAt":"2026-10-17T18:27:57Z","conclusion":"success","name":"Verify rust pin matches Go constant","number":9,"startedAt":"2026-10-17T18:27:56Z","status":"completed"},{"completedAt":"2026-10-17T18:28:14Z","conclusion":"success","name":"Install pinned Rust toolchain via rustup","number":10,"startedAt":"2026-10-17T18:27:57Z","status":"completed"},{"completedAt":"2026-10-17T18:28:14Z","conclusion":"success","name":"Verify Go toolchain identity","number":11,"startedAt":"2026-10-17T18:28:14Z","status":"completed"},{"completedAt":"2026-10-17T18:28:14Z","conclusion":"success","name":"Verify versioned Go install compatibility","number":12,"startedAt":"2026-10-17T18:28:14Z","status":"completed"},{"completedAt":"2026-10-17T18:28:14Z","conclusion":"skipped","name":"gofmt check","number":13,"startedAt":"2026-10-17T18:28:14Z","status":"completed"},{"completedAt":"2026-10-17T18:28:34Z","conclusion":"success","name":"go vet","number":14,"startedAt":"2026-10-17T18:28:14Z","status":"completed"},{"completedAt":"2026-10-17T18:29:24Z","conclusion":"success","name":"Ledger consistency","number":15,"startedAt":"2026-10-17T18:28:34Z","status":"completed"},{"completedAt":"2026-10-17T18:31:24Z","conclusion":"cancelled","name":"go test + platform-case gate","number":16,"startedAt":"2026-10-17T18:29:24Z","status":"completed"},{"completedAt":"2026-10-17T18:31:26Z","conclusion":"success","name":"Upload gate evidence","number":17,"startedAt":"2026-10-17T18:31:24Z","status":"completed"},{"completedAt":"2026-10-17T18:31:26Z","conclusion":"skipped","name":"Post Run actions/setup-node@v4","number":31,"startedAt":"2026-10-17T18:31:26Z","status":"completed"},{"completedAt":"2026-10-17T18:31:26Z","conclusion":"skipped","name":"Post Run actions/setup-go@v5","number":32,"startedAt":"2026-10-17T18:31:26Z","status":"completed"},{"completedAt":"2026-10-17T18:31:28Z","conclusion":"success","name":"Post Checkout authoritative protocol suite","number":33,"startedAt":"2026-10-17T18:31:26Z","status":"completed"},{"completedAt":"2026-10-17T18:31:31Z","conclusion":"success","name":"Post Run actions/checkout@v4","number":34,"startedAt":"2026-10-17T18:31:28Z","status":"completed"},{"completedAt":"2026-10-17T18:31:31Z","conclusion":"success","name":"Complete job","number":35,"startedAt":"2026-10-17T18:31:31Z","status":"completed"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197306"},{"completedAt":"2026-10-17T18:28:01Z","conclusion":"success","databaseId":117470197350,"name":"Gate self-test (windows-latest)","startedAt":"2026-10-17T18:26:45Z","status":"completed","steps":[{"completedAt":"2026-10-17T18:26:47Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:26:46Z","status":"completed"},{"completedAt":"2026-10-17T18:27:02Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:26:47Z","status":"completed"},{"completedAt":"2026-10-17T18:27:02Z","conclusion":"skipped","name":"Initialize private Go state","number":3,"startedAt":"2026-10-17T18:27:02Z","status":"completed"},{"completedAt":"2026-10-17T18:27:57Z","conclusion":"success","name":"Self-test the CI gates","number":4,"startedAt":"2026-10-17T18:27:02Z","status":"completed"},{"completedAt":"2026-10-17T18:27:59Z","conclusion":"success","name":"Post Run actions/checkout@v4","number":8,"startedAt":"2026-10-17T18:27:57Z","status":"completed"},{"completedAt":"2026-10-17T18:27:59Z","conclusion":"success","name":"Complete job","number":9,"startedAt":"2026-10-17T18:27:59Z","status":"completed"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197350"},{"completedAt":"2026-10-17T18:27:15Z","conclusion":"success","databaseId":117470197352,"name":"Go 1.26.0 driver (ubuntu-latest)","startedAt":"2026-10-17T18:26:45Z","status":"completed","steps":[{"completedAt":"2026-10-17T18:26:47Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:26:46Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:26:47Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Initialize private Go state","number":3,"startedAt":"2026-10-17T18:26:48Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Checkout authoritative protocol suite","number":4,"startedAt":"2026-10-17T18:26:48Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Run actions/setup-go@v5","number":5,"startedAt":"2026-10-17T18:26:48Z","status":"completed"},{"completedAt":"2026-10-17T18:26:48Z","conclusion":"success","name":"Verify family toolchain identity","number":6,"startedAt":"2026-10-17T18:26:48Z","status":"completed"},{"completedAt":"2026-10-17T18:27:00Z","conclusion":"success","name":"Driver qualification and reproducibility","number":7,"startedAt":"2026-10-17T18:26:48Z","status":"completed"},{"completedAt":"2026-10-17T18:27:02Z","conclusion":"success","name":"Driver vet","number":8,"startedAt":"2026-10-17T18:27:00Z","status":"completed"},{"completedAt":"2026-10-17T18:27:10Z","conclusion":"success","name":"Build manager","number":9,"startedAt":"2026-10-17T18:27:02Z","status":"completed"},{"completedAt":"2026-10-17T18:27:11Z","conclusion":"success","name":"Post Run actions/setup-go@v5","number":16,"startedAt":"2026-10-17T18:27:10Z","status":"completed"},{"completedAt":"2026-10-17T18:27:11Z","conclusion":"success","name":"Post Checkout authoritative protocol suite","number":17,"startedAt":"2026-10-17T18:27:11Z","status":"completed"},{"completedAt":"2026-10-17T18:27:12Z","conclusion":"success","name":"Post Run actions/checkout@v4","number":18,"startedAt":"2026-10-17T18:27:11Z","status":"completed"},{"completedAt":"2026-10-17T18:27:12Z","conclusion":"success","name":"Complete job","number":19,"startedAt":"2026-10-17T18:27:12Z","status":"completed"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197352"},{"completedAt":"2026-10-17T18:31:17Z","conclusion":"cancelled","databaseId":117470197371,"name":"Go 1.26.0 driver (macos-latest)","startedAt":"2026-10-17T18:26:44Z","status":"completed","steps":[],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197371"},{"completedAt":"2026-10-17T18:27:58Z","conclusion":"success","databaseId":117470197377,"name":"Go 1.27.1 driver (ubuntu-latest)","startedAt":"2026-10-17T18:27:24Z","status":"completed","steps":[{"completedAt":"2026-10-17T18:27:27Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:27:25Z","status":"completed"},{"completedAt":"2026-10-17T18:27:27Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:27:27Z","status":"completed"},{"completedAt":"2026-10-17T18:27:27Z","conclusion":"success","name":"Initialize private Go state","number":3,"startedAt":"2026-10-17T18:27:27Z","status":"completed"},{"completedAt":"2026-10-17T18:27:28Z","conclusion":"success","name":"Checkout authoritative protocol suite","number":4,"startedAt":"2026-10-17T18:27:27Z","status":"completed"},{"completedAt":"2026-10-17T18:27:29Z","conclusion":"success","name":"Run actions/setup-go@v5","number":5,"startedAt":"2026-10-17T18:27:28Z","status":"completed"},{"completedAt":"2026-10-17T18:27:29Z","conclusion":"success","name":"Verify family toolchain identity","number":6,"startedAt":"2026-10-17T18:27:29Z","status":"completed"},{"completedAt":"2026-10-17T18:27:45Z","conclusion":"success","name":"Driver qualification and reproducibility","number":7,"startedAt":"2026-10-17T18:27:29Z","status":"completed"},{"completedAt":"2026-10-17T18:27:46Z","conclusion":"success","name":"Driver vet","number":8,"startedAt":"2026-10-17T18:27:45Z","status":"completed"},{"completedAt":"2026-10-17T18:27:54Z","conclusion":"success","name":"Build manager","number":9,"startedAt":"2026-10-17T18:27:46Z","status":"completed"},{"completedAt":"2026-10-17T18:27:55Z","conclusion":"success","name":"Post Run actions/setup-go@v5","number":16,"startedAt":"2026-10-17T18:27:54Z","status":"completed"},{"completedAt":"2026-10-17T18:27:55Z","conclusion":"success","name":"Post Checkout authoritative protocol suite","number":17,"startedAt":"2026-10-17T18:27:55Z","status":"completed"},{"completedAt":"2026-10-17T18:27:55Z","conclusion":"success","name":"Post Run actions/checkout@v4","number":18,"startedAt":"2026-10-17T18:27:55Z","status":"completed"},{"completedAt":"2026-10-17T18:27:55Z","conclusion":"success","name":"Complete job","number":19,"startedAt":"2026-10-17T18:27:55Z","status":"completed"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197377"},{"completedAt":"2026-10-17T18:27:23Z","conclusion":"success","databaseId":117470197389,"name":"Gate self-test (ubuntu-latest)","startedAt":"2026-10-17T18:27:16Z","status":"completed","steps":[{"completedAt":"2026-10-17T18:27:17Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:27:16Z","status":"completed"},{"completedAt":"2026-10-17T18:27:18Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:27:17Z","status":"completed"},{"completedAt":"2026-10-17T18:27:18Z","conclusion":"success","name":"Initialize private Go state","number":3,"startedAt":"2026-10-17T18:27:18Z","status":"completed"},{"completedAt":"2026-10-17T18:27:19Z","conclusion":"success","name":"Self-test the CI gates","number":4,"startedAt":"2026-10-17T18:27:18Z","status":"completed"},{"completedAt":"2026-10-17T18:27:20Z","conclusion":"success","name":"Post Run actions/checkout@v4","number":8,"startedAt":"2026-10-17T18:27:19Z","status":"completed"},{"completedAt":"2026-10-17T18:27:20Z","conclusion":"success","name":"Complete job","number":9,"startedAt":"2026-10-17T18:27:20Z","status":"completed"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197389"},{"completedAt":"2026-10-17T18:29:34Z","conclusion":"success","databaseId":117470197402,"name":"Go 1.25.5 driver (windows-latest)","startedAt":"2026-10-17T18:26:45Z","status":"completed","steps":[{"completedAt":"2026-10-17T18:26:47Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:26:46Z","status":"completed"},{"completedAt":"2026-10-17T18:27:00Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:26:47Z","status":"completed"},{"completedAt":"2026-10-17T18:27:00Z","conclusion":"skipped","name":"Initialize private Go state","number":3,"startedAt":"2026-10-17T18:27:00Z","status":"completed"},{"completedAt":"2026-10-17T18:27:03Z","conclusion":"success","name":"Checkout authoritative protocol suite","number":4,"startedAt":"2026-10-17T18:27:00Z","status":"completed"},{"completedAt":"2026-10-17T18:27:31Z","conclusion":"success","name":"Run actions/setup-go@v5","number":5,"startedAt":"2026-10-17T18:27:03Z","status":"completed"},{"completedAt":"2026-10-17T18:27:31Z","conclusion":"success","name":"Verify family toolchain identity","number":6,"startedAt":"2026-10-17T18:27:31Z","status":"completed"},{"completedAt":"2026-10-17T18:29:10Z","conclusion":"success","name":"Driver qualification and reproducibility","number":7,"startedAt":"2026-10-17T18:27:31Z","status":"completed"},{"completedAt":"2026-10-17T18:29:15Z","conclusion":"success","name":"Driver vet","number":8,"startedAt":"2026-10-17T18:29:10Z","status":"completed"},{"completedAt":"2026-10-17T18:29:28Z","conclusion":"success","name":"Build manager","number":9,"startedAt":"2026-10-17T18:29:15Z","status":"completed"},{"completedAt":"2026-10-17T18:29:28Z","conclusion":"success","name":"Post Run actions/setup-go@v5","number":16,"startedAt":"2026-10-17T18:29:28Z","status":"completed"},{"completedAt":"2026-10-17T18:29:30Z","conclusion":"success","name":"Post Checkout authoritative protocol suite","number":17,"startedAt":"2026-10-17T18:29:28Z","status":"completed"},{"completedAt":"2026-10-17T18:29:32Z","conclusion":"success","name":"Post Run actions/checkout@v4","number":18,"startedAt":"2026-10-17T18:29:30Z","status":"completed"},{"completedAt":"2026-10-17T18:29:32Z","conclusion":"success","name":"Complete job","number":19,"startedAt":"2026-10-17T18:29:32Z","status":"completed"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197402"},{"completedAt":"2026-10-17T18:29:48Z","conclusion":"success","databaseId":117470197420,"name":"Go 1.26.0 driver (windows-latest)","startedAt":"2026-10-17T18:26:45Z","status":"completed","steps":[{"completedAt":"2026-10-17T18:26:47Z","conclusion":"success","name":"Set up job","number":1,"startedAt":"2026-10-17T18:26:46Z","status":"completed"},{"completedAt":"2026-10-17T18:27:00Z","conclusion":"success","name":"Run actions/checkout@v4","number":2,"startedAt":"2026-10-17T18:26:47Z","status":"completed"},{"completedAt":"2026-10-17T18:27:00Z","conclusion":"skipped","name":"Initialize private Go state","number":3,"startedAt":"2026-10-17T18:27:00Z","status":"completed"},{"completedAt":"2026-10-17T18:27:03Z","conclusion":"success","name":"Checkout authoritative protocol suite","number":4,"startedAt":"2026-10-17T18:27:00Z","status":"completed"},{"completedAt":"2026-10-17T18:27:26Z","conclusion":"success","name":"Run actions/setup-go@v5","number":5,"startedAt":"2026-10-17T18:27:03Z","status":"completed"},{"completedAt":"2026-10-17T18:27:26Z","conclusion":"success","name":"Verify family toolchain identity","number":6,"startedAt":"2026-10-17T18:27:26Z","status":"completed"},{"completedAt":"2026-10-17T18:29:25Z","conclusion":"success","name":"Driver qualification and reproducibility","number":7,"startedAt":"2026-10-17T18:27:26Z","status":"completed"},{"completedAt":"2026-10-17T18:29:28Z","conclusion":"success","name":"Driver vet","number":8,"startedAt":"2026-10-17T18:29:25Z","status":"completed"},{"completedAt":"2026-10-17T18:29:41Z","conclusion":"success","name":"Build manager","number":9,"startedAt":"2026-10-17T18:29:28Z","status":"completed"},{"completedAt":"2026-10-17T18:29:41Z","conclusion":"success","name":"Post Run actions/setup-go@v5","number":16,"startedAt":"2026-10-17T18:29:41Z","status":"completed"},{"completedAt":"2026-10-17T18:29:43Z","conclusion":"success","name":"Post Checkout authoritative protocol suite","number":17,"startedAt":"2026-10-17T18:29:41Z","status":"completed"},{"completedAt":"2026-10-17T18:29:46Z","conclusion":"success","name":"Post Run actions/checkout@v4","number":18,"startedAt":"2026-10-17T18:29:43Z","status":"completed"},{"completedAt":"2026-10-17T18:29:46Z","conclusion":"success","name":"Complete job","number":19,"startedAt":"2026-10-17T18:29:46Z","status":"completed"}],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197420"},{"completedAt":"2026-10-17T18:31:17Z","conclusion":"cancelled","databaseId":117470197432,"name":"Go 1.27.1 driver (macos-latest)","startedAt":"2026-10-17T18:26:44Z","status":"completed","steps":[],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197432"},{"completedAt":"2026-10-17T18:31:17Z","conclusion":"cancelled","databaseId":117470197496,"name":"Go 1.25.5 driver (macos-latest)","startedAt":"2026-10-17T18:26:44Z","status":"completed","steps":[],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470197496"},{"completedAt":"2026-10-17T18:26:43Z","conclusion":"skipped","databaseId":117470198141,"name":"Test (self-hosted macOS)","startedAt":"2026-10-17T18:26:44Z","status":"completed","steps":[],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470198141"},{"completedAt":"2026-10-17T18:26:43Z","conclusion":"skipped","databaseId":117470198347,"name":"Candidate suite (${{ matrix.os }})","startedAt":"2026-10-17T18:26:44Z","status":"completed","steps":[],"url":"https://github.com/relux-works/curator/actions/runs/39058113827/job/117470198347"}],"status":"in_progress","url":"https://github.com/relux-works/curator/actions/runs/39058113827"}
+
+
+===== command-exits.json =====
+{
+  "regression-red-01.log": 1,
+  "regression-green-02.log": 0,
+  "callers-02.log": 0,
+  "support-01.log": 0,
+  "marker-03.log": 0,
+  "cross-scope-01.log": 0,
+  "read-guard-01.log": 0,
+  "reviewer-contract-red-01.log": 1,
+  "mutant-stale-01.log": 1,
+  "mutant-selected-01.log": 1,
+  "mutant-invalid-01.log": 1,
+  "mutant-name-01.log": 1,
+  "mutant-unreadable-01.log": 1,
+  "build-02.log": 0,
+  "lint-04.log": 0,
+  "gate-push-01.log": 1,
+  "gate-push-02.log": 0
+}
+
+===== failed-remote-events.json =====
+[
+  {
+    "Time": "2026-10-17T18:27:55.101423406Z",
+    "Action": "run",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftExternalExecutionPolicyInvalidMarkerReDerives"
+  },
+  {
+    "Time": "2026-10-17T18:27:55.101424899Z",
+    "Action": "output",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftExternalExecutionPolicyInvalidMarkerReDerives",
+    "Output": "=== RUN   TestDraftExternalExecutionPolicyInvalidMarkerReDerives\n"
+  },
+  {
+    "Time": "2026-10-17T18:27:55.227082159Z",
+    "Action": "output",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftExternalExecutionPolicyInvalidMarkerReDerives",
+    "Output": "    draftsources_semantic_external_test.go:422: repair = {Alias:test Path:$SYSTEM_TEMP/TestDraftExternalExecutionPolicyInvalidMarkerReDerives4140099464/001 Status:failed Messages:[test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (project .agents/bin lookup, manager global/bin fallback, validated POSIX and PowerShell bare-command fallbacks, Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review.etool external build key=sha256:57ce2cda23a17c3408e8a98368f06a8f1f7daf04c6cbec27ee5f8b3dde37722d outcome=cache-hit] Errors:[build_repository_transaction_failed: review: canonical ownership $SYSTEM_TEMP/TestDraftExternalExecutionPolicyInvalidMarkerReDerives4140099464/001/.agents/skills/review: install_marker_invalid: $SYSTEM_TEMP/TestDraftExternalExecutionPolicyInvalidMarkerReDerives4140099464/001/.agen"
+  },
+  {
+    "Time": "2026-10-17T18:27:55.227147341Z",
+    "Action": "output",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftExternalExecutionPolicyInvalidMarkerReDerives",
+    "Output": "ts/skills/review/.csk-install.json: install marker is not valid for its schema] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}, want re-derivation success\n"
+  },
+  {
+    "Time": "2026-10-17T18:27:55.227523825Z",
+    "Action": "output",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftExternalExecutionPolicyInvalidMarkerReDerives",
+    "Output": "--- FAIL: TestDraftExternalExecutionPolicyInvalidMarkerReDerives (0.13s)\n"
+  },
+  {
+    "Time": "2026-10-17T18:27:55.227599215Z",
+    "Action": "fail",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftExternalExecutionPolicyInvalidMarkerReDerives",
+    "Elapsed": 0.13
+  },
+  {
+    "Time": "2026-10-17T18:27:58.789394611Z",
+    "Action": "run",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftSourcesSemanticCasesBatch4/external-evidence-mismatch-execution_policy"
+  },
+  {
+    "Time": "2026-10-17T18:27:58.789395553Z",
+    "Action": "output",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftSourcesSemanticCasesBatch4/external-evidence-mismatch-execution_policy",
+    "Output": "=== RUN   TestDraftSourcesSemanticCasesBatch4/external-evidence-mismatch-execution_policy\n"
+  },
+  {
+    "Time": "2026-10-17T18:27:58.789398168Z",
+    "Action": "output",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftSourcesSemanticCasesBatch4/external-evidence-mismatch-execution_policy",
+    "Output": "=== PAUSE TestDraftSourcesSemanticCasesBatch4/external-evidence-mismatch-execution_policy\n"
+  },
+  {
+    "Time": "2026-10-17T18:27:58.789400762Z",
+    "Action": "pause",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftSourcesSemanticCasesBatch4/external-evidence-mismatch-execution_policy"
+  },
+  {
+    "Time": "2026-10-17T18:27:58.789505107Z",
+    "Action": "cont",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftSourcesSemanticCasesBatch4/external-evidence-mismatch-execution_policy"
+  },
+  {
+    "Time": "2026-10-17T18:27:58.789506881Z",
+    "Action": "output",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftSourcesSemanticCasesBatch4/external-evidence-mismatch-execution_policy",
+    "Output": "=== CONT  TestDraftSourcesSemanticCasesBatch4/external-evidence-mismatch-execution_policy\n"
+  },
+  {
+    "Time": "2026-10-17T18:27:59.074942296Z",
+    "Action": "output",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftSourcesSemanticCasesBatch4/external-evidence-mismatch-execution_policy",
+    "Output": "    draftsources_semantic_external_test.go:422: repair = {Alias:test Path:$SYSTEM_TEMP/TestDraftSourcesSemanticCasesBatch4external-evidence-mismatch-e645222209/001 Status:failed Messages:[test: review: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (project .agents/bin lookup, manager global/bin fallback, validated POSIX and PowerShell bare-command fallbacks, Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: review.etool external build key=sha256:57ce2cda23a17c3408e8a98368f06a8f1f7daf04c6cbec27ee5f8b3dde37722d outcome=cache-hit] Errors:[build_repository_transaction_failed: review: canonical ownership $SYSTEM_TEMP/TestDraftSourcesSemanticCasesBatch4external-evidence-mismatch-e645222209/001/.agents/skills/review: install_marker_invalid: $SYSTEM_TEMP/TestDraftSourcesSemanticCasesBatch4external-evidence-misma"
+  },
+  {
+    "Time": "2026-10-17T18:27:59.074954028Z",
+    "Action": "output",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftSourcesSemanticCasesBatch4/external-evidence-mismatch-execution_policy",
+    "Output": "tch-e645222209/001/.agents/skills/review/.csk-install.json: install marker is not valid for its schema] Diagnostics:[] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false Attestations:map[] LegacyPackages:map[] LegacyLockSHA256:}, want re-derivation success\n"
+  },
+  {
+    "Time": "2026-10-17T18:27:59.075697468Z",
+    "Action": "output",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftSourcesSemanticCasesBatch4/external-evidence-mismatch-execution_policy",
+    "Output": "--- FAIL: TestDraftSourcesSemanticCasesBatch4/external-evidence-mismatch-execution_policy (0.29s)\n"
+  },
+  {
+    "Time": "2026-10-17T18:27:59.086390935Z",
+    "Action": "fail",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftSourcesSemanticCasesBatch4/external-evidence-mismatch-execution_policy",
+    "Elapsed": 0.29
+  },
+  {
+    "Time": "2026-10-17T18:27:59.27076498Z",
+    "Action": "fail",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Test": "TestDraftSourcesSemanticCasesBatch4",
+    "Elapsed": 0
+  },
+  {
+    "Time": "2026-10-17T18:28:00.804378194Z",
+    "Action": "fail",
+    "Package": "github.com/relux-works/curator/internal/crossconformance",
+    "Elapsed": 38.01
+  },
+  {
+    "Time": "2026-10-17T18:28:11.726234146Z",
+    "Action": "run",
+    "Package": "github.com/relux-works/curator/internal/envprofile",
+    "Test": "TestManagerOwnedAbsenceReadsAreGuarded"
+  },
+  {
+    "Time": "2026-10-17T18:28:11.726235749Z",
+    "Action": "output",
+    "Package": "github.com/relux-works/curator/internal/envprofile",
+    "Test": "TestManagerOwnedAbsenceReadsAreGuarded",
+    "Output": "=== RUN   TestManagerOwnedAbsenceReadsAreGuarded\n"
+  },
+  {
+    "Time": "2026-10-17T18:28:13.789010416Z",
+    "Action": "output",
+    "Package": "github.com/relux-works/curator/internal/envprofile",
+    "Test": "TestManagerOwnedAbsenceReadsAreGuarded",
+    "Output": "    state_read_guard_test.go:212: manager-owned reads: 505/505 covered (100.0%): 399 guarded via seam, 106 allowlisted (465 production files scanned)\n"
+  },
+  {
+    "Time": "2026-10-17T18:28:13.789046584Z",
+    "Action": "output",
+    "Package": "github.com/relux-works/curator/internal/envprofile",
+    "Test": "TestManagerOwnedAbsenceReadsAreGuarded",
+    "Output": "    state_read_guard_test.go:218: reviewed allowlist entry has no matching absence-sensitive reader: internal/install/targets.go:stageStaleSkillRemovals\n"
+  },
+  {
+    "Time": "2026-10-17T18:28:13.78905551Z",
+    "Action": "output",
+    "Package": "github.com/relux-works/curator/internal/envprofile",
+    "Test": "TestManagerOwnedAbsenceReadsAreGuarded",
+    "Output": "--- FAIL: TestManagerOwnedAbsenceReadsAreGuarded (2.06s)\n"
+  },
+  {
+    "Time": "2026-10-17T18:28:13.789058205Z",
+    "Action": "fail",
+    "Package": "github.com/relux-works/curator/internal/envprofile",
+    "Test": "TestManagerOwnedAbsenceReadsAreGuarded",
+    "Elapsed": 2.06
+  },
+  {
+    "Time": "2026-10-17T18:28:16.695579484Z",
+    "Action": "fail",
+    "Package": "github.com/relux-works/curator/internal/envprofile",
+    "Elapsed": 50.178
+  }
+]
+
+===== prepare-mutants.py =====
+import json
+from pathlib import Path
+root=Path.cwd()
+out=root/'.temp/BUG-261017-47xdyt/mutants'
+out.mkdir(exist_ok=True)
+target=root/'internal/install/targets.go'
+owner=root/'internal/marker/ownership.go'
+cases={
+ 'stale-loose-file': (target, 'if err := marker.CheckOwnership(filepath.Join(store, name)); err != nil {', 'if err := marker.CheckOwnership(filepath.Join(store, name)); err != nil && name != "loose.txt" {'),
+ 'selected-notes-only': (target, 'if err := marker.CheckOwnership(live); err != nil {', 'ownershipErr := marker.CheckOwnership(live)\n\tif _, err := os.Lstat(filepath.Join(live, "SKILL.md")); os.IsNotExist(err) { ownershipErr = nil }\n\tif err := ownershipErr; err != nil {'),
+ 'selected-invalid-marker': (target, 'if err := marker.CheckOwnership(live); err != nil {', 'var invalid *marker.InvalidError\n\tif err := marker.CheckOwnership(live); err != nil && !errors.As(err, &invalid) {'),
+ 'wrong-name-marker': (owner, 'recorded.Name != filepath.Base(installedDir)', '(recorded.Name != filepath.Base(installedDir) && recorded.Name != "other")'),
+}
+for name,(source,old,new) in cases.items():
+ text=source.read_text()
+ assert text.count(old)==1,(name,text.count(old))
+ mutated=out/(name+'.go'); mutated.write_text(text.replace(old,new))
+ (out/(name+'.json')).write_text(json.dumps({'Replace': {str(source):str(mutated)}}))
+print('4 narrowing overlays prepared; production files unchanged')
+
+
+===== mutants/selected-invalid-marker.go =====
+package install
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/buildrepo"
+	"github.com/relux-works/curator/internal/closure"
+	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/locale"
+	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/opaquescan"
+	"github.com/relux-works/curator/internal/runtimestore"
+	"github.com/relux-works/curator/internal/scriptpolicy"
+	"github.com/relux-works/curator/internal/scriptworker"
+	"github.com/relux-works/curator/internal/skillspec"
+	"github.com/relux-works/curator/internal/staging"
+	"github.com/relux-works/curator/internal/stateread"
+	"github.com/relux-works/curator/internal/whitelist"
+)
+
+// nodeInstall is one node's desired installed state inside one context store.
+type nodeInstall struct {
+	node *closure.Node
+	// store is the live directory that holds the node's context directory.
+	store string
+	// kind labels the store in target identifiers: project, global, or hybrid.
+	kind     string
+	locale   string
+	agents   []string
+	expected *marker.Marker
+}
+
+// stageNode renders the complete desired context directory of one node below
+// the stage root and returns the target it replaces.
+//
+// An already current node produces no target at all: a marker match is the
+// installation's idempotence, and journaling an identical replacement would
+// make every re-run rewrite every skill. Its status is still reported.
+func stageNode(stageRoot string, install nodeInstall, clock Clock) (staging.Plan, string, error) {
+	var plan staging.Plan
+	live := filepath.Join(install.store, install.node.Name)
+	var invalid *marker.InvalidError
+	if err := marker.CheckOwnership(live); err != nil && !errors.As(err, &invalid) {
+		return staging.Plan{}, "", err
+	}
+	current, err := marker.Current(live, install.expected)
+	if err != nil {
+		return staging.Plan{}, "", err
+	}
+	if current {
+		return plan, "up-to-date", nil
+	}
+	staged := filepath.Join(stageRoot, "context", install.kind, install.node.Name)
+	if err := os.RemoveAll(staged); err != nil {
+		return staging.Plan{}, "", err
+	}
+	if err := os.MkdirAll(staged, 0o755); err != nil {
+		return staging.Plan{}, "", err
+	}
+
+	var files []string
+	if install.node.ContextActive() {
+		includeScripts := len(install.node.Spec.Commands) == 0
+		if includeScripts {
+			if _, err := os.Stat(filepath.Join(install.node.Snapshot, "scripts")); err != nil {
+				includeScripts = false
+			}
+		}
+		excludeRoots := whitelist.ContextExcludedRoots(install.node.Spec.RuntimeRoots, install.node.Spec.BuildRoots)
+		files, err = whitelist.CopyContext(install.node.Snapshot, staged, includeScripts, excludeRoots)
+		if err != nil {
+			return staging.Plan{}, "", err
+		}
+		if _, err := locale.Render(install.node.Snapshot, staged, install.locale); err != nil {
+			return staging.Plan{}, "", err
+		}
+	} else {
+		files = []string{}
+		install.expected.Locale = ""
+		install.expected.Agents = []string{}
+	}
+	hashVersion := hashing.WriteVersion()
+	if install.expected.Package != nil {
+		hashVersion = hashing.VersionV1
+	}
+	// Spec §8 interim rule for v1 readers: refuse before hashing a
+	// draft-lane v1 staged identity over NUL bytes.
+	if err := opaquescan.RefuseNULV1(staged, hashVersion); err != nil {
+		return staging.Plan{}, "", err
+	}
+	contentHash, err := hashing.ContentSHA256WithVersion(staged, nil, hashVersion)
+	if err != nil {
+		return staging.Plan{}, "", err
+	}
+	install.expected.ContentSHA256 = contentHash
+	if install.expected.Package == nil {
+		install.expected.HashVersion = hashVersion
+	}
+	install.expected.Files = files
+	install.expected.InstalledAt = installedAt(clock)
+	if err := marker.Write(staged, install.expected); err != nil {
+		return staging.Plan{}, "", err
+	}
+	plan.Replace(staging.ClassContext, install.kind+"/"+install.node.Name, live, staged)
+	return plan, "installed", nil
+}
+
+// refuseInstalledNULForStatus enforces the Spec §8 interim rule for v1
+// readers on the status surface: every installed tree backing a planned
+// node is refused before any currentness comparison when its recorded
+// identity is v1 and the tree contains NUL bytes. V2 trees hash NUL as
+// ordinary data and skip the scan. An absent, unreadable, or invalid
+// marker is not this gate's verdict — the drift classifiers report those
+// states — so only a present recorded marker is guarded.
+func refuseInstalledNULForStatus(nodes []*closure.Node, storeFor func(string) string) error {
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		installed := filepath.Join(storeFor(node.Name), node.Name)
+		recorded, _, err := marker.ReadState(installed)
+		if err != nil || recorded == nil {
+			continue
+		}
+		if err := opaquescan.RefuseNULV1(installed, recorded.ContentHashVersion()); err != nil {
+			return fmt.Errorf("installed skill %s: %w", node.Name, err)
+		}
+	}
+	return nil
+}
+
+// nodeSnapshots returns the resolved content snapshots of every closure
+// node: the admitted inputs the publication boundary guard must protect.
+// Staging already reads these directories (context projection and runtime
+// trees consume snapshot bytes), so a node without one cannot stage and
+// fails here with the member diagnostic instead of staging blind.
+func nodeSnapshots(nodes []*closure.Node) ([]string, error) {
+	admitted := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		if node == nil || node.Snapshot == "" {
+			name := "<nil>"
+			if node != nil {
+				name = node.Name
+			}
+			return nil, fmt.Errorf("source_member_missing: node %s has no content snapshot", name)
+		}
+		admitted = append(admitted, node.Snapshot)
+	}
+	return admitted, nil
+}
+
+// contextSources maps each installed skill name to the directory its content
+// currently lives in, so an adapter mirror can be staged from the replacement
+// this run is about to commit rather than from a canonical path that does not
+// hold it yet. A skill that is already current keeps its live directory.
+func contextSources(plan staging.Plan, store string, names []string) map[string]string {
+	staged := map[string]string{}
+	for _, target := range plan.Targets {
+		if target.Class == staging.ClassContext && filepath.Dir(target.LivePath) == store {
+			staged[filepath.Base(target.LivePath)] = target.StagedPath
+		}
+	}
+	sources := make(map[string]string, len(names))
+	for _, name := range names {
+		if replacement, found := staged[name]; found {
+			sources[name] = replacement
+			continue
+		}
+		sources[name] = filepath.Join(store, name)
+	}
+	return sources
+}
+
+// runtimeStaging is the staged executable state of one scope: commit-keyed
+// script runtime trees plus the canonical launchers that reach them.
+type runtimeStaging struct {
+	plan staging.Plan
+	// commands is the complete set of command names the scope publishes.
+	commands map[string]bool
+	// enforced names the published commands served by native enforced
+	// launchers rather than ordinary shims.
+	enforced map[string]bool
+	// messages carries the per-command derivation records install reports.
+	messages []string
+	// builds records, per node, the published build identity of each compiled
+	// command so the install marker can carry it.
+	builds map[string]map[string]marker.Build
+}
+
+// stageRuntimeAndShims derives every runtime tree, canonical launcher, and
+// stale launcher removal of one scope without touching a live path.
+//
+// runtimeKeys optionally overrides the commit-keyed runtime leaf per node:
+// the draft lane passes frozen source-v1 keys for its local-snapshot
+// members (which carry no commit) so they materialize under their package
+// identity, and the legacy lane passes staged source-v1 keys for its
+// migrated nodes for the same reason. A nil map keeps the resolved-commit
+// behavior byte-identically.
+//
+// A compiled command resolves through the protected cache entry that the
+// commit phase already published or verified, so a launcher can only ever point
+// at an immutable protected artifact — never at a snapshot or private path.
+func stageRuntimeAndShims(
+	stageRoot, home, binDir string,
+	nodes []*closure.Node,
+	role runtimestore.ShimRole,
+	platform string,
+	commit scopeCommit,
+	plannedInputs map[string]map[string]plannedBuildInput,
+	external map[string]map[string]externalEntry,
+	externalRoot string,
+	runtimeKeys map[string]string,
+	projectRoot string,
+) (runtimeStaging, error) {
+	result := runtimeStaging{
+		commands: map[string]bool{},
+		enforced: map[string]bool{},
+		builds:   map[string]map[string]marker.Build{},
+	}
+	var specs []runtimestore.ShimSpec
+	var enforcedSpecs []runtimestore.EnforcedShimSpec
+	for _, node := range nodes {
+		active := node.ActiveCommands()
+		if len(active) == 0 {
+			continue
+		}
+		pathEntries, err := runtimePathEntries(node, binDir, platform)
+		if err != nil {
+			return runtimeStaging{}, err
+		}
+		scriptCommands, err := activeScriptCommands(node, active)
+		if err != nil {
+			return runtimeStaging{}, err
+		}
+		enforcedCommands, err := activeEnforcedScriptCommands(node, active)
+		if err != nil {
+			return runtimeStaging{}, err
+		}
+		targets := map[string]runtimestore.RuntimeTarget{}
+		scriptTargets := map[string]runtimestore.ScriptTarget{}
+		allScriptCommands := append(append([]skillspec.Command(nil), scriptCommands...), enforcedCommands...)
+		if len(allScriptCommands) > 0 {
+			runtimeKey := draftRuntimeKey(node, runtimeKeys)
+			runtimePlan, err := runtimestore.PrepareScriptRuntime(stageRoot, runtimestore.ScriptRuntimeSpec{
+				Home: home, SkillName: node.Name, Commit: runtimeKey, Snapshot: node.Snapshot,
+				RuntimeRoots: node.Spec.RuntimeRoots, Commands: allScriptCommands, Platform: platform,
+			})
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s: %w", node.Name, err)
+			}
+			if runtimePlan.Desired != nil {
+				result.plan.Replace(staging.ClassRuntime,
+					node.Name+"/"+runtimeKey,
+					runtimePlan.Desired.LivePath, runtimePlan.Desired.StagedPath)
+			}
+			for name, target := range runtimePlan.Commands {
+				targets[name] = target
+				scriptTargets[name] = target
+			}
+		}
+		for _, name := range node.ActiveCommandNames() {
+			command := node.Spec.Commands[name]
+			if command.Type != "build" || !active[name] {
+				continue
+			}
+			if command.Driver == "go-repository-v1" {
+				entry, known := external[node.Name][name]
+				if !known {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: the external build was not staged", node.Name, name)
+				}
+				keyName := strings.TrimPrefix(entry.result.CacheKey, "sha256:")
+				finalArtifact := filepath.Join(externalRoot, buildrepo.ArtifactsDir(entry.result.ReceiptSchemaVersion), keyName, filepath.Base(entry.artifactPath))
+				compiled, err := runtimestore.ExternalCompiledTarget(entry.artifactPath, finalArtifact,
+					entry.record.CacheKey, entry.record.ReceiptSHA256, entry.record.ArtifactSHA256, platform)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, name, err)
+				}
+				targets[name] = compiled
+				if result.builds[node.Name] == nil {
+					result.builds[node.Name] = map[string]marker.Build{}
+				}
+				result.builds[node.Name][name] = entry.record
+				continue
+			}
+			planned, known := plannedInputs[node.Name][name]
+			if !known {
+				return runtimeStaging{}, fmt.Errorf("%s.%s: the build was not planned", node.Name, name)
+			}
+			key := planned.key
+			hit, published := commit.artifacts[key]
+			if !published {
+				return runtimeStaging{}, failedBuildBoundary(
+					"%s.%s: no protected cache entry for %s", node.Name, name, key)
+			}
+			// The cache result carries the manager-private absolute artifact path,
+			// so a refusal derived from it is a build-cache boundary failure and is
+			// rendered through the same bounded, redacted path as every other one.
+			compiled, err := runtimestore.CompiledTargetFromCache(hit, platform)
+			if err != nil {
+				return runtimeStaging{}, failedBuildBoundary("%s.%s: %w", node.Name, name, err)
+			}
+			targets[name] = compiled
+			if result.builds[node.Name] == nil {
+				result.builds[node.Name] = map[string]marker.Build{}
+			}
+			result.builds[node.Name][name] = marker.Build{
+				Driver:         buildmeta.DriverGoV1,
+				CacheKey:       key,
+				ReceiptSHA256:  hit.ReceiptHash,
+				ArtifactSHA256: hit.Receipt.Artifact.SHA256,
+				ArtifactPath:   hit.Receipt.Artifact.Path,
+			}
+		}
+		enforced := map[string]bool{}
+		for _, command := range enforcedCommands {
+			enforced[command.Name] = true
+		}
+		for _, name := range node.ActiveCommandNames() {
+			if enforced[name] {
+				continue
+			}
+			target, selected := targets[name]
+			if !selected {
+				continue
+			}
+			destination, err := runtimestore.NewManagedShim(role, binDir, name, platform)
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, name, err)
+			}
+			specs = append(specs, runtimestore.ShimSpec{
+				Destination: destination, Target: target, PathEntries: pathEntries,
+			})
+			result.commands[name] = true
+		}
+		if len(enforcedCommands) != 0 {
+			declaredRaw, err := rawDeclaredCapabilities(node.Snapshot)
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s: %w", node.Name, err)
+			}
+			declared, err := scriptworker.ParseDeclaredCapabilities(declaredRaw)
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s: %w", node.Name, err)
+			}
+			for _, command := range enforcedCommands {
+				target, selected := scriptTargets[command.Name]
+				if !selected {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: the enforced runtime target was not staged", node.Name, command.Name)
+				}
+				destination, err := runtimestore.NewManagedEnforcedShim(role, binDir, command.Name, platform)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				sidecar, err := scriptworker.NewShimSidecar(
+					node.Name, command.Name, command.Interpreter,
+					target.ExecutablePath(), target.RuntimeDir(),
+					projectRoot, node.Spec.SchemaVersion, declaredRaw)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				sidecarPayload, err := sidecar.Marshal()
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				enforcedSpecs = append(enforcedSpecs, runtimestore.EnforcedShimSpec{
+					Destination: destination, Sidecar: sidecarPayload,
+				})
+				result.commands[command.Name] = true
+				result.enforced[command.Name] = true
+				reports, err := enforcedDerivationMessages(node.Name, command, declared, home, binDir, node.Snapshot)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				result.messages = append(result.messages, reports...)
+			}
+		}
+	}
+
+	currentlyManaged, err := runtimestore.ManagedShimsIn(binDir, role, platform)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	currentlyEnforced, err := runtimestore.ManagedEnforcedShimsIn(binDir, role, platform)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	// Sidecar-paired launchers and the sidecars themselves belong to the
+	// enforced transition, so the ordinary transition must not also claim
+	// or remove them. (A sidecar filename parses as an ordinary shim
+	// name, which is exactly why the exclusion is explicit.)
+	enforcedPaths := map[string]bool{}
+	for _, shim := range currentlyEnforced {
+		enforcedPaths[shim.Path()] = true
+		enforcedPaths[shim.SidecarPath()] = true
+	}
+	ordinaryCurrent := currentlyManaged[:0]
+	for _, shim := range currentlyManaged {
+		if !enforcedPaths[shim.Path()] {
+			ordinaryCurrent = append(ordinaryCurrent, shim)
+		}
+	}
+	transition, err := runtimestore.StageShimTransition(stageRoot, specs, ordinaryCurrent)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	enforcedTransition, err := runtimestore.StageEnforcedShimTransition(stageRoot, enforcedSpecs, currentlyEnforced)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	// The two transitions are computed independently, so an enforcement
+	// flip emits a replacement from one side and a removal of the same
+	// live launcher from the other. The replacement always supersedes
+	// the removal: the commit overwrites the live path, and only the
+	// orphaned sidecar still needs its own removal.
+	replaced := map[string]bool{}
+	for _, desired := range transition.Desired {
+		replaced[desired.LivePath] = true
+	}
+	for _, desired := range enforcedTransition.Desired {
+		replaced[desired.LivePath] = true
+	}
+	for _, desired := range transition.Desired {
+		result.plan.Replace(staging.ClassCanonicalShim, desired.Command, desired.LivePath, desired.StagedPath)
+	}
+	for _, removal := range transition.Removals {
+		if replaced[removal.LivePath] {
+			continue
+		}
+		result.plan.Remove("shim/"+removal.Command, removal.LivePath)
+	}
+	for _, desired := range enforcedTransition.Desired {
+		identifier := enforcedPlanIdentifier(desired.Command, desired.LivePath)
+		result.plan.Replace(staging.ClassCanonicalShim, identifier, desired.LivePath, desired.StagedPath)
+	}
+	for _, removal := range enforcedTransition.Removals {
+		if replaced[removal.LivePath] {
+			continue
+		}
+		result.plan.Remove(enforcedPlanIdentifier(removal.Command, removal.LivePath), removal.LivePath)
+	}
+	return result, nil
+}
+
+// enforcedPlanIdentifier names one enforced launcher or sidecar target in
+// the transaction plan. The launcher and its sidecar share a command but
+// are distinct live paths, so they need distinct identifiers: one shared
+// identifier duplicates the removal target whenever both removals land,
+// which is exactly the Windows enforcement flip — the `.exe` launcher and
+// the `.cmd` shim are different paths, so no replacement suppresses
+// either removal. Desired and removal sides share this spelling so one
+// flip cannot collide with itself in either class.
+func enforcedPlanIdentifier(command, livePath string) string {
+	if strings.HasSuffix(livePath, ".curator-shim.json") {
+		return "enforced-sidecar/" + command
+	}
+	return "enforced-shim/" + command
+}
+
+// activeScriptCommands lists the active declared-only script commands of
+// one node in command-lexical order. Enforced commands are not returned
+// here; they stage through activeEnforcedScriptCommands below.
+func activeScriptCommands(node *closure.Node, active map[string]bool) ([]skillspec.Command, error) {
+	var commands []skillspec.Command
+	for _, name := range node.ActiveCommandNames() {
+		command := node.Spec.Commands[name]
+		if command.Type != "script" || !active[name] {
+			continue
+		}
+		if scriptpolicy.Enforced(command) {
+			continue
+		}
+		commands = append(commands, command)
+	}
+	return commands, nil
+}
+
+// activeEnforcedScriptCommands lists the active enforced script commands of
+// one node in command-lexical order. Admission refuses an unknown policy
+// and an incomplete control table; the host preflight then refuses with
+// `script_execution_control_unavailable` when this host cannot provide a
+// mandatory control, before anything is staged — rather than writing the
+// ordinary uncontained shim §4.1.1 forbids or publishing a launcher that
+// can never run. The host probe runs once per call, not once per command:
+// the host cannot differ between two commands of one install. Once both
+// gates pass the commands proceed to native launcher staging — the guard
+// never formats a nil admission, so it cannot degrade to a wrapped nil.
+func activeEnforcedScriptCommands(node *closure.Node, active map[string]bool) ([]skillspec.Command, error) {
+	var commands []skillspec.Command
+	for _, name := range node.ActiveCommandNames() {
+		command := node.Spec.Commands[name]
+		if command.Type != "script" || !active[name] {
+			continue
+		}
+		if !scriptpolicy.Enforced(command) {
+			continue
+		}
+		if err := scriptpolicy.Admit(map[string]skillspec.Command{name: command}); err != nil {
+			return nil, fmt.Errorf("%s.%s: %w", node.Name, name, err)
+		}
+		commands = append(commands, command)
+	}
+	if len(commands) != 0 {
+		if err := scriptworker.PreflightHostControls(); err != nil {
+			return nil, fmt.Errorf("%s: %w", node.Name, err)
+		}
+	}
+	return commands, nil
+}
+
+// rawDeclaredCapabilities re-reads the declared `capabilities` object of
+// one node snapshot. Derivation reads the declared manifest bytes rather
+// than the parsed schema defaults, so the sidecar stores the raw object
+// and the launcher derives presence from it. The bytes are re-validated
+// both here and at launch.
+func rawDeclaredCapabilities(snapshot string) (json.RawMessage, error) {
+	manifestPath := filepath.Join(snapshot, skillspec.ManifestSourcePath(snapshot))
+	payload, err := os.ReadFile(manifestPath) // #nosec G304 -- admitted node snapshot manifest
+	if err != nil {
+		return nil, fmt.Errorf("cannot read the declared capabilities: %w", err)
+	}
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &envelope); err != nil {
+		return nil, fmt.Errorf("cannot decode the declared capabilities: %w", err)
+	}
+	raw, present := envelope["capabilities"]
+	if !present {
+		return nil, nil
+	}
+	return raw, nil
+}
+
+// enforcedDerivationMessages records one enforced command's install-time
+// derivation: the breaking-change notice plus every withheld env_read
+// entry, recorded network host, and unresolvable exec name. The per-command
+// profile itself derives fresh at every invocation; this record describes
+// the install moment.
+func enforcedDerivationMessages(skill string, command skillspec.Command, declared scriptworker.DeclaredCapabilities, home, binDir, snapshot string) ([]string, error) {
+	report, err := scriptworker.DeriveStaticReport(declared, command.Interpreter, nil,
+		[]string{snapshot, home, binDir})
+	if err != nil {
+		return nil, err
+	}
+	prefix := skill + ": command '" + command.Name + "' is enforced (script-worker-v1): "
+	messages := []string{prefix +
+		"undeclared environment variables are absent and undeclared executables do not resolve at run time"}
+	if len(report.WithheldEnv) != 0 {
+		messages = append(messages, prefix+"withholds manager-owned env_read entries: "+
+			strings.Join(report.WithheldEnv, ", "))
+	}
+	if len(report.RecordedHosts) != 0 {
+		messages = append(messages, prefix+"declares network hosts, recorded reporting-only without filtering: "+
+			strings.Join(report.RecordedHosts, ", "))
+	}
+	if len(report.UnresolvedExec) != 0 {
+		messages = append(messages, prefix+"omits unresolvable exec names from PATH: "+
+			strings.Join(report.UnresolvedExec, ", "))
+	}
+	return messages, nil
+}
+
+// stageStaleSkillRemovals turns installed skills that the next closure does not
+// keep into removal targets. Only valid preceding install markers authorize
+// removal; being inside the store grants no ownership. Collect every conflict
+// before refusing, without returning a partial removal plan.
+func stageStaleSkillRemovals(store, kind string, expected map[string]bool) (staging.Plan, error) {
+	var plan staging.Plan
+	inventory, err := stateread.ReadDir(store)
+	if err != nil {
+		return staging.Plan{}, err
+	}
+	var names []string
+	var conflicts []error
+	for _, entry := range inventory.Entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") || expected[name] {
+			continue
+		}
+		if err := marker.CheckOwnership(filepath.Join(store, name)); err != nil {
+			conflicts = append(conflicts, err)
+			continue
+		}
+		names = append(names, name)
+	}
+	if len(conflicts) != 0 {
+		return staging.Plan{}, errors.Join(conflicts...)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		plan.Remove("skill/"+kind+"/"+name, filepath.Join(store, name))
+	}
+	return plan, nil
+}
+
+// plannedInputs indexes the derived build inputs of a plan by node and command.
+type plannedBuildInput struct {
+	key buildmeta.CacheKey
+}
+
+func (plan BuildPlan) plannedInputs() map[string]map[string]plannedBuildInput {
+	inputs := map[string]map[string]plannedBuildInput{}
+	for _, build := range plan.builds {
+		if inputs[build.skill] == nil {
+			inputs[build.skill] = map[string]plannedBuildInput{}
+		}
+		inputs[build.skill][build.command] = plannedBuildInput{key: build.key}
+	}
+	return inputs
+}
+
+// referencedKeys lists every protected cache key the committed markers depend
+// on, so garbage collection retains them while the transaction is in flight.
+func (staged runtimeStaging) referencedKeys() []string {
+	var keys []string
+	for _, commands := range staged.builds {
+		for _, build := range commands {
+			keys = append(keys, string(build.CacheKey))
+		}
+	}
+	return keys
+}
+
+
+===== mutants/selected-notes-only.go =====
+package install
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/buildrepo"
+	"github.com/relux-works/curator/internal/closure"
+	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/locale"
+	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/opaquescan"
+	"github.com/relux-works/curator/internal/runtimestore"
+	"github.com/relux-works/curator/internal/scriptpolicy"
+	"github.com/relux-works/curator/internal/scriptworker"
+	"github.com/relux-works/curator/internal/skillspec"
+	"github.com/relux-works/curator/internal/staging"
+	"github.com/relux-works/curator/internal/stateread"
+	"github.com/relux-works/curator/internal/whitelist"
+)
+
+// nodeInstall is one node's desired installed state inside one context store.
+type nodeInstall struct {
+	node *closure.Node
+	// store is the live directory that holds the node's context directory.
+	store string
+	// kind labels the store in target identifiers: project, global, or hybrid.
+	kind     string
+	locale   string
+	agents   []string
+	expected *marker.Marker
+}
+
+// stageNode renders the complete desired context directory of one node below
+// the stage root and returns the target it replaces.
+//
+// An already current node produces no target at all: a marker match is the
+// installation's idempotence, and journaling an identical replacement would
+// make every re-run rewrite every skill. Its status is still reported.
+func stageNode(stageRoot string, install nodeInstall, clock Clock) (staging.Plan, string, error) {
+	var plan staging.Plan
+	live := filepath.Join(install.store, install.node.Name)
+	ownershipErr := marker.CheckOwnership(live)
+	if _, err := os.Lstat(filepath.Join(live, "SKILL.md")); os.IsNotExist(err) { ownershipErr = nil }
+	if err := ownershipErr; err != nil {
+		return staging.Plan{}, "", err
+	}
+	current, err := marker.Current(live, install.expected)
+	if err != nil {
+		return staging.Plan{}, "", err
+	}
+	if current {
+		return plan, "up-to-date", nil
+	}
+	staged := filepath.Join(stageRoot, "context", install.kind, install.node.Name)
+	if err := os.RemoveAll(staged); err != nil {
+		return staging.Plan{}, "", err
+	}
+	if err := os.MkdirAll(staged, 0o755); err != nil {
+		return staging.Plan{}, "", err
+	}
+
+	var files []string
+	if install.node.ContextActive() {
+		includeScripts := len(install.node.Spec.Commands) == 0
+		if includeScripts {
+			if _, err := os.Stat(filepath.Join(install.node.Snapshot, "scripts")); err != nil {
+				includeScripts = false
+			}
+		}
+		excludeRoots := whitelist.ContextExcludedRoots(install.node.Spec.RuntimeRoots, install.node.Spec.BuildRoots)
+		files, err = whitelist.CopyContext(install.node.Snapshot, staged, includeScripts, excludeRoots)
+		if err != nil {
+			return staging.Plan{}, "", err
+		}
+		if _, err := locale.Render(install.node.Snapshot, staged, install.locale); err != nil {
+			return staging.Plan{}, "", err
+		}
+	} else {
+		files = []string{}
+		install.expected.Locale = ""
+		install.expected.Agents = []string{}
+	}
+	hashVersion := hashing.WriteVersion()
+	if install.expected.Package != nil {
+		hashVersion = hashing.VersionV1
+	}
+	// Spec §8 interim rule for v1 readers: refuse before hashing a
+	// draft-lane v1 staged identity over NUL bytes.
+	if err := opaquescan.RefuseNULV1(staged, hashVersion); err != nil {
+		return staging.Plan{}, "", err
+	}
+	contentHash, err := hashing.ContentSHA256WithVersion(staged, nil, hashVersion)
+	if err != nil {
+		return staging.Plan{}, "", err
+	}
+	install.expected.ContentSHA256 = contentHash
+	if install.expected.Package == nil {
+		install.expected.HashVersion = hashVersion
+	}
+	install.expected.Files = files
+	install.expected.InstalledAt = installedAt(clock)
+	if err := marker.Write(staged, install.expected); err != nil {
+		return staging.Plan{}, "", err
+	}
+	plan.Replace(staging.ClassContext, install.kind+"/"+install.node.Name, live, staged)
+	return plan, "installed", nil
+}
+
+// refuseInstalledNULForStatus enforces the Spec §8 interim rule for v1
+// readers on the status surface: every installed tree backing a planned
+// node is refused before any currentness comparison when its recorded
+// identity is v1 and the tree contains NUL bytes. V2 trees hash NUL as
+// ordinary data and skip the scan. An absent, unreadable, or invalid
+// marker is not this gate's verdict — the drift classifiers report those
+// states — so only a present recorded marker is guarded.
+func refuseInstalledNULForStatus(nodes []*closure.Node, storeFor func(string) string) error {
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		installed := filepath.Join(storeFor(node.Name), node.Name)
+		recorded, _, err := marker.ReadState(installed)
+		if err != nil || recorded == nil {
+			continue
+		}
+		if err := opaquescan.RefuseNULV1(installed, recorded.ContentHashVersion()); err != nil {
+			return fmt.Errorf("installed skill %s: %w", node.Name, err)
+		}
+	}
+	return nil
+}
+
+// nodeSnapshots returns the resolved content snapshots of every closure
+// node: the admitted inputs the publication boundary guard must protect.
+// Staging already reads these directories (context projection and runtime
+// trees consume snapshot bytes), so a node without one cannot stage and
+// fails here with the member diagnostic instead of staging blind.
+func nodeSnapshots(nodes []*closure.Node) ([]string, error) {
+	admitted := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		if node == nil || node.Snapshot == "" {
+			name := "<nil>"
+			if node != nil {
+				name = node.Name
+			}
+			return nil, fmt.Errorf("source_member_missing: node %s has no content snapshot", name)
+		}
+		admitted = append(admitted, node.Snapshot)
+	}
+	return admitted, nil
+}
+
+// contextSources maps each installed skill name to the directory its content
+// currently lives in, so an adapter mirror can be staged from the replacement
+// this run is about to commit rather than from a canonical path that does not
+// hold it yet. A skill that is already current keeps its live directory.
+func contextSources(plan staging.Plan, store string, names []string) map[string]string {
+	staged := map[string]string{}
+	for _, target := range plan.Targets {
+		if target.Class == staging.ClassContext && filepath.Dir(target.LivePath) == store {
+			staged[filepath.Base(target.LivePath)] = target.StagedPath
+		}
+	}
+	sources := make(map[string]string, len(names))
+	for _, name := range names {
+		if replacement, found := staged[name]; found {
+			sources[name] = replacement
+			continue
+		}
+		sources[name] = filepath.Join(store, name)
+	}
+	return sources
+}
+
+// runtimeStaging is the staged executable state of one scope: commit-keyed
+// script runtime trees plus the canonical launchers that reach them.
+type runtimeStaging struct {
+	plan staging.Plan
+	// commands is the complete set of command names the scope publishes.
+	commands map[string]bool
+	// enforced names the published commands served by native enforced
+	// launchers rather than ordinary shims.
+	enforced map[string]bool
+	// messages carries the per-command derivation records install reports.
+	messages []string
+	// builds records, per node, the published build identity of each compiled
+	// command so the install marker can carry it.
+	builds map[string]map[string]marker.Build
+}
+
+// stageRuntimeAndShims derives every runtime tree, canonical launcher, and
+// stale launcher removal of one scope without touching a live path.
+//
+// runtimeKeys optionally overrides the commit-keyed runtime leaf per node:
+// the draft lane passes frozen source-v1 keys for its local-snapshot
+// members (which carry no commit) so they materialize under their package
+// identity, and the legacy lane passes staged source-v1 keys for its
+// migrated nodes for the same reason. A nil map keeps the resolved-commit
+// behavior byte-identically.
+//
+// A compiled command resolves through the protected cache entry that the
+// commit phase already published or verified, so a launcher can only ever point
+// at an immutable protected artifact — never at a snapshot or private path.
+func stageRuntimeAndShims(
+	stageRoot, home, binDir string,
+	nodes []*closure.Node,
+	role runtimestore.ShimRole,
+	platform string,
+	commit scopeCommit,
+	plannedInputs map[string]map[string]plannedBuildInput,
+	external map[string]map[string]externalEntry,
+	externalRoot string,
+	runtimeKeys map[string]string,
+	projectRoot string,
+) (runtimeStaging, error) {
+	result := runtimeStaging{
+		commands: map[string]bool{},
+		enforced: map[string]bool{},
+		builds:   map[string]map[string]marker.Build{},
+	}
+	var specs []runtimestore.ShimSpec
+	var enforcedSpecs []runtimestore.EnforcedShimSpec
+	for _, node := range nodes {
+		active := node.ActiveCommands()
+		if len(active) == 0 {
+			continue
+		}
+		pathEntries, err := runtimePathEntries(node, binDir, platform)
+		if err != nil {
+			return runtimeStaging{}, err
+		}
+		scriptCommands, err := activeScriptCommands(node, active)
+		if err != nil {
+			return runtimeStaging{}, err
+		}
+		enforcedCommands, err := activeEnforcedScriptCommands(node, active)
+		if err != nil {
+			return runtimeStaging{}, err
+		}
+		targets := map[string]runtimestore.RuntimeTarget{}
+		scriptTargets := map[string]runtimestore.ScriptTarget{}
+		allScriptCommands := append(append([]skillspec.Command(nil), scriptCommands...), enforcedCommands...)
+		if len(allScriptCommands) > 0 {
+			runtimeKey := draftRuntimeKey(node, runtimeKeys)
+			runtimePlan, err := runtimestore.PrepareScriptRuntime(stageRoot, runtimestore.ScriptRuntimeSpec{
+				Home: home, SkillName: node.Name, Commit: runtimeKey, Snapshot: node.Snapshot,
+				RuntimeRoots: node.Spec.RuntimeRoots, Commands: allScriptCommands, Platform: platform,
+			})
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s: %w", node.Name, err)
+			}
+			if runtimePlan.Desired != nil {
+				result.plan.Replace(staging.ClassRuntime,
+					node.Name+"/"+runtimeKey,
+					runtimePlan.Desired.LivePath, runtimePlan.Desired.StagedPath)
+			}
+			for name, target := range runtimePlan.Commands {
+				targets[name] = target
+				scriptTargets[name] = target
+			}
+		}
+		for _, name := range node.ActiveCommandNames() {
+			command := node.Spec.Commands[name]
+			if command.Type != "build" || !active[name] {
+				continue
+			}
+			if command.Driver == "go-repository-v1" {
+				entry, known := external[node.Name][name]
+				if !known {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: the external build was not staged", node.Name, name)
+				}
+				keyName := strings.TrimPrefix(entry.result.CacheKey, "sha256:")
+				finalArtifact := filepath.Join(externalRoot, buildrepo.ArtifactsDir(entry.result.ReceiptSchemaVersion), keyName, filepath.Base(entry.artifactPath))
+				compiled, err := runtimestore.ExternalCompiledTarget(entry.artifactPath, finalArtifact,
+					entry.record.CacheKey, entry.record.ReceiptSHA256, entry.record.ArtifactSHA256, platform)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, name, err)
+				}
+				targets[name] = compiled
+				if result.builds[node.Name] == nil {
+					result.builds[node.Name] = map[string]marker.Build{}
+				}
+				result.builds[node.Name][name] = entry.record
+				continue
+			}
+			planned, known := plannedInputs[node.Name][name]
+			if !known {
+				return runtimeStaging{}, fmt.Errorf("%s.%s: the build was not planned", node.Name, name)
+			}
+			key := planned.key
+			hit, published := commit.artifacts[key]
+			if !published {
+				return runtimeStaging{}, failedBuildBoundary(
+					"%s.%s: no protected cache entry for %s", node.Name, name, key)
+			}
+			// The cache result carries the manager-private absolute artifact path,
+			// so a refusal derived from it is a build-cache boundary failure and is
+			// rendered through the same bounded, redacted path as every other one.
+			compiled, err := runtimestore.CompiledTargetFromCache(hit, platform)
+			if err != nil {
+				return runtimeStaging{}, failedBuildBoundary("%s.%s: %w", node.Name, name, err)
+			}
+			targets[name] = compiled
+			if result.builds[node.Name] == nil {
+				result.builds[node.Name] = map[string]marker.Build{}
+			}
+			result.builds[node.Name][name] = marker.Build{
+				Driver:         buildmeta.DriverGoV1,
+				CacheKey:       key,
+				ReceiptSHA256:  hit.ReceiptHash,
+				ArtifactSHA256: hit.Receipt.Artifact.SHA256,
+				ArtifactPath:   hit.Receipt.Artifact.Path,
+			}
+		}
+		enforced := map[string]bool{}
+		for _, command := range enforcedCommands {
+			enforced[command.Name] = true
+		}
+		for _, name := range node.ActiveCommandNames() {
+			if enforced[name] {
+				continue
+			}
+			target, selected := targets[name]
+			if !selected {
+				continue
+			}
+			destination, err := runtimestore.NewManagedShim(role, binDir, name, platform)
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, name, err)
+			}
+			specs = append(specs, runtimestore.ShimSpec{
+				Destination: destination, Target: target, PathEntries: pathEntries,
+			})
+			result.commands[name] = true
+		}
+		if len(enforcedCommands) != 0 {
+			declaredRaw, err := rawDeclaredCapabilities(node.Snapshot)
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s: %w", node.Name, err)
+			}
+			declared, err := scriptworker.ParseDeclaredCapabilities(declaredRaw)
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s: %w", node.Name, err)
+			}
+			for _, command := range enforcedCommands {
+				target, selected := scriptTargets[command.Name]
+				if !selected {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: the enforced runtime target was not staged", node.Name, command.Name)
+				}
+				destination, err := runtimestore.NewManagedEnforcedShim(role, binDir, command.Name, platform)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				sidecar, err := scriptworker.NewShimSidecar(
+					node.Name, command.Name, command.Interpreter,
+					target.ExecutablePath(), target.RuntimeDir(),
+					projectRoot, node.Spec.SchemaVersion, declaredRaw)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				sidecarPayload, err := sidecar.Marshal()
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				enforcedSpecs = append(enforcedSpecs, runtimestore.EnforcedShimSpec{
+					Destination: destination, Sidecar: sidecarPayload,
+				})
+				result.commands[command.Name] = true
+				result.enforced[command.Name] = true
+				reports, err := enforcedDerivationMessages(node.Name, command, declared, home, binDir, node.Snapshot)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				result.messages = append(result.messages, reports...)
+			}
+		}
+	}
+
+	currentlyManaged, err := runtimestore.ManagedShimsIn(binDir, role, platform)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	currentlyEnforced, err := runtimestore.ManagedEnforcedShimsIn(binDir, role, platform)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	// Sidecar-paired launchers and the sidecars themselves belong to the
+	// enforced transition, so the ordinary transition must not also claim
+	// or remove them. (A sidecar filename parses as an ordinary shim
+	// name, which is exactly why the exclusion is explicit.)
+	enforcedPaths := map[string]bool{}
+	for _, shim := range currentlyEnforced {
+		enforcedPaths[shim.Path()] = true
+		enforcedPaths[shim.SidecarPath()] = true
+	}
+	ordinaryCurrent := currentlyManaged[:0]
+	for _, shim := range currentlyManaged {
+		if !enforcedPaths[shim.Path()] {
+			ordinaryCurrent = append(ordinaryCurrent, shim)
+		}
+	}
+	transition, err := runtimestore.StageShimTransition(stageRoot, specs, ordinaryCurrent)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	enforcedTransition, err := runtimestore.StageEnforcedShimTransition(stageRoot, enforcedSpecs, currentlyEnforced)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	// The two transitions are computed independently, so an enforcement
+	// flip emits a replacement from one side and a removal of the same
+	// live launcher from the other. The replacement always supersedes
+	// the removal: the commit overwrites the live path, and only the
+	// orphaned sidecar still needs its own removal.
+	replaced := map[string]bool{}
+	for _, desired := range transition.Desired {
+		replaced[desired.LivePath] = true
+	}
+	for _, desired := range enforcedTransition.Desired {
+		replaced[desired.LivePath] = true
+	}
+	for _, desired := range transition.Desired {
+		result.plan.Replace(staging.ClassCanonicalShim, desired.Command, desired.LivePath, desired.StagedPath)
+	}
+	for _, removal := range transition.Removals {
+		if replaced[removal.LivePath] {
+			continue
+		}
+		result.plan.Remove("shim/"+removal.Command, removal.LivePath)
+	}
+	for _, desired := range enforcedTransition.Desired {
+		identifier := enforcedPlanIdentifier(desired.Command, desired.LivePath)
+		result.plan.Replace(staging.ClassCanonicalShim, identifier, desired.LivePath, desired.StagedPath)
+	}
+	for _, removal := range enforcedTransition.Removals {
+		if replaced[removal.LivePath] {
+			continue
+		}
+		result.plan.Remove(enforcedPlanIdentifier(removal.Command, removal.LivePath), removal.LivePath)
+	}
+	return result, nil
+}
+
+// enforcedPlanIdentifier names one enforced launcher or sidecar target in
+// the transaction plan. The launcher and its sidecar share a command but
+// are distinct live paths, so they need distinct identifiers: one shared
+// identifier duplicates the removal target whenever both removals land,
+// which is exactly the Windows enforcement flip — the `.exe` launcher and
+// the `.cmd` shim are different paths, so no replacement suppresses
+// either removal. Desired and removal sides share this spelling so one
+// flip cannot collide with itself in either class.
+func enforcedPlanIdentifier(command, livePath string) string {
+	if strings.HasSuffix(livePath, ".curator-shim.json") {
+		return "enforced-sidecar/" + command
+	}
+	return "enforced-shim/" + command
+}
+
+// activeScriptCommands lists the active declared-only script commands of
+// one node in command-lexical order. Enforced commands are not returned
+// here; they stage through activeEnforcedScriptCommands below.
+func activeScriptCommands(node *closure.Node, active map[string]bool) ([]skillspec.Command, error) {
+	var commands []skillspec.Command
+	for _, name := range node.ActiveCommandNames() {
+		command := node.Spec.Commands[name]
+		if command.Type != "script" || !active[name] {
+			continue
+		}
+		if scriptpolicy.Enforced(command) {
+			continue
+		}
+		commands = append(commands, command)
+	}
+	return commands, nil
+}
+
+// activeEnforcedScriptCommands lists the active enforced script commands of
+// one node in command-lexical order. Admission refuses an unknown policy
+// and an incomplete control table; the host preflight then refuses with
+// `script_execution_control_unavailable` when this host cannot provide a
+// mandatory control, before anything is staged — rather than writing the
+// ordinary uncontained shim §4.1.1 forbids or publishing a launcher that
+// can never run. The host probe runs once per call, not once per command:
+// the host cannot differ between two commands of one install. Once both
+// gates pass the commands proceed to native launcher staging — the guard
+// never formats a nil admission, so it cannot degrade to a wrapped nil.
+func activeEnforcedScriptCommands(node *closure.Node, active map[string]bool) ([]skillspec.Command, error) {
+	var commands []skillspec.Command
+	for _, name := range node.ActiveCommandNames() {
+		command := node.Spec.Commands[name]
+		if command.Type != "script" || !active[name] {
+			continue
+		}
+		if !scriptpolicy.Enforced(command) {
+			continue
+		}
+		if err := scriptpolicy.Admit(map[string]skillspec.Command{name: command}); err != nil {
+			return nil, fmt.Errorf("%s.%s: %w", node.Name, name, err)
+		}
+		commands = append(commands, command)
+	}
+	if len(commands) != 0 {
+		if err := scriptworker.PreflightHostControls(); err != nil {
+			return nil, fmt.Errorf("%s: %w", node.Name, err)
+		}
+	}
+	return commands, nil
+}
+
+// rawDeclaredCapabilities re-reads the declared `capabilities` object of
+// one node snapshot. Derivation reads the declared manifest bytes rather
+// than the parsed schema defaults, so the sidecar stores the raw object
+// and the launcher derives presence from it. The bytes are re-validated
+// both here and at launch.
+func rawDeclaredCapabilities(snapshot string) (json.RawMessage, error) {
+	manifestPath := filepath.Join(snapshot, skillspec.ManifestSourcePath(snapshot))
+	payload, err := os.ReadFile(manifestPath) // #nosec G304 -- admitted node snapshot manifest
+	if err != nil {
+		return nil, fmt.Errorf("cannot read the declared capabilities: %w", err)
+	}
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &envelope); err != nil {
+		return nil, fmt.Errorf("cannot decode the declared capabilities: %w", err)
+	}
+	raw, present := envelope["capabilities"]
+	if !present {
+		return nil, nil
+	}
+	return raw, nil
+}
+
+// enforcedDerivationMessages records one enforced command's install-time
+// derivation: the breaking-change notice plus every withheld env_read
+// entry, recorded network host, and unresolvable exec name. The per-command
+// profile itself derives fresh at every invocation; this record describes
+// the install moment.
+func enforcedDerivationMessages(skill string, command skillspec.Command, declared scriptworker.DeclaredCapabilities, home, binDir, snapshot string) ([]string, error) {
+	report, err := scriptworker.DeriveStaticReport(declared, command.Interpreter, nil,
+		[]string{snapshot, home, binDir})
+	if err != nil {
+		return nil, err
+	}
+	prefix := skill + ": command '" + command.Name + "' is enforced (script-worker-v1): "
+	messages := []string{prefix +
+		"undeclared environment variables are absent and undeclared executables do not resolve at run time"}
+	if len(report.WithheldEnv) != 0 {
+		messages = append(messages, prefix+"withholds manager-owned env_read entries: "+
+			strings.Join(report.WithheldEnv, ", "))
+	}
+	if len(report.RecordedHosts) != 0 {
+		messages = append(messages, prefix+"declares network hosts, recorded reporting-only without filtering: "+
+			strings.Join(report.RecordedHosts, ", "))
+	}
+	if len(report.UnresolvedExec) != 0 {
+		messages = append(messages, prefix+"omits unresolvable exec names from PATH: "+
+			strings.Join(report.UnresolvedExec, ", "))
+	}
+	return messages, nil
+}
+
+// stageStaleSkillRemovals turns installed skills that the next closure does not
+// keep into removal targets. Only valid preceding install markers authorize
+// removal; being inside the store grants no ownership. Collect every conflict
+// before refusing, without returning a partial removal plan.
+func stageStaleSkillRemovals(store, kind string, expected map[string]bool) (staging.Plan, error) {
+	var plan staging.Plan
+	inventory, err := stateread.ReadDir(store)
+	if err != nil {
+		return staging.Plan{}, err
+	}
+	var names []string
+	var conflicts []error
+	for _, entry := range inventory.Entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") || expected[name] {
+			continue
+		}
+		if err := marker.CheckOwnership(filepath.Join(store, name)); err != nil {
+			conflicts = append(conflicts, err)
+			continue
+		}
+		names = append(names, name)
+	}
+	if len(conflicts) != 0 {
+		return staging.Plan{}, errors.Join(conflicts...)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		plan.Remove("skill/"+kind+"/"+name, filepath.Join(store, name))
+	}
+	return plan, nil
+}
+
+// plannedInputs indexes the derived build inputs of a plan by node and command.
+type plannedBuildInput struct {
+	key buildmeta.CacheKey
+}
+
+func (plan BuildPlan) plannedInputs() map[string]map[string]plannedBuildInput {
+	inputs := map[string]map[string]plannedBuildInput{}
+	for _, build := range plan.builds {
+		if inputs[build.skill] == nil {
+			inputs[build.skill] = map[string]plannedBuildInput{}
+		}
+		inputs[build.skill][build.command] = plannedBuildInput{key: build.key}
+	}
+	return inputs
+}
+
+// referencedKeys lists every protected cache key the committed markers depend
+// on, so garbage collection retains them while the transaction is in flight.
+func (staged runtimeStaging) referencedKeys() []string {
+	var keys []string
+	for _, commands := range staged.builds {
+		for _, build := range commands {
+			keys = append(keys, string(build.CacheKey))
+		}
+	}
+	return keys
+}
+
+
+===== mutants/stale-loose-file.go =====
+package install
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/buildrepo"
+	"github.com/relux-works/curator/internal/closure"
+	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/locale"
+	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/opaquescan"
+	"github.com/relux-works/curator/internal/runtimestore"
+	"github.com/relux-works/curator/internal/scriptpolicy"
+	"github.com/relux-works/curator/internal/scriptworker"
+	"github.com/relux-works/curator/internal/skillspec"
+	"github.com/relux-works/curator/internal/staging"
+	"github.com/relux-works/curator/internal/stateread"
+	"github.com/relux-works/curator/internal/whitelist"
+)
+
+// nodeInstall is one node's desired installed state inside one context store.
+type nodeInstall struct {
+	node *closure.Node
+	// store is the live directory that holds the node's context directory.
+	store string
+	// kind labels the store in target identifiers: project, global, or hybrid.
+	kind     string
+	locale   string
+	agents   []string
+	expected *marker.Marker
+}
+
+// stageNode renders the complete desired context directory of one node below
+// the stage root and returns the target it replaces.
+//
+// An already current node produces no target at all: a marker match is the
+// installation's idempotence, and journaling an identical replacement would
+// make every re-run rewrite every skill. Its status is still reported.
+func stageNode(stageRoot string, install nodeInstall, clock Clock) (staging.Plan, string, error) {
+	var plan staging.Plan
+	live := filepath.Join(install.store, install.node.Name)
+	if err := marker.CheckOwnership(live); err != nil {
+		return staging.Plan{}, "", err
+	}
+	current, err := marker.Current(live, install.expected)
+	if err != nil {
+		return staging.Plan{}, "", err
+	}
+	if current {
+		return plan, "up-to-date", nil
+	}
+	staged := filepath.Join(stageRoot, "context", install.kind, install.node.Name)
+	if err := os.RemoveAll(staged); err != nil {
+		return staging.Plan{}, "", err
+	}
+	if err := os.MkdirAll(staged, 0o755); err != nil {
+		return staging.Plan{}, "", err
+	}
+
+	var files []string
+	if install.node.ContextActive() {
+		includeScripts := len(install.node.Spec.Commands) == 0
+		if includeScripts {
+			if _, err := os.Stat(filepath.Join(install.node.Snapshot, "scripts")); err != nil {
+				includeScripts = false
+			}
+		}
+		excludeRoots := whitelist.ContextExcludedRoots(install.node.Spec.RuntimeRoots, install.node.Spec.BuildRoots)
+		files, err = whitelist.CopyContext(install.node.Snapshot, staged, includeScripts, excludeRoots)
+		if err != nil {
+			return staging.Plan{}, "", err
+		}
+		if _, err := locale.Render(install.node.Snapshot, staged, install.locale); err != nil {
+			return staging.Plan{}, "", err
+		}
+	} else {
+		files = []string{}
+		install.expected.Locale = ""
+		install.expected.Agents = []string{}
+	}
+	hashVersion := hashing.WriteVersion()
+	if install.expected.Package != nil {
+		hashVersion = hashing.VersionV1
+	}
+	// Spec §8 interim rule for v1 readers: refuse before hashing a
+	// draft-lane v1 staged identity over NUL bytes.
+	if err := opaquescan.RefuseNULV1(staged, hashVersion); err != nil {
+		return staging.Plan{}, "", err
+	}
+	contentHash, err := hashing.ContentSHA256WithVersion(staged, nil, hashVersion)
+	if err != nil {
+		return staging.Plan{}, "", err
+	}
+	install.expected.ContentSHA256 = contentHash
+	if install.expected.Package == nil {
+		install.expected.HashVersion = hashVersion
+	}
+	install.expected.Files = files
+	install.expected.InstalledAt = installedAt(clock)
+	if err := marker.Write(staged, install.expected); err != nil {
+		return staging.Plan{}, "", err
+	}
+	plan.Replace(staging.ClassContext, install.kind+"/"+install.node.Name, live, staged)
+	return plan, "installed", nil
+}
+
+// refuseInstalledNULForStatus enforces the Spec §8 interim rule for v1
+// readers on the status surface: every installed tree backing a planned
+// node is refused before any currentness comparison when its recorded
+// identity is v1 and the tree contains NUL bytes. V2 trees hash NUL as
+// ordinary data and skip the scan. An absent, unreadable, or invalid
+// marker is not this gate's verdict — the drift classifiers report those
+// states — so only a present recorded marker is guarded.
+func refuseInstalledNULForStatus(nodes []*closure.Node, storeFor func(string) string) error {
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		installed := filepath.Join(storeFor(node.Name), node.Name)
+		recorded, _, err := marker.ReadState(installed)
+		if err != nil || recorded == nil {
+			continue
+		}
+		if err := opaquescan.RefuseNULV1(installed, recorded.ContentHashVersion()); err != nil {
+			return fmt.Errorf("installed skill %s: %w", node.Name, err)
+		}
+	}
+	return nil
+}
+
+// nodeSnapshots returns the resolved content snapshots of every closure
+// node: the admitted inputs the publication boundary guard must protect.
+// Staging already reads these directories (context projection and runtime
+// trees consume snapshot bytes), so a node without one cannot stage and
+// fails here with the member diagnostic instead of staging blind.
+func nodeSnapshots(nodes []*closure.Node) ([]string, error) {
+	admitted := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		if node == nil || node.Snapshot == "" {
+			name := "<nil>"
+			if node != nil {
+				name = node.Name
+			}
+			return nil, fmt.Errorf("source_member_missing: node %s has no content snapshot", name)
+		}
+		admitted = append(admitted, node.Snapshot)
+	}
+	return admitted, nil
+}
+
+// contextSources maps each installed skill name to the directory its content
+// currently lives in, so an adapter mirror can be staged from the replacement
+// this run is about to commit rather than from a canonical path that does not
+// hold it yet. A skill that is already current keeps its live directory.
+func contextSources(plan staging.Plan, store string, names []string) map[string]string {
+	staged := map[string]string{}
+	for _, target := range plan.Targets {
+		if target.Class == staging.ClassContext && filepath.Dir(target.LivePath) == store {
+			staged[filepath.Base(target.LivePath)] = target.StagedPath
+		}
+	}
+	sources := make(map[string]string, len(names))
+	for _, name := range names {
+		if replacement, found := staged[name]; found {
+			sources[name] = replacement
+			continue
+		}
+		sources[name] = filepath.Join(store, name)
+	}
+	return sources
+}
+
+// runtimeStaging is the staged executable state of one scope: commit-keyed
+// script runtime trees plus the canonical launchers that reach them.
+type runtimeStaging struct {
+	plan staging.Plan
+	// commands is the complete set of command names the scope publishes.
+	commands map[string]bool
+	// enforced names the published commands served by native enforced
+	// launchers rather than ordinary shims.
+	enforced map[string]bool
+	// messages carries the per-command derivation records install reports.
+	messages []string
+	// builds records, per node, the published build identity of each compiled
+	// command so the install marker can carry it.
+	builds map[string]map[string]marker.Build
+}
+
+// stageRuntimeAndShims derives every runtime tree, canonical launcher, and
+// stale launcher removal of one scope without touching a live path.
+//
+// runtimeKeys optionally overrides the commit-keyed runtime leaf per node:
+// the draft lane passes frozen source-v1 keys for its local-snapshot
+// members (which carry no commit) so they materialize under their package
+// identity, and the legacy lane passes staged source-v1 keys for its
+// migrated nodes for the same reason. A nil map keeps the resolved-commit
+// behavior byte-identically.
+//
+// A compiled command resolves through the protected cache entry that the
+// commit phase already published or verified, so a launcher can only ever point
+// at an immutable protected artifact — never at a snapshot or private path.
+func stageRuntimeAndShims(
+	stageRoot, home, binDir string,
+	nodes []*closure.Node,
+	role runtimestore.ShimRole,
+	platform string,
+	commit scopeCommit,
+	plannedInputs map[string]map[string]plannedBuildInput,
+	external map[string]map[string]externalEntry,
+	externalRoot string,
+	runtimeKeys map[string]string,
+	projectRoot string,
+) (runtimeStaging, error) {
+	result := runtimeStaging{
+		commands: map[string]bool{},
+		enforced: map[string]bool{},
+		builds:   map[string]map[string]marker.Build{},
+	}
+	var specs []runtimestore.ShimSpec
+	var enforcedSpecs []runtimestore.EnforcedShimSpec
+	for _, node := range nodes {
+		active := node.ActiveCommands()
+		if len(active) == 0 {
+			continue
+		}
+		pathEntries, err := runtimePathEntries(node, binDir, platform)
+		if err != nil {
+			return runtimeStaging{}, err
+		}
+		scriptCommands, err := activeScriptCommands(node, active)
+		if err != nil {
+			return runtimeStaging{}, err
+		}
+		enforcedCommands, err := activeEnforcedScriptCommands(node, active)
+		if err != nil {
+			return runtimeStaging{}, err
+		}
+		targets := map[string]runtimestore.RuntimeTarget{}
+		scriptTargets := map[string]runtimestore.ScriptTarget{}
+		allScriptCommands := append(append([]skillspec.Command(nil), scriptCommands...), enforcedCommands...)
+		if len(allScriptCommands) > 0 {
+			runtimeKey := draftRuntimeKey(node, runtimeKeys)
+			runtimePlan, err := runtimestore.PrepareScriptRuntime(stageRoot, runtimestore.ScriptRuntimeSpec{
+				Home: home, SkillName: node.Name, Commit: runtimeKey, Snapshot: node.Snapshot,
+				RuntimeRoots: node.Spec.RuntimeRoots, Commands: allScriptCommands, Platform: platform,
+			})
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s: %w", node.Name, err)
+			}
+			if runtimePlan.Desired != nil {
+				result.plan.Replace(staging.ClassRuntime,
+					node.Name+"/"+runtimeKey,
+					runtimePlan.Desired.LivePath, runtimePlan.Desired.StagedPath)
+			}
+			for name, target := range runtimePlan.Commands {
+				targets[name] = target
+				scriptTargets[name] = target
+			}
+		}
+		for _, name := range node.ActiveCommandNames() {
+			command := node.Spec.Commands[name]
+			if command.Type != "build" || !active[name] {
+				continue
+			}
+			if command.Driver == "go-repository-v1" {
+				entry, known := external[node.Name][name]
+				if !known {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: the external build was not staged", node.Name, name)
+				}
+				keyName := strings.TrimPrefix(entry.result.CacheKey, "sha256:")
+				finalArtifact := filepath.Join(externalRoot, buildrepo.ArtifactsDir(entry.result.ReceiptSchemaVersion), keyName, filepath.Base(entry.artifactPath))
+				compiled, err := runtimestore.ExternalCompiledTarget(entry.artifactPath, finalArtifact,
+					entry.record.CacheKey, entry.record.ReceiptSHA256, entry.record.ArtifactSHA256, platform)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, name, err)
+				}
+				targets[name] = compiled
+				if result.builds[node.Name] == nil {
+					result.builds[node.Name] = map[string]marker.Build{}
+				}
+				result.builds[node.Name][name] = entry.record
+				continue
+			}
+			planned, known := plannedInputs[node.Name][name]
+			if !known {
+				return runtimeStaging{}, fmt.Errorf("%s.%s: the build was not planned", node.Name, name)
+			}
+			key := planned.key
+			hit, published := commit.artifacts[key]
+			if !published {
+				return runtimeStaging{}, failedBuildBoundary(
+					"%s.%s: no protected cache entry for %s", node.Name, name, key)
+			}
+			// The cache result carries the manager-private absolute artifact path,
+			// so a refusal derived from it is a build-cache boundary failure and is
+			// rendered through the same bounded, redacted path as every other one.
+			compiled, err := runtimestore.CompiledTargetFromCache(hit, platform)
+			if err != nil {
+				return runtimeStaging{}, failedBuildBoundary("%s.%s: %w", node.Name, name, err)
+			}
+			targets[name] = compiled
+			if result.builds[node.Name] == nil {
+				result.builds[node.Name] = map[string]marker.Build{}
+			}
+			result.builds[node.Name][name] = marker.Build{
+				Driver:         buildmeta.DriverGoV1,
+				CacheKey:       key,
+				ReceiptSHA256:  hit.ReceiptHash,
+				ArtifactSHA256: hit.Receipt.Artifact.SHA256,
+				ArtifactPath:   hit.Receipt.Artifact.Path,
+			}
+		}
+		enforced := map[string]bool{}
+		for _, command := range enforcedCommands {
+			enforced[command.Name] = true
+		}
+		for _, name := range node.ActiveCommandNames() {
+			if enforced[name] {
+				continue
+			}
+			target, selected := targets[name]
+			if !selected {
+				continue
+			}
+			destination, err := runtimestore.NewManagedShim(role, binDir, name, platform)
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, name, err)
+			}
+			specs = append(specs, runtimestore.ShimSpec{
+				Destination: destination, Target: target, PathEntries: pathEntries,
+			})
+			result.commands[name] = true
+		}
+		if len(enforcedCommands) != 0 {
+			declaredRaw, err := rawDeclaredCapabilities(node.Snapshot)
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s: %w", node.Name, err)
+			}
+			declared, err := scriptworker.ParseDeclaredCapabilities(declaredRaw)
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s: %w", node.Name, err)
+			}
+			for _, command := range enforcedCommands {
+				target, selected := scriptTargets[command.Name]
+				if !selected {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: the enforced runtime target was not staged", node.Name, command.Name)
+				}
+				destination, err := runtimestore.NewManagedEnforcedShim(role, binDir, command.Name, platform)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				sidecar, err := scriptworker.NewShimSidecar(
+					node.Name, command.Name, command.Interpreter,
+					target.ExecutablePath(), target.RuntimeDir(),
+					projectRoot, node.Spec.SchemaVersion, declaredRaw)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				sidecarPayload, err := sidecar.Marshal()
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				enforcedSpecs = append(enforcedSpecs, runtimestore.EnforcedShimSpec{
+					Destination: destination, Sidecar: sidecarPayload,
+				})
+				result.commands[command.Name] = true
+				result.enforced[command.Name] = true
+				reports, err := enforcedDerivationMessages(node.Name, command, declared, home, binDir, node.Snapshot)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				result.messages = append(result.messages, reports...)
+			}
+		}
+	}
+
+	currentlyManaged, err := runtimestore.ManagedShimsIn(binDir, role, platform)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	currentlyEnforced, err := runtimestore.ManagedEnforcedShimsIn(binDir, role, platform)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	// Sidecar-paired launchers and the sidecars themselves belong to the
+	// enforced transition, so the ordinary transition must not also claim
+	// or remove them. (A sidecar filename parses as an ordinary shim
+	// name, which is exactly why the exclusion is explicit.)
+	enforcedPaths := map[string]bool{}
+	for _, shim := range currentlyEnforced {
+		enforcedPaths[shim.Path()] = true
+		enforcedPaths[shim.SidecarPath()] = true
+	}
+	ordinaryCurrent := currentlyManaged[:0]
+	for _, shim := range currentlyManaged {
+		if !enforcedPaths[shim.Path()] {
+			ordinaryCurrent = append(ordinaryCurrent, shim)
+		}
+	}
+	transition, err := runtimestore.StageShimTransition(stageRoot, specs, ordinaryCurrent)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	enforcedTransition, err := runtimestore.StageEnforcedShimTransition(stageRoot, enforcedSpecs, currentlyEnforced)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	// The two transitions are computed independently, so an enforcement
+	// flip emits a replacement from one side and a removal of the same
+	// live launcher from the other. The replacement always supersedes
+	// the removal: the commit overwrites the live path, and only the
+	// orphaned sidecar still needs its own removal.
+	replaced := map[string]bool{}
+	for _, desired := range transition.Desired {
+		replaced[desired.LivePath] = true
+	}
+	for _, desired := range enforcedTransition.Desired {
+		replaced[desired.LivePath] = true
+	}
+	for _, desired := range transition.Desired {
+		result.plan.Replace(staging.ClassCanonicalShim, desired.Command, desired.LivePath, desired.StagedPath)
+	}
+	for _, removal := range transition.Removals {
+		if replaced[removal.LivePath] {
+			continue
+		}
+		result.plan.Remove("shim/"+removal.Command, removal.LivePath)
+	}
+	for _, desired := range enforcedTransition.Desired {
+		identifier := enforcedPlanIdentifier(desired.Command, desired.LivePath)
+		result.plan.Replace(staging.ClassCanonicalShim, identifier, desired.LivePath, desired.StagedPath)
+	}
+	for _, removal := range enforcedTransition.Removals {
+		if replaced[removal.LivePath] {
+			continue
+		}
+		result.plan.Remove(enforcedPlanIdentifier(removal.Command, removal.LivePath), removal.LivePath)
+	}
+	return result, nil
+}
+
+// enforcedPlanIdentifier names one enforced launcher or sidecar target in
+// the transaction plan. The launcher and its sidecar share a command but
+// are distinct live paths, so they need distinct identifiers: one shared
+// identifier duplicates the removal target whenever both removals land,
+// which is exactly the Windows enforcement flip — the `.exe` launcher and
+// the `.cmd` shim are different paths, so no replacement suppresses
+// either removal. Desired and removal sides share this spelling so one
+// flip cannot collide with itself in either class.
+func enforcedPlanIdentifier(command, livePath string) string {
+	if strings.HasSuffix(livePath, ".curator-shim.json") {
+		return "enforced-sidecar/" + command
+	}
+	return "enforced-shim/" + command
+}
+
+// activeScriptCommands lists the active declared-only script commands of
+// one node in command-lexical order. Enforced commands are not returned
+// here; they stage through activeEnforcedScriptCommands below.
+func activeScriptCommands(node *closure.Node, active map[string]bool) ([]skillspec.Command, error) {
+	var commands []skillspec.Command
+	for _, name := range node.ActiveCommandNames() {
+		command := node.Spec.Commands[name]
+		if command.Type != "script" || !active[name] {
+			continue
+		}
+		if scriptpolicy.Enforced(command) {
+			continue
+		}
+		commands = append(commands, command)
+	}
+	return commands, nil
+}
+
+// activeEnforcedScriptCommands lists the active enforced script commands of
+// one node in command-lexical order. Admission refuses an unknown policy
+// and an incomplete control table; the host preflight then refuses with
+// `script_execution_control_unavailable` when this host cannot provide a
+// mandatory control, before anything is staged — rather than writing the
+// ordinary uncontained shim §4.1.1 forbids or publishing a launcher that
+// can never run. The host probe runs once per call, not once per command:
+// the host cannot differ between two commands of one install. Once both
+// gates pass the commands proceed to native launcher staging — the guard
+// never formats a nil admission, so it cannot degrade to a wrapped nil.
+func activeEnforcedScriptCommands(node *closure.Node, active map[string]bool) ([]skillspec.Command, error) {
+	var commands []skillspec.Command
+	for _, name := range node.ActiveCommandNames() {
+		command := node.Spec.Commands[name]
+		if command.Type != "script" || !active[name] {
+			continue
+		}
+		if !scriptpolicy.Enforced(command) {
+			continue
+		}
+		if err := scriptpolicy.Admit(map[string]skillspec.Command{name: command}); err != nil {
+			return nil, fmt.Errorf("%s.%s: %w", node.Name, name, err)
+		}
+		commands = append(commands, command)
+	}
+	if len(commands) != 0 {
+		if err := scriptworker.PreflightHostControls(); err != nil {
+			return nil, fmt.Errorf("%s: %w", node.Name, err)
+		}
+	}
+	return commands, nil
+}
+
+// rawDeclaredCapabilities re-reads the declared `capabilities` object of
+// one node snapshot. Derivation reads the declared manifest bytes rather
+// than the parsed schema defaults, so the sidecar stores the raw object
+// and the launcher derives presence from it. The bytes are re-validated
+// both here and at launch.
+func rawDeclaredCapabilities(snapshot string) (json.RawMessage, error) {
+	manifestPath := filepath.Join(snapshot, skillspec.ManifestSourcePath(snapshot))
+	payload, err := os.ReadFile(manifestPath) // #nosec G304 -- admitted node snapshot manifest
+	if err != nil {
+		return nil, fmt.Errorf("cannot read the declared capabilities: %w", err)
+	}
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &envelope); err != nil {
+		return nil, fmt.Errorf("cannot decode the declared capabilities: %w", err)
+	}
+	raw, present := envelope["capabilities"]
+	if !present {
+		return nil, nil
+	}
+	return raw, nil
+}
+
+// enforcedDerivationMessages records one enforced command's install-time
+// derivation: the breaking-change notice plus every withheld env_read
+// entry, recorded network host, and unresolvable exec name. The per-command
+// profile itself derives fresh at every invocation; this record describes
+// the install moment.
+func enforcedDerivationMessages(skill string, command skillspec.Command, declared scriptworker.DeclaredCapabilities, home, binDir, snapshot string) ([]string, error) {
+	report, err := scriptworker.DeriveStaticReport(declared, command.Interpreter, nil,
+		[]string{snapshot, home, binDir})
+	if err != nil {
+		return nil, err
+	}
+	prefix := skill + ": command '" + command.Name + "' is enforced (script-worker-v1): "
+	messages := []string{prefix +
+		"undeclared environment variables are absent and undeclared executables do not resolve at run time"}
+	if len(report.WithheldEnv) != 0 {
+		messages = append(messages, prefix+"withholds manager-owned env_read entries: "+
+			strings.Join(report.WithheldEnv, ", "))
+	}
+	if len(report.RecordedHosts) != 0 {
+		messages = append(messages, prefix+"declares network hosts, recorded reporting-only without filtering: "+
+			strings.Join(report.RecordedHosts, ", "))
+	}
+	if len(report.UnresolvedExec) != 0 {
+		messages = append(messages, prefix+"omits unresolvable exec names from PATH: "+
+			strings.Join(report.UnresolvedExec, ", "))
+	}
+	return messages, nil
+}
+
+// stageStaleSkillRemovals turns installed skills that the next closure does not
+// keep into removal targets. Only valid preceding install markers authorize
+// removal; being inside the store grants no ownership. Collect every conflict
+// before refusing, without returning a partial removal plan.
+func stageStaleSkillRemovals(store, kind string, expected map[string]bool) (staging.Plan, error) {
+	var plan staging.Plan
+	inventory, err := stateread.ReadDir(store)
+	if err != nil {
+		return staging.Plan{}, err
+	}
+	var names []string
+	var conflicts []error
+	for _, entry := range inventory.Entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") || expected[name] {
+			continue
+		}
+		if err := marker.CheckOwnership(filepath.Join(store, name)); err != nil && name != "loose.txt" {
+			conflicts = append(conflicts, err)
+			continue
+		}
+		names = append(names, name)
+	}
+	if len(conflicts) != 0 {
+		return staging.Plan{}, errors.Join(conflicts...)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		plan.Remove("skill/"+kind+"/"+name, filepath.Join(store, name))
+	}
+	return plan, nil
+}
+
+// plannedInputs indexes the derived build inputs of a plan by node and command.
+type plannedBuildInput struct {
+	key buildmeta.CacheKey
+}
+
+func (plan BuildPlan) plannedInputs() map[string]map[string]plannedBuildInput {
+	inputs := map[string]map[string]plannedBuildInput{}
+	for _, build := range plan.builds {
+		if inputs[build.skill] == nil {
+			inputs[build.skill] = map[string]plannedBuildInput{}
+		}
+		inputs[build.skill][build.command] = plannedBuildInput{key: build.key}
+	}
+	return inputs
+}
+
+// referencedKeys lists every protected cache key the committed markers depend
+// on, so garbage collection retains them while the transaction is in flight.
+func (staged runtimeStaging) referencedKeys() []string {
+	var keys []string
+	for _, commands := range staged.builds {
+		for _, build := range commands {
+			keys = append(keys, string(build.CacheKey))
+		}
+	}
+	return keys
+}
+
+
+===== mutants/stale-unreadable-marker.go =====
+package install
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/buildrepo"
+	"github.com/relux-works/curator/internal/closure"
+	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/locale"
+	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/opaquescan"
+	"github.com/relux-works/curator/internal/runtimestore"
+	"github.com/relux-works/curator/internal/scriptpolicy"
+	"github.com/relux-works/curator/internal/scriptworker"
+	"github.com/relux-works/curator/internal/skillspec"
+	"github.com/relux-works/curator/internal/staging"
+	"github.com/relux-works/curator/internal/stateread"
+	"github.com/relux-works/curator/internal/whitelist"
+)
+
+// nodeInstall is one node's desired installed state inside one context store.
+type nodeInstall struct {
+	node *closure.Node
+	// store is the live directory that holds the node's context directory.
+	store string
+	// kind labels the store in target identifiers: project, global, or hybrid.
+	kind     string
+	locale   string
+	agents   []string
+	expected *marker.Marker
+}
+
+// stageNode renders the complete desired context directory of one node below
+// the stage root and returns the target it replaces.
+//
+// An already current node produces no target at all: a marker match is the
+// installation's idempotence, and journaling an identical replacement would
+// make every re-run rewrite every skill. Its status is still reported.
+func stageNode(stageRoot string, install nodeInstall, clock Clock) (staging.Plan, string, error) {
+	var plan staging.Plan
+	live := filepath.Join(install.store, install.node.Name)
+	if err := marker.CheckOwnership(live); err != nil {
+		return staging.Plan{}, "", err
+	}
+	current, err := marker.Current(live, install.expected)
+	if err != nil {
+		return staging.Plan{}, "", err
+	}
+	if current {
+		return plan, "up-to-date", nil
+	}
+	staged := filepath.Join(stageRoot, "context", install.kind, install.node.Name)
+	if err := os.RemoveAll(staged); err != nil {
+		return staging.Plan{}, "", err
+	}
+	if err := os.MkdirAll(staged, 0o755); err != nil {
+		return staging.Plan{}, "", err
+	}
+
+	var files []string
+	if install.node.ContextActive() {
+		includeScripts := len(install.node.Spec.Commands) == 0
+		if includeScripts {
+			if _, err := os.Stat(filepath.Join(install.node.Snapshot, "scripts")); err != nil {
+				includeScripts = false
+			}
+		}
+		excludeRoots := whitelist.ContextExcludedRoots(install.node.Spec.RuntimeRoots, install.node.Spec.BuildRoots)
+		files, err = whitelist.CopyContext(install.node.Snapshot, staged, includeScripts, excludeRoots)
+		if err != nil {
+			return staging.Plan{}, "", err
+		}
+		if _, err := locale.Render(install.node.Snapshot, staged, install.locale); err != nil {
+			return staging.Plan{}, "", err
+		}
+	} else {
+		files = []string{}
+		install.expected.Locale = ""
+		install.expected.Agents = []string{}
+	}
+	hashVersion := hashing.WriteVersion()
+	if install.expected.Package != nil {
+		hashVersion = hashing.VersionV1
+	}
+	// Spec §8 interim rule for v1 readers: refuse before hashing a
+	// draft-lane v1 staged identity over NUL bytes.
+	if err := opaquescan.RefuseNULV1(staged, hashVersion); err != nil {
+		return staging.Plan{}, "", err
+	}
+	contentHash, err := hashing.ContentSHA256WithVersion(staged, nil, hashVersion)
+	if err != nil {
+		return staging.Plan{}, "", err
+	}
+	install.expected.ContentSHA256 = contentHash
+	if install.expected.Package == nil {
+		install.expected.HashVersion = hashVersion
+	}
+	install.expected.Files = files
+	install.expected.InstalledAt = installedAt(clock)
+	if err := marker.Write(staged, install.expected); err != nil {
+		return staging.Plan{}, "", err
+	}
+	plan.Replace(staging.ClassContext, install.kind+"/"+install.node.Name, live, staged)
+	return plan, "installed", nil
+}
+
+// refuseInstalledNULForStatus enforces the Spec §8 interim rule for v1
+// readers on the status surface: every installed tree backing a planned
+// node is refused before any currentness comparison when its recorded
+// identity is v1 and the tree contains NUL bytes. V2 trees hash NUL as
+// ordinary data and skip the scan. An absent, unreadable, or invalid
+// marker is not this gate's verdict — the drift classifiers report those
+// states — so only a present recorded marker is guarded.
+func refuseInstalledNULForStatus(nodes []*closure.Node, storeFor func(string) string) error {
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		installed := filepath.Join(storeFor(node.Name), node.Name)
+		recorded, _, err := marker.ReadState(installed)
+		if err != nil || recorded == nil {
+			continue
+		}
+		if err := opaquescan.RefuseNULV1(installed, recorded.ContentHashVersion()); err != nil {
+			return fmt.Errorf("installed skill %s: %w", node.Name, err)
+		}
+	}
+	return nil
+}
+
+// nodeSnapshots returns the resolved content snapshots of every closure
+// node: the admitted inputs the publication boundary guard must protect.
+// Staging already reads these directories (context projection and runtime
+// trees consume snapshot bytes), so a node without one cannot stage and
+// fails here with the member diagnostic instead of staging blind.
+func nodeSnapshots(nodes []*closure.Node) ([]string, error) {
+	admitted := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		if node == nil || node.Snapshot == "" {
+			name := "<nil>"
+			if node != nil {
+				name = node.Name
+			}
+			return nil, fmt.Errorf("source_member_missing: node %s has no content snapshot", name)
+		}
+		admitted = append(admitted, node.Snapshot)
+	}
+	return admitted, nil
+}
+
+// contextSources maps each installed skill name to the directory its content
+// currently lives in, so an adapter mirror can be staged from the replacement
+// this run is about to commit rather than from a canonical path that does not
+// hold it yet. A skill that is already current keeps its live directory.
+func contextSources(plan staging.Plan, store string, names []string) map[string]string {
+	staged := map[string]string{}
+	for _, target := range plan.Targets {
+		if target.Class == staging.ClassContext && filepath.Dir(target.LivePath) == store {
+			staged[filepath.Base(target.LivePath)] = target.StagedPath
+		}
+	}
+	sources := make(map[string]string, len(names))
+	for _, name := range names {
+		if replacement, found := staged[name]; found {
+			sources[name] = replacement
+			continue
+		}
+		sources[name] = filepath.Join(store, name)
+	}
+	return sources
+}
+
+// runtimeStaging is the staged executable state of one scope: commit-keyed
+// script runtime trees plus the canonical launchers that reach them.
+type runtimeStaging struct {
+	plan staging.Plan
+	// commands is the complete set of command names the scope publishes.
+	commands map[string]bool
+	// enforced names the published commands served by native enforced
+	// launchers rather than ordinary shims.
+	enforced map[string]bool
+	// messages carries the per-command derivation records install reports.
+	messages []string
+	// builds records, per node, the published build identity of each compiled
+	// command so the install marker can carry it.
+	builds map[string]map[string]marker.Build
+}
+
+// stageRuntimeAndShims derives every runtime tree, canonical launcher, and
+// stale launcher removal of one scope without touching a live path.
+//
+// runtimeKeys optionally overrides the commit-keyed runtime leaf per node:
+// the draft lane passes frozen source-v1 keys for its local-snapshot
+// members (which carry no commit) so they materialize under their package
+// identity, and the legacy lane passes staged source-v1 keys for its
+// migrated nodes for the same reason. A nil map keeps the resolved-commit
+// behavior byte-identically.
+//
+// A compiled command resolves through the protected cache entry that the
+// commit phase already published or verified, so a launcher can only ever point
+// at an immutable protected artifact — never at a snapshot or private path.
+func stageRuntimeAndShims(
+	stageRoot, home, binDir string,
+	nodes []*closure.Node,
+	role runtimestore.ShimRole,
+	platform string,
+	commit scopeCommit,
+	plannedInputs map[string]map[string]plannedBuildInput,
+	external map[string]map[string]externalEntry,
+	externalRoot string,
+	runtimeKeys map[string]string,
+	projectRoot string,
+) (runtimeStaging, error) {
+	result := runtimeStaging{
+		commands: map[string]bool{},
+		enforced: map[string]bool{},
+		builds:   map[string]map[string]marker.Build{},
+	}
+	var specs []runtimestore.ShimSpec
+	var enforcedSpecs []runtimestore.EnforcedShimSpec
+	for _, node := range nodes {
+		active := node.ActiveCommands()
+		if len(active) == 0 {
+			continue
+		}
+		pathEntries, err := runtimePathEntries(node, binDir, platform)
+		if err != nil {
+			return runtimeStaging{}, err
+		}
+		scriptCommands, err := activeScriptCommands(node, active)
+		if err != nil {
+			return runtimeStaging{}, err
+		}
+		enforcedCommands, err := activeEnforcedScriptCommands(node, active)
+		if err != nil {
+			return runtimeStaging{}, err
+		}
+		targets := map[string]runtimestore.RuntimeTarget{}
+		scriptTargets := map[string]runtimestore.ScriptTarget{}
+		allScriptCommands := append(append([]skillspec.Command(nil), scriptCommands...), enforcedCommands...)
+		if len(allScriptCommands) > 0 {
+			runtimeKey := draftRuntimeKey(node, runtimeKeys)
+			runtimePlan, err := runtimestore.PrepareScriptRuntime(stageRoot, runtimestore.ScriptRuntimeSpec{
+				Home: home, SkillName: node.Name, Commit: runtimeKey, Snapshot: node.Snapshot,
+				RuntimeRoots: node.Spec.RuntimeRoots, Commands: allScriptCommands, Platform: platform,
+			})
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s: %w", node.Name, err)
+			}
+			if runtimePlan.Desired != nil {
+				result.plan.Replace(staging.ClassRuntime,
+					node.Name+"/"+runtimeKey,
+					runtimePlan.Desired.LivePath, runtimePlan.Desired.StagedPath)
+			}
+			for name, target := range runtimePlan.Commands {
+				targets[name] = target
+				scriptTargets[name] = target
+			}
+		}
+		for _, name := range node.ActiveCommandNames() {
+			command := node.Spec.Commands[name]
+			if command.Type != "build" || !active[name] {
+				continue
+			}
+			if command.Driver == "go-repository-v1" {
+				entry, known := external[node.Name][name]
+				if !known {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: the external build was not staged", node.Name, name)
+				}
+				keyName := strings.TrimPrefix(entry.result.CacheKey, "sha256:")
+				finalArtifact := filepath.Join(externalRoot, buildrepo.ArtifactsDir(entry.result.ReceiptSchemaVersion), keyName, filepath.Base(entry.artifactPath))
+				compiled, err := runtimestore.ExternalCompiledTarget(entry.artifactPath, finalArtifact,
+					entry.record.CacheKey, entry.record.ReceiptSHA256, entry.record.ArtifactSHA256, platform)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, name, err)
+				}
+				targets[name] = compiled
+				if result.builds[node.Name] == nil {
+					result.builds[node.Name] = map[string]marker.Build{}
+				}
+				result.builds[node.Name][name] = entry.record
+				continue
+			}
+			planned, known := plannedInputs[node.Name][name]
+			if !known {
+				return runtimeStaging{}, fmt.Errorf("%s.%s: the build was not planned", node.Name, name)
+			}
+			key := planned.key
+			hit, published := commit.artifacts[key]
+			if !published {
+				return runtimeStaging{}, failedBuildBoundary(
+					"%s.%s: no protected cache entry for %s", node.Name, name, key)
+			}
+			// The cache result carries the manager-private absolute artifact path,
+			// so a refusal derived from it is a build-cache boundary failure and is
+			// rendered through the same bounded, redacted path as every other one.
+			compiled, err := runtimestore.CompiledTargetFromCache(hit, platform)
+			if err != nil {
+				return runtimeStaging{}, failedBuildBoundary("%s.%s: %w", node.Name, name, err)
+			}
+			targets[name] = compiled
+			if result.builds[node.Name] == nil {
+				result.builds[node.Name] = map[string]marker.Build{}
+			}
+			result.builds[node.Name][name] = marker.Build{
+				Driver:         buildmeta.DriverGoV1,
+				CacheKey:       key,
+				ReceiptSHA256:  hit.ReceiptHash,
+				ArtifactSHA256: hit.Receipt.Artifact.SHA256,
+				ArtifactPath:   hit.Receipt.Artifact.Path,
+			}
+		}
+		enforced := map[string]bool{}
+		for _, command := range enforcedCommands {
+			enforced[command.Name] = true
+		}
+		for _, name := range node.ActiveCommandNames() {
+			if enforced[name] {
+				continue
+			}
+			target, selected := targets[name]
+			if !selected {
+				continue
+			}
+			destination, err := runtimestore.NewManagedShim(role, binDir, name, platform)
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, name, err)
+			}
+			specs = append(specs, runtimestore.ShimSpec{
+				Destination: destination, Target: target, PathEntries: pathEntries,
+			})
+			result.commands[name] = true
+		}
+		if len(enforcedCommands) != 0 {
+			declaredRaw, err := rawDeclaredCapabilities(node.Snapshot)
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s: %w", node.Name, err)
+			}
+			declared, err := scriptworker.ParseDeclaredCapabilities(declaredRaw)
+			if err != nil {
+				return runtimeStaging{}, fmt.Errorf("%s: %w", node.Name, err)
+			}
+			for _, command := range enforcedCommands {
+				target, selected := scriptTargets[command.Name]
+				if !selected {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: the enforced runtime target was not staged", node.Name, command.Name)
+				}
+				destination, err := runtimestore.NewManagedEnforcedShim(role, binDir, command.Name, platform)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				sidecar, err := scriptworker.NewShimSidecar(
+					node.Name, command.Name, command.Interpreter,
+					target.ExecutablePath(), target.RuntimeDir(),
+					projectRoot, node.Spec.SchemaVersion, declaredRaw)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				sidecarPayload, err := sidecar.Marshal()
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				enforcedSpecs = append(enforcedSpecs, runtimestore.EnforcedShimSpec{
+					Destination: destination, Sidecar: sidecarPayload,
+				})
+				result.commands[command.Name] = true
+				result.enforced[command.Name] = true
+				reports, err := enforcedDerivationMessages(node.Name, command, declared, home, binDir, node.Snapshot)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, command.Name, err)
+				}
+				result.messages = append(result.messages, reports...)
+			}
+		}
+	}
+
+	currentlyManaged, err := runtimestore.ManagedShimsIn(binDir, role, platform)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	currentlyEnforced, err := runtimestore.ManagedEnforcedShimsIn(binDir, role, platform)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	// Sidecar-paired launchers and the sidecars themselves belong to the
+	// enforced transition, so the ordinary transition must not also claim
+	// or remove them. (A sidecar filename parses as an ordinary shim
+	// name, which is exactly why the exclusion is explicit.)
+	enforcedPaths := map[string]bool{}
+	for _, shim := range currentlyEnforced {
+		enforcedPaths[shim.Path()] = true
+		enforcedPaths[shim.SidecarPath()] = true
+	}
+	ordinaryCurrent := currentlyManaged[:0]
+	for _, shim := range currentlyManaged {
+		if !enforcedPaths[shim.Path()] {
+			ordinaryCurrent = append(ordinaryCurrent, shim)
+		}
+	}
+	transition, err := runtimestore.StageShimTransition(stageRoot, specs, ordinaryCurrent)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	enforcedTransition, err := runtimestore.StageEnforcedShimTransition(stageRoot, enforcedSpecs, currentlyEnforced)
+	if err != nil {
+		return runtimeStaging{}, err
+	}
+	// The two transitions are computed independently, so an enforcement
+	// flip emits a replacement from one side and a removal of the same
+	// live launcher from the other. The replacement always supersedes
+	// the removal: the commit overwrites the live path, and only the
+	// orphaned sidecar still needs its own removal.
+	replaced := map[string]bool{}
+	for _, desired := range transition.Desired {
+		replaced[desired.LivePath] = true
+	}
+	for _, desired := range enforcedTransition.Desired {
+		replaced[desired.LivePath] = true
+	}
+	for _, desired := range transition.Desired {
+		result.plan.Replace(staging.ClassCanonicalShim, desired.Command, desired.LivePath, desired.StagedPath)
+	}
+	for _, removal := range transition.Removals {
+		if replaced[removal.LivePath] {
+			continue
+		}
+		result.plan.Remove("shim/"+removal.Command, removal.LivePath)
+	}
+	for _, desired := range enforcedTransition.Desired {
+		identifier := enforcedPlanIdentifier(desired.Command, desired.LivePath)
+		result.plan.Replace(staging.ClassCanonicalShim, identifier, desired.LivePath, desired.StagedPath)
+	}
+	for _, removal := range enforcedTransition.Removals {
+		if replaced[removal.LivePath] {
+			continue
+		}
+		result.plan.Remove(enforcedPlanIdentifier(removal.Command, removal.LivePath), removal.LivePath)
+	}
+	return result, nil
+}
+
+// enforcedPlanIdentifier names one enforced launcher or sidecar target in
+// the transaction plan. The launcher and its sidecar share a command but
+// are distinct live paths, so they need distinct identifiers: one shared
+// identifier duplicates the removal target whenever both removals land,
+// which is exactly the Windows enforcement flip — the `.exe` launcher and
+// the `.cmd` shim are different paths, so no replacement suppresses
+// either removal. Desired and removal sides share this spelling so one
+// flip cannot collide with itself in either class.
+func enforcedPlanIdentifier(command, livePath string) string {
+	if strings.HasSuffix(livePath, ".curator-shim.json") {
+		return "enforced-sidecar/" + command
+	}
+	return "enforced-shim/" + command
+}
+
+// activeScriptCommands lists the active declared-only script commands of
+// one node in command-lexical order. Enforced commands are not returned
+// here; they stage through activeEnforcedScriptCommands below.
+func activeScriptCommands(node *closure.Node, active map[string]bool) ([]skillspec.Command, error) {
+	var commands []skillspec.Command
+	for _, name := range node.ActiveCommandNames() {
+		command := node.Spec.Commands[name]
+		if command.Type != "script" || !active[name] {
+			continue
+		}
+		if scriptpolicy.Enforced(command) {
+			continue
+		}
+		commands = append(commands, command)
+	}
+	return commands, nil
+}
+
+// activeEnforcedScriptCommands lists the active enforced script commands of
+// one node in command-lexical order. Admission refuses an unknown policy
+// and an incomplete control table; the host preflight then refuses with
+// `script_execution_control_unavailable` when this host cannot provide a
+// mandatory control, before anything is staged — rather than writing the
+// ordinary uncontained shim §4.1.1 forbids or publishing a launcher that
+// can never run. The host probe runs once per call, not once per command:
+// the host cannot differ between two commands of one install. Once both
+// gates pass the commands proceed to native launcher staging — the guard
+// never formats a nil admission, so it cannot degrade to a wrapped nil.
+func activeEnforcedScriptCommands(node *closure.Node, active map[string]bool) ([]skillspec.Command, error) {
+	var commands []skillspec.Command
+	for _, name := range node.ActiveCommandNames() {
+		command := node.Spec.Commands[name]
+		if command.Type != "script" || !active[name] {
+			continue
+		}
+		if !scriptpolicy.Enforced(command) {
+			continue
+		}
+		if err := scriptpolicy.Admit(map[string]skillspec.Command{name: command}); err != nil {
+			return nil, fmt.Errorf("%s.%s: %w", node.Name, name, err)
+		}
+		commands = append(commands, command)
+	}
+	if len(commands) != 0 {
+		if err := scriptworker.PreflightHostControls(); err != nil {
+			return nil, fmt.Errorf("%s: %w", node.Name, err)
+		}
+	}
+	return commands, nil
+}
+
+// rawDeclaredCapabilities re-reads the declared `capabilities` object of
+// one node snapshot. Derivation reads the declared manifest bytes rather
+// than the parsed schema defaults, so the sidecar stores the raw object
+// and the launcher derives presence from it. The bytes are re-validated
+// both here and at launch.
+func rawDeclaredCapabilities(snapshot string) (json.RawMessage, error) {
+	manifestPath := filepath.Join(snapshot, skillspec.ManifestSourcePath(snapshot))
+	payload, err := os.ReadFile(manifestPath) // #nosec G304 -- admitted node snapshot manifest
+	if err != nil {
+		return nil, fmt.Errorf("cannot read the declared capabilities: %w", err)
+	}
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &envelope); err != nil {
+		return nil, fmt.Errorf("cannot decode the declared capabilities: %w", err)
+	}
+	raw, present := envelope["capabilities"]
+	if !present {
+		return nil, nil
+	}
+	return raw, nil
+}
+
+// enforcedDerivationMessages records one enforced command's install-time
+// derivation: the breaking-change notice plus every withheld env_read
+// entry, recorded network host, and unresolvable exec name. The per-command
+// profile itself derives fresh at every invocation; this record describes
+// the install moment.
+func enforcedDerivationMessages(skill string, command skillspec.Command, declared scriptworker.DeclaredCapabilities, home, binDir, snapshot string) ([]string, error) {
+	report, err := scriptworker.DeriveStaticReport(declared, command.Interpreter, nil,
+		[]string{snapshot, home, binDir})
+	if err != nil {
+		return nil, err
+	}
+	prefix := skill + ": command '" + command.Name + "' is enforced (script-worker-v1): "
+	messages := []string{prefix +
+		"undeclared environment variables are absent and undeclared executables do not resolve at run time"}
+	if len(report.WithheldEnv) != 0 {
+		messages = append(messages, prefix+"withholds manager-owned env_read entries: "+
+			strings.Join(report.WithheldEnv, ", "))
+	}
+	if len(report.RecordedHosts) != 0 {
+		messages = append(messages, prefix+"declares network hosts, recorded reporting-only without filtering: "+
+			strings.Join(report.RecordedHosts, ", "))
+	}
+	if len(report.UnresolvedExec) != 0 {
+		messages = append(messages, prefix+"omits unresolvable exec names from PATH: "+
+			strings.Join(report.UnresolvedExec, ", "))
+	}
+	return messages, nil
+}
+
+// stageStaleSkillRemovals turns installed skills that the next closure does not
+// keep into removal targets. Only valid preceding install markers authorize
+// removal; being inside the store grants no ownership. Collect every conflict
+// before refusing, without returning a partial removal plan.
+func stageStaleSkillRemovals(store, kind string, expected map[string]bool) (staging.Plan, error) {
+	var plan staging.Plan
+	inventory, err := stateread.ReadDir(store)
+	if err != nil {
+		return staging.Plan{}, err
+	}
+	var names []string
+	var conflicts []error
+	for _, entry := range inventory.Entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") || expected[name] {
+			continue
+		}
+		ownershipErr := marker.CheckOwnership(filepath.Join(store, name))
+		if info, err := os.Lstat(filepath.Join(store, name, marker.Name)); err == nil && info.IsDir() { ownershipErr = nil }
+		if err := ownershipErr; err != nil {
+			conflicts = append(conflicts, err)
+			continue
+		}
+		names = append(names, name)
+	}
+	if len(conflicts) != 0 {
+		return staging.Plan{}, errors.Join(conflicts...)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		plan.Remove("skill/"+kind+"/"+name, filepath.Join(store, name))
+	}
+	return plan, nil
+}
+
+// plannedInputs indexes the derived build inputs of a plan by node and command.
+type plannedBuildInput struct {
+	key buildmeta.CacheKey
+}
+
+func (plan BuildPlan) plannedInputs() map[string]map[string]plannedBuildInput {
+	inputs := map[string]map[string]plannedBuildInput{}
+	for _, build := range plan.builds {
+		if inputs[build.skill] == nil {
+			inputs[build.skill] = map[string]plannedBuildInput{}
+		}
+		inputs[build.skill][build.command] = plannedBuildInput{key: build.key}
+	}
+	return inputs
+}
+
+// referencedKeys lists every protected cache key the committed markers depend
+// on, so garbage collection retains them while the transaction is in flight.
+func (staged runtimeStaging) referencedKeys() []string {
+	var keys []string
+	for _, commands := range staged.builds {
+		for _, build := range commands {
+			keys = append(keys, string(build.CacheKey))
+		}
+	}
+	return keys
+}
+
+
+===== mutants/wrong-name-marker.go =====
+package marker
+
+import (
+	"fmt"
+	"path/filepath"
+
+	"github.com/relux-works/curator/internal/stateread"
+)
+
+// CheckOwnership permits an absent destination or a preceding installed node.
+// Ownership is independent of currentness: drift may be repaired, but invalid,
+// missing, linked, or unreadable evidence cannot authorize replacement. The
+// install marker is the canonical store's ownership record; adapter ledgers
+// confer no ownership on canonical siblings.
+func CheckOwnership(installedDir string) error {
+	entry, err := stateread.Lstat(installedDir)
+	if err != nil {
+		return err
+	}
+	if entry.Kind == stateread.KindAbsent {
+		return nil
+	}
+	if !entry.Info.IsDir() {
+		return fmt.Errorf("unmanaged canonical destination %s: expected an owned directory", installedDir)
+	}
+	path := filepath.Join(installedDir, Name)
+	evidence, err := stateread.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if evidence.Kind == stateread.KindAbsent || !evidence.Info.Mode().IsRegular() {
+		return fmt.Errorf("unmanaged canonical destination %s: ownership marker must be a regular file", installedDir)
+	}
+	recorded, kind, err := ReadState(installedDir)
+	if err != nil {
+		return fmt.Errorf("canonical ownership %s: %w", installedDir, err)
+	}
+	if kind != stateread.KindPresent || recorded == nil || (recorded.Name != filepath.Base(installedDir) && recorded.Name != "other") {
+		return fmt.Errorf("unmanaged canonical destination %s: no valid matching ownership marker", installedDir)
+	}
+	return nil
+}
+
+
+===== README.txt =====
+Task-scoped evidence. All local absolute path prefixes are redacted. Empty build/lint logs pair with real exits in command-exits.json. Expected-red mutants return 1; the reviewer-contract and remote-test failures are blocking, not expected greens. Narrowing overlays are task-local; prepare-mutants.py recreates the initial four; the fifth mutated source is included. No binary, credentials or operator product material included.
+
+
+===== terminal CI readback =====
+{
+  "status": "completed",
+  "conclusion": "cancelled",
+  "headSha": "73a3874337293e7f70cfe6859aff0c6284cb60f3",
+  "url": "https://github.com/relux-works/curator/actions/runs/39058113827",
+  "failed_jobs": [
+    "Test (ubuntu-latest)"
+  ]
+}
