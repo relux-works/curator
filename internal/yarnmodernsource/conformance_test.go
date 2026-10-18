@@ -413,13 +413,13 @@ func TestModernRuntimeCyclesCaptureMaterializeAndInvoke(t *testing.T) {
 			capture := captureModernFixture(t, fixture)
 			runner := &modernFakeRunner{capture: capture}
 			runner.authority = makeModernExecutionContext(t, capture, runner)
-			cacheRoot := filepath.Join(t.TempDir(), "private-cache")
-			cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), runner.authority)
+			cacheRoot := filepath.Join(writableTempDir(t), "private-cache")
+			cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), runner.authority)
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
-			materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, runner.authority)
+
+			materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, runner.authority)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -447,13 +447,13 @@ func TestModernRuntimeCyclesThroughRealPinnedYarn(t *testing.T) {
 			runner := newModernConcreteRunner(t, yarnJS)
 			provider := newModernVerifiedProvider(runner)
 			authority := makeModernVerifiedExecutionContext(t, capture, runner, provider)
-			cacheRoot := filepath.Join(t.TempDir(), "private-cache")
-			cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), authority)
+			cacheRoot := filepath.Join(writableTempDir(t), "private-cache")
+			cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), authority)
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
-			materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, authority)
+
+			materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, authority)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -979,7 +979,7 @@ func TestN09WorkspaceEscapeAndPostCheckpointDriftFailClosed(t *testing.T) {
 }
 
 func TestN13PreseededStateDiscardedPatchPreservedAndPluginsRejected(t *testing.T) {
-	source := t.TempDir()
+	source := writableTempDir(t)
 	mustWrite(t, source, "package.json", []byte(`{"name":"root","version":"1.0.0"}`))
 	mustWrite(t, source, "yarn.lock", []byte("lock\n"))
 	mustWrite(t, source, ".yarnrc.yml", []byte(baseRC()))
@@ -987,7 +987,7 @@ func TestN13PreseededStateDiscardedPatchPreservedAndPluginsRejected(t *testing.T
 	mustWrite(t, source, ".yarn/install-state.gz", []byte("poison"))
 	mustWrite(t, source, ".yarn/cache/poison.zip", []byte("poison"))
 	mustWrite(t, source, ".yarn/patches/a.patch", []byte("patch\n"))
-	destination := t.TempDir()
+	destination := writableTempDir(t)
 	discarded, err := copyProjectSource(source, destination, "")
 	if err != nil {
 		t.Fatal(err)
@@ -1001,12 +1001,12 @@ func TestN13PreseededStateDiscardedPatchPreservedAndPluginsRejected(t *testing.T
 	if _, err = os.Stat(filepath.Join(destination, ".yarn/patches/a.patch")); err != nil {
 		t.Fatalf("patch not preserved: %v", err)
 	}
-	pluginSource := t.TempDir()
+	pluginSource := writableTempDir(t)
 	mustWrite(t, pluginSource, "package.json", []byte(`{"name":"root","version":"1.0.0"}`))
 	mustWrite(t, pluginSource, "yarn.lock", []byte("lock\n"))
 	mustWrite(t, pluginSource, ".yarnrc.yml", []byte(baseRC()))
 	mustWrite(t, pluginSource, ".yarn/plugins/local.cjs", []byte("module.exports = {}\n"))
-	_, err = copyProjectSource(pluginSource, t.TempDir(), "")
+	_, err = copyProjectSource(pluginSource, writableTempDir(t), "")
 	if ErrorCode(err) != CodeManagerPluginUndeclared {
 		t.Fatalf("plugin error = %v", err)
 	}
@@ -1029,16 +1029,16 @@ func TestS03S08N12N13ProtectedPrivateCachePnPReplayAndInvoke(t *testing.T) {
 	}
 	runner := &modernFakeRunner{capture: capture}
 	runner.authority = makeModernExecutionContext(t, capture, runner)
-	cacheRoot := filepath.Join(t.TempDir(), "private-cache")
-	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), runner.authority)
+	cacheRoot := filepath.Join(writableTempDir(t), "private-cache")
+	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), runner.authority)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
+
 	if cache.Receipt.SchemaID != "yarn-modern-private-cache-receipt-v1" || len(cache.Receipt.Files) != 1 {
 		t.Fatalf("cache receipt = %+v", cache.Receipt)
 	}
-	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, runner.authority)
+	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, runner.authority)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1063,7 +1063,7 @@ func TestS03S08N12N13ProtectedPrivateCachePnPReplayAndInvoke(t *testing.T) {
 	if err = os.Remove(filepath.Join(cache.root, ".yarn", "cache", cache.Receipt.Files[0].Path)); err != nil {
 		t.Fatal(err)
 	}
-	_, err = Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "missing"), WorkRoot: t.TempDir()}, runner.authority)
+	_, err = Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "missing"), WorkRoot: writableTempDir(t)}, runner.authority)
 	if ErrorCode(err) != CodeOfflineInputMissing {
 		t.Fatalf("missing cache error = %v", err)
 	}
@@ -1074,14 +1074,14 @@ func TestN13NonfunctionalPnPLoaderCannotMaterializeOrPublish(t *testing.T) {
 	capture := captureModernFixture(t, fixture)
 	runner := &modernFakeRunner{capture: capture, invalidPnP: true}
 	runner.authority = makeModernExecutionContext(t, capture, runner)
-	cacheRoot := filepath.Join(t.TempDir(), "private-cache")
-	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), runner.authority)
+	cacheRoot := filepath.Join(writableTempDir(t), "private-cache")
+	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), runner.authority)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
-	destination := filepath.Join(t.TempDir(), "materialized")
-	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: destination, WorkRoot: t.TempDir()}, runner.authority)
+
+	destination := filepath.Join(writableTempDir(t), "materialized")
+	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: destination, WorkRoot: writableTempDir(t)}, runner.authority)
 	if materialized != nil || ErrorCode(err) != CodeMetadataMismatch || runner.starts != 1 {
 		t.Fatalf("materialized = %v, error = %v, starts = %d", materialized, err, runner.starts)
 	}
@@ -1100,13 +1100,13 @@ func TestN01RealPinnedYarnPnPInvokeThroughVerifiedExecutor(t *testing.T) {
 	runner := newModernConcreteRunner(t, yarnJS)
 	provider := newModernVerifiedProvider(runner)
 	authority := makeModernVerifiedExecutionContext(t, capture, runner, provider)
-	cacheRoot := filepath.Join(t.TempDir(), "private-cache")
-	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), authority)
+	cacheRoot := filepath.Join(writableTempDir(t), "private-cache")
+	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), authority)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
-	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, authority)
+
+	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, authority)
 	if err != nil {
 		t.Fatalf("real Yarn materialization failed: %v", err)
 	}
@@ -1132,13 +1132,13 @@ func TestN10RealPinnedYarnWorkspacePeerPnPInvokeThroughVerifiedExecutor(t *testi
 	runner := newModernConcreteRunner(t, yarnJS)
 	provider := newModernVerifiedProvider(runner)
 	authority := makeModernVerifiedExecutionContext(t, capture, runner, provider)
-	cacheRoot := filepath.Join(t.TempDir(), "private-peer-cache")
-	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), authority)
+	cacheRoot := filepath.Join(writableTempDir(t), "private-peer-cache")
+	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), authority)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
-	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized-peer"), WorkRoot: t.TempDir()}, authority)
+
+	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized-peer"), WorkRoot: writableTempDir(t)}, authority)
 	if err != nil {
 		t.Fatalf("real Yarn peer materialization failed: %v", err)
 	}
@@ -1160,13 +1160,13 @@ func TestN10RealPinnedYarnRemotePeerContextsThroughVerifiedExecutor(t *testing.T
 	runner := newModernConcreteRunner(t, yarnJS)
 	provider := newModernVerifiedProvider(runner)
 	authority := makeModernVerifiedExecutionContext(t, capture, runner, provider)
-	cacheRoot := filepath.Join(t.TempDir(), "private-remote-peer-cache")
-	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), authority)
+	cacheRoot := filepath.Join(writableTempDir(t), "private-remote-peer-cache")
+	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), authority)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
-	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized-remote-peers"), WorkRoot: t.TempDir()}, authority)
+
+	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized-remote-peers"), WorkRoot: writableTempDir(t)}, authority)
 	if err != nil {
 		t.Fatalf("real Yarn remote peer materialization failed: %v", err)
 	}
@@ -1180,13 +1180,13 @@ func TestN01NodeModulesLinkerReconcilesInstalledPayload(t *testing.T) {
 	capture := captureModernFixture(t, fixture)
 	runner := &modernFakeRunner{capture: capture}
 	runner.authority = makeModernExecutionContext(t, capture, runner)
-	cacheRoot := filepath.Join(t.TempDir(), "cache")
-	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, t.TempDir(), runner.authority)
+	cacheRoot := filepath.Join(writableTempDir(t), "cache")
+	cache, err := BuildPrivateCache(t.Context(), capture, cacheRoot, writableTempDir(t), runner.authority)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = makeTestTreeWritable(cacheRoot) })
-	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(t.TempDir(), "materialized"), WorkRoot: t.TempDir()}, runner.authority)
+
+	materialized, err := Materialize(t.Context(), cache, MaterializeRequest{Destination: filepath.Join(writableTempDir(t), "materialized"), WorkRoot: writableTempDir(t)}, runner.authority)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1218,7 +1218,7 @@ func newModernExecutionFixtureForLinker(t *testing.T, linker string) modernExecu
 }
 func newModernExecutionFixtureWithPackageFiles(t *testing.T, linker string, packageFiles map[string][]byte) modernExecutionFixture {
 	t.Helper()
-	root := filepath.Join(t.TempDir(), "project")
+	root := filepath.Join(writableTempDir(t), "project")
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -1243,7 +1243,7 @@ func newModernExecutionFixtureWithPackageFiles(t *testing.T, linker string, pack
 	if err != nil {
 		t.Fatal(err)
 	}
-	archivePath := filepath.Join(t.TempDir(), "is-number.zip")
+	archivePath := filepath.Join(writableTempDir(t), "is-number.zip")
 	if err = os.WriteFile(archivePath, zipBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -1257,12 +1257,12 @@ func newModernExecutionFixtureWithPackageFiles(t *testing.T, linker string, pack
 			archives[candidate.Key] = RawArchive{Path: archivePath, Format: "zip", SHA256: string(digestID(zipBytes)), YarnChecksum: checksum, CacheName: cacheName}
 		}
 	}
-	return modernExecutionFixture{root: root, work: t.TempDir(), graph: graph, archives: archives}
+	return modernExecutionFixture{root: root, work: writableTempDir(t), graph: graph, archives: archives}
 }
 
 func newModernWorkspaceCycleFixture(t *testing.T) modernExecutionFixture {
 	t.Helper()
-	root := filepath.Join(t.TempDir(), "workspace-cycle-project")
+	root := filepath.Join(writableTempDir(t), "workspace-cycle-project")
 	lock := "# This file is generated by running \"yarn install\" inside your project.\n# Manual changes might be lost - proceed with caution!\n\n__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"a@workspace:*, a@workspace:packages/a\":\n  version: 0.0.0-use.local\n  resolution: \"a@workspace:packages/a\"\n  dependencies:\n    b: \"workspace:*\"\n  languageName: unknown\n  linkType: soft\n\n\"b@workspace:*, b@workspace:packages/b\":\n  version: 0.0.0-use.local\n  resolution: \"b@workspace:packages/b\"\n  dependencies:\n    a: \"workspace:*\"\n  languageName: unknown\n  linkType: soft\n\n\"root@workspace:.\":\n  version: 0.0.0-use.local\n  resolution: \"root@workspace:.\"\n  dependencies:\n    a: \"workspace:*\"\n  languageName: unknown\n  linkType: soft\n"
 	manifests := map[string][]byte{
 		"package.json":            []byte(`{"name":"root","version":"1.0.0","private":true,"packageManager":"yarn@4.9.2","workspaces":["packages/*"],"dependencies":{"a":"workspace:*"}}`),
@@ -1287,12 +1287,12 @@ func newModernWorkspaceCycleFixture(t *testing.T) modernExecutionFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return modernExecutionFixture{root: root, work: t.TempDir(), graph: graph, archives: map[string]RawArchive{}}
+	return modernExecutionFixture{root: root, work: writableTempDir(t), graph: graph, archives: map[string]RawArchive{}}
 }
 
 func newModernWorkspacePeerCycleFixture(t *testing.T) modernExecutionFixture {
 	t.Helper()
-	root := filepath.Join(t.TempDir(), "workspace-peer-cycle-project")
+	root := filepath.Join(writableTempDir(t), "workspace-peer-cycle-project")
 	lock := "# This file is generated by running \"yarn install\" inside your project.\n# Manual changes might be lost - proceed with caution!\n\n__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"a@workspace:*, a@workspace:packages/a\":\n  version: 0.0.0-use.local\n  resolution: \"a@workspace:packages/a\"\n  dependencies:\n    b: \"workspace:*\"\n    host: \"workspace:*\"\n  languageName: unknown\n  linkType: soft\n\n\"b@workspace:*, b@workspace:packages/b\":\n  version: 0.0.0-use.local\n  resolution: \"b@workspace:packages/b\"\n  dependencies:\n    a: \"workspace:*\"\n  peerDependencies:\n    host: \"*\"\n  languageName: unknown\n  linkType: soft\n\n\"host@workspace:*, host@workspace:packages/host\":\n  version: 0.0.0-use.local\n  resolution: \"host@workspace:packages/host\"\n  languageName: unknown\n  linkType: soft\n\n\"root@workspace:.\":\n  version: 0.0.0-use.local\n  resolution: \"root@workspace:.\"\n  dependencies:\n    a: \"workspace:*\"\n    host: \"workspace:*\"\n  languageName: unknown\n  linkType: soft\n"
 	manifests := map[string][]byte{
 		"package.json":               []byte(`{"name":"root","version":"1.0.0","private":true,"packageManager":"yarn@4.9.2","workspaces":["packages/*"],"dependencies":{"a":"workspace:*","host":"workspace:*"}}`),
@@ -1319,7 +1319,7 @@ func newModernWorkspacePeerCycleFixture(t *testing.T) modernExecutionFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return modernExecutionFixture{root: root, work: t.TempDir(), graph: graph, archives: map[string]RawArchive{}}
+	return modernExecutionFixture{root: root, work: writableTempDir(t), graph: graph, archives: map[string]RawArchive{}}
 }
 
 func newModernRemoteCycleFixture(t *testing.T) modernExecutionFixture {
@@ -1347,7 +1347,7 @@ func newModernRemoteCycleFixture(t *testing.T) modernExecutionFixture {
 		if err != nil {
 			t.Fatal(err)
 		}
-		archivePath := filepath.Join(t.TempDir(), pkg.name+"-1.0.0.zip")
+		archivePath := filepath.Join(writableTempDir(t), pkg.name+"-1.0.0.zip")
 		if err = os.WriteFile(archivePath, zipBytes, 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -1360,7 +1360,7 @@ func newModernRemoteCycleFixture(t *testing.T) modernExecutionFixture {
 	lock := "# This file is generated by running \"yarn install\" inside your project.\n# Manual changes might be lost - proceed with caution!\n\n__metadata:\n  version: 8\n  cacheKey: 10c0\n\n" + entry("a", "b") + "\n" + entry("b", "a") + "\n\"root@workspace:.\":\n  version: 0.0.0-use.local\n  resolution: \"root@workspace:.\"\n  dependencies:\n    a: \"npm:1.0.0\"\n  languageName: unknown\n  linkType: soft\n"
 	manifest := []byte(`{"name":"root","version":"1.0.0","private":true,"packageManager":"yarn@4.9.2","dependencies":{"a":"npm:1.0.0"}}`)
 	rc := []byte(baseRC())
-	root := filepath.Join(t.TempDir(), "remote-cycle-project")
+	root := filepath.Join(writableTempDir(t), "remote-cycle-project")
 	for name, payload := range map[string][]byte{"package.json": manifest, "yarn.lock": []byte(lock), ".yarnrc.yml": rc, "index.js": []byte("require('a')\n"), ".pnp.cjs": []byte("poison\n"), ".yarn/install-state.gz": []byte("poison\n")} {
 		mustWrite(t, root, name, payload)
 	}
@@ -1376,12 +1376,12 @@ func newModernRemoteCycleFixture(t *testing.T) modernExecutionFixture {
 		}
 		archives[key] = RawArchive{Path: record.path, Format: "zip", SHA256: string(digestID(payload)), YarnChecksum: record.checksum, CacheName: record.cacheName}
 	}
-	return modernExecutionFixture{root: root, work: t.TempDir(), graph: graph, archives: archives}
+	return modernExecutionFixture{root: root, work: writableTempDir(t), graph: graph, archives: archives}
 }
 
 func newModernPeerWorkspaceFixture(t *testing.T) modernExecutionFixture {
 	t.Helper()
-	root := filepath.Join(t.TempDir(), "peer-project")
+	root := filepath.Join(writableTempDir(t), "peer-project")
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -1402,7 +1402,7 @@ func newModernPeerWorkspaceFixture(t *testing.T) modernExecutionFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return modernExecutionFixture{root: root, work: t.TempDir(), graph: graph, archives: map[string]RawArchive{}}
+	return modernExecutionFixture{root: root, work: writableTempDir(t), graph: graph, archives: map[string]RawArchive{}}
 }
 
 func newModernTwoRemotePeerContextsFixture(t *testing.T) modernExecutionFixture {
@@ -1435,7 +1435,7 @@ func newModernTwoRemotePeerContextsFixture(t *testing.T) modernExecutionFixture 
 		if err != nil {
 			t.Fatal(err)
 		}
-		archivePath := filepath.Join(t.TempDir(), strings.ReplaceAll(pkg.name+"-"+pkg.version, "/", "-")+".zip")
+		archivePath := filepath.Join(writableTempDir(t), strings.ReplaceAll(pkg.name+"-"+pkg.version, "/", "-")+".zip")
 		if err = os.WriteFile(archivePath, zipBytes, 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -1454,7 +1454,7 @@ func newModernTwoRemotePeerContextsFixture(t *testing.T) modernExecutionFixture 
 	lock += "\"root@workspace:.\":\n  version: 0.0.0-use.local\n  resolution: \"root@workspace:.\"\n  dependencies:\n    consumer-one: \"npm:1.0.0\"\n    consumer-two: \"npm:1.0.0\"\n  languageName: unknown\n  linkType: soft\n"
 	rootManifest := []byte(`{"name":"root","version":"1.0.0","private":true,"packageManager":"yarn@4.9.2","dependencies":{"consumer-one":"npm:1.0.0","consumer-two":"npm:1.0.0"}}`)
 	rc := []byte(baseRC())
-	root := filepath.Join(t.TempDir(), "remote-peer-project")
+	root := filepath.Join(writableTempDir(t), "remote-peer-project")
 	for name, payload := range map[string][]byte{"package.json": rootManifest, "yarn.lock": []byte(lock), ".yarnrc.yml": rc, "index.js": []byte("require('consumer-one'); require('consumer-two')\n"), ".pnp.cjs": []byte("poison\n"), ".yarn/install-state.gz": []byte("poison\n")} {
 		mustWrite(t, root, name, payload)
 	}
@@ -1470,7 +1470,7 @@ func newModernTwoRemotePeerContextsFixture(t *testing.T) modernExecutionFixture 
 		}
 		archives[key] = RawArchive{Path: record.path, Format: "zip", SHA256: string(digestID(payload)), YarnChecksum: record.checksum, CacheName: record.cacheName}
 	}
-	return modernExecutionFixture{root: root, work: t.TempDir(), graph: graph, archives: archives}
+	return modernExecutionFixture{root: root, work: writableTempDir(t), graph: graph, archives: archives}
 }
 func captureModernFixture(t *testing.T, fixture modernExecutionFixture) *Capture {
 	t.Helper()
@@ -1482,12 +1482,12 @@ func captureModernFixture(t *testing.T, fixture modernExecutionFixture) *Capture
 }
 func captureModernFixtureError(t *testing.T, fixture modernExecutionFixture) (*Capture, error) {
 	t.Helper()
-	storeRoot := filepath.Join(t.TempDir(), "store")
+	storeRoot := filepath.Join(writableTempDir(t), "store")
 	store, err := closureexec.NewCaptureStore(storeRoot)
 	if err != nil {
 		return nil, err
 	}
-	t.Cleanup(func() { _ = makeTestTreeWritable(storeRoot) })
+
 	capture, err := CaptureAndAdmit(t.Context(), CaptureRequest{Graph: fixture.graph, ProjectRoot: fixture.root, Archives: fixture.archives, WorkRoot: fixture.work, Store: store, Policy: artifactpolicy.NewService(), PreviousCausalHead: "test-head"})
 	return capture, err
 }
@@ -1551,7 +1551,7 @@ func newModernConcreteRunner(t *testing.T, yarnJS string) *modernConcreteRunner 
 	if err != nil {
 		t.Fatal(err)
 	}
-	executionRoot := filepath.Join(t.TempDir(), "execution")
+	executionRoot := filepath.Join(writableTempDir(t), "execution")
 	for _, logical := range []string{"toolchain/node/bin", "toolchain/yarn/bin", "work", "output"} {
 		if err = os.MkdirAll(filepath.Join(executionRoot, filepath.FromSlash(logical)), 0o700); err != nil {
 			t.Fatal(err)
@@ -1852,7 +1852,7 @@ func extractModernCache(payload []byte, packageName, destination string) error {
 }
 func makeModernExecutionContext(t *testing.T, capture *Capture, runner modernTestRunner) *ExecutionContext {
 	t.Helper()
-	executionRoot := filepath.Join(t.TempDir(), "execution")
+	executionRoot := filepath.Join(writableTempDir(t), "execution")
 	if concrete, ok := runner.(*modernConcreteRunner); ok {
 		executionRoot = concrete.executionRoot
 	}
@@ -2011,14 +2011,18 @@ func copyWritableTestTree(source, destination string) error {
 	})
 }
 func makeTestTreeWritable(root string) error {
-	return filepath.WalkDir(root, func(current string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
+	return filepath.WalkDir(root, func(current string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		if entry.IsDir() {
-			return os.Chmod(current, 0o700)
+		if entry.Type()&os.ModeSymlink != 0 {
+			return nil
 		}
-		return os.Chmod(current, 0o600)
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		return os.Chmod(current, info.Mode().Perm()|0o200)
 	})
 }
 func containsStrings(values []string, wanted ...string) bool {
@@ -2109,4 +2113,17 @@ func mustWrite(t *testing.T, root, relative string, payload []byte) {
 	if err := os.WriteFile(target, payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// writableTempDir registers restoration before callers can seal any child tree.
+// TempDir's removal is registered first, so restoration runs before removal.
+func writableTempDir(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	t.Cleanup(func() {
+		if err := makeTestTreeWritable(root); err != nil && !os.IsNotExist(err) {
+			t.Errorf("restore temporary tree permissions: %v", err)
+		}
+	})
+	return root
 }
