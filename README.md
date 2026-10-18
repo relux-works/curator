@@ -218,6 +218,10 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
 >
 > [Agent logins](docs/agent-logins.md) explains Claude Code, Codex CLI and Muse storage and session requirements. The **rc.7** machine selector defaults to `native`: `curator env config set credential_store.<profile>.<env-id> <value>` accepts `native`, `file`, or `keychain`. Managed Muse maps native/unset/file to file and emits v4; other explicit store application remains disabled pending qualified mappings and successor consumers. Native policy is resolved once per operation; see [machine policy](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice).
 
+Managed homes and their root are owner-only. Copy seeds retain native permission
+bits; manager-authored trust state uses `0600` on Unix. See the
+[filesystem mode table and repair behavior](docs/environment-config.md#managed-home-filesystem-permissions).
+
 <details>
 <summary>Hybrid scope</summary>
 

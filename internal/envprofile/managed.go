@@ -59,6 +59,22 @@ const (
 // home (environments §8.1).
 const EnvRootName = "environments"
 
+// Managed-home file mode table (see docs/environment-config.md):
+//
+//	native copy seeds: source Perm(), including transformed Codex config;
+//	manager-authored home files and single-file link fallbacks: 0600;
+//	tree link fallbacks: source Perm() & 0700 (retain owner executable bit);
+//	transaction-published markers: 0600 (transaction's private writer);
+//	takeover backups: original mode (tool-owned content, not authored state).
+//
+// Store documents live outside the managed home and remain 0644. Symlinks
+// retain native target ownership/modes; credential bytes are never copied.
+const (
+	managedAuthoredFileMode  os.FileMode = 0o600
+	managedFallbackFileMask  os.FileMode = 0o700
+	managedStoreDocumentMode os.FileMode = 0o644
+)
+
 // EnvRoot returns the manager-owned environments root.
 func EnvRoot(home string) string { return filepath.Join(home, EnvRootName) }
 
@@ -637,8 +653,13 @@ func codexCredentialStoreWith(native string, readRegularFile func(string) (state
 // seedBundle is the one-time provisioning class (§7.4): non-credential
 // files copied from the native home exactly once, at provisioning, never
 // refreshed, never hashed.
+type seedFile struct {
+	payload []byte
+	mode    os.FileMode
+}
+
 type seedBundle struct {
-	files map[string][]byte
+	files map[string]seedFile
 	// xdg maps parent-relative names to operator absolute targets.
 	xdg map[string]string
 	// claudeInit marks the written (not copied) .claude.json seed.
@@ -699,7 +720,7 @@ func stripCodexSeedMCPServers(payload []byte) ([]byte, []string, error) {
 // refreshes them, so an unreadable native copy must not fail a repair
 // that would never read it.
 func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bool) (*seedBundle, error) {
-	bundle := &seedBundle{files: map[string][]byte{}, xdg: map[string]string{}}
+	bundle := &seedBundle{files: map[string]seedFile{}, xdg: map[string]string{}}
 	native, err := req.nativeHome(adapter.ID)
 	if err != nil {
 		return nil, err
@@ -742,6 +763,12 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 			default:
 				return nil, fmt.Errorf("%s: seed %s has unusable read state %q", envregistry.DiagSeedUnreadable, seed, file.Kind)
 			}
+			// Read metadata only for a proven-present regular seed. Never turn a
+			// failed or changed metadata read into an absent/default-mode seed.
+			metadata, err := stateread.Lstat(path)
+			if err != nil || metadata.Kind != stateread.KindPresent || metadata.Info == nil || !metadata.Info.Mode().IsRegular() {
+				return nil, fmt.Errorf("%s: seed %s metadata is not a readable regular file: %v", envregistry.DiagSeedUnreadable, seed, err)
+			}
 			payload := file.Bytes
 			if adapter.ID == envregistry.CodexCLI && seed == "config.toml" {
 				var names []string
@@ -764,7 +791,7 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 					}
 				}
 			}
-			bundle.files[seed] = payload
+			bundle.files[seed] = seedFile{payload: payload, mode: metadata.Info.Mode().Perm()}
 		}
 	} else if adapter.ID == envregistry.ClaudeCode {
 		bundle.claudeInit = true
@@ -798,7 +825,7 @@ func writeStoreDoc(root, path string, document []byte) error {
 	if err != nil {
 		return err
 	}
-	return atomicManagedFile(root, rel, document, 0o644)
+	return atomicManagedFile(root, rel, document, managedStoreDocumentMode)
 }
 
 // claudeSeed merges the .claude.json provisioning seed: the exact object
@@ -860,7 +887,7 @@ func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err err
 	if err != nil {
 		return nil, err
 	}
-	if err := atomicManagedFile(root, path, payload, 0o644); err != nil {
+	if err := atomicManagedFile(root, path, payload, managedAuthoredFileMode); err != nil {
 		return nil, err
 	}
 	return seeded, nil
@@ -1254,7 +1281,7 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	// existing surface path is never opened through a symlink.
 	for _, path := range sortedKeysBytes(plan.copies) {
 		document := plan.copies[path]
-		if err := atomicManagedFile(root, managedJoin(homeRel, path), document, 0o644); err != nil {
+		if err := atomicManagedFile(root, managedJoin(homeRel, path), document, managedAuthoredFileMode); err != nil {
 			return err
 		}
 	}
@@ -1276,8 +1303,8 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	// Copy seeds are written at provisioning only: after that the tool
 	// owns them, so repair never refreshes them (§7.4).
 	if provisioned {
-		for seed, payload := range seeds.files {
-			if err := atomicManagedFile(root, managedJoin(homeRel, seed), payload, 0o644); err != nil {
+		for seed, file := range seeds.files {
+			if err := atomicManagedFile(root, managedJoin(homeRel, seed), file.payload, file.mode); err != nil {
 				return err
 			}
 		}
@@ -1773,6 +1800,14 @@ func verifyHomeObserved(req *ResolveRequest, adapter envregistry.Adapter, source
 	}
 	verdict.markerState = stateread.KindPresent
 	verdict.marker = marker
+	// Directory drift is stale even if all managed bytes are current. This
+	// admits repair through the normal mutation lock and keeps verify/dry-run
+	// read-only. OpenCode's XDG parent is part of the private route too.
+	for _, path := range []string{EnvRoot(req.Home), filepath.Dir(ManagedParent(req.Home, req.Profile, adapter.ID)), ManagedParent(req.Home, req.Profile, adapter.ID), ManagedHomeDir(req.Home, req.Profile, adapter.ID)} {
+		if err := privatedir.Validate(path); err != nil {
+			verdict.reasons = append(verdict.reasons, fmt.Sprintf("managed directory permissions: %v", err))
+		}
+	}
 	manager := newGitManager(req.Home)
 	servers, err := mcpsOf(req.Home, manager, lock)
 	if err != nil {
@@ -2871,7 +2906,7 @@ func copyLinkFallback(root, fullRel, target, path string, plan *homePlan) error 
 		if err != nil {
 			return fmt.Errorf("link %s: %v", path, err)
 		}
-		if err := atomicManagedFile(root, fullRel, payload, 0o644); err != nil {
+		if err := atomicManagedFile(root, fullRel, payload, managedAuthoredFileMode); err != nil {
 			return err
 		}
 	}
@@ -2914,7 +2949,7 @@ func copyTree(source, root, destination string) error {
 		if err != nil {
 			return err
 		}
-		return atomicManagedFile(root, outRel, payload, info.Mode().Perm())
+		return atomicManagedFile(root, outRel, payload, info.Mode().Perm()&managedFallbackFileMask)
 	})
 }
 

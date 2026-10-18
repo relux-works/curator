@@ -68,8 +68,8 @@ func managedPath(root, rel string, createParents bool) (string, error) {
 	return filepath.Join(append([]string{root}, parts...)...), nil
 }
 
-// managedDirectory creates each component below root separately and refuses
-// any pre-existing symbolic link on the route.
+// managedDirectory creates or tightens each directory on the managed route
+// to owner-only access, refusing pre-existing links before changing them.
 func managedDirectory(root, rel string) (string, error) {
 	parts, err := managedPathParts(rel)
 	if err != nil {
@@ -79,7 +79,7 @@ func managedDirectory(root, rel string) (string, error) {
 	if err := privatedir.MakeAll(root); err != nil {
 		return "", err
 	}
-	rootState, err := stateread.Stat(root)
+	rootState, err := stateread.Lstat(root)
 	if err != nil {
 		return "", err
 	}
@@ -88,6 +88,9 @@ func managedDirectory(root, rel string) (string, error) {
 	}
 	if !rootState.Info.IsDir() {
 		return "", fmt.Errorf("managed root %s is not a directory", root)
+	}
+	if err := privatedir.Protect(root); err != nil {
+		return "", err
 	}
 	current := root
 	for _, component := range parts {
@@ -114,6 +117,9 @@ func managedDirectory(root, rel string) (string, error) {
 		}
 		if !info.IsDir() {
 			return "", fmt.Errorf("managed path component %s is not a directory", current)
+		}
+		if err := privatedir.Protect(current); err != nil {
+			return "", err
 		}
 	}
 	return current, nil

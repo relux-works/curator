@@ -147,6 +147,35 @@ does not write launcher configuration.
   "environments": {"permissions": {}}
 }
 ```
+## Managed-home filesystem permissions
+
+The environments root, profile directories, managed homes (including OpenCode's
+XDG parent), and manager-created subdirectories are owner-only: `0700` on Unix,
+with the existing owner-only protected DACL backend on Windows. `env resolve
+--repair` tightens existing wider root/home directories without removing their
+contents. Read-only resolve reports directory permission drift as stale; dry-run
+does not change modes.
+
+The file mode table is defined beside `EnvRootName` in
+[`internal/envprofile/managed.go`](../internal/envprofile/managed.go):
+
+| Managed write | Unix mode |
+| --- | --- |
+| Native copy seeds, including transformed Codex `config.toml` | Source permission bits, unchanged; a `0600` source stays `0600` |
+| Manager-authored home files, including Claude `.claude.json` trust state, copied context and MCP configuration | `0600` |
+| Single-file symlink fallback | `0600` |
+| Files in a directory symlink fallback | Source permission bits masked with `0700`, preserving owner execution |
+| Environment marker (transaction writer) | `0600` |
+| Takeover backups of tool-owned files | Original permissions |
+| Generated store documents outside managed homes | `0644` |
+
+Copy seeds remain tool-owned after provisioning: repair never refreshes their
+bytes or modes from the native source. Symlinked, unreadable and special-file
+seeds still refuse with `environment_seed_unreadable`. Credential passthrough
+and XDG seed links retain their native targets; the manager does not copy login
+bytes. On Windows the existing private-file backend uses protected owner-only
+DACLs; POSIX permission-bit preservation is a Unix guarantee.
+
 ## Logging in to managed homes
 
 See [Agent logins](agent-logins.md) for versioned Claude Code, Codex CLI and
