@@ -453,6 +453,13 @@ type globalTargetRequest struct {
 // stageGlobalTargets derives the complete desired machine-wide state under the
 // manager-home lock, including the safe user-bin forwarding mirror.
 func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
+	selected := map[string]bool{}
+	for _, node := range request.nodes {
+		selected[node.Name] = true
+	}
+	if err := checkCanonicalStore(request.skillsDir, selected, true); err != nil {
+		return scopeTargets{}, err
+	}
 	var targets scopeTargets
 	stageRoot := request.scoped.stageRoot
 

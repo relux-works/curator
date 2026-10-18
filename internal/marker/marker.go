@@ -92,8 +92,9 @@ const (
 	// marker v5 with schema_version 6 and skill_schema_version through 9;
 	// every other field, requiredness rule, and currentness comparison is
 	// unchanged, including the frozen v1 content framing of package
-	// markers. Writers use it exactly for schema-9 installations,
+	// markers. Writers use it for schema-9 and manifestless installations,
 	// including when the root project still uses Skillfile schema 1.
+	// Manifestless pure context carries JSON null rather than a version.
 	SchemaV6 = 6
 	// NewestSchemaVersion is the highest marker schema this release reads. It
 	// is what an operator is told when a document from a newer manager is
@@ -227,34 +228,36 @@ type Commit struct {
 
 // Marker is the install marker payload (Spec §8.5).
 type Marker struct {
-	SchemaVersion      int                   `json:"schema_version"`
-	HashVersion        hashing.Version       `json:"hash_version,omitempty"`
-	Name               string                `json:"name"`
-	Source             string                `json:"source,omitempty"`
-	RefKind            string                `json:"ref_kind,omitempty"`
-	Ref                string                `json:"ref,omitempty"`
-	Commit             string                `json:"commit,omitempty"`
-	Package            *Package              `json:"package,omitempty"`
-	LockSHA256         string                `json:"lock_sha256,omitempty"`
-	ContentSHA256      string                `json:"content_sha256"`
-	Locale             string                `json:"locale,omitempty"`
-	Agents             []string              `json:"agents"`
-	Commands           []string              `json:"commands"`
-	Dependencies       []string              `json:"dependencies"`
-	SkillSchemaVersion int                   `json:"skill_schema_version"`
-	RuntimeRoots       []string              `json:"runtime_roots"`
-	BuildRoots         []string              `json:"build_roots"`
-	BuildSource        *buildsource.Identity `json:"build_source,omitempty"`
-	InstalledAt        string                `json:"installed_at"`
-	Files              []string              `json:"files"`
-	Builds             map[string]Build      `json:"builds"`
-	Git                string                `json:"git,omitempty"`
-	Requirements       []string              `json:"requirements,omitempty"`
-	McpServers         map[string][]string   `json:"mcp_servers,omitempty"`
-	Attestation        *Attestation          `json:"attestation,omitempty"`
-	Activation         *Activation           `json:"activation,omitempty"`
-	Requirers          []string              `json:"requirers,omitempty"`
-	Substituted        string                `json:"substituted,omitempty"`
+	SchemaVersion      int             `json:"schema_version"`
+	HashVersion        hashing.Version `json:"hash_version,omitempty"`
+	Name               string          `json:"name"`
+	Source             string          `json:"source,omitempty"`
+	RefKind            string          `json:"ref_kind,omitempty"`
+	Ref                string          `json:"ref,omitempty"`
+	Commit             string          `json:"commit,omitempty"`
+	Package            *Package        `json:"package,omitempty"`
+	LockSHA256         string          `json:"lock_sha256,omitempty"`
+	ContentSHA256      string          `json:"content_sha256"`
+	Locale             string          `json:"locale,omitempty"`
+	Agents             []string        `json:"agents"`
+	Commands           []string        `json:"commands"`
+	Dependencies       []string        `json:"dependencies"`
+	SkillSchemaVersion int             `json:"skill_schema_version"`
+	// Manifestless selects the explicit v6 null form; integer zero is invalid.
+	Manifestless bool                  `json:"-"`
+	RuntimeRoots []string              `json:"runtime_roots"`
+	BuildRoots   []string              `json:"build_roots"`
+	BuildSource  *buildsource.Identity `json:"build_source,omitempty"`
+	InstalledAt  string                `json:"installed_at"`
+	Files        []string              `json:"files"`
+	Builds       map[string]Build      `json:"builds"`
+	Git          string                `json:"git,omitempty"`
+	Requirements []string              `json:"requirements,omitempty"`
+	McpServers   map[string][]string   `json:"mcp_servers,omitempty"`
+	Attestation  *Attestation          `json:"attestation,omitempty"`
+	Activation   *Activation           `json:"activation,omitempty"`
+	Requirers    []string              `json:"requirers,omitempty"`
+	Substituted  string                `json:"substituted,omitempty"`
 }
 
 // BuildCurrentness supplies independently derived build state. RawSnapshot
@@ -289,6 +292,9 @@ func (m Marker) MarshalJSON() ([]byte, error) {
 	var object map[string]any
 	if err := json.Unmarshal(payload, &object); err != nil {
 		return nil, err
+	}
+	if m.Manifestless {
+		object["skill_schema_version"] = nil
 	}
 	if m.Locale == "" {
 		object["locale"] = nil
@@ -329,7 +335,9 @@ func ReadState(installedDir string) (*Marker, stateread.Kind, error) {
 	var m Marker
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&m); err != nil || !validMarker(&m, raw) {
+	decodeErr := decoder.Decode(&m)
+	m.Manifestless = m.SchemaVersion == SchemaV6 && bytes.Equal(bytes.TrimSpace(raw["skill_schema_version"]), []byte("null"))
+	if err := decodeErr; err != nil || !validMarker(&m, raw) {
 		if err == nil {
 			err = errors.New("install marker is not valid for its schema")
 		}
@@ -366,6 +374,13 @@ func packageAllowed(required []string) []string {
 }
 
 func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
+	if m.Manifestless {
+		if m.SchemaVersion != SchemaV6 || m.SkillSchemaVersion != 0 || !bytes.Equal(bytes.TrimSpace(raw["skill_schema_version"]), []byte("null")) ||
+			len(m.Commands) != 0 || len(m.Dependencies) != 0 || len(m.RuntimeRoots) != 0 || len(m.BuildRoots) != 0 || len(m.Builds) != 0 || m.BuildSource != nil ||
+			raw["requirements"] != nil || raw["mcp_servers"] != nil || (m.Activation != nil && len(m.Activation.Commands) != 0) {
+			return false
+		}
+	}
 	commonRequired := []string{
 		"schema_version", "name", "source", "ref_kind", "ref", "commit", "content_sha256", "locale",
 		"agents", "commands", "dependencies", "skill_schema_version", "runtime_roots", "installed_at", "files",
@@ -455,7 +470,7 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 		(m.SchemaVersion == PolicySchemaVersion && m.SkillSchemaVersion != 8) ||
 		(m.SchemaVersion == SchemaV5 && m.Package == nil && m.SkillSchemaVersion > 8) ||
 		(m.SchemaVersion == SchemaV5 && m.Package != nil && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 8)) ||
-		(m.SchemaVersion == SchemaV6 && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 9)) {
+		(m.SchemaVersion == SchemaV6 && !m.Manifestless && (m.SkillSchemaVersion < 1 || m.SkillSchemaVersion > 9)) {
 		return false
 	}
 	setsSorted := m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion ||
@@ -1230,7 +1245,7 @@ func Write(dir string, m *Marker) error {
 		return errors.New("install marker is nil")
 	}
 	switch {
-	case m.Package != nil && m.SkillSchemaVersion == 9:
+	case m.Package != nil && (m.SkillSchemaVersion == 9 || m.Manifestless):
 		m.SchemaVersion = SchemaV6
 		m.HashVersion = 0
 	case m.Package != nil:
@@ -1369,7 +1384,7 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 			return false, nil
 		}
 		wantVersion := SchemaV5
-		if expected.SkillSchemaVersion == 9 {
+		if expected.SkillSchemaVersion == 9 || expected.Manifestless {
 			wantVersion = SchemaV6
 		}
 		if recorded.SchemaVersion != wantVersion {

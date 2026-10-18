@@ -180,6 +180,7 @@ func buildDraftMarker(
 		Commands:           commands,
 		Dependencies:       dependencies,
 		SkillSchemaVersion: node.Spec.SchemaVersion,
+		Manifestless:       node.Spec.SchemaVersion == 0 && node.Spec.SourceFile == "",
 		RuntimeRoots:       node.Spec.RuntimeRoots,
 		BuildRoots:         buildRoots,
 		BuildSource:        source,

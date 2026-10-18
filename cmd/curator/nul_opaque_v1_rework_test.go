@@ -47,8 +47,11 @@ func TestStatusCheckRefusesV1NULAppearingAfterInstall(t *testing.T) {
 	configPath := filepath.Join(home, "config.json")
 	skill := filepath.Join(cliSkillsRoot(home), "skill-a")
 	addCLISkillFilesAndRetag(t, skill, map[string]string{
-		"assets/a.bin": "x",
-		"assets/b.md":  "y",
+		// A present manifest keeps this on the legacy hash-writer lane;
+		// manifestless packages now use the specified source v6 carrier.
+		"agent-skill.json": `{"schema_version":4,"capabilities":{},"commands":{},"dependencies":{"skills":{}}}`,
+		"assets/a.bin":     "x",
+		"assets/b.md":      "y",
 	})
 	if code, stdout, stderr := capture(t, configPath, "install", "app"); code != exitOK {
 		t.Fatalf("clean v1 install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
@@ -118,7 +121,9 @@ func TestStatusCheckAdmitsV2NULBearingInstall(t *testing.T) {
 	configPath := filepath.Join(home, "config.json")
 	skill := filepath.Join(cliSkillsRoot(home), "skill-a")
 	addCLISkillFilesAndRetag(t, skill, map[string]string{
-		"assets/a.bin": "x\x00assets/b.md\x00y",
+		// Exercise the legacy v2 writer with an actual manifest.
+		"agent-skill.json": `{"schema_version":4,"capabilities":{},"commands":{},"dependencies":{"skills":{}}}`,
+		"assets/a.bin":     "x\x00assets/b.md\x00y",
 	})
 	if code, stdout, stderr := capture(t, configPath, "install", "app"); code != exitOK {
 		t.Fatalf("v2 NUL install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
