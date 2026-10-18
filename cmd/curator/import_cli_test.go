@@ -372,13 +372,14 @@ func TestProfileInstallReinstallHonoursUseAndTakeover(t *testing.T) {
 	})
 
 	t.Run("takeover without use switches nothing", func(t *testing.T) {
+		// Consent without activation is a usage error and preserves the current profile and unmanaged bytes.
 		source, tk, fresh := setupBlockedReinstall(t)
 		code, stdout, stderr := runProfile(t, source, "profile", "install", tk, "--as", "tk", "--takeover")
-		if code != exitOK {
+		if code != exitUsage || !strings.Contains(stderr, "--takeover") {
 			t.Fatalf("install --takeover = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 		}
-		if !strings.Contains(stdout, "updated profile tk") {
-			t.Fatalf("a same-source reinstall reports an update:\n%s", stdout)
+		if stdout != "" {
+			t.Fatalf("refused consent must not report an update:\n%s", stdout)
 		}
 		if got := currentOf(t, source); got != "other" {
 			t.Fatalf("current=%q, want other: --takeover without --use activates nothing", got)

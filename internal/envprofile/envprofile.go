@@ -476,6 +476,9 @@ type Policy struct {
 	// the operation fails rather than overwrite. It is operation-scoped
 	// and never set from machine configuration.
 	Takeover bool
+	// backupReadDirectory injects a stale backup listing for collision tests.
+	// Production leaves it nil and reads the actual directory.
+	backupReadDirectory func(string) (stateread.Directory, error)
 }
 
 // checkHardenedProfileMutation enforces the hardened install/update
@@ -1314,6 +1317,9 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 		// the rows still print exactly once.
 		surfacing = carrySurfacing(sink, surfacing)
 		writeUpdateWarnings(warningSink, name, warnings)
+		if err := syncCurrentNativeSkills(home, name, policy); err != nil {
+			return Info{}, false, err
+		}
 		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, false, nil
 	}
 	warnings := resolutionWarnings(result)
