@@ -4,10 +4,47 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+## v0.15.0-rc.7 — 2026-10-18
+
 ### Added
 
 - `env config show` reports effective permissions posture per installed profile;
   `show permissions` reports the current profile using fragment lock semantics.
+- The `credential_store` machine selector: config grammar, CLI forms and typed
+  transport into resolve. An unavailable selection fails closed.
+- The credential-store policy of a managed home is projected once per operation
+  across resolve, status and migration. Muse managed profiles carry the same
+  policy: an explicit file-backed store, shared or isolated admission, the v4
+  launch-environment fragment and a verified root-context fact.
+- Muse status distinguishes the 1.4.7 loader evidence, the 1.4.8 backend
+  evidence, the exact replay qualification, the workspace residual and unknown
+  refresh or discovery. The Muse 1.4.8 R6256.1 qualification record ships with
+  an opt-in replay.
+- Managed-home snapshots, rc.7 track (library, driven by tests; CLI integration
+  follows):
+  - an identity verifier with the v1 cross-conformance vectors;
+  - non-recovering capture under the writer lock. It refuses on pending
+    journals, verifies content from file evidence only and never runs the
+    vendor tool;
+  - publication to a retained destination handle: only an absent destination or
+    an exactly verified prior snapshot is admitted. Staging is private, the
+    rename does not replace, and the published tree is verified in full. A
+    failure keeps the published output and never rolls back destructively.
+- Docs: logging in to managed homes, and an agent logins reference with
+  diagrams.
+
+### Fixed
+
+- Every subcommand answers `-h` and `--help` before `--` with its own help and
+  exit 0, and writes nothing to the working directory, `HOME`, `CURATOR_HOME` or
+  `TMPDIR`. `help <subcommand>` prints the same text.
+- Migrated global skills are audited with the capabilities their own package
+  manifests declare. A refusal names the skill, the host, the file and the
+  `capabilities.network` remedy; a malformed or unreadable manifest blocks.
+- Cached audit findings are reused only under equal effective capabilities.
+- The scriptworker Landlock availability probe can no longer recurse through
+  test binaries into a runaway process tree.
+- CI: Linux jobs run on the self-hosted runners with job-private Go state.
 
 ## v0.15.0-rc.6 — 2026-10-14
 
