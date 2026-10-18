@@ -841,6 +841,9 @@ func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err err
 	if entry == nil {
 		entry = map[string]any{}
 	}
+	trusted, _ := entry["hasTrustDialogAccepted"].(bool)
+	approved, _ := entry["hasClaudeMdExternalIncludesApproved"].(bool)
+	satisfied := trusted && (form != envregistry.FormReferenced || approved)
 	entry["hasTrustDialogAccepted"] = true
 	if form == envregistry.FormReferenced {
 		entry["hasClaudeMdExternalIncludesApproved"] = true
@@ -856,7 +859,17 @@ func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err err
 		seeded = append(seeded, launchDir)
 	}
 	sort.Strings(seeded)
-	payload, err = protocoljsonMarshal(object)
+	if present && satisfied {
+		return seeded, nil
+	}
+	if present {
+		// Tool-owned state is ordinary JSON, not CCJ-1. UseNumber in the
+		// reader keeps all number lexemes intact through this merge.
+		payload, err = json.Marshal(object)
+		payload = append(payload, '\n')
+	} else {
+		payload, err = protocoljsonMarshal(object)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -866,9 +879,11 @@ func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err err
 	return seeded, nil
 }
 
-// decodeJSONObject decodes one JSON object value.
+// decodeJSONObject decodes one JSON object value without rounding numbers or
+// changing their textual representation in tool-owned state.
 func decodeJSONObject(payload []byte) (map[string]any, bool) {
 	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.UseNumber()
 	var object map[string]any
 	if err := decoder.Decode(&object); err != nil || object == nil {
 		return nil, false
