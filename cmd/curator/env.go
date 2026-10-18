@@ -136,12 +136,6 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, envAliasUsage)
 		return exitUsage
 	}
-	// --takeover applies only with --repair (cli/curator.md): without a
-	// repair there is no write to take over.
-	if *takeover && !*repair {
-		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve --takeover applies only with --repair")
-		return exitUsage
-	}
 	if *preserveLock && !*repair {
 		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve --preserve-lock requires --repair")
 		return exitUsage
