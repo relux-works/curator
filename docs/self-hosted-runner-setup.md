@@ -72,7 +72,7 @@ installs.
 
 ## Linux runners (`relux-linux`)
 
-The Linux entries of `Test`, `Go family qualification`, `Gate self-test`, `Lint`,
+The Linux entries of `Test`, `Race`, `Go family qualification`, `Gate self-test`, `Lint`,
 `Interop conformance gate` and `Naming gate` can run on the repository's
 self-hosted Linux runners (labels `self-hosted, relux-linux, curator`). Check
 names do not change: a routed job is still `Test (ubuntu-latest)`.
@@ -90,14 +90,17 @@ Routing is decided per run:
   setting that requires approval before fork workflows run for all external
   contributors.
 
-`Race` stays on the hosted image: `go test -race` needs cgo and a C compiler.
+Snapshot publication refuses a destination whose retained ancestry carries an
+access or default ACL. The qualified self-hosted Linux runners meet that
+requirement; the hosted Linux image does not. A fork pull request's hosted
+Linux snapshot controls are therefore expected to refuse. This is a known
+limit, not a pass.
 
 One-time prerequisites on each Linux runner host (the runner account itself
 needs no sudo and no Docker):
 
 - a C toolchain (`gcc`, `cc`, `make`; on Debian or Ubuntu the
-  `build-essential` package): the Rust lanes link with `cc`, and moving `Race`
-  later needs it too;
+  `build-essential` package): the Rust lanes link with `cc`, and `Race` needs cgo and a C compiler;
 - `rustup` for the runner account, installed per rustup.rs under that
   account's `~/.cargo/bin`; `install-rust-toolchain.sh` resolves it there;
 - `git`, `python3`, `tar`, `xz`, `curl`, `zip` and `unzip`;
@@ -119,8 +122,8 @@ on a successful final step. No shared cache is deleted.
 On self-hosted Linux, `setup-go` cache restore/save is disabled. The lint
 action also skips its cache and uses a private `GOLANGCI_LINT_CACHE`. This
 prevents restored per-user state from reconnecting otherwise isolated jobs.
-Hosted macOS/Windows caching and routing, the fork guard, and the hosted Race
-lane retain their existing behavior. `GOTOOLCHAIN=local` and `GOENV=off` remain
+Hosted macOS/Windows caching and routing and the fork guard retain their
+existing behavior. `GOTOOLCHAIN=local` and `GOENV=off` remain
 mandatory. Shared Go state was implicated in intermittent cross-toolchain
 link errors involving `golang.org/x/sys/unix.Syscall` and ABI0/ABIInternal.
 

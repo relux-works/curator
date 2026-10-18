@@ -361,43 +361,116 @@ func TestLinuxRoutingKeepsForksHosted(t *testing.T) {
 	if err := yaml.Unmarshal(workflowBytes(t), &wf); err != nil {
 		t.Fatal(err)
 	}
+	// Required jobs cannot silently escape the behavioral routing checks.
+	for _, name := range []string{"test", "go-family-qualification", "race"} {
+		route, _ := wf.Jobs[name].RunsOn.(string)
+		if !strings.Contains(route, "LINUX_SELF_HOSTED") {
+			t.Fatalf("%s: missing required Linux routing", name)
+		}
+	}
 	for name, job := range wf.Jobs {
 		route, _ := job.RunsOn.(string)
 		if !strings.Contains(route, "LINUX_SELF_HOSTED") {
 			continue
 		}
-		for _, event := range []string{"pull_request", "push", "workflow_dispatch"} {
-			for _, enabled := range []string{"true", "false"} {
-				for _, fork := range []bool{true, false} {
-					for _, platform := range []string{"ubuntu-latest", "macos-latest", "windows-latest"} {
-						osName := platform
-						if !strings.Contains(route, "matrix.os") {
-							osName = "ubuntu-latest"
-						}
-						head := "example/repository"
-						if fork {
-							head = "fork/repository"
-						}
-						ctx, err := json.Marshal(map[string]any{"vars": map[string]string{"LINUX_SELF_HOSTED": enabled}, "matrix": map[string]string{"os": osName}, "github": map[string]any{"event_name": event, "repository": "example/repository", "event": map[string]any{"pull_request": map[string]any{"head": map[string]any{"repo": map[string]string{"full_name": head}}}}}})
-						if err != nil {
-							t.Fatal(err)
-						}
-						expr := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(route, "${{"), "}}"))
-						program := "const {vars,matrix,github}=JSON.parse(process.argv[1]); const fromJSON=JSON.parse; console.log(JSON.stringify(" + expr + "));"
-						out, err := exec.Command("node", "-e", program, string(ctx)).CombinedOutput()
-						if err != nil {
-							t.Fatalf("%s routing: %v: %s", name, err, out)
-						}
-						want := `"` + osName + `"`
-						if enabled == "true" && osName == "ubuntu-latest" && (event != "pull_request" || !fork) {
-							want = `["self-hosted","relux-linux","curator"]`
-						}
-						if strings.TrimSpace(string(out)) != want {
-							t.Fatalf("%s %s enabled=%s fork=%v %s: got %s want %s", name, event, enabled, fork, platform, out, want)
+		t.Run(name, func(t *testing.T) {
+			for _, event := range []string{"pull_request", "push", "workflow_dispatch"} {
+				for _, enabled := range []string{"true", "false"} {
+					for _, fork := range []bool{true, false} {
+						for _, platform := range []string{"ubuntu-latest", "macos-latest", "windows-latest"} {
+							osName := platform
+							if !strings.Contains(route, "matrix.os") {
+								osName = "ubuntu-latest"
+							}
+							head := "example/repository"
+							if fork {
+								head = "fork/repository"
+							}
+							ctx, err := json.Marshal(map[string]any{"vars": map[string]string{"LINUX_SELF_HOSTED": enabled}, "matrix": map[string]string{"os": osName}, "github": map[string]any{"event_name": event, "repository": "example/repository", "event": map[string]any{"pull_request": map[string]any{"head": map[string]any{"repo": map[string]string{"full_name": head}}}}}})
+							if err != nil {
+								t.Fatal(err)
+							}
+							expr := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(route, "${{"), "}}"))
+							program := "const {vars,matrix,github}=JSON.parse(process.argv[1]); const fromJSON=JSON.parse; console.log(JSON.stringify(" + expr + "));"
+							out, err := exec.Command("node", "-e", program, string(ctx)).CombinedOutput()
+							if err != nil {
+								t.Fatalf("%s routing: %v: %s", name, err, out)
+							}
+							want := `"` + osName + `"`
+							if enabled == "true" && osName == "ubuntu-latest" && (event != "pull_request" || !fork) {
+								want = `["self-hosted","relux-linux","curator"]`
+							}
+							if strings.TrimSpace(string(out)) != want {
+								t.Fatalf("%s %s enabled=%s fork=%v %s: got %s want %s", name, event, enabled, fork, platform, out, want)
+							}
 						}
 					}
 				}
 			}
-		}
+		})
 	}
+}
+
+// Regression: Windows checkouts use CRLF. Both LF and CRLF positive controls
+// admit the intended race routing; token-preserving plants must fail the same
+// behavioral assertion, rather than failing to locate or parse the job.
+func TestLinuxRoutingRejectsRacePlants(t *testing.T) {
+	data := workflowBytes(t)
+	var wf workflow
+	if err := yaml.Unmarshal(data, &wf); err != nil {
+		t.Fatal(err)
+	}
+	route, ok := wf.Jobs["race"].RunsOn.(string)
+	if !ok {
+		t.Fatal("missing race routing")
+	}
+	header := regexp.MustCompile(`(?m)^  race:\r?$`)
+	normalized := strings.ReplaceAll(string(data), "\r\n", "\n")
+	for _, ending := range []struct{ name, value string }{{"LF", "\n"}, {"CRLF", "\r\n"}} {
+		t.Run(ending.name, func(t *testing.T) {
+			fixture := strings.ReplaceAll(normalized, "\n", ending.value)
+			t.Run("positive", func(t *testing.T) { assertRaceRouteChild(t, fixture, 0) })
+			for _, tc := range []struct{ name, old, replacement string }{
+				{"fork_admitted", "github.event.pull_request.head.repo.full_name == github.repository", "github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'pull_request'"},
+				{"dispatch_hosted", "vars.LINUX_SELF_HOSTED == 'true'", "vars.LINUX_SELF_HOSTED == 'true' && github.event_name != 'workflow_dispatch'"},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					altered := strings.Replace(route, tc.old, tc.replacement, 1)
+					if altered == route {
+						t.Fatal("race plant not applied")
+					}
+					// Change only the race expression; match either checkout line ending.
+					position := header.FindStringIndex(fixture)
+					if position == nil {
+						t.Fatal("race job not found")
+					}
+					start := position[0]
+					mutant := fixture[:start] + strings.Replace(fixture[start:], route, altered, 1)
+					assertRaceRouteChild(t, mutant, 1)
+				})
+			}
+		})
+	}
+}
+
+func assertRaceRouteChild(t *testing.T, fixture string, wantExit int) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "ci.yml")
+	if err := os.WriteFile(path, []byte(fixture), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(os.Args[0], "-test.run=^TestLinuxRoutingKeepsForksHosted$/^race$", "-test.v")
+	cmd.Env = append(os.Environ(), "CI_WORKFLOW_UNDER_TEST="+path)
+	out, err := cmd.CombinedOutput()
+	if wantExit == 0 {
+		if err != nil || !strings.Contains(string(out), "--- PASS: TestLinuxRoutingKeepsForksHosted/race") {
+			t.Fatalf("want positive race routing control (exit 0), got %v: %s", err, out)
+		}
+		return
+	}
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != wantExit || !strings.Contains(string(out), "--- FAIL: TestLinuxRoutingKeepsForksHosted/race") || !strings.Contains(string(out), "want ") {
+		t.Fatalf("want behavioral race routing failure (exit %d), got %v: %s", wantExit, err, out)
+	}
+	t.Logf("plant killed by TestLinuxRoutingKeepsForksHosted/race, exit %d: %s", exit.ExitCode(), out)
 }
