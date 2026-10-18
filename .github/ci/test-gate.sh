@@ -107,6 +107,19 @@ run_stage() {
 
 TEST_RC=0
 
+# Windows CI uses independent workers for top-level cases in the three slow
+# packages. A partial shard never attests the platform ledger; the aggregate
+# job verifies exhaustive inventory and applies that ledger to all four streams.
+if [ -n "${CURATOR_TEST_SHARD:-}" ]; then
+ if [ -s "$DEFERRED" ] || [ -s "$EXCLUDED" ] || [ -s "$ASSERT" ]; then
+  echo 'test-gate: sharding requires a fully served, non-excluded package set' >&2
+  exit 2
+ fi
+ # shellcheck disable=SC2046
+ run_stage served "$GO" run ./tools/testshard run "$EVIDENCE" "$CURATOR_TEST_SHARD" $(cat "$SERVED")
+ exit $?
+fi
+
 # --- served: the root is exported ------------------------------------------
 if [ -s "$SERVED" ]; then
 	# shellcheck disable=SC2046,SC2086

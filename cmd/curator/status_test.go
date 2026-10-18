@@ -239,6 +239,14 @@ func compiledProjectDeclaring(t *testing.T, declarations string) (string, string
 // go-v1 build command from a vendored module.
 func writeCompiledSkillRepo(t *testing.T, skill string) {
 	t.Helper()
+	if err := os.MkdirAll(skill, 0755); err != nil {
+		t.Fatal(err)
+	}
+	copySourceFixture(t, "compiled-skill", skill, func(root string) { buildCompiledSkillRepo(t, root) })
+}
+
+func buildCompiledSkillRepo(t *testing.T, skill string) {
+	t.Helper()
 	writeFile(t, filepath.Join(skill, "SKILL.md"), "---\nname: build-skill\ndescription: compiled command\n---\n"+
 		"Resolve .agents/bin/build-tool.cmd, then global/bin/build-tool, then command -v build-tool or Get-Command build-tool.\n")
 	writeFile(t, filepath.Join(skill, "assets", "prompt.md"), "prompt-visible asset\n")
@@ -255,6 +263,7 @@ func writeCompiledSkillRepo(t *testing.T, skill string) {
 		}
 	}`)
 	runGit(t, skill, "init", "-q", "-b", "main")
+	configureSourceFixtureGit(t, skill)
 	runGit(t, skill, "add", ".")
 	runGit(t, skill, "commit", "-qm", "initial build skill")
 	runGit(t, skill, "tag", "v1")

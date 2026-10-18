@@ -100,12 +100,19 @@ func writeGitStoreFixture(t *testing.T, home, kind, name, source string, files m
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	gitRun(t, repo, "init", "--quiet")
-	for path, content := range files {
-		writeGitFile(t, repo, path, content)
+	key, err := json.Marshal(files)
+	if err != nil {
+		t.Fatal(err)
 	}
-	gitRun(t, repo, "add", "--all")
-	gitRun(t, repo, "commit", "--quiet", "-m", "fixture")
+	copySourceFixture(t, "git-store/"+string(key), repo, func(template string) {
+		gitRun(t, template, "init", "--quiet")
+		configureSourceFixtureGit(t, template)
+		for path, content := range files {
+			writeGitFile(t, template, path, content)
+		}
+		gitRun(t, template, "add", "--all")
+		gitRun(t, template, "commit", "--quiet", "-m", "fixture")
+	})
 	commit := fixtureGitOutput(t, repo, "rev-parse", "HEAD")
 	if _, err := contextstore.EnsureGit(home, kind, name, repo, commit); err != nil {
 		t.Fatalf("create %s/%s Git snapshot fixture: %v", kind, name, err)

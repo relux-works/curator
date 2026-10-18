@@ -1,6 +1,7 @@
 package install
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,13 +19,18 @@ import (
 func setupLegacyScriptRepo(e *env, name, command, scriptBody string) string {
 	e.t.Helper()
 	dir := filepath.Join(e.skillsRoot, name)
-	writeDraftScriptSkill(e.t, dir, name, command, scriptBody, func(spec map[string]any) {
-		spec["schema_version"] = 9
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		e.t.Fatal(err)
+	}
+	key := fmt.Sprintf("legacy-script/%q/%q/%q", name, command, scriptBody)
+	copySourceFixture(e.t, key, dir, func(root string) {
+		writeDraftScriptSkill(e.t, root, name, command, scriptBody, func(spec map[string]any) { spec["schema_version"] = 9 })
+		e.git(root, "init", "-q", "-b", "main")
+		configureSourceFixtureGit(e.t, root)
+		e.git(root, "add", ".")
+		e.git(root, "commit", "-qm", "schema9 script")
+		e.git(root, "tag", "v1")
 	})
-	e.git(dir, "init", "-q", "-b", "main")
-	e.git(dir, "add", ".")
-	e.git(dir, "commit", "-qm", "schema9 script")
-	e.git(dir, "tag", "v1")
 	return e.gitOutput(dir, "rev-parse", "HEAD")
 }
 

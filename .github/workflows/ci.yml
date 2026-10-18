@@ -153,7 +153,7 @@ jobs:
   # dropped without appearing in the uploaded evidence.
   # ---------------------------------------------------------------------------
   test:
-    name: Test (${{ matrix.os }})
+    name: Test (${{ matrix.os }}${{ matrix.shard != 'full' && format(' / shard {0}', matrix.shard) || '' }})
     # Linux entries run on the repository's self-hosted Linux runners when the
     # LINUX_SELF_HOSTED repository variable is true, for pushes, dispatches and
     # same-repository pull requests. A pull request from a fork always stays on
@@ -163,7 +163,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - {os: ubuntu-latest, shard: full}
+          - {os: macos-latest, shard: full}
+          - {os: windows-latest, shard: '0'}
+          - {os: windows-latest, shard: '1'}
+          - {os: windows-latest, shard: '2'}
+          - {os: windows-latest, shard: '3'}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -285,15 +291,52 @@ jobs:
         env:
           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
           GO_TEST_TIMEOUT: ${{ runner.os == 'Windows' && '120m' || '60m' }}
+          CURATOR_TEST_SHARD: ${{ matrix.shard != 'full' && matrix.shard || '' }}
         run: bash .github/ci/test-gate.sh .temp/ci-evidence/test
 
       - name: Upload gate evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-evidence-${{ matrix.os }}
+          name: test-evidence-${{ matrix.os }}${{ matrix.shard != 'full' && format('-{0}', matrix.shard) || '' }}
           path: .temp/ci-evidence/
           if-no-files-found: warn
+
+  test-windows:
+    name: Test (windows-latest)
+    needs: test
+    if: always()
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: test-evidence-windows-latest-*
+          path: .temp/windows-shards
+      - name: Require every test worker to pass
+        shell: bash
+        env:
+          WORKER_RESULT: ${{ needs.test.result }}
+        run: test "$WORKER_RESULT" = success
+      - name: Verify exhaustive shard inventory and merge streams
+        shell: bash
+        run: |
+          go run ./tools/testshard merge .temp/windows-shards
+          mkdir -p .temp/ci-evidence/test
+          cp .temp/windows-shards/go-test.json .temp/ci-evidence/test/go-test.json
+      - name: Combined Windows platform-case gate
+        shell: bash
+        run: bash .github/ci/platform-case-gate.sh .temp/ci-evidence/test/go-test.json .temp/ci-evidence/test
+      - name: Upload combined Windows evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-evidence-windows-latest
+          path: .temp/ci-evidence/
+          if-no-files-found: error
 
   # ---------------------------------------------------------------------------
   # The same default lane on the organisation's self-hosted macOS ARM64

@@ -252,11 +252,18 @@ func newProfileInstallFixture(t *testing.T, shape string) profileInstallFixture 
 		packageRoot = filepath.Join(repo, "contexts", "tk")
 		args = []string{"--directory", "contexts/tk"}
 	}
-	writeContextPackage(t, packageRoot, "tk", "1.0.0", "original source\n")
-	profileInstallGit(t, repo, "init", "-q")
-	profileInstallGit(t, repo, "add", ".")
-	profileInstallGit(t, repo, "commit", "-m", "v1")
-	profileInstallGit(t, repo, "tag", "v1.0.0")
+	copySourceFixture(t, "profile-install/"+shape, repo, func(template string) {
+		root := template
+		if shape == "git-collection" {
+			root = filepath.Join(template, "contexts", "tk")
+		}
+		writeContextPackage(t, root, "tk", "1.0.0", "original source\n")
+		profileInstallGit(t, template, "init", "-q")
+		configureSourceFixtureGit(t, template)
+		profileInstallGit(t, template, "add", ".")
+		profileInstallGit(t, template, "commit", "-m", "v1")
+		profileInstallGit(t, template, "tag", "v1.0.0")
+	})
 
 	operand := "https://example.com/profile-install/" + strings.ReplaceAll(shape, "-", "/")
 	gitConfig := filepath.Join(t.TempDir(), "gitconfig")

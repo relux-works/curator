@@ -16,6 +16,8 @@ import (
 // Neither an absent history nor a self-minted manifest/lock proves that the
 // declaration changed. Exercise both production entries, including dry runs.
 func TestLegacyLaneRejectsUnboundPreviousGeneration(t *testing.T) {
+	// Each case owns its repositories, config and installed state; no process globals.
+	t.Parallel()
 	for _, global := range []bool{false, true} {
 		for _, fault := range []string{"missing", "unreadable", "malformed", "manifest", "lock", "rehashed-lock"} {
 			scope := "project"
@@ -128,6 +130,8 @@ func TestLegacyLaneRejectsUnboundPreviousGeneration(t *testing.T) {
 // Dependency refs come from the old consumer's locked manifest, even when the
 // provider's old tag has moved and an unrelated alias still names that commit.
 func TestLegacyLaneDependencyTagMovement(t *testing.T) {
+	// Each case owns its repositories, config and installed state; no process globals.
+	t.Parallel()
 	for _, global := range []bool{false, true} {
 		for _, changedDeclaration := range []bool{false, true} {
 			scope, operation := "project", "same-tag"

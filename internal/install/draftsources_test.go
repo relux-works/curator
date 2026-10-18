@@ -144,18 +144,27 @@ func draftProject(t *testing.T, payload string, skills map[string]string) (strin
 	t.Helper()
 	project := t.TempDir()
 	home := t.TempDir()
-	for dir, name := range skills {
-		writeDraftPackage(t, filepath.Join(project, filepath.FromSlash(dir)), name)
-	}
-	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
+	key, err := json.Marshal(struct {
+		Payload string
+		Skills  map[string]string
+	}{payload, skills})
+	if err != nil {
 		t.Fatal(err)
 	}
-	// The install .gitignore gate runs before closure: init a repository
-	// and ignore every managed output so the draft lane is reached.
-	testGit(t, project, "init", "-q")
-	if err := os.WriteFile(filepath.Join(project, ".gitignore"), []byte(".agents/\n.claude/skills/\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	copySourceFixture(t, "draft/"+string(key), project, func(root string) {
+		for dir, name := range skills {
+			writeDraftPackage(t, filepath.Join(root, filepath.FromSlash(dir)), name)
+		}
+		if err := os.WriteFile(filepath.Join(root, "Skillfile.json"), []byte(payload), 0644); err != nil {
+			t.Fatal(err)
+		}
+		// Preserve the real install gitignore gate and fresh per-test resolution.
+		testGit(t, root, "init", "-q")
+		configureSourceFixtureGit(t, root)
+		if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".agents/\n.claude/skills/\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	})
 	return project, home, []byte(payload)
 }
 
