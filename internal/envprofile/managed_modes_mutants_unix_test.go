@@ -44,8 +44,8 @@ func TestManagedModesNarrowingMutants(t *testing.T) {
 		},
 		{
 			"claude-trust-0644", "managed.go",
-			"root, path, payload, managedAuthoredFileMode)",
-			"root, path, payload, 0o644)",
+			"root, managedJoin(homeRel, \".claude.json\"), prepared.payload, managedAuthoredFileMode)",
+			"root, managedJoin(homeRel, \".claude.json\"), prepared.payload, 0o644)",
 			"^TestManagedAuthoredFilesArePrivate$",
 			"TestManagedAuthoredFilesArePrivate", ".claude.json mode = 0644, want 0600",
 		},
