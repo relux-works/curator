@@ -1,0 +1,1422 @@
+{
+  "identity": {
+    "base": "892dab098aef1497df9ccacdb173faaf4f8b8418",
+    "previous_candidate": "9517bb1a1941d00c224be5d4eff5f9a93e926475",
+    "unchanged_files": {
+      "docs/environment-config.md": true,
+      "internal/envprofile/managed.go": true,
+      "internal/envprofile/nofollow.go": true,
+      "internal/envprofile/managed_modes_unix_test.go": true,
+      "internal/envprofile/managed_modes_mutants_unix_test.go": true
+    },
+    "delta": "README mode note removed to satisfy rc.7 wave; README and CHANGELOG equal current base",
+    "go_version": "go version go1.25.5 darwin/arm64",
+    "sha256": {
+      "docs/environment-config.md": "de089b1a2aac5eae42b6a64fbaa84e553d599ff21c247166b484fc4b9dc846d0",
+      "internal/envprofile/managed.go": "e9efee3a7faf09ef093518512ffe6f70fa019823c01919f4655c86672afc689f",
+      "internal/envprofile/nofollow.go": "ae6e73e44d09b1d3f0a7e970777196ddeef7a1faabbabf929343b652f8659a36",
+      "internal/envprofile/managed_modes_unix_test.go": "db9c80729c4fa54da0330b030d3f299f2ef2b64201056ab0735d3e781d751ccb",
+      "internal/envprofile/managed_modes_mutants_unix_test.go": "8a210ccb160428afe670c402a42aa03049a9bdf8d97dc502e33148e2080ddf9d"
+    },
+    "candidate_blob_ids": {
+      "docs/environment-config.md": "77e7066aef638c02604157680aec69c553fc8fc8",
+      "internal/envprofile/managed.go": "d4b05390409e341aa340c205a9a2eb83f5e5cb85",
+      "internal/envprofile/nofollow.go": "032fb67735190c0e722e89a963010200abb31c18",
+      "internal/envprofile/managed_modes_unix_test.go": "b6ffb58f18fd8c905111412a134c3b7fed3bbada",
+      "internal/envprofile/managed_modes_mutants_unix_test.go": "f7dc7896879f3ab282b17098650a351fbcf3b15d"
+    },
+    "base_tree": "9f5ab83e59148bfb0a342d725d896bb17b133125",
+    "candidate_tree": "efc4e2371c2f7e21ec8b56d9ffc0273b5c98c722"
+  },
+  "commands": {
+    "envprofile-resolve-tests": {
+      "exit_code": 0,
+      "seconds": 118.782,
+      "raw_stream_sha256": "b8744313573f3c98ea84d93c232eb0860c60a2d3e6085b8aa8d36eb8f543e4a5",
+      "verdicts": [
+        {
+          "Action": "pass",
+          "Test": "TestResolvePublishesCredentialMarkerThroughLockedJournal",
+          "Elapsed": 1.37
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveRecoversCredentialMarkerAfterRenameCrash",
+          "Elapsed": 1.21
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolvePublishesCredentialMarkerThroughLockedJournalV2WriterMode",
+          "Elapsed": 0.9
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveRecoversCredentialMarkerAfterRenameCrashV2WriterMode",
+          "Elapsed": 1.49
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedModesNarrowingMutants/single-fallback-0644",
+          "Elapsed": 4.19
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedModesNarrowingMutants/executable-tree-fallback-0755",
+          "Elapsed": 5.19
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedModesNarrowingMutants/private-seed-0644",
+          "Elapsed": 5.8
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedModesNarrowingMutants/claude-trust-0644",
+          "Elapsed": 5.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedModesNarrowingMutants/codex-directory-drift-admitted",
+          "Elapsed": 5.28
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedModesNarrowingMutants/codex-directory-not-tightened",
+          "Elapsed": 4.91
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedModesNarrowingMutants",
+          "Elapsed": 30.41
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedFallbackPermissions/tree-false",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedFallbackPermissions/tree-true",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedFallbackPermissions",
+          "Elapsed": 0.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedSeedPreservesNativePermissions/0600",
+          "Elapsed": 0.96
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedSeedPreservesNativePermissions/0400",
+          "Elapsed": 1.59
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedSeedPreservesNativePermissions/0640",
+          "Elapsed": 1.82
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedSeedPreservesNativePermissions/0644",
+          "Elapsed": 1.71
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedSeedPreservesNativePermissions",
+          "Elapsed": 6.09
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedHomeRepairTightensDirectories/claude_code",
+          "Elapsed": 2.21
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedHomeRepairTightensDirectories/codex_cli",
+          "Elapsed": 2.49
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedHomeRepairTightensDirectories/opencode",
+          "Elapsed": 2.41
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedHomeRepairTightensDirectories/pi",
+          "Elapsed": 2.64
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedHomeRepairTightensDirectories/muse",
+          "Elapsed": 1.94
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedHomeRepairTightensDirectories",
+          "Elapsed": 11.68
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedAuthoredFilesArePrivate",
+          "Elapsed": 1.85
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedSeedRefusalsPreserved/symlink",
+          "Elapsed": 0.78
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedSeedRefusalsPreserved/unreadable",
+          "Elapsed": 1.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedSeedRefusalsPreserved/fifo",
+          "Elapsed": 0.98
+        },
+        {
+          "Action": "pass",
+          "Test": "TestManagedSeedRefusalsPreserved",
+          "Elapsed": 2.79
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveVerifiesGitStoreEntryAgainstPinnedTree",
+          "Elapsed": 1.61
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveRejectsGitPinMissingFromLocalObjectDatabase",
+          "Elapsed": 1.36
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveProvisionRepair",
+          "Elapsed": 0.98
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveReportsRecordedContextSurfaceHashDrift/root-context",
+          "Elapsed": 1.49
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveReportsRecordedContextSurfaceHashDrift/system-prompt",
+          "Elapsed": 1.31
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveReportsRecordedContextSurfaceHashDrift",
+          "Elapsed": 2.8
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveRejectsEnvironmentMarkerHashVersionMismatch",
+          "Elapsed": 1.19
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveStaleUnprovisioned",
+          "Elapsed": 1.07
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveUnknowns",
+          "Elapsed": 0.62
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveDefaultProfile",
+          "Elapsed": 1.06
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveDriftRepair",
+          "Elapsed": 29.25
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolvePassthroughLiveness",
+          "Elapsed": 2.21
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveClaudeProjectEntry",
+          "Elapsed": 2.76
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveIsolatedOpencode",
+          "Elapsed": 1.05
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveFormUnsupported",
+          "Elapsed": 0.72
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveLockContention",
+          "Elapsed": 0.71
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveFormats",
+          "Elapsed": 1.45
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveRefusesMissingLockNamedStoreEntryAtBoundary",
+          "Elapsed": 1.27
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveRefusesV1CommitPinnedContextNUL/module",
+          "Elapsed": 0.45
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveRefusesV1CommitPinnedContextNUL/excluded",
+          "Elapsed": 0.33
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveRefusesV1CommitPinnedContextNUL",
+          "Elapsed": 0.77
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveCleanV1CommitContextStaysCurrent",
+          "Elapsed": 0.56
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveAdmitsV2CommitPinnedContextNUL/v2-module",
+          "Elapsed": 0.5
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveAdmitsV2CommitPinnedContextNUL/v2-excluded",
+          "Elapsed": 0.68
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveAdmitsV2CommitPinnedContextNUL",
+          "Elapsed": 1.18
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveRejectsGroupWritableOnlyPathOverlay",
+          "Elapsed": 1.21
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveRepairKeepsEnclosingStoreRootFailureClass",
+          "Elapsed": 1.69
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolvePassthroughKnobs/absent-warns",
+          "Elapsed": 1.18
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolvePassthroughKnobs/null-silent",
+          "Elapsed": 0.94
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolvePassthroughKnobs/list-bounds-silently",
+          "Elapsed": 0.99
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolvePassthroughKnobs/empty-list-bounds-all",
+          "Elapsed": 0.97
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolvePassthroughKnobs",
+          "Elapsed": 4.08
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveRenderedDocumentReplacesStoreSymlinkWithoutFollowing",
+          "Elapsed": 1.1
+        },
+        {
+          "Action": "pass",
+          "Elapsed": 118.782
+        }
+      ]
+    },
+    "seed-nofollow-tests": {
+      "exit_code": 0,
+      "seconds": 61.599,
+      "raw_stream_sha256": "219992e8b2cc79a3563692e68529649b8ae518f3e39bb8eca3695a907e329d22",
+      "verdicts": [
+        {
+          "Action": "pass",
+          "Test": "TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression",
+          "Elapsed": 2.3
+        },
+        {
+          "Action": "pass",
+          "Test": "TestCodexSeedStripsInlineMCPTable",
+          "Elapsed": 0.92
+        },
+        {
+          "Action": "pass",
+          "Test": "TestCodexSeedRejectsInvalidTOMLBeforePublishingHome",
+          "Elapsed": 1.61
+        },
+        {
+          "Action": "pass",
+          "Test": "TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair",
+          "Elapsed": 2.28
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors/a-copies-whole-with-servers",
+          "Elapsed": 1.26
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors/b-strips-servers-keeps-rest",
+          "Elapsed": 1.53
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors/a-without-servers-no-warning",
+          "Elapsed": 0.95
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors/b-without-servers-no-warning",
+          "Elapsed": 1.33
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors/b-subtable-only-form-stripped",
+          "Elapsed": 1.13
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors/a-inline-table-form-inherited",
+          "Elapsed": 1.25
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors/b-empty-mcp-servers-table-no-warning",
+          "Elapsed": 1.32
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors/a-home-lists-ungoverned",
+          "Elapsed": 1.33
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors/a-home-unstripped-under-b",
+          "Elapsed": 1.9
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors/b-home-lists-not-inherited",
+          "Elapsed": 1.14
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors/pre-rule-home-unstripped-under-b",
+          "Elapsed": 1.49
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors/pre-rule-home-unstripped-under-a",
+          "Elapsed": 1.03
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors/b-home-empty-snapshot-no-rows",
+          "Elapsed": 1.45
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors/a-home-empty-snapshot-no-rows",
+          "Elapsed": 1.36
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors/non-codex-home-without-record-no-rows",
+          "Elapsed": 1.56
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentsCodexSeedVectors",
+          "Elapsed": 20.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDotfileManagerVectors/chezmoi-macos-present-suspected",
+          "Elapsed": 2.15
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDotfileManagerVectors/home-manager-macos-present-suspected",
+          "Elapsed": 6.4
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDotfileManagerVectors/yadm-macos-present-suspected",
+          "Elapsed": 3.95
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDotfileManagerVectors/macos-all-absent-quiet",
+          "Elapsed": 1.67
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDotfileManagerVectors/yadm-macos-xdg-data-home-relocated",
+          "Elapsed": 2.14
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDotfileManagerVectors/macos-home-manager-and-yadm-names-home-manager",
+          "Elapsed": 1.5
+        },
+        {
+          "Action": "pass",
+          "Test": "TestDotfileManagerVectors",
+          "Elapsed": 17.82
+        },
+        {
+          "Action": "pass",
+          "Test": "TestUnreadableDotfileStateKeepsTakeoverQuiet",
+          "Elapsed": 1.46
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentWriteNofollowVectors/takeover-symlinked-target-authorized-replaced",
+          "Elapsed": 1.33
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentWriteNofollowVectors/takeover-symlinked-target-unauthorized-stopped",
+          "Elapsed": 1.44
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentWriteNofollowVectors/materialize-symlinked-parent-refused",
+          "Elapsed": 0.84
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentWriteNofollowVectors/takeover-symlinked-parent-authorized-still-refused",
+          "Elapsed": 1.2
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentWriteNofollowVectors/repair-planted-link-replaced",
+          "Elapsed": 1.92
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentWriteNofollowVectors/repair-manager-owned-link-replaced",
+          "Elapsed": 1.75
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentWriteNofollowVectors/backup-symlinked-destination-refused",
+          "Elapsed": 1.34
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentWriteNofollowVectors/backup-symlinked-target-refused",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentWriteNofollowVectors/materialize-clean-path-written",
+          "Elapsed": 1.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentWriteNofollowVectors/takeover-inside-link-unauthorized-unmanaged-conflict",
+          "Elapsed": 1.86
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentWriteNofollowVectors/materialize-recorded-file-replaced",
+          "Elapsed": 2.22
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvironmentWriteNofollowVectors",
+          "Elapsed": 14.93
+        },
+        {
+          "Action": "pass",
+          "Elapsed": 61.599
+        }
+      ]
+    },
+    "cli-env-tests": {
+      "exit_code": 1,
+      "seconds": 299.382,
+      "raw_stream_sha256": "e417c6dad92b79bf580f9f4bdd819f92b0d86fffa2d10d4bf5fadc5120552ada",
+      "verdicts": [
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveCredentialRecordProvisionAndRepair",
+          "Elapsed": 2.52
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveCredentialRecordPathlessKeyring",
+          "Elapsed": 1.72
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveCredentialRecordIsolatedKeychain",
+          "Elapsed": 1.9
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveKeepsSchema1BytesForMetadataOnly",
+          "Elapsed": 2.26
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome",
+          "Elapsed": 2.07
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvMigratePlanApplyPi",
+          "Elapsed": 35.55
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvMigrateConflictRefuses",
+          "Elapsed": 1.42
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveRepairNeedsMigration",
+          "Elapsed": 29.98
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvMigrateUsage",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvMigrateApplyRequiresPlan",
+          "Elapsed": 11.23
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvMigratePrintBeforeWrite",
+          "Elapsed": 14.18
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveRepairFailedOnUninspectable",
+          "Elapsed": 15.25
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveEmitsPermissionsV2AtProductionEntry/permissions-yolo-profile/schema-validation",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveEmitsPermissionsV2AtProductionEntry/permissions-yolo-profile",
+          "Elapsed": 2.44
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveEmitsPermissionsV2AtProductionEntry/permissions-native-profile/schema-validation",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveEmitsPermissionsV2AtProductionEntry/permissions-native-profile",
+          "Elapsed": 2.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveEmitsPermissionsV2AtProductionEntry/permissions-absent-default/schema-validation",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveEmitsPermissionsV2AtProductionEntry/permissions-absent-default",
+          "Elapsed": 1.48
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveEmitsPermissionsV2AtProductionEntry/permissions-system-lock-global/schema-validation",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveEmitsPermissionsV2AtProductionEntry/permissions-system-lock-global",
+          "Elapsed": 1.16
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveEmitsPermissionsV2AtProductionEntry",
+          "Elapsed": 7.1
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveBareStaleIsAFailure",
+          "Elapsed": 0.88
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveRepairEmitsFragment",
+          "Elapsed": 1.55
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveRejectsSwappedStoreEntry",
+          "Elapsed": 1.09
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveUnknowns",
+          "Elapsed": 0.88
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveIsolatedSystemLockUsesDirection",
+          "Elapsed": 1.51
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveExplicitSharedConflictsWithIsolatedSystemLock",
+          "Elapsed": 1.35
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveLockedIsolationRequiresMigration",
+          "Elapsed": 2.09
+        },
+        {
+          "Action": "fail",
+          "Test": "TestEnvStatusMatrix",
+          "Elapsed": 23.13
+        },
+        {
+          "Action": "fail",
+          "Test": "TestEnvStatusRegistryBoundaryPostureAndCheck",
+          "Elapsed": 20.82
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvStatusReportsDroppedSystemModuleThroughCLI",
+          "Elapsed": 3.98
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvStatusS4Posture",
+          "Elapsed": 0.73
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvStatusEffectivePassableList",
+          "Elapsed": 0.85
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolvePreserveLockRequiresRepair",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolvePreserveLockRepairBindsUnchangedLock",
+          "Elapsed": 1.17
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolvePreserveLockRefusesCurrentV1AndPlainRepairMigrates",
+          "Elapsed": 7.57
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageTakeoverPreservesFileMode/0600",
+          "Elapsed": 1.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageTakeoverPreservesFileMode/0644",
+          "Elapsed": 0.92
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageTakeoverPreservesFileMode/0751",
+          "Elapsed": 0.89
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageTakeoverPreservesFileMode/0400",
+          "Elapsed": 1.18
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageTakeoverPreservesFileMode",
+          "Elapsed": 4.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageTakeoverRestoresSymlink/absolute",
+          "Elapsed": 1.65
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageTakeoverRestoresSymlink/relative",
+          "Elapsed": 1.69
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageTakeoverRestoresSymlink/dangling",
+          "Elapsed": 1.82
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageTakeoverRestoresSymlink/directory",
+          "Elapsed": 1.9
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageTakeoverRestoresSymlink",
+          "Elapsed": 7.07
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageSymlinkRestoreRefusesLinkedParent/context",
+          "Elapsed": 0.68
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageSymlinkRestoreRefusesLinkedParent/nested/context",
+          "Elapsed": 0.96
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageSymlinkRestoreRefusesLinkedParent",
+          "Elapsed": 1.64
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageSymlinkRestoreRefusesPlannedLinkedParent/private.md",
+          "Elapsed": 0.77
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageSymlinkRestoreRefusesPlannedLinkedParent/nested/private.md",
+          "Elapsed": 0.99
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageSymlinkRestoreRefusesPlannedLinkedParent",
+          "Elapsed": 1.76
+        },
+        {
+          "Action": "skip",
+          "Test": "TestEnvUnmanageBackupRecordVectors",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageDoesNotRestoreWithoutAnObservedRecord",
+          "Elapsed": 1.75
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageRestoresNewestBackupGeneration",
+          "Elapsed": 0.96
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageRestoresRecordedTakeoverBackup",
+          "Elapsed": 0.88
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvUnmanageLeavesBackupsWithoutRestoreFlag",
+          "Elapsed": 0.86
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveAcceptsAliases",
+          "Elapsed": 1.8
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveAliasAdjacentUnknownsRefused",
+          "Elapsed": 0.88
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvStatusPrintsCanonicalAfterAliasUse",
+          "Elapsed": 1.74
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigSetNormalizesEnvKnobs",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigSetNormalizesWholesaleValues",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigAliasOutputPrintsCanonicalKnob",
+          "Elapsed": 0.02
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigAliasLockRefusalPrintsCanonicalKnob",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigShowPermissionsAtProductionEntry/profile",
+          "Elapsed": 1.32
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigShowPermissionsAtProductionEntry/global",
+          "Elapsed": 1.06
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigShowPermissionsAtProductionEntry",
+          "Elapsed": 2.38
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigShowPermissionsRejectsUnreadableConfig/machine",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigShowPermissionsRejectsUnreadableConfig/system",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigShowPermissionsRejectsUnreadableConfig",
+          "Elapsed": 0.93
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigShowPermissionsRejectsUnreadableInventoryAndCurrent",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigShowPermissionsRejectsUnreadableInventoryAncestor",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigShowPermissionsWithoutProfiles",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigShowDefaults",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigSetUnsetRoundTrip",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigSetListKnob",
+          "Elapsed": 0.01
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigRefusals",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigProviderDirectoriesRoundTrip",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigProviderDirectoriesLockedRefuses",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvConfigLockedKnobRefuses",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvStatusReportsLockedRequire",
+          "Elapsed": 0.04
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvStatusReportsNotInheritedNativeCodexServers",
+          "Elapsed": 1.28
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveStripsAndReportsInlineNativeCodexMCPTable",
+          "Elapsed": 1.19
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvResolveStaleHintsRepair",
+          "Elapsed": 0.94
+        },
+        {
+          "Action": "fail",
+          "Test": "TestEnvStatusCheckCurrentScopeOnly",
+          "Elapsed": 10.54
+        },
+        {
+          "Action": "fail",
+          "Test": "TestEnvStatusMissingAndUnreadableKeepRecord",
+          "Elapsed": 20.6
+        },
+        {
+          "Action": "fail",
+          "Test": "TestEnvStatusUnreadableApprovalStateSurfaced",
+          "Elapsed": 21.32
+        },
+        {
+          "Action": "fail",
+          "Test": "TestEnvStatusReportsShellHookTrustPosture",
+          "Elapsed": 23.52
+        },
+        {
+          "Action": "pass",
+          "Test": "TestResolveTakeoverRequiresRepair",
+          "Elapsed": 0
+        },
+        {
+          "Action": "pass",
+          "Test": "TestUmbrellaSymlinkIntoManagedRefused",
+          "Elapsed": 0
+        },
+        {
+          "Action": "fail",
+          "Elapsed": 299.382
+        }
+      ]
+    },
+    "cli-status-retry": {
+      "exit_code": 0,
+      "seconds": 142.458,
+      "raw_stream_sha256": "e35b2f521bd1adeb3291353d78dacf179f43e4c3f6493438468e0d2dfe709101",
+      "verdicts": [
+        {
+          "Action": "pass",
+          "Test": "TestEnvStatusMatrix",
+          "Elapsed": 22.27
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvStatusRegistryBoundaryPostureAndCheck",
+          "Elapsed": 24.08
+        },
+        {
+          "Action": "pass",
+          "Elapsed": 142.458
+        }
+      ]
+    },
+    "cli-status-retry-rest": {
+      "exit_code": 0,
+      "seconds": 131.316,
+      "raw_stream_sha256": "e312ca45972746616960ecf56731a79959f942930a988320a9af820b961dde3d",
+      "verdicts": [
+        {
+          "Action": "pass",
+          "Test": "TestEnvStatusCheckCurrentScopeOnly",
+          "Elapsed": 14.94
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvStatusMissingAndUnreadableKeepRecord",
+          "Elapsed": 31.24
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvStatusUnreadableApprovalStateSurfaced",
+          "Elapsed": 33.14
+        },
+        {
+          "Action": "pass",
+          "Test": "TestEnvStatusReportsShellHookTrustPosture",
+          "Elapsed": 51.62
+        },
+        {
+          "Action": "pass",
+          "Elapsed": 131.316
+        }
+      ]
+    }
+  },
+  "other_commands": {
+    "go build ./...": 0,
+    "go vet ./internal/envprofile ./cmd/curator": 0,
+    "git diff --exit-code HEAD -- README.md CHANGELOG.md": 0,
+    "git diff --check": 0,
+    "gofmt -l changed Go files (empty output verified)": 0,
+    "git diff --cached --exit-code": 0,
+    "interrupted full envprofile attempt": 1
+  },
+  "mutants": {
+    "single-fallback-0644": {
+      "events": [
+        {
+          "Action": "run"
+        },
+        {
+          "Action": "output",
+          "Output": "=== RUN   TestManagedModesNarrowingMutants/single-fallback-0644\n"
+        },
+        {
+          "Action": "output",
+          "Output": "    managed_modes_mutants_unix_test.go:97: expected-red go test exit 1:\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        === RUN   TestManagedFallbackPermissions\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        === RUN   TestManagedFallbackPermissions/tree-false\n"
+        },
+        {
+          "Action": "output",
+          "Output": "            managed_modes_unix_test.go:65: copy mode = 0644, want 0600 (permissions must not widen)\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        --- FAIL: TestManagedFallbackPermissions (0.01s)\n"
+        },
+        {
+          "Action": "output",
+          "Output": "            --- FAIL: TestManagedFallbackPermissions/tree-false (0.01s)\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\tgithub.com/relux-works/curator/internal/envprofile\t0.357s\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\n"
+        },
+        {
+          "Action": "output",
+          "Output": "--- PASS: TestManagedModesNarrowingMutants/single-fallback-0644 (4.19s)\n"
+        },
+        {
+          "Action": "pass",
+          "Elapsed": 4.19
+        }
+      ]
+    },
+    "executable-tree-fallback-0755": {
+      "events": [
+        {
+          "Action": "run"
+        },
+        {
+          "Action": "output",
+          "Output": "=== RUN   TestManagedModesNarrowingMutants/executable-tree-fallback-0755\n"
+        },
+        {
+          "Action": "output",
+          "Output": "    managed_modes_mutants_unix_test.go:97: expected-red go test exit 1:\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        === RUN   TestManagedFallbackPermissions\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        === RUN   TestManagedFallbackPermissions/tree-true\n"
+        },
+        {
+          "Action": "output",
+          "Output": "            managed_modes_unix_test.go:65: 0755 mode = 0755, want 0700 (permissions must not widen)\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        --- FAIL: TestManagedFallbackPermissions (0.04s)\n"
+        },
+        {
+          "Action": "output",
+          "Output": "            --- FAIL: TestManagedFallbackPermissions/tree-true (0.04s)\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\tgithub.com/relux-works/curator/internal/envprofile\t0.384s\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\n"
+        },
+        {
+          "Action": "output",
+          "Output": "--- PASS: TestManagedModesNarrowingMutants/executable-tree-fallback-0755 (5.19s)\n"
+        },
+        {
+          "Action": "pass",
+          "Elapsed": 5.19
+        }
+      ]
+    },
+    "private-seed-0644": {
+      "events": [
+        {
+          "Action": "run"
+        },
+        {
+          "Action": "output",
+          "Output": "=== RUN   TestManagedModesNarrowingMutants/private-seed-0644\n"
+        },
+        {
+          "Action": "output",
+          "Output": "    managed_modes_mutants_unix_test.go:97: expected-red go test exit 1:\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        === RUN   TestManagedSeedPreservesNativePermissions\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        === RUN   TestManagedSeedPreservesNativePermissions/0600\n"
+        },
+        {
+          "Action": "output",
+          "Output": "            managed_modes_unix_test.go:95: config.toml mode = 0644, want 0600 (permissions must not widen)\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        --- FAIL: TestManagedSeedPreservesNativePermissions (1.19s)\n"
+        },
+        {
+          "Action": "output",
+          "Output": "            --- FAIL: TestManagedSeedPreservesNativePermissions/0600 (1.19s)\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\tgithub.com/relux-works/curator/internal/envprofile\t1.570s\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\n"
+        },
+        {
+          "Action": "output",
+          "Output": "--- PASS: TestManagedModesNarrowingMutants/private-seed-0644 (5.80s)\n"
+        },
+        {
+          "Action": "pass",
+          "Elapsed": 5.8
+        }
+      ]
+    },
+    "claude-trust-0644": {
+      "events": [
+        {
+          "Action": "run"
+        },
+        {
+          "Action": "output",
+          "Output": "=== RUN   TestManagedModesNarrowingMutants/claude-trust-0644\n"
+        },
+        {
+          "Action": "output",
+          "Output": "    managed_modes_mutants_unix_test.go:97: expected-red go test exit 1:\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        === RUN   TestManagedAuthoredFilesArePrivate\n"
+        },
+        {
+          "Action": "output",
+          "Output": "            managed_modes_unix_test.go:170: .claude.json mode = 0644, want 0600 (permissions must not widen)\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        --- FAIL: TestManagedAuthoredFilesArePrivate (1.26s)\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\tgithub.com/relux-works/curator/internal/envprofile\t1.601s\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\n"
+        },
+        {
+          "Action": "output",
+          "Output": "--- PASS: TestManagedModesNarrowingMutants/claude-trust-0644 (5.04s)\n"
+        },
+        {
+          "Action": "pass",
+          "Elapsed": 5.04
+        }
+      ]
+    },
+    "codex-directory-drift-admitted": {
+      "events": [
+        {
+          "Action": "run"
+        },
+        {
+          "Action": "output",
+          "Output": "=== RUN   TestManagedModesNarrowingMutants/codex-directory-drift-admitted\n"
+        },
+        {
+          "Action": "output",
+          "Output": "    managed_modes_mutants_unix_test.go:97: expected-red go test exit 1:\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        === RUN   TestManagedHomeRepairTightensDirectories\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        === RUN   TestManagedHomeRepairTightensDirectories/codex_cli\n"
+        },
+        {
+          "Action": "output",
+          "Output": "            managed_modes_unix_test.go:138: wide home must be stale: <nil>\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        --- FAIL: TestManagedHomeRepairTightensDirectories (1.66s)\n"
+        },
+        {
+          "Action": "output",
+          "Output": "            --- FAIL: TestManagedHomeRepairTightensDirectories/codex_cli (1.66s)\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\tgithub.com/relux-works/curator/internal/envprofile\t2.042s\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\n"
+        },
+        {
+          "Action": "output",
+          "Output": "--- PASS: TestManagedModesNarrowingMutants/codex-directory-drift-admitted (5.28s)\n"
+        },
+        {
+          "Action": "pass",
+          "Elapsed": 5.28
+        }
+      ]
+    },
+    "codex-directory-not-tightened": {
+      "events": [
+        {
+          "Action": "run"
+        },
+        {
+          "Action": "output",
+          "Output": "=== RUN   TestManagedModesNarrowingMutants/codex-directory-not-tightened\n"
+        },
+        {
+          "Action": "output",
+          "Output": "    managed_modes_mutants_unix_test.go:97: expected-red go test exit 1:\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        === RUN   TestManagedHomeRepairTightensDirectories\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        === RUN   TestManagedHomeRepairTightensDirectories/codex_cli\n"
+        },
+        {
+          "Action": "output",
+          "Output": "            managed_modes_unix_test.go:147: environment_repair_failed: managed directory permissions: <tmp>/TestManagedHomeRepairTightensDirectoriescodex_cli1448159631/001/environments/acme/codex_cli is not a private owner-only directory; managed directory permissions: <tmp>/TestManagedHomeRepairTightensDirectoriescodex_cli1448159631/001/environments/acme/codex_cli is not a private owner-only directory\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        --- FAIL: TestManagedHomeRepairTightensDirectories (1.72s)\n"
+        },
+        {
+          "Action": "output",
+          "Output": "            --- FAIL: TestManagedHomeRepairTightensDirectories/codex_cli (1.72s)\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\tgithub.com/relux-works/curator/internal/envprofile\t2.067s\n"
+        },
+        {
+          "Action": "output",
+          "Output": "        FAIL\n"
+        },
+        {
+          "Action": "output",
+          "Output": "--- PASS: TestManagedModesNarrowingMutants/codex-directory-not-tightened (4.91s)\n"
+        },
+        {
+          "Action": "pass",
+          "Elapsed": 4.91
+        }
+      ]
+    }
+  },
+  "bounds": [
+    "Current r5 requires affected checks and build; full configured validation runs after handoff and remains unclaimed.",
+    "The first broad CLI run failed due to installed untrusted providers on ambient PATH; all six named failures are rerun on the prior isolated PATH.",
+    "The interrupted full envprofile stream is partial, not passing evidence.",
+    "No current full-suite, hosted, Linux, Windows or signed-snapshot result is claimed."
+  ]
+}

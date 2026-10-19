@@ -1,0 +1,130 @@
+{
+  "scope": "Linux/macOS permission suites and narrowing controls; full workflow verdict is recorded separately",
+  "candidate": {
+    "candidate": "04f9d8d2f06d6ca2df2e0e1b06f78078445fca35",
+    "tree": "8c29fe0bc3ad426e196062a7efa7c9d6a601658b",
+    "base": "db65e39555b8dbac7e75f3b2d337daa33831f297",
+    "signature": "G",
+    "branch": "gate/BUG-261018-dbeghc/refresh-261018-055412"
+  },
+  "verifier_command": "python3 .temp/BUG-261018-dbeghc/refresh-402fdbc9/verify-hosted-permissions.py",
+  "verifier_exit_code": 0,
+  "platforms": [
+    {
+      "run": 39102151566,
+      "candidate": "04f9d8d2f06d6ca2df2e0e1b06f78078445fca35",
+      "stream_sha256": "5a4108b8216c87ffdbe826ceeb9e78bb88255745680a57530a26fb4998b43f2f",
+      "platform": "linux",
+      "permission_suites": {
+        "TestManagedSeedPreservesNativePermissions": "pass",
+        "TestManagedHomeRepairTightensDirectories": "pass",
+        "TestManagedAuthoredFilesArePrivate": "pass",
+        "TestManagedSeedRefusalsPreserved": "pass",
+        "TestManagedFallbackPermissions": "pass",
+        "TestManagedModesNarrowingMutants": "pass"
+      },
+      "mutants": {
+        "single-fallback-0644": {
+          "wrapper": "pass",
+          "child_exit": 1,
+          "named_failing_test": "TestManagedFallbackPermissions/tree-false",
+          "reason": "copy mode = 0644, want 0600",
+          "verdict": "killed"
+        },
+        "executable-tree-fallback-0755": {
+          "wrapper": "pass",
+          "child_exit": 1,
+          "named_failing_test": "TestManagedFallbackPermissions/tree-true",
+          "reason": "0755 mode = 0755, want 0700",
+          "verdict": "killed"
+        },
+        "private-seed-0644": {
+          "wrapper": "pass",
+          "child_exit": 1,
+          "named_failing_test": "TestManagedSeedPreservesNativePermissions/0600",
+          "reason": "mode = 0644, want 0600",
+          "verdict": "killed"
+        },
+        "claude-trust-0644": {
+          "wrapper": "pass",
+          "child_exit": 1,
+          "named_failing_test": "TestManagedAuthoredFilesArePrivate",
+          "reason": ".claude.json mode = 0644, want 0600",
+          "verdict": "killed"
+        },
+        "codex-directory-drift-admitted": {
+          "wrapper": "pass",
+          "child_exit": 1,
+          "named_failing_test": "TestManagedHomeRepairTightensDirectories/codex_cli",
+          "reason": "wide home must be stale: <nil>",
+          "verdict": "killed"
+        },
+        "codex-directory-not-tightened": {
+          "wrapper": "pass",
+          "child_exit": 1,
+          "named_failing_test": "TestManagedHomeRepairTightensDirectories/codex_cli",
+          "reason": "managed directory permissions:",
+          "verdict": "killed"
+        }
+      }
+    },
+    {
+      "run": 39102151566,
+      "candidate": "04f9d8d2f06d6ca2df2e0e1b06f78078445fca35",
+      "stream_sha256": "3acb54fea931ad8674b8a59642b9cf19e8761775a9db363d04fe5ba0109775d8",
+      "platform": "macos",
+      "permission_suites": {
+        "TestManagedSeedPreservesNativePermissions": "pass",
+        "TestManagedHomeRepairTightensDirectories": "pass",
+        "TestManagedAuthoredFilesArePrivate": "pass",
+        "TestManagedSeedRefusalsPreserved": "pass",
+        "TestManagedFallbackPermissions": "pass",
+        "TestManagedModesNarrowingMutants": "pass"
+      },
+      "mutants": {
+        "single-fallback-0644": {
+          "wrapper": "pass",
+          "child_exit": 1,
+          "named_failing_test": "TestManagedFallbackPermissions/tree-false",
+          "reason": "copy mode = 0644, want 0600",
+          "verdict": "killed"
+        },
+        "executable-tree-fallback-0755": {
+          "wrapper": "pass",
+          "child_exit": 1,
+          "named_failing_test": "TestManagedFallbackPermissions/tree-true",
+          "reason": "0755 mode = 0755, want 0700",
+          "verdict": "killed"
+        },
+        "private-seed-0644": {
+          "wrapper": "pass",
+          "child_exit": 1,
+          "named_failing_test": "TestManagedSeedPreservesNativePermissions/0600",
+          "reason": "mode = 0644, want 0600",
+          "verdict": "killed"
+        },
+        "claude-trust-0644": {
+          "wrapper": "pass",
+          "child_exit": 1,
+          "named_failing_test": "TestManagedAuthoredFilesArePrivate",
+          "reason": ".claude.json mode = 0644, want 0600",
+          "verdict": "killed"
+        },
+        "codex-directory-drift-admitted": {
+          "wrapper": "pass",
+          "child_exit": 1,
+          "named_failing_test": "TestManagedHomeRepairTightensDirectories/codex_cli",
+          "reason": "wide home must be stale: <nil>",
+          "verdict": "killed"
+        },
+        "codex-directory-not-tightened": {
+          "wrapper": "pass",
+          "child_exit": 1,
+          "named_failing_test": "TestManagedHomeRepairTightensDirectories/codex_cli",
+          "reason": "managed directory permissions:",
+          "verdict": "killed"
+        }
+      }
+    }
+  ]
+}

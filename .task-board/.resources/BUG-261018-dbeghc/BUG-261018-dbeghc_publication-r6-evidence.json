@@ -1,0 +1,168 @@
+{
+  "identity": {
+    "base": "892dab098aef1497df9ccacdb173faaf4f8b8418",
+    "incoming_trunk": "59746a4545db06607446dcfe5fc35f28118a9125",
+    "files_unchanged_from_previous_local_evidence": {
+      "docs/environment-config.md": true,
+      "internal/envprofile/managed.go": true,
+      "internal/envprofile/nofollow.go": true,
+      "internal/envprofile/managed_modes_unix_test.go": true,
+      "internal/envprofile/managed_modes_mutants_unix_test.go": true
+    },
+    "refresh_exit": 1,
+    "candidate_tree": "efc4e2371c2f7e21ec8b56d9ffc0273b5c98c722",
+    "go_version": "go version go1.25.5 darwin/arm64",
+    "current_tracked_patch_sha256": "9ec3d539a0709a64c009f0821c5d6299776dd8d958a0a0a157829d8006221232",
+    "candidate_paths": [
+      " M docs/environment-config.md",
+      " M internal/envprofile/managed.go",
+      " M internal/envprofile/nofollow.go",
+      "?? internal/envprofile/managed_modes_mutants_unix_test.go",
+      "?? internal/envprofile/managed_modes_unix_test.go"
+    ]
+  },
+  "commands": [
+    {
+      "command": "go test -count=1 -timeout=5m -json -run ^Test(Managed|Resolve) ./internal/envprofile",
+      "exit": 0,
+      "passes": [
+        "TestResolvePublishesCredentialMarkerThroughLockedJournal",
+        "TestResolveRecoversCredentialMarkerAfterRenameCrash",
+        "TestResolvePublishesCredentialMarkerThroughLockedJournalV2WriterMode",
+        "TestResolveRecoversCredentialMarkerAfterRenameCrashV2WriterMode",
+        "TestManagedModesNarrowingMutants/single-fallback-0644",
+        "TestManagedModesNarrowingMutants/executable-tree-fallback-0755",
+        "TestManagedModesNarrowingMutants/private-seed-0644",
+        "TestManagedModesNarrowingMutants/claude-trust-0644",
+        "TestManagedModesNarrowingMutants/codex-directory-drift-admitted",
+        "TestManagedModesNarrowingMutants/codex-directory-not-tightened",
+        "TestManagedModesNarrowingMutants",
+        "TestManagedFallbackPermissions/tree-false",
+        "TestManagedFallbackPermissions/tree-true",
+        "TestManagedFallbackPermissions",
+        "TestManagedSeedPreservesNativePermissions/0600",
+        "TestManagedSeedPreservesNativePermissions/0400",
+        "TestManagedSeedPreservesNativePermissions/0640",
+        "TestManagedSeedPreservesNativePermissions/0644",
+        "TestManagedSeedPreservesNativePermissions",
+        "TestManagedHomeRepairTightensDirectories/claude_code",
+        "TestManagedHomeRepairTightensDirectories/codex_cli",
+        "TestManagedHomeRepairTightensDirectories/opencode",
+        "TestManagedHomeRepairTightensDirectories/pi",
+        "TestManagedHomeRepairTightensDirectories/muse",
+        "TestManagedHomeRepairTightensDirectories",
+        "TestManagedAuthoredFilesArePrivate",
+        "TestManagedSeedRefusalsPreserved/symlink",
+        "TestManagedSeedRefusalsPreserved/unreadable",
+        "TestManagedSeedRefusalsPreserved/fifo",
+        "TestManagedSeedRefusalsPreserved",
+        "TestResolveVerifiesGitStoreEntryAgainstPinnedTree",
+        "TestResolveRejectsGitPinMissingFromLocalObjectDatabase",
+        "TestResolveProvisionRepair",
+        "TestResolveReportsRecordedContextSurfaceHashDrift/root-context",
+        "TestResolveReportsRecordedContextSurfaceHashDrift/system-prompt",
+        "TestResolveReportsRecordedContextSurfaceHashDrift",
+        "TestResolveRejectsEnvironmentMarkerHashVersionMismatch",
+        "TestResolveStaleUnprovisioned",
+        "TestResolveUnknowns",
+        "TestResolveDefaultProfile",
+        "TestResolveDriftRepair",
+        "TestResolvePassthroughLiveness",
+        "TestResolveClaudeProjectEntry",
+        "TestResolveIsolatedOpencode",
+        "TestResolveFormUnsupported",
+        "TestResolveLockContention",
+        "TestResolveFormats",
+        "TestResolveRefusesMissingLockNamedStoreEntryAtBoundary",
+        "TestResolveRefusesV1CommitPinnedContextNUL/module",
+        "TestResolveRefusesV1CommitPinnedContextNUL/excluded",
+        "TestResolveRefusesV1CommitPinnedContextNUL",
+        "TestResolveCleanV1CommitContextStaysCurrent",
+        "TestResolveAdmitsV2CommitPinnedContextNUL/v2-module",
+        "TestResolveAdmitsV2CommitPinnedContextNUL/v2-excluded",
+        "TestResolveAdmitsV2CommitPinnedContextNUL",
+        "TestResolveRejectsGroupWritableOnlyPathOverlay",
+        "TestResolveRepairKeepsEnclosingStoreRootFailureClass",
+        "TestResolvePassthroughKnobs/absent-warns",
+        "TestResolvePassthroughKnobs/null-silent",
+        "TestResolvePassthroughKnobs/list-bounds-silently",
+        "TestResolvePassthroughKnobs/empty-list-bounds-all",
+        "TestResolvePassthroughKnobs",
+        "TestResolveRenderedDocumentReplacesStoreSymlinkWithoutFollowing"
+      ],
+      "narrowing_controls": [
+        {
+          "mutant": "single-fallback-0644",
+          "expected_red_child_exit": 1,
+          "failure_output": "    managed_modes_mutants_unix_test.go:97: expected-red go test exit 1:\n"
+        },
+        {
+          "mutant": "executable-tree-fallback-0755",
+          "expected_red_child_exit": 1,
+          "failure_output": "    managed_modes_mutants_unix_test.go:97: expected-red go test exit 1:\n"
+        },
+        {
+          "mutant": "private-seed-0644",
+          "expected_red_child_exit": 1,
+          "failure_output": "    managed_modes_mutants_unix_test.go:97: expected-red go test exit 1:\n"
+        },
+        {
+          "mutant": "claude-trust-0644",
+          "expected_red_child_exit": 1,
+          "failure_output": "    managed_modes_mutants_unix_test.go:97: expected-red go test exit 1:\n"
+        },
+        {
+          "mutant": "codex-directory-drift-admitted",
+          "expected_red_child_exit": 1,
+          "failure_output": "    managed_modes_mutants_unix_test.go:97: expected-red go test exit 1:\n"
+        },
+        {
+          "mutant": "codex-directory-not-tightened",
+          "expected_red_child_exit": 1,
+          "failure_output": "    managed_modes_mutants_unix_test.go:97: expected-red go test exit 1:\n"
+        }
+      ]
+    },
+    {
+      "command": "go build ./...",
+      "exit": 0
+    },
+    {
+      "command": "go vet ./internal/envprofile ./cmd/curator",
+      "exit": 0
+    },
+    {
+      "command": "gofmt -l changed Go files; empty-output assertion",
+      "exit": 0
+    },
+    {
+      "command": "git diff --exit-code main -- README.md CHANGELOG.md",
+      "exit": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit": 0
+    },
+    {
+      "command": "git diff --cached --exit-code",
+      "exit": 0
+    },
+    {
+      "command": "task-board worktree refresh-candidate BUG-261018-dbeghc",
+      "exit": 1,
+      "refusal": "change_request_candidate_drift: candidate refresh would leave tracked board paths outside its file transaction stale; synchronize the board with the prepared checkpoint before retrying (paths=.task-board/.activity/BUG-261018-uoisfe/events.ndjson, .task-board/.activity/EPIC-261016-stqc77/events.ndjson, .task-board/.activity/STORY-261018-k5yd2n/events.ndjson, .task-board/EPIC-261016-stqc77_curator-rc7-code-wave/STORY-261018-k5yd2n_native-skills-in-place/BUG-261018-uoisfe_in-place-profile-skills-miss-native-surface/README.md, .task-board/EPIC-261016-stqc77_curator-rc7-code-wave/STORY-261018-k5yd2n_native-skills-in-place/BUG-261018-uoisfe_in-place-profile-skills-miss-native-surface/progress.md, .task-board/EPIC-261016-stqc77_curator-rc7-code-wave/STORY-261018-k5yd2n_native-skills-in-place/README.md, .task-board/EPIC-261016-stqc77_curator-rc7-code-wave/STORY-261018-k5yd2n_native-skills-in-place/progress.md, .task-board/EPIC-261016-stqc77_curator-rc7-code-wave/progress.md, prepared_tree_oid=4b0d82cc6a7997ac15f1ce0d41ecedd3b52729d8, workspace_tree_oid=efc4e2371c2f7e21ec8b56d9ffc0273b5c98c722)\n"
+    }
+  ],
+  "bounds": [
+    "Candidate unchanged; refresh refused before combination installation. No new exact signed candidate claimed.",
+    "Full local suite, full hosted gate, conformance and broad CLI suites not rerun in this retry. Prior evidence remains historical; configured full validation follows a successful handoff.",
+    "Only local macOS arm64 permission behavior is established in this run; Linux/Windows are not rerun."
+  ],
+  "log_sha256": {
+    "envprofile-01.json": "0b36b18cacb1b175dbd725f75c2e71ee006511f21196a28b7ebdf2c3d09115a3",
+    "envprofile-01.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build-01.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "vet-01.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gofmt-01.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

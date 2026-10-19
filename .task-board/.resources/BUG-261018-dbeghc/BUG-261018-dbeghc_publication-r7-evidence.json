@@ -1,0 +1,3396 @@
+{
+  "base": "5ecb68da8f8ceab4dda118f2263abfb3da63ab8c",
+  "environment": "darwin/arm64; go1.25.5",
+  "implementation_changed_this_round": false,
+  "identity": {
+    "base": "5ecb68da8f8ceab4dda118f2263abfb3da63ab8c",
+    "main": "5ecb68da8f8ceab4dda118f2263abfb3da63ab8c",
+    "paths": {
+      "docs/environment-config.md": {
+        "blob": "77e7066aef638c02604157680aec69c553fc8fc8",
+        "sha256": "de089b1a2aac5eae42b6a64fbaa84e553d599ff21c247166b484fc4b9dc846d0"
+      },
+      "internal/envprofile/managed.go": {
+        "blob": "a558940daa077a8695694bdbda4b4ca908741450",
+        "sha256": "955588f240c5b224c19c25d2abadb02711ed6f62ad1074a09850f45f51fa00db"
+      },
+      "internal/envprofile/nofollow.go": {
+        "blob": "032fb67735190c0e722e89a963010200abb31c18",
+        "sha256": "ae6e73e44d09b1d3f0a7e970777196ddeef7a1faabbabf929343b652f8659a36"
+      },
+      "internal/envprofile/managed_modes_unix_test.go": {
+        "blob": "b6ffb58f18fd8c905111412a134c3b7fed3bbada",
+        "sha256": "db9c80729c4fa54da0330b030d3f299f2ef2b64201056ab0735d3e781d751ccb"
+      },
+      "internal/envprofile/managed_modes_mutants_unix_test.go": {
+        "blob": "f7dc7896879f3ab282b17098650a351fbcf3b15d",
+        "sha256": "8a210ccb160428afe670c402a42aa03049a9bdf8d97dc502e33148e2080ddf9d"
+      }
+    }
+  },
+  "commands": [
+    {
+      "command": "go test -count=1 -timeout=5m -json -run '^Test(Managed|Resolve|NativeSkills)' -skip 'NarrowingMutants' ./internal/envprofile ./cmd/curator",
+      "exit": 0,
+      "log_sha256": "ca0b3b34c64f837516dccd86b3fb70cd9b9ca6712e08c83e0354a9e3c4f4995b",
+      "passed_packages": [
+        "github.com/relux-works/curator/cmd/curator",
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "passed_tests": [
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestResolveTakeoverRequiresRepair"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/bootstrap"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/init"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/add"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/remove"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/install"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/update"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/upgrade"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/status"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/list"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/project"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/project/add"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/project/resolve"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/project/refresh"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/skill"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/skill/check"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/global"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/global/init"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/global/add"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/global/remove"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/global/list"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/global/status"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/global/install"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/global/adopt"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/global/update"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/global/upgrade"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/profile"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/profile/import"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/profile/list"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/profile/remove"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose/<profile>/add"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose/<profile>/remove"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/profile/compose/<profile>/list"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/env"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/env/status"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/env/config"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/env/config/show"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/env/config/set"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/env/config/unset"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/env/migrate"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/env/unmanage"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/run"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/add"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/remove"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/list"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/hybrid/status"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/audit"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/gc"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/shell-init"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/hook"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/hook/approve"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/hook/approvals"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/hook/revoke"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/ui"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/config"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/config/show"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh/add"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh/list"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-ssh/remove"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/add"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/login"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/list"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/config/build-https/remove"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand/version"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverEveryRegisteredCommand"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverArgumentDiscardRegression/list"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverArgumentDiscardRegression/update"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverArgumentDiscardRegression/gc"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverArgumentDiscardRegression/version"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverArgumentDiscardRegression/--version"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverArgumentDiscardRegression"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverActivationBoundary"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/bootstrap//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/bootstrap//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/bootstrap//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/bootstrap//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/bootstrap//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/init//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/init//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/init//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/init//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/init//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/add//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/add//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/add//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/add//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/add//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/remove//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/remove//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/remove//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/remove//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/remove//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/install//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/install//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/install//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/install//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/install//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/update//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/update//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/update//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/update//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/update//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/upgrade//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/upgrade//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/upgrade//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/upgrade//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/upgrade//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/status//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/status//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/status//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/status//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/status//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/list//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/list//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/list//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/list//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/list//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project_add//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project_add//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project_add//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project_add//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project_add//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project_resolve//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project_resolve//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project_resolve//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project_resolve//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project_resolve//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project_refresh//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project_refresh//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project_refresh//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project_refresh//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/project_refresh//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/skill//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/skill//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/skill//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/skill//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/skill//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/skill_check//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/skill_check//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/skill_check//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/skill_check//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/skill_check//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_init//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_init//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_init//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_init//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_init//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_add//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_add//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_add//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_add//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_add//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_remove//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_remove//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_remove//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_remove//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_remove//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_list//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_list//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_list//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_list//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_list//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_status//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_status//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_status//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_status//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_status//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_install//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_install//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_install//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_install//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_install//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_adopt//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_adopt//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_adopt//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_adopt//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_adopt//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_update//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_update//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_update//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_update//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_update//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_upgrade//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_upgrade//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_upgrade//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_upgrade//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/global_upgrade//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=true/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=true/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=true/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=true/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=true/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=1/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=1/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=1/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=1/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=1/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=TRUE/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=TRUE/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=TRUE/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=TRUE/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=TRUE/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=false/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=false/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=false/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=false/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=false/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=0/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=0/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=0/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=0/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_install/--use=0/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_import//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_import//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_import//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_import//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_import//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_list//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_list//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_list//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_list//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_list//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_use//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_use//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_use//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_use//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_use//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_update//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_update//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_update//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_update//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_update//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_remove//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_remove//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_remove//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_remove//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_remove//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_sync//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_sync//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_sync//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_sync//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_sync//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose_<profile>_add//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose_<profile>_add//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose_<profile>_add//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose_<profile>_add//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose_<profile>_add//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose_<profile>_remove//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose_<profile>_remove//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose_<profile>_remove//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose_<profile>_remove//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose_<profile>_remove//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose_<profile>_list//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose_<profile>_list//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose_<profile>_list//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose_<profile>_list//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/profile_compose_<profile>_list//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=true/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=true/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=true/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=true/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=true/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=1/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=1/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=1/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=1/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=1/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=false/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=false/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=false/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=false/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=false/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=0/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=0/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=0/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=0/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--dry-run=0/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=true/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=true/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=true/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=true/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=true/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=1/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=1/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=1/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=1/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=1/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=false/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=false/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=false/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=false/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=false/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=0/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=0/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=0/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=0/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair,--dry-run=0/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=true/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=true/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=true/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=true/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=true/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=1/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=1/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=1/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=1/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=1/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=false/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=false/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=false/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=false/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=false/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=0/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=0/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=0/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=0/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=true,--dry-run=0/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=true/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=true/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=true/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=true/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=true/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=1/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=1/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=1/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=1/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=1/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=false/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=false/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=false/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=false/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=false/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=0/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=0/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=0/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=0/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=1,--dry-run=0/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=true/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=true/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=true/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=true/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=true/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=1/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=1/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=1/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=1/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=1/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=false/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=false/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=false/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=false/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=false/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=0/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=0/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=0/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=0/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=TRUE,--dry-run=0/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=true/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=true/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=true/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=true/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=true/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=1/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=1/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=1/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=1/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=1/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=false/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=false/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=false/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=false/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=false/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=0/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=0/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=0/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=0/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=false,--dry-run=0/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=true/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=true/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=true/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=true/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=true/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=1/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=1/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=1/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=1/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=1/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=false/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=false/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=false/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=false/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=false/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=0/-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=0/--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=0/prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=0/prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_resolve/--repair=0,--dry-run=0/help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_status//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_status//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_status//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_status//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_status//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config_show//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config_show//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config_show//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config_show//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config_show//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config_set//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config_set//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config_set//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config_set//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config_set//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config_unset//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config_unset//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config_unset//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config_unset//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_config_unset//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_migrate//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_migrate//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_migrate//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_migrate//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_migrate//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_unmanage//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_unmanage//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_unmanage//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_unmanage//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/env_unmanage//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/run//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/run//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/run//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/run//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/run//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_add//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_add//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_add//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_add//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_add//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_remove//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_remove//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_remove//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_remove//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_remove//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_list//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_list//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_list//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_list//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_list//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_status//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_status//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_status//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_status//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hybrid_status//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/audit//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/audit//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/audit//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/audit//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/audit//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/gc//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/gc//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/gc//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/gc//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/gc//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/shell-init//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/shell-init//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/shell-init//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/shell-init//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/shell-init//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook_approve//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook_approve//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook_approve//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook_approve//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook_approve//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook_approvals//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook_approvals//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook_approvals//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook_approvals//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook_approvals//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook_revoke//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook_revoke//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook_revoke//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook_revoke//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/hook_revoke//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/ui//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/ui//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/ui//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/ui//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/ui//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_show//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_show//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_show//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_show//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_show//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh_add//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh_add//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh_add//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh_add//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh_add//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh_list//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh_list//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh_list//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh_list//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh_list//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh_remove//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh_remove//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh_remove//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh_remove//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-ssh_remove//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_add//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_add//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_add//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_add//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_add//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_login//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_login//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_login//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_login//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_login//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_list//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_list//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_list//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_list//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_list//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_remove//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_remove//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_remove//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_remove//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/config_build-https_remove//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/version//-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/version//--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/version//prefix_-h"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/version//prefix_--help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct/version//help"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpCrossProduct"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolvePublishesCredentialMarkerThroughLockedJournal"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveRecoversCredentialMarkerAfterRenameCrash"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolvePublishesCredentialMarkerThroughLockedJournalV2WriterMode"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverRegistryNarrowingMutant"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveRecoversCredentialMarkerAfterRenameCrashV2WriterMode"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedFallbackPermissions/tree-false"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedFallbackPermissions/tree-true"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedFallbackPermissions"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedSeedPreservesNativePermissions/0600"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedSeedPreservesNativePermissions/0400"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpNarrowingMutant/missing-repair"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedSeedPreservesNativePermissions/0640"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedSeedPreservesNativePermissions/0644"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedSeedPreservesNativePermissions"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpNarrowingMutant/dry-run"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverHelpNarrowingMutant"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedHomeRepairTightensDirectories/claude_code"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedHomeRepairTightensDirectories/codex_cli"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsCLIOperations/install"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedHomeRepairTightensDirectories/opencode"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsCLIOperations/use"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedHomeRepairTightensDirectories/pi"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedHomeRepairTightensDirectories/muse"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedHomeRepairTightensDirectories"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedAuthoredFilesArePrivate"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedSeedRefusalsPreserved/symlink"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedSeedRefusalsPreserved/unreadable"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedSeedRefusalsPreserved/fifo"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedSeedRefusalsPreserved"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveVerifiesGitStoreEntryAgainstPinnedTree"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveRejectsGitPinMissingFromLocalObjectDatabase"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveProvisionRepair"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveReportsRecordedContextSurfaceHashDrift/root-context"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveReportsRecordedContextSurfaceHashDrift/system-prompt"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveReportsRecordedContextSurfaceHashDrift"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveRejectsEnvironmentMarkerHashVersionMismatch"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveStaleUnprovisioned"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveUnknowns"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveDefaultProfile"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveDriftRepair"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolvePassthroughLiveness"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveClaudeProjectEntry"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsCLIOperations/sync"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveIsolatedOpencode"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveFormUnsupported"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsCLIOperations/update"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveLockContention"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveFormats"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsCLIOperations/repair"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsCLIOperations"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverFlagBoundary/profile-list"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverFlagBoundary/profile-remove-default"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverFlagBoundary/profile-import"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverFlagBoundary/env-status"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverFlagBoundary/env-resolve-claude_code"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverFlagBoundary/env-resolve-claude_code---repair---dry-run"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverFlagBoundary/env-unmanage-claude_code"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverFlagBoundary/status"
+        },
+        {
+          "package": "github.com/relux-works/curator/cmd/curator",
+          "test": "TestNativeSkillsTakeoverFlagBoundary"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveRefusesMissingLockNamedStoreEntryAtBoundary"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsUseAndSync"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsTakeover/foreign"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsTakeover/directory"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsTakeover/file"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsTakeover/store"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsTakeover/relative-store"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsTakeover"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsLinkedParent/ordinary"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsLinkedParent/takeover"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsLinkedParent"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsLedger"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsUnreadableMarker"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsRepair"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsConvergenceAndSwitch"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsInstallAndUpdate"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsBackupCollision"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsUnrecordedLedger/ledgered"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsUnrecordedLedger/unreadable-ledger"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsUnrecordedLedger"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestNativeSkillsEmptyProfileLeavesUnnamedParent"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveRefusesV1CommitPinnedContextNUL/module"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveRefusesV1CommitPinnedContextNUL/excluded"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveRefusesV1CommitPinnedContextNUL"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveCleanV1CommitContextStaysCurrent"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveAdmitsV2CommitPinnedContextNUL/v2-module"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveAdmitsV2CommitPinnedContextNUL/v2-excluded"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveAdmitsV2CommitPinnedContextNUL"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveRejectsGroupWritableOnlyPathOverlay"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveRepairKeepsEnclosingStoreRootFailureClass"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolvePassthroughKnobs/absent-warns"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolvePassthroughKnobs/null-silent"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolvePassthroughKnobs/list-bounds-silently"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolvePassthroughKnobs/empty-list-bounds-all"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolvePassthroughKnobs"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestResolveRenderedDocumentReplacesStoreSymlinkWithoutFollowing"
+        }
+      ],
+      "skipped": []
+    },
+    {
+      "command": "go test -count=1 -timeout=4m -json -run '^TestClaude(Repair|Absent|Seed)' -skip 'NarrowingMutants' ./internal/envprofile",
+      "exit": 0,
+      "log_sha256": "2e01077f5b2103c938d3d9c3f6a9386137f19d0b789b2a318f914d53c91b2a77",
+      "passed_packages": [
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "passed_tests": [
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairPreservesNumberText/referenced/new-launch"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairPreservesNumberText/referenced/existing-launch"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairPreservesNumberText/referenced/missing-trust"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairPreservesNumberText/referenced/missing-approval"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairPreservesNumberText/referenced/missing-projects"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairPreservesNumberText/referenced/non-object-projects"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairPreservesNumberText/referenced/overflow"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairPreservesNumberText/monolithic/new-launch"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairPreservesNumberText/monolithic/existing-launch"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairPreservesNumberText/monolithic/missing-trust"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairPreservesNumberText/monolithic/missing-approval"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairPreservesNumberText/monolithic/missing-projects"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairPreservesNumberText/monolithic/non-object-projects"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairPreservesNumberText/monolithic/overflow"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairPreservesNumberText"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairSatisfiedIsNoOp/referenced"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairSatisfiedIsNoOp/monolithic"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairSatisfiedIsNoOp"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeAbsentSeedGolden/referenced"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeAbsentSeedGolden/monolithic"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeAbsentSeedGolden"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairRefusesUnsafeState/array"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairRefusesUnsafeState/null"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairRefusesUnsafeState/scalar"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairRefusesUnsafeState/malformed"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairRefusesUnsafeState/symlink"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairRefusesUnsafeState/directory"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairRefusesUnsafeState/unreadable"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeRepairRefusesUnsafeState"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestClaudeSeedMergePreservesToolState"
+        }
+      ],
+      "skipped": []
+    },
+    {
+      "command": "go test -count=1 -timeout=4m -json -run '^TestManagedModesNarrowingMutants$' ./internal/envprofile",
+      "exit": 0,
+      "log_sha256": "58afec19fde1824493415f31d0c06fde41da763fe66b49dabeb98b5070235343",
+      "passed_packages": [
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "passed_tests": [
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedModesNarrowingMutants/single-fallback-0644"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedModesNarrowingMutants/executable-tree-fallback-0755"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedModesNarrowingMutants/private-seed-0644"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedModesNarrowingMutants/claude-trust-0644"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedModesNarrowingMutants/codex-directory-drift-admitted"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedModesNarrowingMutants/codex-directory-not-tightened"
+        },
+        {
+          "package": "github.com/relux-works/curator/internal/envprofile",
+          "test": "TestManagedModesNarrowingMutants"
+        }
+      ],
+      "skipped": []
+    },
+    {
+      "command": "go build ./...",
+      "exit": 0
+    },
+    {
+      "command": "go vet ./...",
+      "exit": 0
+    },
+    {
+      "command": "git diff --exit-code HEAD -- README.md CHANGELOG.md",
+      "exit": 0
+    },
+    {
+      "command": "git diff --exit-code main -- README.md CHANGELOG.md",
+      "exit": 0
+    },
+    {
+      "command": "git diff --cached --exit-code",
+      "exit": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit": 0
+    },
+    {
+      "command": "gofmt -l internal/envprofile/managed.go internal/envprofile/nofollow.go internal/envprofile/managed_modes_unix_test.go internal/envprofile/managed_modes_mutants_unix_test.go",
+      "exit": 0
+    }
+  ],
+  "mutants": [
+    {
+      "mutant": "single-fallback-0644",
+      "child_exit": 1,
+      "named_failures": [
+        "--- FAIL: TestManagedFallbackPermissions (0.02s)",
+        "--- FAIL: TestManagedFallbackPermissions/tree-false (0.02s)"
+      ],
+      "reason": [
+        "copy mode = 0644, want 0600 (permissions must not widen)"
+      ]
+    },
+    {
+      "mutant": "executable-tree-fallback-0755",
+      "child_exit": 1,
+      "named_failures": [
+        "--- FAIL: TestManagedFallbackPermissions (0.02s)",
+        "--- FAIL: TestManagedFallbackPermissions/tree-true (0.02s)"
+      ],
+      "reason": [
+        "0755 mode = 0755, want 0700 (permissions must not widen)"
+      ]
+    },
+    {
+      "mutant": "private-seed-0644",
+      "child_exit": 1,
+      "named_failures": [
+        "--- FAIL: TestManagedSeedPreservesNativePermissions (0.86s)",
+        "--- FAIL: TestManagedSeedPreservesNativePermissions/0600 (0.86s)"
+      ],
+      "reason": [
+        "config.toml mode = 0644, want 0600 (permissions must not widen)"
+      ]
+    },
+    {
+      "mutant": "claude-trust-0644",
+      "child_exit": 1,
+      "named_failures": [
+        "--- FAIL: TestManagedAuthoredFilesArePrivate (1.11s)"
+      ],
+      "reason": [
+        ".claude.json mode = 0644, want 0600 (permissions must not widen)"
+      ]
+    },
+    {
+      "mutant": "codex-directory-drift-admitted",
+      "child_exit": 1,
+      "named_failures": [
+        "--- FAIL: TestManagedHomeRepairTightensDirectories (1.80s)",
+        "--- FAIL: TestManagedHomeRepairTightensDirectories/codex_cli (1.80s)"
+      ],
+      "reason": [
+        "wide home must be stale: <nil>"
+      ]
+    },
+    {
+      "mutant": "codex-directory-not-tightened",
+      "child_exit": 1,
+      "named_failures": [
+        "--- FAIL: TestManagedHomeRepairTightensDirectories (2.14s)",
+        "--- FAIL: TestManagedHomeRepairTightensDirectories/codex_cli (2.14s)"
+      ],
+      "reason": [
+        "environment_repair_failed: managed directory permissions: <private fixture path>"
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "command": "git diff --exit-code 9517bb1a -- <four unchanged task paths including untracked tests>",
+      "exit": 1,
+      "reason": "Comparison against the real index treats the two untracked carried tests as deleted. Direct byte comparison against git show subsequently exited 0 for all four paths; no test is removed."
+    },
+    {
+      "command": "task-board q element(...) / get(...){resources}",
+      "exit": 1,
+      "reason": "Unknown query operation/field; recovered with documented get(...){overview checklist outcomeResources}."
+    }
+  ],
+  "bounds": [
+    "4 of 5 AC rows driven; full local and hosted validation delegated to configured post-turn validation by r7.",
+    "No new Linux/Windows or concurrent-filesystem-race claim.",
+    "Six permission mutants killed; no survivor.",
+    "No new reviewer verdict; earlier CR revision 3 stale from freshness, not rejection."
+  ]
+}

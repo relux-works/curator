@@ -1,0 +1,2899 @@
+{
+  "candidate": {
+    "candidate": "04f9d8d2f06d6ca2df2e0e1b06f78078445fca35",
+    "tree": "8c29fe0bc3ad426e196062a7efa7c9d6a601658b",
+    "base": "db65e39555b8dbac7e75f3b2d337daa33831f297",
+    "signature": "G",
+    "branch": "gate/BUG-261018-dbeghc/refresh-261018-055412"
+  },
+  "runtime": {
+    "platform": "Darwin/arm64",
+    "versions": {
+      "go version": "go version go1.25.5 darwin/arm64",
+      "node --version": "v25.6.1",
+      "pnpm --version": "10.33.0",
+      "rustc --version": "rustc 1.91.0 (f8297e351 2025-10-28)"
+    }
+  },
+  "local": {
+    "candidate": {
+      "candidate": "04f9d8d2f06d6ca2df2e0e1b06f78078445fca35",
+      "tree": "8c29fe0bc3ad426e196062a7efa7c9d6a601658b",
+      "base": "db65e39555b8dbac7e75f3b2d337daa33831f297",
+      "signature": "G",
+      "branch": "gate/BUG-261018-dbeghc/refresh-261018-055412"
+    },
+    "packages": 85,
+    "heavy_tests": {
+      "cmd/curator": {
+        "expected": 425,
+        "observed": 425
+      },
+      "internal/install": {
+        "expected": 363,
+        "observed": 363
+      },
+      "internal/envprofile": {
+        "expected": 375,
+        "observed": 375
+      }
+    },
+    "verdicts": 12406,
+    "sha256": "42aea20842a9e9791d1db72a80f46328c7fd3e8ceb87d9c1f41b6e5ee64e3029",
+    "sources": [
+      {
+        "batch": "packages-01",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "github.com/relux-works/curator/cmd/curator-spec-pin",
+          "github.com/relux-works/curator/internal/adapters",
+          "github.com/relux-works/curator/internal/artifactpolicy",
+          "github.com/relux-works/curator/internal/artifactpolicy/conformance",
+          "github.com/relux-works/curator/internal/audit",
+          "github.com/relux-works/curator/internal/buildcache",
+          "github.com/relux-works/curator/internal/buildmeta",
+          "github.com/relux-works/curator/internal/buildrepo"
+        ],
+        "exit_code": 0,
+        "seconds": 149.199,
+        "sha256": "c2fe6bf9b5d60d584411ca1ff559bb78a3149999ff23f0fec59bbcdd441090a6",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator-spec-pin": "skip",
+          "github.com/relux-works/curator/internal/adapters": "pass",
+          "github.com/relux-works/curator/internal/artifactpolicy/conformance": "skip",
+          "github.com/relux-works/curator/internal/audit": "pass",
+          "github.com/relux-works/curator/internal/buildcache": "pass",
+          "github.com/relux-works/curator/internal/buildmeta": "pass",
+          "github.com/relux-works/curator/internal/artifactpolicy": "pass",
+          "github.com/relux-works/curator/internal/buildrepo": "pass"
+        }
+      },
+      {
+        "batch": "packages-02",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "github.com/relux-works/curator/internal/buildsource",
+          "github.com/relux-works/curator/internal/capabilities",
+          "github.com/relux-works/curator/internal/closure",
+          "github.com/relux-works/curator/internal/closureexec",
+          "github.com/relux-works/curator/internal/closuregraph",
+          "github.com/relux-works/curator/internal/config",
+          "github.com/relux-works/curator/internal/conformancecoverage",
+          "github.com/relux-works/curator/internal/contextaudit"
+        ],
+        "exit_code": 0,
+        "seconds": 48.156,
+        "sha256": "76f8afd2190727d9765e85e4459d06b1558c43cdc7d0b3c0a32ff456aeb99ecd",
+        "final": {
+          "github.com/relux-works/curator/internal/capabilities": "pass",
+          "github.com/relux-works/curator/internal/buildsource": "pass",
+          "github.com/relux-works/curator/internal/closureexec": "pass",
+          "github.com/relux-works/curator/internal/closure": "pass",
+          "github.com/relux-works/curator/internal/config": "pass",
+          "github.com/relux-works/curator/internal/conformancecoverage": "pass",
+          "github.com/relux-works/curator/internal/contextaudit": "pass",
+          "github.com/relux-works/curator/internal/closuregraph": "pass"
+        }
+      },
+      {
+        "batch": "packages-03",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "github.com/relux-works/curator/internal/contextlock",
+          "github.com/relux-works/curator/internal/contextmaterialize",
+          "github.com/relux-works/curator/internal/contextpkg",
+          "github.com/relux-works/curator/internal/contextresolve",
+          "github.com/relux-works/curator/internal/contextstore",
+          "github.com/relux-works/curator/internal/crossconformance",
+          "github.com/relux-works/curator/internal/devsub",
+          "github.com/relux-works/curator/internal/envfiles"
+        ],
+        "exit_code": 0,
+        "seconds": 201.925,
+        "sha256": "56b9e1eadbf1cc8a6cd36b75cfcaa6a0ea4b14612fc748fbc7ce6d415a8bf294",
+        "final": {
+          "github.com/relux-works/curator/internal/contextlock": "pass",
+          "github.com/relux-works/curator/internal/contextmaterialize": "pass",
+          "github.com/relux-works/curator/internal/contextpkg": "pass",
+          "github.com/relux-works/curator/internal/contextresolve": "pass",
+          "github.com/relux-works/curator/internal/contextstore": "pass",
+          "github.com/relux-works/curator/internal/devsub": "pass",
+          "github.com/relux-works/curator/internal/envfiles": "pass",
+          "github.com/relux-works/curator/internal/crossconformance": "pass"
+        }
+      },
+      {
+        "batch": "packages-04",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "github.com/relux-works/curator/internal/envfragment",
+          "github.com/relux-works/curator/internal/envmarker",
+          "github.com/relux-works/curator/internal/envregistry",
+          "github.com/relux-works/curator/internal/envsnapshot",
+          "github.com/relux-works/curator/internal/gitcred",
+          "github.com/relux-works/curator/internal/gitignore",
+          "github.com/relux-works/curator/internal/gitops",
+          "github.com/relux-works/curator/internal/globalbins"
+        ],
+        "exit_code": 0,
+        "seconds": 20.837,
+        "sha256": "1d72e4395c7d1a8419c1ef23a7983077fb8d31934bf0f107d8d5e8b6c05caf98",
+        "final": {
+          "github.com/relux-works/curator/internal/envfragment": "pass",
+          "github.com/relux-works/curator/internal/envmarker": "pass",
+          "github.com/relux-works/curator/internal/envregistry": "pass",
+          "github.com/relux-works/curator/internal/gitcred": "pass",
+          "github.com/relux-works/curator/internal/gitignore": "pass",
+          "github.com/relux-works/curator/internal/envsnapshot": "pass",
+          "github.com/relux-works/curator/internal/globalbins": "pass",
+          "github.com/relux-works/curator/internal/gitops": "pass"
+        }
+      },
+      {
+        "batch": "packages-05",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "github.com/relux-works/curator/internal/godriver",
+          "github.com/relux-works/curator/internal/hashing",
+          "github.com/relux-works/curator/internal/hookapproval",
+          "github.com/relux-works/curator/internal/identifiers",
+          "github.com/relux-works/curator/internal/identity",
+          "github.com/relux-works/curator/internal/install/atomicity",
+          "github.com/relux-works/curator/internal/interop",
+          "github.com/relux-works/curator/internal/interop/environments"
+        ],
+        "exit_code": 0,
+        "seconds": 122.32,
+        "sha256": "a3876588bdfd3ed5c529f5bb35469e166ab141aae6484620284f605971379460",
+        "final": {
+          "github.com/relux-works/curator/internal/hashing": "pass",
+          "github.com/relux-works/curator/internal/hookapproval": "pass",
+          "github.com/relux-works/curator/internal/identifiers": "pass",
+          "github.com/relux-works/curator/internal/identity": "pass",
+          "github.com/relux-works/curator/internal/install/atomicity": "pass",
+          "github.com/relux-works/curator/internal/interop": "pass",
+          "github.com/relux-works/curator/internal/interop/environments": "pass",
+          "github.com/relux-works/curator/internal/godriver": "pass"
+        }
+      },
+      {
+        "batch": "packages-06",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "github.com/relux-works/curator/internal/locale",
+          "github.com/relux-works/curator/internal/managerlock",
+          "github.com/relux-works/curator/internal/manifest",
+          "github.com/relux-works/curator/internal/marker",
+          "github.com/relux-works/curator/internal/mcp",
+          "github.com/relux-works/curator/internal/moduleroots",
+          "github.com/relux-works/curator/internal/nodesource",
+          "github.com/relux-works/curator/internal/npmsource"
+        ],
+        "exit_code": 0,
+        "seconds": 19.512,
+        "sha256": "ad46bc35a9ca58b97f42a0bf1dd8480d4d3d4a3c5eb68c02530a45bbf1935240",
+        "final": {
+          "github.com/relux-works/curator/internal/locale": "pass",
+          "github.com/relux-works/curator/internal/manifest": "pass",
+          "github.com/relux-works/curator/internal/managerlock": "pass",
+          "github.com/relux-works/curator/internal/mcp": "pass",
+          "github.com/relux-works/curator/internal/moduleroots": "pass",
+          "github.com/relux-works/curator/internal/marker": "pass",
+          "github.com/relux-works/curator/internal/nodesource": "pass",
+          "github.com/relux-works/curator/internal/npmsource": "pass"
+        }
+      },
+      {
+        "batch": "packages-07",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "github.com/relux-works/curator/internal/opaquescan",
+          "github.com/relux-works/curator/internal/pathboundary",
+          "github.com/relux-works/curator/internal/pkgversion",
+          "github.com/relux-works/curator/internal/pnpmsource",
+          "github.com/relux-works/curator/internal/privatedir",
+          "github.com/relux-works/curator/internal/protocoljson",
+          "github.com/relux-works/curator/internal/registry",
+          "github.com/relux-works/curator/internal/runtimestore"
+        ],
+        "exit_code": 0,
+        "seconds": 34.327,
+        "sha256": "a2f6bd1671e4c646c9e0148070d57546737f865ef5ad1c329aa300a84f0c0dd8",
+        "final": {
+          "github.com/relux-works/curator/internal/opaquescan": "pass",
+          "github.com/relux-works/curator/internal/pathboundary": "pass",
+          "github.com/relux-works/curator/internal/pkgversion": "pass",
+          "github.com/relux-works/curator/internal/privatedir": "pass",
+          "github.com/relux-works/curator/internal/protocoljson": "pass",
+          "github.com/relux-works/curator/internal/registry": "pass",
+          "github.com/relux-works/curator/internal/runtimestore": "pass",
+          "github.com/relux-works/curator/internal/pnpmsource": "pass"
+        }
+      },
+      {
+        "batch": "packages-08",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "github.com/relux-works/curator/internal/rustsource",
+          "github.com/relux-works/curator/internal/scopes",
+          "github.com/relux-works/curator/internal/scriptpolicy",
+          "github.com/relux-works/curator/internal/scriptworker",
+          "github.com/relux-works/curator/internal/shell",
+          "github.com/relux-works/curator/internal/skillcheck",
+          "github.com/relux-works/curator/internal/skillspec",
+          "github.com/relux-works/curator/internal/snapshot"
+        ],
+        "exit_code": 0,
+        "seconds": 134.823,
+        "sha256": "d560bb2b58c4c804e187b49b4307904023121c11c40352fc356ca22a780f887e",
+        "final": {
+          "github.com/relux-works/curator/internal/scopes": "pass",
+          "github.com/relux-works/curator/internal/scriptpolicy": "pass",
+          "github.com/relux-works/curator/internal/scriptworker": "pass",
+          "github.com/relux-works/curator/internal/rustsource": "pass",
+          "github.com/relux-works/curator/internal/shell": "pass",
+          "github.com/relux-works/curator/internal/skillcheck": "pass",
+          "github.com/relux-works/curator/internal/snapshot": "pass",
+          "github.com/relux-works/curator/internal/skillspec": "pass"
+        }
+      },
+      {
+        "batch": "packages-09",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "github.com/relux-works/curator/internal/sourcelock",
+          "github.com/relux-works/curator/internal/staging",
+          "github.com/relux-works/curator/internal/stateread",
+          "github.com/relux-works/curator/internal/swiftpmbuild",
+          "github.com/relux-works/curator/internal/swiftpminterop",
+          "github.com/relux-works/curator/internal/swiftpmsource",
+          "github.com/relux-works/curator/internal/testcli",
+          "github.com/relux-works/curator/internal/testgitenv"
+        ],
+        "exit_code": 0,
+        "seconds": 29.295,
+        "sha256": "7607c6a4c4f46cab79260ba71bfe0f0cf410a5520afa1d52c52b91d80c638ad0",
+        "final": {
+          "github.com/relux-works/curator/internal/sourcelock": "pass",
+          "github.com/relux-works/curator/internal/staging": "pass",
+          "github.com/relux-works/curator/internal/stateread": "pass",
+          "github.com/relux-works/curator/internal/swiftpmbuild": "pass",
+          "github.com/relux-works/curator/internal/swiftpminterop": "pass",
+          "github.com/relux-works/curator/internal/testcli": "skip",
+          "github.com/relux-works/curator/internal/testgitenv": "skip",
+          "github.com/relux-works/curator/internal/swiftpmsource": "pass"
+        }
+      },
+      {
+        "batch": "packages-10",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "github.com/relux-works/curator/internal/testtoolchain",
+          "github.com/relux-works/curator/internal/transaction",
+          "github.com/relux-works/curator/internal/ui",
+          "github.com/relux-works/curator/internal/verr",
+          "github.com/relux-works/curator/internal/version",
+          "github.com/relux-works/curator/internal/whitelist",
+          "github.com/relux-works/curator/internal/yarnclassicsource",
+          "github.com/relux-works/curator/internal/yarnmodernsource"
+        ],
+        "exit_code": 0,
+        "seconds": 25.31,
+        "sha256": "fa12eb03c15ba30ff8bfc0d1ce32e05fee40e2368b6b7c4eaf866be4be59a9fa",
+        "final": {
+          "github.com/relux-works/curator/internal/testtoolchain": "skip",
+          "github.com/relux-works/curator/internal/ui": "pass",
+          "github.com/relux-works/curator/internal/verr": "pass",
+          "github.com/relux-works/curator/internal/version": "pass",
+          "github.com/relux-works/curator/internal/whitelist": "pass",
+          "github.com/relux-works/curator/internal/yarnclassicsource": "pass",
+          "github.com/relux-works/curator/internal/yarnmodernsource": "pass",
+          "github.com/relux-works/curator/internal/transaction": "pass"
+        }
+      },
+      {
+        "batch": "packages-11",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "github.com/relux-works/curator/tools/ciworkflow",
+          "github.com/relux-works/curator/tools/goreleaserconfig"
+        ],
+        "exit_code": 0,
+        "seconds": 33.713,
+        "sha256": "00252239ca061928dea6c17d0f8ebdf853793c1f576cb5177bf8e47561b39f18",
+        "final": {
+          "github.com/relux-works/curator/tools/goreleaserconfig": "pass",
+          "github.com/relux-works/curator/tools/ciworkflow": "pass"
+        }
+      },
+      {
+        "batch": "cli-01",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestAuditAllowPinsOnlySupportedContentIdentity|TestAuditAllowRefusalPrecedesConfigLoad|TestCLIAuditBindsDependencyDirectory|TestCLIStatusReportsLegacyPackageMarkerCurrent|TestReviewCLIStatusDetectsChangedTagAtSameCommit|TestAuditAllowRecordsPinCreationTime|TestCLIAuditEmitsScriptLabels|TestCLIAuditMixedSkillRecordsBothPolicies|TestCLIAuditJSONCarriesScriptLabels|TestCLIAuditJSONRecordsExplicitAbsence|TestClassifyBuildCommandMapsEveryCacheOutcomeToADistinctCode|TestUnusableToolchainRowsCarryTheDriverBoundaryCode|TestClassifyBuildCommandDetectsRecordedIdentityDrift|TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves|TestInputCausesAreDistinctAndDocumented|TestClassifySkillBuildsAcceptsOnlyAnExactlyCurrentInstallation|TestClassifySkillBuildsWithoutCompiledStateStaysSilent|TestClassifySkillBuildsDetectsContextExposure|TestClassifySkillBuildsDetectsCommandDriftInBothDirections|TestClassifySkillBuildsRefusesAMarkerThatCannotDescribeABuild)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 24.706,
+        "sha256": "5de387a5b0fc5423652ef4e9fa73d23577bda3568cd6da3f11554c22338f0a64",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-02",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestMarkerDigestsDistinguishesAbsentAndUnreadable|TestContextExposureDistinguishesAbsentAndUnreadableBuildRoots|TestMarkerRefusalSeparatesUnsupportedFromInvalid|TestCurrentnessCodesAreDistinctAndOnlyExactStatesPass|TestEveryCurrentnessCodeIsDocumented|TestCheckFailsForEveryNonCurrentCode|TestBuildReportsNeverPublishAnAbsolutePath|TestBuildReportDetailIsBounded|TestGoToolchainGuidanceNamesTheAcceptedSelectionAndTestedFamilies|TestRepairNoticesDistinguishRepairFromAPreservedInstallation|TestMarkerDigestsDetectAConcurrentInstallMarkerChange|TestStatusReportMarksCompiledStateThatMovedDuringTheCheck|TestStatusReportReportsCompiledCommandsOfAnUninstalledSkill|TestClassifySkillBuildsAcceptsEveryBuildBearingMarkerSchema|TestStatusReportFindsASchema8InstallationCurrent|TestCommandHelpNarrowingMutants|TestRegisteredSubcommandHelpNoWrites|TestCommandHelpInitPositiveControl|TestCommandHelpRunPassthrough|TestCommandHelpUnknownTopic)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 40.496,
+        "sha256": "b18528dcb63a89708c2f5f066c2e736e438f1a92cfc5058e48d84b40e732a262",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-03",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestWithDraftRemediationTable|TestDraftAttemptTransportTable|TestDraftAttemptClauseShape|TestEndpointExhaustionCarriesRemediation|TestDraftProjectResolveHelp|TestDraftInstallStatusHelpIncludesSchema2Workflow|TestDraftDocumentedLocalShapesThroughCLI|TestDraftRemediationThroughCLI|TestDraftMachinePolicySetupThroughCLI|TestDraftDocumentedGitRevisionThroughCLI|TestDraftFetchFailureSanitizedThroughCLI|TestDraftAvailabilityFallbackThroughCLI|TestDraftStripCloneFramingTable|TestDraftLaunchConsumesFrozenRuntimeThroughCLI|TestDraftRepairRestoresDriftedContentThroughCLI|TestDraftDocsPinExamples|TestProjectResolveLocalCreatesLockThroughCLI|TestProjectResolveSchema1KeepsReadOnlyMeaning|TestProjectResolveIgnoresRemovedSwitch|TestProjectResolveGitSelectionThroughCLI)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 43.319,
+        "sha256": "7cad040ea4c5122d1beeae91c6f663380d75e414409c5acf730d3910c0cc1d1a",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-04",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestProjectResolveGitRuntimeTamperRefusedThroughCLI|TestProjectResolveGitMissingMemberRefusedThroughCLI|TestProjectResolveTransitiveProviderUsesConfiguredRootThroughCLI|TestProjectResolveTransitiveProviderIgnoresProcessCWDThroughCLI|TestProjectResolveGitAliasSelectionThroughCLI|TestProjectResolveLegacyConfiguredGitThroughCLI|TestProjectResolveLegacyNetworkGitThroughCLI|TestProjectResolveLegacyMixedThroughCLI|TestProjectResolveGitTagDiffersFromHEADThroughCLI|TestProjectResolveCanonicalRepositorySourceThroughCLI|TestProjectResolveGitCollectionPinnedToTagThroughCLI|TestProjectRefreshGitBranchMembershipChangeThroughCLI|TestProjectResolveDraftAllowlistLegacyThroughCLI|TestProjectResolveDraftAllowlistTransitiveThroughCLI|TestProjectResolveGitRealInstallThroughCLI|TestProjectRefreshLegacyConfiguredGitBranchThroughCLI|TestProjectRefreshLegacyNetworkGitBranchThroughCLI|TestProjectRefreshTransitiveTagAdvanceThroughCLI|TestProjectRefreshFetchFailurePreservesStateThroughCLI|TestProjectRefreshRemoteEnumerationFailurePreservesStateThroughCLI)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 67.58,
+        "sha256": "866198d3e5790831bdb0869e8346c6b20374d9721c8cbb4fa84b0978205cfa11",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-05",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestProjectResolveOriginLessSkipsFetchThroughCLI|TestProjectRefreshAliasFetchDedupedThroughCLI|TestDraftStatusReportsUpToDateThroughCLI|TestDraftStatusNeedsInstallAfterRefreshWithoutInstall|TestDraftStatusLockOnlyChangeNeedsInstall|TestDraftStatusLegacyMarkerNeedsInstall|TestDraftStatusStaleManifestRefuses|TestDraftStatusStaleEmptyLockRefuses|TestDraftStatusStaleSwappedSelectionRefuses|TestDraftStatusContentDrift|TestDraftStatusNotInstalled|TestDraftStatusLiveMutationWithoutRefreshStaysCurrent|TestDraftStatusInvalidMarker|TestDraftStatusAppliesKeepsSchema1ProjectsUntouched|TestDraftStatusDriftFailsClosedWithoutFrozenInputs|TestDraftStatusDriftFailsClosedOnStaleLock|TestClassifyDraftMemberComparesExactCurrentness|TestClassifyDraftMemberPresenceRows|TestProductionExternalDepsAssignsTransportProvenanceSink|TestProductionExternalDepsFalseDrivesMirrorFetchToSink)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 96.662,
+        "sha256": "196becb969d27e6f0950874d37222b4a08625c29f350352ff03a16df9198d116",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-06",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestDraftTransportLegacyGolden|TestDraftTransportResolvedMatrix|TestDraftTransportProviderAdmission|TestDraftTransportIdentityInvalidSurfacesThroughCLI|TestReviewProbeLegacyLaneIdentityInvalid|TestProductionBinaryDispatchesSSHWrapper|TestEnvResolveCredentialRecordProvisionAndRepair|TestEnvResolveCredentialRecordPathlessKeyring|TestEnvResolveCredentialRecordIsolatedKeychain|TestEnvResolveKeepsSchema1BytesForMetadataOnly|TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome|TestCredentialStoreCLIConfigRoundTrip|TestCredentialStoreCLIConfigRefusesMalformed|TestCredentialStoreCLIPromotion|TestCredentialStoreCLIResolveRefusesUnqualifiedDelivery|TestReviewDottedCredentialProfile|TestReviewDottedCredentialProfileExisting|TestCredentialStoreCLIDottedProfileRouting|TestCredentialStoreCLIInvalidProfileRouting|TestEnvMigratePlanApplyPi)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 164.989,
+        "sha256": "9d0574e939a9b1af9168e8014c9bafe9d85066e028387604caae363b598a29da",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-07",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestEnvMigrateConflictRefuses|TestEnvResolveRepairNeedsMigration|TestEnvMigrateUsage|TestEnvMigrateApplyRequiresPlan|TestEnvMigratePrintBeforeWrite|TestEnvResolveRepairFailedOnUninspectable|TestCuratorSpecMainLaunchEnvFragmentV2SchemaCases|TestEnvResolveEmitsPermissionsV2AtProductionEntry|TestEnvResolveBareStaleIsAFailure|TestEnvResolveRepairEmitsFragment|TestEnvResolveRejectsSwappedStoreEntry|TestEnvResolveUnknowns|TestEnvResolveIsolatedSystemLockUsesDirection|TestEnvResolveExplicitSharedConflictsWithIsolatedSystemLock|TestEnvResolveLockedIsolationRequiresMigration|TestEnvStatusMatrix|TestEnvStatusRegistryBoundaryPostureAndCheck|TestEnvStatusReportsDroppedSystemModuleThroughCLI|TestUmbrellaMissingProvider|TestUmbrellaDispatchesToProvider)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 227.479,
+        "sha256": "b0ad5a9adc5201d9bc0741a656c377185c0a0fad75f43897d87a48b89d9e4ef6",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-08",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestUmbrellaPropagatesExitCode|TestUmbrellaInvalidNameIsUsage|TestImplementedCommandWinsOverProvider|TestEnvStatusS4Posture|TestEnvStatusEffectivePassableList|TestEnvResolvePreserveLockRequiresRepair|TestEnvResolvePreserveLockRepairBindsUnchangedLock|TestEnvResolvePreserveLockRefusesCurrentV1AndPlainRepairMigrates|TestEnvUnmanageTakeoverPreservesFileMode|TestEnvUnmanageTakeoverRestoresSymlink|TestEnvUnmanageSymlinkRestoreRefusesLinkedParent|TestEnvUnmanageSymlinkRestoreRefusesPlannedLinkedParent|TestEnvUnmanageBackupRecordVectors|TestEnvUnmanageDoesNotRestoreWithoutAnObservedRecord|TestEnvUnmanageRestoresNewestBackupGeneration|TestEnvUnmanageRestoresRecordedTakeoverBackup|TestEnvUnmanageLeavesBackupsWithoutRestoreFlag|TestEnvResolveAcceptsAliases|TestEnvResolveAliasAdjacentUnknownsRefused|TestProfileUseEnvAliases)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 169.276,
+        "sha256": "6e1990f1a20aeb686cd323997ffaad394b99be96bd77e72fe0359a5cd6795df5",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-09",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestProfileUseUnknownEnvRefused|TestEnvStatusPrintsCanonicalAfterAliasUse|TestEnvConfigSetNormalizesEnvKnobs|TestEnvConfigSetNormalizesWholesaleValues|TestEnvConfigAliasOutputPrintsCanonicalKnob|TestEnvConfigAliasLockRefusalPrintsCanonicalKnob|TestRunDispatchNormalizesAliasOperand|TestNormalizeRunEnvOperand|TestUsageListsAliases|TestNormalizeEnvKnobPositions|TestEnvConfigShowPermissionsAtProductionEntry|TestEnvConfigShowPermissionsRejectsUnreadableConfig|TestEnvConfigShowPermissionsRejectsUnreadableInventoryAndCurrent|TestEnvConfigShowPermissionsRejectsUnreadableInventoryAncestor|TestEnvConfigShowPermissionsWithoutProfiles|TestEnvConfigShowDefaults|TestEnvConfigSetUnsetRoundTrip|TestEnvConfigSetListKnob|TestEnvConfigRefusals|TestEnvConfigProviderDirectoriesRoundTrip)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 70.726,
+        "sha256": "f7da325b52f3e0a1f03645e8f98aabb3e49453f64739289080a88b45fe3688c8",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-10",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestEnvConfigProviderDirectoriesLockedRefuses|TestEnvConfigLockedKnobRefuses|TestProfileComposeAddListRemove|TestProfileComposeAddWarnsWhenOverlaysForbidden|TestProfileComposeRefusals|TestProfileUseLockedRequireRefuses|TestProfileInstallUseLockedRequireRefuses|TestProfileInstallFirstActivationLockedRequireRefuses|TestProfileUseClearOperandIsUsage|TestProfileScopedUseUnaffectedByLockedRequire|TestProfileImportUseLockedRequireRefuses|TestProfileUpdateResyncPassesLockedRequire|TestEnvStatusReportsLockedRequire|TestPrintEnvStatusShowsCodexSeedPostureAndNames|TestEnvStatusReportsNotInheritedNativeCodexServers|TestEnvResolveStripsAndReportsInlineNativeCodexMCPTable|TestGlobalInitCleanHomeRefusesWithBootstrapHint|TestGlobalInitMalformedConfigHasNoBootstrapHint|TestGlobalInitHelpWithoutConfig|TestGlobalInitSubcommandHelpWithoutConfigRefuses)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 64.772,
+        "sha256": "f96e77c00ba1b4776b54a1d6eef792b15effdcca3f1a241a081957ae23815e2e",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-11",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestGlobalInitEnvResolveSubcommandHelpPreservesFlagSet|TestBootstrapDocsExampleRuns|TestEnvResolveStaleHintsRepair|TestEnvStatusCheckCurrentScopeOnly|TestPostureWarningOncePerProcessTree|TestGCPreservesRuntimeOnUncertainMarks|TestGCRetainsLiveProcessBuild|TestGCPrunesDeadConsumersUnderTheHomeLock|TestGCFailsClosedForUntrustedCurrentPathSource|TestGCWaitsForTheHomeLock|TestGCRunsSerializedAcrossConcurrentInvocations|TestSignerRowsSurviveHostileGlobalGitConfig|TestGlobalAdoptCLIAdoptsAndIsIdempotent|TestGlobalAdoptCLIRefusesByteMismatch|TestGlobalAdoptCLIRefusesUnknownAndMissingCommandsWithoutWrites|TestGlobalAddPublishesProfileLockBeforeNativeMaterialization|TestGlobalAddConflictRetainsLockAndProfileSyncTakeoverRecovers|TestGlobalInstallPublishesMigratedLockBeforeNativeMaterialization|TestGlobalInstallConflictRetainsMigratedLockAndTakeoverRecovers|TestGlobalStatusRejectsSchema2SkillfileThroughCLI)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 295.002,
+        "sha256": "b22cee6c9fb0db9177bf9857c22de545c48cc77d8407c61dfed43f1d8abbdf19",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-12",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestReviewGlobalStatusDetectsChangedTagAtSameCommit|TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck|TestGlobalStatusReportsATransitivelyResolvedCompiledCommand|TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands|TestGlobalStatusWithoutASkillfileStaysSilentAndCurrent|TestGlobalStatusFailsCheckWhenTheUserHomeCannotBeResolved|TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven|TestGlobalStatusRejectsPositionalArguments|TestStatusRecordedButMissingStaysInInventory|TestStatusUnreadableCandidatesKeepRecord|TestStatusUnreadableApprovalStateSurfaced|TestEnvStatusMissingAndUnreadableKeepRecord|TestEnvStatusUnreadableApprovalStateSurfaced|TestHookApprovalsUnreadableStateNamesReadFailure|TestHookApproveRecordsOperatorApproval|TestHookApproveFailsDistinctlyOnAbsentAndUnreadable|TestHookApproveReRecordsAfterChange|TestHookApproveIsIdempotentWhenRecordMatches|TestHookApproveResolvesSymlinkedOperand|TestHookApprovalsListsReadOnly)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 379.658,
+        "sha256": "c50b64c88947f7e5be4a140471f68e1979cdd8bcd8d7f77e5d68c661cf831567",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-13",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestHookApprovalsToleratesMalformedRecord|TestHookApprovalsOnAbsentStateIsEmpty|TestHookRevokeRemovesRecord|TestHookRevokeAbsentLeavesStateByteIdentical|TestHookUsageErrors|TestHookDiagnosticsAgreeWithShell|TestStatusReportsShellHookTrustPosture|TestStatusJSONCarriesShellHookTrust|TestStatusReportsRecordedPathsBeyondTheCurrentProject|TestEnvStatusReportsShellHookTrustPosture|TestHookApproveEndToEndWithGeneratedHook|TestProfileImportRow|TestProfileImportLossyRow|TestProfileImportNameTakenRow|TestProfileComposeAddPathRow|TestProfileComposeAddRefusesAFormOnAPathSource|TestPathOverlayFromMachineConfigJoinsTheClosure|TestOverlayFromMachineConfigIsRefusedByKind|TestProfileUseTakeoverRow|TestProfileInstallReinstallHonoursUseAndTakeover)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 163.662,
+        "sha256": "d1b9201231fa6a0442660bde5d3b2452aeb8802a7c1c678e5e0021bbb62584e5",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-14",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestResolveTakeoverRequiresRepair|TestSyncTakeoverFlagParses|TestInstallGitignoreEntryPoint|TestLegacyPackageStatusBindingAndRepair|TestAuthoritativeLifecycleBootstrapCasesAreExecutable|TestAuthoritativeLifecycleUpgradeCasesAreExecutable|TestEnforcedShimDispatchRefusesUnreadableSidecar|TestRunUsesInjectedConfigSourceAndWriters|TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt|TestCLIVerifiedCapabilityDriftStartsNothingAndAdoptsNoCache|TestCLIExecutionAssuranceSelectionIsPortableDefaultAndVerifiedFailClosed|TestProductionExternalDepsBindTrustedGitAndAudit|TestProductionExternalAuditReturnsAdvisoryWarnings|TestUsageEnumeratesDocumentedCommands|TestRunVersionExitsZero|TestRunNoArgsPrintsUsage|TestRunUnknownCommand|TestShellInitPrintsHooks|TestShellInitInstallCachesHookWithoutConfig|TestSkillCheckOnTempDir)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 362.03,
+        "sha256": "d21a04654e6be7d603b90417ef1f3e48f446a62e856e704aa9257da2dd26349c",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-15",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestInstallFlagsAcceptTrailingOptions|TestInstallAuditFlagAcceptsOptionalMode|TestInstallFlagsCarryTheRunWideBuildSSHSelection|TestSelectProjectTargetsUsesAliasesAndStableAllOrder|TestStatusDriftDetectsContentTampering|TestBootstrapAndProjectCommands|TestBootstrapIfMissingKeepsExistingConfigWithoutParsing|TestBootstrapIfMissingCreatesAbsentConfig|TestBootstrapIfMissingRejectsForce|TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot|TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot|TestCLIEndToEndInstallStatusAndTamperCheck|TestHiddenWorkerModeIsNotAUserVisibleCommand|TestProductionBinaryDispatchesNetNSProbe|TestProductionBinaryDispatchesLandlockProbe|TestProductionBinaryDispatchesRustOracleBeforeAmbientCargoDiscovery|TestConfigBuildSSHAddListRemove|TestConfigBuildSSHListWithoutScopesPrintsNothing|TestConfigBuildSSHAddRejectsInvalidInvocations|TestConfigBuildSSHAgentFlagKeepsScopePositional)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 66.692,
+        "sha256": "a417b814cc0b59a8061a892f75d3eeb1e262f28ac4dbc6fcb909998e1d9ec9c9",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-16",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestConfigBuildSSHRemoveRejectsMissingAndMalformedTargets|TestConfigBuildHTTPSAddListRemove|TestConfigBuildHTTPSListWithoutScopesPrintsNothing|TestConfigBuildHTTPSAddRejectsInvalidInvocations|TestConfigBuildHTTPSRemoveRejectsMissingAndMalformedTargets|TestConfigBuildHTTPSLoginRejectsInvalidInvocations|TestConfigBuildHTTPSLoginStoresThroughTheOperatorHelperAndSelectsIt|TestConfigBuildHTTPSRemoveNeverTouchesTheOperatorsOwnGitCredential|TestConfigHelpDocumentsPrecedenceAndSubcommands|TestConfigBuildHTTPSHelpDocumentsPrecedenceAndDisclosure|TestConfigSubcommandDispatch|TestTheCredentialPromptIsWiredOnlyWhereAnOperatorCanAnswerIt|TestThePromptPersistsThroughTheOrdinaryConfigWriter|TestSSHThisRunOnlyPromptNeverReachesTheSavedConfig|TestHTTPSThisRunOnlyPromptNeverReachesConfigOrCredentialStore|TestMuseCredentialPolicyNarrowingMutants|TestMuseRootContextCopyFallback|TestMuseRootContextVectors|TestMuseRootContextDrift|TestMuseRootContextRefusals)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 71.998,
+        "sha256": "378a4c82a2fdf99363dad98eac737906b51c9e9cdb420dba31cf18657de9ee93",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-17",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestMuseCredentialPolicyStatus|TestMuseRootContextStatus|TestMuseRootContextNarrowingMutants|TestMuseCLIFragmentAndFakeLaunch|TestMuseProfileSeedSecretAndCredentialRefusals|TestMuseFragmentV3PublishedCases|TestMuseCLIAuthParentBoundary|TestMuseFragmentV4PublishedCases|TestMuseCLIStorePolicy|TestNativeBlackboxExternalBuildLifecycle|TestProductionExternalAuditOpaqueNULFollowsHashVersion|TestCLIAuditOpaqueNULFollowsHashVersion|TestAuditAllowWritesWriterVersionPinCarrier|TestStatusCheckRefusesV1NULAppearingAfterInstall|TestStatusCheckAdmitsV2NULBearingInstall|TestProfileUpdateSystemDeltaConfirmationGolden|TestProfileUpdateMCPDeltaConfirmationGolden|TestProfileUpdateAllDeltaVectorsAtCLI|TestProfileUpdateAllStopsAtFirstUnconfirmedDelta|TestProfileInstallReinstallDeltaVectorsAtCLI)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 269.873,
+        "sha256": "34e0a21917f7dbc2432f0a16ab366cfb1ac9dd6d3dbda72a256c6fdef312307d",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-18",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestProfileGitReinstallHonoursUseAndTakeover|TestProfileInstallActivationMatrix|TestProfileInstallStopThenRetryConformanceVector|TestProfileInstallReinstallUsePreservesProjectScope|TestSourceSignerVectorsAtProfileInstall|TestRevisionDoesNotBorrowTagSignature|TestProfileInstallListsStdioCommands|TestProfileUpdateListsNewDeclaration|TestProfileInstallWarnsEmptyAllowlist|TestProfileInstallSurfacesBeforePublication|TestProfileUpdateSurfacesBeforePublication|TestGitFileURLHasNoBackslash|TestProfileInstallListUse|TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable|TestProfileInstallRefusesPathMCPDeclarationThroughCLI|TestProfileUseUnknownIsAFailure|TestProfileRemoveInUseIsAFailure|TestProfileInstallRefConflictIsAFailure|TestProfileSyncCoversTheMachineScope|TestProfileComposeListsDeclaredOverlays)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 180.622,
+        "sha256": "c68321e37bf6e438d539a5824545fb04472e587e944df45096f2c7f69211c9e9",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-19",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestProfileUseUnknownEnvironmentIsAFailure|TestProfileUseTargetIsStageB|TestProfileUseTargetBoundToAdapter|TestProfileInstallWarnsOnSystemModule|TestProfileScopedUseAndClear|TestProfileUpdatePinnedTagIsUnchanged|TestProfileMachineUseSkipsScopedAdapter|TestProfileUseReportsAllAdaptersAlreadyScoped|TestProfileInstallFileOperandIsRefused|TestProfileListMigrationHonoursSystemPolicy|TestProfileInstallUseActivatesThroughSwitch|TestProfileInstallUsePartialLeavesCurrent|TestProfileInstallFirstActivationFailureReportsPersistedProfile|TestProfileReinstallActivationFailureKeepsUpdatedWording|TestSecurityPostureVectorsThroughCLI|TestHardenedRegistryOutageRefusesWithAdvisoryRegistryPolicy|TestPermissiveRegistryOutageWarnsWithArtifactIdentity|TestSecurityPostureWarningAndEnvStatusRows|TestSecurityPostureWarningIsNotEmittedByEnforcedShim|TestSecurityPostureHardenedContradictionFailsEnvStatusCheck)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 139.375,
+        "sha256": "aacb1c2d817e23cf8005cb583eda4c46289406c421b5f3bba76c577338aeb03a",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-20",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestSecurityPostureSchema1EnvStatusHasNoPostureInventory|TestSecurityPostureCuratorStatusRows|TestSecurityPostureProfileInstallRefusesEmptySourceAllowlistBeforeWriting|TestSecurityPostureProfileInstallRefusesMCPDeclarations|TestSecurityPostureHardenedMCPContradictionFailsEnvStatusCheck|TestSecurityPostureHardenedEmptyMCPWithoutDeclarationsWarnsAndInstalls|TestSecurityPostureResolveRefusesExplicitUnboundedPassthrough|TestSecurityPostureRevisionBDefaultRefusesEmptySources|TestSecurityPostureExplicitPermissiveInstallsWithoutSourceAllowlist|TestSecurityPostureRevisionBDefaultEnvStatus|TestCLIHelperProcess|TestCompiledProjectStatusAndUntrustedRecovery|TestCompiledProjectRepairsCorruptCompiledState|TestCompiledProjectRestoresCacheWhenCommitFails|TestStatusReportsATransitivelyResolvedCompiledCommand|TestStatusReportsAnUnusableToolchainPerCompiledCommand|TestStatusKeepsLegacyBehaviourWhenAPlanFailsWithoutCompiledCommands|TestGCRetainsAndReportsReferencedCompiledState|TestCompiledInstallFollowsTheNativeControlInventoryExactly|TestDryRunNeverClaimsACompletedCompilerCheck)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 358.867,
+        "sha256": "286413e40bf1f968bff99b7bdc128ef633f1d14102f1ede62dc5bbd8efe6a6c3",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-21",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestStatusExplainsAnUnusableGoToolchain|TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands|TestCuratorStatusProviderPostureAndCheck|TestStatusAcceptsAnUnchangedLegacyMarkerSchema|TestHostGoToolchainIsSelectableOnAnInventoryPlatform|TestInstallPrintsTheRemedyAVersionManagerSelectionEarns|TestUmbrellaProviderResolutionVectors|TestActiveRevisionIsWarningRelease|TestUmbrellaHostilePathPlantWarnsUnderAEndToEnd|TestUmbrellaHostilePathPlantRefusedUnderB|TestUmbrellaTrustedRootSymlinkEscape|TestUmbrellaTrustRootSelectionBothRevisions|TestUmbrellaRefusedDirectoriesBothRevisions|TestUmbrellaSymlinkIntoManagedRefused|TestUmbrellaUnreadableRootNeverAbsence|TestUmbrellaMissingNamesRoots|TestUmbrellaWarningText|TestProviderPostureRows|TestProviderSubcommandParsing|TestExecutableCandidates)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 19.022,
+        "sha256": "19844d16713f34f8995a8da800804286406f10657e44d6003622c3522b06eb27",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "cli-22",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestProviderInputsForHostScannedBinWarnsWithoutLedger|TestProviderInputsForHostPublishedBinRefuses|TestProviderPostureReportsUnreadablePublishedShimLedger|TestProviderInputsForHostExplicitBinRefuses|TestUmbrellaTrustRootCaseVariantIdentity)$",
+          "./cmd/curator"
+        ],
+        "exit_code": 0,
+        "seconds": 5.239,
+        "sha256": "a1cd7cc0a47c6b3bf66bd2a19b3dc9f9c6f1cc79c71224ba5d4dc8752f48e114",
+        "final": {
+          "github.com/relux-works/curator/cmd/curator": "pass"
+        }
+      },
+      {
+        "batch": "install-01",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestProjectManifestABAAroundTheReadRestartsClosure|TestGlobalManifestABAAroundTheReadRestartsClosure|TestSubstitutionsABAAroundTheReadRestartsClosure|TestHybridActivationABAAroundTheReadRestartsClosure|TestByteIdenticalRewriteDuringTheReadDoesNotRestart|TestVerifiedBuildAuthorityCarriesOneBindingThroughCacheAndDispatch|TestAssuredToolchainProbeKeepsAuthorityAndInnerFailuresDisjoint|TestVerifiedBuildAuthorityFailsBeforeCacheOrDispatchOnProviderDrift|TestVerifiedBuildAuthorityRechecksProviderBeforeCacheAndDispatch|TestScriptAuditLabelsAtInstallEntry|TestScriptAuditLabelsAtGlobalInstallEntry|TestDeclaredOnlyWithHostsGlobalInstallsWithOnlyDeclaredOnly|TestDeclaredOnlyWithHostsInstallsWithOnlyDeclaredOnly|TestBuildHTTPSPrecedenceLongestScopeAndAnonymousFallback|TestBuildHTTPSDiscoveryOnlyListsAndNeverSelectsAHostCredential|TestBuildHTTPSHostPinMakesOtherHostsResolveWithoutTheOverride|TestCaptureBuildHTTPSSelectionFreezesAndRedactsSecrets|TestBuildHTTPSResolutionSkipsOtherEffectiveTransports|TestBuildHTTPSSelectedSourcesFailClosedWithExactRemedies|TestBuildHTTPSCredentialReadersMaterializeConfiguredSources)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 58.257,
+        "sha256": "f30183656022214ccbbbf78a46a4a951874b78957ff407c66ed0e30764f72d65",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-02",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestBuildHTTPSResolutionIsCarriedByTheExternalInstallPlan|TestPromptedBuildHTTPSAbortStopsTheProductionPlanBeforeAnyFetch|TestResolvedHTTPSCredentialIsBoundToOnlyItsEffectiveFetch|TestHTTPSPromptDefaultSelectsExistingCredentialAndNarrowestSavedScope|TestHTTPSPromptThisRunOnlyNeverReachesPersistenceOnEitherCredentialSurface|TestHTTPSPromptPersistsEnteredTokenOnlyAfterScopeChoice|TestHTTPSPromptAbortNeverPersistsOrSelects|TestRunWideSelectionCoversEveryRepositoryAheadOfConfiguredScopes|TestConfiguredScopesAreSelectedPerRepository|TestRepositoriesThatNeedNoCredentialSkipSelection|TestSubstitutionMovesARepositoryOffAndOntoTheSSHTransport|TestUnselectedSSHRepositoriesFailClosedWithTheProtocolCode|TestDefaultBuildSSHScopeIsTheRepositoryNamespace|TestCaptureBuildSSHSelectionPrefersFlagsOverTheEnvironment|TestConfiguredPathsExpandTheOperatorHome|TestKnownHostsFallBackFromScopeToRunWideToOperator|TestAgentUnsetDiagnosticIsIdenticalForRunWideAndScopedSelections|TestConfiguredAgentResolvesToTheLiveSocket|TestRunWideAgentAutoRequiresALiveSocket|TestEveryConfiguredShapeReachesTheWrapperPolicy)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 1.973,
+        "sha256": "516cb8f36c97fcf69f96cfc3e75c0cb26e9611d7b4e9fca0cda8c07ed0636a5f",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-03",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestDiscoveryListsTheLiveAgentAndPublicIdentitiesOnly|TestDiscoveryDegradesWhenTheAgentCannotBeAsked|TestDiscoveryWithoutAnAgentOrAHomeFindsNothing|TestDiscoveryCapsTheIdentityListingAndReportsTheRemainder|TestAgentKeyCountReadsTheToolOutputRatherThanItsNoise|TestSSHAddKeyCountDegradesWhenTheSocketIsNotAnAgent|TestAddCommandsAreBuiltFromTheDiscoveredCandidates|TestUnselectedRepositoriesFailClosedWithCommandsBuiltFromTheCandidates|TestAHostWithoutCandidatesSaysSoRatherThanInventingAPath|TestAPromptedScopeCoversTheRepositoryAndIsReportedAsItsSource|TestProvenanceNamesEverySourceOnePerRepository|TestAResolverThatCoversNothingStillFailsClosed|TestAnAbortedResolverFailsTheRunWithItsOwnError|TestPromptedScopesDoNotMutateTheLoadedConfiguration|TestTheCredentialPrecheckRunsBeforeAnyFetch|TestADryRunReportsThePerRepositoryCredentialSource|TestTheCredentialReportIsLabelledByTheScopeThatProducedIt|TestPromptDefaultSelectionPinsTheAgentToTheFirstDiscoveredKey|TestPromptThisRunOnlyReturnsSSHCredentialWithoutPersisting|TestPromptNumberedSelectionAndAnExplicitScope)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 1.614,
+        "sha256": "21eff3c3e09efebfed5ee2637056676c2e0fb4ba33aff1da0065c9d18c7673dc",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-04",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestPromptManualIdentityPathCoversAKeyDiscoveryDidNotList|TestPromptRejectsAMalformedManualPathAndAsksAgain|TestPromptRejectsAnUnofferedChoiceAndAMalformedScope|TestPromptAbortFailsClosedWithoutPersistingAnything|TestAbortCarriesTheProtocolCodeSoTheRunStillFailsClosed|TestOneScopeChoiceCoversEverySiblingRepository|TestPromptWithoutCandidatesStillOffersTheManualPath|TestPromptListsTheUnlistedIdentityCount|TestAPersistFailureStopsTheRunRatherThanContinuing|TestAuthoritativeCacheOutcomesDriveInstallation|TestAuthoritativeCacheRejectionsAreRebuiltNeverAdopted|TestCacheWrongTargetRebuildCompletesWithinDeadline|TestRunCommitRecheckRefusesDestinationInsideAdmitted|TestRunCommitRecheckRefusesSwappedParent|TestRunCommitRecheckPassesUnchangedBoundaries|TestRunCommitWithoutBoundariesSkipsRecheck|TestCommitOrdersTargetClassesWithConsumerLast|TestConsumerLedgerIsAbsentAfterAFailedFirstInstallAndCommitsLastOnSuccess|TestCachePublicationFailureLeavesInstallationAndProtectedCacheUntouched|TestAFailedCommitRestoresTheBuildCacheItReplaced)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 32.484,
+        "sha256": "377257ea429dc76863586a4330ba727d2590449a15b6ac8b1fd69404e74e1d04",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-05",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestARolledBackTargetCommitRestoresTheBuildCacheItReplaced|TestAnInFlightTransactionKeepsThePublishedCacheEntry|TestAPublicationThatChangedTheCacheIsReportedAsRetained|TestAReversalThatDidNotCompleteIsReportedAsRetained|TestBuildPublicationFailuresAreRedactedInTheResult|TestConcurrentProjectInstallsPreserveBothConsumers|TestInstallHelperProcess|TestRollbackCannotRestoreOverAnotherProjectsCommittedSharedTargets|TestRecoveryCompletesBeforeAnyNewMutation|TestStaleInstalledGenerationRestartsInsteadOfApplyingTheOldPlan|TestMaintenanceFailureAfterCommitIsAWarning|TestNoSharedTargetChangesBeforeTheManagerHomeLock|TestGlobalCommitCarriesNoConsumerLedger|TestStagedPlanRejectsTwoProducersClaimingOneLivePath|TestAdapterLedgerCommitsAfterTheMirrorsItClaims|TestRedactDiagnosticReplacesEveryAbsoluteLocation|TestRedactDiagnosticCannotDriveATerminal|TestRedactDiagnosticIsBounded|TestRedactDiagnosticKeepsInvalidUTF8Out|TestPlanLinesRedactAnUntrustedReason)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 10.423,
+        "sha256": "907110c663f1586b9ecb013a4e0cd0be2e584e8a3c9c06766df1b5bae2c04bda",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-06",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestBuildFailuresAreRedactedInTheResult|TestGoToolchainRemedyReachesTheOperatorIntact|TestDraftFailureAtEveryTargetClassRestoresPriorState|TestDraftAuditStrictLocalRequiresAttestation|TestDraftAuditAdvisoryLocalPasses|TestDraftAuditBindingLifecycle|TestDraftAuditHostileContentBlocked|TestDraftAuditPinDoesNotWaiveStrictFindings|TestDraftAuditRevocationBlocks|TestDraftAuditBrokenReportRefuses|TestDraftAuditFirstIssuanceVsBrokenRecord|TestDraftAuditPolicyRenewalBrokenEvidence|TestDraftAuditRenewalNeverHidesRefusal|TestDraftAuditRenewalMarkersNeverRenewable|TestDraftAuditMalformedShapeRefuses|TestDraftAuditClosedPackageShapeRefuses|TestDraftAuditEnforcedScriptAdmitted|TestDraftAuditDuplicateKeysRefuse|TestDraftAuditUnreadableBindingRefuses|TestExternalAdoptionsListEveryPublishedEntryOnce)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 269.545,
+        "sha256": "9ae9acb6a94d8bc0f4bc3e43b76e158947bb3be0e99899e74282d2e694837119",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-07",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestAdoptExternalPublicationsWarnsWithoutCreatingAnything|TestDraftBuildsPublishReceipt3OnBothArms|TestDraftBuildKeyFollowsThePackageIdentity|TestDraftBuildRefusesASessionThatBindsTheLegacyDigest|TestDraftBuildToolchainFailureBehaviorIsPreserved|TestLegacyBuildsKeepReceipt1|TestDraftBuildFinalRootParentsAreStoreCreated|TestReviewExternalExecutionBindsExactReceipt3Input|TestDraftBuildRefusesCompilerViewDigest|TestDraftEvidenceExactMatch|TestDraftGitInstallWritesMarkerV5|TestDraftGitMarkerLockBindingRoundTrip|TestDraftGitRuntimeMaterializesUnderSourceV1Key|TestDraftGitInstallCarriesRegistryAttestation|TestDraftInstallRevokedEvidenceRefusesDespiteAttestedMarker|TestDraftLocalRejectsConfusedAttestation|TestDraftMarkerArmGuards|TestDraftSelectorSubstitutionForbidden|TestDraftGitBuildsPublishReceipt3|TestDraftDeclaredTagBumpIsNotAMovedTag)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 155.544,
+        "sha256": "aa345ffdf2c2245b2cfd1929ed80cc7ea0bd65b94fa1aaad26abc6df92beca06",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-08",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestDraftSameTagMoveInstallsWithoutWarning|TestLegacyDeclaredTagBumpIsNotAMovedTag|TestDraftDryRunExposesResolvedAttestations|TestDraftRepairRevalidatesLockedSource|TestDraftRepairRestoresDriftedContent|TestDraftRefusedRepairPreservesLock|TestDraftInstallFailsStaleBindingsGeneration|TestDraftRefreshThenInstallReplacesLockAndMarker|TestDraftRetargetFailsAtWriteTimeAndRollsBack|TestDraftAdmittedReplacementFailsAtWriteTimeAndRollsBack|TestDraftUnmanagedAdapterDestinationRefuses|TestDraftLocalRuntimeMaterializesFromFrozenSnapshot|TestDraftLocalRefreshReplacesFrozenRuntime|TestDraftLocalTamperedFrozenRuntimeRefuses|TestDraftLocalMissingSnapshotReplays|TestDraftLocalEnforcedCommandRefused|TestDraftLocalMissingSystemCommandRefused|TestDraftLocalSkillDependencyRefused|TestDraftLocalInvalidCapabilitiesRefuseAtResolve|TestDraftMarkerPackageDigestMatchesLockDigest)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 154.764,
+        "sha256": "96e58180ee3cfe842cff67832be24eeed024b3256d316fef3b6b53c9816acff1",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-09",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestDraftRuntimeKeysCoverAllArms|TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts|TestDraftInstallMissingLockFails|TestDraftInstallStaleLockFails|TestDraftInstallReplaysMissingLocalSnapshot|TestDraftReplayRefusesUnreadableGitSnapshotCache|TestDraftInstallRefusesUnreadableLocalSnapshotCache|TestDraftInstallUsesPinnedBytes|TestSchema2InstallRequiresLockAndLegacyStillWorks|TestDraftFreshMachineTransitiveReplaySourceGuards|TestDraftReplayFileURLUsesPortableGitConfigSyntax|TestDraftFreshMachineReplaysEverySourceThroughInstallAndUpgrade|TestDraftFreshMachineReplaysDeclaredGitSourceWithoutBindings|TestDraftReplaySeedSurvivesIsolatedFetch|TestDraftFreshGitSourceWithoutEndpointIsUnavailableAndPreservesLock|TestDraftFreshMachineMovedTagReplaysLockedCommitWithoutRefResolution|TestDraftFreshGitReplayChecksContentHashBeforePublishingSnapshot|TestDraftFreshPathMismatchAndUnreachableSourcePreserveLock|TestDraftInstallDoesNotIgnoreOrPrivatizeSkillfileLock|TestDraftInstallGitPinnedSubtree)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 31.152,
+        "sha256": "aea07c4177319463125b7c59a18f4bc619d6859d602923f6549a216df59ce4c1",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-10",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestDraftInstallGitTamperRefused|TestAcquireDraftNetworkRevision2ProvenanceSink|TestDraftTransportEnabled|TestDraftTransportPlanConversion|TestDraftTransportAuth|TestDraftPlanNeedsSSH|TestDraftPlanNamesProvider|TestDraftSSHWrapperBase|TestDraftManagerExecutable|TestAcquireDraftNetworkSelection|TestAcquireDraftNetworkWindowsRefusesBeforeAnyProcess|TestDefaultAcquireFetchesTheDeclaredURL|TestAcquireDraftNetworkRevision2Positives|TestAcquireDraftNetworkRevision2ExhaustionSanitized|TestAcquireDraftNetworkRevision2Refusals|TestRevision1ReaderRejectsV2Shapes|TestUserConfigIgnoredByResolvedLane|TestDraftTransportPlanV2Conversion|TestDraftPlanNeedsSSHRevision2|TestAuthoritativeDryRunCasesMutateNothingPersistent)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 95.017,
+        "sha256": "e856723e5020d95ad54aa6cea292dc525cc9f9c68f4ccaae357f064ef54a0e3a",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-11",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestDryRunEffectBindingsSeeWhatARealOperationWrites|TestLegacyMixedBuildProjectInstallProducesMarkerV3|TestExternalCommandNameCollisionFailsBeforeMutation|TestGlobalMixedBuildStagesExternalBeforeLocal|TestAuthoritativeMixedBuildCasesUseProjectInstallEntry|TestAuthoritativePathShimCasesUseProjectInstallEntry|TestAuthoritativeSigningCasesUseProjectInstallEntry|TestAuthoritativeTransactionCasesUseProjectInstallEntry|TestRevisionSubstitutionDerivesEffectiveObjectFormat|TestMarkerGenerationDistinguishesAbsentUnreadableAndInvalid|TestMovedTagReaderTreatsInvalidMarkerAsStaleButKeepsReadFailure|TestReadDocumentBindsGenerationToBytesRewrittenInPlace|TestReadDocumentBindsGenerationToBytesReplacedByRename|TestDeclarationGenerationIsContentAddressed|TestDocumentGenerationIsStableWhenUnreadable|TestObservationsRecheckDocumentsAgainstTheParsedBytes|TestGitFixtureRetriesOnceOnSpawnEACCES|TestGitFixtureRetriesOnceOnSpawnEAGAIN|TestGitFixtureNeverRetriesNonZeroExit|TestGitFixtureNeverRetriesWrappedExitError)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 155.372,
+        "sha256": "8ab8835d03de8a63eddbce2f47dfbfbeede508acb10d51cfc48711c61f0d42b3",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-12",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestGitFixtureRetryPredicate|TestGitFixturePersistentSpawnFailureCarriesDiagnostic|TestGitFixtureNonRetryableSpawnErrorFailsFastWithDiagnostic|TestGitFixtureRealSpawnEACCESRetriesOnce|TestGitFixtureUnresolvableGitFailsFastWithDiagnostic|TestGitFixtureOuterEntryRunsRealGit|TestGitFixtureOuterEntryLogsRetryOnTransientEACCES|TestProjectRefusesOnGitignoreSpawnFailure|TestProjectNonGitWithDevSubstitution|TestGlobalInstallRecognizesAdoptedForwardingShim|TestGlobalReconcilesOwnedLegacyForwardingLink|TestEndToEndInstall|TestProjectInstallRecordsShellHookApprovals|TestProjectDryRunRecordsNoShellHookApprovals|TestBuildRootExcludedBeforeLocaleRenderingWithoutCompilerExecution|TestRuntimeLauncherResolvesSkillDependencyWithoutShellHook|TestRuntimeLauncherCapturesDeclaredSystemDependency|TestSecondInstallIsUpToDate|TestTamperTriggersReinstall|TestRemovedSkillCleanedUp)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 60.533,
+        "sha256": "a3fdec26574492a4e2386e02c528f242c764c6f0f65f8fc508aa3d49bfde4067",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-13",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestDryRunTouchesNothing|TestGitignoreGateSkips|TestMissingSystemCommandFails|TestMovedTagWarningAndStrict|TestRuntimeOnlyProviderGetsMarkerNoAdapter|TestRuntimeOnlyProviderStillRequiresSkillMd|TestHybridSkillActivatesWithoutTouchingProjectStore|TestHybridShadowedByProjectDeclaration|TestGlobalInstall|TestGlobalInstallRejectsSchema2Skillfile|TestGlobalUpgradeDryRunLeavesPersistentStateUnchanged|TestGlobalInstallUsesManifestLocaleAndAuditGate|TestGlobalStrictTagsDetectMovedTag|TestMcpRequirementGatesInstall|TestAuditGateBlocksUndeclaredNetwork|TestBrokenTransitiveManifestNamesTheBrokenSkill|TestAuditAdmitsVendoredThirdPartyText|TestInstallScriptSecurityRows|TestLegacyLaneBuildsPublishReceipt3|TestLegacyLaneBuildMarkerRebindsTamperedReceipt)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 46.62,
+        "sha256": "5137654e5d50931dff41841aeed39c6cb67e36f1a7849d62fffae5b31fc9903c",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-14",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestLegacyLaneRecordsDependencyDirectory|TestLegacyLockPackageArms|TestBuildMarkerRecordsReceipt3ForMigratedLegacyNode|TestLegacyLaneRefusesGlobDependencyDirectory|TestLegacyLaneRejectsUnboundPreviousGeneration|TestLegacyLaneDependencyTagMovement|TestLegacyLaneMovedTagRefusesStrictSecondInstall|TestReviewChangedDeclaredTagIsNotMovedTag|TestLegacyLaneSameTagMoveWithAlias|TestLegacyLaneChangedTagAfterOldTagDeleted|TestLegacyLaneRuntimeMatchesPackageMarker|TestGlobalLaneRuntimeMatchesPackageMarker|TestPostCommitMaintenanceRunsUnderTheHeldHomeLock|TestPostCommitMaintenanceWarningsReachTheResult|TestPostCommitMaintenanceMarksInFlightJournals|TestDeclaredModuleRootsReachTheBuilder|TestASchemaSixCommandDeclaresNoModules|TestOpaqueNULIsBlockedAtProjectAndGlobalInstallWithAuditDisabled|TestV1ReinstallRefusesNULAppearingAfterInstall|TestV2InstallAdmitsNULBearingSkillAtProjectAndGlobal)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 127.557,
+        "sha256": "410e2c8435215863144d04b2bbcd93c1418240586232962f9014389744073084",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-15",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestV2InstallDistinguishesNULCollisionTwins|TestDraftLaneStillBlocksNULBearingMember|TestProjectDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot|TestGlobalDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot|TestDryRunRemovesItsOperationPrivateRootOnFailure|TestGlobalDryRunRemovesItsOperationPrivateRootOnFailure|TestRealRunKeepsEveryEphemeralPathInOneOperationPrivateRoot|TestGlobalMcpFailureBlocksToolchainCacheAndBuild|TestGlobalRegistryFailureBlocksToolchainCacheAndBuild|TestGlobalMarkersCarryMcpAndAttestationEvidence|TestRegistryRevocationDeniesInstall|TestRegistryAttestationLandsInMarker|TestV1InstallRejectsV2RegistryEvidence|TestV2RegistryAttestationUsesVersionedInstallPath|TestRegistryFirstUseReportsAndPersistsTOFUPosture|TestRegistryCheckpointPersistsBeforeTamperedNetworkSnapshot|TestRegistryInvalidFirstUseCheckpointFailsClosed|TestRegistryRebootstrapRegressionKeepsExistingHighWater|TestRegistryBootstrapVectorsDriveInstall|TestStrictRegistryPolicyFailsUnknown)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 59.911,
+        "sha256": "ee282f6dacb7b7b6f3245089c03baa18e1b2d8d274a880dc0c6d46ad9556f0e1",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-16",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestRegistryMirrorComparisonVectorsDriveInstall|TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch|TestRegistrySnapshotMintedDuringFetchIsNotFuture|TestRegistrySnapshotSlowSiblingDoesNotFlipInstantRegistry|TestRegistrySnapshotTwoSecondsPastSkewStillRefuses|TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries|TestRegistrySnapshotWithinTheBoundIsAcceptedThroughInstall|TestStableDeclarationInputsCommitWithoutRestarting|TestProjectDeclarationRemovedBeforeHomeLockRestartsAndCommitsNoStaleState|TestProjectDeclarationAddedBeforeHomeLockRestartsAndCommitsTheNewClosure|TestGlobalDeclarationRemovedBeforeHomeLockRestartsAndCommitsNoStaleState|TestGlobalDeclarationAddedBeforeHomeLockRestartsAndCommitsTheNewClosure|TestDevSubstitutionAppearingBeforeHomeLockRestartsClosureResolution|TestEnforcedScriptCommandIsRefusedAtInstall|TestDeclaredOnlySchema8ScriptCommandInstallsUnchanged|TestActiveScriptCommandWritersSplitDeclaredOnlyAndEnforced|TestActiveEnforcedScriptCommandsAdmits|TestActiveEnforcedScriptCommandsRefusesUnavailableHost|TestEnforcedScriptCommandInstallsNativeLauncher|TestScriptOptInCasesAtInstallEntry)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 88.603,
+        "sha256": "b167361e39ed4e7e14b8808459731c7be27b5961530229eeea884bbd8599633b",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-17",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestGlobalEnforcedInstallExcludesForwardingMirror|TestEnforcedInstallAndLaunchAtCLIEntry|TestEnforcedToDeclaredOnlyFlipRemovesNativeLauncher|TestStageProjectTargetsPopulatesBoundaries|TestStageProjectTargetsRefusesMirrorOverSnapshot|TestStageProjectTargetsRefusesProjectInsideSnapshot|TestStageProjectTargetsRefusesMissingSnapshot|TestStageGlobalTargetsPopulatesBoundaries|TestStageGlobalTargetsRefusesMirrorOverSnapshot|TestRunCommitWithRealStagingJournalsOneTransaction|TestRunCommitWithRealStagingRefusesOverlapBeforeJournaling|TestPerWriteGuardRefusesSwappedParentAndRollsBack|TestProjectInstallRefusesAdapterDestinationOverSnapshot|TestGlobalInstallRefusesAdapterDestinationOverSnapshot|TestDryRunPlansBuildsWithoutToolchainSessionOrPersistentState|TestGlobalDryRunPlansBuildsWithoutSessionOrPersistentState|TestGlobalStagingFailureLeavesGlobalScopeUnchanged|TestDryRunReportsCacheHitWithoutBuilding|TestCacheHitPerformsNoSourceAwareGoCommand|TestStagingRunsProviderFirstAndCommandLexical)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 87.366,
+        "sha256": "7159a9cc2928b2b48bd9f6fe2f27f12b8046be3307c4d452980df9ab67d4338e",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-18",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestStagedOutputsStayPrivateAndAreReleased|TestSecondBuildFailurePreservesPriorInstallationAndLiveCache|TestToolchainDriftAfterTheFinalBuildBlocksHandoffAndPreservesLiveState|TestGlobalToolchainDriftAfterTheFinalBuildPreservesGlobalScope|TestCacheHitOnlyPlanStillFinalizesToolchainTrust|TestCacheInspectionIsBracketedByTheFrozenSource|TestSourceMutationDuringStagingBlocksHandoffOfACacheHit|TestToolchainFailureBlocksEveryPersistentMutation|TestCorruptCacheEntryIsRebuiltAndNeverReused|TestUnsupportedCacheProtectionFailsClosed|TestIncompletePlansNeverClaimACompleteDiagnostic|TestToolchainFailurePlansAnInventoryOfEveryActiveCommand|TestUntrustedCacheEntryIsRebuiltAndNeverReused|TestScriptOnlyInstallPerformsNoToolchainOrCacheWork|TestInjectedClockAndGenerationReaderDriveInstallMarkers|TestPlannedBuildAccessorsAreImmutable|TestReleaseTakesNoToolchainVerdictAfterLiveMutation|TestGlobalReleaseTakesNoToolchainVerdictAfterLiveMutation|TestSessionReleaseFailureWarnsWithoutFailingACommittedInstall|TestDefaultToolchainProbeRemovesItsProbeRootOnFailure)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 11.718,
+        "sha256": "e2e2382aea1c23d709fed3536e1062e7c66d47a0b1e9147d4a868921d4ad908c",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "install-19",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestDefaultToolchainProbeRemovesItsProbeRootOnSuccess|TestDefaultToolchainEstablishRemovesItsPrivateRootOnFailure|TestProjectWriteBlobsSpawnFailureIsWrapped)$",
+          "./internal/install"
+        ],
+        "exit_code": 0,
+        "seconds": 12.534,
+        "sha256": "d38a39f188c005770f8f0f131f2f34d56a670c861f0234ee244c11f3dcdda2fd",
+        "final": {
+          "github.com/relux-works/curator/internal/install": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-01",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestInstallErrorRefusesTransitiveSystemModule|TestInstallErrorWaiverAdmits|TestUpdateErrorLeavesLockUnchanged|TestDropRepairWarnsAndFragmentFollowsAdmitted|TestDropAllDroppedOmitsFragmentSection|TestStatusReportsPolicyAndDropped|TestStatusErrorReportsPolicyWithoutDropped|TestStatusUnreadableTransitiveManifestDoesNotBecomeNoDrops|TestPolicyFromConfigCarriesAdmission|TestPathInstallAdmitsOrdinaryDirectory|TestLegacyPathInstallIgnoresStoreOverlap|TestPathOverlayAdmitsOrdinaryDirectory|TestStrictAuditMemberCapabilityCacheIsolation|TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression|TestCodexSeedStripsInlineMCPTable|TestCodexSeedRejectsInvalidTOMLBeforePublishingHome|TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair|TestEnvironmentsCodexSeedVectors|TestSharedToIsolatedRemovesStaleLink|TestCredentialLinkRegularFileRefuses)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 49.382,
+        "sha256": "bd29fad99394ff7bc20feb7ae3e1f9621041597ff2024236f0490a3878dfb702",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-02",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestStaleCredentialLinkRefusals|TestDanglingPiLinkReportedDetached|TestCodexIsolatedAdmission|TestCodexUnknownStoreSharedRefuses|TestPiProvisionTargetsAgentRoot|TestCredentialLinkDirectory|TestCredentialLinkUnrecordedSymlinkRefuses|TestReviewerDanglingExpectedTarget|TestReviewerLiteralCodexSelector|TestDanglingExpectedTargetRepairSucceeds|TestCredentialLinkTargetInspectionFailure|TestCodexCredentialStoreTOMLSpellings|TestCodexMalformedStoreSharedRefuses|TestPiProvisionTargetsAgentRootV2WriterMode|TestCredentialStorePolicyActivation|TestCredentialStorePolicyNativeInspection|TestCredentialLinkInspectionRepairFails|TestMigrateApplyLockContention|TestCredentialProjectionSingleObservation|TestCredentialProjectionIsolationRefusals)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 32.397,
+        "sha256": "c95fc3821b26d95ea87996f398778f3f9b25a78103da9eaea8e07c82776680d7",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-03",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestCredentialProjectionStatusObservation|TestCredentialProjectionIdentitySubrequest|TestResolvePublishesCredentialMarkerThroughLockedJournal|TestResolveRecoversCredentialMarkerAfterRenameCrash|TestResolvePublishesCredentialMarkerThroughLockedJournalV2WriterMode|TestResolveRecoversCredentialMarkerAfterRenameCrashV2WriterMode|TestUpdateSystemDeltaRefusesBeforePublication|TestEnvironmentsEnvPassthroughVectors|TestMigrationHonoursSystemLockedAllowlist|TestMigrationHonoursSystemLockedRevocation|TestMigrationSucceedsWhenSystemPolicyPermits|TestMigrationHonoursConfigPathOverride|TestMachinePolicyLoadFailureFailsMigration|TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault|TestLoadMachinePolicyRejectsDanglingConfigSymlink|TestSourceAllowlistRejectsAdjacentPathSegment|TestRevokedSkillMemberIsRefused|TestRevokedMCPMemberIsRefused|TestStrictAuditCanaryFailureBlocksInstall|TestCanonicalGitRejectsFileRemote)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 18.918,
+        "sha256": "409b31a131a45ec97a92a75b910ddd798445b826b4e4f6765f08c233ce1df949",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-04",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestGateSourceRejectsFileRemote|TestFileOperandIsRefused|TestFileRequirementSourceIsRefused|TestInstallUseSwitchesAndAgrees|TestInstallUsePartialLeavesCurrent|TestOperandShadowedByDirectoryResolvesAsGit|TestAbsentPathOperandWithRequirementIsRefConflict|TestInstallOperandKindIsSyntactic|TestInstallNeverDemotesANetworkIdentityToAPath|TestInstallRefusesANonSourceOperand|TestMachineUseSkipsScopedAdapter|TestMachineUseClearsEveryScopeEqualToNewDefault|TestInstallUseSkipsScopedAdapter|TestScopedUseStillSwitchesOnlyThatHome|TestSyncWritesScopedHomeOnce|TestScopedRecordFilenameIsPortable|TestCanonicalIdentityUnifiesSpellings|TestCanonicalIdentityRejectsMalformedSource|TestSourceAllowlistRefusesBeforeClone|TestRevokedSourceIsRefused)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 20.012,
+        "sha256": "09bad9a2aee230f4ba5d3411985e3e86054c4bc17c0e7881e83cdb155ee116c5",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-05",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestMCPAllowlistRefusesOutsidePackage|TestStrictAuditCanaryPasses|TestMigratedSkillSourceIsCanonical|TestPolicyFromConfigCarriesEnvGates|TestPolicyFromConfigCarriesStateWaiverHashVersion|TestMachineClearReachesSeamGate|TestInstallPathAndList|TestInstallRejectsSecretMember|TestReinstallSameSourceIsAnUpdate|TestNameTaken|TestUseMaterializesLinkedHomes|TestUseReplacesWithBackup|TestUsePartialRecordsNothing|TestRemoveRefusesCurrent|TestRemovePurgeCleansHomes|TestUpdatePathLeavesLockInPlace|TestInstallGitResolvesNetworkIdentity|TestInstallSurfacesSystemModuleWarning|TestInstallSurfacesUnresolvedMCPCommand|TestUpdateDefaultIsBlocked)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 14.981,
+        "sha256": "3ceed7deac2323802a0131cc7174790da9052b8c4874a35caafdc1002a28d955",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-06",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestScopedUseAndClear|TestListFailsOnCorruptRecord|TestInstallDirectoryRejectsSecretUnderSubdirectory|TestInstallTransitiveDirectoryRejectsSecret|TestEnsureDefaultCreatesLocalProfile|TestDefaultProfileMaterializesOnFreshHome|TestEnsureDefaultMigratesGlobalSkills|TestMutationLockContention|TestIncompleteJournalRecoversOnEntry|TestOperationsLeaveNoJournalResidue|TestGlobalSkillCapabilitiesNarrowingMutants|TestMigratedGlobalSkillNetworkCapabilities|TestMigratedGlobalSkillIgnoresPreManifestVerdictCache|TestMigratedGlobalSkillDeclarationKeepsOtherGates|TestMigratedGlobalSkillManifestErrorsBlock|TestInstalledMemberCapabilitiesStayKindScoped|TestMigratedGlobalSkillBinaryWriteVersion|TestMigratedGlobalSkillNetworkUndeclaredFollowUp|TestMigratedGlobalSkillPromptScopeValidation|TestMigratedGlobalSkillNullCapabilityDeclarations)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 64.388,
+        "sha256": "81fee1b40b772c85e72a4f8964fd06197affca28c5ef8d0de6dbc8e7d0032460",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-07",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestImportLosslessInstallsThroughPathPipeline|TestImportNormalizesOrdersAndPins|TestNormalizeImportText|TestImportLossyStopsWithoutConsent|TestImportLossyProceedsWithConsent|TestImportUnreadableRootIsLoss|TestImportInvalidUTF8IsLoss|TestImportPartialActivationKeepsLock|TestImportNameTakenBeforeAnyWrite|TestImportSkillForeignPinnedByRevision|TestImportSkillMarkerRecovery|TestImportRecordsImportedFromNative|TestImportSkipsManagedRootContext|TestImportDivergentSkillsAreLoss|TestImportLedgerFailureIsLoss|TestImportAbsentMarkerDetectsNative|TestImportCorruptMarkerIsLoss|TestImportUnreadableMarkerIsLoss|TestDotfileManagerVectors|TestUnreadableDotfileStateKeepsTakeoverQuiet)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 19.692,
+        "sha256": "4fd5caed40261a8279e83bca07ff1077510e0dade828453be676317df8e1646a",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-08",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestDotfileManagerTableMatchesSpecFixture|TestDotfileStatePathResolution|TestForeignManagerHintLstatDiscipline|TestDotfileManagerStateAloneDoesNotWarn|TestManagedModesNarrowingMutants|TestManagedFallbackPermissions|TestManagedSeedPreservesNativePermissions|TestManagedHomeRepairTightensDirectories|TestManagedAuthoredFilesArePrivate|TestManagedSeedRefusalsPreserved|TestResolveVerifiesGitStoreEntryAgainstPinnedTree|TestResolveRejectsGitPinMissingFromLocalObjectDatabase|TestResolveProvisionRepair|TestResolveReportsRecordedContextSurfaceHashDrift|TestResolveRejectsEnvironmentMarkerHashVersionMismatch|TestResolveStaleUnprovisioned|TestResolveUnknowns|TestResolveDefaultProfile|TestResolveDriftRepair|TestResolvePassthroughLiveness)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 55.065,
+        "sha256": "4392c86b45160d18b91b7085db96049981d397c27795ea8581ed86d5be95cc1c",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-09",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestClaudeRootAlwaysCopied|TestResolveClaudeProjectEntry|TestCodexKeyringAmbient|TestCodexUnreadableConfigFails|TestRepairNeverRefreshesSeeds|TestResolveIsolatedOpencode|TestResolveFormUnsupported|TestResolveLockContention|TestResolveFormats|TestMaterializeCaptureCurrentAndRelease|TestMaterializeCaptureCredentialStoreAdmission|TestMaterializeCapturePendingDoesNotRecover|TestMaterializeCaptureBadRecoveryEvidence|TestMaterializeCaptureWaitReselectsAndTimeout|TestMaterializeCaptureSameFragmentDrift|TestMaterializeCaptureAndStatusNeverProbeVendor|TestMaterializeCaptureDoesNotProvision|TestMaterializeCaptureObjectBounds|TestMaterializeCaptureSerializesProfileWriters|TestMaterializeCaptureConcurrentRepair)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 36.001,
+        "sha256": "000804046711e7ba77b62d1542f96ab657046b297b4fabc161140079d1b26db3",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-10",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestMaterializeCaptureStoreObjectIdentity|TestMaterializeCaptureAuthorizingDrift|TestMaterializeCaptureUnreadableJournal|TestMaterializeCaptureExternalTornGeneration|TestMaterializeCaptureCredentialPolicyReleaseObservation|TestMaterializeCaptureCredentialPolicyReleaseCache|TestMigratePiWrongTargetToAgentRoot|TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker|TestMigrateNoSecretCopies|TestMigrateConflictsRefuse|TestMigratePiRootInspectionFailure|TestMigratePlanDriftRefuses|TestMigrateRollbackRestoresPriorState|TestMigrateOldRootBytesWarnAndProceed|TestMigratePendingNeedsNothing|TestMigrateUnknownOperands|TestMigrateInspectIsReadOnly|TestMigrateApplyRequiresPlan|TestMigratePrintFailureRefusesBeforeMutation|TestMigrateMarkerDriftRefuses)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 34.435,
+        "sha256": "fa8f3334b7d0c1867d1c3fdbfcc57fb260b05d496ad222772c74a26330245a48",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-11",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestMigrateFailedRelinkKeepsOldLink|TestMigrateSyscallFailureRollsBack|TestMigrateInterruptedApplyRecovers|TestMigratePublishFailureRevertsLinks|TestMigrateSealedJournalDeletesWithoutTouching|TestMigrateBrokenJournalRefuses|TestMigrateRecoveryRefusesUnexpectedTarget|TestMigrateRecoveryCleansOwnedTemp|TestMigrateSchema1UnlinkPublishesCompleteSchema3MarkerV2WriterMode|TestMuseCredentialPolicyMatrix|TestMuseMissingNativeFilePolicy|TestMusePolicySwitchPreservesCredentials|TestMusePolicyExplicitMigration|TestMusePublishedLinkStates|TestMuseForkRefusedRegression|TestMuseAuthParentBoundaryAtResolve|TestMuseDirectoriesAndIsolation|TestMuseAuthRepairAdditionalStates|TestMuseGlobalReconciliationUsesExplicitProvisioning|TestMuseStatusOptionalProvisioning)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 45.719,
+        "sha256": "46819bbe19913cfd10b9db1827e615a8b0a9d995b88bb06a81a378550b3470c6",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-12",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestMusePublishedRegistryLayout|TestResolveRefusesMissingLockNamedStoreEntryAtBoundary|TestGitFileURLForKeepsVolumesOutOfTheHost|TestServeWritesTheGitSafeRemote|TestInstallBlocksBothV1CollidingSkillTrees|TestInstallBlocksDeepNULFileInContextPathSnapshot|TestUpdateBlocksDeepNULFileInNewContextMember|TestResolveRefusesV1CommitPinnedContextNUL|TestResolveCleanV1CommitContextStaysCurrent|TestResolveAdmitsV2CommitPinnedContextNUL|TestSwitchMaterializeRefusesV1CommitPinnedContextNUL|TestStrictAuditMemberRefusesV1NULBeforeHashing|TestValidateNamedStorePinsRefusesV1NULBeforeHashing|TestSkillsOfRefusesV1NULBeforeHashing|TestGuardedReadersV1NULRefusalComputesNoV1Identity|TestInstallAdmitsV1CollidingSkillTreesUnderV2|TestInstallAdmitsDeepNULFileInContextPathSnapshotUnderV2|TestPrecedencePrimitivesDriveEmission|TestPrecedenceTieKeepsTopologicalOrder|TestPathOverlayJoinsClosure)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 16.165,
+        "sha256": "c604330be899fe97df028dd9a4cefaf39ee533ec3b27b7ff9c1127f79288550d",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-13",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestOverlayExplicitWeightOverridesDefault|TestGitOverlayJoinsClosure|TestPathOverlayFormIsSourceInvalid|TestOverlayInvalidSourceKindIsSourceInvalid|TestSCPOverlayResolvesAsGit|TestOverlayRepeatedNameIsCompositionInvalid|TestOverlayDuplicateNameIsCompositionInvalid|TestForbiddenOverlaysResolveAlone|TestRemoveRefusesOverlayOfAnotherProfile|TestWeightRulesApplyInOrder|TestWeightRulesAllFourDisagree|TestWeightDuplicateRefused|TestWeightUnknownRefused|TestNonRootWeightsMapRefused|TestWeightConflictErrorAndWarning|TestPathInstallCapturesDirtyUntrackedInsideGit|TestPathKindMCPVectorsDriveInstallEntry|TestPathKindBoundaryVectorsDriveProductionEntries|TestPathKindDryRunVectorsDriveReadOnlyResolve|TestPathRootAndImportedMCPDeclarationsRefused)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 31.226,
+        "sha256": "b6022207c9437c684a6a0b9488e1c60101b568983eac730fd7d7fffd6c6c91f9",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-14",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestPathOverlayMCPDeclarationRefused|TestPathOverlayBoundaryRejectsEscapingAndInternalLinks|TestPathOverlayTrustedSystemModuleRemainsAdmitted|TestPathOverlayFailureBlocksResolveAndMakesStatusNonCurrent|TestPathSourceMutationsRejectUntrustedOverlayBeforeDefaultWrites|TestResolveRejectsGroupWritableOnlyPathOverlay|TestMissingPathOperandIsPathMissing|TestMissingOverlayPathIsPathMissing|TestNonDirectoryPathIsSourceInvalid|TestNestedGitIsSourceInvalid|TestSymlinkInPathIsUntrusted|TestFoldedPathsAreSourceInvalid|TestRootGitExcluded|TestUnreadablePathIsUnreadable|TestPathSnapshotImmutableAcrossUpdateSyncUse|TestPathUpdateAllSucceedsWithImportedProfile|TestUnreadablePathRootLeadsUnreadable|TestUpdatePathWithoutStatePinIsSourceInvalid|TestUpdatePathMissingSnapshotIsSourceInvalid|TestUpdatePathSnapshotNameMismatchIsSourceInvalid)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 15.753,
+        "sha256": "1f0c09b347e045befb3d69fa7445f7e951a96c66ea1818df0c9e96a4c231f01d",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-15",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestPathReinstallBareAndNonCurrentMovesPin|TestUpdateBlocksSecretOverlayMember|TestReinstallBlocksSecretOverlayMember|TestUpdateBlocksRevokedOverlayMember|TestUpdateBlocksV1RevokedOverlayMemberUnderV1Writers|TestReinstallBlocksRevokedOverlayMember|TestPermissionsForProfileProperties|TestRepairPreserveLockVectors|TestPreserveLockRefusesBeforeStoreRebuild|TestPreserveLockRaceRefusesBeforeJournalRecovery|TestPreserveLockMigrationRefusalPrecedesBusyLock|TestPreserveLockRevalidationHoldsRepairLock|TestPlainRepairMigrationKeepsLockPrivate|TestSystemDeltaVectors|TestRC14MigrationRehashesLegacyIdentities|TestRC14ResolveRepairMigratesSiblingHomes|TestRC14IdentityMigrationRollsBackEveryEntry|TestRC14IdentityMigrationRefusesSiblingPlanDrift|TestRC14IdentityMigrationRefusesVersionAndPinMismatch|TestRC14IdentityMigrationRecoversInterruptedCommit)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 38.3,
+        "sha256": "019fa82ebacae54f382cc11680ee9fb964c4784ca5547047682d0ea79438acfc",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-16",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestRC14Schema1IdentityMigrationWithoutCredentialOperations|TestRC14IdentityMigrationPreservesFallbackCopies|TestRC14UseMigratesLegacyProfileBeforeNativePublication|TestEnvironmentsReadFailureVectors|TestPassthroughReadFailuresAreUnknownAndNeverRepaired|TestUnreadableLockIsUntrustedAcrossStatusResolveRepairAndUpdate|TestUnreadableLockRefusesUpdateWithoutRewriting|TestAbsentLockRemainsProfileUnknown|TestUnreadableCodexSeedDoesNotSelectAbsentDefault|TestReviewerRecoveryMarkerDrift|TestReviewerRecoveryPreservesRegularTemp|TestManagerOwnedAbsenceReadsAreGuarded|TestManagerReadScannerFindsAliasedNotExistCollapse|TestCurrentPointerAbsenceAndUnreadabilityDiffer|TestScopedCurrentAbsenceAndUnreadabilityDiffer|TestScopedCurrentReadFailureDoesNotFallBackToMachineCurrent|TestProfileSourceAbsenceAndUnreadabilityDiffer|TestUnreadableDefaultProfileSourceDoesNotRecreateDefault|TestOverlayOwnerLockAbsenceAndUnreadabilityDiffer|TestImportAbsentAndUnreadableRootSurfaceDiffer)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 38.969,
+        "sha256": "936a5d5a8970ecc24bab32ea31accccfd7870927001336db8c5757a83e265773",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-17",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestImportAbsentAndUnreadableSkillsLedgerDiffer|TestImportAbsentAndUnreadableSkillsSurfaceDiffer|TestUpdatePathSnapshotUnreadableIsNotAbsent|TestStatusScopeMarkerAbsenceAndUnreadabilityDiffer|TestStatusOrphanMarkerAbsenceAndUnreadabilityDiffer|TestStatusUnreadableOrphanInventoryIsNotEmpty|TestStatusBackupInventoryAbsenceAndUnreadabilityDiffer|TestRemovePurgeMarkerAbsenceAndUnreadabilityDiffer|TestStatusSignerPostureUnknownWithoutCachedSource|TestStatusSignerPostureReadFailureIsNonCurrent|TestUpdateConfirmationPostureVectorAtStatus|TestSignerPostureVectorsAtStatus|TestStatusOrphanRetention|TestStatusShadowAcknowledgment|TestStatusProfileMembersAndUnregistered|TestSeedUnreadableStopsBeforeFirstWrite|TestReservedSkillName|TestProfilePathCollision|TestOpencodeFormFallback|TestRepairFailedMissingStore)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 29.573,
+        "sha256": "292d2b1399e226f10d4140cb3f7beb8eb8f6268a9f938ebe8392f72760d70b09",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-18",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestOpencodeXDGSeeds|TestClaudeSeedMergePreservesToolState|TestStatusShellHookTrustFromLaunchProject|TestStatusShellHookTrustMissingUnreadableAndStateFailures|TestResolveRepairKeepsEnclosingStoreRootFailureClass|TestStoreBoundaryResolveVectorsDriveResolve|TestStoreBoundaryDryRunVectorsDriveResolveRepairPlan|TestStoreBoundaryRepairVectorsDriveResolveRepair|TestStoreBoundaryStatusVectorsDriveStatus|TestStoreBoundaryCheckedRootsExcludeCuratorHome|TestInstallEmitsSurfacingBeforePublication|TestUpdateEmitsSurfacingBeforePublication|TestReinstallEmitsSurfacingBeforePublication|TestSurfacingEmittedDespitePublicationFailure|TestSurfacingSinkWriteFailureIsNonFatal|TestInstallSurfacesMCPDeclarations|TestInstallSurfacingSilentWithoutMCP|TestUpdateSurfacesCandidateMCPSet|TestAllowlistWarningOperations|TestEmptyAllowlistWarningLeavesCurrentStatusCurrent)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 54.11,
+        "sha256": "9beeaa45ae390d2d1c3f4cd1343d37fe96837398e36a87fa241b6fa4cb68ba84",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      },
+      {
+        "batch": "envprofile-19",
+        "command": [
+          "go",
+          "test",
+          "-json",
+          "-count=1",
+          "-p",
+          "2",
+          "-timeout=8m",
+          "-run",
+          "^(TestResolvePassthroughKnobs|TestStatusS4Posture|TestSurfacingUnreadableManifest|TestUseWithoutTakeoverRefusesUnmanaged|TestUseTakeoverBacksUpAndNotifies|TestForeignSymlinkStopsSwitch|TestTakeoverWarnsDotfileHeuristic|TestTakeoverSymlinkedDotfileManagerStateDoesNotWarn|TestReadOnlyCommandsNeverOnboard|TestRepairTakeoverProvisionsManagedHome|TestUnmanageRestorePlanRetainsMetadata|TestUnmanageRestoreRefusesLinkedParent|TestUnmanageRestoreSymlinkReplacesDestinationEntry|TestEnvironmentWriteNofollowVectors|TestResolveRenderedDocumentReplacesStoreSymlinkWithoutFollowing)$",
+          "./internal/envprofile"
+        ],
+        "exit_code": 0,
+        "seconds": 21.132,
+        "sha256": "1e34c9a93d963e23226171df23cbfe5eff482c6eeac515f3cd10b0009fad49da",
+        "final": {
+          "github.com/relux-works/curator/internal/envprofile": "pass"
+        }
+      }
+    ]
+  },
+  "ancillary": {
+    "build-01": {
+      "command": "go build -o <scratch>/curator ./cmd/curator",
+      "exit_code": 0
+    },
+    "vet-01": {
+      "command": "go vet ./...",
+      "exit_code": 0
+    },
+    "lint-01": {
+      "command": "GOLANGCI_LINT_CACHE=<scratch>/lint-cache golangci-lint run",
+      "exit_code": 0
+    },
+    "ledger-01": {
+      "command": "bash .github/ci/ledger-consistency.sh <scratch>/ledger",
+      "exit_code": 0
+    },
+    "diff-check-01": {
+      "command": "git diff --check",
+      "exit_code": 0
+    },
+    "suite-plan-01": {
+      "command": "bash .github/ci/suite-plan.sh <verified-pin-root> <scratch>/plan",
+      "exit_code": 0
+    },
+    "combination-check-01": {
+      "command": "byte comparison of README against trunk and task files against revision 1 signed snapshot",
+      "exit_code": 0
+    },
+    "spec-root-identity-01": {
+      "command": "compare all 1423 conformance files against pinned Git blobs",
+      "exit_code": 0
+    },
+    "refresh-candidate-01": {
+      "command": "task-board worktree refresh-candidate BUG-261018-dbeghc",
+      "exit_code": 0
+    },
+    "download-linux-01": {
+      "command": "gh run download 39102151566 --name test-evidence-ubuntu-latest --dir <scratch>/hosted-linux",
+      "exit_code": 0
+    },
+    "download-macos-01": {
+      "command": "gh run download 39102151566 --name test-evidence-macos-latest --dir <scratch>/hosted-macos",
+      "exit_code": 0
+    },
+    "hosted-permission-check-01": {
+      "command": "python3 <scratch>/verify-hosted-permissions.py",
+      "exit_code": 0
+    },
+    "hosted-watch-01": {
+      "command": "gh run watch 39102151566 --exit-status",
+      "exit_code": 0
+    },
+    "hosted-verdict-check-01": {
+      "command": "verify exact head, 20 successful jobs and two named conditional skips from hosted-verdict.json",
+      "exit_code": 0
+    },
+    "build-02": {
+      "command": "go build -o <scratch>/curator ./cmd/curator",
+      "exit_code": 0,
+      "supersedes": "build-01 for checkpoint provenance"
+    },
+    "local-inventory-01": {
+      "command": "python3 <scratch>/collect-refresh.py",
+      "exit_code": 0
+    },
+    "inventory-control-01": {
+      "command": "python3 <scratch>/collect-refresh.py --control-missing-batch",
+      "exit_code": 1,
+      "expected_failure": "missing command result: known-missing-batch"
+    },
+    "platform-gate-01": {
+      "command": "bash .github/ci/platform-case-gate.sh <scratch>/local-effective.json <scratch>/local-platform",
+      "exit_code": 0
+    },
+    "integrity-01": {
+      "command": "python3 <scratch>/check-integrity.py",
+      "exit_code": 0
+    }
+  },
+  "archive": {
+    "relative_path": ".temp/BUG-261018-dbeghc/refresh-402fdbc9/BUG-261018-dbeghc_refresh-402fdbc9.zip",
+    "sha256": "e55af5b6f83e410cec7daf696ad262f1378d3035c713a33a4e2365049760e3c0",
+    "size_bytes": 1232776,
+    "files": [
+      {
+        "file": "batches.json",
+        "source_sha256": "25a8fb7a4690b9d157a454541414ad28ca782c3a16e3e55896f631122ffc0013",
+        "sanitized_sha256": "25a8fb7a4690b9d157a454541414ad28ca782c3a16e3e55896f631122ffc0013",
+        "redacted": false
+      },
+      {
+        "file": "build-02.log",
+        "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "redacted": false
+      },
+      {
+        "file": "candidate.json",
+        "source_sha256": "61ee3e81c57f7cf658c480ed0673cbcb85654ca2a314b33d195b78cdee70b67a",
+        "sanitized_sha256": "61ee3e81c57f7cf658c480ed0673cbcb85654ca2a314b33d195b78cdee70b67a",
+        "redacted": false
+      },
+      {
+        "file": "check-integrity.py",
+        "source_sha256": "5fe8ec1b503a3322284519d6d6d3fc40f71f32b7bbb8e2a27100c2dbfb7fd3a6",
+        "sanitized_sha256": "5fe8ec1b503a3322284519d6d6d3fc40f71f32b7bbb8e2a27100c2dbfb7fd3a6",
+        "redacted": false
+      },
+      {
+        "file": "cli-01-result.json",
+        "source_sha256": "b44b3eb1d74dd096c2bec102b3efaf9e1d17daca36bd65c4562834e9324eafbb",
+        "sanitized_sha256": "b44b3eb1d74dd096c2bec102b3efaf9e1d17daca36bd65c4562834e9324eafbb",
+        "redacted": false
+      },
+      {
+        "file": "cli-01.json",
+        "source_sha256": "5de387a5b0fc5423652ef4e9fa73d23577bda3568cd6da3f11554c22338f0a64",
+        "sanitized_sha256": "5de387a5b0fc5423652ef4e9fa73d23577bda3568cd6da3f11554c22338f0a64",
+        "redacted": false
+      },
+      {
+        "file": "cli-02-result.json",
+        "source_sha256": "674aeabacea3bbf1b626686b45dde1b13dd8ba5947146c04ac305b8b4c03327f",
+        "sanitized_sha256": "674aeabacea3bbf1b626686b45dde1b13dd8ba5947146c04ac305b8b4c03327f",
+        "redacted": false
+      },
+      {
+        "file": "cli-02.json",
+        "source_sha256": "b18528dcb63a89708c2f5f066c2e736e438f1a92cfc5058e48d84b40e732a262",
+        "sanitized_sha256": "4445ba8993496b38fa4ea2a5eae2b23e2335b330a450f07a5e37f41c43cef946",
+        "redacted": true
+      },
+      {
+        "file": "cli-03-result.json",
+        "source_sha256": "16e95d369d61971955e60e0753a70d05ca09402692bd70066d58eaf350efeb6f",
+        "sanitized_sha256": "16e95d369d61971955e60e0753a70d05ca09402692bd70066d58eaf350efeb6f",
+        "redacted": false
+      },
+      {
+        "file": "cli-03.json",
+        "source_sha256": "7cad040ea4c5122d1beeae91c6f663380d75e414409c5acf730d3910c0cc1d1a",
+        "sanitized_sha256": "7cad040ea4c5122d1beeae91c6f663380d75e414409c5acf730d3910c0cc1d1a",
+        "redacted": false
+      },
+      {
+        "file": "cli-04-result.json",
+        "source_sha256": "d62faf7d213024915cedfdaa32926ed46582dc313001458588a2ca653c34da65",
+        "sanitized_sha256": "d62faf7d213024915cedfdaa32926ed46582dc313001458588a2ca653c34da65",
+        "redacted": false
+      },
+      {
+        "file": "cli-04.json",
+        "source_sha256": "866198d3e5790831bdb0869e8346c6b20374d9721c8cbb4fa84b0978205cfa11",
+        "sanitized_sha256": "866198d3e5790831bdb0869e8346c6b20374d9721c8cbb4fa84b0978205cfa11",
+        "redacted": false
+      },
+      {
+        "file": "cli-05-result.json",
+        "source_sha256": "53262a20c8011235850af8a3bb0f7b05ca5e14dc606a3dfc4a4c5c21471e8371",
+        "sanitized_sha256": "53262a20c8011235850af8a3bb0f7b05ca5e14dc606a3dfc4a4c5c21471e8371",
+        "redacted": false
+      },
+      {
+        "file": "cli-05.json",
+        "source_sha256": "196becb969d27e6f0950874d37222b4a08625c29f350352ff03a16df9198d116",
+        "sanitized_sha256": "196becb969d27e6f0950874d37222b4a08625c29f350352ff03a16df9198d116",
+        "redacted": false
+      },
+      {
+        "file": "cli-06-result.json",
+        "source_sha256": "0c8829c683df7c7eb246e71793518756193c1df330787517c93e4d745735ce9b",
+        "sanitized_sha256": "0c8829c683df7c7eb246e71793518756193c1df330787517c93e4d745735ce9b",
+        "redacted": false
+      },
+      {
+        "file": "cli-06.json",
+        "source_sha256": "9d0574e939a9b1af9168e8014c9bafe9d85066e028387604caae363b598a29da",
+        "sanitized_sha256": "9d0574e939a9b1af9168e8014c9bafe9d85066e028387604caae363b598a29da",
+        "redacted": false
+      },
+      {
+        "file": "cli-07-result.json",
+        "source_sha256": "ebfc61568882c1c2f043cadec65ea68c30545053959a5a79afa96b13dffb9adb",
+        "sanitized_sha256": "ebfc61568882c1c2f043cadec65ea68c30545053959a5a79afa96b13dffb9adb",
+        "redacted": false
+      },
+      {
+        "file": "cli-07.json",
+        "source_sha256": "b0ad5a9adc5201d9bc0741a656c377185c0a0fad75f43897d87a48b89d9e4ef6",
+        "sanitized_sha256": "b0ad5a9adc5201d9bc0741a656c377185c0a0fad75f43897d87a48b89d9e4ef6",
+        "redacted": false
+      },
+      {
+        "file": "cli-08-result.json",
+        "source_sha256": "9bc1de74abe63da5ec6ab17778a7a5ce4a29404bc7bd2bf5f08696e20c774ce2",
+        "sanitized_sha256": "9bc1de74abe63da5ec6ab17778a7a5ce4a29404bc7bd2bf5f08696e20c774ce2",
+        "redacted": false
+      },
+      {
+        "file": "cli-08.json",
+        "source_sha256": "6e1990f1a20aeb686cd323997ffaad394b99be96bd77e72fe0359a5cd6795df5",
+        "sanitized_sha256": "6e1990f1a20aeb686cd323997ffaad394b99be96bd77e72fe0359a5cd6795df5",
+        "redacted": false
+      },
+      {
+        "file": "cli-09-result.json",
+        "source_sha256": "706965ae5e2a01904f288b368c4ceb74215ae78d867afeb0faf8dc5a17bb53df",
+        "sanitized_sha256": "706965ae5e2a01904f288b368c4ceb74215ae78d867afeb0faf8dc5a17bb53df",
+        "redacted": false
+      },
+      {
+        "file": "cli-09.json",
+        "source_sha256": "f7da325b52f3e0a1f03645e8f98aabb3e49453f64739289080a88b45fe3688c8",
+        "sanitized_sha256": "f7da325b52f3e0a1f03645e8f98aabb3e49453f64739289080a88b45fe3688c8",
+        "redacted": false
+      },
+      {
+        "file": "cli-10-result.json",
+        "source_sha256": "96fc97801d8715a5cac7746e2d2d4626e2304e8ce6dad8df5440ab80d0aab386",
+        "sanitized_sha256": "96fc97801d8715a5cac7746e2d2d4626e2304e8ce6dad8df5440ab80d0aab386",
+        "redacted": false
+      },
+      {
+        "file": "cli-10.json",
+        "source_sha256": "f96e77c00ba1b4776b54a1d6eef792b15effdcca3f1a241a081957ae23815e2e",
+        "sanitized_sha256": "b12ddc8f7580e94efb21f43301554bb5c6ef01235d74b8207149f97837d82677",
+        "redacted": true
+      },
+      {
+        "file": "cli-11-result.json",
+        "source_sha256": "fdc2dfcf681e1765feb1eebea44fa2e777b3895535cecfa06a05a52b493f50d2",
+        "sanitized_sha256": "fdc2dfcf681e1765feb1eebea44fa2e777b3895535cecfa06a05a52b493f50d2",
+        "redacted": false
+      },
+      {
+        "file": "cli-11.json",
+        "source_sha256": "b22cee6c9fb0db9177bf9857c22de545c48cc77d8407c61dfed43f1d8abbdf19",
+        "sanitized_sha256": "a37a60c7ff22baa46d5082619fda1019d1c66fa91b0163a4f1a4c45d48ceba5c",
+        "redacted": true
+      },
+      {
+        "file": "cli-12-result.json",
+        "source_sha256": "90f2447577717578456e63cb8cff280d1a5b19ab60b90b0a691c5f4d5796982e",
+        "sanitized_sha256": "90f2447577717578456e63cb8cff280d1a5b19ab60b90b0a691c5f4d5796982e",
+        "redacted": false
+      },
+      {
+        "file": "cli-12.json",
+        "source_sha256": "c50b64c88947f7e5be4a140471f68e1979cdd8bcd8d7f77e5d68c661cf831567",
+        "sanitized_sha256": "c50b64c88947f7e5be4a140471f68e1979cdd8bcd8d7f77e5d68c661cf831567",
+        "redacted": false
+      },
+      {
+        "file": "cli-13-result.json",
+        "source_sha256": "c709d2457525dedaa53a7c6a25de399fc06b322ee1dc093dbc9d822cc5fe2fff",
+        "sanitized_sha256": "c709d2457525dedaa53a7c6a25de399fc06b322ee1dc093dbc9d822cc5fe2fff",
+        "redacted": false
+      },
+      {
+        "file": "cli-13.json",
+        "source_sha256": "d1b9201231fa6a0442660bde5d3b2452aeb8802a7c1c678e5e0021bbb62584e5",
+        "sanitized_sha256": "d1b9201231fa6a0442660bde5d3b2452aeb8802a7c1c678e5e0021bbb62584e5",
+        "redacted": false
+      },
+      {
+        "file": "cli-14-result.json",
+        "source_sha256": "979c7742fe9b928fe0b5f6f1a5b4a0839cd2de241bd8a63703814cb93eb3977c",
+        "sanitized_sha256": "979c7742fe9b928fe0b5f6f1a5b4a0839cd2de241bd8a63703814cb93eb3977c",
+        "redacted": false
+      },
+      {
+        "file": "cli-14.json",
+        "source_sha256": "d21a04654e6be7d603b90417ef1f3e48f446a62e856e704aa9257da2dd26349c",
+        "sanitized_sha256": "551372fd7c884b688deeaa6f70c79e3d2b3c1ffbaf14f8279f8e58fc99d9c11e",
+        "redacted": true
+      },
+      {
+        "file": "cli-15-result.json",
+        "source_sha256": "4f2ff617a4403f0670162e33be91c2288c5643da097615aa196dbe4a5bda3608",
+        "sanitized_sha256": "4f2ff617a4403f0670162e33be91c2288c5643da097615aa196dbe4a5bda3608",
+        "redacted": false
+      },
+      {
+        "file": "cli-15.json",
+        "source_sha256": "a417b814cc0b59a8061a892f75d3eeb1e262f28ac4dbc6fcb909998e1d9ec9c9",
+        "sanitized_sha256": "a417b814cc0b59a8061a892f75d3eeb1e262f28ac4dbc6fcb909998e1d9ec9c9",
+        "redacted": false
+      },
+      {
+        "file": "cli-16-result.json",
+        "source_sha256": "fc1666a78c88eb212b6e98f62482c993f6b482cbccf7e30eeaf2f93937952d13",
+        "sanitized_sha256": "fc1666a78c88eb212b6e98f62482c993f6b482cbccf7e30eeaf2f93937952d13",
+        "redacted": false
+      },
+      {
+        "file": "cli-16.json",
+        "source_sha256": "378a4c82a2fdf99363dad98eac737906b51c9e9cdb420dba31cf18657de9ee93",
+        "sanitized_sha256": "378a4c82a2fdf99363dad98eac737906b51c9e9cdb420dba31cf18657de9ee93",
+        "redacted": false
+      },
+      {
+        "file": "cli-17-result.json",
+        "source_sha256": "8aeaff5b5970680c41bc5776892ea73f8aed1b9194beef39a3b5065616e69739",
+        "sanitized_sha256": "8aeaff5b5970680c41bc5776892ea73f8aed1b9194beef39a3b5065616e69739",
+        "redacted": false
+      },
+      {
+        "file": "cli-17.json",
+        "source_sha256": "34e0a21917f7dbc2432f0a16ab366cfb1ac9dd6d3dbda72a256c6fdef312307d",
+        "sanitized_sha256": "ebd05848a8513744c23a9d587beb76ade5bad50e6a8c2c0385fb338445bfaff9",
+        "redacted": true
+      },
+      {
+        "file": "cli-18-result.json",
+        "source_sha256": "2f266aa56f2cba66a6a2a4d0e4ddbb9eb516138175240818f42d3d0f1dba8c09",
+        "sanitized_sha256": "2f266aa56f2cba66a6a2a4d0e4ddbb9eb516138175240818f42d3d0f1dba8c09",
+        "redacted": false
+      },
+      {
+        "file": "cli-18.json",
+        "source_sha256": "c68321e37bf6e438d539a5824545fb04472e587e944df45096f2c7f69211c9e9",
+        "sanitized_sha256": "c68321e37bf6e438d539a5824545fb04472e587e944df45096f2c7f69211c9e9",
+        "redacted": false
+      },
+      {
+        "file": "cli-19-result.json",
+        "source_sha256": "31ca02569a8680beb93e10441c91133e5f5c0810df7a4360f6bfd85cc2585a12",
+        "sanitized_sha256": "31ca02569a8680beb93e10441c91133e5f5c0810df7a4360f6bfd85cc2585a12",
+        "redacted": false
+      },
+      {
+        "file": "cli-19.json",
+        "source_sha256": "aacb1c2d817e23cf8005cb583eda4c46289406c421b5f3bba76c577338aeb03a",
+        "sanitized_sha256": "aacb1c2d817e23cf8005cb583eda4c46289406c421b5f3bba76c577338aeb03a",
+        "redacted": false
+      },
+      {
+        "file": "cli-20-result.json",
+        "source_sha256": "4ae99a880eab220c054b7694c9c2ce7f56782c2cd72eb44571cc10f1e6019295",
+        "sanitized_sha256": "4ae99a880eab220c054b7694c9c2ce7f56782c2cd72eb44571cc10f1e6019295",
+        "redacted": false
+      },
+      {
+        "file": "cli-20.json",
+        "source_sha256": "286413e40bf1f968bff99b7bdc128ef633f1d14102f1ede62dc5bbd8efe6a6c3",
+        "sanitized_sha256": "286413e40bf1f968bff99b7bdc128ef633f1d14102f1ede62dc5bbd8efe6a6c3",
+        "redacted": false
+      },
+      {
+        "file": "cli-21-result.json",
+        "source_sha256": "13b0b372f3e06c1b8e83acc4c66f6d8576da062c0bfd1c3c939c67948011a1be",
+        "sanitized_sha256": "13b0b372f3e06c1b8e83acc4c66f6d8576da062c0bfd1c3c939c67948011a1be",
+        "redacted": false
+      },
+      {
+        "file": "cli-21.json",
+        "source_sha256": "19844d16713f34f8995a8da800804286406f10657e44d6003622c3522b06eb27",
+        "sanitized_sha256": "19844d16713f34f8995a8da800804286406f10657e44d6003622c3522b06eb27",
+        "redacted": false
+      },
+      {
+        "file": "cli-22-result.json",
+        "source_sha256": "ce8dd333ffc87ce0fa5720186d7995ebc6a83cf38a7fc41f08c475d5d0625bb1",
+        "sanitized_sha256": "ce8dd333ffc87ce0fa5720186d7995ebc6a83cf38a7fc41f08c475d5d0625bb1",
+        "redacted": false
+      },
+      {
+        "file": "cli-22.json",
+        "source_sha256": "a1cd7cc0a47c6b3bf66bd2a19b3dc9f9c6f1cc79c71224ba5d4dc8752f48e114",
+        "sanitized_sha256": "a1cd7cc0a47c6b3bf66bd2a19b3dc9f9c6f1cc79c71224ba5d4dc8752f48e114",
+        "redacted": false
+      },
+      {
+        "file": "cli-tests.txt",
+        "source_sha256": "da2cfa21f5ac0d3e4570ace7f042bd2255be1e15c06f1866eb8b835d9eda7bf8",
+        "sanitized_sha256": "da2cfa21f5ac0d3e4570ace7f042bd2255be1e15c06f1866eb8b835d9eda7bf8",
+        "redacted": false
+      },
+      {
+        "file": "collect-refresh.py",
+        "source_sha256": "39165c2ce6c0f6d67fab89ebacd394b108a6be3ad96c09b87df8e6643ad6ff40",
+        "sanitized_sha256": "39165c2ce6c0f6d67fab89ebacd394b108a6be3ad96c09b87df8e6643ad6ff40",
+        "redacted": false
+      },
+      {
+        "file": "combination-check-01.json",
+        "source_sha256": "eeee64997cb22e81785eb38ca483b977914688b639c90c5e3bea87373c97c76f",
+        "sanitized_sha256": "eeee64997cb22e81785eb38ca483b977914688b639c90c5e3bea87373c97c76f",
+        "redacted": false
+      },
+      {
+        "file": "command-results.json",
+        "source_sha256": "221ab2e1b3acedf1a54ff0160f56536412582738f7f90f09630f7e9978d95ae4",
+        "sanitized_sha256": "221ab2e1b3acedf1a54ff0160f56536412582738f7f90f09630f7e9978d95ae4",
+        "redacted": false
+      },
+      {
+        "file": "diagnostics/cli-01-initial-result.json",
+        "source_sha256": "70f04d3c600d6200f2fe8849c038fb8d9c0167bde5754725a99e8dca8ed71d38",
+        "sanitized_sha256": "70f04d3c600d6200f2fe8849c038fb8d9c0167bde5754725a99e8dca8ed71d38",
+        "redacted": false
+      },
+      {
+        "file": "diagnostics/cli-01-initial.json",
+        "source_sha256": "b85a528d54f6bf42b7e04c51fafa752c6a7ff16f870a8bb43825e7979f916b39",
+        "sanitized_sha256": "b85a528d54f6bf42b7e04c51fafa752c6a7ff16f870a8bb43825e7979f916b39",
+        "redacted": false
+      },
+      {
+        "file": "diagnostics/cli-13-initial-result.json",
+        "source_sha256": "a11eaa1c458933d0849411aad257de2b25f3990a9bc4ecdd614d55a46b2dff49",
+        "sanitized_sha256": "a11eaa1c458933d0849411aad257de2b25f3990a9bc4ecdd614d55a46b2dff49",
+        "redacted": false
+      },
+      {
+        "file": "diagnostics/cli-13-initial.json",
+        "source_sha256": "5322db7d153eaf3bcb25bb20453cf2b03daf66c066ed755baeaad100d59de3e6",
+        "sanitized_sha256": "5322db7d153eaf3bcb25bb20453cf2b03daf66c066ed755baeaad100d59de3e6",
+        "redacted": false
+      },
+      {
+        "file": "diagnostics/cli-13-replay-lock-timeout-result.json",
+        "source_sha256": "80b666bd179344aff1ee73a7d66765904c34eb6d47e02df59642beba4747cfc9",
+        "sanitized_sha256": "80b666bd179344aff1ee73a7d66765904c34eb6d47e02df59642beba4747cfc9",
+        "redacted": false
+      },
+      {
+        "file": "diagnostics/cli-13-replay-lock-timeout.json",
+        "source_sha256": "8e6cf1754e40b9ad11735eedcc5bb666c77e36a182cf2fccbc0a48b50163ee75",
+        "sanitized_sha256": "8e6cf1754e40b9ad11735eedcc5bb666c77e36a182cf2fccbc0a48b50163ee75",
+        "redacted": false
+      },
+      {
+        "file": "diagnostics/packages-01-initial-result.json",
+        "source_sha256": "3b84b9c19378e30841c1b6e7164e5abe254c902679b42a21536fc86fef6ed376",
+        "sanitized_sha256": "3b84b9c19378e30841c1b6e7164e5abe254c902679b42a21536fc86fef6ed376",
+        "redacted": false
+      },
+      {
+        "file": "diagnostics/packages-01-initial.json",
+        "source_sha256": "9213051ff686a6388fe013fb9d496900d189a97b0f92f82e646574284558cbde",
+        "sanitized_sha256": "efaae83cc7982c040eedb5545bf7177c1c2af6bf3edcf953299745e870edb835",
+        "redacted": true
+      },
+      {
+        "file": "envprofile-01-result.json",
+        "source_sha256": "90d3b500aa3e315d0f8b8b7d1165c06610f8e4abcdd45377887ffa81ec6185af",
+        "sanitized_sha256": "90d3b500aa3e315d0f8b8b7d1165c06610f8e4abcdd45377887ffa81ec6185af",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-01.json",
+        "source_sha256": "bd29fad99394ff7bc20feb7ae3e1f9621041597ff2024236f0490a3878dfb702",
+        "sanitized_sha256": "bd29fad99394ff7bc20feb7ae3e1f9621041597ff2024236f0490a3878dfb702",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-02-result.json",
+        "source_sha256": "1c563ae23b58165fdd56bf014da3ac00c766aff4534f6a3d78657b0223f4c708",
+        "sanitized_sha256": "1c563ae23b58165fdd56bf014da3ac00c766aff4534f6a3d78657b0223f4c708",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-02.json",
+        "source_sha256": "c95fc3821b26d95ea87996f398778f3f9b25a78103da9eaea8e07c82776680d7",
+        "sanitized_sha256": "c95fc3821b26d95ea87996f398778f3f9b25a78103da9eaea8e07c82776680d7",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-03-result.json",
+        "source_sha256": "a52dade11831b2a498630e58d6be3d8b6514fb0366b2b3d4ef1df275e0597d26",
+        "sanitized_sha256": "a52dade11831b2a498630e58d6be3d8b6514fb0366b2b3d4ef1df275e0597d26",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-03.json",
+        "source_sha256": "409b31a131a45ec97a92a75b910ddd798445b826b4e4f6765f08c233ce1df949",
+        "sanitized_sha256": "409b31a131a45ec97a92a75b910ddd798445b826b4e4f6765f08c233ce1df949",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-04-result.json",
+        "source_sha256": "5fd71b83083679101c5d527184620e4bb4c62362b05bbf08e6b323030a13fabb",
+        "sanitized_sha256": "5fd71b83083679101c5d527184620e4bb4c62362b05bbf08e6b323030a13fabb",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-04.json",
+        "source_sha256": "09bad9a2aee230f4ba5d3411985e3e86054c4bc17c0e7881e83cdb155ee116c5",
+        "sanitized_sha256": "09bad9a2aee230f4ba5d3411985e3e86054c4bc17c0e7881e83cdb155ee116c5",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-05-result.json",
+        "source_sha256": "b9dc2c57ad314dd17404f114d423779e0fee8aa195b4fd9e39cbd209dc44b517",
+        "sanitized_sha256": "b9dc2c57ad314dd17404f114d423779e0fee8aa195b4fd9e39cbd209dc44b517",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-05.json",
+        "source_sha256": "3ceed7deac2323802a0131cc7174790da9052b8c4874a35caafdc1002a28d955",
+        "sanitized_sha256": "3ceed7deac2323802a0131cc7174790da9052b8c4874a35caafdc1002a28d955",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-06-result.json",
+        "source_sha256": "ad3f33adb63eb05e5eece186bf78bdb07d0f152b2922e0a6e3141f8ccb1cefcf",
+        "sanitized_sha256": "ad3f33adb63eb05e5eece186bf78bdb07d0f152b2922e0a6e3141f8ccb1cefcf",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-06.json",
+        "source_sha256": "81fee1b40b772c85e72a4f8964fd06197affca28c5ef8d0de6dbc8e7d0032460",
+        "sanitized_sha256": "275a3a808b88af0e472a4b3663c269dbd819ad928874c6fb46e961cf3c9e1fe6",
+        "redacted": true
+      },
+      {
+        "file": "envprofile-07-result.json",
+        "source_sha256": "d96771091252046a83228740c408f683756802337bf797a9c819728b09d39cd6",
+        "sanitized_sha256": "d96771091252046a83228740c408f683756802337bf797a9c819728b09d39cd6",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-07.json",
+        "source_sha256": "4fd5caed40261a8279e83bca07ff1077510e0dade828453be676317df8e1646a",
+        "sanitized_sha256": "4fd5caed40261a8279e83bca07ff1077510e0dade828453be676317df8e1646a",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-08-result.json",
+        "source_sha256": "924cddbc2b634b8552dab937fc444c346d6007b9ec5895af1cf2fc5da681bb32",
+        "sanitized_sha256": "924cddbc2b634b8552dab937fc444c346d6007b9ec5895af1cf2fc5da681bb32",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-08.json",
+        "source_sha256": "4392c86b45160d18b91b7085db96049981d397c27795ea8581ed86d5be95cc1c",
+        "sanitized_sha256": "8cf86706328114afa4698ec9600878763633ca76b962f9d1ded506c0b04dad72",
+        "redacted": true
+      },
+      {
+        "file": "envprofile-09-result.json",
+        "source_sha256": "08a1742cce67644ae12432e6b998cbb010b7d1c859c7821b6b13de0a4a294a7a",
+        "sanitized_sha256": "08a1742cce67644ae12432e6b998cbb010b7d1c859c7821b6b13de0a4a294a7a",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-09.json",
+        "source_sha256": "000804046711e7ba77b62d1542f96ab657046b297b4fabc161140079d1b26db3",
+        "sanitized_sha256": "000804046711e7ba77b62d1542f96ab657046b297b4fabc161140079d1b26db3",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-10-result.json",
+        "source_sha256": "4e1d2b294f8dbf541b97b8f54288c5e9f8ff849fc595700ecaab7f3f1b1359c9",
+        "sanitized_sha256": "4e1d2b294f8dbf541b97b8f54288c5e9f8ff849fc595700ecaab7f3f1b1359c9",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-10.json",
+        "source_sha256": "fa8f3334b7d0c1867d1c3fdbfcc57fb260b05d496ad222772c74a26330245a48",
+        "sanitized_sha256": "fa8f3334b7d0c1867d1c3fdbfcc57fb260b05d496ad222772c74a26330245a48",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-11-result.json",
+        "source_sha256": "73c3c3f0cdde8de73ea40c1d20fa815e469a28fffed6d1bf9651eadd2687bc2b",
+        "sanitized_sha256": "73c3c3f0cdde8de73ea40c1d20fa815e469a28fffed6d1bf9651eadd2687bc2b",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-11.json",
+        "source_sha256": "46819bbe19913cfd10b9db1827e615a8b0a9d995b88bb06a81a378550b3470c6",
+        "sanitized_sha256": "46819bbe19913cfd10b9db1827e615a8b0a9d995b88bb06a81a378550b3470c6",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-12-result.json",
+        "source_sha256": "989879612740b0068114fab7cbf9be61d6f7ae77f17c04d1424c11a99b1fcc61",
+        "sanitized_sha256": "989879612740b0068114fab7cbf9be61d6f7ae77f17c04d1424c11a99b1fcc61",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-12.json",
+        "source_sha256": "c604330be899fe97df028dd9a4cefaf39ee533ec3b27b7ff9c1127f79288550d",
+        "sanitized_sha256": "c604330be899fe97df028dd9a4cefaf39ee533ec3b27b7ff9c1127f79288550d",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-13-result.json",
+        "source_sha256": "d0fe26e1bebd0923f37f4251801c7f3f82527b704c90f25d2a148a3eba518732",
+        "sanitized_sha256": "d0fe26e1bebd0923f37f4251801c7f3f82527b704c90f25d2a148a3eba518732",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-13.json",
+        "source_sha256": "b6022207c9437c684a6a0b9488e1c60101b568983eac730fd7d7fffd6c6c91f9",
+        "sanitized_sha256": "b6022207c9437c684a6a0b9488e1c60101b568983eac730fd7d7fffd6c6c91f9",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-14-result.json",
+        "source_sha256": "9127c620bcd06c8ed65c361dfd8ab0de06890db7dd4bbf671fdec6d8a7b054d0",
+        "sanitized_sha256": "9127c620bcd06c8ed65c361dfd8ab0de06890db7dd4bbf671fdec6d8a7b054d0",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-14.json",
+        "source_sha256": "1f0c09b347e045befb3d69fa7445f7e951a96c66ea1818df0c9e96a4c231f01d",
+        "sanitized_sha256": "1f0c09b347e045befb3d69fa7445f7e951a96c66ea1818df0c9e96a4c231f01d",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-15-result.json",
+        "source_sha256": "19aa363fa2b45c9538b6b01b2aba7de07ec001aaa4a8f8efc9c591990f083243",
+        "sanitized_sha256": "19aa363fa2b45c9538b6b01b2aba7de07ec001aaa4a8f8efc9c591990f083243",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-15.json",
+        "source_sha256": "019fa82ebacae54f382cc11680ee9fb964c4784ca5547047682d0ea79438acfc",
+        "sanitized_sha256": "019fa82ebacae54f382cc11680ee9fb964c4784ca5547047682d0ea79438acfc",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-16-result.json",
+        "source_sha256": "d6a024f97194ae152956dc9ff54bf5498e566767faed4c4d347e4d999f2b3b02",
+        "sanitized_sha256": "d6a024f97194ae152956dc9ff54bf5498e566767faed4c4d347e4d999f2b3b02",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-16.json",
+        "source_sha256": "936a5d5a8970ecc24bab32ea31accccfd7870927001336db8c5757a83e265773",
+        "sanitized_sha256": "936a5d5a8970ecc24bab32ea31accccfd7870927001336db8c5757a83e265773",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-17-result.json",
+        "source_sha256": "6ca4c80814c196d7325ab23d0190846d8ac863f2821cc21fd4f401ad236e58f7",
+        "sanitized_sha256": "6ca4c80814c196d7325ab23d0190846d8ac863f2821cc21fd4f401ad236e58f7",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-17.json",
+        "source_sha256": "292d2b1399e226f10d4140cb3f7beb8eb8f6268a9f938ebe8392f72760d70b09",
+        "sanitized_sha256": "292d2b1399e226f10d4140cb3f7beb8eb8f6268a9f938ebe8392f72760d70b09",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-18-result.json",
+        "source_sha256": "27cd598fbff26057f03fe0ec16a50601608cdd854b4480bd75c2e1765da6c9be",
+        "sanitized_sha256": "27cd598fbff26057f03fe0ec16a50601608cdd854b4480bd75c2e1765da6c9be",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-18.json",
+        "source_sha256": "9beeaa45ae390d2d1c3f4cd1343d37fe96837398e36a87fa241b6fa4cb68ba84",
+        "sanitized_sha256": "9beeaa45ae390d2d1c3f4cd1343d37fe96837398e36a87fa241b6fa4cb68ba84",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-19-result.json",
+        "source_sha256": "3f8d024965d100f916bfcab79b26ee8277528924cd87c76164a64437e7b4b9cb",
+        "sanitized_sha256": "3f8d024965d100f916bfcab79b26ee8277528924cd87c76164a64437e7b4b9cb",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-19.json",
+        "source_sha256": "1e34c9a93d963e23226171df23cbfe5eff482c6eeac515f3cd10b0009fad49da",
+        "sanitized_sha256": "1e34c9a93d963e23226171df23cbfe5eff482c6eeac515f3cd10b0009fad49da",
+        "redacted": false
+      },
+      {
+        "file": "envprofile-tests.txt",
+        "source_sha256": "387abdd39dfc1e1db7d70d0724040bf63008d3bb50086c84fdf1f1ae3be563f7",
+        "sanitized_sha256": "387abdd39dfc1e1db7d70d0724040bf63008d3bb50086c84fdf1f1ae3be563f7",
+        "redacted": false
+      },
+      {
+        "file": "hosted-linux-permission-evidence.json",
+        "source_sha256": "9c558b1acba9c3da374b9ba36d0bd64d1f041d5807f41e460edee345a3421c1d",
+        "sanitized_sha256": "9c558b1acba9c3da374b9ba36d0bd64d1f041d5807f41e460edee345a3421c1d",
+        "redacted": false
+      },
+      {
+        "file": "hosted-macos-permission-evidence.json",
+        "source_sha256": "61826f54888b1319951251ee6dfc74336bddf876c0054e257b177975b962c44e",
+        "sanitized_sha256": "61826f54888b1319951251ee6dfc74336bddf876c0054e257b177975b962c44e",
+        "redacted": false
+      },
+      {
+        "file": "hosted-permission-check-01.log",
+        "source_sha256": "77676ff1b4a3b109c3ebd387867e636814157706846abf552f6f82f6716334f9",
+        "sanitized_sha256": "77676ff1b4a3b109c3ebd387867e636814157706846abf552f6f82f6716334f9",
+        "redacted": false
+      },
+      {
+        "file": "hosted-verdict.json",
+        "source_sha256": "30ea6fdfe9abdc80cb362987c2662f2a4e58082fae262c3035d9a287860eab55",
+        "sanitized_sha256": "30ea6fdfe9abdc80cb362987c2662f2a4e58082fae262c3035d9a287860eab55",
+        "redacted": false
+      },
+      {
+        "file": "hosted-watch-01.log",
+        "source_sha256": "55eb50db3b63fb7781e95b74dea095a923eba4cdd8d625855d4e4221227990e2",
+        "sanitized_sha256": "55eb50db3b63fb7781e95b74dea095a923eba4cdd8d625855d4e4221227990e2",
+        "redacted": false
+      },
+      {
+        "file": "install-01-result.json",
+        "source_sha256": "a3273863396192be799d98c7251b5414cd0b0f03c4caaf48d71c05292f60ee62",
+        "sanitized_sha256": "a3273863396192be799d98c7251b5414cd0b0f03c4caaf48d71c05292f60ee62",
+        "redacted": false
+      },
+      {
+        "file": "install-01.json",
+        "source_sha256": "f30183656022214ccbbbf78a46a4a951874b78957ff407c66ed0e30764f72d65",
+        "sanitized_sha256": "f30183656022214ccbbbf78a46a4a951874b78957ff407c66ed0e30764f72d65",
+        "redacted": false
+      },
+      {
+        "file": "install-02-result.json",
+        "source_sha256": "9e1310839c0d6f4c333ea263b906865523d2ee6d067c678daa68cfae2318171d",
+        "sanitized_sha256": "9e1310839c0d6f4c333ea263b906865523d2ee6d067c678daa68cfae2318171d",
+        "redacted": false
+      },
+      {
+        "file": "install-02.json",
+        "source_sha256": "516cb8f36c97fcf69f96cfc3e75c0cb26e9611d7b4e9fca0cda8c07ed0636a5f",
+        "sanitized_sha256": "516cb8f36c97fcf69f96cfc3e75c0cb26e9611d7b4e9fca0cda8c07ed0636a5f",
+        "redacted": false
+      },
+      {
+        "file": "install-03-result.json",
+        "source_sha256": "c428fd748a5cedda1efc4a2595a546690743dabe04536aa0c3d57752fb14bb24",
+        "sanitized_sha256": "c428fd748a5cedda1efc4a2595a546690743dabe04536aa0c3d57752fb14bb24",
+        "redacted": false
+      },
+      {
+        "file": "install-03.json",
+        "source_sha256": "21eff3c3e09efebfed5ee2637056676c2e0fb4ba33aff1da0065c9d18c7673dc",
+        "sanitized_sha256": "21eff3c3e09efebfed5ee2637056676c2e0fb4ba33aff1da0065c9d18c7673dc",
+        "redacted": false
+      },
+      {
+        "file": "install-04-result.json",
+        "source_sha256": "3637de136c70f87681b98b5aab048c97e3752343385632e03e2ff765f10f9aea",
+        "sanitized_sha256": "3637de136c70f87681b98b5aab048c97e3752343385632e03e2ff765f10f9aea",
+        "redacted": false
+      },
+      {
+        "file": "install-04.json",
+        "source_sha256": "377257ea429dc76863586a4330ba727d2590449a15b6ac8b1fd69404e74e1d04",
+        "sanitized_sha256": "377257ea429dc76863586a4330ba727d2590449a15b6ac8b1fd69404e74e1d04",
+        "redacted": false
+      },
+      {
+        "file": "install-05-result.json",
+        "source_sha256": "890e874ef6aea8a84fa9ac0f845883caf3bc4519f3b3222ef6460b8dab62dab4",
+        "sanitized_sha256": "890e874ef6aea8a84fa9ac0f845883caf3bc4519f3b3222ef6460b8dab62dab4",
+        "redacted": false
+      },
+      {
+        "file": "install-05.json",
+        "source_sha256": "907110c663f1586b9ecb013a4e0cd0be2e584e8a3c9c06766df1b5bae2c04bda",
+        "sanitized_sha256": "907110c663f1586b9ecb013a4e0cd0be2e584e8a3c9c06766df1b5bae2c04bda",
+        "redacted": false
+      },
+      {
+        "file": "install-06-result.json",
+        "source_sha256": "f16e3c93a4a308e6c20104c3f2acb3963bb46680a27e0673765374b9b7709bef",
+        "sanitized_sha256": "f16e3c93a4a308e6c20104c3f2acb3963bb46680a27e0673765374b9b7709bef",
+        "redacted": false
+      },
+      {
+        "file": "install-06.json",
+        "source_sha256": "9ae9acb6a94d8bc0f4bc3e43b76e158947bb3be0e99899e74282d2e694837119",
+        "sanitized_sha256": "9ae9acb6a94d8bc0f4bc3e43b76e158947bb3be0e99899e74282d2e694837119",
+        "redacted": false
+      },
+      {
+        "file": "install-07-result.json",
+        "source_sha256": "6d2b1037fcb5e1c114d235d35ba5e6d90d15e083a6924a9a6eeb64eb7bf7c6ae",
+        "sanitized_sha256": "6d2b1037fcb5e1c114d235d35ba5e6d90d15e083a6924a9a6eeb64eb7bf7c6ae",
+        "redacted": false
+      },
+      {
+        "file": "install-07.json",
+        "source_sha256": "aa345ffdf2c2245b2cfd1929ed80cc7ea0bd65b94fa1aaad26abc6df92beca06",
+        "sanitized_sha256": "aa345ffdf2c2245b2cfd1929ed80cc7ea0bd65b94fa1aaad26abc6df92beca06",
+        "redacted": false
+      },
+      {
+        "file": "install-08-result.json",
+        "source_sha256": "6a9be6b7e660ef5c1dc7331ac56b2fb303f086bde281fdce5d214a3511a3fefd",
+        "sanitized_sha256": "6a9be6b7e660ef5c1dc7331ac56b2fb303f086bde281fdce5d214a3511a3fefd",
+        "redacted": false
+      },
+      {
+        "file": "install-08.json",
+        "source_sha256": "96e58180ee3cfe842cff67832be24eeed024b3256d316fef3b6b53c9816acff1",
+        "sanitized_sha256": "96e58180ee3cfe842cff67832be24eeed024b3256d316fef3b6b53c9816acff1",
+        "redacted": false
+      },
+      {
+        "file": "install-09-result.json",
+        "source_sha256": "7015efe79e95eec2ed11b4046d80a1e3508edd7b5741ac1999ebbb804952c68f",
+        "sanitized_sha256": "7015efe79e95eec2ed11b4046d80a1e3508edd7b5741ac1999ebbb804952c68f",
+        "redacted": false
+      },
+      {
+        "file": "install-09.json",
+        "source_sha256": "aea07c4177319463125b7c59a18f4bc619d6859d602923f6549a216df59ce4c1",
+        "sanitized_sha256": "aea07c4177319463125b7c59a18f4bc619d6859d602923f6549a216df59ce4c1",
+        "redacted": false
+      },
+      {
+        "file": "install-10-result.json",
+        "source_sha256": "5a64895e71c43452ab8693d271cf2c7e9424daf75d32bc78449213d3d2cdadf3",
+        "sanitized_sha256": "5a64895e71c43452ab8693d271cf2c7e9424daf75d32bc78449213d3d2cdadf3",
+        "redacted": false
+      },
+      {
+        "file": "install-10.json",
+        "source_sha256": "e856723e5020d95ad54aa6cea292dc525cc9f9c68f4ccaae357f064ef54a0e3a",
+        "sanitized_sha256": "e856723e5020d95ad54aa6cea292dc525cc9f9c68f4ccaae357f064ef54a0e3a",
+        "redacted": false
+      },
+      {
+        "file": "install-11-result.json",
+        "source_sha256": "6eaecfdbeb5327172dbd31882cc98c48ba332020a0c9570215f0fc3d98f8c30e",
+        "sanitized_sha256": "6eaecfdbeb5327172dbd31882cc98c48ba332020a0c9570215f0fc3d98f8c30e",
+        "redacted": false
+      },
+      {
+        "file": "install-11.json",
+        "source_sha256": "8ab8835d03de8a63eddbce2f47dfbfbeede508acb10d51cfc48711c61f0d42b3",
+        "sanitized_sha256": "8ab8835d03de8a63eddbce2f47dfbfbeede508acb10d51cfc48711c61f0d42b3",
+        "redacted": false
+      },
+      {
+        "file": "install-12-result.json",
+        "source_sha256": "f89b69c6e3aa022957c1c67202ba1be319917a1cca8ec533ab612fdda92d87a5",
+        "sanitized_sha256": "f89b69c6e3aa022957c1c67202ba1be319917a1cca8ec533ab612fdda92d87a5",
+        "redacted": false
+      },
+      {
+        "file": "install-12.json",
+        "source_sha256": "a3fdec26574492a4e2386e02c528f242c764c6f0f65f8fc508aa3d49bfde4067",
+        "sanitized_sha256": "db0813c25854f5056533f2237c9a2011ec767a47f075ce49e15d15fd9d6d90ad",
+        "redacted": true
+      },
+      {
+        "file": "install-13-result.json",
+        "source_sha256": "7d8ee2ffb1a03832e6d80ede921c3d8f0f685e06145911e9c246006251c8a276",
+        "sanitized_sha256": "7d8ee2ffb1a03832e6d80ede921c3d8f0f685e06145911e9c246006251c8a276",
+        "redacted": false
+      },
+      {
+        "file": "install-13.json",
+        "source_sha256": "5137654e5d50931dff41841aeed39c6cb67e36f1a7849d62fffae5b31fc9903c",
+        "sanitized_sha256": "5137654e5d50931dff41841aeed39c6cb67e36f1a7849d62fffae5b31fc9903c",
+        "redacted": false
+      },
+      {
+        "file": "install-14-result.json",
+        "source_sha256": "336f19d8f014f5b099261c1a7d975c4d3c65afd96b9c813ce61b1fcdec2b25a2",
+        "sanitized_sha256": "336f19d8f014f5b099261c1a7d975c4d3c65afd96b9c813ce61b1fcdec2b25a2",
+        "redacted": false
+      },
+      {
+        "file": "install-14.json",
+        "source_sha256": "410e2c8435215863144d04b2bbcd93c1418240586232962f9014389744073084",
+        "sanitized_sha256": "410e2c8435215863144d04b2bbcd93c1418240586232962f9014389744073084",
+        "redacted": false
+      },
+      {
+        "file": "install-15-result.json",
+        "source_sha256": "9376e109153417a91ec6582c10b511fbc9baf6af762c6462aec3fec4a5073203",
+        "sanitized_sha256": "9376e109153417a91ec6582c10b511fbc9baf6af762c6462aec3fec4a5073203",
+        "redacted": false
+      },
+      {
+        "file": "install-15.json",
+        "source_sha256": "ee282f6dacb7b7b6f3245089c03baa18e1b2d8d274a880dc0c6d46ad9556f0e1",
+        "sanitized_sha256": "ee282f6dacb7b7b6f3245089c03baa18e1b2d8d274a880dc0c6d46ad9556f0e1",
+        "redacted": false
+      },
+      {
+        "file": "install-16-result.json",
+        "source_sha256": "0256756f9b353e17226a6f968d10cbcff0a87e8d79e86ca541a8a3fb54ac1717",
+        "sanitized_sha256": "0256756f9b353e17226a6f968d10cbcff0a87e8d79e86ca541a8a3fb54ac1717",
+        "redacted": false
+      },
+      {
+        "file": "install-16.json",
+        "source_sha256": "b167361e39ed4e7e14b8808459731c7be27b5961530229eeea884bbd8599633b",
+        "sanitized_sha256": "b167361e39ed4e7e14b8808459731c7be27b5961530229eeea884bbd8599633b",
+        "redacted": false
+      },
+      {
+        "file": "install-17-result.json",
+        "source_sha256": "d9cb8945c93569cd32e08e3b9eeff39c99747bc3bf634c049740489e6f606340",
+        "sanitized_sha256": "d9cb8945c93569cd32e08e3b9eeff39c99747bc3bf634c049740489e6f606340",
+        "redacted": false
+      },
+      {
+        "file": "install-17.json",
+        "source_sha256": "7159a9cc2928b2b48bd9f6fe2f27f12b8046be3307c4d452980df9ab67d4338e",
+        "sanitized_sha256": "7159a9cc2928b2b48bd9f6fe2f27f12b8046be3307c4d452980df9ab67d4338e",
+        "redacted": false
+      },
+      {
+        "file": "install-18-result.json",
+        "source_sha256": "6b1304b6ef988d20b6eb2c470917cb069baf5534a61379939fe570ceff410729",
+        "sanitized_sha256": "6b1304b6ef988d20b6eb2c470917cb069baf5534a61379939fe570ceff410729",
+        "redacted": false
+      },
+      {
+        "file": "install-18.json",
+        "source_sha256": "e2e2382aea1c23d709fed3536e1062e7c66d47a0b1e9147d4a868921d4ad908c",
+        "sanitized_sha256": "e2e2382aea1c23d709fed3536e1062e7c66d47a0b1e9147d4a868921d4ad908c",
+        "redacted": false
+      },
+      {
+        "file": "install-19-result.json",
+        "source_sha256": "de0c2858e6fd385af7c865e7554b601be4273f87fa45cc8574de71f71c687726",
+        "sanitized_sha256": "de0c2858e6fd385af7c865e7554b601be4273f87fa45cc8574de71f71c687726",
+        "redacted": false
+      },
+      {
+        "file": "install-19.json",
+        "source_sha256": "d38a39f188c005770f8f0f131f2f34d56a670c861f0234ee244c11f3dcdda2fd",
+        "sanitized_sha256": "d38a39f188c005770f8f0f131f2f34d56a670c861f0234ee244c11f3dcdda2fd",
+        "redacted": false
+      },
+      {
+        "file": "install-tests.txt",
+        "source_sha256": "c0f6915dfc60733fafd4bdd68c606fdfb12278547380df76681721140c3e8359",
+        "sanitized_sha256": "c0f6915dfc60733fafd4bdd68c606fdfb12278547380df76681721140c3e8359",
+        "redacted": false
+      },
+      {
+        "file": "integrity-01.log",
+        "source_sha256": "dd7149a840ea7bea244e9edd6ded38511e4e72d3307543cff5d4d2fe7fa8ee51",
+        "sanitized_sha256": "dd7149a840ea7bea244e9edd6ded38511e4e72d3307543cff5d4d2fe7fa8ee51",
+        "redacted": false
+      },
+      {
+        "file": "integrity.json",
+        "source_sha256": "dd7149a840ea7bea244e9edd6ded38511e4e72d3307543cff5d4d2fe7fa8ee51",
+        "sanitized_sha256": "dd7149a840ea7bea244e9edd6ded38511e4e72d3307543cff5d4d2fe7fa8ee51",
+        "redacted": false
+      },
+      {
+        "file": "inventory-control-01.log",
+        "source_sha256": "4986503d49620a1caf1384c138b95dbf24b793c608d674e7bdd0c1a7ff31ebd1",
+        "sanitized_sha256": "becbbcd06167ccfb8024ab83cab5b7d3a24c9c069359b297f156a8067024bd29",
+        "redacted": true
+      },
+      {
+        "file": "ledger-01.log",
+        "source_sha256": "cb52bf52f8ccb45a26df5e3ef5a8c4722989c11393a834cd300e4382af8e417a",
+        "sanitized_sha256": "cb52bf52f8ccb45a26df5e3ef5a8c4722989c11393a834cd300e4382af8e417a",
+        "redacted": false
+      },
+      {
+        "file": "lint-01.log",
+        "source_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47",
+        "sanitized_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47",
+        "redacted": false
+      },
+      {
+        "file": "local-inventory-01.log",
+        "source_sha256": "875c0ef58c21fbae4721d3f813603aaed25da228c3664d87d0e4e3d86e099ec2",
+        "sanitized_sha256": "875c0ef58c21fbae4721d3f813603aaed25da228c3664d87d0e4e3d86e099ec2",
+        "redacted": false
+      },
+      {
+        "file": "local-platform/observed-cases.tsv",
+        "source_sha256": "8b5c723e4cc644f3dd2781c4f473bec12514c35848b2fcb5ca02ae5952b93656",
+        "sanitized_sha256": "a8ab54fffcce75978ae533604a1a59f00c1573fd8d1c27b3942fc6eb8f5d8751",
+        "redacted": true
+      },
+      {
+        "file": "local-platform/platform-cases.txt",
+        "source_sha256": "e982ef7065a6673dfc16a9538a688448d5c889ad2c92192d6bc67a9e3955c266",
+        "sanitized_sha256": "e982ef7065a6673dfc16a9538a688448d5c889ad2c92192d6bc67a9e3955c266",
+        "redacted": false
+      },
+      {
+        "file": "local-platform/skips-observed.tsv",
+        "source_sha256": "5c83650c9c94010a0bf51a82d3341f948d5ba6f346d1311090d0a7d5130d4f1e",
+        "sanitized_sha256": "7bc2d29c4e2e71edaed83bc34a7b62b70d0b9afafcf9b60b2cbf50622eb697bc",
+        "redacted": true
+      },
+      {
+        "file": "local-provenance.json",
+        "source_sha256": "cf5c7b8ceb534194cc6e53442f8d00a058f1f8ecdd2c0727f63e575361bbca71",
+        "sanitized_sha256": "cf5c7b8ceb534194cc6e53442f8d00a058f1f8ecdd2c0727f63e575361bbca71",
+        "redacted": false
+      },
+      {
+        "file": "packages-01-result.json",
+        "source_sha256": "ad1b7ecd9ebc2a57208d1a92ac5b8039f1f69b35fd3fa4fe37003f79bdeb5751",
+        "sanitized_sha256": "ad1b7ecd9ebc2a57208d1a92ac5b8039f1f69b35fd3fa4fe37003f79bdeb5751",
+        "redacted": false
+      },
+      {
+        "file": "packages-01.json",
+        "source_sha256": "c2fe6bf9b5d60d584411ca1ff559bb78a3149999ff23f0fec59bbcdd441090a6",
+        "sanitized_sha256": "1b876db45ffa10d0ddbf60537d17a15a432062e41c082fd31c04f09c8509b3a4",
+        "redacted": true
+      },
+      {
+        "file": "packages-02-result.json",
+        "source_sha256": "4c5b476d1acf734ccd482f42200692e282fb63ead60acfea83887036738e3f80",
+        "sanitized_sha256": "4c5b476d1acf734ccd482f42200692e282fb63ead60acfea83887036738e3f80",
+        "redacted": false
+      },
+      {
+        "file": "packages-02.json",
+        "source_sha256": "76f8afd2190727d9765e85e4459d06b1558c43cdc7d0b3c0a32ff456aeb99ecd",
+        "sanitized_sha256": "76f8afd2190727d9765e85e4459d06b1558c43cdc7d0b3c0a32ff456aeb99ecd",
+        "redacted": false
+      },
+      {
+        "file": "packages-03-result.json",
+        "source_sha256": "e6b00a8f12efdf756aa8c61896b810d5ac509576dab73197a2f0085344e28df2",
+        "sanitized_sha256": "e6b00a8f12efdf756aa8c61896b810d5ac509576dab73197a2f0085344e28df2",
+        "redacted": false
+      },
+      {
+        "file": "packages-03.json",
+        "source_sha256": "56b9e1eadbf1cc8a6cd36b75cfcaa6a0ea4b14612fc748fbc7ce6d415a8bf294",
+        "sanitized_sha256": "56b9e1eadbf1cc8a6cd36b75cfcaa6a0ea4b14612fc748fbc7ce6d415a8bf294",
+        "redacted": false
+      },
+      {
+        "file": "packages-04-result.json",
+        "source_sha256": "2316a5495b5bd94917490aed64f89c110bb1faedf0f569624ffed87b73241143",
+        "sanitized_sha256": "2316a5495b5bd94917490aed64f89c110bb1faedf0f569624ffed87b73241143",
+        "redacted": false
+      },
+      {
+        "file": "packages-04.json",
+        "source_sha256": "1d72e4395c7d1a8419c1ef23a7983077fb8d31934bf0f107d8d5e8b6c05caf98",
+        "sanitized_sha256": "1c37c59bfa4ec47bf7e3d14467fce12d15c2078714b01dc8bf762b57c3638a17",
+        "redacted": true
+      },
+      {
+        "file": "packages-05-result.json",
+        "source_sha256": "2f41e95dc09592af14daa91fd2dd0df63eefa0c2180f4dfac1fae73eb2f3836e",
+        "sanitized_sha256": "2f41e95dc09592af14daa91fd2dd0df63eefa0c2180f4dfac1fae73eb2f3836e",
+        "redacted": false
+      },
+      {
+        "file": "packages-05.json",
+        "source_sha256": "a3876588bdfd3ed5c529f5bb35469e166ab141aae6484620284f605971379460",
+        "sanitized_sha256": "98e351b64eaf3b9de9b6b32f196fb82b922aa9be90bc61924da2c663976d4100",
+        "redacted": true
+      },
+      {
+        "file": "packages-06-result.json",
+        "source_sha256": "6311998ce6269aaed85823d196ecf9e1eaf7d81e2cb1aebaef51305fbbf1b8b3",
+        "sanitized_sha256": "6311998ce6269aaed85823d196ecf9e1eaf7d81e2cb1aebaef51305fbbf1b8b3",
+        "redacted": false
+      },
+      {
+        "file": "packages-06.json",
+        "source_sha256": "ad46bc35a9ca58b97f42a0bf1dd8480d4d3d4a3c5eb68c02530a45bbf1935240",
+        "sanitized_sha256": "ad46bc35a9ca58b97f42a0bf1dd8480d4d3d4a3c5eb68c02530a45bbf1935240",
+        "redacted": false
+      },
+      {
+        "file": "packages-07-result.json",
+        "source_sha256": "4c9431cd210eea24ce4d560af3b8f6d965614c94cea32672e7e55afaa4f4fa37",
+        "sanitized_sha256": "4c9431cd210eea24ce4d560af3b8f6d965614c94cea32672e7e55afaa4f4fa37",
+        "redacted": false
+      },
+      {
+        "file": "packages-07.json",
+        "source_sha256": "a2f6bd1671e4c646c9e0148070d57546737f865ef5ad1c329aa300a84f0c0dd8",
+        "sanitized_sha256": "a2f6bd1671e4c646c9e0148070d57546737f865ef5ad1c329aa300a84f0c0dd8",
+        "redacted": false
+      },
+      {
+        "file": "packages-08-result.json",
+        "source_sha256": "3851143ddd1717a408966ef78ec8714762919aea77ea712083fb7a1e7e6f6273",
+        "sanitized_sha256": "3851143ddd1717a408966ef78ec8714762919aea77ea712083fb7a1e7e6f6273",
+        "redacted": false
+      },
+      {
+        "file": "packages-08.json",
+        "source_sha256": "d560bb2b58c4c804e187b49b4307904023121c11c40352fc356ca22a780f887e",
+        "sanitized_sha256": "d560bb2b58c4c804e187b49b4307904023121c11c40352fc356ca22a780f887e",
+        "redacted": false
+      },
+      {
+        "file": "packages-09-result.json",
+        "source_sha256": "fc1d48683cc7019a6552e966797559ce6c6214045c27ecaded5c14f7ae3f79ba",
+        "sanitized_sha256": "fc1d48683cc7019a6552e966797559ce6c6214045c27ecaded5c14f7ae3f79ba",
+        "redacted": false
+      },
+      {
+        "file": "packages-09.json",
+        "source_sha256": "7607c6a4c4f46cab79260ba71bfe0f0cf410a5520afa1d52c52b91d80c638ad0",
+        "sanitized_sha256": "7607c6a4c4f46cab79260ba71bfe0f0cf410a5520afa1d52c52b91d80c638ad0",
+        "redacted": false
+      },
+      {
+        "file": "packages-10-result.json",
+        "source_sha256": "bbcfd42ec276b4daee37c1b2ea5a55856d0ef85c02d6044d78fd597c11ee201c",
+        "sanitized_sha256": "bbcfd42ec276b4daee37c1b2ea5a55856d0ef85c02d6044d78fd597c11ee201c",
+        "redacted": false
+      },
+      {
+        "file": "packages-10.json",
+        "source_sha256": "fa12eb03c15ba30ff8bfc0d1ce32e05fee40e2368b6b7c4eaf866be4be59a9fa",
+        "sanitized_sha256": "3a5b5d6ea5a48b10fa29a8d1a64e944e9e171e2ef5a1f6f9f5ddf38f271b12f8",
+        "redacted": true
+      },
+      {
+        "file": "packages-11-result.json",
+        "source_sha256": "39d9e004772b0dde1510c9d5ed19bf89eb127ac422bff73c6f6ae1619e959fdc",
+        "sanitized_sha256": "39d9e004772b0dde1510c9d5ed19bf89eb127ac422bff73c6f6ae1619e959fdc",
+        "redacted": false
+      },
+      {
+        "file": "packages-11.json",
+        "source_sha256": "00252239ca061928dea6c17d0f8ebdf853793c1f576cb5177bf8e47561b39f18",
+        "sanitized_sha256": "00252239ca061928dea6c17d0f8ebdf853793c1f576cb5177bf8e47561b39f18",
+        "redacted": false
+      },
+      {
+        "file": "plan/plan-all-packages.txt",
+        "source_sha256": "1c4a3fc83b5026dda6be6c442eee34d052096d78aa4f8bb73a1ec4aeeaefd090",
+        "sanitized_sha256": "1c4a3fc83b5026dda6be6c442eee34d052096d78aa4f8bb73a1ec4aeeaefd090",
+        "redacted": false
+      },
+      {
+        "file": "plan/plan-assert.txt",
+        "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "redacted": false
+      },
+      {
+        "file": "plan/plan-deferred.txt",
+        "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "redacted": false
+      },
+      {
+        "file": "plan/plan-excluded.txt",
+        "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "redacted": false
+      },
+      {
+        "file": "plan/plan-exclusion-set.tsv",
+        "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "redacted": false
+      },
+      {
+        "file": "plan/plan-go-list.err",
+        "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "redacted": false
+      },
+      {
+        "file": "plan/plan-served.txt",
+        "source_sha256": "1c4a3fc83b5026dda6be6c442eee34d052096d78aa4f8bb73a1ec4aeeaefd090",
+        "sanitized_sha256": "1c4a3fc83b5026dda6be6c442eee34d052096d78aa4f8bb73a1ec4aeeaefd090",
+        "redacted": false
+      },
+      {
+        "file": "plan/suite-plan.txt",
+        "source_sha256": "2610002fb92c2ab10451492dd43d911726de38f43e4efbd5a48eb8bcc3797e2f",
+        "sanitized_sha256": "e4d33fedf97460563c79d00099d775b06532d6dc77b855cfd7c580c50c216720",
+        "redacted": true
+      },
+      {
+        "file": "platform-gate-01.log",
+        "source_sha256": "e982ef7065a6673dfc16a9538a688448d5c889ad2c92192d6bc67a9e3955c266",
+        "sanitized_sha256": "e982ef7065a6673dfc16a9538a688448d5c889ad2c92192d6bc67a9e3955c266",
+        "redacted": false
+      },
+      {
+        "file": "refresh-notes.md",
+        "source_sha256": "61546b6bd44a6e262fc7b94136a9814d1fe344f29eaee0874c596050bf207167",
+        "sanitized_sha256": "61546b6bd44a6e262fc7b94136a9814d1fe344f29eaee0874c596050bf207167",
+        "redacted": false
+      },
+      {
+        "file": "run-batch.py",
+        "source_sha256": "49ad31efc7fc589add754c12af77e7f7a36d1fab0c6a1deaa9acbaa4614914ab",
+        "sanitized_sha256": "49ad31efc7fc589add754c12af77e7f7a36d1fab0c6a1deaa9acbaa4614914ab",
+        "redacted": false
+      },
+      {
+        "file": "runtime-identity.json",
+        "source_sha256": "ebd8b80c5dc1c9ea343c63dcd4f841b6d12439fcc9208d5da857623f42099778",
+        "sanitized_sha256": "ebd8b80c5dc1c9ea343c63dcd4f841b6d12439fcc9208d5da857623f42099778",
+        "redacted": false
+      },
+      {
+        "file": "suite-plan-01.log",
+        "source_sha256": "2610002fb92c2ab10451492dd43d911726de38f43e4efbd5a48eb8bcc3797e2f",
+        "sanitized_sha256": "e4d33fedf97460563c79d00099d775b06532d6dc77b855cfd7c580c50c216720",
+        "redacted": true
+      },
+      {
+        "file": "verify-hosted-permissions.py",
+        "source_sha256": "c8252c9b12d4b3a873b9c737b1e381846fff866fb69a2e3d53bd8a4bb653a1cb",
+        "sanitized_sha256": "c8252c9b12d4b3a873b9c737b1e381846fff866fb69a2e3d53bd8a4bb653a1cb",
+        "redacted": false
+      },
+      {
+        "file": "vet-01.log",
+        "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "redacted": false
+      }
+    ]
+  },
+  "diagnostics": {
+    "cli-13-initial-and-first-replay": {
+      "exit_code": 1,
+      "reason": "TestMain lock acquisition timeout before named tests; replay accepted separately"
+    },
+    "pre-refresh-packages-01-cli-01": {
+      "exit_code": 0,
+      "reason": "superseded for checkpoint provenance; exact commands replayed"
+    },
+    "inventory-control": {
+      "exit_code": 1,
+      "expected_red": true,
+      "reason": "known-missing-batch detected"
+    }
+  }
+}

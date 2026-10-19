@@ -1,0 +1,567 @@
+diff --git a/docs/environment-config.md b/docs/environment-config.md
+index 08b526590c2685bcfb8565cb2aff4dd7b7158684..77e7066aef638c02604157680aec69c553fc8fc8 100644
+--- a/docs/environment-config.md
++++ b/docs/environment-config.md
+@@ -147,6 +147,35 @@ does not write launcher configuration.
+   "environments": {"permissions": {}}
+ }
+ ```
++## Managed-home filesystem permissions
++
++The environments root, profile directories, managed homes (including OpenCode's
++XDG parent), and manager-created subdirectories are owner-only: `0700` on Unix,
++with the existing owner-only protected DACL backend on Windows. `env resolve
++--repair` tightens existing wider root/home directories without removing their
++contents. Read-only resolve reports directory permission drift as stale; dry-run
++does not change modes.
++
++The file mode table is defined beside `EnvRootName` in
++[`internal/envprofile/managed.go`](../internal/envprofile/managed.go):
++
++| Managed write | Unix mode |
++| --- | --- |
++| Native copy seeds, including transformed Codex `config.toml` | Source permission bits, unchanged; a `0600` source stays `0600` |
++| Manager-authored home files, including Claude `.claude.json` trust state, copied context and MCP configuration | `0600` |
++| Single-file symlink fallback | `0600` |
++| Files in a directory symlink fallback | Source permission bits masked with `0700`, preserving owner execution |
++| Environment marker (transaction writer) | `0600` |
++| Takeover backups of tool-owned files | Original permissions |
++| Generated store documents outside managed homes | `0644` |
++
++Copy seeds remain tool-owned after provisioning: repair never refreshes their
++bytes or modes from the native source. Symlinked, unreadable and special-file
++seeds still refuse with `environment_seed_unreadable`. Credential passthrough
++and XDG seed links retain their native targets; the manager does not copy login
++bytes. On Windows the existing private-file backend uses protected owner-only
++DACLs; POSIX permission-bit preservation is a Unix guarantee.
++
+ ## Logging in to managed homes
+ 
+ See [Agent logins](agent-logins.md) for versioned Claude Code, Codex CLI and
+diff --git a/internal/envprofile/managed.go b/internal/envprofile/managed.go
+index a34c9b421ee2c75db4c4b55c634a988a94892a70..d4b05390409e341aa340c205a9a2eb83f5e5cb85 100644
+--- a/internal/envprofile/managed.go
++++ b/internal/envprofile/managed.go
+@@ -59,6 +59,22 @@ const (
+ // home (environments §8.1).
+ const EnvRootName = "environments"
+ 
++// Managed-home file mode table (see docs/environment-config.md):
++//
++//	native copy seeds: source Perm(), including transformed Codex config;
++//	manager-authored home files and single-file link fallbacks: 0600;
++//	tree link fallbacks: source Perm() & 0700 (retain owner executable bit);
++//	transaction-published markers: 0600 (transaction's private writer);
++//	takeover backups: original mode (tool-owned content, not authored state).
++//
++// Store documents live outside the managed home and remain 0644. Symlinks
++// retain native target ownership/modes; credential bytes are never copied.
++const (
++	managedAuthoredFileMode  os.FileMode = 0o600
++	managedFallbackFileMask  os.FileMode = 0o700
++	managedStoreDocumentMode os.FileMode = 0o644
++)
++
+ // EnvRoot returns the manager-owned environments root.
+ func EnvRoot(home string) string { return filepath.Join(home, EnvRootName) }
+ 
+@@ -637,8 +653,13 @@ func codexCredentialStoreWith(native string, readRegularFile func(string) (state
+ // seedBundle is the one-time provisioning class (§7.4): non-credential
+ // files copied from the native home exactly once, at provisioning, never
+ // refreshed, never hashed.
++type seedFile struct {
++	payload []byte
++	mode    os.FileMode
++}
++
+ type seedBundle struct {
+-	files map[string][]byte
++	files map[string]seedFile
+ 	// xdg maps parent-relative names to operator absolute targets.
+ 	xdg map[string]string
+ 	// claudeInit marks the written (not copied) .claude.json seed.
+@@ -699,7 +720,7 @@ func stripCodexSeedMCPServers(payload []byte) ([]byte, []string, error) {
+ // refreshes them, so an unreadable native copy must not fail a repair
+ // that would never read it.
+ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bool) (*seedBundle, error) {
+-	bundle := &seedBundle{files: map[string][]byte{}, xdg: map[string]string{}}
++	bundle := &seedBundle{files: map[string]seedFile{}, xdg: map[string]string{}}
+ 	native, err := req.nativeHome(adapter.ID)
+ 	if err != nil {
+ 		return nil, err
+@@ -742,6 +763,12 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
+ 			default:
+ 				return nil, fmt.Errorf("%s: seed %s has unusable read state %q", envregistry.DiagSeedUnreadable, seed, file.Kind)
+ 			}
++			// Read metadata only for a proven-present regular seed. Never turn a
++			// failed or changed metadata read into an absent/default-mode seed.
++			metadata, err := stateread.Lstat(path)
++			if err != nil || metadata.Kind != stateread.KindPresent || metadata.Info == nil || !metadata.Info.Mode().IsRegular() {
++				return nil, fmt.Errorf("%s: seed %s metadata is not a readable regular file: %v", envregistry.DiagSeedUnreadable, seed, err)
++			}
+ 			payload := file.Bytes
+ 			if adapter.ID == envregistry.CodexCLI && seed == "config.toml" {
+ 				var names []string
+@@ -764,7 +791,7 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
+ 					}
+ 				}
+ 			}
+-			bundle.files[seed] = payload
++			bundle.files[seed] = seedFile{payload: payload, mode: metadata.Info.Mode().Perm()}
+ 		}
+ 	} else if adapter.ID == envregistry.ClaudeCode {
+ 		bundle.claudeInit = true
+@@ -798,7 +825,7 @@ func writeStoreDoc(root, path string, document []byte) error {
+ 	if err != nil {
+ 		return err
+ 	}
+-	return atomicManagedFile(root, rel, document, 0o644)
++	return atomicManagedFile(root, rel, document, managedStoreDocumentMode)
+ }
+ 
+ // claudeSeed merges the .claude.json provisioning seed: the exact object
+@@ -860,7 +887,7 @@ func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err err
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	if err := atomicManagedFile(root, path, payload, 0o644); err != nil {
++	if err := atomicManagedFile(root, path, payload, managedAuthoredFileMode); err != nil {
+ 		return nil, err
+ 	}
+ 	return seeded, nil
+@@ -1254,7 +1281,7 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
+ 	// existing surface path is never opened through a symlink.
+ 	for _, path := range sortedKeysBytes(plan.copies) {
+ 		document := plan.copies[path]
+-		if err := atomicManagedFile(root, managedJoin(homeRel, path), document, 0o644); err != nil {
++		if err := atomicManagedFile(root, managedJoin(homeRel, path), document, managedAuthoredFileMode); err != nil {
+ 			return err
+ 		}
+ 	}
+@@ -1276,8 +1303,8 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
+ 	// Copy seeds are written at provisioning only: after that the tool
+ 	// owns them, so repair never refreshes them (§7.4).
+ 	if provisioned {
+-		for seed, payload := range seeds.files {
+-			if err := atomicManagedFile(root, managedJoin(homeRel, seed), payload, 0o644); err != nil {
++		for seed, file := range seeds.files {
++			if err := atomicManagedFile(root, managedJoin(homeRel, seed), file.payload, file.mode); err != nil {
+ 				return err
+ 			}
+ 		}
+@@ -1773,6 +1800,14 @@ func verifyHomeObserved(req *ResolveRequest, adapter envregistry.Adapter, source
+ 	}
+ 	verdict.markerState = stateread.KindPresent
+ 	verdict.marker = marker
++	// Directory drift is stale even if all managed bytes are current. This
++	// admits repair through the normal mutation lock and keeps verify/dry-run
++	// read-only. OpenCode's XDG parent is part of the private route too.
++	for _, path := range []string{EnvRoot(req.Home), filepath.Dir(ManagedParent(req.Home, req.Profile, adapter.ID)), ManagedParent(req.Home, req.Profile, adapter.ID), ManagedHomeDir(req.Home, req.Profile, adapter.ID)} {
++		if err := privatedir.Validate(path); err != nil {
++			verdict.reasons = append(verdict.reasons, fmt.Sprintf("managed directory permissions: %v", err))
++		}
++	}
+ 	manager := newGitManager(req.Home)
+ 	servers, err := mcpsOf(req.Home, manager, lock)
+ 	if err != nil {
+@@ -2871,7 +2906,7 @@ func copyLinkFallback(root, fullRel, target, path string, plan *homePlan) error
+ 		if err != nil {
+ 			return fmt.Errorf("link %s: %v", path, err)
+ 		}
+-		if err := atomicManagedFile(root, fullRel, payload, 0o644); err != nil {
++		if err := atomicManagedFile(root, fullRel, payload, managedAuthoredFileMode); err != nil {
+ 			return err
+ 		}
+ 	}
+@@ -2914,7 +2949,7 @@ func copyTree(source, root, destination string) error {
+ 		if err != nil {
+ 			return err
+ 		}
+-		return atomicManagedFile(root, outRel, payload, info.Mode().Perm())
++		return atomicManagedFile(root, outRel, payload, info.Mode().Perm()&managedFallbackFileMask)
+ 	})
+ }
+ 
+diff --git a/internal/envprofile/managed_modes_mutants_unix_test.go b/internal/envprofile/managed_modes_mutants_unix_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..f7dc7896879f3ab282b17098650a351fbcf3b15d
+--- /dev/null
++++ b/internal/envprofile/managed_modes_mutants_unix_test.go
+@@ -0,0 +1,100 @@
++//go:build unix
++
++package envprofile
++
++import (
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// Each overlay keeps the writer/check present and weakens one permission
++// class. Only exit 1 with the named behavioral failure counts as a kill.
++// These controls exercise Resolve or its real fallback writer, never a
++// source-token checker.
++func TestManagedModesNarrowingMutants(t *testing.T) {
++	root, err := filepath.Abs("../..")
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, mutant := range []struct{ name, file, before, after, run, fails, reason string }{
++		{
++			"single-fallback-0644", "managed.go",
++			"atomicManagedFile(root, fullRel, payload, managedAuthoredFileMode)",
++			"atomicManagedFile(root, fullRel, payload, 0o644)",
++			"^TestManagedFallbackPermissions$/^tree-false$",
++			"TestManagedFallbackPermissions/tree-false", "copy mode = 0644, want 0600",
++		},
++		{
++			"executable-tree-fallback-0755", "managed.go",
++			"info.Mode().Perm()&managedFallbackFileMask)",
++			"func() os.FileMode { if info.Mode().Perm() == 0o755 { return 0o755 }; return info.Mode().Perm()&managedFallbackFileMask }())",
++			"^TestManagedFallbackPermissions$/^tree-true$",
++			"TestManagedFallbackPermissions/tree-true", "0755 mode = 0755, want 0700",
++		},
++		{
++			"private-seed-0644", "managed.go",
++			"file.payload, file.mode)",
++			"file.payload, func() os.FileMode { if file.mode == 0o600 { return 0o644 }; return file.mode }())",
++			"^TestManagedSeedPreservesNativePermissions$/^0600$",
++			"TestManagedSeedPreservesNativePermissions/0600", "mode = 0644, want 0600",
++		},
++		{
++			"claude-trust-0644", "managed.go",
++			"root, path, payload, managedAuthoredFileMode)",
++			"root, path, payload, 0o644)",
++			"^TestManagedAuthoredFilesArePrivate$",
++			"TestManagedAuthoredFilesArePrivate", ".claude.json mode = 0644, want 0600",
++		},
++		{
++			"codex-directory-drift-admitted", "managed.go",
++			"if err := privatedir.Validate(path); err != nil {",
++			"if err := privatedir.Validate(path); err != nil && adapter.ID != envregistry.CodexCLI {",
++			"^TestManagedHomeRepairTightensDirectories$/^codex_cli$",
++			"TestManagedHomeRepairTightensDirectories/codex_cli", "wide home must be stale: <nil>",
++		},
++		{
++			"codex-directory-not-tightened", "nofollow.go",
++			"if err := privatedir.Protect(current); err != nil {",
++			"if err := func() error { if filepath.Base(current) == \"codex_cli\" { return nil }; return privatedir.Protect(current) }(); err != nil {",
++			"^TestManagedHomeRepairTightensDirectories$/^codex_cli$",
++			"TestManagedHomeRepairTightensDirectories/codex_cli", "managed directory permissions:",
++		},
++	} {
++		t.Run(mutant.name, func(t *testing.T) {
++			original := filepath.Join(root, "internal", "envprofile", mutant.file)
++			payload, err := os.ReadFile(original)
++			if err != nil {
++				t.Fatal(err)
++			}
++			source := strings.ReplaceAll(string(payload), "\r\n", "\n")
++			if strings.Count(source, mutant.before) != 1 {
++				t.Fatal("mutation anchor is not unique")
++			}
++			dir := t.TempDir()
++			replacement := filepath.Join(dir, mutant.file)
++			if err := os.WriteFile(replacement, []byte(strings.Replace(source, mutant.before, mutant.after, 1)), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			overlay, err := json.Marshal(map[string]any{"Replace": map[string]string{original: replacement}})
++			if err != nil {
++				t.Fatal(err)
++			}
++			overlayPath := filepath.Join(dir, "overlay.json")
++			if err := os.WriteFile(overlayPath, overlay, 0o600); err != nil {
++				t.Fatal(err)
++			}
++			command := exec.Command("go", "test", "-overlay", overlayPath, "-count=1", "-timeout=2m", "-v", "-run", mutant.run, "./internal/envprofile")
++			command.Dir = root
++			output, err := command.CombinedOutput()
++			exit, ok := err.(*exec.ExitError)
++			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "--- FAIL: "+mutant.fails+" ") || !strings.Contains(string(output), mutant.reason) {
++				t.Fatalf("mutant survived or lacked the intended permission failure: %v\n%s", err, output)
++			}
++			t.Logf("expected-red go test exit %d:\n%s", exit.ExitCode(), output)
++		})
++	}
++}
+diff --git a/internal/envprofile/managed_modes_unix_test.go b/internal/envprofile/managed_modes_unix_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6ffb58f18fd8c905111412a134c3b7fed3bbada
+--- /dev/null
++++ b/internal/envprofile/managed_modes_unix_test.go
+@@ -0,0 +1,227 @@
++//go:build unix
++
++package envprofile
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/envmarker"
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++func assertManagedMode(t *testing.T, path string, want os.FileMode) {
++	t.Helper()
++	info, err := os.Stat(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got := info.Mode().Perm(); got != want {
++		t.Fatalf("%s mode = %04o, want %04o (permissions must not widen)", filepath.Base(path), got, want)
++	}
++}
++
++// The real fallback writer called by applyPlan keeps copies private and
++// preserves owner execution bits in trees. This does not simulate symlink
++// rejection by a filesystem; fallback selection has separate coverage.
++func TestManagedFallbackPermissions(t *testing.T) {
++	for _, tree := range []bool{false, true} {
++		t.Run(fmt.Sprintf("tree-%t", tree), func(t *testing.T) {
++			root := t.TempDir()
++			source := filepath.Join(t.TempDir(), "source")
++			if tree {
++				if err := os.Mkdir(source, 0o755); err != nil {
++					t.Fatal(err)
++				}
++				for _, mode := range []os.FileMode{0o644, 0o755, 0o400} {
++					path := filepath.Join(source, fmt.Sprintf("%04o", mode))
++					if err := os.WriteFile(path, []byte("fixture\n"), mode); err != nil {
++						t.Fatal(err)
++					}
++					if err := os.Chmod(path, mode); err != nil {
++						t.Fatal(err)
++					}
++				}
++			} else if err := os.WriteFile(source, []byte("fixture\n"), 0o644); err != nil {
++				t.Fatal(err)
++			}
++			plan := &homePlan{marker: &envmarker.Marker{}, links: map[string]string{"copy": source}}
++			if err := copyLinkFallback(root, "copy", source, "copy", plan); err != nil {
++				t.Fatal(err)
++			}
++			if len(plan.links) != 0 {
++				t.Fatal("fallback retained the pending link")
++			}
++			modes := map[string]os.FileMode{"": 0o600}
++			if tree {
++				assertManagedMode(t, filepath.Join(root, "copy"), 0o700)
++				modes = map[string]os.FileMode{"0644": 0o600, "0755": 0o700, "0400": 0o400}
++			}
++			for name, want := range modes {
++				path := filepath.Join(root, "copy", name)
++				assertManagedMode(t, path, want)
++				payload, err := os.ReadFile(path)
++				if err != nil || string(payload) != "fixture\n" {
++					t.Fatalf("fallback bytes changed: %q, %v", payload, err)
++				}
++			}
++		})
++	}
++}
++
++// Resolve provisioning preserves native rwx bits, including read-only and
++// group-readable controls; revision-B TOML transformation must not widen them.
++func TestManagedSeedPreservesNativePermissions(t *testing.T) {
++	for _, mode := range []os.FileMode{0o600, 0o400, 0o640, 0o644} {
++		t.Run(fmt.Sprintf("%04o", mode), func(t *testing.T) {
++			fx := writeManagedFixture(t, "acme")
++			seedLiveNativeCredentials(t, fx)
++			seed := filepath.Join(fx.native[envregistry.CodexCLI], "config.toml")
++			if err := os.WriteFile(seed, []byte("model = 'test'\n[mcp_servers.native]\ncommand = 'server'\n"), mode); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.Chmod(seed, mode); err != nil {
++				t.Fatal(err)
++			}
++			req := fx.request(envregistry.CodexCLI)
++			req.Repair = true
++			if _, err := Resolve(req); err != nil {
++				t.Fatal(err)
++			}
++			managedSeed := filepath.Join(ManagedHomeDir(fx.home, fx.profile, req.EnvID), "config.toml")
++			assertManagedMode(t, managedSeed, mode)
++			payload, err := os.ReadFile(managedSeed)
++			if err != nil || strings.Contains(string(payload), "mcp_servers") || !strings.Contains(string(payload), "model") {
++				t.Fatalf("seed transformation failed: %q, %v", payload, err)
++			}
++		})
++	}
++}
++
++// Resolve creates private roots/homes for every adapter, and repairs 0755
++// directories even when content is current, preserving tool-owned bytes.
++func TestManagedHomeRepairTightensDirectories(t *testing.T) {
++	for _, id := range []string{envregistry.ClaudeCode, envregistry.CodexCLI, envregistry.OpenCode, envregistry.Pi, envregistry.Muse} {
++		t.Run(id, func(t *testing.T) {
++			fx := writeManagedFixture(t, "acme")
++			seedLiveNativeCredentials(t, fx)
++			fx.native[envregistry.Muse] = t.TempDir()
++			if err := os.WriteFile(filepath.Join(fx.native[envregistry.Muse], "auth.json"), []byte("synthetic-native\n"), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			req := fx.request(id)
++			req.Repair = true
++			if _, err := Resolve(req); err != nil {
++				t.Fatal(err)
++			}
++			home := ManagedHomeDir(fx.home, fx.profile, id)
++			paths := []string{EnvRoot(fx.home), filepath.Dir(ManagedParent(fx.home, fx.profile, id)), ManagedParent(fx.home, fx.profile, id), home}
++			for _, path := range paths {
++				assertManagedMode(t, path, 0o700)
++			}
++			for _, path := range paths {
++				if err := os.Chmod(path, 0o755); err != nil {
++					t.Fatal(err)
++				}
++			}
++			keep := filepath.Join(home, "tool-owned.txt")
++			if err := os.WriteFile(keep, []byte("keep\n"), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			// Verification and dry-run must never silently repair permissions.
++			readOnly := req
++			readOnly.Repair = false
++			if _, err := Resolve(readOnly); err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
++				t.Fatalf("wide home must be stale: %v", err)
++			}
++			dry := req
++			dry.DryRun = true
++			if _, err := Resolve(dry); err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
++				t.Fatalf("dry repair must report drift: %v", err)
++			}
++			assertManagedMode(t, home, 0o755)
++			if _, err := Resolve(req); err != nil {
++				t.Fatal(err)
++			}
++			for _, path := range paths {
++				assertManagedMode(t, path, 0o700)
++			}
++			if payload, err := os.ReadFile(keep); err != nil || string(payload) != "keep\n" {
++				t.Fatalf("repair lost contents: %q, %v", payload, err)
++			}
++		})
++	}
++}
++
++// Resolve writes Claude's trust seed, copied context and marker owner-only;
++// repair of an existing wider trust seed retains unrelated tool state.
++func TestManagedAuthoredFilesArePrivate(t *testing.T) {
++	fx := writeManagedFixture(t, "acme")
++	req := fx.request(envregistry.ClaudeCode)
++	req.Repair = true
++	if _, err := Resolve(req); err != nil {
++		t.Fatal(err)
++	}
++	home := ManagedHomeDir(fx.home, fx.profile, req.EnvID)
++	for _, name := range []string{".claude.json", "CLAUDE.md", envmarker.Name} {
++		assertManagedMode(t, filepath.Join(home, name), 0o600)
++	}
++	trust := filepath.Join(home, ".claude.json")
++	if err := os.WriteFile(trust, []byte(`{"projects":{},"toolOwned":true}`), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Chmod(trust, 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Remove(filepath.Join(home, "CLAUDE.md")); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := Resolve(req); err != nil {
++		t.Fatal(err)
++	}
++	assertManagedMode(t, trust, 0o600)
++	if payload, err := os.ReadFile(trust); err != nil || !strings.Contains(string(payload), `"toolOwned":true`) {
++		t.Fatalf("trust repair lost tool state: %q, %v", payload, err)
++	}
++}
++
++// A native symlink, unreadable regular file or FIFO refuses through Resolve
++// before publishing any managed home. Regular readable seeds above are controls.
++func TestManagedSeedRefusalsPreserved(t *testing.T) {
++	for _, kind := range []string{"symlink", "unreadable", "fifo"} {
++		t.Run(kind, func(t *testing.T) {
++			fx := writeManagedFixture(t, "acme")
++			seed := filepath.Join(fx.native[envregistry.CodexCLI], "config.toml")
++			switch kind {
++			case "symlink":
++				target := filepath.Join(t.TempDir(), "config.toml")
++				if err := os.WriteFile(target, []byte("model = 'test'\n"), 0o600); err != nil {
++					t.Fatal(err)
++				}
++				if err := os.Symlink(target, seed); err != nil {
++					t.Fatal(err)
++				}
++			case "unreadable":
++				if err := os.WriteFile(seed, []byte("model = 'test'\n"), 0o000); err != nil {
++					t.Fatal(err)
++				}
++				t.Cleanup(func() { _ = os.Chmod(seed, 0o600) })
++			case "fifo":
++				if err := makeFIFOVectorForTest(seed); err != nil {
++					t.Fatal(err)
++				}
++			}
++			req := fx.request(envregistry.CodexCLI)
++			req.Repair = true
++			if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), envregistry.DiagSeedUnreadable) {
++				t.Fatalf("%s seed must refuse as unreadable: %v", kind, err)
++			}
++			if _, err := os.Lstat(ManagedHomeDir(fx.home, fx.profile, req.EnvID)); !os.IsNotExist(err) {
++				t.Fatalf("seed refusal published a home: %v", err)
++			}
++		})
++	}
++}
+diff --git a/internal/envprofile/nofollow.go b/internal/envprofile/nofollow.go
+index dbbdd7de17c86a520ac0088a539dfe74dce9c5c2..032fb67735190c0e722e89a963010200abb31c18 100644
+--- a/internal/envprofile/nofollow.go
++++ b/internal/envprofile/nofollow.go
+@@ -68,8 +68,8 @@ func managedPath(root, rel string, createParents bool) (string, error) {
+ 	return filepath.Join(append([]string{root}, parts...)...), nil
+ }
+ 
+-// managedDirectory creates each component below root separately and refuses
+-// any pre-existing symbolic link on the route.
++// managedDirectory creates or tightens each directory on the managed route
++// to owner-only access, refusing pre-existing links before changing them.
+ func managedDirectory(root, rel string) (string, error) {
+ 	parts, err := managedPathParts(rel)
+ 	if err != nil {
+@@ -79,7 +79,7 @@ func managedDirectory(root, rel string) (string, error) {
+ 	if err := privatedir.MakeAll(root); err != nil {
+ 		return "", err
+ 	}
+-	rootState, err := stateread.Stat(root)
++	rootState, err := stateread.Lstat(root)
+ 	if err != nil {
+ 		return "", err
+ 	}
+@@ -89,6 +89,9 @@ func managedDirectory(root, rel string) (string, error) {
+ 	if !rootState.Info.IsDir() {
+ 		return "", fmt.Errorf("managed root %s is not a directory", root)
+ 	}
++	if err := privatedir.Protect(root); err != nil {
++		return "", err
++	}
+ 	current := root
+ 	for _, component := range parts {
+ 		current = filepath.Join(current, component)
+@@ -115,6 +118,9 @@ func managedDirectory(root, rel string) (string, error) {
+ 		if !info.IsDir() {
+ 			return "", fmt.Errorf("managed path component %s is not a directory", current)
+ 		}
++		if err := privatedir.Protect(current); err != nil {
++			return "", err
++		}
+ 	}
+ 	return current, nil
+ }

@@ -1,0 +1,58 @@
+{
+  "run": 39119749142,
+  "candidate": "9517bb1a1941d00c224be5d4eff5f9a93e926475",
+  "stream_sha256": "fca28beecc20a509c3b9295e3d00ba790cd87cf1ce5fd269eac11eaec9ae2e7c",
+  "platform": "local",
+  "permission_suites": {
+    "TestManagedSeedPreservesNativePermissions": "pass",
+    "TestManagedHomeRepairTightensDirectories": "pass",
+    "TestManagedAuthoredFilesArePrivate": "pass",
+    "TestManagedSeedRefusalsPreserved": "pass",
+    "TestManagedFallbackPermissions": "pass",
+    "TestManagedModesNarrowingMutants": "pass"
+  },
+  "mutants": {
+    "single-fallback-0644": {
+      "wrapper": "pass",
+      "child_exit": 1,
+      "named_failing_test": "TestManagedFallbackPermissions/tree-false",
+      "reason": "copy mode = 0644, want 0600",
+      "verdict": "killed"
+    },
+    "executable-tree-fallback-0755": {
+      "wrapper": "pass",
+      "child_exit": 1,
+      "named_failing_test": "TestManagedFallbackPermissions/tree-true",
+      "reason": "0755 mode = 0755, want 0700",
+      "verdict": "killed"
+    },
+    "private-seed-0644": {
+      "wrapper": "pass",
+      "child_exit": 1,
+      "named_failing_test": "TestManagedSeedPreservesNativePermissions/0600",
+      "reason": "mode = 0644, want 0600",
+      "verdict": "killed"
+    },
+    "claude-trust-0644": {
+      "wrapper": "pass",
+      "child_exit": 1,
+      "named_failing_test": "TestManagedAuthoredFilesArePrivate",
+      "reason": ".claude.json mode = 0644, want 0600",
+      "verdict": "killed"
+    },
+    "codex-directory-drift-admitted": {
+      "wrapper": "pass",
+      "child_exit": 1,
+      "named_failing_test": "TestManagedHomeRepairTightensDirectories/codex_cli",
+      "reason": "wide home must be stale: <nil>",
+      "verdict": "killed"
+    },
+    "codex-directory-not-tightened": {
+      "wrapper": "pass",
+      "child_exit": 1,
+      "named_failing_test": "TestManagedHomeRepairTightensDirectories/codex_cli",
+      "reason": "managed directory permissions:",
+      "verdict": "killed"
+    }
+  }
+}
