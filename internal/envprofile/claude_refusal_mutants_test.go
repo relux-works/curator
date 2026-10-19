@@ -24,6 +24,13 @@ func TestClaudeRefusalNarrowingMutants(t *testing.T) {
 	source := strings.ReplaceAll(string(payload), "\r\n", "\n")
 	for _, mutant := range []struct{ name, before, after, run, fails, message string }{
 		{
+			"trailing-empty-object",
+			"if err := decoder.Decode(&trailing); err != io.EOF {",
+			"if err := decoder.Decode(&trailing); err != io.EOF && string(payload) != \x60{} {}\x60 {",
+			"^TestClaudePreserveLockRefusalIsZeroWrite$/^referenced$/^(trailing-object|trailing-garbage|valid-whitespace)$",
+			"TestClaudePreserveLockRefusalIsZeroWrite/referenced/trailing-object", "want environment_seed_unreadable refusal",
+		},
+		{
 			"premature-write-malformed-referenced",
 			"if !ok {\n\t\t\treturn nil, fmt.Errorf(\"%s: managed .claude.json is not an object\", envregistry.DiagSeedUnreadable)",
 			"if !ok {\nif string(payload) == \x60{\"broken\":\x60 && form == envregistry.FormReferenced { if err := atomicManagedFile(root, managedJoin(homeRel, \"CLAUDE.md\"), []byte(\"premature write\"), managedAuthoredFileMode); err != nil { return nil, err } }\n\t\t\treturn nil, fmt.Errorf(\"%s: managed .claude.json is not an object\", envregistry.DiagSeedUnreadable)",
