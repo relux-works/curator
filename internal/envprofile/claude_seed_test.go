@@ -235,8 +235,7 @@ func TestClaudeRepairRefusesUnsafeState(t *testing.T) {
 				}
 			}
 			if variant == "unreadable" {
-				// The transaction backup refuses the read before claudeSeed runs.
-				diagnostic = "environment_repair_failed: permission denied"
+				// Seed validation refuses the read before any backup or managed write.
 				if err := os.Chmod(path, 0); err != nil {
 					t.Fatal(err)
 				}

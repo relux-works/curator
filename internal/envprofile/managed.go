@@ -663,7 +663,8 @@ type seedBundle struct {
 	// xdg maps parent-relative names to operator absolute targets.
 	xdg map[string]string
 	// claudeInit marks the written (not copied) .claude.json seed.
-	claudeInit bool
+	claudeInit     bool
+	claudePrepared *claudeSeedPlan
 	// codexSeedRecord is captured only when a codex_cli home is first
 	// provisioned. Repair preserves the marker's existing record and seed.
 	codexSeedRecord *envmarker.CodexSeedRecord
@@ -828,13 +829,20 @@ func writeStoreDoc(root, path string, document []byte) error {
 	return atomicManagedFile(root, rel, document, managedStoreDocumentMode)
 }
 
-// claudeSeed merges the .claude.json provisioning seed: the exact object
-// {"hasCompletedOnboarding":true,"projects":{}} at provisioning, plus one
-// project entry per launch directory holding hasTrustDialogAccepted and —
-// under the referenced form — hasClaudeMdExternalIncludesApproved (§7.4).
-// Later tool writes are its own state: repair only adds the launch
-// directory's entry and never rewrites anything else.
-func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err error) {
+// claudeSeedPlan holds validated output; nil payload preserves the existing
+// configuration bytes, inode and mtime.
+type claudeSeedPlan struct {
+	seeded  []string
+	payload []byte
+}
+
+// prepareClaudeSeed merges the .claude.json provisioning seed: the exact
+// object {"hasCompletedOnboarding":true,"projects":{}} at provisioning,
+// plus the launch directory's trust and referenced-includes approval.
+// Tool-owned values and number lexemes survive the merge. Preparation reads
+// and serializes without writes; publication uses this exact prepared value.
+func prepareClaudeSeed(root, homeRel, launchDir, form string) (*claudeSeedPlan, error) {
+	var seeded []string
 	path := managedJoin(homeRel, ".claude.json")
 	object := map[string]any{"hasCompletedOnboarding": true, "projects": map[string]any{}}
 	payload, present, err := readManagedRegular(root, path)
@@ -887,7 +895,7 @@ func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err err
 	}
 	sort.Strings(seeded)
 	if present && satisfied {
-		return seeded, nil
+		return &claudeSeedPlan{seeded: seeded}, nil
 	}
 	if present {
 		// Tool-owned state is ordinary JSON, not CCJ-1. UseNumber in the
@@ -900,10 +908,7 @@ func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err err
 	if err != nil {
 		return nil, err
 	}
-	if err := atomicManagedFile(root, path, payload, managedAuthoredFileMode); err != nil {
-		return nil, err
-	}
-	return seeded, nil
+	return &claudeSeedPlan{seeded: seeded, payload: payload}, nil
 }
 
 // decodeJSONObject decodes one JSON object value without rounding numbers or
@@ -1202,6 +1207,15 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	if err != nil {
 		return err
 	}
+	// Validate Claude state before directory protection, backups, context writes
+	// or link replacement. Staging/rename I/O errors after this boundary are
+	// not an all-or-nothing home transaction (see atomicManagedFile).
+	if seeds.claudeInit || plan.adapter.ID == envregistry.ClaudeCode {
+		seeds.claudePrepared, err = prepareClaudeSeed(root, homeRel, req.LaunchDir, plan.form)
+		if err != nil {
+			return err
+		}
+	}
 	want := map[string]bool{}
 	for path := range plan.copies {
 		want[path] = true
@@ -1436,11 +1450,13 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 		}
 	}
 	if seeds.claudeInit || plan.adapter.ID == envregistry.ClaudeCode {
-		seeded, err := claudeSeed(root, homeRel, req.LaunchDir, plan.form)
-		if err != nil {
-			return nil, err
+		prepared := seeds.claudePrepared
+		if prepared.payload != nil {
+			if err := atomicManagedFile(root, managedJoin(homeRel, ".claude.json"), prepared.payload, managedAuthoredFileMode); err != nil {
+				return nil, err
+			}
 		}
-		marker.SeededProjects = seeded
+		marker.SeededProjects = prepared.seeded
 		recordedSeeds = append(recordedSeeds, ".claude.json")
 	}
 	sort.Strings(recordedSeeds)
