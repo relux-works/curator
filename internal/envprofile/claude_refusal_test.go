@@ -72,10 +72,10 @@ func assertClaudeRefusalSnapshot(t *testing.T, before, after map[string]claudeRe
 // any managed entry changes. The valid neighbor must actually repair drift.
 func TestClaudePreserveLockRefusalIsZeroWrite(t *testing.T) {
 	for _, form := range []string{envregistry.FormReferenced, envregistry.FormMonolithic} {
-		for _, variant := range []string{"malformed", "array", "null", "scalar", "symlink", "directory", "unreadable", "valid"} {
+		for _, variant := range []string{"malformed", "array", "null", "scalar", "symlink", "directory", "unreadable", "trailing-object", "trailing-garbage", "valid", "valid-whitespace"} {
 			t.Run(form+"/"+variant, func(t *testing.T) {
 				if variant == "unreadable" && (runtime.GOOS == "windows" || os.Geteuid() == 0) {
-					t.Skip("requires POSIX permission enforcement")
+					t.Skip("POSIX mode-bit unreadability")
 				}
 				fx, req, path := claudeRepairFixture(t, form)
 				req.PreserveLock = true
@@ -87,6 +87,12 @@ func TestClaudePreserveLockRefusalIsZeroWrite(t *testing.T) {
 				payload := []byte(`{"unknown":1e-7}`)
 				diagnostic := envregistry.DiagSeedUnreadable
 				switch variant {
+				case "trailing-object":
+					payload = []byte(`{} {}`)
+				case "trailing-garbage":
+					payload = []byte(`{}x`)
+				case "valid-whitespace":
+					payload = []byte("{\"unknown\":1e-7} \t\r\n")
 				case "malformed":
 					payload = []byte(`{"broken":`)
 				case "array":
@@ -125,7 +131,7 @@ func TestClaudePreserveLockRefusalIsZeroWrite(t *testing.T) {
 				before := claudeRefusalSnapshot(t, root)
 				lockBefore := readClaudeState(t, lockPath(fx.home, fx.profile))
 				_, err := Resolve(req)
-				if variant == "valid" {
+				if strings.HasPrefix(variant, "valid") {
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -139,7 +145,7 @@ func TestClaudePreserveLockRefusalIsZeroWrite(t *testing.T) {
 					}
 				} else {
 					if err == nil || !strings.Contains(err.Error(), diagnostic) {
-						t.Fatalf("Resolve = %v, want %s refusal", err, diagnostic)
+						t.Errorf("Resolve = %v, want %s refusal", err, diagnostic)
 					}
 					assertClaudeRefusalSnapshot(t, before, claudeRefusalSnapshot(t, root))
 					if variant == "unreadable" {
@@ -185,7 +191,7 @@ func TestClaudeRepairCommitFailureBoundary(t *testing.T) {
 				t.Fatalf("Resolve = %v, want commit failure", err)
 			}
 			after := claudeRefusalSnapshot(t, root)
-			for _, path := range []string{"CLAUDE.md", "CLAUDE.md/keep", ".claude.json", ".agent-environment.json"} {
+			for _, path := range []string{"CLAUDE.md", filepath.Join("CLAUDE.md", "keep"), ".claude.json", ".agent-environment.json"} {
 				old, ok := before[path]
 				if !ok {
 					t.Fatalf("fixture missing required managed entry %s", path)

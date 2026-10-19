@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -919,12 +920,17 @@ func prepareClaudeSeed(root, homeRel, launchDir, form string) (*claudeSeedPlan, 
 }
 
 // decodeJSONObject decodes one JSON object value without rounding numbers or
-// changing their textual representation in tool-owned state.
+// changing their textual representation in tool-owned state. Only JSON whitespace
+// may follow the object; a successful first Decode alone admits malformed tails.
 func decodeJSONObject(payload []byte) (map[string]any, bool) {
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.UseNumber()
 	var object map[string]any
 	if err := decoder.Decode(&object); err != nil || object == nil {
+		return nil, false
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
 		return nil, false
 	}
 	return object, true
