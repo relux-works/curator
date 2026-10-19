@@ -1,0 +1,17 @@
+=== RUN   TestCredentialLinkUnrecordedSymlinkRefuses
+    credential_link_test.go:567: keyring home records a pathless ambient credential: {Path: Isolation:shared Strategy:keyring-preferred SourceRole:native Backend:ambient BackendVersion:0.153.2 Provenance:provisioned pathSet:false}
+--- FAIL: TestCredentialLinkUnrecordedSymlinkRefuses (0.79s)
+=== RUN   TestResolvePublishesCredentialMarkerThroughLockedJournal
+    credential_record_test.go:75: provisioned credential record: {Path:auth.json Isolation:shared Strategy:keyring-preferred SourceRole:native Backend:file BackendVersion:0.153.2 Provenance:provisioned pathSet:true}
+--- FAIL: TestResolvePublishesCredentialMarkerThroughLockedJournal (0.75s)
+=== RUN   TestResolvePublishesCredentialMarkerThroughLockedJournalV2WriterMode
+    credential_record_test.go:194: provisioned credential record: {Path:auth.json Isolation:shared Strategy:keyring-preferred SourceRole:native Backend:file BackendVersion:0.153.2 Provenance:provisioned pathSet:true}
+--- FAIL: TestResolvePublishesCredentialMarkerThroughLockedJournalV2WriterMode (0.81s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/envprofile	2.678s
+=== RUN   TestCodexCLI162VerifiedRelease
+    envregistry_test.go:21: codex_cli verified release = "0.153.2", want qualified 0.162.1
+--- FAIL: TestCodexCLI162VerifiedRelease (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/envregistry	0.245s
+FAIL

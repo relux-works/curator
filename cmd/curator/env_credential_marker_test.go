@@ -45,7 +45,7 @@ func requireCLICodexRecord(t *testing.T, marker *envmarker.Marker, provenance, b
 	}
 	record := (*marker.Passthrough)[0]
 	if record.Path != "auth.json" || record.Isolation != "shared" || record.Strategy != "keyring-preferred" ||
-		record.SourceRole != "native" || record.Backend != backend || record.BackendVersion != "0.153.2" || record.Provenance != provenance {
+		record.SourceRole != "native" || record.Backend != backend || record.BackendVersion != "0.162.1" || record.Provenance != provenance {
 		t.Fatalf("Codex credential record = %+v", record)
 	}
 }
@@ -91,7 +91,7 @@ func TestEnvResolveCredentialRecordPathlessKeyring(t *testing.T) {
 		t.Fatalf("expected a schema-3 pathless record: %+v", marker)
 	}
 	record := (*marker.Passthrough)[0]
-	if record.Path != "" || record.Isolation != "shared" || record.Strategy != "keyring-preferred" || record.SourceRole != "native" || record.Backend != "ambient" || record.BackendVersion != "0.153.2" || record.Provenance != "provisioned" {
+	if record.Path != "" || record.Isolation != "shared" || record.Strategy != "keyring-preferred" || record.SourceRole != "native" || record.Backend != "ambient" || record.BackendVersion != "0.162.1" || record.Provenance != "provisioned" {
 		t.Fatalf("keyring credential record = %+v", record)
 	}
 	var object map[string]any

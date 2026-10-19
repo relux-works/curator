@@ -1,0 +1,11 @@
+=== RUN   TestEnvResolveCredentialRecordProvisionAndRepair
+    env_credential_marker_test.go:62: Codex credential record = {Path:auth.json Isolation:shared Strategy:keyring-preferred SourceRole:native Backend:file BackendVersion:0.162.1 Provenance:provisioned pathSet:true}
+--- FAIL: TestEnvResolveCredentialRecordProvisionAndRepair (1.11s)
+=== RUN   TestEnvResolveCredentialRecordPathlessKeyring
+    env_credential_marker_test.go:95: keyring credential record = {Path: Isolation:shared Strategy:keyring-preferred SourceRole:native Backend:ambient BackendVersion:0.162.1 Provenance:provisioned pathSet:false}
+--- FAIL: TestEnvResolveCredentialRecordPathlessKeyring (1.20s)
+=== RUN   TestEnvResolveCredentialRecordIsolatedKeychain
+--- PASS: TestEnvResolveCredentialRecordIsolatedKeychain (1.26s)
+FAIL
+FAIL	github.com/relux-works/curator/cmd/curator	192.895s
+FAIL

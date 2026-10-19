@@ -1,0 +1,77 @@
+=== RUN   TestDirectSet
+--- PASS: TestDirectSet (0.00s)
+=== RUN   TestSystemPromptDropSkipsTransitive
+--- PASS: TestSystemPromptDropSkipsTransitive (0.00s)
+=== RUN   TestSystemPromptDropWarnsPerModule
+--- PASS: TestSystemPromptDropWarnsPerModule (0.00s)
+=== RUN   TestSystemPromptErrorRefusesFirst
+--- PASS: TestSystemPromptErrorRefusesFirst (0.00s)
+=== RUN   TestSystemPromptWaiverAdmits
+--- PASS: TestSystemPromptWaiverAdmits (0.00s)
+=== RUN   TestSystemPromptSelectorExcludes
+--- PASS: TestSystemPromptSelectorExcludes (0.00s)
+=== RUN   TestSystemPromptAllDroppedUnwritten
+--- PASS: TestSystemPromptAllDroppedUnwritten (0.00s)
+=== RUN   TestSystemPromptRejectsPolicy
+--- PASS: TestSystemPromptRejectsPolicy (0.00s)
+=== RUN   TestFirstTransitiveSystemModuleOrder
+--- PASS: TestFirstTransitiveSystemModuleOrder (0.00s)
+=== RUN   TestEmittedOrderFollowsPrecedence
+--- PASS: TestEmittedOrderFollowsPrecedence (0.00s)
+=== RUN   TestBadPrecedenceIsRejected
+--- PASS: TestBadPrecedenceIsRejected (0.00s)
+=== RUN   TestMonolithicShape
+--- PASS: TestMonolithicShape (0.00s)
+=== RUN   TestNoChapterCase
+--- PASS: TestNoChapterCase (0.00s)
+=== RUN   TestJoinSeparatesPartsWithOneBlankLine
+--- PASS: TestJoinSeparatesPartsWithOneBlankLine (0.00s)
+=== RUN   TestApplicableHonoursSelectors
+--- PASS: TestApplicableHonoursSelectors (0.00s)
+=== RUN   TestMCPSetSelectors
+--- PASS: TestMCPSetSelectors (0.00s)
+=== RUN   TestMCPEnvNamesUnion
+--- PASS: TestMCPEnvNamesUnion (0.00s)
+=== RUN   TestMCPFilePiWritesNothing
+--- PASS: TestMCPFilePiWritesNothing (0.00s)
+=== RUN   TestMCPFileEmptySetWritesNothing
+--- PASS: TestMCPFileEmptySetWritesNothing (0.00s)
+=== RUN   TestMCPFilePaths
+--- PASS: TestMCPFilePaths (0.00s)
+=== RUN   TestMCPRejectsBadTransport
+--- PASS: TestMCPRejectsBadTransport (0.00s)
+=== RUN   TestMCPRejectsNamelessCommand
+--- PASS: TestMCPRejectsNamelessCommand (0.00s)
+=== RUN   TestMCPRejectsBadName
+--- PASS: TestMCPRejectsBadName (0.00s)
+=== RUN   TestCodexTOMLExactness
+--- PASS: TestCodexTOMLExactness (0.00s)
+=== RUN   TestCodexTOMLEscaping
+--- PASS: TestCodexTOMLEscaping (0.00s)
+=== RUN   TestClaudeMCPJSONShape
+--- PASS: TestClaudeMCPJSONShape (0.00s)
+=== RUN   TestOpenCodeMCPJSONShape
+--- PASS: TestOpenCodeMCPJSONShape (0.00s)
+=== RUN   TestFormatDeclarationRows
+--- PASS: TestFormatDeclarationRows (0.00s)
+=== RUN   TestReferencedClaude
+--- PASS: TestReferencedClaude (0.00s)
+=== RUN   TestReferencedRejectsCodex
+--- PASS: TestReferencedRejectsCodex (0.00s)
+=== RUN   TestReferencedRejectsPi
+--- PASS: TestReferencedRejectsPi (0.00s)
+=== RUN   TestReferencedOpenCode
+--- PASS: TestReferencedOpenCode (0.00s)
+=== RUN   TestReferencedOpenCodeZeroModules
+--- PASS: TestReferencedOpenCodeZeroModules (0.00s)
+=== RUN   TestReferencedNoContext
+--- PASS: TestReferencedNoContext (0.00s)
+=== RUN   TestDetectPathCollision
+--- PASS: TestDetectPathCollision (0.00s)
+=== RUN   TestRootTarget
+--- PASS: TestRootTarget (0.00s)
+=== RUN   TestSystemModuleAdmissionVectors
+    system_module_admission_test.go:106: CURATOR_CONFORMANCE_ROOT is not set
+--- SKIP: TestSystemModuleAdmissionVectors (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/contextmaterialize	0.281s

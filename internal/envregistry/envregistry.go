@@ -282,7 +282,7 @@ var Registry = []Adapter{
 		Seeds:             []string{"config.toml"},
 		CodexSeedRevision: CodexSeedRevision,
 		SeedWritten:       map[string]bool{},
-		VerifiedRelease:   "0.153.2",
+		VerifiedRelease:   "0.162.1",
 		Probe:             []string{"codex", "--version"},
 		SizeAdvisoryBytes: 32768,
 		CredentialScope:   "home",

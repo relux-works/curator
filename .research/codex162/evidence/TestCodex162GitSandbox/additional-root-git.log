@@ -1,0 +1,4 @@
+cwd=$RUN/work
+argv=["$CODEX" "sandbox" "-c" "sandbox_mode=\"workspace-write\"" "-c" "sandbox_workspace_write.writable_roots=[\"$RUN/additional\"]" "--" "/bin/sh" "-c" "printf changed > \"$1\"" "probe" "$RUN/additional/.git/sentinel"]
+exit=1
+probe: $RUN/additional/.git/sentinel: Operation not permitted

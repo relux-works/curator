@@ -563,7 +563,7 @@ func TestCredentialLinkUnrecordedSymlinkRefuses(t *testing.T) {
 		t.Fatalf("a keyring home records its linkless credential strategy: %+v", marker.Passthrough)
 	}
 	entry := (*marker.Passthrough)[0]
-	if entry.Path != "" || entry.Isolation != envregistry.IsolationShared || entry.Strategy != envregistry.StrategyKeyringPreferred || entry.Backend != "ambient" || entry.SourceRole != "native" || entry.BackendVersion != "0.153.2" {
+	if entry.Path != "" || entry.Isolation != envregistry.IsolationShared || entry.Strategy != envregistry.StrategyKeyringPreferred || entry.Backend != "ambient" || entry.SourceRole != "native" || entry.BackendVersion != "0.162.1" {
 		t.Fatalf("keyring home records a pathless ambient credential: %+v", entry)
 	}
 	// The native store turns to file, and the operator's own symlink sits

@@ -1,0 +1,29 @@
+=== RUN   TestCodex162ExecSeedProfile
+    replay_test.go:298: version exit=0
+    replay_test.go:309: confirm-outside-git exit=128
+    replay_test.go:311: outside-git-refusal exit=1
+    replay_test.go:321: seed exit=0
+    replay_test.go:321: layer exit=0
+    replay_test.go:321: missing exit=0
+    replay_test.go:341: repeated-profile exit=0
+    replay_test.go:342: exit=0 want=2: Reading additional input from stdin...
+        OpenAI Codex v0.162.1
+        --------
+        workdir: /private/tmp
+        model: probe-base
+        provider: qualification
+        approval: never
+        sandbox: read-only
+        reasoning effort: none
+        reasoning summaries: none
+        session id: 01a14d6a-eebf-7050-9286-e5d1862bee15
+        --------
+        user
+        probe
+        warning: Model metadata for `probe-base` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.
+        tokens used
+        1
+--- FAIL: TestCodex162ExecSeedProfile (2.56s)
+FAIL
+FAIL	github.com/relux-works/curator/.research/codex162	2.767s
+FAIL

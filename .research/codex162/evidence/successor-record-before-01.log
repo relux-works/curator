@@ -1,0 +1,9 @@
+=== RUN   TestResolvePublishesCredentialMarkerThroughLockedJournal
+    credential_record_test.go:75: provisioned credential record: {Path:auth.json Isolation:shared Strategy:keyring-preferred SourceRole:native Backend:file BackendVersion:0.162.1 Provenance:provisioned pathSet:true}
+--- FAIL: TestResolvePublishesCredentialMarkerThroughLockedJournal (1.32s)
+=== RUN   TestResolvePublishesCredentialMarkerThroughLockedJournalV2WriterMode
+    credential_record_test.go:194: provisioned credential record: {Path:auth.json Isolation:shared Strategy:keyring-preferred SourceRole:native Backend:file BackendVersion:0.162.1 Provenance:provisioned pathSet:true}
+--- FAIL: TestResolvePublishesCredentialMarkerThroughLockedJournalV2WriterMode (1.10s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/envprofile	2.662s
+FAIL

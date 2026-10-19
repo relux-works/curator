@@ -1,0 +1,5 @@
+cwd=$RUN/work
+argv=["$CODEX" "sandbox" "-c" "sandbox_mode=\"workspace-write\"" "-c" "sandbox_workspace_write.writable_roots=[\"$RUN/git-metadata\"]" "--" "/usr/bin/git" "config" "qualification.sentinel" "accepted"]
+exit=0
+2026-10-18 09:10:24.542 xcodebuild[7938:1431744634]  DVTFilePathFSEvents: Failed to start fs event stream.
+2026-10-18 09:10:25.195 xcodebuild[7938:1431744625] [MT] DVTDeveloperPaths: Failed to get length of DARWIN_USER_CACHE_DIR from confstr(3), error = Error Domain=NSPOSIXErrorDomain Code=5 "Input/output error". Using NSCachesDirectory instead.

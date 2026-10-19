@@ -1,0 +1,81 @@
+=== RUN   TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression
+--- PASS: TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression (0.83s)
+=== RUN   TestCodexSeedStripsInlineMCPTable
+--- PASS: TestCodexSeedStripsInlineMCPTable (0.47s)
+=== RUN   TestCodexSeedRejectsInvalidTOMLBeforePublishingHome
+--- PASS: TestCodexSeedRejectsInvalidTOMLBeforePublishingHome (0.31s)
+=== RUN   TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair
+--- PASS: TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair (0.66s)
+=== RUN   TestEnvironmentsCodexSeedVectors
+    codex_seed_test.go:278: CURATOR_CONFORMANCE_ROOT is not set
+--- SKIP: TestEnvironmentsCodexSeedVectors (0.00s)
+=== RUN   TestCodexIsolatedAdmission
+=== RUN   TestCodexIsolatedAdmission/absent_file_admits
+=== RUN   TestCodexIsolatedAdmission/absent_key_admits
+=== RUN   TestCodexIsolatedAdmission/file_admits
+=== RUN   TestCodexIsolatedAdmission/keyring_refuses
+=== RUN   TestCodexIsolatedAdmission/auto_refuses
+=== RUN   TestCodexIsolatedAdmission/unknown_fails_closed
+--- PASS: TestCodexIsolatedAdmission (2.42s)
+    --- PASS: TestCodexIsolatedAdmission/absent_file_admits (0.43s)
+    --- PASS: TestCodexIsolatedAdmission/absent_key_admits (0.51s)
+    --- PASS: TestCodexIsolatedAdmission/file_admits (0.45s)
+    --- PASS: TestCodexIsolatedAdmission/keyring_refuses (0.35s)
+    --- PASS: TestCodexIsolatedAdmission/auto_refuses (0.34s)
+    --- PASS: TestCodexIsolatedAdmission/unknown_fails_closed (0.34s)
+=== RUN   TestCodexUnknownStoreSharedRefuses
+--- PASS: TestCodexUnknownStoreSharedRefuses (0.64s)
+=== RUN   TestReviewerLiteralCodexSelector
+=== RUN   TestReviewerLiteralCodexSelector/keyring
+=== RUN   TestReviewerLiteralCodexSelector/auto
+=== RUN   TestReviewerLiteralCodexSelector/ephemeral
+--- PASS: TestReviewerLiteralCodexSelector (1.17s)
+    --- PASS: TestReviewerLiteralCodexSelector/keyring (0.42s)
+    --- PASS: TestReviewerLiteralCodexSelector/auto (0.38s)
+    --- PASS: TestReviewerLiteralCodexSelector/ephemeral (0.37s)
+=== RUN   TestCodexCredentialStoreTOMLSpellings
+=== RUN   TestCodexCredentialStoreTOMLSpellings/single-quoted_file_admits
+=== RUN   TestCodexCredentialStoreTOMLSpellings/multi-line_basic_keyring_refuses
+=== RUN   TestCodexCredentialStoreTOMLSpellings/multi-line_literal_auto_refuses
+=== RUN   TestCodexCredentialStoreTOMLSpellings/indented_keyring_refuses
+=== RUN   TestCodexCredentialStoreTOMLSpellings/trailing_comment_auto_refuses
+=== RUN   TestCodexCredentialStoreTOMLSpellings/nested_table_key_stays_absent
+=== RUN   TestCodexCredentialStoreTOMLSpellings/dotted_key_stays_absent
+=== RUN   TestCodexCredentialStoreTOMLSpellings/invalid_TOML_fails_closed
+=== RUN   TestCodexCredentialStoreTOMLSpellings/integer_selector_fails_closed
+=== RUN   TestCodexCredentialStoreTOMLSpellings/boolean_selector_fails_closed
+--- PASS: TestCodexCredentialStoreTOMLSpellings (4.07s)
+    --- PASS: TestCodexCredentialStoreTOMLSpellings/single-quoted_file_admits (0.51s)
+    --- PASS: TestCodexCredentialStoreTOMLSpellings/multi-line_basic_keyring_refuses (0.42s)
+    --- PASS: TestCodexCredentialStoreTOMLSpellings/multi-line_literal_auto_refuses (0.46s)
+    --- PASS: TestCodexCredentialStoreTOMLSpellings/indented_keyring_refuses (0.35s)
+    --- PASS: TestCodexCredentialStoreTOMLSpellings/trailing_comment_auto_refuses (0.32s)
+    --- PASS: TestCodexCredentialStoreTOMLSpellings/nested_table_key_stays_absent (0.45s)
+    --- PASS: TestCodexCredentialStoreTOMLSpellings/dotted_key_stays_absent (0.44s)
+    --- PASS: TestCodexCredentialStoreTOMLSpellings/invalid_TOML_fails_closed (0.41s)
+    --- PASS: TestCodexCredentialStoreTOMLSpellings/integer_selector_fails_closed (0.41s)
+    --- PASS: TestCodexCredentialStoreTOMLSpellings/boolean_selector_fails_closed (0.32s)
+=== RUN   TestCodexMalformedStoreSharedRefuses
+=== RUN   TestCodexMalformedStoreSharedRefuses/invalid_TOML
+=== RUN   TestCodexMalformedStoreSharedRefuses/integer_selector
+--- PASS: TestCodexMalformedStoreSharedRefuses (1.01s)
+    --- PASS: TestCodexMalformedStoreSharedRefuses/invalid_TOML (0.49s)
+    --- PASS: TestCodexMalformedStoreSharedRefuses/integer_selector (0.51s)
+=== RUN   TestCodexKeyringAmbient
+=== RUN   TestCodexKeyringAmbient/absent
+=== RUN   TestCodexKeyringAmbient/file
+=== RUN   TestCodexKeyringAmbient/auto
+=== RUN   TestCodexKeyringAmbient/keyring
+--- PASS: TestCodexKeyringAmbient (2.07s)
+    --- PASS: TestCodexKeyringAmbient/absent (0.49s)
+    --- PASS: TestCodexKeyringAmbient/file (0.52s)
+    --- PASS: TestCodexKeyringAmbient/auto (0.53s)
+    --- PASS: TestCodexKeyringAmbient/keyring (0.53s)
+=== RUN   TestCodexUnreadableConfigFails
+--- PASS: TestCodexUnreadableConfigFails (0.79s)
+=== RUN   TestPermissionsForProfileProperties
+--- PASS: TestPermissionsForProfileProperties (0.00s)
+=== RUN   TestUnreadableCodexSeedDoesNotSelectAbsentDefault
+--- PASS: TestUnreadableCodexSeedDoesNotSelectAbsentDefault (0.38s)
+PASS
+ok  	github.com/relux-works/curator/internal/envprofile	15.149s

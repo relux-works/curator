@@ -1,0 +1,21 @@
+cwd=$RUN/work
+argv=["$CODEX" "-p" "curator-mcp" "mcp" "list" "--json"]
+exit=0
+[
+  {
+    "name": "qualification",
+    "enabled": true,
+    "disabled_reason": null,
+    "transport": {
+      "type": "stdio",
+      "command": "/usr/bin/true",
+      "args": [],
+      "env": null,
+      "env_vars": [],
+      "cwd": null
+    },
+    "startup_timeout_sec": null,
+    "tool_timeout_sec": null,
+    "auth_status": "unsupported"
+  }
+]

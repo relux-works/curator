@@ -71,7 +71,7 @@ func TestResolvePublishesCredentialMarkerThroughLockedJournal(t *testing.T) {
 	}
 	entry := (*marker.Passthrough)[0]
 	if entry.Path != "auth.json" || entry.Isolation != "shared" || entry.Strategy != "keyring-preferred" ||
-		entry.SourceRole != "native" || entry.Backend != "file" || entry.BackendVersion != "0.153.2" || entry.Provenance != "provisioned" {
+		entry.SourceRole != "native" || entry.Backend != "file" || entry.BackendVersion != "0.162.1" || entry.Provenance != "provisioned" {
 		t.Fatalf("provisioned credential record: %+v", entry)
 	}
 }
@@ -190,7 +190,7 @@ func TestResolvePublishesCredentialMarkerThroughLockedJournalV2WriterMode(t *tes
 	}
 	entry := (*marker.Passthrough)[0]
 	if entry.Path != "auth.json" || entry.Isolation != "shared" || entry.Strategy != "keyring-preferred" ||
-		entry.SourceRole != "native" || entry.Backend != "file" || entry.BackendVersion != "0.153.2" || entry.Provenance != "provisioned" {
+		entry.SourceRole != "native" || entry.Backend != "file" || entry.BackendVersion != "0.162.1" || entry.Provenance != "provisioned" {
 		t.Fatalf("provisioned credential record: %+v", entry)
 	}
 }

@@ -1,0 +1,25 @@
+model = "probe-base"
+model_provider = "qualification"
+cli_auth_credentials_store = "file"
+approval_policy = "never"
+sandbox_mode = "read-only"
+[model_providers.qualification]
+name = "Loopback qualification"
+base_url = "http://127.0.0.1:53740"
+wire_api = "responses"
+requires_openai_auth = false
+request_max_retries = 0
+stream_max_retries = 0
+
+[projects."$RUN/work"]
+trust_level = "trusted"
+[projects."$RUN/second-work"]
+trust_level = "trusted"
+
+[tui]
+screen_reader_detection_done = true
+
+[hooks.state]
+
+[hooks.state."$RUN/work/.codex/config.toml:session_start:0:0"]
+trusted_hash = "sha256:53da3614b184326422d3d96abc1223fc45ad07f4528318984319ca4424737445"

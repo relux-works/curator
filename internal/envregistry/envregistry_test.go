@@ -14,6 +14,14 @@ func mustAdapter(t *testing.T, id string) Adapter {
 	return adapter
 }
 
+// The production registry lookup pins the release qualified by the disposable
+// CLI probes in .research/codex162; a neighboring unqualified release must fail.
+func TestCodexCLI162VerifiedRelease(t *testing.T) {
+	if got := mustAdapter(t, CodexCLI).VerifiedRelease; got != "0.162.1" {
+		t.Fatalf("codex_cli verified release = %q, want qualified 0.162.1", got)
+	}
+}
+
 func TestRegistryClosed(t *testing.T) {
 	if len(Registry) != 5 {
 		t.Fatalf("the revision-1 registry holds %d adapters, want 5", len(Registry))
