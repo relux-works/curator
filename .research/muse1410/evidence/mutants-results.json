@@ -1,0 +1,137 @@
+[
+  {
+    "mutant": "checker-duplicate-count",
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261018-ujp9nh/mutants/checker-duplicate-count",
+      "-run",
+      "^TestReviewContradictoryObservation$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_test": "TestReviewContradictoryObservation/count-zero-then-one",
+    "killed": true
+  },
+  {
+    "mutant": "checker-duplicate-outcome",
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261018-ujp9nh/mutants/checker-duplicate-outcome",
+      "-run",
+      "^TestReviewContradictoryObservation$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_test": "TestReviewContradictoryObservation/outcome-failed-then-ready",
+    "killed": true
+  },
+  {
+    "mutant": "snapshot-extra-entry",
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261018-ujp9nh/mutants/snapshot-extra-entry",
+      "-run",
+      "^TestFrozenSnapshot$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_test": "TestFrozenSnapshot/extra",
+    "killed": true
+  },
+  {
+    "mutant": "snapshot-go-listed-link",
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261018-ujp9nh/mutants/snapshot-go-listed-link",
+      "-run",
+      "^Test(FrozenSnapshot|FrozenSnapshotSourceInputs)$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_test": "TestFrozenSnapshot/listed-symlink",
+    "killed": true
+  },
+  {
+    "mutant": "snapshot-reference-listed-link",
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261018-ujp9nh/mutants/snapshot-reference-listed-link",
+      "-run",
+      "^TestReferenceSnapshotPhysicalClosure$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_test": "TestReferenceSnapshotPhysicalClosure/listed-symlink",
+    "killed": true
+  },
+  {
+    "mutant": "snapshot-reference-dangling-link",
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261018-ujp9nh/mutants/snapshot-reference-dangling-link",
+      "-run",
+      "^TestReferenceSnapshotPhysicalClosure$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_test": "TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link",
+    "killed": true
+  },
+  {
+    "mutant": "intake-one-foreign-build",
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261018-ujp9nh/mutants/intake-one-foreign-build",
+      "-run",
+      "^TestVendorIntakeBoundary$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_test": "TestVendorIntakeBoundary/wrong-digest",
+    "killed": true
+  },
+  {
+    "mutant": "offline-loopback",
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261018-ujp9nh/mutants/offline-loopback",
+      "-run",
+      "^TestMuse1410OfflineBoundary$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_test": "TestMuse1410OfflineBoundary",
+    "killed": true
+  },
+  {
+    "mutant": "offline-one-keychain-file",
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261018-ujp9nh/mutants/offline-one-keychain-file",
+      "-run",
+      "^TestMuse1410OfflineBoundary$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_test": "TestMuse1410OfflineBoundary",
+    "killed": true
+  }
+]

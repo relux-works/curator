@@ -1,0 +1,917 @@
+{
+  "binary_sha256": "11cc1ae887b4975bbbe1de7358ee9260a612444df9ce4dbfffa1dd785826dbcf",
+  "checkpoint": "e88fdf2dbec7f94c48b0232a350a0a9f9484fdeb",
+  "spec_main": "e41f96387287f5e76604627f9e63662f7d6d86d4",
+  "source_sha256": {
+    "intake_test.go": "e3c95a8b4acf6b27b9845b03968c7e720c501e549c7662cf5d681780a48c764f",
+    "reference-snapshot-check.py": "984c57f7d874586f1d9f23feb8d50b14438fbeed21ffea2872879830e505d554",
+    "replay_test.go": "ea6ba47a3833c25619b024db1b1f9811ac656550b6f37dc7e7b64eb9563d29b4",
+    "review_attack_test.go": "5cf3f947c6a2e62e3b9d7dfc46f461677ec6fde53a0f8b5acf3fdf51ae2f4fe9"
+  },
+  "cases": [
+    {
+      "case": "TestMuse1410ExecInteractiveKeyObservation",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410InteractiveExclusionRegression_linked",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Including your 1 Claude Code personal skill",
+        "Rules loaded this session",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410InteractiveExclusionRegression_snapshot",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Including your 1 Claude Code personal skill",
+        "Rules loaded this session",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_absent_claude-rules_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=326 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=326 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_absent_claude-rules_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_absent_codex-rules_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=318 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=318 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_absent_codex-rules_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_absent_skills_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Including your 1 Claude Code personal skill",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_absent_skills_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_linked_claude-rules_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_linked_claude-rules_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_linked_codex-rules_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=19",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_linked_codex-rules_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_linked_skills_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1"
+      ],
+      "visible_markers": [
+        "Including your 1 Claude Code personal skill",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_linked_skills_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_snapshot_claude-rules_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_snapshot_claude-rules_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_snapshot_codex-rules_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_snapshot_codex-rules_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_snapshot_skills_exclude-false",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=2"
+      ],
+      "visible_markers": [
+        "Including your 1 Claude Code personal skill",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_exec_snapshot_skills_exclude-true",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_absent_claude-rules_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=326 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=326 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Rules loaded this session",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_absent_claude-rules_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=326 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=326 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Rules loaded this session",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_absent_codex-rules_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=318 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=318 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Rules loaded this session",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_absent_codex-rules_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=318 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=318 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Rules loaded this session",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_absent_skills_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Including your 1 Claude Code personal skill",
+        "Rules loaded this session",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_absent_skills_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Including your 1 Claude Code personal skill",
+        "Rules loaded this session",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_linked_claude-rules_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=2",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1"
+      ],
+      "visible_markers": [
+        "Rules loaded this session",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_linked_claude-rules_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1"
+      ],
+      "visible_markers": [
+        "Rules loaded this session",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_linked_codex-rules_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Rules loaded this session",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_linked_codex-rules_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Rules loaded this session",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_linked_skills_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Including your 1 Claude Code personal skill",
+        "Rules loaded this session",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_linked_skills_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Including your 1 Claude Code personal skill",
+        "Rules loaded this session",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_snapshot_claude-rules_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Rules loaded this session",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_snapshot_claude-rules_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Rules loaded this session",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_snapshot_codex-rules_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Rules loaded this session",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_snapshot_codex-rules_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Rules loaded this session",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_snapshot_skills_exclude-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Including your 1 Claude Code personal skill",
+        "Rules loaded this session",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410LoaderMatrix_interactive_snapshot_skills_exclude-true",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Including your 1 Claude Code personal skill",
+        "Rules loaded this session",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410ParserRefusals_interactive-exec-flag",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context"
+      ],
+      "exit": 2,
+      "loader_records": [],
+      "visible_markers": [
+        "invalid TUI options"
+      ]
+    },
+    {
+      "case": "TestMuse1410ParserRefusals_interactive-string-false",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=\"false\""
+      ],
+      "exit": 2,
+      "loader_records": [],
+      "visible_markers": [
+        "the JSON type does not fit this setting"
+      ]
+    },
+    {
+      "case": "TestMuse1410WorkspaceResidual_exec_linked",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=1060 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410WorkspaceResidual_exec_snapshot",
+      "argv": [
+        "exec",
+        "--json",
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "--no-foreign-personal-context",
+        "MUSE1410_OFFLINE_CONTROL"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=1060 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
+      ],
+      "visible_markers": [
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410WorkspaceResidual_interactive_linked",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=1060 duration_ms=0",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Including your 1 Claude Code personal skill",
+        "Rules loaded this session",
+        "project: AGENTS.md",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    },
+    {
+      "case": "TestMuse1410WorkspaceResidual_interactive_snapshot",
+      "argv": [
+        "--provider",
+        "echo",
+        "--trust-workspace",
+        "-c",
+        "context.foreign_personal_skills=false"
+      ],
+      "exit": 0,
+      "loader_records": [
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=1060 duration_ms=1",
+        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
+        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
+      ],
+      "visible_markers": [
+        "Including your 1 Claude Code personal skill",
+        "Rules loaded this session",
+        "project: AGENTS.md",
+        "$CONFIG_DIR/AGENTS.md",
+        "echo: MUSE1410_OFFLINE_CONTROL"
+      ]
+    }
+  ]
+}

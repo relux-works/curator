@@ -1,0 +1,1273 @@
+--- FAIL: TestDraftStatusReportsUpToDateThroughCLI (4.11s)
+    draft_status_test.go:140: status --check = 1, want 0
+        stderr:
+        warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+--- FAIL: TestDraftStatusNeedsInstallAfterRefreshWithoutInstall (8.84s)
+    draft_status_test.go:185: status --check after install = 1
+        stdout:
+        app: review up-to-date
+        security_posture: permissive (profile)
+        hook-trust: A-warning (shipped)
+        registry-policy: advisory (profile)
+        audit-mode: advisory (profile)
+        source-allowlist: 0 (profile)
+        shell-hook-trust: /private$OS_TEMP: approved (approved_by=manager)
+        shell-hook-trust: /private$OS_TEMP: approved (approved_by=manager)
+        provider engines: $USER_HOME/.local/bin/curator-engines (subcommand_provider_untrusted, non-current)
+        provider engines.2026-09-30: $USER_HOME/.local/bin/curator-engines.2026-09-30 (subcommand_provider_untrusted, non-current)
+        provider run: $OS_TEMP (subcommand_provider_outside_trust_roots, current)
+        provider session: $OS_TEMP (subcommand_provider_outside_trust_roots, current)
+        
+        stderr:
+        warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+--- FAIL: TestDraftStatusLiveMutationWithoutRefreshStaysCurrent (1.21s)
+    draft_status_test.go:403: status --check = 1, want 0 without a refresh
+        stdout:
+        app: review up-to-date
+        security_posture: permissive (profile)
+        hook-trust: A-warning (shipped)
+        registry-policy: advisory (profile)
+        audit-mode: advisory (profile)
+        source-allowlist: 0 (profile)
+        shell-hook-trust: /private$OS_TEMP: approved (approved_by=manager)
+        shell-hook-trust: /private$OS_TEMP: approved (approved_by=manager)
+        provider engines: $USER_HOME/.local/bin/curator-engines (subcommand_provider_untrusted, non-current)
+        provider engines.2026-09-30: $USER_HOME/.local/bin/curator-engines.2026-09-30 (subcommand_provider_untrusted, non-current)
+        provider run: $OS_TEMP (subcommand_provider_outside_trust_roots, current)
+        provider session: $OS_TEMP (subcommand_provider_outside_trust_roots, current)
+        
+        stderr:
+        warning: security_posture_permissive: security_posture is permissive; set security_posture: hardened in the machine configuration to adopt the hardened defaults
+panic: test timed out after 10m0s
+	running tests:
+		TestReviewProbeLegacyLaneIdentityInvalid (4s)
+
+goroutine 5307 [running]:
+testing.(*M).startAlarm.func1()
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2682 +0x2b0
+created by time.goFunc
+	$USER_HOME/.goenv/versions/1.25.5/src/time/sleep.go:215 +0x38
+
+goroutine 1 [chan receive]:
+testing.(*T).Run(0x14000504c40, {0x100b7862e?, 0x140005fda98?}, 0x100e77170)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2005 +0x378
+testing.runTests.func1(0x14000504c40)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2477 +0x38
+testing.tRunner(0x14000504c40, 0x140005fdbc8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+testing.runTests(0x1400000e228, {0x101392060, 0x1b2, 0x1b2}, {0x20?, 0x100e1a1c0?, 0x101397be0?})
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2475 +0x3b8
+testing.(*M).Run(0x140002103c0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2337 +0x530
+github.com/relux-works/curator/cmd/curator.TestMain(0x140002103c0)
+	$WORKTREE/cmd/curator/status_test.go:64 +0x184
+main.main()
+	_testmain.go:913 +0x88
+
+goroutine 14 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x1400024f340)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestCLIAuditBindsDependencyDirectory(0x1400024f340)
+	$WORKTREE/cmd/curator/audit_directory_test.go:127 +0x28
+testing.tRunner(0x1400024f340, 0x100e76680)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 15 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x1400024f500)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestCLIStatusReportsLegacyPackageMarkerCurrent(0x1400024f500)
+	$WORKTREE/cmd/curator/audit_directory_test.go:191 +0x28
+testing.tRunner(0x1400024f500, 0x100e766d0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 16 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x1400024f6c0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestReviewCLIStatusDetectsChangedTagAtSameCommit(0x1400024f6c0)
+	$WORKTREE/cmd/curator/audit_directory_test.go:219 +0x28
+testing.tRunner(0x1400024f6c0, 0x100e77148)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 70 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002da1c0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestCLIAuditEmitsScriptLabels(0x140002da1c0)
+	$WORKTREE/cmd/curator/auditlabels_test.go:168 +0x28
+testing.tRunner(0x140002da1c0, 0x100e76688)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 71 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002da380)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestCLIAuditMixedSkillRecordsBothPolicies(0x140002da380)
+	$WORKTREE/cmd/curator/auditlabels_test.go:225 +0x28
+testing.tRunner(0x140002da380, 0x100e766a0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 72 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002da540)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestCLIAuditJSONCarriesScriptLabels(0x140002da540)
+	$WORKTREE/cmd/curator/auditlabels_test.go:254 +0x28
+testing.tRunner(0x140002da540, 0x100e76690)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 73 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002da700)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestCLIAuditJSONRecordsExplicitAbsence(0x140002da700)
+	$WORKTREE/cmd/curator/auditlabels_test.go:296 +0x28
+testing.tRunner(0x140002da700, 0x100e76698)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 74 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002daa80)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestClassifyBuildCommandMapsEveryCacheOutcomeToADistinctCode(0x140002daa80)
+	$WORKTREE/cmd/curator/builds_test.go:81 +0x28
+testing.tRunner(0x140002daa80, 0x100e766f0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 75 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002dae00)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestUnusableToolchainRowsCarryTheDriverBoundaryCode(0x140002dae00)
+	$WORKTREE/cmd/curator/builds_test.go:114 +0x28
+testing.tRunner(0x140002dae00, 0x100e77370)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 76 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002db180)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestClassifyBuildCommandDetectsRecordedIdentityDrift(0x140002db180)
+	$WORKTREE/cmd/curator/builds_test.go:130 +0x28
+testing.tRunner(0x140002db180, 0x100e766e8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 77 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002db500)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves(0x140002db500)
+	$WORKTREE/cmd/curator/builds_test.go:249 +0x28
+testing.tRunner(0x140002db500, 0x100e76668)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 78 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002db880)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestInputCausesAreDistinctAndDocumented(0x140002db880)
+	$WORKTREE/cmd/curator/builds_test.go:371 +0x28
+testing.tRunner(0x140002db880, 0x100e76cf0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 79 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002dbc00)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestClassifySkillBuildsAcceptsOnlyAnExactlyCurrentInstallation(0x140002dbc00)
+	$WORKTREE/cmd/curator/builds_test.go:391 +0x28
+testing.tRunner(0x140002dbc00, 0x100e76710)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 80 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x14000326000)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestClassifySkillBuildsWithoutCompiledStateStaysSilent(0x14000326000)
+	$WORKTREE/cmd/curator/builds_test.go:413 +0x20
+testing.tRunner(0x14000326000, 0x100e76730)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 81 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x14000326380)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestClassifySkillBuildsDetectsContextExposure(0x14000326380)
+	$WORKTREE/cmd/curator/builds_test.go:425 +0x20
+testing.tRunner(0x14000326380, 0x100e76720)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 82 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x14000326700)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestClassifySkillBuildsDetectsCommandDriftInBothDirections(0x14000326700)
+	$WORKTREE/cmd/curator/builds_test.go:449 +0x20
+testing.tRunner(0x14000326700, 0x100e76718)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 83 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x14000326a80)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestClassifySkillBuildsRefusesAMarkerThatCannotDescribeABuild(0x14000326a80)
+	$WORKTREE/cmd/curator/builds_test.go:475 +0x28
+testing.tRunner(0x14000326a80, 0x100e76728)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 84 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x14000326e00)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestMarkerDigestsDistinguishesAbsentAndUnreadable(0x14000326e00)
+	$WORKTREE/cmd/curator/builds_test.go:491 +0x28
+testing.tRunner(0x14000326e00, 0x100e76d30)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 85 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x14000327180)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestContextExposureDistinguishesAbsentAndUnreadableBuildRoots(0x14000327180)
+	$WORKTREE/cmd/curator/builds_test.go:515 +0x28
+testing.tRunner(0x14000327180, 0x100e767f0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 86 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x14000327500)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestMarkerRefusalSeparatesUnsupportedFromInvalid(0x14000327500)
+	$WORKTREE/cmd/curator/builds_test.go:549 +0x28
+testing.tRunner(0x14000327500, 0x100e76d38)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 87 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x14000327880)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestCurrentnessCodesAreDistinctAndOnlyExactStatesPass(0x14000327880)
+	$WORKTREE/cmd/curator/builds_test.go:622 +0x28
+testing.tRunner(0x14000327880, 0x100e76838)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 88 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x14000327c00)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestEveryCurrentnessCodeIsDocumented(0x14000327c00)
+	$WORKTREE/cmd/curator/builds_test.go:664 +0x28
+testing.tRunner(0x14000327c00, 0x100e76b58)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 89 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x1400032a000)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestCheckFailsForEveryNonCurrentCode(0x1400032a000)
+	$WORKTREE/cmd/curator/builds_test.go:680 +0x28
+testing.tRunner(0x1400032a000, 0x100e766e0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 90 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x1400032a380)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestBuildReportsNeverPublishAnAbsolutePath(0x1400032a380)
+	$WORKTREE/cmd/curator/builds_test.go:704 +0x28
+testing.tRunner(0x1400032a380, 0x100e76678)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 91 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x1400032a700)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestBuildReportDetailIsBounded(0x1400032a700)
+	$WORKTREE/cmd/curator/builds_test.go:733 +0x28
+testing.tRunner(0x1400032a700, 0x100e76670)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 92 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x1400032aa80)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestGoToolchainGuidanceNamesTheAcceptedSelectionAndTestedFamilies(0x1400032aa80)
+	$WORKTREE/cmd/curator/builds_test.go:747 +0x28
+testing.tRunner(0x1400032aa80, 0x100e76c50)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 93 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x1400032ae00)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestRepairNoticesDistinguishRepairFromAPreservedInstallation(0x1400032ae00)
+	$WORKTREE/cmd/curator/builds_test.go:786 +0x30
+testing.tRunner(0x1400032ae00, 0x100e77138)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 94 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x1400032b180)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestMarkerDigestsDetectAConcurrentInstallMarkerChange(0x1400032b180)
+	$WORKTREE/cmd/curator/builds_test.go:845 +0x28
+testing.tRunner(0x1400032b180, 0x100e76d28)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 95 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x1400032b500)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestStatusReportMarksCompiledStateThatMovedDuringTheCheck(0x1400032b500)
+	$WORKTREE/cmd/curator/builds_test.go:878 +0x28
+testing.tRunner(0x1400032b500, 0x100e772a0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 96 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x1400032b880)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestStatusReportReportsCompiledCommandsOfAnUninstalledSkill(0x1400032b880)
+	$WORKTREE/cmd/curator/builds_test.go:909 +0x28
+testing.tRunner(0x1400032b880, 0x100e772a8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 97 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x1400032bc00)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestClassifySkillBuildsAcceptsEveryBuildBearingMarkerSchema(0x1400032bc00)
+	$WORKTREE/cmd/curator/builds_test.go:999 +0x28
+testing.tRunner(0x1400032bc00, 0x100e76708)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 98 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x1400034e000)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestStatusReportFindsASchema8InstallationCurrent(0x1400034e000)
+	$WORKTREE/cmd/curator/builds_test.go:1045 +0x24
+testing.tRunner(0x1400034e000, 0x100e77298)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 4530 [chan receive, 2 minutes]:
+testing.(*T).Parallel(0x140004b4380)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/cmd/curator.TestProductionExternalDepsAssignsTransportProvenanceSink(0x140004b4380)
+	$WORKTREE/cmd/curator/draft_transport_provenance_test.go:24 +0x28
+testing.tRunner(0x140004b4380, 0x100e76e60)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 5271 [runnable]:
+os.rootOpenDir(0x5, {0x14000ff6cdd, 0x9})
+	$USER_HOME/.goenv/versions/1.25.5/src/os/root_unix.go:110 +0x25c
+os.doInRoot[...](0x140003000e8, {0x14000ff6cd8, 0x18}, 0x0, 0x14000d67638)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/root_openat.go:347 +0x268
+os.rootOpenFileNolog(0x140003000e8, {0x14000ff6cd8, 0x18}, 0x0, 0x18?)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/root_unix.go:83 +0x58
+os.(*Root).OpenFile(0x140003000e8, {0x14000ff6cd8, 0x18}, 0x0, 0x0)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/root.go:122 +0xec
+os.(*Root).Open(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/root.go:103
+github.com/relux-works/curator/internal/godriver.digestToolchainRecords({0x100e84ac0, 0x14000136380}, 0x140003000e8, {0x1400186a000, 0x3edd, 0x100e84ac0?}, {0x14000974120, 0x20})
+	$WORKTREE/internal/godriver/fingerprint.go:91 +0x2a8
+github.com/relux-works/curator/internal/godriver.fingerprintToolchain({0x100e84ac0, 0x14000136380}, {0x14000a32180?, 0x14000974114?}, {0x14000974120, 0x20})
+	$WORKTREE/internal/godriver/fingerprint.go:46 +0x1ac
+github.com/relux-works/curator/internal/godriver.establish({0x100e84938, 0x1013c03a0}, {{0x140006ca310, 0x6b}, {0x0, 0x0}, {0x1400002a217, 0x20}, {0x14000359140, 0x3, ...}, ...}, ...)
+	$WORKTREE/internal/godriver/session.go:284 +0xb14
+github.com/relux-works/curator/internal/godriver.probe({0x100e84938?, 0x1013c03a0?}, {{0x140006ca310, 0x6b}, {_, _}, {_, _}, {_, _, ...}, ...}, ...)
+	$WORKTREE/internal/godriver/session.go:164 +0xd8
+github.com/relux-works/curator/internal/godriver.Probe(...)
+	$WORKTREE/internal/godriver/session.go:160
+github.com/relux-works/curator/internal/install.(*goToolchain).Probe(0x140004226c0, {0x100e84938, 0x1013c03a0})
+	$WORKTREE/internal/install/builddeps.go:191 +0x1cc
+github.com/relux-works/curator/internal/install.(*assuredToolchain).Probe(0x140004cabd0, {0x100e84938, 0x1013c03a0})
+	$WORKTREE/internal/install/assurance.go:122 +0xec
+github.com/relux-works/curator/internal/install.planExternalBuilds({_, _}, {_, _}, {_, _}, {_, _}, {_, _, ...}, ...)
+	$WORKTREE/internal/install/external.go:164 +0x1c0
+github.com/relux-works/curator/internal/install.projectAttempt(_, {_, _}, {_, _}, {{0x100b40e42, 0x7}, 0x1, 0x0, 0x0, ...}, ...)
+	$WORKTREE/internal/install/install.go:765 +0x4260
+github.com/relux-works/curator/internal/install.Project(_, {_, _}, {_, _}, {{0x100b40e42, 0x7}, 0x1, 0x0, 0x0, ...})
+	$WORKTREE/internal/install/install.go:245 +0x5c4
+github.com/relux-works/curator/cmd/curator.cli.cmdInstallMode({{0x100e810a8, 0x14000503a40}, {0x100e7ea00, 0x14000346e60}, {0x100e7ea00, 0x14000346e80}, 0x140004d8948, 0x0, 0x0, 0x0, ...}, ...)
+	$WORKTREE/cmd/curator/main.go:783 +0x61c
+github.com/relux-works/curator/cmd/curator.cli.cmdInstall({{0x100e810a8, 0x14000503a40}, {0x100e7ea00, 0x14000346e60}, {0x100e7ea00, 0x14000346e80}, 0x140004d8948, 0x0, 0x0, 0x0, ...}, ...)
+	$WORKTREE/cmd/curator/main.go:732 +0x50
+github.com/relux-works/curator/cmd/curator.cli.run({{0x100e810a8, 0x14000503a40}, {0x100e7ea00, 0x14000346e60}, {0x100e7ea00, 0x14000346e80}, 0x140004d8948, 0x0, 0x0, 0x0, ...}, ...)
+	$WORKTREE/cmd/curator/main.go:313 +0x488
+github.com/relux-works/curator/cmd/curator.captureWithUserHomeAndProviderPath(0x1400038db20?, {0x140001c0480, 0x78}, 0x140004d8948, 0x0, {0x1400033e270, 0x3, 0x3})
+	$WORKTREE/cmd/curator/status_test.go:113 +0xdc
+github.com/relux-works/curator/cmd/curator.captureWithUserHome(...)
+	$WORKTREE/cmd/curator/status_test.go:106
+github.com/relux-works/curator/cmd/curator.capture(0x1400070b180, {0x140001c0480, 0x78}, {0x1400033e270, 0x3, 0x3})
+	$WORKTREE/cmd/curator/status_test.go:102 +0x1ec
+github.com/relux-works/curator/cmd/curator.TestReviewProbeLegacyLaneIdentityInvalid(0x1400070b180)
+	$WORKTREE/cmd/curator/draft_transport_test.go:808 +0x3f8
+testing.tRunner(0x1400070b180, 0x100e77170)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+FAIL	github.com/relux-works/curator/cmd/curator	600.433s
+?   	github.com/relux-works/curator/cmd/curator-spec-pin	[no test files]
+ok  	github.com/relux-works/curator/internal/adapters	0.955s
+ok  	github.com/relux-works/curator/internal/artifactpolicy	455.362s
+?   	github.com/relux-works/curator/internal/artifactpolicy/conformance	[no test files]
+ok  	github.com/relux-works/curator/internal/audit	108.015s
+ok  	github.com/relux-works/curator/internal/buildcache	7.664s
+ok  	github.com/relux-works/curator/internal/buildmeta	0.561s
+ok  	github.com/relux-works/curator/internal/buildrepo	287.708s
+ok  	github.com/relux-works/curator/internal/buildsource	0.342s
+ok  	github.com/relux-works/curator/internal/capabilities	0.540s
+ok  	github.com/relux-works/curator/internal/closure	96.276s
+ok  	github.com/relux-works/curator/internal/closureexec	4.914s
+ok  	github.com/relux-works/curator/internal/closuregraph	23.042s
+ok  	github.com/relux-works/curator/internal/config	3.169s
+ok  	github.com/relux-works/curator/internal/conformancecoverage	0.591s
+ok  	github.com/relux-works/curator/internal/contextaudit	0.294s
+ok  	github.com/relux-works/curator/internal/contextlock	0.296s
+ok  	github.com/relux-works/curator/internal/contextmaterialize	0.331s
+ok  	github.com/relux-works/curator/internal/contextpkg	0.395s
+ok  	github.com/relux-works/curator/internal/contextresolve	0.314s
+ok  	github.com/relux-works/curator/internal/contextstore	0.541s
+ok  	github.com/relux-works/curator/internal/crossconformance	444.437s
+ok  	github.com/relux-works/curator/internal/devsub	0.488s
+ok  	github.com/relux-works/curator/internal/envfiles	0.487s
+ok  	github.com/relux-works/curator/internal/envfragment	0.329s
+ok  	github.com/relux-works/curator/internal/envmarker	0.306s
+panic: test timed out after 10m0s
+	running tests:
+		TestManagedHomeRepairTightensDirectories (6s)
+		TestManagedHomeRepairTightensDirectories/muse (1s)
+
+goroutine 7322 [running]:
+testing.(*M).startAlarm.func1()
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2682 +0x2b0
+created by time.goFunc
+	$USER_HOME/.goenv/versions/1.25.5/src/time/sleep.go:215 +0x38
+
+goroutine 1 [chan receive]:
+testing.(*T).Run(0x14000103880, {0x100e4e06d?, 0x14000225ac8?}, 0x1010b8718)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2005 +0x378
+testing.runTests.func1(0x14000103880)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2477 +0x38
+testing.tRunner(0x14000103880, 0x14000225bf8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+testing.runTests(0x140001381f8, {0x1014f6e40, 0x189, 0x189}, {0xf?, 0x14000225c88?, 0x1014fc3a0?})
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2475 +0x3b8
+testing.(*M).Run(0x140003f1360)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2337 +0x530
+github.com/relux-works/curator/internal/envprofile.TestMain(0x140003f1360)
+	$WORKTREE/internal/envprofile/network_fixture_test.go:49 +0xa4
+main.main()
+	_testmain.go:831 +0x88
+
+goroutine 6932 [chan receive]:
+testing.(*T).Run(0x140003fd340, {0x100e22c49?, 0x140000def08?}, 0x14000509c38)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2005 +0x378
+github.com/relux-works/curator/internal/envprofile.TestManagedHomeRepairTightensDirectories(0x140003fd340)
+	$WORKTREE/internal/envprofile/managed_modes_unix_test.go:108 +0xa8
+testing.tRunner(0x140003fd340, 0x1010b8718)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 7219 [runnable]:
+syscall.syscall(0x140005b69c0?, 0xbb?, 0x140000f23f8?, 0x1008d0a9c?)
+	$USER_HOME/.goenv/versions/1.25.5/src/runtime/sys_darwin.go:27 +0x40
+syscall.Lstat({0x140005b69c0?, 0x1008d05f4?}, 0x14000406038)
+	$USER_HOME/.goenv/versions/1.25.5/src/syscall/zsyscall_darwin_arm64.go:1944 +0x6c
+os.lstatNolog.func1(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/stat_unix.go:45
+os.ignoringEINTR(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/file_posix.go:256
+os.lstatNolog({0x140005b69c0, 0xbb})
+	$USER_HOME/.goenv/versions/1.25.5/src/os/stat_unix.go:44 +0x50
+os.Lstat({0x140005b69c0, 0xbb})
+	$USER_HOME/.goenv/versions/1.25.5/src/os/stat.go:26 +0x30
+github.com/relux-works/curator/internal/transaction.DigestPath({0x140005b69c0, 0xbb})
+	$WORKTREE/internal/transaction/digest.go:21 +0x28
+github.com/relux-works/curator/internal/transaction.verifyRemovalEntry({0x140005b69c0, 0xbb}, {0x1010c7f28, 0x14000224410}, {{0x0, 0x0}, {0x100e22bbd, 0x4}, 0x180, {0x14000032fa0, ...}, ...})
+	$WORKTREE/internal/transaction/journal.go:925 +0x1d8
+github.com/relux-works/curator/internal/transaction.validateRemovalTree.func1({0x140005b69c0, 0xbb}, {0x1010c7f28, 0x14000224410}, {0x0?, 0x0?})
+	$WORKTREE/internal/transaction/journal.go:886 +0x13c
+path/filepath.walk({0x140005b69c0, 0xbb}, {0x1010c7f28, 0x14000224410}, 0x140000f2c90)
+	$USER_HOME/.goenv/versions/1.25.5/src/path/filepath/path.go:345 +0xc8
+path/filepath.Walk({0x140005b69c0, 0xbb}, 0x140000f2c90)
+	$USER_HOME/.goenv/versions/1.25.5/src/path/filepath/path.go:427 +0x6c
+github.com/relux-works/curator/internal/transaction.validateRemovalTree({0x140005b69c0, 0xbb}, {0x14000258000, 0x1, 0x14000032b40?}, 0x1)
+	$WORKTREE/internal/transaction/journal.go:869 +0x1fc
+github.com/relux-works/curator/internal/transaction.removeDurablyWithEntries({0x0, 0x0}, {0x140005b69c0, 0xbb}, {0x14000032b40, 0x47}, {0x14000258000, 0x1, 0x1}, 0x140000f2f88, ...)
+	$WORKTREE/internal/transaction/journal.go:802 +0x1cc
+github.com/relux-works/curator/internal/transaction.(*Engine).finishRecordedRemoval(0x14000188730, 0x1400015e9a0, {0x0, {0x0, 0x0}, {0x140005b69c0, 0xbb}, {0x14000032b40, 0x47}})
+	$WORKTREE/internal/transaction/engine.go:953 +0x168
+github.com/relux-works/curator/internal/transaction.(*Engine).removeRecordedSidecar(0x14000188730, 0x1400015e9a0, {0x0, {0x0, 0x0}, {0x140005b69c0, 0xbb}, {0x14000032b40, 0x47}})
+	$WORKTREE/internal/transaction/engine.go:946 +0x140
+github.com/relux-works/curator/internal/transaction.(*Engine).cleanupCommitted(0x14000188730, 0x1400015e9a0)
+	$WORKTREE/internal/transaction/engine.go:847 +0x18c
+github.com/relux-works/curator/internal/transaction.(*Engine).commit(0x14000188730, 0x1400015e9a0)
+	$WORKTREE/internal/transaction/engine.go:385 +0x1dc
+github.com/relux-works/curator/internal/transaction.(*Engine).resume(0x14000188730?, 0x140005714d0?)
+	$WORKTREE/internal/transaction/engine.go:352 +0x10c
+github.com/relux-works/curator/internal/transaction.(*Engine).Commit(0x14000188730, {0x1010c07c0?, 0x1400007a0d8?}, {0x140005714d0, 0x28})
+	$WORKTREE/internal/transaction/engine.go:317 +0xfc
+github.com/relux-works/curator/internal/envprofile.(*operation).publish(0x14000323540, 0x140005fdc50, {0x0, 0x0, 0x100e24b8e?})
+	$WORKTREE/internal/envprofile/lock.go:190 +0x980
+github.com/relux-works/curator/internal/envprofile.applyPlan(0x14000323540, 0x14000572608, 0x1400017f448, 0x140004a0f00, 0x140005fe610, 0x14000247e00, 0x0)
+	$WORKTREE/internal/envprofile/managed.go:1343 +0x10c8
+github.com/relux-works/curator/internal/envprofile.repairUnderLock(_, {{0x100e22c49, 0x4}, {0x100e2a18f, 0xf}, {0x1014ed800, 0x4, 0x4}, 0x0, {0x100e30767, ...}, ...}, ...)
+	$WORKTREE/internal/envprofile/managed.go:2869 +0x1558
+github.com/relux-works/curator/internal/envprofile.resolveVerified({{0x1400039e310, 0x6b}, {0x100e22c6d, 0x4}, {0x100e22c49, 0x4}, {0x1400039eb60, 0x6b}, {0x0, 0x14000149aa0, ...}, ...}, ...)
+	$WORKTREE/internal/envprofile/managed.go:2653 +0xd0c
+github.com/relux-works/curator/internal/envprofile.Resolve(...)
+	$WORKTREE/internal/envprofile/managed.go:2496
+github.com/relux-works/curator/internal/envprofile.TestManagedHomeRepairTightensDirectories.func1(0x140003fd880)
+	$WORKTREE/internal/envprofile/managed_modes_unix_test.go:146 +0x640
+testing.tRunner(0x140003fd880, 0x14000509c38)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 6932
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+FAIL	github.com/relux-works/curator/internal/envprofile	600.375s
+ok  	github.com/relux-works/curator/internal/envregistry	0.284s
+ok  	github.com/relux-works/curator/internal/envsnapshot	21.765s
+ok  	github.com/relux-works/curator/internal/gitcred	4.939s
+ok  	github.com/relux-works/curator/internal/gitignore	2.528s
+ok  	github.com/relux-works/curator/internal/gitops	36.201s
+ok  	github.com/relux-works/curator/internal/globalbins	1.359s
+ok  	github.com/relux-works/curator/internal/godriver	127.590s
+ok  	github.com/relux-works/curator/internal/hashing	0.443s
+ok  	github.com/relux-works/curator/internal/hookapproval	0.897s
+ok  	github.com/relux-works/curator/internal/identifiers	0.272s
+ok  	github.com/relux-works/curator/internal/identity	0.374s
+panic: test timed out after 10m0s
+	running tests:
+		TestGlobalReconcilesOwnedLegacyForwardingLink (4s)
+		TestGlobalReconcilesOwnedLegacyForwardingLink/foreign-regular (2s)
+
+goroutine 3988 [running]:
+testing.(*M).startAlarm.func1()
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2682 +0x2b0
+created by time.goFunc
+	$USER_HOME/.goenv/versions/1.25.5/src/time/sleep.go:215 +0x38
+
+goroutine 1 [chan receive]:
+testing.(*T).Run(0x14000396000, {0x102b50a2a?, 0x1400014faf8?}, 0x102dcf128)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2005 +0x378
+testing.runTests.func1(0x14000396000)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2477 +0x38
+testing.tRunner(0x14000396000, 0x1400014fc28)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+testing.runTests(0x1400038c000, {0x103208980, 0x173, 0x173}, {0xf?, 0x1400014fcb8?, 0x10320dd20?})
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2475 +0x3b8
+testing.(*M).Run(0x140003588c0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2337 +0x530
+github.com/relux-works/curator/internal/install.TestMain(0x140003588c0)
+	$WORKTREE/internal/install/scriptpolicy_test.go:86 +0x2c
+main.main()
+	_testmain.go:787 +0x88
+
+goroutine 309 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002d01c0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestRunCommitRecheckRefusesSwappedParent(0x140002d01c0)
+	$WORKTREE/internal/install/commit_boundaries_test.go:73 +0x28
+testing.tRunner(0x140002d01c0, 0x102dcf4b0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 310 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002d0380)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestRunCommitRecheckPassesUnchangedBoundaries(0x140002d0380)
+	$WORKTREE/internal/install/commit_boundaries_test.go:114 +0x28
+testing.tRunner(0x140002d0380, 0x102dcf4a0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 311 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002d0540)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestRunCommitWithoutBoundariesSkipsRecheck(0x140002d0540)
+	$WORKTREE/internal/install/commit_boundaries_test.go:148 +0x28
+testing.tRunner(0x140002d0540, 0x102dcf4c8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 230 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x14000107500)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestScriptAuditLabelsAtInstallEntry(0x14000107500)
+	$WORKTREE/internal/install/auditlabels_test.go:86 +0x28
+testing.tRunner(0x14000107500, 0x102dcf518)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 308 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002d0000)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestRunCommitRecheckRefusesDestinationInsideAdmitted(0x140002d0000)
+	$WORKTREE/internal/install/commit_boundaries_test.go:34 +0x28
+testing.tRunner(0x140002d0000, 0x102dcf4a8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 312 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002d0700)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestCommitOrdersTargetClassesWithConsumerLast(0x140002d0700)
+	$WORKTREE/internal/install/commit_test.go:206 +0x28
+testing.tRunner(0x140002d0700, 0x102dcec88)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 313 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002d08c0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestConsumerLedgerIsAbsentAfterAFailedFirstInstallAndCommitsLastOnSuccess(0x140002d08c0)
+	$WORKTREE/internal/install/commit_test.go:249 +0x28
+testing.tRunner(0x140002d08c0, 0x102dcecb0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 307 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x14000107dc0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestCacheWrongTargetRebuildCompletesWithinDeadline(0x14000107dc0)
+	$WORKTREE/internal/install/cache_rebuild_deadline_test.go:28 +0x20
+testing.tRunner(0x14000107dc0, 0x102dcec70)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 232 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x14000107880)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestDeclaredOnlyWithHostsGlobalInstallsWithOnlyDeclaredOnly(0x14000107880)
+	$WORKTREE/internal/install/auditlabels_test.go:312 +0x28
+testing.tRunner(0x14000107880, 0x102dcecd8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 231 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140001076c0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestScriptAuditLabelsAtGlobalInstallEntry(0x140001076c0)
+	$WORKTREE/internal/install/auditlabels_test.go:202 +0x28
+testing.tRunner(0x140001076c0, 0x102dcf510)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 306 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x14000107340)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestAuthoritativeCacheRejectionsAreRebuiltNeverAdopted(0x14000107340)
+	$WORKTREE/internal/install/cache_conformance_test.go:176 +0x28
+testing.tRunner(0x14000107340, 0x102dcebb8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 233 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x14000107a40)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestDeclaredOnlyWithHostsInstallsWithOnlyDeclaredOnly(0x14000107a40)
+	$WORKTREE/internal/install/auditlabels_test.go:348 +0x28
+testing.tRunner(0x14000107a40, 0x102dcece0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 305 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x14000107180)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestAuthoritativeCacheOutcomesDriveInstallation(0x14000107180)
+	$WORKTREE/internal/install/cache_conformance_test.go:63 +0x24
+testing.tRunner(0x14000107180, 0x102dcebb0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 314 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002d0c40)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestCachePublicationFailureLeavesInstallationAndProtectedCacheUntouched(0x140002d0c40)
+	$WORKTREE/internal/install/commit_test.go:277 +0x28
+testing.tRunner(0x140002d0c40, 0x102dcec68)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 315 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002d0fc0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestAFailedCommitRestoresTheBuildCacheItReplaced(0x140002d0fc0)
+	$WORKTREE/internal/install/commit_test.go:372 +0x28
+testing.tRunner(0x140002d0fc0, 0x102dceac8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 316 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002d1340)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestARolledBackTargetCommitRestoresTheBuildCacheItReplaced(0x140002d1340)
+	$WORKTREE/internal/install/commit_test.go:464 +0x28
+testing.tRunner(0x140002d1340, 0x102dceb00)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 317 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002d16c0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestAnInFlightTransactionKeepsThePublishedCacheEntry(0x140002d16c0)
+	$WORKTREE/internal/install/commit_test.go:504 +0x28
+testing.tRunner(0x140002d16c0, 0x102dceb90)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 318 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002d1a40)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestAPublicationThatChangedTheCacheIsReportedAsRetained(0x140002d1a40)
+	$WORKTREE/internal/install/commit_test.go:553 +0x28
+testing.tRunner(0x140002d1a40, 0x102dceae8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 319 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002d1dc0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestAReversalThatDidNotCompleteIsReportedAsRetained(0x140002d1dc0)
+	$WORKTREE/internal/install/commit_test.go:614 +0x28
+testing.tRunner(0x140002d1dc0, 0x102dceaf8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 320 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x1400050cfc0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestBuildPublicationFailuresAreRedactedInTheResult(0x1400050cfc0)
+	$WORKTREE/internal/install/commit_test.go:665 +0x28
+testing.tRunner(0x1400050cfc0, 0x102dcec38)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 321 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x1400050da40)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestConcurrentProjectInstallsPreserveBothConsumers(0x1400050da40)
+	$WORKTREE/internal/install/commit_test.go:730 +0x28
+testing.tRunner(0x1400050da40, 0x102dcec90)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 323 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002c81c0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestRollbackCannotRestoreOverAnotherProjectsCommittedSharedTargets(0x140002c81c0)
+	$WORKTREE/internal/install/commit_test.go:804 +0x28
+testing.tRunner(0x140002c81c0, 0x102dcf498)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 324 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002c8380)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestRecoveryCompletesBeforeAnyNewMutation(0x140002c8380)
+	$WORKTREE/internal/install/commit_test.go:848 +0x28
+testing.tRunner(0x140002c8380, 0x102dcf3c0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 325 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002c8700)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestStaleInstalledGenerationRestartsInsteadOfApplyingTheOldPlan(0x140002c8700)
+	$WORKTREE/internal/install/commit_test.go:920 +0x28
+testing.tRunner(0x140002c8700, 0x102dcf5a0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 326 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002c8a80)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestMaintenanceFailureAfterCommitIsAWarning(0x140002c8a80)
+	$WORKTREE/internal/install/commit_test.go:972 +0x28
+testing.tRunner(0x140002c8a80, 0x102dcf278)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 327 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002c8e00)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestNoSharedTargetChangesBeforeTheManagerHomeLock(0x140002c8e00)
+	$WORKTREE/internal/install/commit_test.go:996 +0x28
+testing.tRunner(0x140002c8e00, 0x102dcf2a8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 328 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002c9180)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestGlobalCommitCarriesNoConsumerLedger(0x140002c9180)
+	$WORKTREE/internal/install/commit_test.go:1026 +0x28
+testing.tRunner(0x140002c9180, 0x102dcf0a0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 329 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002c9500)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestStagedPlanRejectsTwoProducersClaimingOneLivePath(0x140002c9500)
+	$WORKTREE/internal/install/commit_test.go:1052 +0x24
+testing.tRunner(0x140002c9500, 0x102dcf590)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 330 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002c9880)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestAdapterLedgerCommitsAfterTheMirrorsItClaims(0x140002c9880)
+	$WORKTREE/internal/install/commit_test.go:1089 +0x30
+testing.tRunner(0x140002c9880, 0x102dceb60)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 331 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002c9c00)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestRedactDiagnosticReplacesEveryAbsoluteLocation(0x140002c9c00)
+	$WORKTREE/internal/install/diagnostics_test.go:17 +0x28
+testing.tRunner(0x140002c9c00, 0x102dcf3e0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 332 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002f4000)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestRedactDiagnosticCannotDriveATerminal(0x140002f4000)
+	$WORKTREE/internal/install/diagnostics_test.go:87 +0x24
+testing.tRunner(0x140002f4000, 0x102dcf3c8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 333 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002f4380)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestRedactDiagnosticIsBounded(0x140002f4380)
+	$WORKTREE/internal/install/diagnostics_test.go:101 +0x24
+testing.tRunner(0x140002f4380, 0x102dcf3d0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 334 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002f4700)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestRedactDiagnosticKeepsInvalidUTF8Out(0x140002f4700)
+	$WORKTREE/internal/install/diagnostics_test.go:116 +0x20
+testing.tRunner(0x140002f4700, 0x102dcf3d8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 335 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002f4a80)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestPlanLinesRedactAnUntrustedReason(0x140002f4a80)
+	$WORKTREE/internal/install/diagnostics_test.go:129 +0x28
+testing.tRunner(0x140002f4a80, 0x102dcf2d0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 336 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002f4e00)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestBuildFailuresAreRedactedInTheResult(0x140002f4e00)
+	$WORKTREE/internal/install/diagnostics_test.go:148 +0x28
+testing.tRunner(0x140002f4e00, 0x102dcebf0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 337 [chan receive, 9 minutes]:
+testing.(*T).Parallel(0x140002f5180)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestGoToolchainRemedyReachesTheOperatorIntact(0x140002f5180)
+	$WORKTREE/internal/install/diagnostics_test.go:179 +0x28
+testing.tRunner(0x140002f5180, 0x102dcf160)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3290 [chan receive]:
+testing.(*T).Parallel(0x14000f47c00)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestDraftTransportEnabled(0x14000f47c00)
+	$WORKTREE/internal/install/drafttransport_test.go:20 +0x28
+testing.tRunner(0x14000f47c00, 0x102dcefb0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3094 [chan receive]:
+testing.(*T).Parallel(0x140005e8e00)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestGitFixturePersistentSpawnFailureCarriesDiagnostic(0x140005e8e00)
+	$WORKTREE/internal/install/gitfixture_retry_test.go:170 +0x28
+testing.tRunner(0x140005e8e00, 0x102dcf060)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3955 [chan receive]:
+testing.(*T).Parallel(0x14000c4dc00)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestDocumentGenerationIsStableWhenUnreadable(0x14000c4dc00)
+	$WORKTREE/internal/install/generation_test.go:162 +0x24
+testing.tRunner(0x14000c4dc00, 0x102dced38)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3960 [chan receive]:
+testing.(*T).Parallel(0x140002f7340)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestGitFixtureNeverRetriesWrappedExitError(0x140002f7340)
+	$WORKTREE/internal/install/gitfixture_retry_test.go:115 +0x28
+testing.tRunner(0x140002f7340, 0x102dcf040)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3096 [chan receive]:
+testing.(*T).Parallel(0x14000338000)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestGitFixtureRealSpawnEACCESRetriesOnce(0x14000338000)
+	$WORKTREE/internal/install/gitfixture_retry_test.go:226 +0x28
+testing.tRunner(0x14000338000, 0x102dcf068)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3280 [chan receive]:
+testing.(*T).Parallel(0x14000c4d880)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestDraftPlanNamesProvider(0x14000c4d880)
+	$WORKTREE/internal/install/drafttransport_test.go:293 +0x28
+testing.tRunner(0x14000c4d880, 0x102dcef30)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3291 [chan receive]:
+testing.(*T).Parallel(0x14000f47dc0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestDraftTransportPlanConversion(0x14000f47dc0)
+	$WORKTREE/internal/install/drafttransport_test.go:52 +0x28
+testing.tRunner(0x14000f47dc0, 0x102dcefb8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3099 [chan receive]:
+testing.(*T).Parallel(0x14000338540)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestGitFixtureOuterEntryLogsRetryOnTransientEACCES(0x14000338540)
+	$WORKTREE/internal/install/gitfixture_retry_test.go:303 +0x28
+testing.tRunner(0x14000338540, 0x102dcf050)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 4005 [chan receive]:
+testing.(*T).Run(0x140002f7a40, {0x102b22db4?, 0x37?}, 0x1400000e090)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2005 +0x378
+github.com/relux-works/curator/internal/install.TestGlobalReconcilesOwnedLegacyForwardingLink(0x140002f7a40)
+	$WORKTREE/internal/install/global_legacy_link_test.go:20 +0x90
+testing.tRunner(0x140002f7a40, 0x102dcf128)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 4023 [runnable]:
+syscall.syscall(0x14001382000?, 0xa0?, 0x14000572fd8?, 0x1025b8a2c?)
+	$USER_HOME/.goenv/versions/1.25.5/src/runtime/sys_darwin.go:27 +0x40
+syscall.Lstat({0x14001382000?, 0x1025b8584?}, 0x14001384038)
+	$USER_HOME/.goenv/versions/1.25.5/src/syscall/zsyscall_darwin_arm64.go:1944 +0x6c
+os.lstatNolog.func1(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/stat_unix.go:45
+os.ignoringEINTR(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/file_posix.go:256
+os.lstatNolog({0x14001382000, 0xa0})
+	$USER_HOME/.goenv/versions/1.25.5/src/os/stat_unix.go:44 +0x50
+os.Lstat({0x14001382000, 0xa0})
+	$USER_HOME/.goenv/versions/1.25.5/src/os/stat.go:26 +0x30
+path/filepath.walkSymlinks({0x140000e6640?, 0x14000e02000?})
+	$USER_HOME/.goenv/versions/1.25.5/src/path/filepath/symlink.go:85 +0x14c
+path/filepath.evalSymlinks(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/path/filepath/symlink_unix.go:10
+path/filepath.EvalSymlinks({0x140000e6640?, 0x98?})
+	$USER_HOME/.goenv/versions/1.25.5/src/path/filepath/path.go:148 +0x20
+github.com/relux-works/curator/internal/staging.Canonicalize({0x140000e6640, 0x98})
+	$WORKTREE/internal/staging/boundaries.go:34 +0xe0
+github.com/relux-works/curator/internal/staging.recheckTarget({{0x102b249b6, 0x11}, {0x1400044e048, 0x11}, {0x0, 0x0}, {0x140000e6640, 0x98}, {0x140004dcf70, 0xc4}}, ...)
+	$WORKTREE/internal/staging/boundaries.go:483 +0x2ec
+github.com/relux-works/curator/internal/staging.RecheckOne({{0x102b249b6, 0x11}, {0x1400044e048, 0x11}, {0x0, 0x0}, {0x140000e6640, 0x98}, {0x140004dcf70, 0xc4}}, ...)
+	$WORKTREE/internal/staging/boundaries.go:411 +0xac
+github.com/relux-works/curator/internal/install.journalPlan.boundaryCheckFor.func1(0x14000573700?, {0x14000c2d400, 0x98})
+	$WORKTREE/internal/install/commit.go:1080 +0x28c
+github.com/relux-works/curator/internal/transaction.(*Engine).checkBoundary(0x1400038e190, 0x14000c1f760, 0x0)
+	$WORKTREE/internal/transaction/engine.go:525 +0x90
+github.com/relux-works/curator/internal/transaction.(*Engine).commitTarget(0x1400038e190, 0x14000c1f760, 0x0)
+	$WORKTREE/internal/transaction/engine.go:475 +0x768
+github.com/relux-works/curator/internal/transaction.(*Engine).commit(0x1400038e190, 0x14000c1f760)
+	$WORKTREE/internal/transaction/engine.go:370 +0xd0
+github.com/relux-works/curator/internal/transaction.(*Engine).resume(0x1400038e190?, 0x140004cdc20?)
+	$WORKTREE/internal/transaction/engine.go:352 +0x10c
+github.com/relux-works/curator/internal/transaction.(*Engine).Commit(0x1400038e190, {0x102dd6100?, 0x1400012e0c8?}, {0x140004cdc20, 0x28})
+	$WORKTREE/internal/transaction/engine.go:317 +0xfc
+github.com/relux-works/curator/internal/install.runCommit({_, _}, {{0x102b1b7b1, 0x6}, {0x140001f8000, 0x7b}, {0x0, 0x0}, {0x1400031e080, {0x102dd8438, ...}, ...}, ...})
+	$WORKTREE/internal/install/commit.go:691 +0xd5c
+github.com/relux-works/curator/internal/install.globalAttempt(_, {_, _}, {{0x0, 0x0}, 0x0, 0x0, 0x0, 0x0, 0x0, ...}, ...)
+	$WORKTREE/internal/install/global.go:392 +0x3b4c
+github.com/relux-works/curator/internal/install.Global.func2()
+	$WORKTREE/internal/install/global.go:58 +0xa0
+github.com/relux-works/curator/internal/install.runWithRestarts({0x102b1b7b1, _}, {{_, _}, {_, _}, {_, _}, _, {_, ...}, ...}, ...)
+	$WORKTREE/internal/install/install.go:272 +0xe4
+github.com/relux-works/curator/internal/install.Global(_, {_, _}, {{0x0, 0x0}, 0x0, 0x0, 0x0, 0x0, 0x0, ...})
+	$WORKTREE/internal/install/global.go:57 +0x564
+github.com/relux-works/curator/internal/install.TestGlobalReconcilesOwnedLegacyForwardingLink.func1(0x140002f7880)
+	$WORKTREE/internal/install/global_legacy_link_test.go:60 +0x5a8
+testing.tRunner(0x140002f7880, 0x1400000e090)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 4005
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3820 [chan receive]:
+testing.(*T).Parallel(0x140005e96c0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestDraftPlanNeedsSSHRevision2(0x140005e96c0)
+	$WORKTREE/internal/install/drafttransport_v2_test.go:561 +0x28
+testing.tRunner(0x140005e96c0, 0x102dcef40)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3098 [chan receive]:
+testing.(*T).Parallel(0x14000338380)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestGitFixtureOuterEntryRunsRealGit(0x14000338380)
+	$WORKTREE/internal/install/gitfixture_retry_test.go:273 +0x24
+testing.tRunner(0x14000338380, 0x102dcf058)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3959 [chan receive]:
+testing.(*T).Parallel(0x140002f7180)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestGitFixtureNeverRetriesNonZeroExit(0x140002f7180)
+	$WORKTREE/internal/install/gitfixture_retry_test.go:88 +0x28
+testing.tRunner(0x140002f7180, 0x102dcf038)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3095 [chan receive]:
+testing.(*T).Parallel(0x14000de5880)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestGitFixtureNonRetryableSpawnErrorFailsFastWithDiagnostic(0x14000de5880)
+	$WORKTREE/internal/install/gitfixture_retry_test.go:204 +0x28
+testing.tRunner(0x14000de5880, 0x102dcf048)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3957 [chan receive]:
+testing.(*T).Parallel(0x140005d9500)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestGitFixtureRetriesOnceOnSpawnEACCES(0x140005d9500)
+	$WORKTREE/internal/install/gitfixture_retry_test.go:44 +0x28
+testing.tRunner(0x140005d9500, 0x102dcf070)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3279 [chan receive]:
+testing.(*T).Parallel(0x14000c4d500)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestDraftPlanNeedsSSH(0x14000c4d500)
+	$WORKTREE/internal/install/drafttransport_test.go:274 +0x28
+testing.tRunner(0x14000c4d500, 0x102dcef38)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3956 [chan receive]:
+testing.(*T).Parallel(0x14000c4ddc0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestObservationsRecheckDocumentsAgainstTheParsedBytes(0x14000c4ddc0)
+	$WORKTREE/internal/install/generation_test.go:181 +0x28
+testing.tRunner(0x14000c4ddc0, 0x102dcf2b0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3411 [chan receive]:
+testing.(*T).Parallel(0x14000f47500)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestDraftManagerExecutable(0x14000f47500)
+	$WORKTREE/internal/install/drafttransport_test.go:341 +0x20
+testing.tRunner(0x14000f47500, 0x102dcef18)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3819 [chan receive]:
+testing.(*T).Parallel(0x140005e9500)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestDraftTransportPlanV2Conversion(0x140005e9500)
+	$WORKTREE/internal/install/drafttransport_v2_test.go:531 +0x28
+testing.tRunner(0x140005e9500, 0x102dcefc0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3958 [chan receive]:
+testing.(*T).Parallel(0x140005d9880)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestGitFixtureRetriesOnceOnSpawnEAGAIN(0x140005d9880)
+	$WORKTREE/internal/install/gitfixture_retry_test.go:76 +0x28
+testing.tRunner(0x140005d9880, 0x102dcf078)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3961 [chan receive]:
+testing.(*T).Parallel(0x140002f7500)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestGitFixtureRetryPredicate(0x140002f7500)
+	$WORKTREE/internal/install/gitfixture_retry_test.go:139 +0x28
+testing.tRunner(0x140002f7500, 0x102dcf080)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 3954 [chan receive]:
+testing.(*T).Parallel(0x140003c5dc0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1708 +0x190
+github.com/relux-works/curator/internal/install.TestDeclarationGenerationIsContentAddressed(0x140003c5dc0)
+	$WORKTREE/internal/install/generation_test.go:128 +0x24
+testing.tRunner(0x140003c5dc0, 0x102dcecc0)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+FAIL	github.com/relux-works/curator/internal/install	600.443s
+ok  	github.com/relux-works/curator/internal/install/atomicity	409.826s
+ok  	github.com/relux-works/curator/internal/interop	0.399s
+ok  	github.com/relux-works/curator/internal/interop/environments	0.372s
+ok  	github.com/relux-works/curator/internal/locale	0.769s
+ok  	github.com/relux-works/curator/internal/managerlock	2.715s
+ok  	github.com/relux-works/curator/internal/manifest	4.572s
+ok  	github.com/relux-works/curator/internal/marker	13.009s
+ok  	github.com/relux-works/curator/internal/mcp	0.822s
+ok  	github.com/relux-works/curator/internal/moduleroots	0.774s
+ok  	github.com/relux-works/curator/internal/nodesource	1.658s
+ok  	github.com/relux-works/curator/internal/npmsource	148.351s
+ok  	github.com/relux-works/curator/internal/opaquescan	0.375s
+ok  	github.com/relux-works/curator/internal/pathboundary	1.486s
+ok  	github.com/relux-works/curator/internal/pkgversion	0.377s
+ok  	github.com/relux-works/curator/internal/pnpmsource	137.520s
+ok  	github.com/relux-works/curator/internal/privatedir	0.494s
+ok  	github.com/relux-works/curator/internal/protocoljson	0.373s
+ok  	github.com/relux-works/curator/internal/registry	17.954s
+ok  	github.com/relux-works/curator/internal/runtimestore	4.573s
+ok  	github.com/relux-works/curator/internal/rustsource	235.235s
+ok  	github.com/relux-works/curator/internal/scopes	5.503s
+ok  	github.com/relux-works/curator/internal/scriptpolicy	0.287s
+ok  	github.com/relux-works/curator/internal/scriptworker	51.918s
+ok  	github.com/relux-works/curator/internal/shell	115.632s
+ok  	github.com/relux-works/curator/internal/skillcheck	2.464s
+ok  	github.com/relux-works/curator/internal/skillspec	19.878s
+ok  	github.com/relux-works/curator/internal/snapshot	6.800s
+ok  	github.com/relux-works/curator/internal/sourcelock	0.654s
+ok  	github.com/relux-works/curator/internal/staging	1.607s
+ok  	github.com/relux-works/curator/internal/stateread	0.417s
+ok  	github.com/relux-works/curator/internal/swiftpmbuild	71.840s
+ok  	github.com/relux-works/curator/internal/swiftpminterop	201.401s
+ok  	github.com/relux-works/curator/internal/swiftpmsource	66.555s
+?   	github.com/relux-works/curator/internal/testcli	[no test files]
+?   	github.com/relux-works/curator/internal/testgitenv	[no test files]
+?   	github.com/relux-works/curator/internal/testtoolchain	[no test files]
+ok  	github.com/relux-works/curator/internal/transaction	154.878s
+ok  	github.com/relux-works/curator/internal/ui	0.587s
+ok  	github.com/relux-works/curator/internal/verr	0.282s
+ok  	github.com/relux-works/curator/internal/version	0.289s
+ok  	github.com/relux-works/curator/internal/whitelist	0.874s
+ok  	github.com/relux-works/curator/internal/yarnclassicsource	20.502s
+ok  	github.com/relux-works/curator/internal/yarnmodernsource	17.195s
+ok  	github.com/relux-works/curator/tools/ciworkflow	35.807s
+ok  	github.com/relux-works/curator/tools/goreleaserconfig	0.328s
+FAIL

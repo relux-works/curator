@@ -1,0 +1,26 @@
+=== RUN   TestReviewContradictoryObservation
+=== RUN   TestReviewContradictoryObservation/overflow-count
+=== RUN   TestReviewContradictoryObservation/outcome-ready-then-failed
+=== RUN   TestReviewContradictoryObservation/duplicate-count
+=== RUN   TestReviewContradictoryObservation/duplicate-outcome
+=== RUN   TestReviewContradictoryObservation/count-zero-then-one
+    review_attack_test.go:26: contradictory record admitted: event="skills.catalog_load" outcome="ready" user_skills=0 user_skills=1
+=== RUN   TestReviewContradictoryObservation/count-one-then-zero
+=== RUN   TestReviewContradictoryObservation/outcome-failed-then-ready
+=== RUN   TestReviewContradictoryObservation/duplicate-event
+=== RUN   TestReviewContradictoryObservation/quoted-decoy
+=== RUN   TestReviewContradictoryObservation/malformed-count
+--- FAIL: TestReviewContradictoryObservation (0.00s)
+    --- PASS: TestReviewContradictoryObservation/overflow-count (0.00s)
+    --- PASS: TestReviewContradictoryObservation/outcome-ready-then-failed (0.00s)
+    --- PASS: TestReviewContradictoryObservation/duplicate-count (0.00s)
+    --- PASS: TestReviewContradictoryObservation/duplicate-outcome (0.00s)
+    --- FAIL: TestReviewContradictoryObservation/count-zero-then-one (0.00s)
+    --- PASS: TestReviewContradictoryObservation/count-one-then-zero (0.00s)
+    --- PASS: TestReviewContradictoryObservation/outcome-failed-then-ready (0.00s)
+    --- PASS: TestReviewContradictoryObservation/duplicate-event (0.00s)
+    --- PASS: TestReviewContradictoryObservation/quoted-decoy (0.00s)
+    --- PASS: TestReviewContradictoryObservation/malformed-count (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator/.temp/TASK-261018-ujp9nh/mutants/checker-duplicate-count	0.383s
+FAIL

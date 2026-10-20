@@ -1,0 +1,275 @@
+{
+  "task": "TASK-261018-ujp9nh",
+  "candidate_base": "e88fdf2dbec7f94c48b0232a350a0a9f9484fdeb",
+  "binary_sha256": "11cc1ae887b4975bbbe1de7358ee9260a612444df9ce4dbfffa1dd785826dbcf",
+  "spec_main": "e41f96387287f5e76604627f9e63662f7d6d86d4",
+  "source_sha256": {
+    "intake_test.go": "e3c95a8b4acf6b27b9845b03968c7e720c501e549c7662cf5d681780a48c764f",
+    "reference-snapshot-check.py": "984c57f7d874586f1d9f23feb8d50b14438fbeed21ffea2872879830e505d554",
+    "replay_test.go": "ea6ba47a3833c25619b024db1b1f9811ac656550b6f37dc7e7b64eb9563d29b4",
+    "review_attack_test.go": "5cf3f947c6a2e62e3b9d7dfc46f461677ec6fde53a0f8b5acf3fdf51ae2f4fe9"
+  },
+  "ac_rows_driven": "6 of 6",
+  "vendor_loader_parser_cases": 45,
+  "vendor_exit_counts": {
+    "0": 43,
+    "2": 2
+  },
+  "verdicts": {
+    "exec": "qualified for measured loader rows",
+    "interactive": "refused; P4 failure persists from 1.4.8; 7.9 pending"
+  },
+  "commands": [
+    {
+      "command": "go build -o .temp/TASK-261018-ujp9nh/curator ./cmd/curator",
+      "exit": 0,
+      "evidence": "build-curator-01.log"
+    },
+    {
+      "command": "go build ./...",
+      "exit": 0,
+      "evidence": "build-01.log"
+    },
+    {
+      "command": "go vet ./...",
+      "exit": 0,
+      "evidence": "vet-01.log"
+    },
+    {
+      "command": "go test ./...",
+      "exit": 1,
+      "evidence": "default-test-01.log"
+    },
+    {
+      "command": "env -u MUSE1410_BINARY go test ./.research/muse1410 -count=1 -v",
+      "exit": 0,
+      "evidence": "ungated-01.log"
+    },
+    {
+      "command": "gated controls initial expected-parser-refusal assertion",
+      "exit": 1,
+      "evidence": "controls-01.log"
+    },
+    {
+      "command": "gated corrected controls and reference CLI",
+      "exit": 0,
+      "evidence": "controls-02.log"
+    },
+    {
+      "command": "gated initial loader matrix/regression/workspace",
+      "exit": 0,
+      "evidence": "replay-01.log"
+    },
+    {
+      "command": "gated go test ./.research/muse1410 -count=1 -v",
+      "exit": 0,
+      "evidence": "replay-02.log"
+    },
+    {
+      "command": "go vet ./.research/muse1410",
+      "exit": 0,
+      "evidence": "harness-vet-01.log"
+    },
+    {
+      "command": "golangci-lint run ./.research/muse1410/...",
+      "exit": 0,
+      "evidence": "harness-lint-01.log"
+    },
+    {
+      "command": "MUSE1410_OMIT_EXCLUSION=exec go test ./.research/muse1410 -run ^TestMuse1410LoaderMatrix$/exec/linked/skills -count=1 -v",
+      "exit": 1,
+      "evidence": "plant-exec-01.log"
+    },
+    {
+      "command": "MUSE1410_OMIT_EXCLUSION=interactive go test ./.research/muse1410 -run ^TestMuse1410LoaderMatrix$/interactive/linked/skills -count=1 -v",
+      "exit": 0,
+      "evidence": "plant-interactive-01.log"
+    },
+    {
+      "command": "controlled-PATH CLI ambient-provider diagnostic control",
+      "exit": 0,
+      "evidence": "default-path-control-01.log"
+    },
+    {
+      "command": "accepted existing hosted default Go stage on unchanged inputs: go test -json -count=1 -timeout 60m PACKAGE...",
+      "exit": 0,
+      "evidence": "hosted-default-exits.log"
+    }
+  ],
+  "accepted_hosted_default_suite": {
+    "run": 39193852508,
+    "head_sha": "e88fdf2dbec7f94c48b0232a350a0a9f9484fdeb",
+    "job": "Test (macos-latest)",
+    "go_test_overall_exit": 0,
+    "package_passes": 80,
+    "package_no_test_skips": 5,
+    "coverage_of_default_packages": "85 of 85",
+    "failure_events": 0,
+    "test_stream_sha256": "3592b90d813b35f565b63fd1d0e5a71586f79b8b9a40418c4d148bb48381aca8",
+    "environment": "Original hosted workflow environment; not claimed equivalent to the contended local host. Unchanged candidate default-source/test/config inputs reuse this exact hosted evidence."
+  },
+  "local_default_suite": "Original go test ./... exited 1; bounded diagnostics include timeouts, lock refusals and stopped/incomplete calls. No local full-suite success is claimed. Full hosted evidence is accepted only for unchanged default inputs and its original environment. New harness ran locally, full gated exit 0.",
+  "mutants": [
+    {
+      "mutant": "checker-duplicate-count",
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261018-ujp9nh/mutants/checker-duplicate-count",
+        "-run",
+        "^TestReviewContradictoryObservation$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_test": "TestReviewContradictoryObservation/count-zero-then-one",
+      "killed": true
+    },
+    {
+      "mutant": "checker-duplicate-outcome",
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261018-ujp9nh/mutants/checker-duplicate-outcome",
+        "-run",
+        "^TestReviewContradictoryObservation$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_test": "TestReviewContradictoryObservation/outcome-failed-then-ready",
+      "killed": true
+    },
+    {
+      "mutant": "snapshot-extra-entry",
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261018-ujp9nh/mutants/snapshot-extra-entry",
+        "-run",
+        "^TestFrozenSnapshot$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_test": "TestFrozenSnapshot/extra",
+      "killed": true
+    },
+    {
+      "mutant": "snapshot-go-listed-link",
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261018-ujp9nh/mutants/snapshot-go-listed-link",
+        "-run",
+        "^Test(FrozenSnapshot|FrozenSnapshotSourceInputs)$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_test": "TestFrozenSnapshot/listed-symlink",
+      "killed": true
+    },
+    {
+      "mutant": "snapshot-reference-listed-link",
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261018-ujp9nh/mutants/snapshot-reference-listed-link",
+        "-run",
+        "^TestReferenceSnapshotPhysicalClosure$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_test": "TestReferenceSnapshotPhysicalClosure/listed-symlink",
+      "killed": true
+    },
+    {
+      "mutant": "snapshot-reference-dangling-link",
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261018-ujp9nh/mutants/snapshot-reference-dangling-link",
+        "-run",
+        "^TestReferenceSnapshotPhysicalClosure$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_test": "TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link",
+      "killed": true
+    },
+    {
+      "mutant": "intake-one-foreign-build",
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261018-ujp9nh/mutants/intake-one-foreign-build",
+        "-run",
+        "^TestVendorIntakeBoundary$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_test": "TestVendorIntakeBoundary/wrong-digest",
+      "killed": true
+    },
+    {
+      "mutant": "offline-loopback",
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261018-ujp9nh/mutants/offline-loopback",
+        "-run",
+        "^TestMuse1410OfflineBoundary$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_test": "TestMuse1410OfflineBoundary",
+      "killed": true
+    },
+    {
+      "mutant": "offline-one-keychain-file",
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261018-ujp9nh/mutants/offline-one-keychain-file",
+        "-run",
+        "^TestMuse1410OfflineBoundary$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_test": "TestMuse1410OfflineBoundary",
+      "killed": true
+    },
+    {
+      "mutant": "checker-one-skill",
+      "exit": 1,
+      "named_test": "TestObservationChecker",
+      "killed": true
+    },
+    {
+      "mutant": "exec omission",
+      "exit": 1,
+      "named_test": "TestMuse1410LoaderMatrix/exec/linked/skills/exclude-true",
+      "killed": true
+    },
+    {
+      "mutant": "interactive omission",
+      "exit": 0,
+      "named_test": null,
+      "killed": false,
+      "bound": "Vendor exclusion already retains one skill, so omission proves no interactive protection."
+    }
+  ],
+  "candidate_scope": [
+    ".research/muse1410/",
+    "docs/qualification/muse-1.4.10-R6427.1.md"
+  ],
+  "qualification_record_sha256": "3051ba59382182e67349edaa2888891efce082ff963f787a45a4a2c408ba251e",
+  "gaps_sha256": "bc532a3c3707e3ae41e40d9877cef179e7cd6ce26cb2464b9635397c1372ac97",
+  "repository_state": "uncommitted managed Story candidate; no producer commit"
+}

@@ -1,0 +1,204 @@
+=== RUN   TestVendorIntakeBoundary
+=== RUN   TestVendorIntakeBoundary/unset
+=== RUN   TestVendorIntakeBoundary/wrong-digest
+--- PASS: TestVendorIntakeBoundary (0.04s)
+    --- PASS: TestVendorIntakeBoundary/unset (0.02s)
+    --- PASS: TestVendorIntakeBoundary/wrong-digest (0.02s)
+=== RUN   TestMuse1410Identity
+    intake_test.go:58: version exit=0; Muse Code 1.4.10 (1.4.10-R6427.1); exact digest verified
+--- PASS: TestMuse1410Identity (0.28s)
+=== RUN   TestObservationChecker
+--- PASS: TestObservationChecker (0.00s)
+=== RUN   TestMuse1410OfflineBoundary
+--- PASS: TestMuse1410OfflineBoundary (0.31s)
+=== RUN   TestFrozenSnapshot
+=== RUN   TestFrozenSnapshot/regular
+=== RUN   TestFrozenSnapshot/altered
+=== RUN   TestFrozenSnapshot/extra
+=== RUN   TestFrozenSnapshot/listed-symlink
+=== RUN   TestFrozenSnapshot/unlisted-dangling-link
+=== RUN   TestFrozenSnapshot/missing
+--- PASS: TestFrozenSnapshot (0.95s)
+    --- PASS: TestFrozenSnapshot/regular (0.15s)
+    --- PASS: TestFrozenSnapshot/altered (0.18s)
+    --- PASS: TestFrozenSnapshot/extra (0.21s)
+    --- PASS: TestFrozenSnapshot/listed-symlink (0.18s)
+    --- PASS: TestFrozenSnapshot/unlisted-dangling-link (0.15s)
+    --- PASS: TestFrozenSnapshot/missing (0.08s)
+=== RUN   TestFrozenSnapshotSourceInputs
+=== RUN   TestFrozenSnapshotSourceInputs/regular
+=== RUN   TestFrozenSnapshotSourceInputs/listed-symlink
+=== RUN   TestFrozenSnapshotSourceInputs/unlisted-dangling-link
+--- PASS: TestFrozenSnapshotSourceInputs (0.61s)
+    --- PASS: TestFrozenSnapshotSourceInputs/regular (0.28s)
+    --- PASS: TestFrozenSnapshotSourceInputs/listed-symlink (0.19s)
+    --- PASS: TestFrozenSnapshotSourceInputs/unlisted-dangling-link (0.15s)
+=== RUN   TestReferenceSnapshotPhysicalClosure
+=== RUN   TestReferenceSnapshotPhysicalClosure/regular
+=== RUN   TestReferenceSnapshotPhysicalClosure/listed-symlink
+=== RUN   TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link
+--- PASS: TestReferenceSnapshotPhysicalClosure (1.73s)
+    --- PASS: TestReferenceSnapshotPhysicalClosure/regular (0.98s)
+    --- PASS: TestReferenceSnapshotPhysicalClosure/listed-symlink (0.39s)
+    --- PASS: TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link (0.36s)
+=== RUN   TestMuse1410ParserRefusals
+=== RUN   TestMuse1410ParserRefusals/interactive-exec-flag
+=== RUN   TestMuse1410ParserRefusals/interactive-string-false
+--- PASS: TestMuse1410ParserRefusals (0.51s)
+    --- PASS: TestMuse1410ParserRefusals/interactive-exec-flag (0.13s)
+    --- PASS: TestMuse1410ParserRefusals/interactive-string-false (0.16s)
+=== RUN   TestMuse1410LoaderMatrix
+=== RUN   TestMuse1410LoaderMatrix/exec/absent/claude-rules/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=1 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/absent/claude-rules/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=0 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/absent/codex-rules/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=1 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/absent/codex-rules/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=0 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/absent/skills/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=0 foreign_sources=0 user_skills=1; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/absent/skills/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=0 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/linked/claude-rules/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/linked/claude-rules/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/linked/codex-rules/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/linked/codex-rules/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/linked/skills/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/linked/skills/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/snapshot/claude-rules/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/snapshot/claude-rules/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/snapshot/codex-rules/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/snapshot/codex-rules/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/snapshot/skills/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
+=== RUN   TestMuse1410LoaderMatrix/exec/snapshot/skills/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/absent/claude-rules/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=1 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/absent/claude-rules/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=1 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/absent/codex-rules/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=1 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/absent/codex-rules/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=1 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/absent/skills/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=0 foreign_sources=0 user_skills=1; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/absent/skills/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=0 foreign_sources=0 user_skills=1; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/linked/claude-rules/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/linked/claude-rules/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/linked/codex-rules/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/linked/codex-rules/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/linked/skills/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/linked/skills/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/snapshot/claude-rules/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/snapshot/claude-rules/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/snapshot/codex-rules/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/snapshot/codex-rules/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/snapshot/skills/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
+=== RUN   TestMuse1410LoaderMatrix/interactive/snapshot/skills/exclude-true
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
+--- PASS: TestMuse1410LoaderMatrix (145.41s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/absent/claude-rules/exclude-false (3.04s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/absent/claude-rules/exclude-true (3.43s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/absent/codex-rules/exclude-false (3.43s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/absent/codex-rules/exclude-true (3.11s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/absent/skills/exclude-false (3.08s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/absent/skills/exclude-true (3.27s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/linked/claude-rules/exclude-false (5.50s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/linked/claude-rules/exclude-true (7.23s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/linked/codex-rules/exclude-false (4.55s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/linked/codex-rules/exclude-true (2.99s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/linked/skills/exclude-false (3.20s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/linked/skills/exclude-true (4.17s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/snapshot/claude-rules/exclude-false (4.51s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/snapshot/claude-rules/exclude-true (3.52s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/snapshot/codex-rules/exclude-false (3.61s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/snapshot/codex-rules/exclude-true (3.49s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/snapshot/skills/exclude-false (3.21s)
+    --- PASS: TestMuse1410LoaderMatrix/exec/snapshot/skills/exclude-true (3.23s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/absent/claude-rules/exclude-false (3.98s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/absent/claude-rules/exclude-true (3.63s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/absent/codex-rules/exclude-false (3.22s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/absent/codex-rules/exclude-true (4.34s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/absent/skills/exclude-false (4.25s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/absent/skills/exclude-true (3.62s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/linked/claude-rules/exclude-false (3.74s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/linked/claude-rules/exclude-true (4.06s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/linked/codex-rules/exclude-false (3.71s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/linked/codex-rules/exclude-true (4.08s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/linked/skills/exclude-false (4.12s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/linked/skills/exclude-true (4.36s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/snapshot/claude-rules/exclude-false (3.97s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/snapshot/claude-rules/exclude-true (4.65s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/snapshot/codex-rules/exclude-false (3.84s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/snapshot/codex-rules/exclude-true (4.54s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/snapshot/skills/exclude-false (4.34s)
+    --- PASS: TestMuse1410LoaderMatrix/interactive/snapshot/skills/exclude-true (5.29s)
+=== RUN   TestMuse1410InteractiveExclusionRegression
+=== RUN   TestMuse1410InteractiveExclusionRegression/linked
+    replay_test.go:820: vendor exit=0; required interactive exclusion FAILED (user_skills=1); see docs/qualification/muse-1.4.10-R6427.1.md
+=== RUN   TestMuse1410InteractiveExclusionRegression/snapshot
+    replay_test.go:820: vendor exit=0; required interactive exclusion FAILED (user_skills=1); see docs/qualification/muse-1.4.10-R6427.1.md
+--- PASS: TestMuse1410InteractiveExclusionRegression (17.40s)
+    --- PASS: TestMuse1410InteractiveExclusionRegression/linked (6.20s)
+    --- PASS: TestMuse1410InteractiveExclusionRegression/snapshot (4.18s)
+=== RUN   TestMuse1410WorkspaceResidual
+=== RUN   TestMuse1410WorkspaceResidual/exec/linked
+=== RUN   TestMuse1410WorkspaceResidual/exec/snapshot
+=== RUN   TestMuse1410WorkspaceResidual/interactive/linked
+=== RUN   TestMuse1410WorkspaceResidual/interactive/snapshot
+--- PASS: TestMuse1410WorkspaceResidual (18.55s)
+    --- PASS: TestMuse1410WorkspaceResidual/exec/linked (3.18s)
+    --- PASS: TestMuse1410WorkspaceResidual/exec/snapshot (4.39s)
+    --- PASS: TestMuse1410WorkspaceResidual/interactive/linked (4.15s)
+    --- PASS: TestMuse1410WorkspaceResidual/interactive/snapshot (4.52s)
+=== RUN   TestMuse1410ExecInteractiveKeyObservation
+    replay_test.go:871: vendor exit=0; exec accepts -c context.foreign_personal_skills=false; exclusion semantics not measured by this parser case
+--- PASS: TestMuse1410ExecInteractiveKeyObservation (3.64s)
+=== RUN   TestReviewContradictoryObservation
+=== RUN   TestReviewContradictoryObservation/outcome-failed-then-ready
+=== RUN   TestReviewContradictoryObservation/outcome-ready-then-failed
+=== RUN   TestReviewContradictoryObservation/duplicate-count
+=== RUN   TestReviewContradictoryObservation/duplicate-outcome
+=== RUN   TestReviewContradictoryObservation/quoted-decoy
+=== RUN   TestReviewContradictoryObservation/overflow-count
+=== RUN   TestReviewContradictoryObservation/count-zero-then-one
+=== RUN   TestReviewContradictoryObservation/count-one-then-zero
+=== RUN   TestReviewContradictoryObservation/duplicate-event
+=== RUN   TestReviewContradictoryObservation/malformed-count
+--- PASS: TestReviewContradictoryObservation (0.00s)
+    --- PASS: TestReviewContradictoryObservation/outcome-failed-then-ready (0.00s)
+    --- PASS: TestReviewContradictoryObservation/outcome-ready-then-failed (0.00s)
+    --- PASS: TestReviewContradictoryObservation/duplicate-count (0.00s)
+    --- PASS: TestReviewContradictoryObservation/duplicate-outcome (0.00s)
+    --- PASS: TestReviewContradictoryObservation/quoted-decoy (0.00s)
+    --- PASS: TestReviewContradictoryObservation/overflow-count (0.00s)
+    --- PASS: TestReviewContradictoryObservation/count-zero-then-one (0.00s)
+    --- PASS: TestReviewContradictoryObservation/count-one-then-zero (0.00s)
+    --- PASS: TestReviewContradictoryObservation/duplicate-event (0.00s)
+    --- PASS: TestReviewContradictoryObservation/malformed-count (0.00s)
+PASS
+ok  	github.com/relux-works/curator/.research/muse1410	189.630s

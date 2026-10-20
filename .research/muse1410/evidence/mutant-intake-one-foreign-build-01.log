@@ -1,0 +1,12 @@
+=== RUN   TestVendorIntakeBoundary
+=== RUN   TestVendorIntakeBoundary/unset
+=== RUN   TestVendorIntakeBoundary/wrong-digest
+    intake_test.go:33: intake exit=0 want=1: === RUN   TestMuse1410OfflineBoundary
+        --- PASS: TestMuse1410OfflineBoundary (0.10s)
+        PASS
+--- FAIL: TestVendorIntakeBoundary (0.22s)
+    --- PASS: TestVendorIntakeBoundary/unset (0.03s)
+    --- FAIL: TestVendorIntakeBoundary/wrong-digest (0.19s)
+FAIL
+FAIL	github.com/relux-works/curator/.temp/TASK-261018-ujp9nh/mutants/intake-one-foreign-build	0.503s
+FAIL

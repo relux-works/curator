@@ -1,0 +1,18 @@
+=== RUN   TestFrozenSnapshot
+=== RUN   TestFrozenSnapshot/regular
+=== RUN   TestFrozenSnapshot/altered
+=== RUN   TestFrozenSnapshot/extra
+    replay_test.go:498: extra snapshot admitted
+=== RUN   TestFrozenSnapshot/listed-symlink
+=== RUN   TestFrozenSnapshot/unlisted-dangling-link
+=== RUN   TestFrozenSnapshot/missing
+--- FAIL: TestFrozenSnapshot (1.00s)
+    --- PASS: TestFrozenSnapshot/regular (0.17s)
+    --- PASS: TestFrozenSnapshot/altered (0.22s)
+    --- FAIL: TestFrozenSnapshot/extra (0.21s)
+    --- PASS: TestFrozenSnapshot/listed-symlink (0.12s)
+    --- PASS: TestFrozenSnapshot/unlisted-dangling-link (0.14s)
+    --- PASS: TestFrozenSnapshot/missing (0.14s)
+FAIL
+FAIL	github.com/relux-works/curator/.temp/TASK-261018-ujp9nh/mutants/snapshot-extra-entry	1.457s
+FAIL

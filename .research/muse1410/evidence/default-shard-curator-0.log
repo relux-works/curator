@@ -1,0 +1,224 @@
+panic: test timed out after 8m0s
+	running tests:
+		TestCompiledProjectStatusAndUntrustedRecovery (16s)
+		TestStatusReportsAnUnusableToolchainPerCompiledCommand (16s)
+
+goroutine 4988 [running]:
+testing.(*M).startAlarm.func1()
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2682 +0x2b0
+created by time.goFunc
+	$USER_HOME/.goenv/versions/1.25.5/src/time/sleep.go:215 +0x38
+
+goroutine 1 [chan receive]:
+testing.tRunner.func1()
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1891 +0x3d0
+testing.tRunner(0x14000003dc0, 0x1400040fbc8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1940 +0x104
+testing.runTests(0x1400000e060, {0x103dd6060, 0x1b2, 0x1b2}, {0x20?, 0x10385e1c0?, 0x103ddbbe0?})
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2475 +0x3b8
+testing.(*M).Run(0x14000392820)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:2337 +0x530
+github.com/relux-works/curator/cmd/curator.TestMain(0x14000392820)
+	$WORKTREE/cmd/curator/status_test.go:64 +0x184
+main.main()
+	_testmain.go:913 +0x88
+
+goroutine 4999 [select]:
+os/exec.(*Cmd).watchCtx(0x14000642180, 0x140001780e0)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/exec/exec.go:789 +0x70
+created by os/exec.(*Cmd).Start in goroutine 4630
+	$USER_HOME/.goenv/versions/1.25.5/src/os/exec/exec.go:775 +0x678
+
+goroutine 4629 [runnable]:
+syscall.syscall6(0x1400126f9c8?, 0x7?, 0x102eb0730?, 0x10?, 0x0?, 0x0?, 0x0?)
+	$USER_HOME/.goenv/versions/1.25.5/src/runtime/sys_darwin.go:60 +0x40
+syscall.openat(0x11, {0x1400126f9c8?, 0x14002b38db8?}, 0x1100100, 0x0)
+	$USER_HOME/.goenv/versions/1.25.5/src/syscall/zsyscall_darwin_arm64.go:1861 +0x8c
+internal/syscall/unix.Openat(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/internal/syscall/unix/at_libc2.go:19
+os.rootOpenDir.func1(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/root_unix.go:116
+os.ignoringEINTR(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/file_posix.go:256
+os.rootOpenDir(0x11, {0x1400126f9c8, 0x7})
+	$USER_HOME/.goenv/versions/1.25.5/src/os/root_unix.go:115 +0x4c
+os.doInRoot[...](0x1400052d248, {0x1400126f9c0, 0x1e}, 0x0, 0x14002b38ff8)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/root_openat.go:347 +0x268
+os.rootOpenFileNolog(0x1400052d248, {0x1400126f9c0, 0x1e}, 0x0, 0x20?)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/root_unix.go:83 +0x58
+os.(*Root).OpenFile(0x1400052d248, {0x1400126f9c0, 0x1e}, 0x0, 0x0)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/root.go:122 +0xec
+os.(*Root).Open(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/root.go:103
+github.com/relux-works/curator/internal/godriver.digestToolchainRecords({0x1038c8938, 0x103e043a0}, 0x1400052d248, {0x1400278c000, 0x3edd, 0x1031af4f0?}, {0x14000027220, 0x20})
+	$WORKTREE/internal/godriver/fingerprint.go:91 +0x2a8
+github.com/relux-works/curator/internal/godriver.fingerprintToolchain({0x1038c8938, 0x103e043a0}, {0x140003e0320?, 0x14000578000?}, {0x14000027220, 0x20})
+	$WORKTREE/internal/godriver/fingerprint.go:46 +0x1ac
+github.com/relux-works/curator/internal/godriver.(*Session).VerifyToolchain(0x140001fc480, {0x1038c8938, 0x103e043a0})
+	$WORKTREE/internal/godriver/session.go:334 +0x54
+github.com/relux-works/curator/internal/godriver.Build({0x1038c8938, 0x103e043a0}, {0x140001fc480, 0x14000262000, 0x14000a992c0, {0x1400104e030, 0x11}, {0x140003e0080, 0x1a}, {0x140004bc200, ...}, ...})
+	$WORKTREE/internal/godriver/build.go:276 +0x1ba4
+github.com/relux-works/curator/internal/install.goBuilder.Stage({}, {_, _}, {{0x1038c8c10, 0x14000b08408}, 0x14000262000, 0x14000a992c0, {0x1400104e030, 0x11}, {0x140003e0080, ...}, ...})
+	$WORKTREE/internal/install/builddeps.go:238 +0x134
+github.com/relux-works/curator/internal/install.(*assuredBuilder).Stage(_, {_, _}, {{0x1038c8c10, 0x14000b08408}, 0x14000262000, 0x14000a992c0, {0x1400104e030, 0x11}, {0x140003e0080, ...}, ...})
+	$WORKTREE/internal/install/assurance.go:165 +0xe4
+github.com/relux-works/curator/internal/install.stageBuilds({0x1038c8938, 0x103e043a0}, {{0x103582e0d, 0x3}, {0x140006fe708, 0x1, 0x1}, 0x1400035f320, {0x1038c8c80, 0x14000b08420}, ...}, ...)
+	$WORKTREE/internal/install/stage.go:110 +0x480
+github.com/relux-works/curator/internal/install.projectAttempt(_, {_, _}, {_, _}, {{0x103584e42, 0x7}, 0x0, 0x0, 0x0, ...}, ...)
+	$WORKTREE/internal/install/install.go:823 +0x4be4
+github.com/relux-works/curator/internal/install.Project.func2()
+	$WORKTREE/internal/install/install.go:262 +0xb4
+github.com/relux-works/curator/internal/install.runWithRestarts({0x103582e0d, _}, {{_, _}, {_, _}, {_, _}, _, {_, ...}, ...}, ...)
+	$WORKTREE/internal/install/install.go:272 +0xe4
+github.com/relux-works/curator/internal/install.Project(_, {_, _}, {_, _}, {{0x103584e42, 0x7}, 0x0, 0x0, 0x0, ...})
+	$WORKTREE/internal/install/install.go:261 +0x474
+github.com/relux-works/curator/cmd/curator.cli.cmdInstallMode({{0x1038c50a8, 0x1400063a000}, {0x1038c2a00, 0x1400031a080}, {0x1038c2a00, 0x1400031a0e0}, 0x14000232018, 0x0, 0x0, 0x0, ...}, ...)
+	$WORKTREE/cmd/curator/main.go:783 +0x61c
+github.com/relux-works/curator/cmd/curator.cli.cmdInstall({{0x1038c50a8, 0x1400063a000}, {0x1038c2a00, 0x1400031a080}, {0x1038c2a00, 0x1400031a0e0}, 0x14000232018, 0x0, 0x0, 0x0, ...}, ...)
+	$WORKTREE/cmd/curator/main.go:732 +0x50
+github.com/relux-works/curator/cmd/curator.cli.run({{0x1038c50a8, 0x1400063a000}, {0x1038c2a00, 0x1400031a080}, {0x1038c2a00, 0x1400031a0e0}, 0x14000232018, 0x0, 0x0, 0x0, ...}, ...)
+	$WORKTREE/cmd/curator/main.go:313 +0x488
+github.com/relux-works/curator/cmd/curator.captureWithUserHomeAndProviderPath(0x1400079bd30?, {0x14000350280, 0x7d}, 0x14000232018, 0x0, {0x1400031a000, 0x2, 0x2})
+	$WORKTREE/cmd/curator/status_test.go:113 +0xdc
+github.com/relux-works/curator/cmd/curator.captureWithUserHome(...)
+	$WORKTREE/cmd/curator/status_test.go:106
+github.com/relux-works/curator/cmd/curator.capture(0x1400087f500, {0x14000350280, 0x7d}, {0x1400031a000, 0x2, 0x2})
+	$WORKTREE/cmd/curator/status_test.go:102 +0x1ec
+github.com/relux-works/curator/cmd/curator.newInstalledCompiledProject(0x1400087f500)
+	$WORKTREE/cmd/curator/status_test.go:517 +0xcc
+github.com/relux-works/curator/cmd/curator.TestCompiledProjectStatusAndUntrustedRecovery(0x1400087f500)
+	$WORKTREE/cmd/curator/status_test.go:538 +0x34
+testing.tRunner(0x1400087f500, 0x1038ba770)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 4966 [IO wait]:
+internal/poll.runtime_pollWait(0x1320c0200, 0x72)
+	$USER_HOME/.goenv/versions/1.25.5/src/runtime/netpoll.go:351 +0xa0
+internal/poll.(*pollDesc).wait(0x14000c812c0?, 0x14000d10000?, 0x1)
+	$USER_HOME/.goenv/versions/1.25.5/src/internal/poll/fd_poll_runtime.go:84 +0x28
+internal/poll.(*pollDesc).waitRead(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0x14000c812c0, {0x14000d10000, 0x8000, 0x8000})
+	$USER_HOME/.goenv/versions/1.25.5/src/internal/poll/fd_unix.go:165 +0x1e0
+os.(*File).read(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/file_posix.go:29
+os.(*File).Read(0x140005ec3f8, {0x14000d10000?, 0x140006b7da8?, 0x102e2ce48?})
+	$USER_HOME/.goenv/versions/1.25.5/src/os/file.go:144 +0x68
+io.copyBuffer({0x1038c3480, 0x140004289c0}, {0x1038c2938, 0x1400014e268}, {0x0, 0x0, 0x0})
+	$USER_HOME/.goenv/versions/1.25.5/src/io/io.go:429 +0x18c
+io.Copy(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/io/io.go:388
+os.genericWriteTo(0x14000444000?, {0x1038c3480, 0x140004289c0})
+	$USER_HOME/.goenv/versions/1.25.5/src/os/file.go:295 +0x58
+os.(*File).WriteTo(0x140006b7fa8?, {0x1038c3480?, 0x140004289c0?})
+	$USER_HOME/.goenv/versions/1.25.5/src/os/file.go:273 +0x5c
+io.copyBuffer({0x1038c3480, 0x140004289c0}, {0x1038c2a20, 0x140005ec3f8}, {0x0, 0x0, 0x0})
+	$USER_HOME/.goenv/versions/1.25.5/src/io/io.go:411 +0x98
+io.Copy(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/io/io.go:388
+os/exec.(*Cmd).writerDescriptor.func1()
+	$USER_HOME/.goenv/versions/1.25.5/src/os/exec/exec.go:596 +0x40
+os/exec.(*Cmd).Start.func2(0x14000642480?)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/exec/exec.go:749 +0x30
+created by os/exec.(*Cmd).Start in goroutine 4629
+	$USER_HOME/.goenv/versions/1.25.5/src/os/exec/exec.go:748 +0x6a4
+
+goroutine 4967 [select]:
+os/exec.(*Cmd).watchCtx(0x14000b44000, 0x1400017a1c0)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/exec/exec.go:789 +0x70
+created by os/exec.(*Cmd).Start in goroutine 4629
+	$USER_HOME/.goenv/versions/1.25.5/src/os/exec/exec.go:775 +0x678
+
+goroutine 4630 [runnable]:
+syscall.syscall(0x14002b48ae8?, 0x102ecc874?, 0x800000?, 0x7ffff800000?)
+	$USER_HOME/.goenv/versions/1.25.5/src/runtime/sys_darwin.go:27 +0x40
+syscall.read(0x1400108a2a0?, {0x14003542000?, 0x140005f0180?, 0x14003542000?})
+	$USER_HOME/.goenv/versions/1.25.5/src/syscall/zsyscall_darwin_arm64.go:1245 +0x48
+syscall.Read(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/syscall/syscall_unix.go:183
+internal/poll.ignoringEINTRIO(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/internal/poll/fd_unix.go:738
+internal/poll.(*FD).Read(0x1400108a2a0, {0x14003542000, 0x20000, 0x20000})
+	$USER_HOME/.goenv/versions/1.25.5/src/internal/poll/fd_unix.go:161 +0x204
+os.(*File).read(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/file_posix.go:29
+os.(*File).Read(0x14000802020, {0x14003542000?, 0xc5?, 0x20000?})
+	$USER_HOME/.goenv/versions/1.25.5/src/os/file.go:144 +0x68
+github.com/relux-works/curator/internal/godriver.copyWithContext({0x1038c8938, 0x103e043a0}, {0x1038c2d40, 0x140001b2120}, {0x1038c2a20, 0x14000802020})
+	$WORKTREE/internal/godriver/fingerprint.go:343 +0x8c
+github.com/relux-works/curator/internal/godriver.digestToolchainRecords({0x1038c8938, 0x103e043a0}, 0x14000738290, {0x14002392000, 0x3edd, 0x1031af4f0?}, {0x14000026c60, 0x20})
+	$WORKTREE/internal/godriver/fingerprint.go:105 +0x538
+github.com/relux-works/curator/internal/godriver.fingerprintToolchain({0x1038c8938, 0x103e043a0}, {0x140003d4360?, 0x140006de1a0?}, {0x14000026c60, 0x20})
+	$WORKTREE/internal/godriver/fingerprint.go:46 +0x1ac
+github.com/relux-works/curator/internal/godriver.(*Session).VerifyToolchain(0x140004d0c60, {0x1038c8938, 0x103e043a0})
+	$WORKTREE/internal/godriver/session.go:334 +0x54
+github.com/relux-works/curator/internal/godriver.Build({0x1038c8938, 0x103e043a0}, {0x140004d0c60, 0x14000636000, 0x140003952f0, {0x140001b11b8, 0x11}, {0x140003d4060, 0x1a}, {0x1400036ff90, ...}, ...})
+	$WORKTREE/internal/godriver/build.go:276 +0x1ba4
+github.com/relux-works/curator/internal/install.goBuilder.Stage({}, {_, _}, {{0x1038c8c10, 0x14000674330}, 0x14000636000, 0x140003952f0, {0x140001b11b8, 0x11}, {0x140003d4060, ...}, ...})
+	$WORKTREE/internal/install/builddeps.go:238 +0x134
+github.com/relux-works/curator/internal/install.(*assuredBuilder).Stage(_, {_, _}, {{0x1038c8c10, 0x14000674330}, 0x14000636000, 0x140003952f0, {0x140001b11b8, 0x11}, {0x140003d4060, ...}, ...})
+	$WORKTREE/internal/install/assurance.go:165 +0xe4
+github.com/relux-works/curator/internal/install.stageBuilds({0x1038c8938, 0x103e043a0}, {{0x103582e0d, 0x3}, {0x140004be708, 0x1, 0x1}, 0x140003c06c0, {0x1038c8c80, 0x14000674348}, ...}, ...)
+	$WORKTREE/internal/install/stage.go:110 +0x480
+github.com/relux-works/curator/internal/install.projectAttempt(_, {_, _}, {_, _}, {{0x103584e42, 0x7}, 0x0, 0x0, 0x0, ...}, ...)
+	$WORKTREE/internal/install/install.go:823 +0x4be4
+github.com/relux-works/curator/internal/install.Project.func2()
+	$WORKTREE/internal/install/install.go:262 +0xb4
+github.com/relux-works/curator/internal/install.runWithRestarts({0x103582e0d, _}, {{_, _}, {_, _}, {_, _}, _, {_, ...}, ...}, ...)
+	$WORKTREE/internal/install/install.go:272 +0xe4
+github.com/relux-works/curator/internal/install.Project(_, {_, _}, {_, _}, {{0x103584e42, 0x7}, 0x0, 0x0, 0x0, ...})
+	$WORKTREE/internal/install/install.go:261 +0x474
+github.com/relux-works/curator/cmd/curator.cli.cmdInstallMode({{0x1038c50a8, 0x140003d6b70}, {0x1038c2a00, 0x14000f661a0}, {0x1038c2a00, 0x14000f661c0}, 0x14000b08258, 0x0, 0x0, 0x0, ...}, ...)
+	$WORKTREE/cmd/curator/main.go:783 +0x61c
+github.com/relux-works/curator/cmd/curator.cli.cmdInstall({{0x1038c50a8, 0x140003d6b70}, {0x1038c2a00, 0x14000f661a0}, {0x1038c2a00, 0x14000f661c0}, 0x14000b08258, 0x0, 0x0, 0x0, ...}, ...)
+	$WORKTREE/cmd/curator/main.go:732 +0x50
+github.com/relux-works/curator/cmd/curator.cli.run({{0x1038c50a8, 0x140003d6b70}, {0x1038c2a00, 0x14000f661a0}, {0x1038c2a00, 0x14000f661c0}, 0x14000b08258, 0x0, 0x0, 0x0, ...}, ...)
+	$WORKTREE/cmd/curator/main.go:313 +0x488
+github.com/relux-works/curator/cmd/curator.captureWithUserHomeAndProviderPath(0x140000c9930?, {0x140003a8750, 0x86}, 0x14000b08258, 0x0, {0x14000f66160, 0x2, 0x2})
+	$WORKTREE/cmd/curator/status_test.go:113 +0xdc
+github.com/relux-works/curator/cmd/curator.captureWithUserHome(...)
+	$WORKTREE/cmd/curator/status_test.go:106
+github.com/relux-works/curator/cmd/curator.capture(0x1400087f6c0, {0x140003a8750, 0x86}, {0x14000f66160, 0x2, 0x2})
+	$WORKTREE/cmd/curator/status_test.go:102 +0x1ec
+github.com/relux-works/curator/cmd/curator.TestStatusReportsAnUnusableToolchainPerCompiledCommand(0x1400087f6c0)
+	$WORKTREE/cmd/curator/status_test.go:1314 +0xcc
+testing.tRunner(0x1400087f6c0, 0x1038bb2b8)
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	$USER_HOME/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 4998 [IO wait]:
+internal/poll.runtime_pollWait(0x1320c0400, 0x72)
+	$USER_HOME/.goenv/versions/1.25.5/src/runtime/netpoll.go:351 +0xa0
+internal/poll.(*pollDesc).wait(0x14000997b60?, 0x14000d08000?, 0x1)
+	$USER_HOME/.goenv/versions/1.25.5/src/internal/poll/fd_poll_runtime.go:84 +0x28
+internal/poll.(*pollDesc).waitRead(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0x14000997b60, {0x14000d08000, 0x8000, 0x8000})
+	$USER_HOME/.goenv/versions/1.25.5/src/internal/poll/fd_unix.go:165 +0x1e0
+os.(*File).read(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/file_posix.go:29
+os.(*File).Read(0x1400014e248, {0x14000d08000?, 0x1400068dda8?, 0x102e2ce48?})
+	$USER_HOME/.goenv/versions/1.25.5/src/os/file.go:144 +0x68
+io.copyBuffer({0x1038c3480, 0x14000646cc0}, {0x1038c2938, 0x14000782260}, {0x0, 0x0, 0x0})
+	$USER_HOME/.goenv/versions/1.25.5/src/io/io.go:429 +0x18c
+io.Copy(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/io/io.go:388
+os.genericWriteTo(0x140004aa380?, {0x1038c3480, 0x14000646cc0})
+	$USER_HOME/.goenv/versions/1.25.5/src/os/file.go:295 +0x58
+os.(*File).WriteTo(0x1400068dfa8?, {0x1038c3480?, 0x14000646cc0?})
+	$USER_HOME/.goenv/versions/1.25.5/src/os/file.go:273 +0x5c
+io.copyBuffer({0x1038c3480, 0x14000646cc0}, {0x1038c2a20, 0x1400014e248}, {0x0, 0x0, 0x0})
+	$USER_HOME/.goenv/versions/1.25.5/src/io/io.go:411 +0x98
+io.Copy(...)
+	$USER_HOME/.goenv/versions/1.25.5/src/io/io.go:388
+os/exec.(*Cmd).writerDescriptor.func1()
+	$USER_HOME/.goenv/versions/1.25.5/src/os/exec/exec.go:596 +0x40
+os/exec.(*Cmd).Start.func2(0x140001ee780?)
+	$USER_HOME/.goenv/versions/1.25.5/src/os/exec/exec.go:749 +0x30
+created by os/exec.(*Cmd).Start in goroutine 4630
+	$USER_HOME/.goenv/versions/1.25.5/src/os/exec/exec.go:748 +0x6a4
+FAIL	github.com/relux-works/curator/cmd/curator	480.254s
+FAIL

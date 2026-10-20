@@ -1,0 +1,77 @@
+[
+  {
+    "command": "go build -o .temp/TASK-261018-ujp9nh/curator ./cmd/curator",
+    "exit": 0,
+    "evidence": "build-curator-01.log"
+  },
+  {
+    "command": "go build ./...",
+    "exit": 0,
+    "evidence": "build-01.log"
+  },
+  {
+    "command": "go vet ./...",
+    "exit": 0,
+    "evidence": "vet-01.log"
+  },
+  {
+    "command": "go test ./...",
+    "exit": 1,
+    "evidence": "default-test-01.log"
+  },
+  {
+    "command": "env -u MUSE1410_BINARY go test ./.research/muse1410 -count=1 -v",
+    "exit": 0,
+    "evidence": "ungated-01.log"
+  },
+  {
+    "command": "gated controls initial expected-parser-refusal assertion",
+    "exit": 1,
+    "evidence": "controls-01.log"
+  },
+  {
+    "command": "gated corrected controls and reference CLI",
+    "exit": 0,
+    "evidence": "controls-02.log"
+  },
+  {
+    "command": "gated initial loader matrix/regression/workspace",
+    "exit": 0,
+    "evidence": "replay-01.log"
+  },
+  {
+    "command": "gated go test ./.research/muse1410 -count=1 -v",
+    "exit": 0,
+    "evidence": "replay-02.log"
+  },
+  {
+    "command": "go vet ./.research/muse1410",
+    "exit": 0,
+    "evidence": "harness-vet-01.log"
+  },
+  {
+    "command": "golangci-lint run ./.research/muse1410/...",
+    "exit": 0,
+    "evidence": "harness-lint-01.log"
+  },
+  {
+    "command": "MUSE1410_OMIT_EXCLUSION=exec go test ./.research/muse1410 -run ^TestMuse1410LoaderMatrix$/exec/linked/skills -count=1 -v",
+    "exit": 1,
+    "evidence": "plant-exec-01.log"
+  },
+  {
+    "command": "MUSE1410_OMIT_EXCLUSION=interactive go test ./.research/muse1410 -run ^TestMuse1410LoaderMatrix$/interactive/linked/skills -count=1 -v",
+    "exit": 0,
+    "evidence": "plant-interactive-01.log"
+  },
+  {
+    "command": "controlled-PATH CLI ambient-provider diagnostic control",
+    "exit": 0,
+    "evidence": "default-path-control-01.log"
+  },
+  {
+    "command": "accepted existing hosted default Go stage on unchanged inputs: go test -json -count=1 -timeout 60m PACKAGE...",
+    "exit": 0,
+    "evidence": "hosted-default-exits.log"
+  }
+]
