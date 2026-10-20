@@ -1217,9 +1217,12 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	// or link replacement. Staging/rename I/O errors after this boundary are
 	// not an all-or-nothing home transaction (see atomicManagedFile).
 	if seeds.claudeInit || plan.adapter.ID == envregistry.ClaudeCode {
-		seeds.claudePrepared, err = prepareClaudeSeed(root, homeRel, req.LaunchDir, plan.form)
-		if err != nil {
-			return err
+		seeds.claudePrepared = op.claudePrepared
+		if seeds.claudePrepared == nil {
+			seeds.claudePrepared, err = prepareClaudeSeed(root, homeRel, req.LaunchDir, plan.form)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	want := map[string]bool{}
@@ -2699,10 +2702,41 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 	if req.beforeRepairLock != nil {
 		req.beforeRepairLock()
 	}
-	op, err := beginOperationValidated(req.Home, req.validatePreservedLock, req.transactionOptions...)
+	var prepared *claudeSeedPlan
+	validate := func() error {
+		if err := req.validatePreservedLock(); err != nil {
+			return err
+		}
+		if req.EnvID != envregistry.ClaudeCode {
+			return nil
+		}
+		adapter, err := envregistry.ByID(req.EnvID)
+		if err != nil {
+			return err
+		}
+		form, err := req.Machine.EffectiveForm(adapter)
+		if err != nil {
+			return err
+		}
+		// The manager home exists under the acquired lock, but environments/
+		// may be absent on first provisioning. Validate from the existing
+		// ancestor without creating directories just to read an absent seed.
+		root := req.Home
+		homeRel, err := managedRelative(root, ManagedHomeDir(req.Home, req.Profile, req.EnvID))
+		if err != nil {
+			return err
+		}
+		// This callback holds the repair lock and precedes journal recovery,
+		// store rebuilding and legacy identity migration. Carry this exact
+		// plan to applyPlan; a second read after publication is too late.
+		prepared, err = prepareClaudeSeed(root, homeRel, req.LaunchDir, form)
+		return err
+	}
+	op, err := beginOperationValidated(req.Home, validate, req.transactionOptions...)
 	if err != nil {
 		return nil, err
 	}
+	op.claudePrepared = prepared
 	// Recovery may itself have published a replacement lock.
 	if err := req.validatePreservedLock(); err != nil {
 		_ = op.close()
