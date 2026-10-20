@@ -26,6 +26,8 @@ var lockTimeout = 30 * time.Second
 type operation struct {
 	lock   *managerlock.HomeLock
 	engine *transaction.Engine
+	// Prepared under this lock before recovery or repair publication.
+	claudePrepared *claudeSeedPlan
 }
 
 // beginCaptureOperation never provisions a home or invokes recovery. The

@@ -24,6 +24,13 @@ func TestClaudeRefusalNarrowingMutants(t *testing.T) {
 	source := strings.ReplaceAll(string(payload), "\r\n", "\n")
 	for _, mutant := range []struct{ name, before, after, run, fails, message string }{
 		{
+			"legacy-malformed-referenced-ordering",
+			"prepared, err = prepareClaudeSeed(root, homeRel, req.LaunchDir, form)\n\t\treturn err",
+			"prepared, err = prepareClaudeSeed(root, homeRel, req.LaunchDir, form)\n if err != nil && form == envregistry.FormReferenced { payload, _ := os.ReadFile(filepath.Join(ManagedHomeDir(req.Home, req.Profile, req.EnvID), \".claude.json\")); if string(payload) == `{\"broken\":` { return nil } }\n\t\treturn err",
+			"^TestReviewLegacyRefusal$/^referenced$/^(malformed|valid)$",
+			"TestReviewLegacyRefusal/referenced/malformed", "refusal changed managed entry CLAUDE.md",
+		},
+		{
 			"trailing-empty-object",
 			"if err := decoder.Decode(&trailing); err != io.EOF {",
 			"if err := decoder.Decode(&trailing); err != io.EOF && string(payload) != \x60{} {}\x60 {",
@@ -69,6 +76,9 @@ func TestClaudeRefusalNarrowingMutants(t *testing.T) {
 			exit, ok := err.(*exec.ExitError)
 			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "--- FAIL: "+mutant.fails+" ") || !strings.Contains(string(output), mutant.message) {
 				t.Fatalf("mutant survived or lacked the intended behavioral failure: %v\n%s", err, output)
+			}
+			if mutant.name == "legacy-malformed-referenced-ordering" && !strings.Contains(string(output), "--- PASS: TestReviewLegacyRefusal/referenced/valid ") {
+				t.Fatalf("mutant valid neighbor did not pass:\n%s", output)
 			}
 			t.Logf("expected-red go test exit %d:\n%s", exit.ExitCode(), output)
 		})
