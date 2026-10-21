@@ -1315,6 +1315,13 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	for _, path := range sortedKeys(plan.links) {
 		target := plan.links[path]
 		rel := managedJoin(homeRel, path)
+		if recordedSkillFallback(prior, path) {
+			if err := publishSkillFallback(op, root, rel, target); err != nil {
+				return err
+			}
+			recordLinkFallback(plan, path)
+			continue
+		}
 		if err := atomicManagedLink(root, rel, target); err != nil {
 			var unavailable *errSymlinkUnavailable
 			if !errors.As(err, &unavailable) {
@@ -2970,6 +2977,11 @@ func copyLinkFallback(root, fullRel, target, path string, plan *homePlan) error 
 			return err
 		}
 	}
+	recordLinkFallback(plan, path)
+	return nil
+}
+
+func recordLinkFallback(plan *homePlan, path string) {
 	for key, surface := range plan.marker.Surfaces {
 		for _, candidate := range surface.Paths {
 			if candidate == path {
@@ -2981,7 +2993,6 @@ func copyLinkFallback(root, fullRel, target, path string, plan *homePlan) error 
 		}
 	}
 	delete(plan.links, path)
-	return nil
 }
 
 // copyTree copies a directory tree for symlink-fallback copies.

@@ -2,6 +2,7 @@ package envprofile
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/transaction"
 	"github.com/relux-works/curator/internal/whitelist"
 )
 
@@ -246,11 +248,27 @@ func TestProfileSkillProjectionPublication(t *testing.T) {
 // both native status and managed verification. Repair replaces them without
 // takeover, preserves the lock, and converges to readable projected context.
 func TestProfileSkillProjectionRepair(t *testing.T) {
-	for _, rawLink := range []bool{false, true} {
+	for _, mode := range []string{"old-marker", "raw-link", "raw-copy"} {
 		for _, id := range []string{"claude_code", "codex_cli"} {
-			t.Run(fmt.Sprintf("%s/raw-link-%t", id, rawLink), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%s/%s", id, mode), func(t *testing.T) {
 				pinHomes(t)
 				fx := writeManagedFixture(t, "sample")
+				if mode != "old-marker" {
+					lock, _, err := readLock(fx.home, fx.profile)
+					if err != nil {
+						t.Fatal(err)
+					}
+					for i, member := range lock.Members {
+						if member.Kind == contextlock.KindSkill {
+							lock.Members[i].Commit = writeGitStoreFixture(t, fx.home, member.Kind, member.Name, member.Source, map[string]string{
+								"SKILL.md": "# myskill\n", ".research/notes.md": "excluded old context\n", "references/README.md": "excluded nested name\n",
+							})
+						}
+					}
+					if _, err := contextlock.Write(lockPath(fx.home, fx.profile), lock); err != nil {
+						t.Fatal(err)
+					}
+				}
 				req := fx.request(id)
 				req.Repair = true
 				if _, err := Resolve(req); err != nil {
@@ -276,11 +294,15 @@ func TestProfileSkillProjectionRepair(t *testing.T) {
 				rel := "skills/myskill"
 				for _, base := range []string{fx.native[id], ManagedHomeDir(fx.home, fx.profile, id)} {
 					live := filepath.Join(base, rel)
-					if rawLink {
+					if mode != "old-marker" {
 						if err := os.Remove(live); err != nil {
 							t.Fatal(err)
 						}
-						if err := os.Symlink(raw, live); err != nil {
+						if mode == "raw-copy" {
+							if err := copyTree(raw, base, rel); err != nil {
+								t.Fatal(err)
+							}
+						} else if err := os.Symlink(raw, live); err != nil {
 							t.Fatal(err)
 						}
 					}
@@ -289,6 +311,10 @@ func TestProfileSkillProjectionRepair(t *testing.T) {
 						t.Fatal(err)
 					}
 					surface := marker.Surfaces[envmarker.SurfaceSkills]
+					if mode == "raw-copy" {
+						copies := []envmarker.Copy{{Path: rel, Reason: envmarker.ReasonSymlinkFallback}}
+						surface.Copies = &copies
+					}
 					surface.ContentSHA256, _ = contextmaterialize.SurfaceHashWithVersion(map[string][]byte{rel: []byte(oldHash)}, lock.ContentHashVersion())
 					marker.Surfaces[envmarker.SurfaceSkills] = surface
 					body, err := marker.Marshal()
@@ -318,6 +344,13 @@ func TestProfileSkillProjectionRepair(t *testing.T) {
 				row, err = nativeSkillsState(fx.home, fx.profile, id, req.NativeHomeOf)
 				if err != nil || row == nil || row.State != "current" {
 					t.Fatalf("native repair did not converge: %+v %v", row, err)
+				}
+				for _, base := range []string{fx.native[id], ManagedHomeDir(fx.home, fx.profile, id)} {
+					for _, excluded := range []string{".research/notes.md", "references/README.md"} {
+						if _, err := os.Stat(filepath.Join(base, rel, excluded)); !os.IsNotExist(err) {
+							t.Fatalf("old excluded file survived repair: %v", err)
+						}
+					}
 				}
 				after, err := os.ReadFile(lockPath(fx.home, fx.profile))
 				if err != nil || !bytes.Equal(before, after) {
@@ -427,5 +460,55 @@ func TestProfileSkillProjectionMissingStore(t *testing.T) {
 	req.Repair = false
 	if _, err := Resolve(req); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// A failure after the copied-tree transaction commits its target rolls back
+// the entire old tree, including old excluded files; retry publishes exactly
+// the projected tree. The fault must fire on the real entry transaction.
+func TestSkillProjectionFallbackRollback(t *testing.T) {
+	home, source := t.TempDir(), t.TempDir()
+	root := EnvRoot(home)
+	rel := "sample/codex_cli/skills/guide"
+	old := t.TempDir()
+	writeGitFile(t, old, "SKILL.md", "old\n")
+	writeGitFile(t, old, ".research/notes.md", "old excluded\n")
+	if err := copyTree(old, root, rel); err != nil {
+		t.Fatal(err)
+	}
+	writeGitFile(t, source, "SKILL.md", "new\n")
+	live := filepath.Join(root, rel)
+	before := projectionFiles(t, live)
+	fired := false
+	op, err := beginOperation(home, transaction.WithHooks(transaction.Hooks{Fault: func(event transaction.Event) error {
+		if event.Point == transaction.PointTargetCommitted {
+			fired = true
+			return errors.New("injected projection publication")
+		}
+		return nil
+	}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = publishSkillFallback(op, root, rel, source)
+	if closeErr := op.close(); closeErr != nil {
+		t.Fatal(closeErr)
+	}
+	if !fired || err == nil || !strings.Contains(err.Error(), "injected projection publication") {
+		t.Fatalf("intended publication fault not observed: %v %t", err, fired)
+	}
+	if !reflect.DeepEqual(projectionFiles(t, live), before) {
+		t.Fatal("failed copy replacement changed old tree")
+	}
+	op, err = beginOperation(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer op.close()
+	if err := publishSkillFallback(op, root, rel, source); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(projectionFiles(t, live), projectionFiles(t, source)) {
+		t.Fatal("copy replacement retry retained old excluded files")
 	}
 }
