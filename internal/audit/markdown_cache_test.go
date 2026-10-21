@@ -54,6 +54,7 @@ func TestReviewPriorMarkdownAllowance(t *testing.T) {
 	}
 	oldSource := versionPattern.ReplaceAllString(source, `RulesetVersion = "4"`)
 	oldSource = strings.Replace(oldSource, markdown, "", 1)
+	oldSource = strings.Replace(oldSource, `return scan(path, posix) // Agent-facing Markdown.`, `return nil // Pre-Markdown detector.`, 1)
 	replacement := filepath.Join(root, "old-audit.go")
 	if err := os.WriteFile(replacement, []byte(oldSource), 0600); err != nil {
 		t.Fatal(err)
