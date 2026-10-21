@@ -40,14 +40,22 @@ required empty settings and contributions. Lock schemas 1–2 remain readable
 and reject skill directories. Draft lock schema 3 remains unsupported.
 
 Audit content identity, manifest capabilities and findings use the selected
-package tree. Markdown guidance participates in network-declaration detection only within
+package tree. For skills, Markdown guidance participates in network-declaration detection only within
 agent-facing context (core section 3), using the shared context roots and
 exclusions, validated runtime/build roots, and command-less scripts rule.
 Non-Markdown scripts and the skill manifest retain their prior scan surface.
 Markdown enumeration uses the same filesystem walk as context copying, including
 canonical root aliases on case-insensitive filesystems. Descendant exclusions
 retain case-sensitive protocol comparison.
-Detector ruleset 7 uses a new verdict cache namespace: ruleset 6 could cache
+Context members instead audit every declared module through the same reader
+used for materialization, including root and system classes, all environment
+selectors, and non-Markdown extensions. Skill exclusions do not apply to those
+modules. Context and MCP source audits retain implicit-none capabilities. MCP
+publishes server configuration rather than Markdown and retains the historical
+all-Markdown scan. Unknown kinds and invalid context manifests conservatively
+use that all-Markdown scan as well. Verdict equality also binds the subject kind.
+Detector ruleset 8 uses a new verdict cache namespace: ruleset 7 could cache
+allowances for context modules, ruleset 6 could cache
 allowances for root case aliases, ruleset 5 could cache
 false refusals from repository-only Markdown, while rulesets 1–4 (including
 ruleset 4, which did not inspect Markdown) could cache stale allowances. Those

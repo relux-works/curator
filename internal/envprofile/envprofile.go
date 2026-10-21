@@ -1781,6 +1781,7 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
 		directory = resolved.Directory
 	}
 	subject := audit.Subject{
+		Kind:          resolved.Kind,
 		Name:          resolved.Name,
 		Source:        sourceForRevocation,
 		Git:           gitForRevocation,

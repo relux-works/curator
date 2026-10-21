@@ -22,6 +22,8 @@ import (
 
 	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/contextlock"
+	"github.com/relux-works/curator/internal/contextpkg"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/scriptpolicy"
@@ -51,7 +53,7 @@ var severityRank = map[string]int{
 // backend and model (Spec §12.1).
 const (
 	PromptVersion  = "1"
-	RulesetVersion = "7"
+	RulesetVersion = "8"
 )
 
 // findingOpaqueNUL is the shared opaque-NUL finding id: every v1
@@ -67,8 +69,11 @@ type Finding struct {
 	Verifiable bool   `json:"verifiable"`
 }
 
-// Subject is one skill under audit.
+// Subject is one package under audit.
 type Subject struct {
+	// Kind selects the publication contract: skill, context, or mcp. Empty
+	// retains the skill contract for older callers; unknown kinds scan all Markdown.
+	Kind          string
 	Name          string
 	Source        string
 	Git           string
@@ -392,7 +397,7 @@ func auditSubjectWithOpaquePaths(cfg *config.Config, subject Subject, persist bo
 		return report, nil
 	}
 
-	findings := detectWithOpaquePaths(subject.Snapshot, subject.Capabilities, opaquePaths)
+	findings := detectWithOpaquePaths(subject.Snapshot, subject.Capabilities, opaquePaths, subject.Kind)
 	if persist {
 		storeCachedFindings(cfg, contentHash, subject, findings, report.ScriptPolicies)
 	}
@@ -669,6 +674,7 @@ func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.
 		Commit        string                `json:"commit"`
 		Directory     string                `json:"directory"`
 		Package       SourcePackage         `json:"package"`
+		Kind          string                `json:"subject_kind"`
 		Capabilities  capabilities.Manifest `json:"capabilities"`
 		Findings      []Finding             `json:"findings"`
 	}
@@ -693,6 +699,10 @@ func loadCachedFindings(cfg *config.Config, contentHash string, version hashing.
 	// when the content hash matches. Records that predate the package
 	// member state no identity and only ever match a subject that states
 	// none; records that predate the directory member bind the root.
+	// Publication contracts can differ for the same bytes and capabilities.
+	if data.Kind != subject.Kind {
+		return nil, false
+	}
 	if data.Commit != subject.Commit {
 		return nil, false
 	}
@@ -768,6 +778,7 @@ func storeCachedFindings(cfg *config.Config, contentHash string, subject Subject
 		"ruleset_version": RulesetVersion,
 		"findings":        findings,
 		"capabilities":    subject.Capabilities,
+		"subject_kind":    subject.Kind,
 		"script_policies": policies,
 	}
 	// The record binds the stated package identity, when the subject
@@ -803,10 +814,13 @@ func detect(snapshot string, caps capabilities.Manifest) []Finding {
 			Verifiable: true,
 		}}
 	}
-	return detectWithOpaquePaths(snapshot, caps, opaquePaths)
+	return detectWithOpaquePaths(snapshot, caps, opaquePaths, "")
 }
 
-func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePaths []string) []Finding {
+func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePaths []string, kind string) []Finding {
+	if kind == "" {
+		kind = contextlock.KindSkill
+	}
 	findings := opaqueNULFindings(opaquePaths)
 	declaredHosts := map[string]bool{}
 	for _, host := range caps.Network {
@@ -831,11 +845,7 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
 		excludeRoots = whitelist.ContextExcludedRoots(spec.RuntimeRoots, spec.BuildRoots)
 	}
 
-	scan := func(path, posix string) error {
-		payload, readErr := os.ReadFile(path) // #nosec G304 -- walked snapshot
-		if readErr != nil {
-			return nil
-		}
+	scanBytes := func(payload []byte, posix string) error {
 		text := string(payload)
 		for _, rawURL := range urlRE.FindAllString(text, -1) {
 			parsed, err := url.Parse(rawURL)
@@ -865,16 +875,45 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
 		}
 		return nil
 	}
+	scan := func(path, posix string) error {
+		payload, err := os.ReadFile(path) // #nosec G304 -- walked snapshot
+		if err != nil {
+			return nil
+		}
+		return scanBytes(payload, posix)
+	}
+	// Context modules are published verbatim, irrespective of extension, class,
+	// selector or skill exclusions. Read them through the materializer's reader.
+	contextModules := false
+	if kind == contextlock.KindContext {
+		if manifest, err := contextpkg.LoadManifest(snapshot); err == nil {
+			contextModules = true
+			for _, module := range manifest.Modules {
+				payload, err := contextpkg.ReadModule(snapshot, module)
+				posix := contextpkg.ContextDir + "/" + module.Path
+				if err != nil {
+					findings = append(findings, Finding{ID: "audit.context.scan-incomplete", Severity: SeverityCritical, File: posix, Evidence: "cannot read declared context module", Verifiable: true})
+					continue
+				}
+				_ = scanBytes(payload, posix)
+			}
+		}
+	}
 	// Enumerate Markdown through the very same filesystem lookups, walk and
 	// predicate as CopyContext. Canonical root aliases on case-insensitive
 	// volumes must not escape the audit through directory-entry spelling.
-	_ = whitelist.WalkContext(snapshot, includeScripts, excludeRoots, func(path, posix string) error {
-		if !strings.EqualFold(filepath.Ext(posix), ".md") {
-			return nil
-		}
-		return scan(path, posix) // Agent-facing Markdown.
-	})
+	if kind == contextlock.KindSkill {
+		_ = whitelist.WalkContext(snapshot, includeScripts, excludeRoots, func(path, posix string) error {
+			if !strings.EqualFold(filepath.Ext(posix), ".md") {
+				return nil
+			}
+			return scan(path, posix) // Agent-facing Markdown.
+		})
+	}
+
 	// Preserve the historical non-Markdown scripts/manifest scan separately.
+	// MCP publishes server configuration, not Markdown. Keep its base all-Markdown
+	// scan; unknown kinds and invalid context manifests use that same fallback.
 	_ = filepath.WalkDir(snapshot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() {
 			return nil
@@ -888,7 +927,7 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
 		if !strings.HasPrefix(posix, "scripts/") && posix != manifestName && !markdown {
 			return nil
 		}
-		if markdown {
+		if markdown && (kind == contextlock.KindSkill || contextModules) {
 			return nil
 		}
 		return scan(path, posix)
