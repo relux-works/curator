@@ -330,6 +330,13 @@ func prepareIdentityMigration(req *ResolveRequest, profiles []string, report *Mi
 					return nil, fmt.Errorf("identity migration cannot add unrecorded surface %s", path)
 				}
 			}
+			// Populate immutable projections before the coordinated identity
+			// activation, just as the migration populates v2 package entries.
+			for _, skill := range plan.skillProjections {
+				if err := publishSkillProjection(req.Home, skill); err != nil {
+					return nil, err
+				}
+			}
 			// Preserve symlink fallback copies, including whole skill trees.
 			for name, surface := range prior.Surfaces {
 				if surface.Copies == nil {

@@ -126,7 +126,10 @@ func nativeSkillsState(home, profile, id string, nativeHomeOf func(string) (stri
 			reasons = append(reasons, path+" belongs to legacy global scope (adapter ledger); left in place")
 			continue
 		}
-		expected[path] = []byte(skill.hash)
+		if err := verifySkillProjection(home, skill); err != nil {
+			reasons = append(reasons, path+" skill projection missing or drifted")
+		}
+		expected[path] = skillSurfaceIdentity(skill)
 		if marker == nil {
 			reasons = append(reasons, path+" is not recorded")
 			continue
