@@ -44,6 +44,9 @@ type gitManager struct {
 	home           string
 	fetchRaw       map[string]string
 	allowedSources []string
+	// Non-nil only during new-profile installation. Each missing exact pin
+	// gets at most one acquisition attempt within that operation.
+	missingPins map[string]bool
 }
 
 func newGitManager(home string) *gitManager {
@@ -238,9 +241,17 @@ func (m *gitManager) ResolveTag(_ string, name, source, tag string) (string, err
 
 // Manifest reads the package manifest at a commit, below directory when set.
 func (m *gitManager) Manifest(kind, name, source, directory, commit string) (*contextresolve.Package, error) {
+	if !contextpkg.ValidCommit(commit) {
+		return nil, fmt.Errorf("%s: invalid exact commit for %s", DiagSourceInvalid, name)
+	}
 	dir, err := m.ensureRepo(source)
 	if err != nil {
 		return nil, err
+	}
+	if m.missingPins != nil {
+		if err := m.acquireMissingPin(dir, source, commit); err != nil {
+			return nil, fmt.Errorf("%s: acquire %s at %s: %w", DiagSourceInvalid, name, commit, err)
+		}
 	}
 	snapshot, err := os.MkdirTemp("", "curator-profile-manifest-*")
 	if err != nil {
@@ -289,14 +300,61 @@ func (m *gitManager) Manifest(kind, name, source, directory, commit string) (*co
 	}
 }
 
+// acquireMissingPin distinguishes an absent object from a failed database
+// read. Only Git's explicit missing response permits acquisition; malformed
+// output, corruption and non-commit objects refuse without network activity.
+// The exact-object fetch retains the profile lane's configured transport, but
+// does not update refs, FETCH_HEAD, submodules or unrelated repositories.
+func (m *gitManager) acquireMissingPin(dir, source, commit string) error {
+	probe := exec.Command("git", "-C", dir, "cat-file", "--batch-check") // #nosec G204 -- fixed command, manager cache
+	probe.Stdin = strings.NewReader(commit + "\n")
+	out, err := probe.Output()
+	if err != nil {
+		return fmt.Errorf("inspect pinned object: %w", err)
+	}
+	fields := strings.Fields(string(out))
+	if len(fields) == 3 && fields[0] == commit && fields[1] == "commit" {
+		return nil
+	}
+	if string(out) != commit+" missing\n" {
+		return fmt.Errorf("pinned object is not an available commit")
+	}
+	key := source + "\x00" + commit
+	if m.missingPins[key] {
+		return fmt.Errorf("pinned object remains unavailable after acquisition")
+	}
+	m.missingPins[key] = true
+	cmd := exec.Command("git", "-C", dir, "fetch", "--no-tags", "--no-write-fetch-head",
+		"--no-auto-maintenance", "--recurse-submodules=no", "--refmap=", "origin", commit) // #nosec G204 -- validated exact commit, fixed remote
+	// Preserve operator transport configuration, but apply the same protocol
+	// boundary as every gitops network operation, including after rewrites.
+	cmd.Env = append(os.Environ(), "GIT_ALLOW_PROTOCOL="+gitops.AllowedProtocols)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("fetch exact pin: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	// Re-probe, retaining the attempted key: a successful transport that did
+	// not supply the object must refuse, never fetch repeatedly.
+	return m.acquireMissingPin(dir, source, commit)
+}
+
 // VerifyCandidate verifies the selected tag signature and peeled commit
 // signature against the configured source signer list. The resolver makes
 // the authorization decision from the returned signer identity; Git's
 // verification result alone never admits a candidate.
 func (m *gitManager) VerifyCandidate(_, _, source, tag, commit string, allowed []contextresolve.Signer) (contextresolve.CandidateSignatures, error) {
+	if !contextpkg.ValidCommit(commit) {
+		return contextresolve.CandidateSignatures{}, fmt.Errorf("%s: invalid exact commit", DiagSourceInvalid)
+	}
 	dir, err := m.ensureRepo(source)
 	if err != nil {
 		return contextresolve.CandidateSignatures{}, err
+	}
+	// The resolver authorizes before reading Manifest. New installs must make
+	// the selected object available here too; acquisition grants no trust.
+	if m.missingPins != nil {
+		if err := m.acquireMissingPin(dir, source, commit); err != nil {
+			return contextresolve.CandidateSignatures{}, err
+		}
 	}
 	return m.verifyCandidateInRepo(dir, tag, commit, allowed)
 }
