@@ -4,6 +4,50 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+## v0.15.0-rc.8 — 2026-10-21
+
+### Added
+
+- Profile Git skill requirements accept `directory` to select a package inside
+  a repository (CIP-0021). Successor locks are schema 4 (hash version 2) and
+  bind the directory. Lock schemas 1 and 2 stay readable and reject skill
+  directories.
+- Profile skills installed in place are linked into each harness's native
+  skills directory (Claude Code, Codex, pi), with explicit `--takeover` for
+  foreign entries and exact backups.
+- `RELEASE_SIGNERS`, the canonical list of release-tag signers. Hosts verify
+  Curator release tags against it. Tags from this release on are signed by the
+  ivmbp agent release key.
+- Qualify the `codex_cli` adapter on Codex 0.162.1. Disposable-home evidence
+  and the opt-in replay are in `.research/codex162/`.
+- Research records, each with an exact-digest opt-in offline replay:
+  - Muse 1.4.10-R6427.1 and 1.4.11-R6667.1 foreign-context exclusion:
+    qualified for exec, refused for interactive (P4);
+  - Codex 0.162.1 project-source exclusion: complete strict exclusion is
+    refused, because late-created repository skills still load.
+
+### Changed
+
+- Managed homes are owner-only: directories `0700` and manager-written files
+  `0600`; copied seeds keep their source mode. `env resolve --repair` tightens
+  existing wider homes.
+- The skill audit's network-declaration gate scans Markdown. The ruleset
+  version is bumped, so a cached allowance from before the change cannot pass
+  it.
+
+### Fixed
+
+- Managed-home repair preserves Claude Code's own `.claude.json` values,
+  including floating-point numbers, and only adds or updates the
+  launch-directory entry (previously a `CCJ-1 does not support float64`
+  failure).
+- Skill install never deletes or replaces store entries Curator does not own;
+  ownership requires a valid matching `.csk-install.json`.
+- Hosts under reserved test TLDs (`test`, `example`, `invalid`, `localhost`)
+  are not counted as audit network contacts; lookalikes stay contacts.
+- Tests leave no read-only temporary trees. Self-hosted Linux runners restore
+  their temporary root with guarded, chmod-only permission repair.
+
 ## v0.15.0-rc.7 — 2026-10-18
 
 ### Added
