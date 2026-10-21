@@ -18,12 +18,19 @@ func TestNetworkContactNarrowingMutants(t *testing.T) {
 	}
 	type mutation struct{ name, file, before, after, pkg, run, fails, message string }
 	mutants := []mutation{
+		{"markdown-scripts-always-visible", "internal/audit/audit.go", `includeScripts = len(spec.Commands) == 0`, `includeScripts = true`, "./internal/audit", "^TestMarkdownScopeScriptsAndManifest$/^exports$", "TestMarkdownScopeScriptsAndManifest/exports", "excluded Markdown refused"},
+		{"markdown-scripts-never-visible", "internal/audit/audit.go", `includeScripts = len(spec.Commands) == 0`, `includeScripts = false`, "./internal/audit", "^TestMarkdownScopeScriptsAndManifest$/^commandless$", "TestMarkdownScopeScriptsAndManifest/commandless", "visible Markdown verdict"},
+
+		{"markdown-everywhere", "internal/audit/audit.go", `if markdown && !whitelist.ContextPathIncluded(posix, includeScripts, excludeRoots) {`, `if markdown && false && !whitelist.ContextPathIncluded(posix, includeScripts, excludeRoots) {`, "./internal/audit", "^TestMarkdownScopeRepositoryNoise$", "TestMarkdownScopeRepositoryNoise", "excluded Markdown refused"},
+		{"markdown-drop-references", "internal/audit/audit.go", `if markdown && !whitelist.ContextPathIncluded(posix, includeScripts, excludeRoots) {`, `if markdown && (strings.HasPrefix(posix, "references/") || !whitelist.ContextPathIncluded(posix, includeScripts, excludeRoots)) {`, "./internal/audit", "^TestMarkdownScopeVisibleContacts$/^references/guide.md$", "TestMarkdownScopeVisibleContacts/references/guide.md", "visible Markdown verdict"},
+		{"markdown-reuse-ruleset-five", "internal/audit/audit.go", `RulesetVersion = "` + RulesetVersion + `"`, `RulesetVersion = "5"`, "./internal/audit", "^TestMarkdownScopeInvalidatesRulesetFive$", "TestMarkdownScopeInvalidatesRulesetFive/", "stale Markdown refusal reused"},
+
 		{"full-url-percent-path", "internal/audit/audit.go", `\\\\/?#`, `\\\\`, "./internal/audit", "^TestNetworkContactNormalizationBoundaries$/^percent-path-real$", "TestNetworkContactNormalizationBoundaries/percent-path-real", "URL classification: []"},
 		{"contains-test", "internal/audit/audit.go", `switch host[lastDot+1:] {`, `if strings.Contains(host, ".test") { return host, true }; switch host[lastDot+1:] {`, "./internal/audit", "^TestNetworkContactVectors$/^lookalike-nested-test$", "TestNetworkContactVectors/lookalike-nested-test", "Gate pass=false"},
 		{"exempt-example-com", "internal/audit/audit.go", `switch host[lastDot+1:] {`, `if host == "example.com" { return host, true }; switch host[lastDot+1:] {`, "./internal/audit", "^TestNetworkContactVectors$/^documentation-com$", "TestNetworkContactVectors/documentation-com", "Gate pass=false"},
 		{"exempt-bare-test", "internal/audit/audit.go", `if lastDot <= 0 {`, `if host == "test" { return host, true }; if lastDot <= 0 {`, "./internal/audit", "^TestNetworkContactVectors$/^bare-test$", "TestNetworkContactVectors/bare-test", "Gate pass=false"},
 		{"reserved-clears-file", "internal/audit/audit.go", `if exempt || declaredHost(declaredHosts, host) {`, `if exempt { return nil }; if exempt || declaredHost(declaredHosts, host) {`, "./internal/audit", "^TestNetworkContactVectors$/^mixed-reserved-first$", "TestNetworkContactVectors/mixed-reserved-first", "Gate pass=false"},
-		{"reuse-ruleset-three", "internal/audit/audit.go", `RulesetVersion = "5"`, `RulesetVersion = "3"`, "./internal/audit", "^TestNetworkContactCacheInvalidatesRulesetThree$", "TestNetworkContactCacheInvalidatesRulesetThree/", "stale ruleset reused"},
+		{"reuse-ruleset-three", "internal/audit/audit.go", `RulesetVersion = "` + RulesetVersion + `"`, `RulesetVersion = "3"`, "./internal/audit", "^TestNetworkContactCacheInvalidatesRulesetThree$", "TestNetworkContactCacheInvalidatesRulesetThree/", "stale ruleset reused"},
 	}
 	for _, mutant := range mutants {
 		t.Run(mutant.name, func(t *testing.T) {

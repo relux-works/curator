@@ -58,7 +58,7 @@ func CopyContext(snapshot, destination string, includeScripts bool, excludeRoots
 		if err != nil {
 			continue
 		}
-		if PathExcluded(root, excludeRoots) {
+		if !ContextPathIncluded(root, includeScripts, excludeRoots) {
 			continue
 		}
 		if !info.IsDir() {
@@ -78,12 +78,12 @@ func CopyContext(snapshot, destination string, includeScripts bool, excludeRoots
 			}
 			posix := filepath.ToSlash(rel)
 			if entry.IsDir() {
-				if path != src && PathExcluded(posix, excludeRoots) {
+				if path != src && !ContextPathIncluded(posix, includeScripts, excludeRoots) {
 					return filepath.SkipDir
 				}
 				return nil
 			}
-			if PathExcluded(posix, excludeRoots) {
+			if !ContextPathIncluded(posix, includeScripts, excludeRoots) {
 				return nil
 			}
 			if err := copyFile(path, filepath.Join(destination, rel)); err != nil {
@@ -117,6 +117,25 @@ func ContextExcludedRoots(runtimeRoots, buildRoots []string) []string {
 	}
 	sort.Strings(roots)
 	return roots
+}
+
+// ContextPathIncluded reports whether a POSIX-relative snapshot path belongs
+// to the static agent-facing context. Callers supply only validated runtime
+// and build roots; scripts are context only for command-less packages.
+func ContextPathIncluded(posix string, includeScripts bool, excludeRoots []string) bool {
+	if PathExcluded(posix, excludeRoots) {
+		return false
+	}
+	root, _, _ := strings.Cut(posix, "/")
+	if root == "scripts" {
+		return includeScripts
+	}
+	for _, included := range IncludeRoots {
+		if root == included {
+			return true
+		}
+	}
+	return false
 }
 
 // PathExcluded reports whether a POSIX-relative snapshot path is excluded
