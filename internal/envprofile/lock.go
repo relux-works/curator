@@ -28,6 +28,7 @@ type operation struct {
 	engine *transaction.Engine
 	// Prepared under this lock before recovery or repair publication.
 	claudePrepared *claudeSeedPlan
+	recovered      bool
 }
 
 // beginCaptureOperation never provisions a home or invokes recovery. The
@@ -97,11 +98,21 @@ func beginOperationValidated(home string, validate func() error, options ...tran
 		_ = lock.Close()
 		return nil, err
 	}
-	if err := engine.Recover(lock); err != nil {
+	recovered, err := engine.RecoverWithOutcome(lock)
+	if err != nil {
 		_ = lock.Close()
 		return nil, fmt.Errorf("recover incomplete profile transactions: %w", err)
 	}
-	return &operation{lock: lock, engine: engine}, nil
+	return &operation{lock: lock, engine: engine, recovered: recovered}, nil
+}
+
+// Preserve the original diagnostic and error chain while reporting only an
+// actually completed recovery of previously durable intent.
+func (op *operation) recoveryRefusal(err error) error {
+	if op.recovered {
+		return fmt.Errorf("%w; previously pending transaction recovery completed", err)
+	}
+	return err
 }
 
 func (op *operation) close() error {
