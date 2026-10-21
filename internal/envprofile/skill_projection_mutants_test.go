@@ -28,9 +28,11 @@ func TestSkillProjectionNarrowingMutants(t *testing.T) {
 		{"old-surface-identity", "skill_projection.go", `skillProjectionVersion + ":" + skill.hash`, `skill.hash`, "^TestProfileSkillProjectionRepair$/./^old-marker$", "TestProfileSkillProjectionRepair/", "old native surface current"},
 		{"missing-managed-projection", "managed.go", "if err := verifySkillProjection(req.Home, skill); err != nil {", "if err := verifySkillProjection(req.Home, skill); false && err != nil {", "^TestProfileSkillProjectionMissingStore$", "TestProfileSkillProjectionMissingStore", "missing projection current"},
 		{"missing-native-projection", "native_skills.go", "if err := verifySkillProjection(home, skill); err != nil {", "if err := verifySkillProjection(home, skill); false && err != nil {", "^TestProfileSkillProjectionMissingStore$", "TestProfileSkillProjectionMissingStore", "missing native projection current"},
-		{"changed-projection-bytes", "skill_projection.go", `return fmt.Errorf("skill context projection differs from its identity")`, `return nil`, "^TestSkillProjectionStoreReuse$/^bytes$", "TestSkillProjectionStoreReuse/bytes", "altered projection reused"},
+		{"omit-projection-rebuild", "skill_projection.go", "if err := verifySkillProjection(home, skill); !errors.Is(err, ErrSkillProjectionIdentity) {\n\t\t\treturn err\n\t\t}", "return verifySkillProjection(home, skill)", "^TestProfileSkillProjectionDamagedStore$/./^(missing-file|extra-file|changed-file)$", "TestProfileSkillProjectionDamagedStore/", "projection repair did not converge"},
+		{"rebuild-source-identity", "skill_projection.go", `return fmt.Errorf("%w: skill context changed while projecting", ErrSkillProjectionIdentity)`, `return nil`, "^TestSkillProjectionRebuildSourceRefusal$", "TestSkillProjectionRebuildSourceRefusal", "wrong staged identity refusal"},
+		{"changed-projection-bytes", "skill_projection.go", `return ErrSkillProjectionIdentity`, `return nil`, "^TestSkillProjectionStoreReuse$/^bytes$", "TestSkillProjectionStoreReuse/bytes", "altered projection reused"},
 		{"extra-projection-link", "skill_projection.go", `if err := pathboundary.ValidateWithin(contextstore.Root(home), skill.root); err != nil {`, `if err := pathboundary.ValidateWithin(contextstore.Root(home), skill.root); false && err != nil {`, "^TestSkillProjectionStoreReuse$/^link$", "TestSkillProjectionStoreReuse/link", "altered projection reused"},
-		{"changed-source", "skill_projection.go", `return fmt.Errorf("skill context changed while projecting")`, `return nil`, "^TestSkillProjectionStoreReuse$/^source-changed$", "TestSkillProjectionStoreReuse/source-changed", "changed source published"},
+		{"changed-source", "skill_projection.go", `return fmt.Errorf("%w: skill context changed while projecting", ErrSkillProjectionIdentity)`, `return nil`, "^TestSkillProjectionStoreReuse$/^source-changed$", "TestSkillProjectionStoreReuse/source-changed", "changed source published"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(root, "internal/envprofile", tc.file)
@@ -61,6 +63,9 @@ func TestSkillProjectionNarrowingMutants(t *testing.T) {
 			exit, ok := err.(*exec.ExitError)
 			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "--- FAIL: "+tc.fail) || !strings.Contains(string(output), tc.message) {
 				t.Fatalf("mutant survived or lacked intended failure: %v\n%s", err, output)
+			}
+			if tc.name == "omit-projection-rebuild" && strings.Count(string(output), "--- FAIL: TestProfileSkillProjectionDamagedStore/") != 6 {
+				t.Fatalf("rebuild mutant did not fail all six cases:\n%s", output)
 			}
 			t.Logf("expected-red exit %d:\n%s", exit.ExitCode(), output)
 		})

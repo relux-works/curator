@@ -1324,7 +1324,7 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 		// the rows still print exactly once.
 		surfacing = carrySurfacing(sink, surfacing)
 		writeUpdateWarnings(warningSink, name, warnings)
-		if err := syncCurrentNativeSkills(home, name, policy); err != nil {
+		if err := syncCurrentNativeSkills(op, home, name, policy); err != nil {
 			return Info{}, false, err
 		}
 		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, false, nil

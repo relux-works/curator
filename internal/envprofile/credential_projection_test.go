@@ -196,7 +196,12 @@ func TestCredentialProjectionIdentitySubrequest(t *testing.T) {
 				t.Fatalf("caller policy: %+v, %v", policy, err)
 			}
 			before := snapshotCredentialScope(t, fx)
-			migration, err := prepareIdentityMigration(&req, []string{fx.profile}, nil)
+			op, err := beginOperation(fx.home)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer op.close()
+			migration, err := prepareIdentityMigration(op, &req, []string{fx.profile}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

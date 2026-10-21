@@ -262,7 +262,7 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 		}
 		if lock.ContentHashVersion() == hashing.VersionV1 {
 			req := &ResolveRequest{Home: home, Profile: effective, Machine: envregistry.DefaultMachineConfig(), Policy: policy}
-			migration, err := prepareIdentityMigration(req, []string{effective}, nil)
+			migration, err := prepareIdentityMigration(op, req, []string{effective}, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -272,7 +272,7 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 			}
 		}
 	}
-	results, err := materializeScope(home, effective, environment, policy)
+	results, err := materializeScope(op, home, effective, environment, policy)
 	if err != nil {
 		return results, err
 	}
@@ -411,7 +411,7 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
 		machine = DefaultProfile
 	}
 	var results []EntryResult
-	machineResults, err := materializeScope(home, machine, "", policy)
+	machineResults, err := materializeScope(op, home, machine, "", policy)
 	if err != nil {
 		return machineResults, err
 	}
@@ -427,7 +427,7 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
 	sort.Strings(scopes)
 	for _, scope := range scopes {
 		environment, _ := splitScope(scope)
-		scopeResults, err := materializeScope(home, scoped[scope], environment, policy)
+		scopeResults, err := materializeScope(op, home, scoped[scope], environment, policy)
 		if err != nil {
 			return append(results, scopeResults...), err
 		}
@@ -445,11 +445,11 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
 // SyncWithPolicy re-materializes each skipped home from its scoped record in
 // its own pass, so every home is written exactly once and the recorded state
 // and the bytes always agree when the command returns.
-func materializeScope(home, profile, environment string, policy Policy) ([]EntryResult, error) {
-	return materializeScopeWithNativeHome(home, profile, environment, policy, nil)
+func materializeScope(op *operation, home, profile, environment string, policy Policy) ([]EntryResult, error) {
+	return materializeScopeWithNativeHome(op, home, profile, environment, policy, nil)
 }
 
-func materializeScopeWithNativeHome(home, profile, environment string, policy Policy, nativeHomeOf func(string) (string, error)) ([]EntryResult, error) {
+func materializeScopeWithNativeHome(op *operation, home, profile, environment string, policy Policy, nativeHomeOf func(string) (string, error)) ([]EntryResult, error) {
 	lock, hash, err := readLock(home, profile)
 	if err != nil {
 		return nil, err
@@ -493,7 +493,7 @@ func materializeScopeWithNativeHome(home, profile, environment string, policy Po
 	}
 	var results []EntryResult
 	for _, adapter := range adapters {
-		results = append(results, materializeOne(home, source, profile, lock, hash, precedence, order, packages, skills, adapter, policy, nativeHomeOf))
+		results = append(results, materializeOne(op, home, source, profile, lock, hash, precedence, order, packages, skills, adapter, policy, nativeHomeOf))
 	}
 	return results, nil
 }
@@ -687,7 +687,7 @@ func loadMaterial(home string, manager *gitManager, lock *contextlock.Lock) (map
 // environment_surface_unmanaged_conflict (or
 // environment_foreign_manager_detected for a foreign-manager symlink)
 // rather than overwrite.
-func materializeOne(home string, source Source, profile string, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, packages map[string]contextmaterialize.Package, skills []skillOf, adapter Adapter, policy Policy, nativeHomeOf func(string) (string, error)) EntryResult {
+func materializeOne(op *operation, home string, source Source, profile string, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, packages map[string]contextmaterialize.Package, skills []skillOf, adapter Adapter, policy Policy, nativeHomeOf func(string) (string, error)) EntryResult {
 	takeover := policy.Takeover
 	native, err := resolveNativeHome(adapter, nativeHomeOf)
 	if err != nil {
@@ -914,7 +914,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 		marker.Surfaces[envmarker.SurfaceRootContext] = surface
 	}
 	for _, skill := range skills {
-		if err := publishSkillProjection(home, skill); err != nil {
+		if err := publishSkillProjection(op, home, skill); err != nil {
 			return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
 		}
 	}

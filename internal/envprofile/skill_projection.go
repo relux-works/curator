@@ -1,6 +1,7 @@
 package envprofile
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,6 +21,9 @@ import (
 // The publication revision is independent of the audit ruleset: it versions
 // the installed tree and surface identity without changing admission inputs.
 const skillProjectionVersion = "core-3.1-v1"
+
+// ErrSkillProjectionIdentity identifies a projection that differs from its pin.
+var ErrSkillProjectionIdentity = errors.New("skill context projection differs from its identity")
 
 func skillSurfaceIdentity(skill skillOf) []byte {
 	return []byte(skillProjectionVersion + ":" + skill.hash)
@@ -60,7 +64,7 @@ func projectSkill(home, source string, version hashing.Version) (skillOf, error)
 // publishSkillProjection runs only during materialization under its mutation
 // lock. A complete private staging tree is renamed into the shared store;
 // raw package snapshots and command/runtime stores remain untouched.
-func publishSkillProjection(home string, skill skillOf) error {
+func publishSkillProjection(op *operation, home string, skill skillOf) error {
 	parent := filepath.Dir(skill.root)
 	if err := privatedir.MakeAll(parent); err != nil {
 		return err
@@ -73,7 +77,16 @@ func publishSkillProjection(home string, skill skillOf) error {
 		return err
 	}
 	if state.Kind == stateread.KindPresent {
-		return verifySkillProjection(home, skill)
+		if err := verifySkillProjection(home, skill); !errors.Is(err, ErrSkillProjectionIdentity) {
+			return err
+		}
+	}
+	// Capture the old complete tree before staging. The transaction rechecks
+	// this preimage before replacing it; foreign routes and links were refused
+	// by verification above, and a failed rebuild never touches this tree.
+	preimage, err := transaction.DigestPath(skill.root)
+	if err != nil {
+		return err
 	}
 	staging, err := os.MkdirTemp(parent, ".projection-*")
 	if err != nil {
@@ -88,15 +101,19 @@ func publishSkillProjection(home string, skill skillOf) error {
 		return err
 	}
 	if digest != skill.hash {
-		return fmt.Errorf("skill context changed while projecting")
+		return fmt.Errorf("%w: skill context changed while projecting", ErrSkillProjectionIdentity)
 	}
 	if err := privatedir.ProtectTree(staging); err != nil {
 		return err
 	}
-	if err := os.Rename(staging, skill.root); err != nil {
+	plan := transaction.Plan{TransactionID: newTransactionID(), ProjectIdentity: "profile-skill-projection", Targets: []transaction.Target{{
+		Class: "skill-projection", Identifier: skill.hash, LivePath: skill.root,
+		StagedSource: staging, PreimageDigest: preimage,
+	}}}
+	if _, err := op.engine.Prepare(op.lock, plan); err != nil {
 		return err
 	}
-	return nil
+	return op.engine.Commit(op.lock, plan.TransactionID)
 }
 
 func verifySkillProjection(home string, skill skillOf) error {
@@ -115,7 +132,7 @@ func verifySkillProjection(home string, skill skillOf) error {
 		return err
 	}
 	if digest != skill.hash {
-		return fmt.Errorf("skill context projection differs from its identity")
+		return ErrSkillProjectionIdentity
 	}
 	return nil
 }
