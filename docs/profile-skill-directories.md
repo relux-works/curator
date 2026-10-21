@@ -40,10 +40,14 @@ required empty settings and contributions. Lock schemas 1–2 remain readable
 and reject skill directories. Draft lock schema 3 remains unsupported.
 
 Audit content identity, manifest capabilities and findings use the selected
-package tree. Markdown guidance participates in network-declaration detection
-alongside scripts and the skill manifest. Detector ruleset 5 uses a new verdict
-cache namespace, so allowances from rulesets 1–4 (including ruleset 4, which did
-not inspect Markdown) are cache misses and the package is scanned again. Old
+package tree. Markdown guidance participates in network-declaration detection only within
+agent-facing context (core section 3), using the shared context roots and
+exclusions, validated runtime/build roots, and command-less scripts rule.
+Non-Markdown scripts and the skill manifest retain their prior scan surface.
+Detector ruleset 6 uses a new verdict cache namespace: ruleset 5 could cache
+false refusals from repository-only Markdown, while rulesets 1–4 (including
+ruleset 4, which did not inspect Markdown) could cache stale allowances. Those
+records are cache misses and the package is scanned again. Old
 records remain untouched; fresh verdicts bind the current ruleset. Root and
 sibling files
 cannot lend capabilities or contribute findings to the selected skill.
@@ -61,7 +65,11 @@ suite drives 56 published cases through `contextpkg.ParseManifest` and
 `contextlock.Parse`; the identity suite checks two independent canonical locks.
 The lifecycle suite substitutes real fixture Git commits for symbolic pins
 and drives install, update, sync, migration, managed resolve and in-place use
-with temporary homes. Rejections assert diagnostics and preservation of
+with temporary homes. The vendored corpus remains unchanged; its historical
+undeclared-contact witness is relocated from package-root `notes.md` to
+`references/notes.md` when materializing the lifecycle case, so it exercises
+agent-facing context under core section 3. A declared-host positive control
+uses the same visible path. Rejections assert diagnostics and preservation of
 profile files and surfaces. The narrowing harness uses Go overlays, including
 an inside-snapshot symlink control whose target contains valid skill content.
 Additional metadata regression cases pair valid frontmatter with malformed,
