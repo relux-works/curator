@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/audit"
 )
 
 type directoryMutation struct{ file, before, after string }
@@ -28,7 +30,7 @@ func TestSkillDirectoryNarrowingMutants(t *testing.T) {
  weight, err := strconv.ParseInt(string(member.Weight), 10, 64)`},
 		}},
 		{"reuse-pre-markdown-ruleset", "audit", "^TestReviewPriorMarkdownAllowance$", "TestReviewPriorMarkdownAllowance/v1", "prior ruleset-4 allowance bypassed current Markdown network gate", []directoryMutation{
-			{"audit/audit.go", `RulesetVersion = "5"`, `RulesetVersion = "4"`},
+			{"audit/audit.go", `RulesetVersion = "` + audit.RulesetVersion + `"`, `RulesetVersion = "4"`},
 		}},
 		{"schema-one-directory", "contextpkg", "^TestSkillDirectorySchemaVectors$/^manifest-v1-still-refuses-skill-directory$", "TestSkillDirectorySchemaVectors/manifest-v1-still-refuses-skill-directory", "valid=false", []directoryMutation{
 			{"contextpkg/contextpkg.go", `if schemaVersion == 2 {`, `if schemaVersion == 2 || schemaVersion == 1 {`},
@@ -70,7 +72,7 @@ func TestSkillDirectoryNarrowingMutants(t *testing.T) {
  }`},
 		}},
 		{"markdown-contact-ignored", "envprofile", "^TestSkillDirectoryLifecycleVectors$/^selected-root-undeclared-contact$", "TestSkillDirectoryLifecycleVectors/selected-root-undeclared-contact", "want refusal audit.capability.network-undeclared", []directoryMutation{
-			{"audit/audit.go", `if !strings.HasPrefix(posix, "scripts/") && posix != manifestName && !strings.EqualFold(filepath.Ext(posix), ".md") {`, `if !strings.HasPrefix(posix, "scripts/") && posix != manifestName && (!strings.EqualFold(filepath.Ext(posix), ".md") || posix == "notes.md") {`},
+			{"audit/audit.go", `if !strings.HasPrefix(posix, "scripts/") && posix != manifestName && !markdown {`, `if !strings.HasPrefix(posix, "scripts/") && posix != manifestName && (!markdown || posix == "references/notes.md") {`},
 		}},
 		{"alternate-directory-identity", "contextpkg", "^TestSkillDirectoryLockIdentityVectors$/^alternate$", "TestSkillDirectoryLockIdentityVectors/alternate", "canonical or identity mismatch", []directoryMutation{
 			{"contextlock/contextlock.go", `object["directory"] = member.Directory`, `object["directory"] = member.Directory
