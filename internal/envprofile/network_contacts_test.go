@@ -12,7 +12,8 @@ import (
 // Every pinned network-contact vector runs through the public Install and
 // EnsureDefaultWithPolicy entries. Refusals retain exact host/file evidence
 // and publish no profile; successful migration retains the pinned skill.
-// Fixture paths are prefixed by scripts/, the current extraction surface.
+// Fixture paths are prefixed by scripts/, the current extraction surface;
+// all skill fixtures retain the required context entry alongside the corpus.
 func TestProfileNetworkContactVectors(t *testing.T) {
 	payload, err := os.ReadFile("../audit/testdata/network-contacts.json")
 	if err != nil {
@@ -37,7 +38,10 @@ func TestProfileNetworkContactVectors(t *testing.T) {
 	}
 	for _, tc := range corpus.Cases {
 		t.Run(tc.Name, func(t *testing.T) {
-			files := map[string]string{"README.md": "network fixture\n"}
+			files := map[string]string{
+				"README.md": "network fixture\n",
+				"SKILL.md":  "---\nname: network-fixture\ndescription: Network contact fixture.\n---\n",
+			}
 			for file, text := range tc.Files {
 				files["scripts/"+file] = text
 			}

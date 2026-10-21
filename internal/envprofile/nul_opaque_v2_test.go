@@ -17,15 +17,18 @@ import (
 // commit-pinned, so the twin-distinguishing proof for the shared audit
 // gate lives in the audit and install packages; here the v1 collision
 // preamble ties the admitted fixtures to the pair the v1 lane refuses.
-// The v1 refusal of the same pair lives in nul_opaque_test.go.
+// The v1 refusal of the same pair lives in nul_opaque_test.go. Both maps also
+// include the identical core-required skill entry, preserving the collision.
 func TestInstallAdmitsV1CollidingSkillTreesUnderV2(t *testing.T) {
 	enableV2WritersForTest(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	single := map[string]string{
+		"SKILL.md":     "---\nname: framing-data\ndescription: Framing data fixture.\n---\n",
 		"assets/a.bin": "x\x00docs/b.md\x00y\x00z",
 	}
 	split := map[string]string{
+		"SKILL.md":     "---\nname: framing-data\ndescription: Framing data fixture.\n---\n",
 		"assets/a.bin": "x",
 		"docs/b.md":    "y\x00z",
 	}

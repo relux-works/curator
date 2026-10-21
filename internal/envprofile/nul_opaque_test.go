@@ -16,6 +16,7 @@ import (
 // TestInstallBlocksBothV1CollidingSkillTrees drives Install through
 // contextresolve.Resolve -> auditAndStore -> auditMember. Both trees have the
 // same v1 hash, but each has a regular NUL-bearing file in a different path.
+// Each fixture also contains the identical core-required skill entry.
 func TestInstallBlocksBothV1CollidingSkillTrees(t *testing.T) {
 	enableV1WritersForTest(t)
 	pinHomes(t)
@@ -28,6 +29,7 @@ func TestInstallBlocksBothV1CollidingSkillTrees(t *testing.T) {
 		{
 			name: "single-record",
 			files: map[string]string{
+				"SKILL.md":     "---\nname: framing-data\ndescription: Framing data fixture.\n---\n",
 				"assets/a.bin": "x\x00docs/b.md\x00y\x00z",
 			},
 			finding: "assets/a.bin",
@@ -35,6 +37,7 @@ func TestInstallBlocksBothV1CollidingSkillTrees(t *testing.T) {
 		{
 			name: "split-records",
 			files: map[string]string{
+				"SKILL.md":     "---\nname: framing-data\ndescription: Framing data fixture.\n---\n",
 				"assets/a.bin": "x",
 				"docs/b.md":    "y\x00z",
 			},
@@ -78,6 +81,7 @@ func TestInstallBlocksBothV1CollidingSkillTrees(t *testing.T) {
 	t.Run("nul-free-skill-still-installs", func(t *testing.T) {
 		home := t.TempDir()
 		skillRepo := gitRepo(t, map[string]string{
+			"SKILL.md":     "---\nname: framing-data\ndescription: Framing data fixture.\n---\n",
 			"assets/a.bin": "x",
 			"docs/b.md":    "y",
 		}, "v1.0.0")
