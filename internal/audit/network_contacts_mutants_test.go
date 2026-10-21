@@ -23,7 +23,7 @@ func TestNetworkContactNarrowingMutants(t *testing.T) {
 		{"exempt-example-com", "internal/audit/audit.go", `switch host[lastDot+1:] {`, `if host == "example.com" { return host, true }; switch host[lastDot+1:] {`, "./internal/audit", "^TestNetworkContactVectors$/^documentation-com$", "TestNetworkContactVectors/documentation-com", "Gate pass=false"},
 		{"exempt-bare-test", "internal/audit/audit.go", `if lastDot <= 0 {`, `if host == "test" { return host, true }; if lastDot <= 0 {`, "./internal/audit", "^TestNetworkContactVectors$/^bare-test$", "TestNetworkContactVectors/bare-test", "Gate pass=false"},
 		{"reserved-clears-file", "internal/audit/audit.go", `if exempt || declaredHost(declaredHosts, host) {`, `if exempt { return nil }; if exempt || declaredHost(declaredHosts, host) {`, "./internal/audit", "^TestNetworkContactVectors$/^mixed-reserved-first$", "TestNetworkContactVectors/mixed-reserved-first", "Gate pass=false"},
-		{"reuse-ruleset-three", "internal/audit/audit.go", `RulesetVersion = "4"`, `RulesetVersion = "3"`, "./internal/audit", "^TestNetworkContactCacheInvalidatesRulesetThree$", "TestNetworkContactCacheInvalidatesRulesetThree/", "stale ruleset reused"},
+		{"reuse-ruleset-three", "internal/audit/audit.go", `RulesetVersion = "5"`, `RulesetVersion = "3"`, "./internal/audit", "^TestNetworkContactCacheInvalidatesRulesetThree$", "TestNetworkContactCacheInvalidatesRulesetThree/", "stale ruleset reused"},
 	}
 	for _, mutant := range mutants {
 		t.Run(mutant.name, func(t *testing.T) {

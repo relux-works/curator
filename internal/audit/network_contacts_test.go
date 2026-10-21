@@ -101,7 +101,7 @@ func TestNetworkContactVectors(t *testing.T) {
 }
 
 // A genuine ruleset-3 refusal (or stale allow for a real host) cannot mask
-// ruleset-4 classification in either hash framing; old bytes are retained.
+// current classification in either hash framing; old bytes are retained.
 func TestNetworkContactCacheInvalidatesRulesetThree(t *testing.T) {
 	for _, version := range []hashing.Version{hashing.VersionV1, hashing.VersionV2} {
 		for _, host := range []string{"api.test", "api.example.com"} {

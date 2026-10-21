@@ -45,7 +45,7 @@ func TestCapabilityCacheNarrowingMutants(t *testing.T) {
 		}
 	}
 	mutants = append(mutants,
-		mutation{"reuse-ruleset-two", "internal/audit/audit.go", `RulesetVersion = "4"`, `RulesetVersion = "2"`, "./internal/audit", "^TestCapabilityCacheRulesetRetainsOldRecords$", "TestCapabilityCacheRulesetRetainsOldRecords", "want block, cache hit=false"},
+		mutation{"reuse-ruleset-two", "internal/audit/audit.go", `RulesetVersion = "5"`, `RulesetVersion = "2"`, "./internal/audit", "^TestCapabilityCacheRulesetRetainsOldRecords$", "TestCapabilityCacheRulesetRetainsOldRecords", "want block, cache hit=false"},
 		mutation{"accept-null-scope", "internal/capabilities/capabilities.go", `if rawScope, present := obj["prompt_scope"]; present {`, `if rawScope, present := obj["prompt_scope"]; present && rawScope != nil {`, "./internal/skillspec", "^TestCapabilitiesNullRejectedFromV3$", "TestCapabilitiesNullRejectedFromV3/v3/agent-skill.json/null-scope", "want refusal naming capabilities.prompt_scope"},
 		mutation{"accept-null-schema-three", "internal/skillspec/parse.go", `if data["capabilities"] == nil {`, `if data["capabilities"] == nil && schema != 3 {`, "./internal/skillspec", "^TestCapabilitiesNullRejectedFromV3$", "TestCapabilitiesNullRejectedFromV3/v3/agent-skill.json/null ", "want refusal naming capabilities"},
 	)
