@@ -1252,7 +1252,7 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 		return err
 	}
 	for _, skill := range plan.skillProjections {
-		if err := publishSkillProjection(req.Home, skill); err != nil {
+		if err := publishSkillProjection(op, req.Home, skill); err != nil {
 			return err
 		}
 	}
@@ -2734,7 +2734,7 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		return nil, err
 	}
 	if repairWouldChangeLockHash(lock) {
-		migration, err := prepareIdentityMigration(req, []string{req.Profile}, nil)
+		migration, err := prepareIdentityMigration(op, req, []string{req.Profile}, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -2764,7 +2764,7 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))
 	}
 	if verdict.current {
-		if err := repairNativeSkills(req); err != nil {
+		if err := repairNativeSkills(op, req); err != nil {
 			return nil, err
 		}
 		fragment, err := buildFragment(req, adapter, verdict)
@@ -2901,13 +2901,13 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		if isCredentialRefusal(err) {
 			return nil, err
 		}
-		return nil, fmt.Errorf("%s: %v", DiagRepairFailed, err)
+		return nil, fmt.Errorf("%s: %w", DiagRepairFailed, err)
 	}
 	after := verifyHome(req, adapter, source, lock, hash)
 	if !after.current {
 		return nil, fmt.Errorf("%s: %s", DiagRepairFailed, strings.Join(after.reasons, "; "))
 	}
-	if err := repairNativeSkills(req); err != nil {
+	if err := repairNativeSkills(op, req); err != nil {
 		return nil, err
 	}
 	fragment, err := buildFragment(req, adapter, after)

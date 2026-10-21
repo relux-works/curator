@@ -187,7 +187,7 @@ func nativeSkillsState(home, profile, id string, nativeHomeOf func(string) (stri
 	return row, nil
 }
 
-func repairNativeSkills(req *ResolveRequest) error {
+func repairNativeSkills(op *operation, req *ResolveRequest) error {
 	row, err := nativeSkillsState(req.Home, req.Profile, req.EnvID, req.NativeHomeOf)
 	if err != nil {
 		return err
@@ -195,7 +195,7 @@ func repairNativeSkills(req *ResolveRequest) error {
 	if row == nil || row.State == "current" {
 		return nil
 	}
-	results, err := materializeScopeWithNativeHome(req.Home, req.Profile, req.EnvID, req.Policy, req.NativeHomeOf)
+	results, err := materializeScopeWithNativeHome(op, req.Home, req.Profile, req.EnvID, req.Policy, req.NativeHomeOf)
 	if err != nil {
 		return err
 	}
@@ -209,13 +209,13 @@ func repairNativeSkills(req *ResolveRequest) error {
 
 // An unchanged lock does not imply current native discovery surfaces. Update
 // repairs participating effective-current homes without re-resolving path bytes.
-func syncCurrentNativeSkills(home, profile string, policy Policy) error {
+func syncCurrentNativeSkills(op *operation, home, profile string, policy Policy) error {
 	for _, adapter := range Adapters {
 		if inPlaceSkillsDir(adapter.ID) == profileSkillsSurfaceDir {
 			continue
 		}
 		req := &ResolveRequest{Home: home, Profile: profile, EnvID: adapter.ID, Policy: policy}
-		if err := repairNativeSkills(req); err != nil {
+		if err := repairNativeSkills(op, req); err != nil {
 			return err
 		}
 	}

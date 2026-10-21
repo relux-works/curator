@@ -173,7 +173,7 @@ func identityMigrationInputs(req *MigrateRequest, profiles []string) (map[string
 // prepareIdentityMigration rebuilds the full profile projection from verified
 // pinned snapshots, retaining unrelated metadata. Credential changes, when
 // supplied, join this same transaction rather than a separate marker rewrite.
-func prepareIdentityMigration(req *ResolveRequest, profiles []string, report *MigrateReport) (_ *identityMigration, resultErr error) {
+func prepareIdentityMigration(op *operation, req *ResolveRequest, profiles []string, report *MigrateReport) (_ *identityMigration, resultErr error) {
 	root, err := os.MkdirTemp("", "curator-identity-migration-*")
 	if err != nil {
 		return nil, err
@@ -333,7 +333,7 @@ func prepareIdentityMigration(req *ResolveRequest, profiles []string, report *Mi
 			// Populate immutable projections before the coordinated identity
 			// activation, just as the migration populates v2 package entries.
 			for _, skill := range plan.skillProjections {
-				if err := publishSkillProjection(req.Home, skill); err != nil {
+				if err := publishSkillProjection(op, req.Home, skill); err != nil {
 					return nil, err
 				}
 			}

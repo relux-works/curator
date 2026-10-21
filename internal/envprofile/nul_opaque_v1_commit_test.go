@@ -354,7 +354,7 @@ func TestSwitchMaterializeRefusesV1CommitPinnedContextNUL(t *testing.T) {
 			var results []EntryResult
 			var materializeErr error
 			calls := hashing.CountV1Hashes(func() {
-				results, materializeErr = materializeScopeWithNativeHome(home, profile, envregistry.ClaudeCode, Policy{}, nativeHomeOf)
+				results, materializeErr = materializeTestScope(t, home, profile, envregistry.ClaudeCode, Policy{}, nativeHomeOf)
 			})
 			if !shape.wantRefusal {
 				if materializeErr != nil {

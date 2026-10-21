@@ -72,7 +72,7 @@ func TestSkillProjectionCoreSelection(t *testing.T) {
 			if entries, err := os.ReadDir(home); err != nil || len(entries) != 0 {
 				t.Fatalf("planning wrote state: %v %v", entries, err)
 			}
-			if err := publishSkillProjection(home, skill); err != nil {
+			if err := publishTestSkillProjection(t, home, skill); err != nil {
 				t.Fatal(err)
 			}
 			want := map[string][]byte{"SKILL.md": []byte("# Guide\n"), "references/guide.md": []byte("visible\n")}
@@ -86,7 +86,7 @@ func TestSkillProjectionCoreSelection(t *testing.T) {
 			if !reflect.DeepEqual(projectionFiles(t, canonical), want) {
 				t.Fatal("canonical copier differs")
 			}
-			if err := publishSkillProjection(home, skill); err != nil {
+			if err := publishTestSkillProjection(t, home, skill); err != nil {
 				t.Fatal(err)
 			}
 			for _, id := range []string{"claude_code", "codex_cli"} {
@@ -274,7 +274,7 @@ func TestProfileSkillProjectionRepair(t *testing.T) {
 				if _, err := Resolve(req); err != nil {
 					t.Fatal(err)
 				}
-				if _, err := materializeScopeWithNativeHome(fx.home, fx.profile, id, Policy{}, req.NativeHomeOf); err != nil {
+				if _, err := materializeTestScope(t, fx.home, fx.profile, id, Policy{}, req.NativeHomeOf); err != nil {
 					t.Fatal(err)
 				}
 				lock, _, err := readLock(fx.home, fx.profile)
@@ -361,9 +361,9 @@ func TestProfileSkillProjectionRepair(t *testing.T) {
 	}
 }
 
-// Reuse accepts an intact projection and refuses altered bytes, extra links,
-// and a linked store destination without changing either the stored tree or
-// the link target. A missing projection is rebuilt from its pinned source.
+// Reuse accepts intact projections and rebuilds altered bytes. Extra links
+// and linked destinations refuse without modifying their targets. A source
+// changed after planning cannot publish under the original pin.
 func TestSkillProjectionStoreReuse(t *testing.T) {
 	for _, kind := range []string{"bytes", "link", "destination", "source-changed"} {
 		t.Run(kind, func(t *testing.T) {
@@ -375,7 +375,7 @@ func TestSkillProjectionStoreReuse(t *testing.T) {
 			}
 			if kind == "source-changed" {
 				writeGitFile(t, source, "SKILL.md", "# Changed\n")
-				if err := publishSkillProjection(home, skill); err == nil || !strings.Contains(err.Error(), "changed while projecting") {
+				if err := publishTestSkillProjection(t, home, skill); err == nil || !strings.Contains(err.Error(), "changed while projecting") {
 					t.Fatalf("changed source published: %v", err)
 				}
 				if _, err := os.Lstat(skill.root); !os.IsNotExist(err) {
@@ -383,7 +383,7 @@ func TestSkillProjectionStoreReuse(t *testing.T) {
 				}
 				return
 			}
-			if err := publishSkillProjection(home, skill); err != nil {
+			if err := publishTestSkillProjection(t, home, skill); err != nil {
 				t.Fatal(err)
 			}
 			if err := verifySkillProjection(home, skill); err != nil {
@@ -406,8 +406,20 @@ func TestSkillProjectionStoreReuse(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			err = publishSkillProjection(home, skill)
-			want := map[string]string{"bytes": "differs from its identity", "link": "link_safety", "destination": "containment"}[kind]
+			if kind == "bytes" {
+				if err := verifySkillProjection(home, skill); !errors.Is(err, ErrSkillProjectionIdentity) {
+					t.Fatalf("altered projection reused: %v", err)
+				}
+				if err := publishTestSkillProjection(t, home, skill); err != nil {
+					t.Fatal(err)
+				}
+				if err := verifySkillProjection(home, skill); err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			err = publishTestSkillProjection(t, home, skill)
+			want := map[string]string{"link": "link_safety", "destination": "containment"}[kind]
 			if err == nil || !strings.Contains(err.Error(), want) {
 				t.Fatalf("altered projection reused or wrong refusal: %v", err)
 			}
@@ -428,7 +440,7 @@ func TestProfileSkillProjectionMissingStore(t *testing.T) {
 	if _, err := Resolve(req); err != nil {
 		t.Fatal(err)
 	}
-	if results, err := materializeScopeWithNativeHome(fx.home, fx.profile, req.EnvID, Policy{}, req.NativeHomeOf); err != nil || len(results) != 1 || !results[0].OK {
+	if results, err := materializeTestScope(t, fx.home, fx.profile, req.EnvID, Policy{}, req.NativeHomeOf); err != nil || len(results) != 1 || !results[0].OK {
 		t.Fatalf("native materialization: %+v %v", results, err)
 	}
 	lock, _, err := readLock(fx.home, fx.profile)
@@ -525,7 +537,7 @@ func TestSkillProjectionLegacyFraming(t *testing.T) {
 				t.Fatal(err)
 			}
 			if phase == "verify" {
-				if err := publishSkillProjection(home, skill); err != nil {
+				if err := publishTestSkillProjection(t, home, skill); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -539,7 +551,7 @@ func TestSkillProjectionLegacyFraming(t *testing.T) {
 				case "plan":
 					_, err = projectSkill(home, source, hashing.VersionV1)
 				case "stage":
-					err = publishSkillProjection(home, skill)
+					err = publishTestSkillProjection(t, home, skill)
 				case "verify":
 					err = verifySkillProjection(home, skill)
 				}
@@ -560,7 +572,7 @@ func TestSkillProjectionLegacyFraming(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := publishSkillProjection(home, skill); err != nil {
+	if err := publishTestSkillProjection(t, home, skill); err != nil {
 		t.Fatal(err)
 	}
 	if err := verifySkillProjection(home, skill); err != nil {
@@ -569,4 +581,24 @@ func TestSkillProjectionLegacyFraming(t *testing.T) {
 	if !reflect.DeepEqual(projectionFiles(t, source), projectionFiles(t, skill.root)) {
 		t.Fatal("v2 projection changed bytes")
 	}
+}
+
+func publishTestSkillProjection(t *testing.T, home string, skill skillOf) error {
+	t.Helper()
+	op, err := beginOperation(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer op.close()
+	return publishSkillProjection(op, home, skill)
+}
+
+func materializeTestScope(t *testing.T, home, profile, environment string, policy Policy, nativeHomeOf func(string) (string, error)) ([]EntryResult, error) {
+	t.Helper()
+	op, err := beginOperation(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer op.close()
+	return materializeScopeWithNativeHome(op, home, profile, environment, policy, nativeHomeOf)
 }

@@ -111,7 +111,7 @@ func globalSkillOperation(home string, policy Policy, machine envregistry.Machin
 	if err := preflightInPlaceScope(home, profile, "", policy, nativeHomeOf); err != nil {
 		return info, err
 	}
-	nativeResults, err := materializeScopeWithNativeHome(home, profile, "", policy, nativeHomeOf)
+	nativeResults, err := materializeScopeWithNativeHome(op, home, profile, "", policy, nativeHomeOf)
 	if err != nil {
 		return info, err
 	}

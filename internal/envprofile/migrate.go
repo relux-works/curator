@@ -1010,7 +1010,7 @@ func ApplyMigration(req MigrateRequest) (*MigrateApplyResult, error) {
 			return result, err
 		}
 		rr := req.resolveFor(req.Profile, req.EnvID)
-		migration, err := prepareIdentityMigration(rr, profiles, report)
+		migration, err := prepareIdentityMigration(op, rr, profiles, report)
 		if err != nil {
 			return result, err
 		}

@@ -80,8 +80,13 @@ markers become stale even when their file bytes happen to match. Native and
 managed repair replace Curator-recorded links without takeover. Old recorded
 managed tree copies are replaced as complete recoverable transaction entries,
 removing excluded files while retaining their copy-fallback record. Missing
-projection stores are stale and rebuilt during repair. Identity migration also
-publishes projections before activating new links or fallback copies.
+projection stores and regular projections with missing, extra or changed files
+are stale. Explicit repair stages one rebuild from the pinned store entry,
+verifies its identity and replaces the complete directory through the existing
+recoverable transaction. A staged identity mismatch returns
+`ErrSkillProjectionIdentity` without replacing the old directory; linked store
+routes remain refused. Shared projections are rebuilt once for all consumers.
+Identity migration also publishes projections before activating new links or fallback copies.
 
 The command publishers in `install/targets.go` and `runtimestore` continue to
 read snapshots and write independent runtime stores/build caches. No command
