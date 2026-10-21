@@ -17,3 +17,9 @@
   A vendor correction or explicit normative-owner resolution is required
   before exclusion qualification and the v4 release gate can advance.
   [Evidence, options and executable witnesses](docs/qualification/muse-1.4.8-R6256.1.md).
+
+- TASK-261021-wt8ve7: Claude Code 2.1.305 project-source exclusion preserves
+  previously loaded project text on resume/fork-resume. A strict consumer
+  needs proven excluded-origin session state, fresh sessions or refusal.
+  Broader late hook/settings/plugin/MCP reloads also remain unqualified.
+  [Measured controls and bounds](docs/qualification/project-source-exclusion-claude.md).
