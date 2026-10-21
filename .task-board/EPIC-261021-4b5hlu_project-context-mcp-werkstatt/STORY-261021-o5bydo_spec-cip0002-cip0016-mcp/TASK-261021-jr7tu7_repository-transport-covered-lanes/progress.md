@@ -28,6 +28,7 @@ estimated(fibonacci(2))
 - [W-RTLANES-brief.md](file://TASK-261021-jr7tu7/W-RTLANES-brief.md)
 - [reviewer-TASK-261021-jr7tu7.md](file://TASK-261021-jr7tu7/reviewer-TASK-261021-jr7tu7.md)
 - [W-RTLANES-review-brief.md](file://TASK-261021-jr7tu7/W-RTLANES-review-brief.md)
+- [W-RTLANES-r3-brief.md](file://TASK-261021-jr7tu7/W-RTLANES-r3-brief.md)
 
 ## Outcome Resources
 - [TASK-261021-jr7tu7_draft-r1.patch](file://TASK-261021-jr7tu7/TASK-261021-jr7tu7_draft-r1.patch)
@@ -39,7 +40,7 @@ estimated(fibonacci(2))
 2026-10-21T00:39:05Z
 
 ## Last Update
-2026-10-21T01:13:13Z
+2026-10-21T01:15:12Z
 
 ## Assigned To
 ivmbp_curator_dev4
