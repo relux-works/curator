@@ -1,5 +1,5 @@
 ## Status
-development
+done
 
 ## Review
 required
@@ -39,12 +39,14 @@ Reviewer round 2: ivmbp_curator_rev3 (round 1: ivmbp_curator_rev1), named by ivm
 - [TASK-261021-vb3z6f_review-r1.md](file://TASK-261021-vb3z6f/TASK-261021-vb3z6f_review-r1.md)
 - [TASK-261021-vb3z6f_results-r2.md](file://TASK-261021-vb3z6f/TASK-261021-vb3z6f_results-r2.md)
 - [TASK-261021-vb3z6f_review-r2.md](file://TASK-261021-vb3z6f/TASK-261021-vb3z6f_review-r2.md)
+- [TASK-261021-vb3z6f_results-r3.md](file://TASK-261021-vb3z6f/TASK-261021-vb3z6f_results-r3.md)
+- [TASK-261021-vb3z6f_review-carry-r3.md](file://TASK-261021-vb3z6f/TASK-261021-vb3z6f_review-carry-r3.md)
 
 ## Created
 2026-10-21T00:28:52Z
 
 ## Last Update
-2026-10-21T02:34:19Z
+2026-10-21T03:45:20Z
 
 ## Assigned To
 ivmbp_curator_dev1
