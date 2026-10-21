@@ -51,7 +51,7 @@ var severityRank = map[string]int{
 // backend and model (Spec §12.1).
 const (
 	PromptVersion  = "1"
-	RulesetVersion = "6"
+	RulesetVersion = "7"
 )
 
 // findingOpaqueNUL is the shared opaque-NUL finding id: every v1
@@ -831,24 +831,7 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
 		excludeRoots = whitelist.ContextExcludedRoots(spec.RuntimeRoots, spec.BuildRoots)
 	}
 
-	_ = filepath.WalkDir(snapshot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
-			return nil
-		}
-		rel, relErr := filepath.Rel(snapshot, path)
-		if relErr != nil {
-			return nil
-		}
-		posix := filepath.ToSlash(rel)
-		// Markdown contacts matter only in agent-facing context (core §3).
-		// The historical non-Markdown scripts/manifest surface is unchanged.
-		markdown := strings.EqualFold(filepath.Ext(posix), ".md")
-		if markdown && !whitelist.ContextPathIncluded(posix, includeScripts, excludeRoots) {
-			return nil
-		}
-		if !strings.HasPrefix(posix, "scripts/") && posix != manifestName && !markdown {
-			return nil
-		}
+	scan := func(path, posix string) error {
 		payload, readErr := os.ReadFile(path) // #nosec G304 -- walked snapshot
 		if readErr != nil {
 			return nil
@@ -881,6 +864,34 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
 			})
 		}
 		return nil
+	}
+	// Enumerate Markdown through the very same filesystem lookups, walk and
+	// predicate as CopyContext. Canonical root aliases on case-insensitive
+	// volumes must not escape the audit through directory-entry spelling.
+	_ = whitelist.WalkContext(snapshot, includeScripts, excludeRoots, func(path, posix string) error {
+		if !strings.EqualFold(filepath.Ext(posix), ".md") {
+			return nil
+		}
+		return scan(path, posix) // Agent-facing Markdown.
+	})
+	// Preserve the historical non-Markdown scripts/manifest scan separately.
+	_ = filepath.WalkDir(snapshot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return nil
+		}
+		rel, relErr := filepath.Rel(snapshot, path)
+		if relErr != nil {
+			return nil
+		}
+		posix := filepath.ToSlash(rel)
+		markdown := strings.EqualFold(filepath.Ext(posix), ".md")
+		if !strings.HasPrefix(posix, "scripts/") && posix != manifestName && !markdown {
+			return nil
+		}
+		if markdown {
+			return nil
+		}
+		return scan(path, posix)
 	})
 	sort.Slice(findings, func(i, j int) bool {
 		if findings[i].File != findings[j].File {

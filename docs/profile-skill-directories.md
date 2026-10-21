@@ -44,7 +44,11 @@ package tree. Markdown guidance participates in network-declaration detection on
 agent-facing context (core section 3), using the shared context roots and
 exclusions, validated runtime/build roots, and command-less scripts rule.
 Non-Markdown scripts and the skill manifest retain their prior scan surface.
-Detector ruleset 6 uses a new verdict cache namespace: ruleset 5 could cache
+Markdown enumeration uses the same filesystem walk as context copying, including
+canonical root aliases on case-insensitive filesystems. Descendant exclusions
+retain case-sensitive protocol comparison.
+Detector ruleset 7 uses a new verdict cache namespace: ruleset 6 could cache
+allowances for root case aliases, ruleset 5 could cache
 false refusals from repository-only Markdown, while rulesets 1–4 (including
 ruleset 4, which did not inspect Markdown) could cache stale allowances. Those
 records are cache misses and the package is scanned again. Old

@@ -72,7 +72,7 @@ func TestSkillDirectoryNarrowingMutants(t *testing.T) {
  }`},
 		}},
 		{"markdown-contact-ignored", "envprofile", "^TestSkillDirectoryLifecycleVectors$/^selected-root-undeclared-contact$", "TestSkillDirectoryLifecycleVectors/selected-root-undeclared-contact", "want refusal audit.capability.network-undeclared", []directoryMutation{
-			{"audit/audit.go", `if !strings.HasPrefix(posix, "scripts/") && posix != manifestName && !markdown {`, `if !strings.HasPrefix(posix, "scripts/") && posix != manifestName && (!markdown || posix == "references/notes.md") {`},
+			{"audit/audit.go", `return scan(path, posix) // Agent-facing Markdown.`, `if posix == "references/notes.md" { return nil }; return scan(path, posix) // Agent-facing Markdown.`},
 		}},
 		{"alternate-directory-identity", "contextpkg", "^TestSkillDirectoryLockIdentityVectors$/^alternate$", "TestSkillDirectoryLockIdentityVectors/alternate", "canonical or identity mismatch", []directoryMutation{
 			{"contextlock/contextlock.go", `object["directory"] = member.Directory`, `object["directory"] = member.Directory
