@@ -77,7 +77,9 @@ Planning and status only read files; materialization publishes a complete
 staged projection atomically and reuses its content-addressed store directory.
 Skills surface identities include `core-3.1-v1`, so old raw-root links and old
 markers become stale even when their file bytes happen to match. Native and
-managed repair replace Curator-recorded links without takeover. Missing
+managed repair replace Curator-recorded links without takeover. Old recorded
+managed tree copies are replaced as complete recoverable transaction entries,
+removing excluded files while retaining their copy-fallback record. Missing
 projection stores are stale and rebuilt during repair. Identity migration also
 publishes projections before activating new links or fallback copies.
 

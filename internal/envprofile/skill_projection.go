@@ -6,11 +6,13 @@ import (
 	"path/filepath"
 
 	"github.com/relux-works/curator/internal/contextstore"
+	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/stateread"
+	"github.com/relux-works/curator/internal/transaction"
 	"github.com/relux-works/curator/internal/whitelist"
 )
 
@@ -112,4 +114,57 @@ func verifySkillProjection(home string, skill skillOf) error {
 		return fmt.Errorf("skill context projection differs from its identity")
 	}
 	return nil
+}
+
+// Only an explicitly recorded skill fallback is eligible for replacement.
+// Unrecorded directories still pass through the ordinary conflict inventory.
+func recordedSkillFallback(prior *envmarker.Marker, path string) bool {
+	if prior == nil {
+		return false
+	}
+	surface := prior.Surfaces[envmarker.SurfaceSkills]
+	if surface.Copies == nil {
+		return false
+	}
+	for _, copy := range *surface.Copies {
+		if copy.Path == path && copy.Reason == envmarker.ReasonSymlinkFallback {
+			return true
+		}
+	}
+	return false
+}
+
+// Replace the complete copied tree through the existing recoverable entry
+// transaction. Overlay-copying would retain excluded files from the old tree;
+// renaming a symlink over a non-empty directory is unavailable on some hosts.
+func publishSkillFallback(op *operation, root, rel, source string) error {
+	live, err := managedPath(root, rel, true)
+	if err != nil {
+		return err
+	}
+	stage, err := os.MkdirTemp(filepath.Dir(live), ".curator-skill-copy-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(stage)
+	stageRel, err := managedRelative(root, stage)
+	if err != nil {
+		return err
+	}
+	nextRel := managedJoin(stageRel, "next")
+	if err := copyTree(source, root, nextRel); err != nil {
+		return err
+	}
+	digest, err := transaction.DigestTarget(transaction.KindEntry, live)
+	if err != nil {
+		return err
+	}
+	plan := transaction.Plan{TransactionID: newTransactionID(), ProjectIdentity: "profile-skill-projection", Targets: []transaction.Target{{
+		Class: "skill-context", Identifier: rel, Kind: transaction.KindEntry, LivePath: live,
+		StagedSource: filepath.Join(stage, "next"), PreimageDigest: digest,
+	}}}
+	if _, err := op.engine.Prepare(op.lock, plan); err != nil {
+		return err
+	}
+	return op.engine.Commit(op.lock, plan.TransactionID)
 }
