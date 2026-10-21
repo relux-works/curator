@@ -1,0 +1,4 @@
+source-control: test exit=1; intended failure: observed EXCL_FOREIGN_ROOT_7352=true; want false
+mcp-control: test exit=1; intended failure: forbidden foreign-mcp startup:
+network-boundary: test exit=1; intended failure: unrelated loopback not denied:
+keychains-boundary: test exit=1; intended failure: synthetic Keychains read not denied:

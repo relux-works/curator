@@ -1,0 +1,160 @@
+=== RUN   TestP1Instructions
+=== RUN   TestP1Instructions/root/exclude-false
+=== RUN   TestP1Instructions/root/exclude-true
+=== RUN   TestP1Instructions/ancestor/exclude-false
+=== RUN   TestP1Instructions/ancestor/exclude-true
+=== RUN   TestP1Instructions/dot-claude/exclude-false
+=== RUN   TestP1Instructions/dot-claude/exclude-true
+=== RUN   TestP1Instructions/local/exclude-false
+=== RUN   TestP1Instructions/local/exclude-true
+=== RUN   TestP1Instructions/rule/exclude-false
+=== RUN   TestP1Instructions/rule/exclude-true
+=== RUN   TestP1Instructions/agents-fallback/exclude-false
+=== RUN   TestP1Instructions/agents-fallback/exclude-true
+--- PASS: TestP1Instructions (25.64s)
+    --- PASS: TestP1Instructions/root/exclude-false (2.52s)
+    --- PASS: TestP1Instructions/root/exclude-true (2.31s)
+    --- PASS: TestP1Instructions/ancestor/exclude-false (2.07s)
+    --- PASS: TestP1Instructions/ancestor/exclude-true (2.19s)
+    --- PASS: TestP1Instructions/dot-claude/exclude-false (2.27s)
+    --- PASS: TestP1Instructions/dot-claude/exclude-true (1.90s)
+    --- PASS: TestP1Instructions/local/exclude-false (2.11s)
+    --- PASS: TestP1Instructions/local/exclude-true (1.84s)
+    --- PASS: TestP1Instructions/rule/exclude-false (2.23s)
+    --- PASS: TestP1Instructions/rule/exclude-true (2.10s)
+    --- PASS: TestP1Instructions/agents-fallback/exclude-false (1.85s)
+    --- PASS: TestP1Instructions/agents-fallback/exclude-true (2.26s)
+=== RUN   TestP2Nested
+=== RUN   TestP2Nested/claude/exclude-false
+=== RUN   TestP2Nested/claude/exclude-true
+=== RUN   TestP2Nested/rule/exclude-false
+=== RUN   TestP2Nested/rule/exclude-true
+=== RUN   TestP2Nested/agents/exclude-false
+=== RUN   TestP2Nested/agents/exclude-true
+--- PASS: TestP2Nested (13.84s)
+    --- PASS: TestP2Nested/claude/exclude-false (2.52s)
+    --- PASS: TestP2Nested/claude/exclude-true (2.32s)
+    --- PASS: TestP2Nested/rule/exclude-false (2.51s)
+    --- PASS: TestP2Nested/rule/exclude-true (2.51s)
+    --- PASS: TestP2Nested/agents/exclude-false (1.74s)
+    --- PASS: TestP2Nested/agents/exclude-true (2.24s)
+=== RUN   TestP3Skills
+=== RUN   TestP3Skills/exclude-false
+=== RUN   TestP3Skills/exclude-true
+--- PASS: TestP3Skills (4.94s)
+    --- PASS: TestP3Skills/exclude-false (2.16s)
+    --- PASS: TestP3Skills/exclude-true (2.78s)
+=== RUN   TestP4Hooks
+=== RUN   TestP4Hooks/exclude-false
+=== RUN   TestP4Hooks/exclude-true
+--- PASS: TestP4Hooks (4.94s)
+    --- PASS: TestP4Hooks/exclude-false (2.56s)
+    --- PASS: TestP4Hooks/exclude-true (2.38s)
+=== RUN   TestP4Plugins
+=== RUN   TestP4Plugins/exclude-false
+=== RUN   TestP4Plugins/exclude-true
+--- PASS: TestP4Plugins (5.73s)
+    --- PASS: TestP4Plugins/exclude-false (2.81s)
+    --- PASS: TestP4Plugins/exclude-true (2.92s)
+=== RUN   TestP5MCP
+=== RUN   TestP5MCP/project-empty-false/exclude-false/strict-false/approved-false
+=== RUN   TestP5MCP/project-empty-false/exclude-false/strict-false/approved-true
+=== RUN   TestP5MCP/project-empty-false/exclude-false/strict-true/approved-false
+=== RUN   TestP5MCP/project-empty-false/exclude-false/strict-true/approved-true
+=== RUN   TestP5MCP/project-empty-false/exclude-true/strict-false/approved-false
+=== RUN   TestP5MCP/project-empty-false/exclude-true/strict-false/approved-true
+=== RUN   TestP5MCP/project-empty-false/exclude-true/strict-true/approved-false
+=== RUN   TestP5MCP/project-empty-false/exclude-true/strict-true/approved-true
+=== RUN   TestP5MCP/project-empty-true/exclude-false/strict-false/approved-false
+=== RUN   TestP5MCP/project-empty-true/exclude-false/strict-false/approved-true
+=== RUN   TestP5MCP/project-empty-true/exclude-false/strict-true/approved-false
+=== RUN   TestP5MCP/project-empty-true/exclude-false/strict-true/approved-true
+=== RUN   TestP5MCP/project-empty-true/exclude-true/strict-false/approved-false
+=== RUN   TestP5MCP/project-empty-true/exclude-true/strict-false/approved-true
+=== RUN   TestP5MCP/project-empty-true/exclude-true/strict-true/approved-false
+=== RUN   TestP5MCP/project-empty-true/exclude-true/strict-true/approved-true
+--- PASS: TestP5MCP (53.58s)
+    --- PASS: TestP5MCP/project-empty-false/exclude-false/strict-false/approved-false (6.02s)
+    --- PASS: TestP5MCP/project-empty-false/exclude-false/strict-false/approved-true (3.24s)
+    --- PASS: TestP5MCP/project-empty-false/exclude-false/strict-true/approved-false (1.82s)
+    --- PASS: TestP5MCP/project-empty-false/exclude-false/strict-true/approved-true (3.58s)
+    --- PASS: TestP5MCP/project-empty-false/exclude-true/strict-false/approved-false (2.21s)
+    --- PASS: TestP5MCP/project-empty-false/exclude-true/strict-false/approved-true (4.04s)
+    --- PASS: TestP5MCP/project-empty-false/exclude-true/strict-true/approved-false (2.48s)
+    --- PASS: TestP5MCP/project-empty-false/exclude-true/strict-true/approved-true (4.19s)
+    --- PASS: TestP5MCP/project-empty-true/exclude-false/strict-false/approved-false (2.76s)
+    --- PASS: TestP5MCP/project-empty-true/exclude-false/strict-false/approved-true (5.18s)
+    --- PASS: TestP5MCP/project-empty-true/exclude-false/strict-true/approved-false (2.46s)
+    --- PASS: TestP5MCP/project-empty-true/exclude-false/strict-true/approved-true (3.57s)
+    --- PASS: TestP5MCP/project-empty-true/exclude-true/strict-false/approved-false (2.05s)
+    --- PASS: TestP5MCP/project-empty-true/exclude-true/strict-false/approved-true (3.97s)
+    --- PASS: TestP5MCP/project-empty-true/exclude-true/strict-true/approved-false (2.63s)
+    --- PASS: TestP5MCP/project-empty-true/exclude-true/strict-true/approved-true (3.39s)
+=== RUN   TestP6SettingsPermissions
+=== RUN   TestP6SettingsPermissions/project/exclude-false
+=== RUN   TestP6SettingsPermissions/project/exclude-true
+=== RUN   TestP6SettingsPermissions/local/exclude-false
+=== RUN   TestP6SettingsPermissions/local/exclude-true
+--- PASS: TestP6SettingsPermissions (8.20s)
+    --- PASS: TestP6SettingsPermissions/project/exclude-false (2.00s)
+    --- PASS: TestP6SettingsPermissions/project/exclude-true (2.18s)
+    --- PASS: TestP6SettingsPermissions/local/exclude-false (1.88s)
+    --- PASS: TestP6SettingsPermissions/local/exclude-true (2.15s)
+=== RUN   TestP7Resume
+=== RUN   TestP7Resume/exclude-false
+=== RUN   TestP7Resume/exclude-true
+--- PASS: TestP7Resume (5.71s)
+    --- PASS: TestP7Resume/exclude-false (2.91s)
+    --- PASS: TestP7Resume/exclude-true (2.80s)
+=== RUN   TestP7Child
+=== RUN   TestP7Child/exclude-false
+=== RUN   TestP7Child/exclude-true
+--- PASS: TestP7Child (5.17s)
+    --- PASS: TestP7Child/exclude-false (2.77s)
+    --- PASS: TestP7Child/exclude-true (2.40s)
+=== RUN   TestP8LateInstructions
+=== RUN   TestP8LateInstructions/exclude-false
+=== RUN   TestP8LateInstructions/exclude-true
+--- PASS: TestP8LateInstructions (4.35s)
+    --- PASS: TestP8LateInstructions/exclude-false (2.31s)
+    --- PASS: TestP8LateInstructions/exclude-true (2.04s)
+=== RUN   TestIdentity
+--- PASS: TestIdentity (0.90s)
+=== RUN   TestIntakeBoundary
+=== RUN   TestIntakeBoundary/missing
+=== RUN   TestIntakeBoundary/wrong-digest
+--- PASS: TestIntakeBoundary (0.85s)
+    --- PASS: TestIntakeBoundary/missing (0.02s)
+    --- PASS: TestIntakeBoundary/wrong-digest (0.03s)
+=== RUN   TestOfflineBoundary
+--- PASS: TestOfflineBoundary (1.36s)
+=== RUN   TestP8LateSkills
+=== RUN   TestP8LateSkills/exclude-false
+=== RUN   TestP8LateSkills/exclude-true
+--- PASS: TestP8LateSkills (5.13s)
+    --- PASS: TestP8LateSkills/exclude-false (2.55s)
+    --- PASS: TestP8LateSkills/exclude-true (2.58s)
+=== RUN   TestP8LateHooks
+=== RUN   TestP8LateHooks/exclude-false
+=== RUN   TestP8LateHooks/exclude-true
+--- PASS: TestP8LateHooks (6.47s)
+    --- PASS: TestP8LateHooks/exclude-false (3.23s)
+    --- PASS: TestP8LateHooks/exclude-true (3.24s)
+=== RUN   TestP7PreviouslyContaminatedResume
+=== RUN   TestP7PreviouslyContaminatedResume/fork-false
+=== RUN   TestP7PreviouslyContaminatedResume/fork-true
+--- PASS: TestP7PreviouslyContaminatedResume (6.31s)
+    --- PASS: TestP7PreviouslyContaminatedResume/fork-false (2.97s)
+    --- PASS: TestP7PreviouslyContaminatedResume/fork-true (3.34s)
+=== RUN   TestCollectorBoundary
+=== RUN   TestCollectorBoundary/neutral
+=== RUN   TestCollectorBoundary/private
+=== RUN   TestCollectorBoundary/flattened
+=== RUN   TestCollectorBoundary/empty
+--- PASS: TestCollectorBoundary (1.86s)
+    --- PASS: TestCollectorBoundary/neutral (0.20s)
+    --- PASS: TestCollectorBoundary/private (0.19s)
+    --- PASS: TestCollectorBoundary/flattened (0.20s)
+    --- PASS: TestCollectorBoundary/empty (0.12s)
+PASS
+ok  	github.com/relux-works/curator/.research/project-exclusion-claude	155.206s

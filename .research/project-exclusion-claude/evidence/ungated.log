@@ -1,0 +1,208 @@
+=== RUN   TestP1Instructions
+=== RUN   TestP1Instructions/root/exclude-false
+    replay_test.go:321: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP1Instructions/root/exclude-true
+    replay_test.go:321: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP1Instructions/ancestor/exclude-false
+    replay_test.go:321: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP1Instructions/ancestor/exclude-true
+    replay_test.go:321: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP1Instructions/dot-claude/exclude-false
+    replay_test.go:321: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP1Instructions/dot-claude/exclude-true
+    replay_test.go:321: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP1Instructions/local/exclude-false
+    replay_test.go:321: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP1Instructions/local/exclude-true
+    replay_test.go:321: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP1Instructions/rule/exclude-false
+    replay_test.go:321: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP1Instructions/rule/exclude-true
+    replay_test.go:321: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP1Instructions/agents-fallback/exclude-false
+    replay_test.go:321: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP1Instructions/agents-fallback/exclude-true
+    replay_test.go:321: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- PASS: TestP1Instructions (0.00s)
+    --- SKIP: TestP1Instructions/root/exclude-false (0.00s)
+    --- SKIP: TestP1Instructions/root/exclude-true (0.00s)
+    --- SKIP: TestP1Instructions/ancestor/exclude-false (0.00s)
+    --- SKIP: TestP1Instructions/ancestor/exclude-true (0.00s)
+    --- SKIP: TestP1Instructions/dot-claude/exclude-false (0.00s)
+    --- SKIP: TestP1Instructions/dot-claude/exclude-true (0.00s)
+    --- SKIP: TestP1Instructions/local/exclude-false (0.00s)
+    --- SKIP: TestP1Instructions/local/exclude-true (0.00s)
+    --- SKIP: TestP1Instructions/rule/exclude-false (0.00s)
+    --- SKIP: TestP1Instructions/rule/exclude-true (0.00s)
+    --- SKIP: TestP1Instructions/agents-fallback/exclude-false (0.00s)
+    --- SKIP: TestP1Instructions/agents-fallback/exclude-true (0.00s)
+=== RUN   TestP2Nested
+=== RUN   TestP2Nested/claude/exclude-false
+    replay_test.go:350: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP2Nested/claude/exclude-true
+    replay_test.go:350: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP2Nested/rule/exclude-false
+    replay_test.go:350: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP2Nested/rule/exclude-true
+    replay_test.go:350: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP2Nested/agents/exclude-false
+    replay_test.go:350: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP2Nested/agents/exclude-true
+    replay_test.go:350: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- PASS: TestP2Nested (0.00s)
+    --- SKIP: TestP2Nested/claude/exclude-false (0.00s)
+    --- SKIP: TestP2Nested/claude/exclude-true (0.00s)
+    --- SKIP: TestP2Nested/rule/exclude-false (0.00s)
+    --- SKIP: TestP2Nested/rule/exclude-true (0.00s)
+    --- SKIP: TestP2Nested/agents/exclude-false (0.00s)
+    --- SKIP: TestP2Nested/agents/exclude-true (0.00s)
+=== RUN   TestP3Skills
+=== RUN   TestP3Skills/exclude-false
+    replay_test.go:383: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP3Skills/exclude-true
+    replay_test.go:383: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- PASS: TestP3Skills (0.00s)
+    --- SKIP: TestP3Skills/exclude-false (0.00s)
+    --- SKIP: TestP3Skills/exclude-true (0.00s)
+=== RUN   TestP4Hooks
+=== RUN   TestP4Hooks/exclude-false
+    replay_test.go:409: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP4Hooks/exclude-true
+    replay_test.go:409: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- PASS: TestP4Hooks (0.00s)
+    --- SKIP: TestP4Hooks/exclude-false (0.00s)
+    --- SKIP: TestP4Hooks/exclude-true (0.00s)
+=== RUN   TestP4Plugins
+=== RUN   TestP4Plugins/exclude-false
+    replay_test.go:432: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP4Plugins/exclude-true
+    replay_test.go:432: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- PASS: TestP4Plugins (0.00s)
+    --- SKIP: TestP4Plugins/exclude-false (0.00s)
+    --- SKIP: TestP4Plugins/exclude-true (0.00s)
+=== RUN   TestP5MCP
+=== RUN   TestP5MCP/project-empty-false/exclude-false/strict-false/approved-false
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP5MCP/project-empty-false/exclude-false/strict-false/approved-true
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP5MCP/project-empty-false/exclude-false/strict-true/approved-false
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP5MCP/project-empty-false/exclude-false/strict-true/approved-true
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP5MCP/project-empty-false/exclude-true/strict-false/approved-false
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP5MCP/project-empty-false/exclude-true/strict-false/approved-true
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP5MCP/project-empty-false/exclude-true/strict-true/approved-false
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP5MCP/project-empty-false/exclude-true/strict-true/approved-true
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP5MCP/project-empty-true/exclude-false/strict-false/approved-false
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP5MCP/project-empty-true/exclude-false/strict-false/approved-true
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP5MCP/project-empty-true/exclude-false/strict-true/approved-false
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP5MCP/project-empty-true/exclude-false/strict-true/approved-true
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP5MCP/project-empty-true/exclude-true/strict-false/approved-false
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP5MCP/project-empty-true/exclude-true/strict-false/approved-true
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP5MCP/project-empty-true/exclude-true/strict-true/approved-false
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP5MCP/project-empty-true/exclude-true/strict-true/approved-true
+    replay_test.go:494: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- PASS: TestP5MCP (0.00s)
+    --- SKIP: TestP5MCP/project-empty-false/exclude-false/strict-false/approved-false (0.00s)
+    --- SKIP: TestP5MCP/project-empty-false/exclude-false/strict-false/approved-true (0.00s)
+    --- SKIP: TestP5MCP/project-empty-false/exclude-false/strict-true/approved-false (0.00s)
+    --- SKIP: TestP5MCP/project-empty-false/exclude-false/strict-true/approved-true (0.00s)
+    --- SKIP: TestP5MCP/project-empty-false/exclude-true/strict-false/approved-false (0.00s)
+    --- SKIP: TestP5MCP/project-empty-false/exclude-true/strict-false/approved-true (0.00s)
+    --- SKIP: TestP5MCP/project-empty-false/exclude-true/strict-true/approved-false (0.00s)
+    --- SKIP: TestP5MCP/project-empty-false/exclude-true/strict-true/approved-true (0.00s)
+    --- SKIP: TestP5MCP/project-empty-true/exclude-false/strict-false/approved-false (0.00s)
+    --- SKIP: TestP5MCP/project-empty-true/exclude-false/strict-false/approved-true (0.00s)
+    --- SKIP: TestP5MCP/project-empty-true/exclude-false/strict-true/approved-false (0.00s)
+    --- SKIP: TestP5MCP/project-empty-true/exclude-false/strict-true/approved-true (0.00s)
+    --- SKIP: TestP5MCP/project-empty-true/exclude-true/strict-false/approved-false (0.00s)
+    --- SKIP: TestP5MCP/project-empty-true/exclude-true/strict-false/approved-true (0.00s)
+    --- SKIP: TestP5MCP/project-empty-true/exclude-true/strict-true/approved-false (0.00s)
+    --- SKIP: TestP5MCP/project-empty-true/exclude-true/strict-true/approved-true (0.00s)
+=== RUN   TestP6SettingsPermissions
+=== RUN   TestP6SettingsPermissions/project/exclude-false
+    replay_test.go:542: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP6SettingsPermissions/project/exclude-true
+    replay_test.go:542: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP6SettingsPermissions/local/exclude-false
+    replay_test.go:542: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP6SettingsPermissions/local/exclude-true
+    replay_test.go:542: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- PASS: TestP6SettingsPermissions (0.00s)
+    --- SKIP: TestP6SettingsPermissions/project/exclude-false (0.00s)
+    --- SKIP: TestP6SettingsPermissions/project/exclude-true (0.00s)
+    --- SKIP: TestP6SettingsPermissions/local/exclude-false (0.00s)
+    --- SKIP: TestP6SettingsPermissions/local/exclude-true (0.00s)
+=== RUN   TestP7Resume
+=== RUN   TestP7Resume/exclude-false
+    replay_test.go:572: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP7Resume/exclude-true
+    replay_test.go:572: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- PASS: TestP7Resume (0.00s)
+    --- SKIP: TestP7Resume/exclude-false (0.00s)
+    --- SKIP: TestP7Resume/exclude-true (0.00s)
+=== RUN   TestP7Child
+=== RUN   TestP7Child/exclude-false
+    replay_test.go:597: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP7Child/exclude-true
+    replay_test.go:597: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- PASS: TestP7Child (0.00s)
+    --- SKIP: TestP7Child/exclude-false (0.00s)
+    --- SKIP: TestP7Child/exclude-true (0.00s)
+=== RUN   TestP8LateInstructions
+=== RUN   TestP8LateInstructions/exclude-false
+    replay_test.go:626: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP8LateInstructions/exclude-true
+    replay_test.go:626: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- PASS: TestP8LateInstructions (0.00s)
+    --- SKIP: TestP8LateInstructions/exclude-false (0.00s)
+    --- SKIP: TestP8LateInstructions/exclude-true (0.00s)
+=== RUN   TestIdentity
+    replay_test.go:649: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- SKIP: TestIdentity (0.00s)
+=== RUN   TestIntakeBoundary
+    replay_test.go:668: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- SKIP: TestIntakeBoundary (0.00s)
+=== RUN   TestOfflineBoundary
+    replay_test.go:709: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- SKIP: TestOfflineBoundary (0.00s)
+=== RUN   TestP8LateSkills
+=== RUN   TestP8LateSkills/exclude-false
+    replay_test.go:804: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP8LateSkills/exclude-true
+    replay_test.go:804: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- PASS: TestP8LateSkills (0.00s)
+    --- SKIP: TestP8LateSkills/exclude-false (0.00s)
+    --- SKIP: TestP8LateSkills/exclude-true (0.00s)
+=== RUN   TestP8LateHooks
+=== RUN   TestP8LateHooks/exclude-false
+    replay_test.go:845: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP8LateHooks/exclude-true
+    replay_test.go:845: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- PASS: TestP8LateHooks (0.00s)
+    --- SKIP: TestP8LateHooks/exclude-false (0.00s)
+    --- SKIP: TestP8LateHooks/exclude-true (0.00s)
+=== RUN   TestP7PreviouslyContaminatedResume
+=== RUN   TestP7PreviouslyContaminatedResume/fork-false
+    replay_test.go:886: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+=== RUN   TestP7PreviouslyContaminatedResume/fork-true
+    replay_test.go:886: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- PASS: TestP7PreviouslyContaminatedResume (0.00s)
+    --- SKIP: TestP7PreviouslyContaminatedResume/fork-false (0.00s)
+    --- SKIP: TestP7PreviouslyContaminatedResume/fork-true (0.00s)
+=== RUN   TestCollectorBoundary
+    replay_test.go:910: opt-in: CLAUDE_EXCL_BINARY unset; no vendor process or fixture
+--- SKIP: TestCollectorBoundary (0.00s)
+PASS
+ok  	github.com/relux-works/curator/.research/project-exclusion-claude	0.218s
