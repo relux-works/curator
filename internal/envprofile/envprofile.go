@@ -856,6 +856,10 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 	if manager == nil {
 		manager = newGitManager(home).withPolicy(options.Policy)
 	}
+	// Only new installs acquire absent exact dependency pins. Reinstall,
+	// update and pinned Resolve/repair retain their existing fetch contracts.
+	// This manager is operation-local and the Install operation lock is held.
+	manager.missingPins = make(map[string]bool)
 	// Machine overlays join the closure beside the root and resolve jointly
 	// with it (environments §6); a forbidding composition policy resolves
 	// the root alone.
