@@ -1,5 +1,5 @@
 ## Status
-development
+done
 
 ## Review
 required
@@ -39,12 +39,14 @@ estimated(fibonacci(2))
 - [TASK-261021-jr7tu7_frozen-inventory-r3.json](file://TASK-261021-jr7tu7/TASK-261021-jr7tu7_frozen-inventory-r3.json)
 - [TASK-261021-jr7tu7_results-r3.md](file://TASK-261021-jr7tu7/TASK-261021-jr7tu7_results-r3.md)
 - [TASK-261021-jr7tu7_review-r2.md](file://TASK-261021-jr7tu7/TASK-261021-jr7tu7_review-r2.md)
+- [TASK-261021-jr7tu7_results-r4.md](file://TASK-261021-jr7tu7/TASK-261021-jr7tu7_results-r4.md)
+- [TASK-261021-jr7tu7_review-carry-r4.md](file://TASK-261021-jr7tu7/TASK-261021-jr7tu7_review-carry-r4.md)
 
 ## Created
 2026-10-21T00:39:05Z
 
 ## Last Update
-2026-10-21T02:05:43Z
+2026-10-21T04:46:28Z
 
 ## Assigned To
 ivmbp_curator_dev4
