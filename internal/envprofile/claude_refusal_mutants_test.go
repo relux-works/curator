@@ -24,6 +24,13 @@ func TestClaudeRefusalNarrowingMutants(t *testing.T) {
 	source := strings.ReplaceAll(string(payload), "\r\n", "\n")
 	for _, mutant := range []struct{ name, before, after, run, fails, message string }{
 		{
+			"early-stale-payload",
+			"bytes.Equal(prepared.input, fresh.input)",
+			"(bytes.Equal(prepared.input, fresh.input) || string(prepared.input) == `{\"counter\":1,\"stale_field\":\"old\"}`)",
+			"^TestClaudeRepairFreshInput$/^(referenced|monolithic)$/^(changed|unchanged)$",
+			"TestClaudeRepairFreshInput/referenced/changed", "fresh tool update lost",
+		},
+		{
 			"legacy-malformed-referenced-ordering",
 			"prepared, err = prepareClaudeSeed(root, homeRel, req.LaunchDir, form)\n\t\treturn err",
 			"prepared, err = prepareClaudeSeed(root, homeRel, req.LaunchDir, form)\n if err != nil && form == envregistry.FormReferenced { payload, _ := os.ReadFile(filepath.Join(ManagedHomeDir(req.Home, req.Profile, req.EnvID), \".claude.json\")); if string(payload) == `{\"broken\":` { return nil } }\n\t\treturn err",
@@ -79,6 +86,13 @@ func TestClaudeRefusalNarrowingMutants(t *testing.T) {
 			}
 			if mutant.name == "legacy-malformed-referenced-ordering" && !strings.Contains(string(output), "--- PASS: TestReviewLegacyRefusal/referenced/valid ") {
 				t.Fatalf("mutant valid neighbor did not pass:\n%s", output)
+			}
+			if mutant.name == "early-stale-payload" {
+				for _, form := range []string{"referenced", "monolithic"} {
+					if !strings.Contains(string(output), "--- FAIL: TestClaudeRepairFreshInput/"+form+"/changed ") || !strings.Contains(string(output), "--- PASS: TestClaudeRepairFreshInput/"+form+"/unchanged ") {
+						t.Fatalf("stale-payload mutant missed failure/control for %s:\n%s", form, output)
+					}
+				}
 			}
 			t.Logf("expected-red go test exit %d:\n%s", exit.ExitCode(), output)
 		})
