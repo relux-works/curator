@@ -1,0 +1,31 @@
+=== RUN   TestFrozenSnapshot
+=== RUN   TestFrozenSnapshot/regular
+=== RUN   TestFrozenSnapshot/altered
+=== RUN   TestFrozenSnapshot/extra
+=== RUN   TestFrozenSnapshot/listed-symlink
+    replay_test.go:498: listed-symlink snapshot admitted
+=== RUN   TestFrozenSnapshot/unlisted-dangling-link
+=== RUN   TestFrozenSnapshot/missing
+--- FAIL: TestFrozenSnapshot (0.01s)
+    --- PASS: TestFrozenSnapshot/regular (0.00s)
+    --- PASS: TestFrozenSnapshot/altered (0.00s)
+    --- PASS: TestFrozenSnapshot/extra (0.00s)
+    --- FAIL: TestFrozenSnapshot/listed-symlink (0.00s)
+    --- PASS: TestFrozenSnapshot/unlisted-dangling-link (0.00s)
+    --- PASS: TestFrozenSnapshot/missing (0.00s)
+=== RUN   TestFrozenSnapshotSourceInputs
+=== RUN   TestFrozenSnapshotSourceInputs/regular
+=== RUN   TestFrozenSnapshotSourceInputs/listed-symlink
+    replay_test.go:540: listed-symlink source fixture exit=0: === RUN   TestFrozenSnapshot
+        === RUN   TestFrozenSnapshot/regular
+        --- PASS: TestFrozenSnapshot (0.00s)
+            --- PASS: TestFrozenSnapshot/regular (0.00s)
+        PASS
+=== RUN   TestFrozenSnapshotSourceInputs/unlisted-dangling-link
+--- FAIL: TestFrozenSnapshotSourceInputs (0.03s)
+    --- PASS: TestFrozenSnapshotSourceInputs/regular (0.01s)
+    --- FAIL: TestFrozenSnapshotSourceInputs/listed-symlink (0.01s)
+    --- PASS: TestFrozenSnapshotSourceInputs/unlisted-dangling-link (0.01s)
+FAIL
+FAIL	github.com/relux-works/curator/.temp/TASK-261021-mw4laf/mutant-snapshot-go-listed-link	0.311s
+FAIL

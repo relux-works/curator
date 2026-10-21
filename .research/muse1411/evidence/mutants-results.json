@@ -1,0 +1,181 @@
+[
+  {
+    "mutant": "checker-one-skill",
+    "patch_exit": 0,
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261021-mw4laf/mutant-checker-one-skill",
+      "-run",
+      "^TestObservationChecker$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_failures": [
+      "--- FAIL: TestObservationChecker (0.00s)"
+    ]
+  },
+  {
+    "mutant": "checker-duplicate-count",
+    "patch_exit": 0,
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261021-mw4laf/mutant-checker-duplicate-count",
+      "-run",
+      "^TestReviewContradictoryObservation$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_failures": [
+      "--- FAIL: TestReviewContradictoryObservation (0.00s)",
+      "--- FAIL: TestReviewContradictoryObservation/count-zero-then-one (0.00s)"
+    ]
+  },
+  {
+    "mutant": "checker-duplicate-outcome",
+    "patch_exit": 0,
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261021-mw4laf/mutant-checker-duplicate-outcome",
+      "-run",
+      "^TestReviewContradictoryObservation$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_failures": [
+      "--- FAIL: TestReviewContradictoryObservation (0.00s)",
+      "--- FAIL: TestReviewContradictoryObservation/outcome-failed-then-ready (0.00s)"
+    ]
+  },
+  {
+    "mutant": "snapshot-extra-entry",
+    "patch_exit": 0,
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261021-mw4laf/mutant-snapshot-extra-entry",
+      "-run",
+      "^TestFrozenSnapshot$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_failures": [
+      "--- FAIL: TestFrozenSnapshot (0.02s)",
+      "--- FAIL: TestFrozenSnapshot/extra (0.00s)"
+    ]
+  },
+  {
+    "mutant": "snapshot-go-listed-link",
+    "patch_exit": 0,
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261021-mw4laf/mutant-snapshot-go-listed-link",
+      "-run",
+      "^Test(FrozenSnapshot|FrozenSnapshotSourceInputs)$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_failures": [
+      "--- FAIL: TestFrozenSnapshot (0.01s)",
+      "--- FAIL: TestFrozenSnapshot/listed-symlink (0.00s)",
+      "--- FAIL: TestFrozenSnapshotSourceInputs (0.03s)",
+      "--- FAIL: TestFrozenSnapshotSourceInputs/listed-symlink (0.01s)"
+    ]
+  },
+  {
+    "mutant": "snapshot-reference-listed-link",
+    "patch_exit": 0,
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261021-mw4laf/mutant-snapshot-reference-listed-link",
+      "-run",
+      "^TestReferenceSnapshotPhysicalClosure$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_failures": [
+      "--- FAIL: TestReferenceSnapshotPhysicalClosure (1.46s)",
+      "--- FAIL: TestReferenceSnapshotPhysicalClosure/listed-symlink (0.60s)"
+    ]
+  },
+  {
+    "mutant": "snapshot-reference-dangling-link",
+    "patch_exit": 0,
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261021-mw4laf/mutant-snapshot-reference-dangling-link",
+      "-run",
+      "^TestReferenceSnapshotPhysicalClosure$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_failures": [
+      "--- FAIL: TestReferenceSnapshotPhysicalClosure (1.51s)",
+      "--- FAIL: TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link (0.59s)"
+    ]
+  },
+  {
+    "mutant": "intake-one-foreign-build",
+    "patch_exit": 0,
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261021-mw4laf/mutant-intake-one-foreign-build",
+      "-run",
+      "^TestVendorIntakeBoundary$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_failures": [
+      "--- FAIL: TestVendorIntakeBoundary (0.15s)",
+      "--- FAIL: TestVendorIntakeBoundary/wrong-digest (0.13s)"
+    ]
+  },
+  {
+    "mutant": "offline-loopback",
+    "patch_exit": 0,
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261021-mw4laf/mutant-offline-loopback",
+      "-run",
+      "^TestMuse1411OfflineBoundary$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_failures": [
+      "--- FAIL: TestMuse1411OfflineBoundary (0.22s)"
+    ]
+  },
+  {
+    "mutant": "offline-one-keychain-file",
+    "patch_exit": 0,
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261021-mw4laf/mutant-offline-one-keychain-file",
+      "-run",
+      "^TestMuse1411OfflineBoundary$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "named_failures": [
+      "--- FAIL: TestMuse1411OfflineBoundary (0.25s)"
+    ]
+  }
+]

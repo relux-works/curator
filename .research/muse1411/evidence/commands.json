@@ -1,0 +1,118 @@
+[
+  {
+    "command": "go build -o .temp/TASK-261021-mw4laf/curator ./cmd/curator",
+    "exit": 0,
+    "log": "build-curator-01.log"
+  },
+  {
+    "command": "go build ./...",
+    "exit": 0,
+    "log": "build-01.log"
+  },
+  {
+    "command": "go vet ./...",
+    "exit": 0,
+    "log": "vet-01.log"
+  },
+  {
+    "command": "env -u MUSE1411_BINARY go test ./.research/muse1411 -count=1 -v",
+    "exit": 0,
+    "log": "ungated-01.log"
+  },
+  {
+    "command": "go vet ./.research/muse1411",
+    "exit": 0,
+    "log": "harness-vet-01.log"
+  },
+  {
+    "command": "golangci-lint run ./.research/muse1411/...",
+    "exit": 0,
+    "log": "harness-lint-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.research/muse1411",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 0,
+    "duration_s": 101.617,
+    "log": "replay-01.log",
+    "environment": "README locators; no exclusion omission"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.research/muse1411",
+      "-run",
+      "^TestMuse1411LoaderMatrix$/exec/linked/skills",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "duration_s": 7.743,
+    "log": "plant-exec-01.log",
+    "environment": "README locators; MUSE1411_OMIT_EXCLUSION=exec"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.research/muse1411",
+      "-run",
+      "^TestMuse1411LoaderMatrix$/interactive/linked/skills",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 0,
+    "duration_s": 9.922,
+    "log": "plant-interactive-01.log",
+    "environment": "README locators; MUSE1411_OMIT_EXCLUSION=interactive"
+  },
+  {
+    "command": "hosted default stage: go test -json -count=1 -timeout 60m PACKAGE...",
+    "exit": 0,
+    "log": "hosted-default-exits.log",
+    "mode": "Existing exact green evidence reused; complete original stream retrieved again and digest verified. No local default full-suite rerun."
+  },
+  {
+    "command": "task-local hygiene audit, initial overbroad whitespace check",
+    "exit": 1,
+    "wrapper_exit": 0,
+    "log": "hygiene-first-01.log",
+    "note": "Python failed; a following status read masked its code in the shell wrapper. Never accepted as success."
+  },
+  {
+    "command": "task-local hygiene audit, second overbroad personal-path pattern",
+    "exit": 1,
+    "log": "hygiene-02.log"
+  },
+  {
+    "command": "task-local hygiene audit, corrected",
+    "exit": 0,
+    "log": "hygiene-03.log"
+  },
+  {
+    "command": "git diff --check",
+    "exit": 0,
+    "log": "diff-check-01.log"
+  },
+  {
+    "command": "gofmt -l .research/muse1411/*.go",
+    "exit": 0,
+    "log": "gofmt-01.log"
+  },
+  {
+    "command": "bash .github/ci/naming-gate.sh .research/muse1411",
+    "exit": 0,
+    "log": "naming-module-01.log"
+  },
+  {
+    "command": "bash .github/ci/naming-gate.sh docs/qualification",
+    "exit": 0,
+    "log": "naming-records-01.log"
+  }
+]

@@ -1,0 +1,10 @@
+--- a/replay_test.go
++++ b/replay_test.go
+@@ -66,6 +66,7 @@
+ 			fields[key] = append(fields[key], value)
+ 		}
+ 		for _, key := range append([]string{"event", "outcome"}, countKeys(want)...) {
++			if key == "user_skills" && len(fields[key]) == 2 && fields[key][0] == "0" && fields[key][1] == "1" { fields[key] = fields[key][:1] }
+ 			if len(fields[key]) != 1 {
+ 				return fmt.Errorf("%s missing or duplicate %s", event, key)
+ 			}

@@ -1,0 +1,10 @@
+--- a/replay_test.go
++++ b/replay_test.go
+@@ -161,6 +161,7 @@
+ 	for _, rel := range []string{".claude", ".codex", ".config", ".local", ".muse", "Library"} {
+ 		sb += "(deny file-read* file-write* (subpath " + strconv.Quote(filepath.Join(native, rel)) + "))\n"
+ 	}
++	sb += "(allow network-outbound (remote tcp \"localhost:*\"))\n"
+ 	write(t, p.sandbox, []byte(sb))
+ 	return p
+ }

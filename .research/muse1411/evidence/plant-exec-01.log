@@ -1,0 +1,11 @@
+=== RUN   TestMuse1411LoaderMatrix
+=== RUN   TestMuse1411LoaderMatrix/exec/linked/skills/exclude-false
+    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
+=== RUN   TestMuse1411LoaderMatrix/exec/linked/skills/exclude-true
+    replay_test.go:788: skills.catalog_load observed user_skills=1; want 0
+--- FAIL: TestMuse1411LoaderMatrix (6.79s)
+    --- PASS: TestMuse1411LoaderMatrix/exec/linked/skills/exclude-false (2.47s)
+    --- FAIL: TestMuse1411LoaderMatrix/exec/linked/skills/exclude-true (3.11s)
+FAIL
+FAIL	github.com/relux-works/curator/.research/muse1411	6.962s
+FAIL
