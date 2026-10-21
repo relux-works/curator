@@ -25,12 +25,14 @@ estimated(fibonacci(5))
 - [ ] Results file attached
 
 ## Notes
+Reviewer round 2: ivmbp_curator_rev3 (round 1: ivmbp_curator_rev1), named by ivmbp_curator_orch.
 
 ## Precondition Resources
 - [W-EXACT-brief.md](file://TASK-261021-vb3z6f/W-EXACT-brief.md)
-- [reviewer-TASK-261021-vb3z6f.md](file://TASK-261021-vb3z6f/reviewer-TASK-261021-vb3z6f.md)
 - [W-EXACT-review-brief.md](file://TASK-261021-vb3z6f/W-EXACT-review-brief.md)
 - [W-EXACT-r2-brief.md](file://TASK-261021-vb3z6f/W-EXACT-r2-brief.md)
+- [W-EXACT-r2-review-brief.md](file://TASK-261021-vb3z6f/W-EXACT-r2-review-brief.md)
+- [reviewer-TASK-261021-vb3z6f.md](file://TASK-261021-vb3z6f/reviewer-TASK-261021-vb3z6f.md)
 
 ## Outcome Resources
 - [TASK-261021-vb3z6f_results-r1.md](file://TASK-261021-vb3z6f/TASK-261021-vb3z6f_results-r1.md)
@@ -41,7 +43,7 @@ estimated(fibonacci(5))
 2026-10-21T00:28:52Z
 
 ## Last Update
-2026-10-21T02:14:01Z
+2026-10-21T02:23:07Z
 
 ## Assigned To
 ivmbp_curator_dev1
