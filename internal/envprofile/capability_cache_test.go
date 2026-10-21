@@ -32,7 +32,7 @@ func TestStrictAuditMemberCapabilityCacheIsolation(t *testing.T) {
 					t.Fatal(err)
 				}
 				cfg := &config.Config{Path: filepath.Join(home, "config.json"), Audit: config.Audit{Enabled: true, Mode: "strict", FailOn: "high", Backend: "null"}}
-				subject := audit.Subject{Name: resolved.Name, Source: resolved.Source, Git: resolved.Source, Commit: resolved.Commit, Snapshot: entry, SchemaVersion: 3, HashVersion: resolvedHashVersion(resolved)}
+				subject := audit.Subject{Kind: kind, Name: resolved.Name, Source: resolved.Source, Git: resolved.Source, Commit: resolved.Commit, Snapshot: entry, SchemaVersion: 3, HashVersion: resolvedHashVersion(resolved)}
 				if kind == contextlock.KindSkill {
 					var ok bool
 					subject.Package, ok = audit.SkillPackage(resolved.Source, "", resolved.Name, resolved.Commit, resolved.Directory)
