@@ -1,0 +1,385 @@
+
+CASE TestP1OutsideGitBoundary_false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=303
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=2
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1OutsideGitBoundary_true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=467
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_.agents_AGENTS.md_ancestor_trusted-false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=409
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=1 authorization_blocks=1 rendered_bytes=361 duration_ms=1
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_.agents_AGENTS.md_ancestor_trusted-true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=380
+event="rules.context_load" outcome="ready" reason="none" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=453 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_.agents_AGENTS.md_root_trusted-false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=439
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=1 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_.agents_AGENTS.md_root_trusted-true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=624
+event="rules.context_load" outcome="ready" reason="none" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=453 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_.claude_CLAUDE.md_ancestor_trusted-false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=398
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=1 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_.claude_CLAUDE.md_ancestor_trusted-true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=606
+event="rules.context_load" outcome="ready" reason="none" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=453 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_.claude_CLAUDE.md_root_trusted-false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=307
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=1 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_.claude_CLAUDE.md_root_trusted-true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=320
+event="rules.context_load" outcome="ready" reason="none" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=453 duration_ms=1
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_AGENTS.md_ancestor_trusted-false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=1431
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=1 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_AGENTS.md_ancestor_trusted-true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=235
+event="rules.context_load" outcome="ready" reason="none" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=445 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_AGENTS.md_root_trusted-false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=556
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=1 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_AGENTS.md_root_trusted-true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=469
+event="rules.context_load" outcome="ready" reason="none" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=445 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_CLAUDE.md_ancestor_trusted-false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=234
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=1 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_CLAUDE.md_ancestor_trusted-true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=276
+event="rules.context_load" outcome="ready" reason="none" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=445 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_CLAUDE.md_root_trusted-false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=525
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=1 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP1RootAndAncestors_CLAUDE.md_root_trusted-true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=347
+event="rules.context_load" outcome="ready" reason="none" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=445 duration_ms=1
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP2NestedStartup_false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=672
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=2 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP2NestedStartup_true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=131
+event="rules.context_load" outcome="ready" reason="none" sources=3 user_sources=1 project_sources=2 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=3 rendered_bytes=577 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP3Skills_.agents_false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=121
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=1 user_skills=1 project_skills=0 diagnostics=1 invalid=0 untrusted=1 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP3Skills_.agents_true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=355
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=2 user_skills=1 project_skills=1 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP3Skills_.claude_false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=1009
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=1 user_skills=1 project_skills=0 diagnostics=1 invalid=0 untrusted=1 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP3Skills_.claude_true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=432
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=2 user_skills=1 project_skills=1 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP3Skills_.codex_false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=280
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=1 user_skills=1 project_skills=0 diagnostics=1 invalid=0 untrusted=1 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP3Skills_.codex_true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=2688
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=2 user_skills=1 project_skills=1 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP4Hooks_false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=331
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="partial" handlers=2 runnable=1 inactive=1 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP4Hooks_true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=450
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="ready" handlers=2 runnable=2 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP4Plugins_approved-install/startup-003.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=1 marketplace_plugins=0 plugin_ids=15 skills=24 hooks=0 mcp_servers=0 commands=2 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=550
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP4Plugins_project-install/startup-003.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=531
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP4Plugins_raw/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=760
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP4Plugins_trusted-project-install/startup-003.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=1 marketplace_plugins=0 plugin_ids=15 skills=24 hooks=0 mcp_servers=0 commands=2 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=345
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP5MCP_empty-false_trusted-false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=1041
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+event="mcp.config.resolve" stage="startup" outcome="ready" reason="none" source_count=1 admitted_plugin_source_count=0 trusted_project_source_count=0 user_settings_source_count=1 server_count=1 warning_count=0 server_failure_count=0 duration_ms=0
+
+CASE TestP5MCP_empty-false_trusted-true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=670
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+event="mcp.config.resolve" stage="startup" outcome="ready" reason="none" source_count=2 admitted_plugin_source_count=0 trusted_project_source_count=1 user_settings_source_count=1 server_count=2 warning_count=0 server_failure_count=0 duration_ms=0
+
+CASE TestP5MCP_empty-home-with-nonempty-project/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=867
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+event="mcp.config.resolve" stage="startup" outcome="ready" reason="none" source_count=2 admitted_plugin_source_count=0 trusted_project_source_count=1 user_settings_source_count=1 server_count=1 warning_count=0 server_failure_count=0 duration_ms=0
+
+CASE TestP5MCP_empty-true_trusted-false/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=397
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+event="mcp.config.resolve" stage="startup" outcome="ready" reason="none" source_count=1 admitted_plugin_source_count=0 trusted_project_source_count=0 user_settings_source_count=1 server_count=1 warning_count=0 server_failure_count=0 duration_ms=0
+
+CASE TestP5MCP_empty-true_trusted-true/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=735
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+event="mcp.config.resolve" stage="startup" outcome="ready" reason="none" source_count=2 admitted_plugin_source_count=0 trusted_project_source_count=1 user_settings_source_count=1 server_count=1 warning_count=0 server_failure_count=0 duration_ms=0
+
+CASE TestP6SettingsCandidates_.claude_settings.json/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="settings" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=568
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP6SettingsCandidates_.claude_settings.local.json/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="settings" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=521
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP6SettingsCandidates_.muse_settings.json/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="settings" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=803
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP7ChildAvailability/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=257
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=1 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP7ResumeTrustGate/startup-002.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=574
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=1 authorization_blocks=1 rendered_bytes=361 duration_ms=1
+event="skills.catalog_load" outcome="ready" reason="none" skills=1 user_skills=1 project_skills=0 diagnostics=1 invalid=0 untrusted=1 shadowed=0 marker_invalid=0 duration_ms=1
+event="hook.admission" outcome="partial" handlers=2 runnable=1 inactive=1 diagnostics=0 advisories=0 duration_ms=0
+event="mcp.config.resolve" stage="startup" outcome="ready" reason="none" source_count=1 admitted_plugin_source_count=0 trusted_project_source_count=0 user_settings_source_count=1 server_count=1 warning_count=0 server_failure_count=0 duration_ms=0
+
+CASE TestP7ResumeTrustGate/startup-027.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="settings" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=23
+event="skills.catalog_load" outcome="ready" reason="none" skills=2 user_skills=1 project_skills=1 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="ready" handlers=2 runnable=2 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+event="mcp.config.resolve" stage="startup" outcome="ready" reason="none" source_count=2 admitted_plugin_source_count=0 trusted_project_source_count=1 user_settings_source_count=1 server_count=2 warning_count=0 server_failure_count=0 duration_ms=0
+
+CASE TestP8LateRoot/startup-040.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=566
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+CASE TestP8LateRoot/startup-041.txt
+event="run_preset.resolve" outcome="ready" reason="none" selected=false provider_source="none" model_source="none" agent_profile_source="none" duration_ms=0
+event="plugin_capability_snapshot.compose" outcome="ready" reason="none" installed_admitted=true bundled_plugins=10 installed_plugins=0 marketplace_plugins=0 plugin_ids=14 skills=24 hooks=0 mcp_servers=0 commands=1 reminders=0 developer_prompts=10 diagnostics=0 rejected=0 conflicts=0 omitted=0 foreign_artifacts=0 duration_ms=12
+event="rules.context_load" outcome="ready" reason="none" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=445 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="empty" handlers=0 runnable=0 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+
+TERMINAL resume-trust.txt
+Do you trust this workspace?
+Workspace: $RUN/TestP7ResumeTrustGate/ancestor/project
+Trusting allows project-local skills, rules, hooks, and plugin config to load before the model runs.
+Only trust this workspace when you trust its contents.
+⟩ 1  Trust and continue
+  2  Quit
+Use Up/Down or 1/2, then Enter. Esc quits.
+
+TERMINAL resume-rules.txt
+Do you trust this workspace?
+Workspace: $RUN/TestP7ResumeTrustGate/ancestor/project
+Trusting allows project-local skills, rules, hooks, and plugin config to load before the model runs.
+Only trust this workspace when you trust its contents.
+⟩ 1  Trust and continue
+  2  Quit
+Use Up/Down or 1/2, then Enter. Esc quits.
+  resumed session 01a15bf0-3d07-7182-9de5-9e3492d7fde7
+❯ MUSE_EXCL_OFFLINE
+◆ echo: MUSE_EXCL_OFFLINE
+  1 optional MCP server unavailable (ctrl+o to expand)
+  session 01a15bf0-3d07-7182-9de5-9e3492d7fde7 does not record a usable model for provider echo; using the provider default model
+  warning: local session messaging unavailable: Operation not permitted (os error 1)
+❯ MUSE_EXCL_RESUME
+◆ echo: MUSE_EXCL_RESUME
+  Rules loaded this session (in precedence order):
+  user: $CONFIG_DIR/AGENTS.md
+  project: none
+── Voice input (⌥ + v to start) ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  echo · $RUN/TestP7ResumeTrustGate/ancestor/project · Launch overrides
+
+TERMINAL late-before.txt
+  Muse Code 1.4.11
+  warning: local session messaging unavailable: Operation not permitted (os error 1)
+❯ MUSE_EXCL_BEFORE
+◆ echo: MUSE_EXCL_BEFORE
+  Rules loaded this session (in precedence order):
+  user: $CONFIG_DIR/AGENTS.md
+  project: none
+── Voice input (⌥ + v to start) ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  echo · $RUN_LATE/TestP8LateRoot/ancestor/project · Launch overrides
+
+TERMINAL late-after.txt
+  Muse Code 1.4.11
+  warning: local session messaging unavailable: Operation not permitted (os error 1)
+❯ MUSE_EXCL_BEFORE
+◆ echo: MUSE_EXCL_BEFORE
+  Rules loaded this session (in precedence order):
+  user: $CONFIG_DIR/AGENTS.md
+  project: none
+❯ MUSE_EXCL_AFTER
+◆ echo: MUSE_EXCL_AFTER
+  Rules loaded this session (in precedence order):
+  user: $CONFIG_DIR/AGENTS.md
+  project: none
+── Voice input (⌥ + v to start) ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  echo · $RUN_LATE/TestP8LateRoot/ancestor/project · Launch overrides
