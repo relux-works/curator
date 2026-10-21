@@ -3,6 +3,7 @@ package envprofile
 import (
 	"bytes"
 	"encoding/json"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -64,7 +65,8 @@ func directoryRequirement(f directoryFixture) map[string]any {
 
 // Every published lifecycle vector drives Install/Update/Sync/EnsureDefault,
 // followed by Use and Resolve for successful materialization. Git OIDs replace
-// symbolic fixture pins; no network or real operator home is used.
+// symbolic fixture pins; the historical root notes.md contact witness moves to
+// references/notes.md under core §3. No network or real operator home is used.
 func TestSkillDirectoryLifecycleVectors(t *testing.T) {
 	var corpus struct{ Cases []directoryVector }
 	readDirectoryJSON(t, "vectors.json", &corpus)
@@ -74,6 +76,16 @@ func TestSkillDirectoryLifecycleVectors(t *testing.T) {
 	for _, tc := range corpus.Cases {
 		t.Run(tc.Name, func(t *testing.T) { driveDirectoryVector(t, tc) })
 	}
+}
+
+// The selected package's visible URL is admitted with its own host declared;
+// this is the nearby positive control for the published undeclared-contact case.
+func TestSkillDirectoryMarkdownDeclaredControl(t *testing.T) {
+	driveDirectoryVector(t, directoryVector{
+		Name: "selected-visible-declared-host", Entry: "profile install",
+		Changes:  map[string]any{"snapshot.files.skills/formatter/references/notes.md": "Contact https://api.example.net for formatting guidance.\n"},
+		Expected: map[string]any{"outcome": "materialized"},
+	})
 }
 
 // Selected skill metadata must satisfy core section 3 before any profile or
@@ -124,6 +136,22 @@ func driveDirectoryVector(t *testing.T, tc directoryVector) {
 		default:
 			t.Fatal(alternate)
 		}
+	}
+	// The unchanged vendored CIP-0021 corpus predates the core §3 Markdown
+	// scope fix. Keep its selected-package/capability/refusal contract, but place
+	// its contact witness in agent-facing context instead of package-root notes.
+	if finding, ok := tc.Expected["finding_file"].(string); ok && finding == "notes.md" {
+		directory, _ := req["directory"].(string)
+		source := filepath.ToSlash(filepath.Join(directory, finding))
+		text, exists := snapshot.Files[source]
+		if !exists {
+			t.Fatal("published Markdown contact witness is missing")
+		}
+		visible := "references/" + finding
+		snapshot.Files[filepath.ToSlash(filepath.Join(directory, visible))] = text
+		delete(snapshot.Files, source)
+		tc.Expected = maps.Clone(tc.Expected)
+		tc.Expected["finding_file"] = visible
 	}
 	baseFiles := map[string]string{}
 	for p, b := range snapshot.Files {
