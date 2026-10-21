@@ -1,0 +1,350 @@
+{
+  "task": "TASK-261021-mw4laf",
+  "title": "muse-1-4-11-exclusion-replay",
+  "checkpoint": "cdcba3bd7a8de6028d3d1dbf621ce4cb19b130a7",
+  "spec_main": "e41f96387287f5e76604627f9e63662f7d6d86d4",
+  "binary_sha256": "6c04ce1719844685153ef6f04b98113cb61b942d97f0a8b0bfb3932c343984d9",
+  "ac_coverage": "6 of 6 task AC rows driven",
+  "surface_table": "Not supplied; brief gap declared",
+  "forms": {
+    "exec": "qualified for measured macOS arm64 loader rows",
+    "interactive": "refused; P4 exclusion fails; section 7.9 pending"
+  },
+  "compared_cases_same_as_1410": "45 of 45",
+  "source_sha256": {
+    "intake_test.go": "5709403078b5019b1a5637b81d343b428682b1dba5b81c7c7ff581abee392d56",
+    "reference-snapshot-check.py": "6a8eca28f4775b9fe35dfa90931f2aa98305568cc4de6c9245bd593a53f82020",
+    "replay_test.go": "dbae5569574a3d4e0ec607ff9eabdb0b5914c6affb6110a0fa7f9001cb287f2d",
+    "review_attack_test.go": "adc03f09a1215b39cfa255f09d6bf8cb214840759974d207bf874d1705175e03"
+  },
+  "commands": [
+    {
+      "command": "go build -o .temp/TASK-261021-mw4laf/curator ./cmd/curator",
+      "exit": 0,
+      "log": "build-curator-01.log"
+    },
+    {
+      "command": "go build ./...",
+      "exit": 0,
+      "log": "build-01.log"
+    },
+    {
+      "command": "go vet ./...",
+      "exit": 0,
+      "log": "vet-01.log"
+    },
+    {
+      "command": "env -u MUSE1411_BINARY go test ./.research/muse1411 -count=1 -v",
+      "exit": 0,
+      "log": "ungated-01.log"
+    },
+    {
+      "command": "go vet ./.research/muse1411",
+      "exit": 0,
+      "log": "harness-vet-01.log"
+    },
+    {
+      "command": "golangci-lint run ./.research/muse1411/...",
+      "exit": 0,
+      "log": "harness-lint-01.log"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "./.research/muse1411",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 0,
+      "duration_s": 101.617,
+      "log": "replay-01.log",
+      "environment": "README locators; no exclusion omission"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "./.research/muse1411",
+        "-run",
+        "^TestMuse1411LoaderMatrix$/exec/linked/skills",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "duration_s": 7.743,
+      "log": "plant-exec-01.log",
+      "environment": "README locators; MUSE1411_OMIT_EXCLUSION=exec"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "./.research/muse1411",
+        "-run",
+        "^TestMuse1411LoaderMatrix$/interactive/linked/skills",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 0,
+      "duration_s": 9.922,
+      "log": "plant-interactive-01.log",
+      "environment": "README locators; MUSE1411_OMIT_EXCLUSION=interactive"
+    },
+    {
+      "command": "hosted default stage: go test -json -count=1 -timeout 60m PACKAGE...",
+      "exit": 0,
+      "log": "hosted-default-exits.log",
+      "mode": "Existing exact green evidence reused; complete original stream retrieved again and digest verified. No local default full-suite rerun."
+    },
+    {
+      "command": "task-local hygiene audit, initial overbroad whitespace check",
+      "exit": 1,
+      "wrapper_exit": 0,
+      "log": "hygiene-first-01.log",
+      "note": "Python failed; a following status read masked its code in the shell wrapper. Never accepted as success."
+    },
+    {
+      "command": "task-local hygiene audit, second overbroad personal-path pattern",
+      "exit": 1,
+      "log": "hygiene-02.log"
+    },
+    {
+      "command": "task-local hygiene audit, corrected",
+      "exit": 0,
+      "log": "hygiene-03.log"
+    },
+    {
+      "command": "git diff --check",
+      "exit": 0,
+      "log": "diff-check-01.log"
+    },
+    {
+      "command": "gofmt -l .research/muse1411/*.go",
+      "exit": 0,
+      "log": "gofmt-01.log"
+    },
+    {
+      "command": "bash .github/ci/naming-gate.sh .research/muse1411",
+      "exit": 0,
+      "log": "naming-module-01.log"
+    },
+    {
+      "command": "bash .github/ci/naming-gate.sh docs/qualification",
+      "exit": 0,
+      "log": "naming-records-01.log"
+    }
+  ],
+  "patch_mutants": [
+    {
+      "mutant": "checker-one-skill",
+      "patch_exit": 0,
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261021-mw4laf/mutant-checker-one-skill",
+        "-run",
+        "^TestObservationChecker$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_failures": [
+        "--- FAIL: TestObservationChecker (0.00s)"
+      ]
+    },
+    {
+      "mutant": "checker-duplicate-count",
+      "patch_exit": 0,
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261021-mw4laf/mutant-checker-duplicate-count",
+        "-run",
+        "^TestReviewContradictoryObservation$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_failures": [
+        "--- FAIL: TestReviewContradictoryObservation (0.00s)",
+        "--- FAIL: TestReviewContradictoryObservation/count-zero-then-one (0.00s)"
+      ]
+    },
+    {
+      "mutant": "checker-duplicate-outcome",
+      "patch_exit": 0,
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261021-mw4laf/mutant-checker-duplicate-outcome",
+        "-run",
+        "^TestReviewContradictoryObservation$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_failures": [
+        "--- FAIL: TestReviewContradictoryObservation (0.00s)",
+        "--- FAIL: TestReviewContradictoryObservation/outcome-failed-then-ready (0.00s)"
+      ]
+    },
+    {
+      "mutant": "snapshot-extra-entry",
+      "patch_exit": 0,
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261021-mw4laf/mutant-snapshot-extra-entry",
+        "-run",
+        "^TestFrozenSnapshot$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_failures": [
+        "--- FAIL: TestFrozenSnapshot (0.02s)",
+        "--- FAIL: TestFrozenSnapshot/extra (0.00s)"
+      ]
+    },
+    {
+      "mutant": "snapshot-go-listed-link",
+      "patch_exit": 0,
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261021-mw4laf/mutant-snapshot-go-listed-link",
+        "-run",
+        "^Test(FrozenSnapshot|FrozenSnapshotSourceInputs)$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_failures": [
+        "--- FAIL: TestFrozenSnapshot (0.01s)",
+        "--- FAIL: TestFrozenSnapshot/listed-symlink (0.00s)",
+        "--- FAIL: TestFrozenSnapshotSourceInputs (0.03s)",
+        "--- FAIL: TestFrozenSnapshotSourceInputs/listed-symlink (0.01s)"
+      ]
+    },
+    {
+      "mutant": "snapshot-reference-listed-link",
+      "patch_exit": 0,
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261021-mw4laf/mutant-snapshot-reference-listed-link",
+        "-run",
+        "^TestReferenceSnapshotPhysicalClosure$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_failures": [
+        "--- FAIL: TestReferenceSnapshotPhysicalClosure (1.46s)",
+        "--- FAIL: TestReferenceSnapshotPhysicalClosure/listed-symlink (0.60s)"
+      ]
+    },
+    {
+      "mutant": "snapshot-reference-dangling-link",
+      "patch_exit": 0,
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261021-mw4laf/mutant-snapshot-reference-dangling-link",
+        "-run",
+        "^TestReferenceSnapshotPhysicalClosure$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_failures": [
+        "--- FAIL: TestReferenceSnapshotPhysicalClosure (1.51s)",
+        "--- FAIL: TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link (0.59s)"
+      ]
+    },
+    {
+      "mutant": "intake-one-foreign-build",
+      "patch_exit": 0,
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261021-mw4laf/mutant-intake-one-foreign-build",
+        "-run",
+        "^TestVendorIntakeBoundary$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_failures": [
+        "--- FAIL: TestVendorIntakeBoundary (0.15s)",
+        "--- FAIL: TestVendorIntakeBoundary/wrong-digest (0.13s)"
+      ]
+    },
+    {
+      "mutant": "offline-loopback",
+      "patch_exit": 0,
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261021-mw4laf/mutant-offline-loopback",
+        "-run",
+        "^TestMuse1411OfflineBoundary$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_failures": [
+        "--- FAIL: TestMuse1411OfflineBoundary (0.22s)"
+      ]
+    },
+    {
+      "mutant": "offline-one-keychain-file",
+      "patch_exit": 0,
+      "command": [
+        "go",
+        "test",
+        "./.temp/TASK-261021-mw4laf/mutant-offline-one-keychain-file",
+        "-run",
+        "^TestMuse1411OfflineBoundary$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "named_failures": [
+        "--- FAIL: TestMuse1411OfflineBoundary (0.25s)"
+      ]
+    }
+  ],
+  "default_suite_reuse": {
+    "run": 39193852508,
+    "head_sha": "e88fdf2dbec7f94c48b0232a350a0a9f9484fdeb",
+    "job": "Test (macos-latest)",
+    "go_test_overall_exit": 0,
+    "package_outcomes": {
+      "skip": 5,
+      "pass": 80
+    },
+    "covered_default_packages": "85 of 85",
+    "failure_events": 0,
+    "test_stream_sha256": "3592b90d813b35f565b63fd1d0e5a71586f79b8b9a40418c4d148bb48381aca8",
+    "original_log_sha256": "b96fe7f9635782fe8193cd8e1e968c7a7c942c9e8c3f4b7a67df0c1fa402b7af",
+    "evidence_retrieved_again": true,
+    "environment": "Original hosted workflow environment; no local full-suite replay or environment equivalence claimed."
+  },
+  "hygiene": {
+    "new_files_checked": 62,
+    "source_digests_match_gated_run": true,
+    "fixtures_byte_identical_to_muse1410": true,
+    "source_delta_only_version_identity_and_sentinels": true,
+    "no_personal_paths_or_secret_assignment_patterns": true,
+    "whitespace_and_gofmt_clean_except_required_patch_context_encoding": true,
+    "existing_tracked_files_unchanged": true,
+    "candidate_uncommitted_at_checkpoint": true,
+    "scope": [
+      ".research/muse1411/",
+      "docs/qualification/muse-1.4.11-R6667.1.md"
+    ]
+  },
+  "delivery": "Uncommitted managed Story candidate; ready for review; no acceptance or landing claimed."
+}

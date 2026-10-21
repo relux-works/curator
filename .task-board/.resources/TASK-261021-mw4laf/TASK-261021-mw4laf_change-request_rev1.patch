@@ -1,0 +1,3945 @@
+diff --git a/.research/muse1411/README.md b/.research/muse1411/README.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6ab755a0190856c20b393fb3c0929a0f4f3dc7d4
+--- /dev/null
++++ b/.research/muse1411/README.md
+@@ -0,0 +1,91 @@
++# Muse 1.4.11 offline loader probe
++
++The canonical [qualification record](../../docs/qualification/muse-1.4.11-R6667.1.md)
++separates exec and interactive loader results from vendor qualification. Green
++witness tests reproduce observations; they do not grant consumer admission.
++
++## Run the opt-in probe
++
++Set `MUSE1411_BINARY` privately to the exact vendor executable from the
++task-board Muse pin store, never the updating launcher. The harness accepts
++only SHA-256 `6c04ce1719844685153ef6f04b98113cb61b942d97f0a8b0bfb3932c343984d9`.
++Do not modify that manager's pin store. A task-local copy with the same digest
++is permitted. Every vendor call sets `MUSE_NO_AUTO_UPDATE=1`, disposable
++HOME/XDG, file credentials and provider echo under Apple sandbox-exec.
++Without `MUSE1411_BINARY`, every vendor test skips before fixture creation.
++Ordinary `go test ./...` excludes this hidden evidence package; explicitly
++run the ungated package to verify the skips and non-vendor controls.
++
++```sh
++mkdir -p .temp/TASK-261021-mw4laf/tmp
++go build -o .temp/TASK-261021-mw4laf/curator ./cmd/curator
++export MUSE1411_CURATOR="$PWD/.temp/TASK-261021-mw4laf/curator"
++export MUSE1411_RUN_ROOT="$PWD/.temp/TASK-261021-mw4laf/replay-new"
++export TMPDIR="$PWD/.temp/TASK-261021-mw4laf/tmp"
++# Set MUSE1411_BINARY privately to the frozen executable.
++# Set MUSE1411_SPEC to curator-spec e41f96387287f5e76604627f9e63662f7d6d86d4.
++# Set MUSE1411_SPEC_PYTHON to its prepared Python executable.
++go test ./.research/muse1411 -count=1 -v
++go vet ./.research/muse1411
++golangci-lint run ./.research/muse1411/...
++```
++
++Always use a fresh run root, including controls. Private raw argv, loader
++logs, output, exits and tmux PIDs stay there. Tmux uses an isolated background
++socket and session. The TUI receives a local echo sentinel, `/rules`, then
++`/exit`; no active UI is used. No login, logout or auth command runs, and no
++remote inference or real Keychain item is accessed. The offline test pairs
++an accessible loopback endpoint with a denied request, and readable ordinary
++bytes with a denied synthetic Keychains file.
++
++## Fixtures and reference checker
++
++`testdata` is byte-identical to the 1.4.10/1.4.8 fixture. Keeping its synthetic
++`muse148-probe` name preserves root, lock and snapshot identities. The current
++Curator binary still drives real `profile install` and `env resolve muse
++--profile muse148-probe --repair --format json`; its link must render the
++same frozen bytes. Snapshot metadata describes the original frozen fixture,
++not a new export from this checkpoint. This proves representation and loader
++behavior, not export provenance or future materialize integration.
++
++`TestFrozenSnapshot` checks physical source inputs before staging private
++0600 copies. Reviewer test `TestReviewContradictoryObservation` retains its
++original name and cases. `TestFrozenSnapshotSourceInputs` and
++`TestReferenceSnapshotPhysicalClosure` retain both symlink attack classes.
++The reference wrapper classifies entries without following links before
++calling the published `managed_home_snapshots.check_bundle`.
++
++```sh
++python3 -m venv .temp/TASK-261021-mw4laf/reference-venv
++.temp/TASK-261021-mw4laf/reference-venv/bin/python -m pip install -r "$MUSE1411_SPEC/requirements-dev.txt"
++export MUSE1411_SPEC_PYTHON="$PWD/.temp/TASK-261021-mw4laf/reference-venv/bin/python"
++go test ./.research/muse1411 -run '^TestReferenceSnapshotPhysicalClosure$' -count=1 -v
++```
++
++The Python dependency is the spec's existing `jsonschema==4.25.1`; no new
++host-test language or library is introduced. Reference tests skip without
++both locators and then provide no reference-checker evidence.
++
++## Narrowing controls
++
++See [mutants](mutants/README.md). To plant an exec foreign-skill leak:
++
++```sh
++MUSE1411_OMIT_EXCLUSION=exec go test ./.research/muse1411 -run '^TestMuse1411LoaderMatrix$/exec/linked/skills' -count=1 -v
++```
++
++The no-exclusion positive control passes; the required exclusion row must
++fail with `user_skills=1; want 0`. Interactive omission is a declared survivor
++if the vendor's exclusion already retains the skill. Do not run Muse under
++the offline-policy mutant: that control runs only synthetic curl/cat probes.
++
++No source-token scanner attests this module. Controls execute behavioral
++suites. Model-visible removal, credentials/refresh, workspace precedence and
++native platforms other than macOS arm64 remain outside this loader record.
++
++The [task gaps record](TASK-261021-mw4laf_gaps.md) contains per-form verdicts,
++actual command exits and mutant results. [Observations](observations.json)
++bind each vendor case to source digests; the
++[1.4.10 comparison](comparison-1.4.10.json) reports the unchanged measured
++loader/parser behavior. Green witnesses do not qualify the broken interactive
++exclusion.
+diff --git a/.research/muse1411/TASK-261021-mw4laf_gaps.md b/.research/muse1411/TASK-261021-mw4laf_gaps.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..146b8a4bbbe9b05717b3e466b4192f3c36a85abf
+--- /dev/null
++++ b/.research/muse1411/TASK-261021-mw4laf_gaps.md
+@@ -0,0 +1,181 @@
++# TASK-261021-mw4laf — Muse 1.4.11 exclusion replay handoff
++
++## Per-form verdicts
++
++| Form | P1–P4 observation | Environments §7.9 exclusion gate | Versus 1.4.10 |
++|---|---|---|---|
++| exec | Exact flag removes foreign rules/skills; linked and snapshot native roots load | Qualified for measured macOS arm64 loader rows | Same |
++| interactive | Valid boolean retains one foreign skill on both root representations | Refused with evidence; required P4 exclusion fails, gate pending | Same; 1.4.8/1.4.10 failure persists |
++
++Binary: `Muse Code 1.4.11 (1.4.11-R6667.1)`, SHA-256
++`6c04ce1719844685153ef6f04b98113cb61b942d97f0a8b0bfb3932c343984d9`.
++The read-only pin-store source and task-local copy both matched. Only ignored
++task-local `identity.json` contains their absolute locators. Public locator:
++`$MUSE1411_BINARY`. The manager's pin store and updating launcher were untouched.
++
++Curator checkpoint: `cdcba3bd7a8de6028d3d1dbf621ce4cb19b130a7`, zero commits
++behind local main when measured. Normative spec main fetched and reread:
++`e41f96387287f5e76604627f9e63662f7d6d86d4`. A task-local snapshot avoids
++depending on the older active spec checkout. Sources: environments §§7.1
++P1–P4, 7.9, 10.2; CIP-0017; Muse v4 conformance README.
++
++The [qualification record](../../docs/qualification/muse-1.4.11-R6667.1.md)
++records every P row, vendor exit and 1.4.10 comparison. The full local gated
++run exited **0**, driving **45 loader/parser cases** (43 exit 0, two exit 2),
++plus version inspection exit 0. [Observations](observations.json) bind the
++cases to exact Go/Python source digests. The
++[comparison](comparison-1.4.10.json) finds 45 of 45 cases unchanged for
++normalized argv, exits, ordered loader event/outcome/count fields and
++selected visible marker sets. Timings, marker extraction order and
++sentinel-dependent byte lengths are not qualification verdicts.
++
++Exec still accepts `-c context.foreign_personal_skills=false`, exit 0;
++the anticipated parser refusal is not observed. Its exclusion semantics
++under foreign inputs remain unmeasured. Interactive rejects the exec flag
++and string false separately, exit 2, before rules loading. No loader-relevant
++change was observed in the exercised interface. Additive MSP session/leave,
++inbox notifications and recoveryMode were not qualified by this loader replay.
++
++## Coverage, retained tests and bounds
++
++**6 of 6 task AC rows driven**, mapped to named candidate tests and real
++production call sites in the qualification record. No catalog-keyed surface
++table was supplied: this is a brief gap. It is not an implicit waiver or a
++claim to cover every runtime-consumer vector.
++
++Entry points: current `curator profile install SOURCE`, `curator env resolve
++muse --profile muse148-probe --repair --format json`, the vendor exec/TUI
++parsers and rules/skills loaders, and published snapshot
++`managed_home_snapshots.check_bundle`. `testdata` is byte-identical to
++1.4.10/1.4.8; historical snapshot metadata does not attest a current export.
++
++Out-of-contract rows and their acceptance boundaries:
++
++- Credential login/backend/refresh, broker key delivery and model-visible
++  foreign removal: the brief limits execution to offline echo P1–P4;
++  CIP-0017 minimal probes 3–5 require separate evidence. No auth or remote
++  inference command runs.
++- Model-visible workspace precedence: the §7.9 workspace residual is
++  enumeration evidence only. Both forms load native/project sources;
++  interactive project count changes 1 → 0 on reload, as before.
++- Capture locks, export provenance, publication, destination admission,
++  runtime-B and materialize integration: the brief reuses a frozen snapshot;
++  this leaf checks physical closure, representation and loading.
++- Serve, runtime/launcher gates, registry pins and credential policy:
++  expressly excluded by Scope. Their authority remains with their owners.
++- Linux/Windows native vendor behavior: the exact executable is macOS arm64.
++- Exec config-key exclusion semantics: parser acceptance is measured with
++  no foreign input; no alternate consumer exclusion mapping is inferred.
++
++Every previously committed reviewer test remains untouched in its original
++module. The new module retains `TestReviewContradictoryObservation` under
++its original name and all cases, plus both physical-link regression classes.
++The local green suite executes all of them, including the reference CLI.
++This is original development, not reviewer rework. All repository changes
++are inside `.research/muse1411/` and the requested qualification record.
++No root README, CHANGELOG, runtime, registry or policy changes.
++
++No new source-token-scanning gate is introduced. The behavioral observation,
++intake, closure and sandbox guards have narrowing controls. The conditional
++source-token-preserving scanner mutant row is inapplicable to these guards.
++
++## Commands and real exits
++
++Each gate ran as a standalone process with direct file redirection; no
++`tee` or status-masking pipe. [Commands](evidence/commands.json) and complete
++sanitized local logs preserve results. README documents the opt-in locators
++and fresh run roots. Expected-red mutation results are failing gates,
++not passing test runs.
++
++| Command | Real exit | Evidence / interpretation |
++|---|---:|---|
++| `go build -o .temp/TASK-261021-mw4laf/curator ./cmd/curator` | 0 | `evidence/build-curator-01.log`; production fixture binary |
++| `go build ./...` | 0 | `evidence/build-01.log` |
++| `go vet ./...` | 0 | `evidence/vet-01.log` |
++| `env -u MUSE1411_BINARY go test ./.research/muse1411 -count=1 -v` | 0 | `evidence/ungated-01.log`; all seven vendor tests and unconfigured reference test skip; non-vendor controls pass |
++| `go test ./.research/muse1411 -count=1 -v` with README locators | 0 | `evidence/replay-01.log`; full candidate-source gated suite, all 45 cases, version, offline and reference controls |
++| `go vet ./.research/muse1411` | 0 | `evidence/harness-vet-01.log` |
++| `golangci-lint run ./.research/muse1411/...` | 0 | `evidence/harness-lint-01.log`; zero issues |
++| `MUSE1411_OMIT_EXCLUSION=exec go test ./.research/muse1411 -run '^TestMuse1411LoaderMatrix$/exec/linked/skills' -count=1 -v` | 1 | `evidence/plant-exec-01.log`; intended P4 failure, positive control passes |
++| `MUSE1411_OMIT_EXCLUSION=interactive go test ./.research/muse1411 -run '^TestMuse1411LoaderMatrix$/interactive/linked/skills' -count=1 -v` | 0 | `evidence/plant-interactive-01.log`; survivor, proves no interactive protection |
++| Ten patch-mutant behavioral commands | 1 each | `evidence/mutants-results.json`; each named failure inspected, table below |
++| Existing hosted default stage: `go test -json -count=1 -timeout 60m PACKAGE...` | 0 | Exact unchanged-input reuse, not a local replay; `evidence/hosted-default-summary.json`, `evidence/hosted-default-exits.log` |
++| Initial task-local hygiene audits | 1 each | Audit-only false positives: mandatory blank patch context, then relative `snapshot/home/config` misread as an absolute home path. First shell wrapper returned 0 after a subsequent status read; that did not make its failed Python audit green |
++| Corrected task-local hygiene audit | 0 | `evidence/hygiene-03.log`; preserves valid patch encoding and distinguishes relative fixture paths from absolute personal paths; source/fixture identity and scope checks pass |
++| `git diff --check` | 0 | `evidence/diff-check-01.log`; existing tracked paths unchanged; new-file whitespace separately audited |
++| `gofmt -l .research/muse1411/*.go` | 0 | `evidence/gofmt-01.log`; empty output |
++| `bash .github/ci/naming-gate.sh .research/muse1411` | 0 | `evidence/naming-module-01.log` |
++| `bash .github/ci/naming-gate.sh docs/qualification` | 0 | `evidence/naming-records-01.log` |
++
++Task-local reference venv creation and installation from the exact spec's
++`requirements-dev.txt` both exited 0. This retains the template's existing
++Python `jsonschema==4.25.1` reference-checker dependency; host tests stay in Go.
++Tools: Go 1.25.5, tmux 3.6a, golangci-lint 2.12.2, macOS 27.0 arm64,
++Apple sandbox-exec. Tool readiness and private raw logs stay under ignored
++task-local `.temp/`.
++
++Offline controls: curl exit 0 / 7 with exactly one server hit, ordinary versus
++synthetic Keychains cat exit 0 / 1 with unchanged bytes. Security-service
++lookups and real native config/library directories are denied. Every vendor
++call uses env -i, four XDG parents, disposable HOME, file backend, echo and
++auto-update disabled. Vendor credential files remain absent. No login,
++logout, auth command, real Keychain item or remote inference is used.
++
++## Narrowing controls
++
++All patch mutants preserve their guard and admit one forbidden input class.
++They were applied only in disposable task-local module copies; candidate
++source was unchanged. Each exit 1 below is the intended assertion failure,
++not an unrelated setup error. The offline mutants run only curl/cat controls,
++never Muse under a weakened sandbox.
++
++| Mutant | What it narrows the gate to | Named failing test | Real exit / bound |
++|---|---|---|---|
++| `checker-one-skill` | Admit exactly one skill where zero is required | `TestObservationChecker` | 1; killed |
++| `checker-duplicate-count` | Admit zero then contradictory one | `TestReviewContradictoryObservation/count-zero-then-one` | 1; killed |
++| `checker-duplicate-outcome` | Admit failed then ready | `TestReviewContradictoryObservation/outcome-failed-then-ready` | 1; killed |
++| `snapshot-extra-entry` | Ignore only `home/extra` | `TestFrozenSnapshot/extra` | 1; killed |
++| `snapshot-go-listed-link` | Follow only the listed root link | `TestFrozenSnapshot/listed-symlink`, `TestFrozenSnapshotSourceInputs/listed-symlink` | 1; killed |
++| `snapshot-reference-listed-link` | Reference inventory follows listed root only | `TestReferenceSnapshotPhysicalClosure/listed-symlink` | 1; killed |
++| `snapshot-reference-dangling-link` | Reference inventory omits hidden dangling link only | `TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link` | 1; killed |
++| `intake-one-foreign-build` | Allow one synthetic wrong digest | `TestVendorIntakeBoundary/wrong-digest` | 1; killed; synthetic bytes are never executed |
++| `offline-loopback` | Permit outbound localhost TCP only | `TestMuse1411OfflineBoundary` | 1; killed at observed curl exit 0 instead of 7 |
++| `offline-one-keychain-file` | Permit only the synthetic Keychains control file | `TestMuse1411OfflineBoundary` | 1; killed at observed cat exit 0 instead of 1 |
++| Exec omission plant | Omit only the required exec flag | `TestMuse1411LoaderMatrix/exec/linked/skills/exclude-true` | 1; killed, `user_skills=1; want 0`; no-exclusion control passes |
++| Interactive omission plant | Omit only the interactive boolean | None — survivor | 0; real vendor exclusion already retains one skill. This establishes no interactive protection |
++
++## Exact default-gate evidence reuse
++
++Standing order 10 requires reuse of exact green evidence on unchanged
++source/test/config/environment identity. Default production sources, tests,
++validation inputs and workflows match baseline
++`e88fdf2dbec7f94c48b0232a350a0a9f9484fdeb`: **1,671 of 1,671 manifest entries**
++match; default-input manifest SHA-256
++`baad451f52d27e33920e1aee5d1b91a53686416fa0fcd5c0c94af280ea4594a9`.
++The only new package is hidden and excluded from default package selection.
++[Reuse identity](evidence/reuse-identity.json) binds this comparison to the
++candidate checkpoint. The new harness is separately exercised locally.
++
++The original [hosted macOS job](https://github.com/relux-works/curator/actions/runs/39193852508/job/117877582459)
++and its complete test-evidence artifact were retrieved again, exit 0 for
++both downloads. The original full Go stream matches SHA-256
++`3592b90d813b35f565b63fd1d0e5a71586f79b8b9a40418c4d148bb48381aca8`:
++**85 of 85 default packages**, 80 pass, five no-test skips, zero failure
++events. Hosted stage, overall Go command and platform gate each record
++exit 0. Existing full gate evidence also records race, lint, interop,
++gate-self-test, naming and Go-driver jobs green. Optional jobs were skipped.
++
++The environment boundary is the original unchanged hosted workflow and
++toolchain, not asserted equivalence to this local host. No local full default
++suite was rerun, and no prior local timeout is presented as passing. This
++uses already-green evidence, not an external-CI fallback or a forged status.
++Full downloaded raw evidence remains private and ignored; the remote job,
++stream digest, preserved prior record and new verification summary are auditable.
++
++## Changelog line and handoff
++
++Changelog: Add an opt-in Muse 1.4.11-R6667.1 offline P1–P4 record: exec loader rows qualified; interactive exclusion refused, unchanged from 1.4.10; no runtime admission change.
++
++See [logbook](TASK-261021-mw4laf_logbook.md) for findings and workflow decisions.
++The candidate remains uncommitted in the managed Story worktree for snapshot
++handoff. Developer delivery is ready for review; no acceptance or landing is claimed.
+diff --git a/.research/muse1411/TASK-261021-mw4laf_logbook.md b/.research/muse1411/TASK-261021-mw4laf_logbook.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b12f297d02e99b0862bfa6eed990339a04ba3ace
+--- /dev/null
++++ b/.research/muse1411/TASK-261021-mw4laf_logbook.md
+@@ -0,0 +1,49 @@
++# TASK-261021-mw4laf — observation logbook
++
++- 2026-10-21: Initial development transition refused because the task lacked
++  an estimate. Added Fibonacci 5 through the board CLI and retried successfully.
++  No implementation preceded the successful transition.
++- Reused the 1.4.10 harness and exact 1.4.8 fixture bytes, retaining all reviewer
++  test names, contradictory-record cases and physical-closure regressions.
++  Updated only build-specific opt-in names, sentinel names, identity and record
++  references. No runtime, registry or credential policy change.
++- Read-only pin-store source and private copy both match
++  `6c04ce1719844685153ef6f04b98113cb61b942d97f0a8b0bfb3932c343984d9`.
++  Version inspection ran under the same offline sandbox and exited 0.
++- Fetched current curator-spec main `e41f96387287f5e76604627f9e63662f7d6d86d4`.
++  The active spec checkout was older; used an ignored task-local snapshot of
++  the fetched ref and reread environments §§7.1, 7.9, 10.2, CIP-0017 and the
++  Muse v4 conformance README. No changes to the external checkout.
++- Full candidate-source gated suite exited 0: 45 loader/parser calls, 43
++  exits 0 and two intended parser exits 2, plus isolated version exit 0.
++  Interactive foreign-skill exclusion still fails on linked and snapshot roots.
++  The green regression witnesses record failure; they do not attest exclusion.
++- All 45 semantic case comparisons with 1.4.10 are unchanged. The exec parser
++  still accepts the interactive config key; no exclusion-semantic claim is
++  inferred from its empty-input parser case. MSP additions were not qualified.
++- Ten narrowing patches all fail their named intended assertions. Exec
++  omission fails its P4 row with the no-exclusion control green. Interactive
++  omission survives: real vendor exclusion already retains one skill, so this
++  plant proves no interactive protection. Candidate source stays unmodified.
++- Offline controls pair reachable/denied loopback and ordinary/denied synthetic
++  Keychains bytes. No auth command, real Keychain item or remote inference ran.
++  Private background tmux servers are task-owned and cleaned by the harness.
++- Reused the exact existing green default-suite evidence as standing order 10
++  requires. All 1,671 default source/test/config/workflow entries match baseline
++  `e88fdf2dbec7f94c48b0232a350a0a9f9484fdeb`. Downloaded the original complete
++  hosted log and test artifact again; the full stream digest matches
++  `3592b90d813b35f565b63fd1d0e5a71586f79b8b9a40418c4d148bb48381aca8`,
++  with 80 package passes, five no-test skips and zero fail events. No local
++  full-suite replay or local/hosted environment equivalence is claimed.
++- Local production build, default build/vet, ungated harness, full opt-in
++  suite, harness vet/lint and reference controls passed. Exact commands,
++  exits, mutant table and bounds are in
++  [the gaps record](TASK-261021-mw4laf_gaps.md) and [evidence](evidence/).
++- The task-local hygiene audit initially rejected required blank patch
++  context, then misclassified relative `snapshot/home/config` as an absolute
++  personal path. Both Python attempts failed, exit 1; the first shell wrapper's
++  later status read returned 0 and was not accepted as audit success.
++  Corrected audit passed without changing harness source or fixture bytes.
++- Delivery remains uncommitted in the managed Story worktree. The only new
++  repository paths are this evidence module and the requested qualification
++  record. No root README or CHANGELOG edits. Developer verdict: ready for review.
+diff --git a/.research/muse1411/comparison-1.4.10.json b/.research/muse1411/comparison-1.4.10.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..2ffa16cefb2c29df8735ca4e433f783971e0edf8
+--- /dev/null
++++ b/.research/muse1411/comparison-1.4.10.json
+@@ -0,0 +1,185 @@
++{
++  "compared_fields": "argv (version sentinel normalized), vendor exit, ordered event/outcome/source/skill count fields, selected visible marker sets; timings, rendered sentinel byte lengths and marker extraction order excluded",
++  "cases": [
++    {
++      "case": "TestMuse1411ExecInteractiveKeyObservation",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411InteractiveExclusionRegression_linked",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411InteractiveExclusionRegression_snapshot",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_absent_claude-rules_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_absent_claude-rules_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_absent_codex-rules_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_absent_codex-rules_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_absent_skills_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_absent_skills_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_linked_claude-rules_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_linked_claude-rules_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_linked_codex-rules_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_linked_codex-rules_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_linked_skills_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_linked_skills_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_snapshot_claude-rules_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_snapshot_claude-rules_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_snapshot_codex-rules_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_snapshot_codex-rules_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_snapshot_skills_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_snapshot_skills_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_absent_claude-rules_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_absent_claude-rules_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_absent_codex-rules_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_absent_codex-rules_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_absent_skills_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_absent_skills_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_linked_claude-rules_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_linked_claude-rules_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_linked_codex-rules_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_linked_codex-rules_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_linked_skills_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_linked_skills_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_snapshot_claude-rules_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_snapshot_claude-rules_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_snapshot_codex-rules_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_snapshot_codex-rules_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_snapshot_skills_exclude-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_snapshot_skills_exclude-true",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411ParserRefusals_interactive-exec-flag",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411ParserRefusals_interactive-string-false",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411WorkspaceResidual_exec_linked",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411WorkspaceResidual_exec_snapshot",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411WorkspaceResidual_interactive_linked",
++      "comparison": "same"
++    },
++    {
++      "case": "TestMuse1411WorkspaceResidual_interactive_snapshot",
++      "comparison": "same"
++    }
++  ]
++}
+diff --git a/.research/muse1411/evidence/build-01.log b/.research/muse1411/evidence/build-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/.research/muse1411/evidence/build-curator-01.log b/.research/muse1411/evidence/build-curator-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/.research/muse1411/evidence/commands.json b/.research/muse1411/evidence/commands.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..0e7d136e399bc44b443ec0fd771bee9130638b97
+--- /dev/null
++++ b/.research/muse1411/evidence/commands.json
+@@ -0,0 +1,118 @@
++[
++  {
++    "command": "go build -o .temp/TASK-261021-mw4laf/curator ./cmd/curator",
++    "exit": 0,
++    "log": "build-curator-01.log"
++  },
++  {
++    "command": "go build ./...",
++    "exit": 0,
++    "log": "build-01.log"
++  },
++  {
++    "command": "go vet ./...",
++    "exit": 0,
++    "log": "vet-01.log"
++  },
++  {
++    "command": "env -u MUSE1411_BINARY go test ./.research/muse1411 -count=1 -v",
++    "exit": 0,
++    "log": "ungated-01.log"
++  },
++  {
++    "command": "go vet ./.research/muse1411",
++    "exit": 0,
++    "log": "harness-vet-01.log"
++  },
++  {
++    "command": "golangci-lint run ./.research/muse1411/...",
++    "exit": 0,
++    "log": "harness-lint-01.log"
++  },
++  {
++    "command": [
++      "go",
++      "test",
++      "./.research/muse1411",
++      "-count=1",
++      "-v"
++    ],
++    "exit": 0,
++    "duration_s": 101.617,
++    "log": "replay-01.log",
++    "environment": "README locators; no exclusion omission"
++  },
++  {
++    "command": [
++      "go",
++      "test",
++      "./.research/muse1411",
++      "-run",
++      "^TestMuse1411LoaderMatrix$/exec/linked/skills",
++      "-count=1",
++      "-v"
++    ],
++    "exit": 1,
++    "duration_s": 7.743,
++    "log": "plant-exec-01.log",
++    "environment": "README locators; MUSE1411_OMIT_EXCLUSION=exec"
++  },
++  {
++    "command": [
++      "go",
++      "test",
++      "./.research/muse1411",
++      "-run",
++      "^TestMuse1411LoaderMatrix$/interactive/linked/skills",
++      "-count=1",
++      "-v"
++    ],
++    "exit": 0,
++    "duration_s": 9.922,
++    "log": "plant-interactive-01.log",
++    "environment": "README locators; MUSE1411_OMIT_EXCLUSION=interactive"
++  },
++  {
++    "command": "hosted default stage: go test -json -count=1 -timeout 60m PACKAGE...",
++    "exit": 0,
++    "log": "hosted-default-exits.log",
++    "mode": "Existing exact green evidence reused; complete original stream retrieved again and digest verified. No local default full-suite rerun."
++  },
++  {
++    "command": "task-local hygiene audit, initial overbroad whitespace check",
++    "exit": 1,
++    "wrapper_exit": 0,
++    "log": "hygiene-first-01.log",
++    "note": "Python failed; a following status read masked its code in the shell wrapper. Never accepted as success."
++  },
++  {
++    "command": "task-local hygiene audit, second overbroad personal-path pattern",
++    "exit": 1,
++    "log": "hygiene-02.log"
++  },
++  {
++    "command": "task-local hygiene audit, corrected",
++    "exit": 0,
++    "log": "hygiene-03.log"
++  },
++  {
++    "command": "git diff --check",
++    "exit": 0,
++    "log": "diff-check-01.log"
++  },
++  {
++    "command": "gofmt -l .research/muse1411/*.go",
++    "exit": 0,
++    "log": "gofmt-01.log"
++  },
++  {
++    "command": "bash .github/ci/naming-gate.sh .research/muse1411",
++    "exit": 0,
++    "log": "naming-module-01.log"
++  },
++  {
++    "command": "bash .github/ci/naming-gate.sh docs/qualification",
++    "exit": 0,
++    "log": "naming-records-01.log"
++  }
++]
+diff --git a/.research/muse1411/evidence/diff-check-01.log b/.research/muse1411/evidence/diff-check-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/.research/muse1411/evidence/gofmt-01.log b/.research/muse1411/evidence/gofmt-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/.research/muse1411/evidence/harness-lint-01.log b/.research/muse1411/evidence/harness-lint-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..6a3ebaa7e4ff0ea473073f92c8f4c737f2edee69
+--- /dev/null
++++ b/.research/muse1411/evidence/harness-lint-01.log
+@@ -0,0 +1 @@
++0 issues.
+diff --git a/.research/muse1411/evidence/harness-vet-01.log b/.research/muse1411/evidence/harness-vet-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/.research/muse1411/evidence/hosted-default-exits.log b/.research/muse1411/evidence/hosted-default-exits.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..d472c2b55e56d8336e60233c229b49d698dd0cce
+--- /dev/null
++++ b/.research/muse1411/evidence/hosted-default-exits.log
+@@ -0,0 +1,3 @@
++Test (macos-latest)	UNKNOWN STEP	2026-10-19T04:00:04.6135220Z test-gate: stage served exit=0 (stream: .temp/ci-evidence/test/go-test-served.json)
++Test (macos-latest)	UNKNOWN STEP	2026-10-19T04:00:04.6149160Z test-gate: go test overall exit=0 (merged stream: .temp/ci-evidence/test/go-test.json)
++Test (macos-latest)	UNKNOWN STEP	2026-10-19T04:00:09.9561600Z test-gate: go test exit=0, platform-case gate exit=0
+diff --git a/.research/muse1411/evidence/hosted-default-summary.json b/.research/muse1411/evidence/hosted-default-summary.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..03d6a7733df729638cbb06735fff5dd81255b2e5
+--- /dev/null
++++ b/.research/muse1411/evidence/hosted-default-summary.json
+@@ -0,0 +1,16 @@
++{
++  "run": 39193852508,
++  "head_sha": "e88fdf2dbec7f94c48b0232a350a0a9f9484fdeb",
++  "job": "Test (macos-latest)",
++  "go_test_overall_exit": 0,
++  "package_outcomes": {
++    "skip": 5,
++    "pass": 80
++  },
++  "covered_default_packages": "85 of 85",
++  "failure_events": 0,
++  "test_stream_sha256": "3592b90d813b35f565b63fd1d0e5a71586f79b8b9a40418c4d148bb48381aca8",
++  "original_log_sha256": "b96fe7f9635782fe8193cd8e1e968c7a7c942c9e8c3f4b7a67df0c1fa402b7af",
++  "evidence_retrieved_again": true,
++  "environment": "Original hosted workflow environment; no local full-suite replay or environment equivalence claimed."
++}
+diff --git a/.research/muse1411/evidence/hygiene-01.json b/.research/muse1411/evidence/hygiene-01.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..298e9d1dbb9dcb9d0301f4a1c31ffe3efae29ac7
+--- /dev/null
++++ b/.research/muse1411/evidence/hygiene-01.json
+@@ -0,0 +1,14 @@
++{
++  "new_files_checked": 62,
++  "source_digests_match_gated_run": true,
++  "fixtures_byte_identical_to_muse1410": true,
++  "source_delta_only_version_identity_and_sentinels": true,
++  "no_personal_paths_or_secret_assignment_patterns": true,
++  "whitespace_and_gofmt_clean_except_required_patch_context_encoding": true,
++  "existing_tracked_files_unchanged": true,
++  "candidate_uncommitted_at_checkpoint": true,
++  "scope": [
++    ".research/muse1411/",
++    "docs/qualification/muse-1.4.11-R6667.1.md"
++  ]
++}
+diff --git a/.research/muse1411/evidence/hygiene-02.log b/.research/muse1411/evidence/hygiene-02.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..464c37dc8f92a4bc409f3f2c1cce6395ad0626d8
+--- /dev/null
++++ b/.research/muse1411/evidence/hygiene-02.log
+@@ -0,0 +1,5 @@
++Traceback (most recent call last):
++  File "$WORKTREE/.temp/TASK-261021-mw4laf/hygiene-check-01.py", line 7, in <module>
++    assert not re.search(r'/(?:Users|home)/[^\s/]+',s),p
++           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++AssertionError: .research/muse1411/replay_test.go
+diff --git a/.research/muse1411/evidence/hygiene-03.log b/.research/muse1411/evidence/hygiene-03.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..35fdc71d1a7886c97fdee19b3559e7fddda34170
+--- /dev/null
++++ b/.research/muse1411/evidence/hygiene-03.log
+@@ -0,0 +1 @@
++{"new_files_checked": 54, "source_digests_match_gated_run": true, "fixtures_byte_identical_to_muse1410": true, "source_delta_only_version_identity_and_sentinels": true, "no_personal_paths_or_secret_assignment_patterns": true, "whitespace_and_gofmt_clean_except_required_patch_context_encoding": true, "existing_tracked_files_unchanged": true, "candidate_uncommitted_at_checkpoint": true, "scope": [".research/muse1411/", "docs/qualification/muse-1.4.11-R6667.1.md"]}
+diff --git a/.research/muse1411/evidence/hygiene-first-01.log b/.research/muse1411/evidence/hygiene-first-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..f09d7d63faa632e0ce09ca09cac3fb964ad37588
+--- /dev/null
++++ b/.research/muse1411/evidence/hygiene-first-01.log
+@@ -0,0 +1,2 @@
++Initial task-local audit: Python exit 1; AssertionError on required blank context in mutants/snapshot-reference-dangling-link.patch.
++The following git status made its shell wrapper exit 0; no passing audit is claimed.
+diff --git a/.research/muse1411/evidence/mutant-checker-duplicate-count-01.log b/.research/muse1411/evidence/mutant-checker-duplicate-count-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..21899f491ff959adc16fb88d36169d5732bf0783
+--- /dev/null
++++ b/.research/muse1411/evidence/mutant-checker-duplicate-count-01.log
+@@ -0,0 +1,26 @@
++=== RUN   TestReviewContradictoryObservation
++=== RUN   TestReviewContradictoryObservation/count-zero-then-one
++    review_attack_test.go:26: contradictory record admitted: event="skills.catalog_load" outcome="ready" user_skills=0 user_skills=1
++=== RUN   TestReviewContradictoryObservation/count-one-then-zero
++=== RUN   TestReviewContradictoryObservation/outcome-failed-then-ready
++=== RUN   TestReviewContradictoryObservation/duplicate-count
++=== RUN   TestReviewContradictoryObservation/duplicate-event
++=== RUN   TestReviewContradictoryObservation/quoted-decoy
++=== RUN   TestReviewContradictoryObservation/malformed-count
++=== RUN   TestReviewContradictoryObservation/overflow-count
++=== RUN   TestReviewContradictoryObservation/outcome-ready-then-failed
++=== RUN   TestReviewContradictoryObservation/duplicate-outcome
++--- FAIL: TestReviewContradictoryObservation (0.00s)
++    --- FAIL: TestReviewContradictoryObservation/count-zero-then-one (0.00s)
++    --- PASS: TestReviewContradictoryObservation/count-one-then-zero (0.00s)
++    --- PASS: TestReviewContradictoryObservation/outcome-failed-then-ready (0.00s)
++    --- PASS: TestReviewContradictoryObservation/duplicate-count (0.00s)
++    --- PASS: TestReviewContradictoryObservation/duplicate-event (0.00s)
++    --- PASS: TestReviewContradictoryObservation/quoted-decoy (0.00s)
++    --- PASS: TestReviewContradictoryObservation/malformed-count (0.00s)
++    --- PASS: TestReviewContradictoryObservation/overflow-count (0.00s)
++    --- PASS: TestReviewContradictoryObservation/outcome-ready-then-failed (0.00s)
++    --- PASS: TestReviewContradictoryObservation/duplicate-outcome (0.00s)
++FAIL
++FAIL	github.com/relux-works/curator/.temp/TASK-261021-mw4laf/mutant-checker-duplicate-count	0.493s
++FAIL
+diff --git a/.research/muse1411/evidence/mutant-checker-duplicate-outcome-01.log b/.research/muse1411/evidence/mutant-checker-duplicate-outcome-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..eeb7414bd9fd8cc91eb62428857e309b06485520
+--- /dev/null
++++ b/.research/muse1411/evidence/mutant-checker-duplicate-outcome-01.log
+@@ -0,0 +1,26 @@
++=== RUN   TestReviewContradictoryObservation
++=== RUN   TestReviewContradictoryObservation/count-zero-then-one
++=== RUN   TestReviewContradictoryObservation/count-one-then-zero
++=== RUN   TestReviewContradictoryObservation/outcome-failed-then-ready
++    review_attack_test.go:26: contradictory record admitted: event="skills.catalog_load" outcome="failed" outcome="ready" user_skills=0
++=== RUN   TestReviewContradictoryObservation/duplicate-outcome
++=== RUN   TestReviewContradictoryObservation/quoted-decoy
++=== RUN   TestReviewContradictoryObservation/malformed-count
++=== RUN   TestReviewContradictoryObservation/outcome-ready-then-failed
++=== RUN   TestReviewContradictoryObservation/duplicate-count
++=== RUN   TestReviewContradictoryObservation/duplicate-event
++=== RUN   TestReviewContradictoryObservation/overflow-count
++--- FAIL: TestReviewContradictoryObservation (0.00s)
++    --- PASS: TestReviewContradictoryObservation/count-zero-then-one (0.00s)
++    --- PASS: TestReviewContradictoryObservation/count-one-then-zero (0.00s)
++    --- FAIL: TestReviewContradictoryObservation/outcome-failed-then-ready (0.00s)
++    --- PASS: TestReviewContradictoryObservation/duplicate-outcome (0.00s)
++    --- PASS: TestReviewContradictoryObservation/quoted-decoy (0.00s)
++    --- PASS: TestReviewContradictoryObservation/malformed-count (0.00s)
++    --- PASS: TestReviewContradictoryObservation/outcome-ready-then-failed (0.00s)
++    --- PASS: TestReviewContradictoryObservation/duplicate-count (0.00s)
++    --- PASS: TestReviewContradictoryObservation/duplicate-event (0.00s)
++    --- PASS: TestReviewContradictoryObservation/overflow-count (0.00s)
++FAIL
++FAIL	github.com/relux-works/curator/.temp/TASK-261021-mw4laf/mutant-checker-duplicate-outcome	0.280s
++FAIL
+diff --git a/.research/muse1411/evidence/mutant-checker-one-skill-01.log b/.research/muse1411/evidence/mutant-checker-one-skill-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..d12910a844e56aca43f3128951d551d2eafa9bac
+--- /dev/null
++++ b/.research/muse1411/evidence/mutant-checker-one-skill-01.log
+@@ -0,0 +1,6 @@
++=== RUN   TestObservationChecker
++    replay_test.go:121: checker admitted one foreign skill
++--- FAIL: TestObservationChecker (0.00s)
++FAIL
++FAIL	github.com/relux-works/curator/.temp/TASK-261021-mw4laf/mutant-checker-one-skill	0.266s
++FAIL
+diff --git a/.research/muse1411/evidence/mutant-intake-one-foreign-build-01.log b/.research/muse1411/evidence/mutant-intake-one-foreign-build-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..14e20b0ce7707e96255ed60cad384ba176182c05
+--- /dev/null
++++ b/.research/muse1411/evidence/mutant-intake-one-foreign-build-01.log
+@@ -0,0 +1,12 @@
++=== RUN   TestVendorIntakeBoundary
++=== RUN   TestVendorIntakeBoundary/unset
++=== RUN   TestVendorIntakeBoundary/wrong-digest
++    intake_test.go:33: intake exit=0 want=1: === RUN   TestMuse1411OfflineBoundary
++        --- PASS: TestMuse1411OfflineBoundary (0.11s)
++        PASS
++--- FAIL: TestVendorIntakeBoundary (0.15s)
++    --- PASS: TestVendorIntakeBoundary/unset (0.01s)
++    --- FAIL: TestVendorIntakeBoundary/wrong-digest (0.13s)
++FAIL
++FAIL	github.com/relux-works/curator/.temp/TASK-261021-mw4laf/mutant-intake-one-foreign-build	0.443s
++FAIL
+diff --git a/.research/muse1411/evidence/mutant-offline-loopback-01.log b/.research/muse1411/evidence/mutant-offline-loopback-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..5b6a28bca9794c4a7771a840c7dd7a9b606563c1
+--- /dev/null
++++ b/.research/muse1411/evidence/mutant-offline-loopback-01.log
+@@ -0,0 +1,6 @@
++=== RUN   TestMuse1411OfflineBoundary
++    replay_test.go:379: network deny exit=0: MUSE1411_NETWORK_CONTROL
++--- FAIL: TestMuse1411OfflineBoundary (0.22s)
++FAIL
++FAIL	github.com/relux-works/curator/.temp/TASK-261021-mw4laf/mutant-offline-loopback	0.488s
++FAIL
+diff --git a/.research/muse1411/evidence/mutant-offline-one-keychain-file-01.log b/.research/muse1411/evidence/mutant-offline-one-keychain-file-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..b47e03439661ee60376b28c8abafcde0f3206a2a
+--- /dev/null
++++ b/.research/muse1411/evidence/mutant-offline-one-keychain-file-01.log
+@@ -0,0 +1,6 @@
++=== RUN   TestMuse1411OfflineBoundary
++    replay_test.go:393: store boundary exit=0 want=1: MUSE1411_SYNTHETIC_STORE_CONTROL
++--- FAIL: TestMuse1411OfflineBoundary (0.25s)
++FAIL
++FAIL	github.com/relux-works/curator/.temp/TASK-261021-mw4laf/mutant-offline-one-keychain-file	0.538s
++FAIL
+diff --git a/.research/muse1411/evidence/mutant-snapshot-extra-entry-01.log b/.research/muse1411/evidence/mutant-snapshot-extra-entry-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c1570ea29ca8f53c3b9aab43dc6cffaf1c45145
+--- /dev/null
++++ b/.research/muse1411/evidence/mutant-snapshot-extra-entry-01.log
+@@ -0,0 +1,18 @@
++=== RUN   TestFrozenSnapshot
++=== RUN   TestFrozenSnapshot/regular
++=== RUN   TestFrozenSnapshot/altered
++=== RUN   TestFrozenSnapshot/extra
++    replay_test.go:498: extra snapshot admitted
++=== RUN   TestFrozenSnapshot/listed-symlink
++=== RUN   TestFrozenSnapshot/unlisted-dangling-link
++=== RUN   TestFrozenSnapshot/missing
++--- FAIL: TestFrozenSnapshot (0.02s)
++    --- PASS: TestFrozenSnapshot/regular (0.00s)
++    --- PASS: TestFrozenSnapshot/altered (0.00s)
++    --- FAIL: TestFrozenSnapshot/extra (0.00s)
++    --- PASS: TestFrozenSnapshot/listed-symlink (0.00s)
++    --- PASS: TestFrozenSnapshot/unlisted-dangling-link (0.00s)
++    --- PASS: TestFrozenSnapshot/missing (0.00s)
++FAIL
++FAIL	github.com/relux-works/curator/.temp/TASK-261021-mw4laf/mutant-snapshot-extra-entry	0.287s
++FAIL
+diff --git a/.research/muse1411/evidence/mutant-snapshot-go-listed-link-01.log b/.research/muse1411/evidence/mutant-snapshot-go-listed-link-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..37f3be4289935c7f0597e72b5e752c26efc2c7b6
+--- /dev/null
++++ b/.research/muse1411/evidence/mutant-snapshot-go-listed-link-01.log
+@@ -0,0 +1,31 @@
++=== RUN   TestFrozenSnapshot
++=== RUN   TestFrozenSnapshot/regular
++=== RUN   TestFrozenSnapshot/altered
++=== RUN   TestFrozenSnapshot/extra
++=== RUN   TestFrozenSnapshot/listed-symlink
++    replay_test.go:498: listed-symlink snapshot admitted
++=== RUN   TestFrozenSnapshot/unlisted-dangling-link
++=== RUN   TestFrozenSnapshot/missing
++--- FAIL: TestFrozenSnapshot (0.01s)
++    --- PASS: TestFrozenSnapshot/regular (0.00s)
++    --- PASS: TestFrozenSnapshot/altered (0.00s)
++    --- PASS: TestFrozenSnapshot/extra (0.00s)
++    --- FAIL: TestFrozenSnapshot/listed-symlink (0.00s)
++    --- PASS: TestFrozenSnapshot/unlisted-dangling-link (0.00s)
++    --- PASS: TestFrozenSnapshot/missing (0.00s)
++=== RUN   TestFrozenSnapshotSourceInputs
++=== RUN   TestFrozenSnapshotSourceInputs/regular
++=== RUN   TestFrozenSnapshotSourceInputs/listed-symlink
++    replay_test.go:540: listed-symlink source fixture exit=0: === RUN   TestFrozenSnapshot
++        === RUN   TestFrozenSnapshot/regular
++        --- PASS: TestFrozenSnapshot (0.00s)
++            --- PASS: TestFrozenSnapshot/regular (0.00s)
++        PASS
++=== RUN   TestFrozenSnapshotSourceInputs/unlisted-dangling-link
++--- FAIL: TestFrozenSnapshotSourceInputs (0.03s)
++    --- PASS: TestFrozenSnapshotSourceInputs/regular (0.01s)
++    --- FAIL: TestFrozenSnapshotSourceInputs/listed-symlink (0.01s)
++    --- PASS: TestFrozenSnapshotSourceInputs/unlisted-dangling-link (0.01s)
++FAIL
++FAIL	github.com/relux-works/curator/.temp/TASK-261021-mw4laf/mutant-snapshot-go-listed-link	0.311s
++FAIL
+diff --git a/.research/muse1411/evidence/mutant-snapshot-reference-dangling-link-01.log b/.research/muse1411/evidence/mutant-snapshot-reference-dangling-link-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..6feccbcd83e1929ce50bd5bad74da462f975ffc0
+--- /dev/null
++++ b/.research/muse1411/evidence/mutant-snapshot-reference-dangling-link-01.log
+@@ -0,0 +1,12 @@
++=== RUN   TestReferenceSnapshotPhysicalClosure
++=== RUN   TestReferenceSnapshotPhysicalClosure/regular
++=== RUN   TestReferenceSnapshotPhysicalClosure/listed-symlink
++=== RUN   TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link
++    replay_test.go:632: unlisted-dangling-link reference exit=0: Reference check_bundle accepted exact frozen metadata and complete regular-file closure
++--- FAIL: TestReferenceSnapshotPhysicalClosure (1.51s)
++    --- PASS: TestReferenceSnapshotPhysicalClosure/regular (0.65s)
++    --- PASS: TestReferenceSnapshotPhysicalClosure/listed-symlink (0.27s)
++    --- FAIL: TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link (0.59s)
++FAIL
++FAIL	github.com/relux-works/curator/.temp/TASK-261021-mw4laf/mutant-snapshot-reference-dangling-link	1.795s
++FAIL
+diff --git a/.research/muse1411/evidence/mutant-snapshot-reference-listed-link-01.log b/.research/muse1411/evidence/mutant-snapshot-reference-listed-link-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..f611639facf20dfd87fd09474a7225ebf73c23c4
+--- /dev/null
++++ b/.research/muse1411/evidence/mutant-snapshot-reference-listed-link-01.log
+@@ -0,0 +1,12 @@
++=== RUN   TestReferenceSnapshotPhysicalClosure
++=== RUN   TestReferenceSnapshotPhysicalClosure/regular
++=== RUN   TestReferenceSnapshotPhysicalClosure/listed-symlink
++    replay_test.go:632: listed-symlink reference exit=0: Reference check_bundle accepted exact frozen metadata and complete regular-file closure
++=== RUN   TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link
++--- FAIL: TestReferenceSnapshotPhysicalClosure (1.46s)
++    --- PASS: TestReferenceSnapshotPhysicalClosure/regular (0.60s)
++    --- FAIL: TestReferenceSnapshotPhysicalClosure/listed-symlink (0.60s)
++    --- PASS: TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link (0.26s)
++FAIL
++FAIL	github.com/relux-works/curator/.temp/TASK-261021-mw4laf/mutant-snapshot-reference-listed-link	1.735s
++FAIL
+diff --git a/.research/muse1411/evidence/mutants-results.json b/.research/muse1411/evidence/mutants-results.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..d17b7eae94206dedfddf3c38b7097ef94290c171
+--- /dev/null
++++ b/.research/muse1411/evidence/mutants-results.json
+@@ -0,0 +1,181 @@
++[
++  {
++    "mutant": "checker-one-skill",
++    "patch_exit": 0,
++    "command": [
++      "go",
++      "test",
++      "./.temp/TASK-261021-mw4laf/mutant-checker-one-skill",
++      "-run",
++      "^TestObservationChecker$",
++      "-count=1",
++      "-v"
++    ],
++    "exit": 1,
++    "named_failures": [
++      "--- FAIL: TestObservationChecker (0.00s)"
++    ]
++  },
++  {
++    "mutant": "checker-duplicate-count",
++    "patch_exit": 0,
++    "command": [
++      "go",
++      "test",
++      "./.temp/TASK-261021-mw4laf/mutant-checker-duplicate-count",
++      "-run",
++      "^TestReviewContradictoryObservation$",
++      "-count=1",
++      "-v"
++    ],
++    "exit": 1,
++    "named_failures": [
++      "--- FAIL: TestReviewContradictoryObservation (0.00s)",
++      "--- FAIL: TestReviewContradictoryObservation/count-zero-then-one (0.00s)"
++    ]
++  },
++  {
++    "mutant": "checker-duplicate-outcome",
++    "patch_exit": 0,
++    "command": [
++      "go",
++      "test",
++      "./.temp/TASK-261021-mw4laf/mutant-checker-duplicate-outcome",
++      "-run",
++      "^TestReviewContradictoryObservation$",
++      "-count=1",
++      "-v"
++    ],
++    "exit": 1,
++    "named_failures": [
++      "--- FAIL: TestReviewContradictoryObservation (0.00s)",
++      "--- FAIL: TestReviewContradictoryObservation/outcome-failed-then-ready (0.00s)"
++    ]
++  },
++  {
++    "mutant": "snapshot-extra-entry",
++    "patch_exit": 0,
++    "command": [
++      "go",
++      "test",
++      "./.temp/TASK-261021-mw4laf/mutant-snapshot-extra-entry",
++      "-run",
++      "^TestFrozenSnapshot$",
++      "-count=1",
++      "-v"
++    ],
++    "exit": 1,
++    "named_failures": [
++      "--- FAIL: TestFrozenSnapshot (0.02s)",
++      "--- FAIL: TestFrozenSnapshot/extra (0.00s)"
++    ]
++  },
++  {
++    "mutant": "snapshot-go-listed-link",
++    "patch_exit": 0,
++    "command": [
++      "go",
++      "test",
++      "./.temp/TASK-261021-mw4laf/mutant-snapshot-go-listed-link",
++      "-run",
++      "^Test(FrozenSnapshot|FrozenSnapshotSourceInputs)$",
++      "-count=1",
++      "-v"
++    ],
++    "exit": 1,
++    "named_failures": [
++      "--- FAIL: TestFrozenSnapshot (0.01s)",
++      "--- FAIL: TestFrozenSnapshot/listed-symlink (0.00s)",
++      "--- FAIL: TestFrozenSnapshotSourceInputs (0.03s)",
++      "--- FAIL: TestFrozenSnapshotSourceInputs/listed-symlink (0.01s)"
++    ]
++  },
++  {
++    "mutant": "snapshot-reference-listed-link",
++    "patch_exit": 0,
++    "command": [
++      "go",
++      "test",
++      "./.temp/TASK-261021-mw4laf/mutant-snapshot-reference-listed-link",
++      "-run",
++      "^TestReferenceSnapshotPhysicalClosure$",
++      "-count=1",
++      "-v"
++    ],
++    "exit": 1,
++    "named_failures": [
++      "--- FAIL: TestReferenceSnapshotPhysicalClosure (1.46s)",
++      "--- FAIL: TestReferenceSnapshotPhysicalClosure/listed-symlink (0.60s)"
++    ]
++  },
++  {
++    "mutant": "snapshot-reference-dangling-link",
++    "patch_exit": 0,
++    "command": [
++      "go",
++      "test",
++      "./.temp/TASK-261021-mw4laf/mutant-snapshot-reference-dangling-link",
++      "-run",
++      "^TestReferenceSnapshotPhysicalClosure$",
++      "-count=1",
++      "-v"
++    ],
++    "exit": 1,
++    "named_failures": [
++      "--- FAIL: TestReferenceSnapshotPhysicalClosure (1.51s)",
++      "--- FAIL: TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link (0.59s)"
++    ]
++  },
++  {
++    "mutant": "intake-one-foreign-build",
++    "patch_exit": 0,
++    "command": [
++      "go",
++      "test",
++      "./.temp/TASK-261021-mw4laf/mutant-intake-one-foreign-build",
++      "-run",
++      "^TestVendorIntakeBoundary$",
++      "-count=1",
++      "-v"
++    ],
++    "exit": 1,
++    "named_failures": [
++      "--- FAIL: TestVendorIntakeBoundary (0.15s)",
++      "--- FAIL: TestVendorIntakeBoundary/wrong-digest (0.13s)"
++    ]
++  },
++  {
++    "mutant": "offline-loopback",
++    "patch_exit": 0,
++    "command": [
++      "go",
++      "test",
++      "./.temp/TASK-261021-mw4laf/mutant-offline-loopback",
++      "-run",
++      "^TestMuse1411OfflineBoundary$",
++      "-count=1",
++      "-v"
++    ],
++    "exit": 1,
++    "named_failures": [
++      "--- FAIL: TestMuse1411OfflineBoundary (0.22s)"
++    ]
++  },
++  {
++    "mutant": "offline-one-keychain-file",
++    "patch_exit": 0,
++    "command": [
++      "go",
++      "test",
++      "./.temp/TASK-261021-mw4laf/mutant-offline-one-keychain-file",
++      "-run",
++      "^TestMuse1411OfflineBoundary$",
++      "-count=1",
++      "-v"
++    ],
++    "exit": 1,
++    "named_failures": [
++      "--- FAIL: TestMuse1411OfflineBoundary (0.25s)"
++    ]
++  }
++]
+diff --git a/.research/muse1411/evidence/naming-module-01.log b/.research/muse1411/evidence/naming-module-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/.research/muse1411/evidence/naming-records-01.log b/.research/muse1411/evidence/naming-records-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/.research/muse1411/evidence/plant-exec-01.json b/.research/muse1411/evidence/plant-exec-01.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..3f919abedf5b01997fe237a6303a0af07e30b1bf
+--- /dev/null
++++ b/.research/muse1411/evidence/plant-exec-01.json
+@@ -0,0 +1,14 @@
++{
++  "command": [
++    "go",
++    "test",
++    "./.research/muse1411",
++    "-run",
++    "^TestMuse1411LoaderMatrix$/exec/linked/skills",
++    "-count=1",
++    "-v"
++  ],
++  "exit": 1,
++  "duration_s": 7.743,
++  "log": "plant-exec-01.log"
++}
+diff --git a/.research/muse1411/evidence/plant-exec-01.log b/.research/muse1411/evidence/plant-exec-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..3eecd25f76c6da0157cd12efae24a542f84ba47a
+--- /dev/null
++++ b/.research/muse1411/evidence/plant-exec-01.log
+@@ -0,0 +1,11 @@
++=== RUN   TestMuse1411LoaderMatrix
++=== RUN   TestMuse1411LoaderMatrix/exec/linked/skills/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/linked/skills/exclude-true
++    replay_test.go:788: skills.catalog_load observed user_skills=1; want 0
++--- FAIL: TestMuse1411LoaderMatrix (6.79s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/linked/skills/exclude-false (2.47s)
++    --- FAIL: TestMuse1411LoaderMatrix/exec/linked/skills/exclude-true (3.11s)
++FAIL
++FAIL	github.com/relux-works/curator/.research/muse1411	6.962s
++FAIL
+diff --git a/.research/muse1411/evidence/plant-interactive-01.json b/.research/muse1411/evidence/plant-interactive-01.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..d72f8e0b03a7539661f056fa68fa45bba2eb9cb7
+--- /dev/null
++++ b/.research/muse1411/evidence/plant-interactive-01.json
+@@ -0,0 +1,14 @@
++{
++  "command": [
++    "go",
++    "test",
++    "./.research/muse1411",
++    "-run",
++    "^TestMuse1411LoaderMatrix$/interactive/linked/skills",
++    "-count=1",
++    "-v"
++  ],
++  "exit": 0,
++  "duration_s": 9.922,
++  "log": "plant-interactive-01.log"
++}
+diff --git a/.research/muse1411/evidence/plant-interactive-01.log b/.research/muse1411/evidence/plant-interactive-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..fe8d179ba095153ec835905f948f2d20f4227a7d
+--- /dev/null
++++ b/.research/muse1411/evidence/plant-interactive-01.log
+@@ -0,0 +1,10 @@
++=== RUN   TestMuse1411LoaderMatrix
++=== RUN   TestMuse1411LoaderMatrix/interactive/linked/skills/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/linked/skills/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
++--- PASS: TestMuse1411LoaderMatrix (9.00s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/linked/skills/exclude-false (3.98s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/linked/skills/exclude-true (3.17s)
++PASS
++ok  	github.com/relux-works/curator/.research/muse1411	9.189s
+diff --git a/.research/muse1411/evidence/replay-01.json b/.research/muse1411/evidence/replay-01.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..d12ecb26a0aa8b4f05207e2c988a465ddd2a2393
+--- /dev/null
++++ b/.research/muse1411/evidence/replay-01.json
+@@ -0,0 +1,12 @@
++{
++  "command": [
++    "go",
++    "test",
++    "./.research/muse1411",
++    "-count=1",
++    "-v"
++  ],
++  "exit": 0,
++  "duration_s": 101.617,
++  "log": "replay-01.log"
++}
+diff --git a/.research/muse1411/evidence/replay-01.log b/.research/muse1411/evidence/replay-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..bd84f5a3a1c9a79f78bb3155cf5f438c3b405f5e
+--- /dev/null
++++ b/.research/muse1411/evidence/replay-01.log
+@@ -0,0 +1,204 @@
++=== RUN   TestVendorIntakeBoundary
++=== RUN   TestVendorIntakeBoundary/unset
++=== RUN   TestVendorIntakeBoundary/wrong-digest
++--- PASS: TestVendorIntakeBoundary (0.03s)
++    --- PASS: TestVendorIntakeBoundary/unset (0.01s)
++    --- PASS: TestVendorIntakeBoundary/wrong-digest (0.02s)
++=== RUN   TestMuse1411Identity
++    intake_test.go:58: version exit=0; Muse Code 1.4.11 (1.4.11-R6667.1); exact digest verified
++--- PASS: TestMuse1411Identity (2.95s)
++=== RUN   TestObservationChecker
++--- PASS: TestObservationChecker (0.00s)
++=== RUN   TestMuse1411OfflineBoundary
++--- PASS: TestMuse1411OfflineBoundary (0.22s)
++=== RUN   TestFrozenSnapshot
++=== RUN   TestFrozenSnapshot/regular
++=== RUN   TestFrozenSnapshot/altered
++=== RUN   TestFrozenSnapshot/extra
++=== RUN   TestFrozenSnapshot/listed-symlink
++=== RUN   TestFrozenSnapshot/unlisted-dangling-link
++=== RUN   TestFrozenSnapshot/missing
++--- PASS: TestFrozenSnapshot (0.03s)
++    --- PASS: TestFrozenSnapshot/regular (0.01s)
++    --- PASS: TestFrozenSnapshot/altered (0.01s)
++    --- PASS: TestFrozenSnapshot/extra (0.00s)
++    --- PASS: TestFrozenSnapshot/listed-symlink (0.00s)
++    --- PASS: TestFrozenSnapshot/unlisted-dangling-link (0.00s)
++    --- PASS: TestFrozenSnapshot/missing (0.00s)
++=== RUN   TestFrozenSnapshotSourceInputs
++=== RUN   TestFrozenSnapshotSourceInputs/regular
++=== RUN   TestFrozenSnapshotSourceInputs/listed-symlink
++=== RUN   TestFrozenSnapshotSourceInputs/unlisted-dangling-link
++--- PASS: TestFrozenSnapshotSourceInputs (0.02s)
++    --- PASS: TestFrozenSnapshotSourceInputs/regular (0.01s)
++    --- PASS: TestFrozenSnapshotSourceInputs/listed-symlink (0.01s)
++    --- PASS: TestFrozenSnapshotSourceInputs/unlisted-dangling-link (0.01s)
++=== RUN   TestReferenceSnapshotPhysicalClosure
++=== RUN   TestReferenceSnapshotPhysicalClosure/regular
++=== RUN   TestReferenceSnapshotPhysicalClosure/listed-symlink
++=== RUN   TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link
++--- PASS: TestReferenceSnapshotPhysicalClosure (1.22s)
++    --- PASS: TestReferenceSnapshotPhysicalClosure/regular (0.72s)
++    --- PASS: TestReferenceSnapshotPhysicalClosure/listed-symlink (0.25s)
++    --- PASS: TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link (0.25s)
++=== RUN   TestMuse1411ParserRefusals
++=== RUN   TestMuse1411ParserRefusals/interactive-string-false
++=== RUN   TestMuse1411ParserRefusals/interactive-exec-flag
++--- PASS: TestMuse1411ParserRefusals (0.35s)
++    --- PASS: TestMuse1411ParserRefusals/interactive-string-false (0.10s)
++    --- PASS: TestMuse1411ParserRefusals/interactive-exec-flag (0.07s)
++=== RUN   TestMuse1411LoaderMatrix
++=== RUN   TestMuse1411LoaderMatrix/exec/absent/claude-rules/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=1 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/absent/claude-rules/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=0 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/absent/codex-rules/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=1 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/absent/codex-rules/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=0 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/absent/skills/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=0 foreign_sources=0 user_skills=1; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/absent/skills/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=0 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/linked/claude-rules/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/linked/claude-rules/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/linked/codex-rules/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/linked/codex-rules/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/linked/skills/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/linked/skills/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/snapshot/claude-rules/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/snapshot/claude-rules/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/snapshot/codex-rules/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/snapshot/codex-rules/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/snapshot/skills/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
++=== RUN   TestMuse1411LoaderMatrix/exec/snapshot/skills/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/absent/claude-rules/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=1 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/absent/claude-rules/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=1 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/absent/codex-rules/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=1 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/absent/codex-rules/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=1 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/absent/skills/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=0 foreign_sources=0 user_skills=1; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/absent/skills/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=0 foreign_sources=0 user_skills=1; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/linked/claude-rules/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/linked/claude-rules/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/linked/codex-rules/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/linked/codex-rules/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/linked/skills/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/linked/skills/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/snapshot/claude-rules/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/snapshot/claude-rules/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/snapshot/codex-rules/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/snapshot/codex-rules/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=0; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/snapshot/skills/exclude-false
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
++=== RUN   TestMuse1411LoaderMatrix/interactive/snapshot/skills/exclude-true
++    replay_test.go:790: vendor exit=0; user_sources=1 foreign_sources=0 user_skills=1; no model claim
++--- PASS: TestMuse1411LoaderMatrix (74.73s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/absent/claude-rules/exclude-false (1.32s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/absent/claude-rules/exclude-true (1.43s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/absent/codex-rules/exclude-false (1.26s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/absent/codex-rules/exclude-true (1.42s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/absent/skills/exclude-false (1.27s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/absent/skills/exclude-true (1.17s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/linked/claude-rules/exclude-false (1.44s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/linked/claude-rules/exclude-true (1.19s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/linked/codex-rules/exclude-false (1.46s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/linked/codex-rules/exclude-true (1.24s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/linked/skills/exclude-false (1.42s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/linked/skills/exclude-true (1.57s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/snapshot/claude-rules/exclude-false (1.31s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/snapshot/claude-rules/exclude-true (1.64s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/snapshot/codex-rules/exclude-false (1.32s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/snapshot/codex-rules/exclude-true (1.49s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/snapshot/skills/exclude-false (1.37s)
++    --- PASS: TestMuse1411LoaderMatrix/exec/snapshot/skills/exclude-true (1.29s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/absent/claude-rules/exclude-false (2.94s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/absent/claude-rules/exclude-true (2.83s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/absent/codex-rules/exclude-false (2.62s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/absent/codex-rules/exclude-true (2.29s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/absent/skills/exclude-false (2.33s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/absent/skills/exclude-true (2.36s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/linked/claude-rules/exclude-false (2.46s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/linked/claude-rules/exclude-true (2.21s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/linked/codex-rules/exclude-false (2.75s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/linked/codex-rules/exclude-true (2.64s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/linked/skills/exclude-false (3.01s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/linked/skills/exclude-true (4.17s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/snapshot/claude-rules/exclude-false (2.99s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/snapshot/claude-rules/exclude-true (3.05s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/snapshot/codex-rules/exclude-false (2.32s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/snapshot/codex-rules/exclude-true (3.10s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/snapshot/skills/exclude-false (2.30s)
++    --- PASS: TestMuse1411LoaderMatrix/interactive/snapshot/skills/exclude-true (2.40s)
++=== RUN   TestMuse1411InteractiveExclusionRegression
++=== RUN   TestMuse1411InteractiveExclusionRegression/linked
++    replay_test.go:820: vendor exit=0; required interactive exclusion FAILED (user_skills=1); see docs/qualification/muse-1.4.11-R6667.1.md
++=== RUN   TestMuse1411InteractiveExclusionRegression/snapshot
++    replay_test.go:820: vendor exit=0; required interactive exclusion FAILED (user_skills=1); see docs/qualification/muse-1.4.11-R6667.1.md
++--- PASS: TestMuse1411InteractiveExclusionRegression (9.37s)
++    --- PASS: TestMuse1411InteractiveExclusionRegression/linked (2.95s)
++    --- PASS: TestMuse1411InteractiveExclusionRegression/snapshot (2.65s)
++=== RUN   TestMuse1411WorkspaceResidual
++=== RUN   TestMuse1411WorkspaceResidual/exec/linked
++=== RUN   TestMuse1411WorkspaceResidual/exec/snapshot
++=== RUN   TestMuse1411WorkspaceResidual/interactive/linked
++=== RUN   TestMuse1411WorkspaceResidual/interactive/snapshot
++--- PASS: TestMuse1411WorkspaceResidual (10.22s)
++    --- PASS: TestMuse1411WorkspaceResidual/exec/linked (1.62s)
++    --- PASS: TestMuse1411WorkspaceResidual/exec/snapshot (1.77s)
++    --- PASS: TestMuse1411WorkspaceResidual/interactive/linked (3.05s)
++    --- PASS: TestMuse1411WorkspaceResidual/interactive/snapshot (2.42s)
++=== RUN   TestMuse1411ExecInteractiveKeyObservation
++    replay_test.go:871: vendor exit=0; exec accepts -c context.foreign_personal_skills=false; exclusion semantics not measured by this parser case
++--- PASS: TestMuse1411ExecInteractiveKeyObservation (1.61s)
++=== RUN   TestReviewContradictoryObservation
++=== RUN   TestReviewContradictoryObservation/outcome-ready-then-failed
++=== RUN   TestReviewContradictoryObservation/duplicate-outcome
++=== RUN   TestReviewContradictoryObservation/quoted-decoy
++=== RUN   TestReviewContradictoryObservation/overflow-count
++=== RUN   TestReviewContradictoryObservation/count-zero-then-one
++=== RUN   TestReviewContradictoryObservation/count-one-then-zero
++=== RUN   TestReviewContradictoryObservation/outcome-failed-then-ready
++=== RUN   TestReviewContradictoryObservation/duplicate-count
++=== RUN   TestReviewContradictoryObservation/duplicate-event
++=== RUN   TestReviewContradictoryObservation/malformed-count
++--- PASS: TestReviewContradictoryObservation (0.00s)
++    --- PASS: TestReviewContradictoryObservation/outcome-ready-then-failed (0.00s)
++    --- PASS: TestReviewContradictoryObservation/duplicate-outcome (0.00s)
++    --- PASS: TestReviewContradictoryObservation/quoted-decoy (0.00s)
++    --- PASS: TestReviewContradictoryObservation/overflow-count (0.00s)
++    --- PASS: TestReviewContradictoryObservation/count-zero-then-one (0.00s)
++    --- PASS: TestReviewContradictoryObservation/count-one-then-zero (0.00s)
++    --- PASS: TestReviewContradictoryObservation/outcome-failed-then-ready (0.00s)
++    --- PASS: TestReviewContradictoryObservation/duplicate-count (0.00s)
++    --- PASS: TestReviewContradictoryObservation/duplicate-event (0.00s)
++    --- PASS: TestReviewContradictoryObservation/malformed-count (0.00s)
++PASS
++ok  	github.com/relux-works/curator/.research/muse1411	100.949s
+diff --git a/.research/muse1411/evidence/reuse-identity.json b/.research/muse1411/evidence/reuse-identity.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..1a4d1193121bc2197cfc2efab214a8fd31ceb7f4
+--- /dev/null
++++ b/.research/muse1411/evidence/reuse-identity.json
+@@ -0,0 +1,10 @@
++{
++  "baseline": "e88fdf2dbec7f94c48b0232a350a0a9f9484fdeb",
++  "candidate_checkpoint": "cdcba3bd7a8de6028d3d1dbf621ce4cb19b130a7",
++  "manifest_sha256": "baad451f52d27e33920e1aee5d1b91a53686416fa0fcd5c0c94af280ea4594a9",
++  "matched_default_input_entries": 1671,
++  "default_source_test_config_workflow_unchanged": true,
++  "hosted_run": 39193852508,
++  "default_green_evidence": "../muse1410/evidence/hosted-default-summary.json",
++  "environment": "Original hosted environment retained as evidence boundary, not recharacterized as equivalent to this local host."
++}
+diff --git a/.research/muse1411/evidence/ungated-01.log b/.research/muse1411/evidence/ungated-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..e3acf7bd42bdb96274d4ce71a4d5e956ebafbf26
+--- /dev/null
++++ b/.research/muse1411/evidence/ungated-01.log
+@@ -0,0 +1,78 @@
++=== RUN   TestVendorIntakeBoundary
++=== RUN   TestVendorIntakeBoundary/unset
++=== RUN   TestVendorIntakeBoundary/wrong-digest
++--- PASS: TestVendorIntakeBoundary (0.01s)
++    --- PASS: TestVendorIntakeBoundary/unset (0.01s)
++    --- PASS: TestVendorIntakeBoundary/wrong-digest (0.01s)
++=== RUN   TestMuse1411Identity
++    intake_test.go:45: vendor replay requires MUSE1411_BINARY, MUSE1411_CURATOR and MUSE1411_RUN_ROOT; no qualification from a skip
++--- SKIP: TestMuse1411Identity (0.00s)
++=== RUN   TestObservationChecker
++--- PASS: TestObservationChecker (0.00s)
++=== RUN   TestMuse1411OfflineBoundary
++    replay_test.go:365: vendor replay requires MUSE1411_BINARY, MUSE1411_CURATOR and MUSE1411_RUN_ROOT; no qualification from a skip
++--- SKIP: TestMuse1411OfflineBoundary (0.00s)
++=== RUN   TestFrozenSnapshot
++=== RUN   TestFrozenSnapshot/regular
++=== RUN   TestFrozenSnapshot/altered
++=== RUN   TestFrozenSnapshot/extra
++=== RUN   TestFrozenSnapshot/listed-symlink
++=== RUN   TestFrozenSnapshot/unlisted-dangling-link
++=== RUN   TestFrozenSnapshot/missing
++--- PASS: TestFrozenSnapshot (0.02s)
++    --- PASS: TestFrozenSnapshot/regular (0.00s)
++    --- PASS: TestFrozenSnapshot/altered (0.00s)
++    --- PASS: TestFrozenSnapshot/extra (0.00s)
++    --- PASS: TestFrozenSnapshot/listed-symlink (0.00s)
++    --- PASS: TestFrozenSnapshot/unlisted-dangling-link (0.00s)
++    --- PASS: TestFrozenSnapshot/missing (0.00s)
++=== RUN   TestFrozenSnapshotSourceInputs
++=== RUN   TestFrozenSnapshotSourceInputs/regular
++=== RUN   TestFrozenSnapshotSourceInputs/listed-symlink
++=== RUN   TestFrozenSnapshotSourceInputs/unlisted-dangling-link
++--- PASS: TestFrozenSnapshotSourceInputs (0.03s)
++    --- PASS: TestFrozenSnapshotSourceInputs/regular (0.01s)
++    --- PASS: TestFrozenSnapshotSourceInputs/listed-symlink (0.01s)
++    --- PASS: TestFrozenSnapshotSourceInputs/unlisted-dangling-link (0.01s)
++=== RUN   TestReferenceSnapshotPhysicalClosure
++    replay_test.go:617: set MUSE1411_SPEC_PYTHON and MUSE1411_SPEC for the published reference CLI
++--- SKIP: TestReferenceSnapshotPhysicalClosure (0.00s)
++=== RUN   TestMuse1411ParserRefusals
++    replay_test.go:738: vendor replay requires MUSE1411_BINARY, MUSE1411_CURATOR and MUSE1411_RUN_ROOT; no qualification from a skip
++--- SKIP: TestMuse1411ParserRefusals (0.00s)
++=== RUN   TestMuse1411LoaderMatrix
++    replay_test.go:760: vendor replay requires MUSE1411_BINARY, MUSE1411_CURATOR and MUSE1411_RUN_ROOT; no qualification from a skip
++--- SKIP: TestMuse1411LoaderMatrix (0.00s)
++=== RUN   TestMuse1411InteractiveExclusionRegression
++    replay_test.go:802: vendor replay requires MUSE1411_BINARY, MUSE1411_CURATOR and MUSE1411_RUN_ROOT; no qualification from a skip
++--- SKIP: TestMuse1411InteractiveExclusionRegression (0.00s)
++=== RUN   TestMuse1411WorkspaceResidual
++    replay_test.go:828: vendor replay requires MUSE1411_BINARY, MUSE1411_CURATOR and MUSE1411_RUN_ROOT; no qualification from a skip
++--- SKIP: TestMuse1411WorkspaceResidual (0.00s)
++=== RUN   TestMuse1411ExecInteractiveKeyObservation
++    replay_test.go:863: vendor replay requires MUSE1411_BINARY, MUSE1411_CURATOR and MUSE1411_RUN_ROOT; no qualification from a skip
++--- SKIP: TestMuse1411ExecInteractiveKeyObservation (0.00s)
++=== RUN   TestReviewContradictoryObservation
++=== RUN   TestReviewContradictoryObservation/count-zero-then-one
++=== RUN   TestReviewContradictoryObservation/count-one-then-zero
++=== RUN   TestReviewContradictoryObservation/outcome-ready-then-failed
++=== RUN   TestReviewContradictoryObservation/duplicate-outcome
++=== RUN   TestReviewContradictoryObservation/duplicate-event
++=== RUN   TestReviewContradictoryObservation/quoted-decoy
++=== RUN   TestReviewContradictoryObservation/outcome-failed-then-ready
++=== RUN   TestReviewContradictoryObservation/duplicate-count
++=== RUN   TestReviewContradictoryObservation/malformed-count
++=== RUN   TestReviewContradictoryObservation/overflow-count
++--- PASS: TestReviewContradictoryObservation (0.00s)
++    --- PASS: TestReviewContradictoryObservation/count-zero-then-one (0.00s)
++    --- PASS: TestReviewContradictoryObservation/count-one-then-zero (0.00s)
++    --- PASS: TestReviewContradictoryObservation/outcome-ready-then-failed (0.00s)
++    --- PASS: TestReviewContradictoryObservation/duplicate-outcome (0.00s)
++    --- PASS: TestReviewContradictoryObservation/duplicate-event (0.00s)
++    --- PASS: TestReviewContradictoryObservation/quoted-decoy (0.00s)
++    --- PASS: TestReviewContradictoryObservation/outcome-failed-then-ready (0.00s)
++    --- PASS: TestReviewContradictoryObservation/duplicate-count (0.00s)
++    --- PASS: TestReviewContradictoryObservation/malformed-count (0.00s)
++    --- PASS: TestReviewContradictoryObservation/overflow-count (0.00s)
++PASS
++ok  	github.com/relux-works/curator/.research/muse1411	0.336s
+diff --git a/.research/muse1411/evidence/vet-01.log b/.research/muse1411/evidence/vet-01.log
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/.research/muse1411/intake_test.go b/.research/muse1411/intake_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..331c9f8e3f298a7d490b0f4f7caff35227c37be1
+--- /dev/null
++++ b/.research/muse1411/intake_test.go
+@@ -0,0 +1,59 @@
++package muse1411
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// The real vendor test entry skips without opt-in and rejects wrong bytes
++// before creating its run root. The gated replay supplies the exact-byte control.
++func TestVendorIntakeBoundary(t *testing.T) {
++	self, err := os.Executable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, shape := range []string{"unset", "wrong-digest"} {
++		t.Run(shape, func(t *testing.T) {
++			root := filepath.Join(t.TempDir(), ".temp", "uncreated")
++			t.Setenv("MUSE1411_RUN_ROOT", root)
++			binary := ""
++			if shape == "wrong-digest" {
++				binary = filepath.Join(t.TempDir(), "foreign-build")
++				write(t, binary, []byte("synthetic unqualified binary\n"))
++			}
++			t.Setenv("MUSE1411_BINARY", binary)
++			out, code := command(t, ".", os.Environ(), self, "-test.run=^TestMuse1411OfflineBoundary$", "-test.v")
++			want, message := 0, "--- SKIP: TestMuse1411OfflineBoundary"
++			if shape == "wrong-digest" {
++				want, message = 1, "unqualified binary digest"
++			}
++			if code != want || !strings.Contains(string(out), message) {
++				t.Fatalf("intake exit=%d want=%d: %s", code, want, out)
++			}
++			if _, err := os.Lstat(root); !os.IsNotExist(err) {
++				t.Fatalf("intake created fixture or unreadable root: %v", err)
++			}
++		})
++	}
++}
++
++// Digest-gated version inspection runs under the same offline sandbox and
++// disposable environment as the loader, never the updating launcher.
++func TestMuse1411Identity(t *testing.T) {
++	p := setup(t)
++	for _, sub := range []string{"native", "tmp", "config", "data", "state", "cache"} {
++		if err := os.MkdirAll(filepath.Join(p.root, sub), 0700); err != nil {
++			t.Fatal(err)
++		}
++	}
++	args := append([]string{"-f", p.sandbox, "/usr/bin/env", "-i"}, p.env(p.root)...)
++	args = append(args, p.binary, "--provider", "echo", "--version")
++	out, code := command(t, p.root, p.env(p.root), "/usr/bin/sandbox-exec", args...)
++	write(t, filepath.Join(p.root, "version.log"), out)
++	if code != 0 || strings.TrimSpace(string(out)) != "Muse Code 1.4.11 (1.4.11-R6667.1)" {
++		t.Fatalf("version exit=%d: %s", code, out)
++	}
++	t.Log("version exit=0; Muse Code 1.4.11 (1.4.11-R6667.1); exact digest verified")
++}
+diff --git a/.research/muse1411/mutants/README.md b/.research/muse1411/mutants/README.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..e73fdcda2945ee7edd045c63f625d35c9d495fdc
+--- /dev/null
++++ b/.research/muse1411/mutants/README.md
+@@ -0,0 +1,35 @@
++# Narrowing controls
++
++Apply each patch only to a new disposable task-local copy of this module.
++Keep the candidate unchanged. Each mutation preserves the guard and admits
++one prohibited class. Run with `-count=1`; cached tests are not evidence.
++
++| Patch / plant | Narrowing | Named failing test |
++|---|---|---|
++| `checker-one-skill.patch` | Admit exactly one foreign skill when zero is required | `TestObservationChecker` |
++| `checker-duplicate-count.patch` | Admit zero followed by contradictory one | `TestReviewContradictoryObservation/count-zero-then-one` |
++| `checker-duplicate-outcome.patch` | Admit failed followed by ready | `TestReviewContradictoryObservation/outcome-failed-then-ready` |
++| `snapshot-extra-entry.patch` | Ignore exactly `home/extra` | `TestFrozenSnapshot/extra` |
++| `snapshot-go-listed-link.patch` | Follow only the listed root link | `TestFrozenSnapshot/listed-symlink`, `TestFrozenSnapshotSourceInputs/listed-symlink` |
++| `snapshot-reference-listed-link.patch` | Reference wrapper follows only the listed root | `TestReferenceSnapshotPhysicalClosure/listed-symlink` |
++| `snapshot-reference-dangling-link.patch` | Reference wrapper drops only the hidden dangling link | `TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link` |
++| `intake-one-foreign-build.patch` | Accept exactly one synthetic wrong digest | `TestVendorIntakeBoundary/wrong-digest` |
++| `offline-loopback.patch` | Permit only outbound localhost TCP | `TestMuse1411OfflineBoundary` |
++| `offline-one-keychain-file.patch` | Permit only the synthetic Keychains file | `TestMuse1411OfflineBoundary` |
++| `MUSE1411_OMIT_EXCLUSION=exec` | Omit only exec exclusion | `TestMuse1411LoaderMatrix/exec/linked/skills/exclude-true` |
++| `MUSE1411_OMIT_EXCLUSION=interactive` | Omit only interactive exclusion | Survivor: broken vendor exclusion already retains one skill; proves no interactive protection |
++
++```sh
++cp -R .research/muse1411 .temp/TASK-261021-mw4laf/mutant-new
++git apply --directory=.temp/TASK-261021-mw4laf/mutant-new .research/muse1411/mutants/checker-one-skill.patch
++go test ./.temp/TASK-261021-mw4laf/mutant-new -run '^TestObservationChecker$' -count=1 -v
++```
++
++The offline mutant must run **only** `TestMuse1411OfflineBoundary`, never
++the vendor matrix. It touches only a synthetic local endpoint and synthetic
++files. The wrong-digest control likewise invokes only that boundary test;
++it never executes its synthetic file as a vendor binary.
++
++Every listed failure needs a real exit 1 and its named assertion. A setup
++failure or an unapplied patch is not a kill. Exact results and survivor bounds
++are recorded in the task handoff alongside sanitized logs.
+diff --git a/.research/muse1411/mutants/checker-duplicate-count.patch b/.research/muse1411/mutants/checker-duplicate-count.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..715f534d9861531c41998b0a6f63928a1e5114ce
+--- /dev/null
++++ b/.research/muse1411/mutants/checker-duplicate-count.patch
+@@ -0,0 +1,10 @@
++--- a/replay_test.go
+++++ b/replay_test.go
++@@ -66,6 +66,7 @@
++ 			fields[key] = append(fields[key], value)
++ 		}
++ 		for _, key := range append([]string{"event", "outcome"}, countKeys(want)...) {
+++			if key == "user_skills" && len(fields[key]) == 2 && fields[key][0] == "0" && fields[key][1] == "1" { fields[key] = fields[key][:1] }
++ 			if len(fields[key]) != 1 {
++ 				return fmt.Errorf("%s missing or duplicate %s", event, key)
++ 			}
+diff --git a/.research/muse1411/mutants/checker-duplicate-outcome.patch b/.research/muse1411/mutants/checker-duplicate-outcome.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..b11d3ea3d9d56203bdb0419eba288b0b74be8194
+--- /dev/null
++++ b/.research/muse1411/mutants/checker-duplicate-outcome.patch
+@@ -0,0 +1,10 @@
++--- a/replay_test.go
+++++ b/replay_test.go
++@@ -66,6 +66,7 @@
++ 			fields[key] = append(fields[key], value)
++ 		}
++ 		for _, key := range append([]string{"event", "outcome"}, countKeys(want)...) {
+++			if key == "outcome" && len(fields[key]) == 2 && fields[key][0] == `"failed"` && fields[key][1] == `"ready"` { fields[key] = fields[key][1:] }
++ 			if len(fields[key]) != 1 {
++ 				return fmt.Errorf("%s missing or duplicate %s", event, key)
++ 			}
+diff --git a/.research/muse1411/mutants/checker-one-skill.patch b/.research/muse1411/mutants/checker-one-skill.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..9c4c1b21651528355d6ef66b79fa088f66564a8f
+--- /dev/null
++++ b/.research/muse1411/mutants/checker-one-skill.patch
+@@ -0,0 +1,11 @@
++--- a/replay_test.go
+++++ b/replay_test.go
++@@ -82,7 +82,7 @@
++ 			if err != nil || !regexp.MustCompile(`^[0-9]+$`).MatchString(value) {
++ 				return fmt.Errorf("%s invalid %s", event, key)
++ 			}
++-			if got != n {
+++			if got != n && !(event == "skills.catalog_load" && key == "user_skills" && n == 0 && got == 1) {
++ 				return fmt.Errorf("%s observed %s=%d; want %d", event, key, got, n)
++ 			}
++ 		}
+diff --git a/.research/muse1411/mutants/intake-one-foreign-build.patch b/.research/muse1411/mutants/intake-one-foreign-build.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..3d277af4f77a1b34f2bde58757a6ea589c7c0dbe
+--- /dev/null
++++ b/.research/muse1411/mutants/intake-one-foreign-build.patch
+@@ -0,0 +1,11 @@
++--- a/replay_test.go
+++++ b/replay_test.go
++@@ -140,7 +140,7 @@
++ 	if !strings.Contains(base, string(filepath.Separator)+".temp"+string(filepath.Separator)) {
++ 		t.Fatal("run root must be under .temp")
++ 	}
++-	if digest(read(t, binary)) != binarySHA {
+++	if got := digest(read(t, binary)); got != binarySHA && got != "252fd6a5a50c8dbd972f5ca1916aee0a477aefbc31b645d05fa901aa534aa36d" {
++ 		t.Fatal("unqualified binary digest; this replay does not accept another build")
++ 	}
++ 	root := filepath.Join(base, strings.ReplaceAll(t.Name(), "/", "_"))
+diff --git a/.research/muse1411/mutants/offline-loopback.patch b/.research/muse1411/mutants/offline-loopback.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..091f1428b1abad1e23afb73378f519b6d4716e1e
+--- /dev/null
++++ b/.research/muse1411/mutants/offline-loopback.patch
+@@ -0,0 +1,10 @@
++--- a/replay_test.go
+++++ b/replay_test.go
++@@ -161,6 +161,7 @@
++ 	for _, rel := range []string{".claude", ".codex", ".config", ".local", ".muse", "Library"} {
++ 		sb += "(deny file-read* file-write* (subpath " + strconv.Quote(filepath.Join(native, rel)) + "))\n"
++ 	}
+++	sb += "(allow network-outbound (remote tcp \"localhost:*\"))\n"
++ 	write(t, p.sandbox, []byte(sb))
++ 	return p
++ }
+diff --git a/.research/muse1411/mutants/offline-one-keychain-file.patch b/.research/muse1411/mutants/offline-one-keychain-file.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..654c84a053b1432a45ed11d291367970e555a5be
+--- /dev/null
++++ b/.research/muse1411/mutants/offline-one-keychain-file.patch
+@@ -0,0 +1,10 @@
++--- a/replay_test.go
+++++ b/replay_test.go
++@@ -161,6 +161,7 @@
++ 	for _, rel := range []string{".claude", ".codex", ".config", ".local", ".muse", "Library"} {
++ 		sb += "(deny file-read* file-write* (subpath " + strconv.Quote(filepath.Join(native, rel)) + "))\n"
++ 	}
+++	sb += "(allow file-read* (literal " + strconv.Quote(filepath.Join(p.root, "synthetic/Library/Keychains/control")) + "))\n"
++ 	write(t, p.sandbox, []byte(sb))
++ 	return p
++ }
+diff --git a/.research/muse1411/mutants/snapshot-extra-entry.patch b/.research/muse1411/mutants/snapshot-extra-entry.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..7ebd34ac8b19b3221296f98920851eef2854bf9d
+--- /dev/null
++++ b/.research/muse1411/mutants/snapshot-extra-entry.patch
+@@ -0,0 +1,10 @@
++--- a/replay_test.go
+++++ b/replay_test.go
++@@ -447,6 +447,7 @@
++ 		if d.IsDir() {
++ 			return nil
++ 		}
+++		if rel, _ := filepath.Rel(root, path); filepath.ToSlash(rel) == "home/extra" { return nil }
++ 		count++
++ 		info, err := d.Info()
++ 		if err != nil {
+diff --git a/.research/muse1411/mutants/snapshot-go-listed-link.patch b/.research/muse1411/mutants/snapshot-go-listed-link.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..2996e737bce42580debc1f7305ac8a4615ce730c
+--- /dev/null
++++ b/.research/muse1411/mutants/snapshot-go-listed-link.patch
+@@ -0,0 +1,10 @@
++--- a/replay_test.go
+++++ b/replay_test.go
++@@ -456,6 +456,7 @@
++ 		if err != nil {
++ 			return err
++ 		}
+++		if filepath.ToSlash(rel) == entry.Path && info.Mode()&os.ModeSymlink != 0 { info, err = os.Stat(path); if err != nil { return err } }
++ 		if filepath.ToSlash(rel) != entry.Path || !info.Mode().IsRegular() || (private && info.Mode().Perm() != 0600) {
++ 			return fmt.Errorf("fixture entry type/mode/set")
++ 		}
+diff --git a/.research/muse1411/mutants/snapshot-reference-dangling-link.patch b/.research/muse1411/mutants/snapshot-reference-dangling-link.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..9fb1f82db88cd6990c5483c2b9e2af52b49f3969
+--- /dev/null
++++ b/.research/muse1411/mutants/snapshot-reference-dangling-link.patch
+@@ -0,0 +1,11 @@
++--- a/reference-snapshot-check.py
+++++ b/reference-snapshot-check.py
++@@ -21,6 +21,8 @@
++             elif stat.S_ISREG(mode):
++                 content[path.relative_to(root).as_posix()] = (path.read_bytes(), f'{mode & 0o777:04o}')
++             else:
+++                if path.relative_to(root).as_posix() == 'home/hidden-link' and stat.S_ISLNK(mode):
+++                    continue
++                 raise ValueError('physical-entry-type')
++     return content
++ 
+diff --git a/.research/muse1411/mutants/snapshot-reference-listed-link.patch b/.research/muse1411/mutants/snapshot-reference-listed-link.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..7c0f45f79e0de22201cdd4f72917d4ec6bbca15e
+--- /dev/null
++++ b/.research/muse1411/mutants/snapshot-reference-listed-link.patch
+@@ -0,0 +1,11 @@
++--- a/reference-snapshot-check.py
+++++ b/reference-snapshot-check.py
++@@ -16,6 +16,8 @@
++         for entry in entries:
++             path = Path(entry.path)
++             mode = entry.stat(follow_symlinks=False).st_mode
+++            if path.relative_to(root).as_posix() == "home/config/muse/AGENTS.md" and stat.S_ISLNK(mode):
+++                mode = entry.stat(follow_symlinks=True).st_mode
++             if stat.S_ISDIR(mode):
++                 content.update(inventory(path))
++             elif stat.S_ISREG(mode):
+diff --git a/.research/muse1411/observations.json b/.research/muse1411/observations.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..da4417f0d315b5184369c8dd99c0c1744f6e7f64
+--- /dev/null
++++ b/.research/muse1411/observations.json
+@@ -0,0 +1,917 @@
++{
++  "binary_sha256": "6c04ce1719844685153ef6f04b98113cb61b942d97f0a8b0bfb3932c343984d9",
++  "checkpoint": "cdcba3bd7a8de6028d3d1dbf621ce4cb19b130a7",
++  "spec_main": "e41f96387287f5e76604627f9e63662f7d6d86d4",
++  "source_sha256": {
++    "intake_test.go": "5709403078b5019b1a5637b81d343b428682b1dba5b81c7c7ff581abee392d56",
++    "reference-snapshot-check.py": "6a8eca28f4775b9fe35dfa90931f2aa98305568cc4de6c9245bd593a53f82020",
++    "replay_test.go": "dbae5569574a3d4e0ec607ff9eabdb0b5914c6affb6110a0fa7f9001cb287f2d",
++    "review_attack_test.go": "adc03f09a1215b39cfa255f09d6bf8cb214840759974d207bf874d1705175e03"
++  },
++  "cases": [
++    {
++      "case": "TestMuse1411ExecInteractiveKeyObservation",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "-c",
++        "context.foreign_personal_skills=false",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411InteractiveExclusionRegression_linked",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "-c",
++        "context.foreign_personal_skills=false"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Including your 1 Claude Code personal skill",
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411InteractiveExclusionRegression_snapshot",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "-c",
++        "context.foreign_personal_skills=false"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Including your 1 Claude Code personal skill",
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_absent_claude-rules_exclude-false",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=326 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=326 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_absent_claude-rules_exclude-true",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "--no-foreign-personal-context",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_absent_codex-rules_exclude-false",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=318 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=318 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_absent_codex-rules_exclude-true",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "--no-foreign-personal-context",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_absent_skills_exclude-false",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Including your 1 Claude Code personal skill",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_absent_skills_exclude-true",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "--no-foreign-personal-context",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_linked_claude-rules_exclude-false",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_linked_claude-rules_exclude-true",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "--no-foreign-personal-context",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_linked_codex-rules_exclude-false",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_linked_codex-rules_exclude-true",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "--no-foreign-personal-context",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_linked_skills_exclude-false",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Including your 1 Claude Code personal skill",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_linked_skills_exclude-true",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "--no-foreign-personal-context",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_snapshot_claude-rules_exclude-false",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_snapshot_claude-rules_exclude-true",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "--no-foreign-personal-context",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_snapshot_codex-rules_exclude-false",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_snapshot_codex-rules_exclude-true",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "--no-foreign-personal-context",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_snapshot_skills_exclude-false",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Including your 1 Claude Code personal skill",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_exec_snapshot_skills_exclude-true",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "--no-foreign-personal-context",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_absent_claude-rules_exclude-false",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=326 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=326 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Rules loaded this session",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_absent_claude-rules_exclude-true",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "-c",
++        "context.foreign_personal_skills=false"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=326 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=326 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Rules loaded this session",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_absent_codex-rules_exclude-false",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=318 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=318 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Rules loaded this session",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_absent_codex-rules_exclude-true",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "-c",
++        "context.foreign_personal_skills=false"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=318 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=1 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=318 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Rules loaded this session",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_absent_skills_exclude-false",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Including your 1 Claude Code personal skill",
++        "Rules loaded this session",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_absent_skills_exclude-true",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "-c",
++        "context.foreign_personal_skills=false"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"empty\" reason=\"none\" sources=0 user_sources=0 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=0 rendered_bytes=0 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Including your 1 Claude Code personal skill",
++        "Rules loaded this session",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_linked_claude-rules_exclude-false",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_linked_claude-rules_exclude-true",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "-c",
++        "context.foreign_personal_skills=false"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_linked_codex-rules_exclude-false",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=1",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_linked_codex-rules_exclude-true",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "-c",
++        "context.foreign_personal_skills=false"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_linked_skills_exclude-false",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=1"
++      ],
++      "visible_markers": [
++        "Including your 1 Claude Code personal skill",
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_linked_skills_exclude-true",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "-c",
++        "context.foreign_personal_skills=false"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Including your 1 Claude Code personal skill",
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_snapshot_claude-rules_exclude-false",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_snapshot_claude-rules_exclude-true",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "-c",
++        "context.foreign_personal_skills=false"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_snapshot_codex-rules_exclude-false",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_snapshot_codex-rules_exclude-true",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "-c",
++        "context.foreign_personal_skills=false"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_snapshot_skills_exclude-false",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Including your 1 Claude Code personal skill",
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411LoaderMatrix_interactive_snapshot_skills_exclude-true",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "-c",
++        "context.foreign_personal_skills=false"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Including your 1 Claude Code personal skill",
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411ParserRefusals_interactive-exec-flag",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "--no-foreign-personal-context"
++      ],
++      "exit": 2,
++      "loader_records": [],
++      "visible_markers": [
++        "invalid TUI options"
++      ]
++    },
++    {
++      "case": "TestMuse1411ParserRefusals_interactive-string-false",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "-c",
++        "context.foreign_personal_skills=\"false\""
++      ],
++      "exit": 2,
++      "loader_records": [],
++      "visible_markers": [
++        "the JSON type does not fit this setting"
++      ]
++    },
++    {
++      "case": "TestMuse1411WorkspaceResidual_exec_linked",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "--no-foreign-personal-context",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=1060 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411WorkspaceResidual_exec_snapshot",
++      "argv": [
++        "exec",
++        "--json",
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "--no-foreign-personal-context",
++        "MUSE1411_OFFLINE_CONTROL"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=1060 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=0 user_skills=0 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0"
++      ],
++      "visible_markers": [
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411WorkspaceResidual_interactive_linked",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "-c",
++        "context.foreign_personal_skills=false"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=1060 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Including your 1 Claude Code personal skill",
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "project: AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    },
++    {
++      "case": "TestMuse1411WorkspaceResidual_interactive_snapshot",
++      "argv": [
++        "--provider",
++        "echo",
++        "--trust-workspace",
++        "-c",
++        "context.foreign_personal_skills=false"
++      ],
++      "exit": 0,
++      "loader_records": [
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=2 user_sources=1 project_sources=1 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=2 rendered_bytes=1060 duration_ms=0",
++        "event=\"skills.catalog_load\" outcome=\"ready\" reason=\"none\" skills=1 user_skills=1 project_skills=0 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0",
++        "event=\"rules.context_load\" outcome=\"ready\" reason=\"none\" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=0 authorization_blocks=1 rendered_bytes=971 duration_ms=0"
++      ],
++      "visible_markers": [
++        "Including your 1 Claude Code personal skill",
++        "Rules loaded this session",
++        "$CONFIG_DIR/AGENTS.md",
++        "project: AGENTS.md",
++        "echo: MUSE1411_OFFLINE_CONTROL"
++      ]
++    }
++  ]
++}
+diff --git a/.research/muse1411/reference-snapshot-check.py b/.research/muse1411/reference-snapshot-check.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..bd9d5753d654099c6a9485120cd0d4db44042e01
+--- /dev/null
++++ b/.research/muse1411/reference-snapshot-check.py
+@@ -0,0 +1,37 @@
++import os, stat, sys
++from pathlib import Path
++spec=Path(sys.argv[1]).resolve()
++sys.path.insert(0,str(spec/'tools'))
++from test_validate import validate
++import managed_home_snapshots as snapshots
++root=Path(sys.argv[2]).absolute()
++# check_bundle accepts an in-memory inventory, not a filesystem safety claim.
++# Classify every physical entry without following links before collecting bytes;
++# dangling and unlisted links must not disappear from that inventory.
++def inventory(directory):
++    if not stat.S_ISDIR(directory.lstat().st_mode):
++        raise ValueError('physical-entry-type')
++    content = {}
++    with os.scandir(directory) as entries:
++        for entry in entries:
++            path = Path(entry.path)
++            mode = entry.stat(follow_symlinks=False).st_mode
++            if stat.S_ISDIR(mode):
++                content.update(inventory(path))
++            elif stat.S_ISREG(mode):
++                content[path.relative_to(root).as_posix()] = (path.read_bytes(), f'{mode & 0o777:04o}')
++            else:
++                raise ValueError('physical-entry-type')
++    return content
++
++if not stat.S_ISDIR(root.lstat().st_mode):
++    raise ValueError('physical-entry-type')
++for name in ('manifest.json', 'launch.json'):
++    if not stat.S_ISREG((root/name).lstat().st_mode):
++        raise ValueError('physical-entry-type')
++content=inventory(root/'home')
++manifest=validate.load_json(root/'manifest.json')
++launch=validate.load_json(root/'launch.json')
++if os.environ.get('MUSE1411_SNAPSHOT_PLANT')=='extra': content['home/extra']=(b'extra','0600')
++snapshots.check_bundle(manifest,launch,content,snapshots.validators(spec,validate.load_json),validate.ccj1_bytes,validate.validate_wire_semantics,(root/'manifest.json').read_bytes(),(root/'launch.json').read_bytes())
++print('Reference check_bundle accepted exact frozen metadata and complete regular-file closure')
+diff --git a/.research/muse1411/replay_test.go b/.research/muse1411/replay_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..0d1c1d3ab469396d11e5b9722f99cc676e990694
+--- /dev/null
++++ b/.research/muse1411/replay_test.go
+@@ -0,0 +1,872 @@
++// Package muse1411 records vendor-loader evidence; it never changes runtime admission.
++package muse1411
++
++import (
++	"bytes"
++	"context"
++	"crypto/sha256"
++	"encoding/hex"
++	"encoding/json"
++	"fmt"
++	"net/http"
++	"net/http/httptest"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"regexp"
++	"runtime"
++	"strconv"
++	"strings"
++	"sync/atomic"
++	"testing"
++	"time"
++)
++
++const binarySHA = "6c04ce1719844685153ef6f04b98113cb61b942d97f0a8b0bfb3932c343984d9"
++const rootSHA = "8c9af1ca52b75aaa1e67af6365f1e39dfcc3c56a274d3571270079ef669ac9d0"
++
++func read(t *testing.T, p string) []byte {
++	t.Helper()
++	b, err := os.ReadFile(p)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return b
++}
++func write(t *testing.T, p string, b []byte) {
++	t.Helper()
++	if err := os.MkdirAll(filepath.Dir(p), 0700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(p, b, 0600); err != nil {
++		t.Fatal(err)
++	}
++}
++func digest(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:]) }
++func quote(s string) string  { return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'" }
++
++// checkCounts requires a real, successful loader record, including zero counts.
++// Missing, failed, truncated and contradictory records cannot prove absence.
++func checkCounts(log, event string, want map[string]int) error {
++	seen := false
++	for _, line := range strings.Split(log, "\n") {
++		if !strings.Contains(line, `event="`+event+`"`) {
++			continue
++		}
++		seen = true
++		// Consume quoted values as whole fields, so tokens inside messages
++		// cannot masquerade as loader fields. Relevant fields must occur once.
++		fields := map[string][]string{}
++		pattern := regexp.MustCompile(`(?:^|[ \t])([A-Za-z_][A-Za-z0-9_]*)=("(?:\\.|[^"\\])*"|[^ \t]+)`)
++		for _, m := range pattern.FindAllStringSubmatchIndex(line, -1) {
++			if m[1] < len(line) && line[m[1]] != ' ' && line[m[1]] != '\t' {
++				return fmt.Errorf("%s malformed field", event)
++			}
++			key, value := line[m[2]:m[3]], line[m[4]:m[5]]
++			fields[key] = append(fields[key], value)
++		}
++		for _, key := range append([]string{"event", "outcome"}, countKeys(want)...) {
++			if len(fields[key]) != 1 {
++				return fmt.Errorf("%s missing or duplicate %s", event, key)
++			}
++		}
++		if fields["event"][0] != strconv.Quote(event) {
++			return fmt.Errorf("%s contradictory event", event)
++		}
++		if fields["outcome"][0] != `"ready"` && fields["outcome"][0] != `"empty"` {
++			return fmt.Errorf("%s failed loader record", event)
++		}
++		for key, n := range want {
++			value := fields[key][0]
++			got, err := strconv.Atoi(value)
++			if err != nil || !regexp.MustCompile(`^[0-9]+$`).MatchString(value) {
++				return fmt.Errorf("%s invalid %s", event, key)
++			}
++			if got != n {
++				return fmt.Errorf("%s observed %s=%d; want %d", event, key, got, n)
++			}
++		}
++	}
++	if !seen {
++		return fmt.Errorf("missing %s loader observation", event)
++	}
++	return nil
++}
++
++func countKeys(want map[string]int) []string {
++	keys := make([]string, 0, len(want))
++	for key := range want {
++		keys = append(keys, key)
++	}
++	return keys
++}
++
++// These controls prove that explicit clean records pass while a foreign source,
++// missing/truncated record or failed read cannot be attested as clean.
++func TestObservationChecker(t *testing.T) {
++	clean := `event="rules.context_load" outcome="ready" user_sources=1 foreign_sources=0`
++	want := map[string]int{"user_sources": 1, "foreign_sources": 0}
++	if err := checkCounts(clean, "rules.context_load", want); err != nil {
++		t.Fatal(err)
++	}
++	for _, bad := range []string{"", "timeout", strings.Replace(clean, "foreign_sources=0", "foreign_sources=1", 1), strings.Replace(clean, "foreign_sources=0", "foreign_sources=", 1), strings.Replace(clean, `outcome="ready"`, `outcome="failed"`, 1), clean + "\n" + strings.Replace(clean, "foreign_sources=0", "foreign_sources=1", 1)} {
++		if checkCounts(bad, "rules.context_load", want) == nil {
++			t.Fatalf("checker admitted %q", bad)
++		}
++	}
++	if err := checkCounts(`event="skills.catalog_load" outcome="ready" user_skills=0`, "skills.catalog_load", map[string]int{"user_skills": 0}); err != nil {
++		t.Fatal(err)
++	}
++	if checkCounts(`event="skills.catalog_load" outcome="ready" user_skills=1`, "skills.catalog_load", map[string]int{"user_skills": 0}) == nil {
++		t.Fatal("checker admitted one foreign skill")
++	}
++}
++
++type probe struct{ root, binary, curator, sandbox string }
++
++func setup(t *testing.T) *probe {
++	t.Helper()
++	binary := os.Getenv("MUSE1411_BINARY")
++	if binary == "" {
++		t.Skip("vendor replay requires MUSE1411_BINARY, MUSE1411_CURATOR and MUSE1411_RUN_ROOT; no qualification from a skip")
++	}
++	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
++		t.Fatal("this evidence identity requires darwin/arm64")
++	}
++	base, err := filepath.Abs(os.Getenv("MUSE1411_RUN_ROOT"))
++	if err != nil || os.Getenv("MUSE1411_RUN_ROOT") == "" {
++		t.Fatal("explicit task-local run root required")
++	}
++	if !strings.Contains(base, string(filepath.Separator)+".temp"+string(filepath.Separator)) {
++		t.Fatal("run root must be under .temp")
++	}
++	if digest(read(t, binary)) != binarySHA {
++		t.Fatal("unqualified binary digest; this replay does not accept another build")
++	}
++	root := filepath.Join(base, strings.ReplaceAll(t.Name(), "/", "_"))
++	if err := os.MkdirAll(root, 0700); err != nil {
++		t.Fatal(err)
++	}
++	p := &probe{root: root, binary: binary, curator: os.Getenv("MUSE1411_CURATOR"), sandbox: filepath.Join(root, "probe.sb")}
++	if p.curator == "" {
++		t.Fatal("MUSE1411_CURATOR required")
++	}
++	// The real account's native stores are denied in addition to env -i and
++	// disposable HOME/XDG. No credential is read to establish this boundary.
++	native, err := os.UserHomeDir()
++	if err != nil {
++		t.Fatal(err)
++	}
++	sb := "(version 1)\n(allow default)\n(deny network*)\n(deny mach-lookup (global-name-regex #\"^com\\.apple\\.(security|Security)\"))\n(deny file-read* file-write* (regex #\"/Keychains(/|$)\"))\n"
++	for _, rel := range []string{".claude", ".codex", ".config", ".local", ".muse", "Library"} {
++		sb += "(deny file-read* file-write* (subpath " + strconv.Quote(filepath.Join(native, rel)) + "))\n"
++	}
++	write(t, p.sandbox, []byte(sb))
++	return p
++}
++
++func (p *probe) env(dir string) []string {
++	return []string{"HOME=" + filepath.Join(dir, "native"), "XDG_CONFIG_HOME=" + filepath.Join(dir, "config"), "XDG_DATA_HOME=" + filepath.Join(dir, "data"), "XDG_STATE_HOME=" + filepath.Join(dir, "state"), "XDG_CACHE_HOME=" + filepath.Join(dir, "cache"), "TMPDIR=" + filepath.Join(dir, "tmp"), "PATH=/usr/bin:/bin", "TERM=xterm-256color", "MUSE_NO_AUTO_UPDATE=1", "TBH_CREDENTIAL_BACKEND=file"}
++}
++func command(t *testing.T, dir string, env []string, name string, args ...string) ([]byte, int) {
++	t.Helper()
++	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
++	defer cancel()
++	cmd := exec.CommandContext(ctx, name, args...)
++	cmd.Dir = dir
++	cmd.Env = env
++	b, err := cmd.CombinedOutput()
++	if ctx.Err() != nil {
++		t.Fatalf("bounded command timed out: %s", name)
++	}
++	if err == nil {
++		return b, 0
++	}
++	if e, ok := err.(*exec.ExitError); ok {
++		return b, e.ExitCode()
++	}
++	t.Fatal(err)
++	return nil, -1
++}
++func (p *probe) fixture(t *testing.T) string {
++	t.Helper()
++	dir := filepath.Join(p.root, "curator")
++	env := p.env(dir)
++	for _, sub := range []string{"native", "tmp", "config/muse", "work/.git"} {
++		if err := os.MkdirAll(filepath.Join(dir, sub), 0700); err != nil {
++			t.Fatal(err)
++		}
++	}
++	for _, f := range []string{"agent-context.json", "context/root.md"} {
++		write(t, filepath.Join(dir, "source", f), read(t, filepath.Join("testdata/source", f)))
++	}
++	config := filepath.Join(dir, "manager/config.json")
++	cfg, _ := json.Marshal(map[string]any{"schema_version": 1, "skills_root": filepath.Join(dir, "skills"), "projects": map[string]any{}})
++	write(t, config, cfg)
++	write(t, filepath.Join(dir, "system.json"), []byte(`{"schema_version":1}`))
++	env = append(env, "CURATOR_CONFIG="+config, "CURATOR_SYSTEM_CONFIG="+filepath.Join(dir, "system.json"))
++	for i, args := range [][]string{{"profile", "install", filepath.Join(dir, "source")}, {"env", "resolve", "muse", "--profile", "muse148-probe", "--repair", "--format", "json"}} {
++		// Synthetic target permits the historical v3 resolver's metadata checks.
++		// Muse never executes in this credential-bearing fixture home.
++		if i == 1 {
++			write(t, filepath.Join(dir, "config/muse/auth.json"), []byte("{}\n"))
++		}
++		b, code := command(t, filepath.Join(dir, "work"), env, p.curator, args...)
++		write(t, filepath.Join(dir, fmt.Sprintf("curator-%d.log", i)), b)
++		if code != 0 {
++			t.Fatalf("Curator fixture command exit=%d: %s", code, b)
++		}
++	}
++	link := filepath.Join(dir, "manager/environments/muse148-probe/muse/config/muse/AGENTS.md")
++	s, err := os.Lstat(link)
++	if err != nil || s.Mode()&os.ModeSymlink == 0 {
++		t.Fatalf("Curator did not produce a real link: %v", err)
++	}
++	if got := read(t, link); digest(got) != rootSHA || !bytes.Equal(got, read(t, "testdata/root.md")) {
++		t.Fatal("Curator rendered root differs from frozen fixture")
++	}
++	return link
++}
++
++type observation struct {
++	Log    string
++	Output string
++	Exit   int
++}
++
++func (p *probe) run(t *testing.T, form, representation, foreign string, exclude, workspace bool, link string, extra ...string) observation {
++	t.Helper()
++	dir := filepath.Join(p.root, strings.ReplaceAll(t.Name(), "/", "_"))
++	for _, sub := range []string{"native", "config/muse", "data", "state", "cache", "tmp", "work/.git"} {
++		if err := os.MkdirAll(filepath.Join(dir, sub), 0700); err != nil {
++			t.Fatal(err)
++		}
++	}
++	root := filepath.Join(dir, "config/muse/AGENTS.md")
++	launchEnv := p.env(dir)
++	if representation == "linked" {
++		if err := os.Symlink(link, root); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if representation == "snapshot" {
++		if err := checkFrozenSnapshot("testdata/snapshot", false); err != nil {
++			t.Fatal(err)
++		}
++		for _, f := range []string{"manifest.json", "launch.json", "home/config/muse/AGENTS.md"} {
++			write(t, filepath.Join(dir, "snapshot", f), read(t, filepath.Join("testdata/snapshot", f)))
++		}
++		root = filepath.Join(dir, "snapshot/home/config/muse/AGENTS.md")
++		for i, value := range launchEnv {
++			if strings.HasPrefix(value, "XDG_") {
++				parts := strings.SplitN(value, "=", 2)
++				launchEnv[i] = parts[0] + "=" + filepath.Join(dir, "snapshot/home", filepath.Base(parts[1]))
++				if err := os.MkdirAll(strings.SplitN(launchEnv[i], "=", 2)[1], 0700); err != nil {
++					t.Fatal(err)
++				}
++			}
++		}
++		s, err := os.Lstat(root)
++		if err != nil || !s.Mode().IsRegular() || s.Mode().Perm() != 0600 {
++			t.Fatal("snapshot root is not an independent private regular file")
++		}
++	}
++	switch foreign {
++	case "claude-rules":
++		write(t, filepath.Join(dir, "native/.claude/CLAUDE.md"), []byte("MUSE1411_FOREIGN_CLAUDE_RULE\n"))
++	case "codex-rules":
++		write(t, filepath.Join(dir, "native/.codex/AGENTS.md"), []byte("MUSE1411_FOREIGN_CODEX_RULE\n"))
++	case "skills":
++		write(t, filepath.Join(dir, "native/.claude/skills/muse1411-foreign/SKILL.md"), []byte("---\nname: muse1411-foreign\ndescription: Synthetic foreign personal skill for offline loader qualification.\n---\nMUSE1411_FOREIGN_SKILL\n"))
++	}
++	if workspace {
++		write(t, filepath.Join(dir, "work/AGENTS.md"), []byte("MUSE1411_WORKSPACE_CONFLICT\n"))
++	}
++	before := map[string][]byte{}
++	if err := filepath.WalkDir(filepath.Join(dir, "native"), func(path string, d os.DirEntry, err error) error {
++		if err != nil {
++			return err
++		}
++		if !d.IsDir() {
++			before[path] = read(t, path)
++		}
++		return nil
++	}); err != nil {
++		t.Fatal(err)
++	}
++	args := []string{}
++	if form == "exec" {
++		args = append(args, "exec", "--json")
++	}
++	args = append(args, "--provider", "echo", "--trust-workspace")
++	if exclude && os.Getenv("MUSE1411_OMIT_EXCLUSION") != form {
++		if form == "exec" {
++			args = append(args, "--no-foreign-personal-context")
++		} else {
++			args = append(args, "-c", "context.foreign_personal_skills=false")
++		}
++	}
++	args = append(args, extra...)
++	if form == "exec" {
++		args = append(args, "MUSE1411_OFFLINE_CONTROL")
++	}
++	wrapped := append([]string{"-f", p.sandbox, "/usr/bin/env", "-i"}, launchEnv...)
++	wrapped = append(wrapped, p.binary)
++	wrapped = append(wrapped, args...)
++	var out []byte
++	code := 0
++	if form == "exec" || len(extra) > 0 {
++		out, code = command(t, filepath.Join(dir, "work"), p.env(dir), "/usr/bin/sandbox-exec", wrapped...)
++	} else {
++		out, code = p.tui(t, dir, wrapped)
++	}
++	write(t, filepath.Join(dir, "output.log"), out)
++	for path, b := range before {
++		if !bytes.Equal(read(t, path), b) {
++			t.Fatalf("fixture source changed: %s", filepath.Base(path))
++		}
++	}
++	if representation != "absent" {
++		if digest(read(t, root)) != rootSHA {
++			t.Fatal("native root bytes changed during vendor run")
++		}
++	} else if _, err := os.Lstat(root); !os.IsNotExist(err) {
++		t.Fatal("root-absent control changed")
++	}
++	for _, path := range []string{"config/muse/auth.json", "snapshot/home/config/muse/auth.json", "native/.config/muse/auth.json"} {
++		if _, err := os.Lstat(filepath.Join(dir, path)); !os.IsNotExist(err) {
++			t.Fatalf("credential store created or unreadable: %s: %v", path, err)
++		}
++	}
++	var logs strings.Builder
++	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
++		if err != nil {
++			return err
++		}
++		if !d.IsDir() && strings.HasPrefix(d.Name(), "cli-") && strings.HasSuffix(path, ".log") {
++			logs.Write(read(t, path))
++		}
++		return nil
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	// Persist only synthetic, sanitized loader observations for public evidence.
++	safe := strings.ReplaceAll(string(out), dir, "$CASE")
++	write(t, filepath.Join(dir, "argv.json"), mustJSON(t, args))
++	write(t, filepath.Join(dir, "exit.txt"), []byte(strconv.Itoa(code)+"\n"))
++	return observation{Log: logs.String(), Output: safe, Exit: code}
++}
++
++// A reachable local endpoint becomes unreachable only inside the probe policy;
++// a synthetic Keychains file is denied while an ordinary file stays readable.
++// No active credential store is accessed by this control.
++func TestMuse1411OfflineBoundary(t *testing.T) {
++	p := setup(t)
++	var calls atomic.Int32
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
++		calls.Add(1)
++		_, _ = w.Write([]byte("MUSE1411_NETWORK_CONTROL"))
++	}))
++	defer server.Close()
++	args := []string{"--silent", "--show-error", "--noproxy", "*", "--connect-timeout", "2", server.URL}
++	if b, c := command(t, p.root, os.Environ(), "/usr/bin/curl", args...); c != 0 || string(b) != "MUSE1411_NETWORK_CONTROL" {
++		t.Fatalf("network positive exit=%d: %s", c, b)
++	}
++	blocked := append([]string{"-f", p.sandbox, "/usr/bin/curl"}, args...)
++	if b, c := command(t, p.root, os.Environ(), "/usr/bin/sandbox-exec", blocked...); c != 7 {
++		t.Fatalf("network deny exit=%d: %s", c, b)
++	}
++	if calls.Load() != 1 {
++		t.Fatal("denied network request reached the server")
++	}
++	for _, rel := range []string{"ordinary/control", "synthetic/Library/Keychains/control"} {
++		write(t, filepath.Join(p.root, rel), []byte("MUSE1411_SYNTHETIC_STORE_CONTROL"))
++	}
++	for _, tc := range []struct {
++		path string
++		code int
++	}{{"ordinary/control", 0}, {"synthetic/Library/Keychains/control", 1}} {
++		b, c := command(t, p.root, os.Environ(), "/usr/bin/sandbox-exec", "-f", p.sandbox, "/bin/cat", filepath.Join(p.root, tc.path))
++		if c != tc.code {
++			t.Fatalf("store boundary exit=%d want=%d: %s", c, tc.code, b)
++		}
++		if c != 0 && !strings.Contains(string(b), "Operation not permitted") {
++			t.Fatalf("unrelated store refusal: %s", b)
++		}
++		if string(read(t, filepath.Join(p.root, tc.path))) != "MUSE1411_SYNTHETIC_STORE_CONTROL" {
++			t.Fatal("control bytes changed")
++		}
++	}
++}
++
++// checkFrozenSnapshot checks the actual home inventory without following links.
++// Git does not preserve 0600, so source fixtures waive mode only; runtime copies do not.
++func checkFrozenSnapshot(root string, private bool) error {
++	for _, name := range []string{"manifest.json", "launch.json", "home"} {
++		info, err := os.Lstat(filepath.Join(root, name))
++		if err != nil {
++			return err
++		}
++		if (name == "home" && !info.IsDir()) || (name != "home" && !info.Mode().IsRegular()) {
++			return fmt.Errorf("fixture metadata/home type")
++		}
++	}
++	manifestBytes, err := os.ReadFile(filepath.Join(root, "manifest.json"))
++	if err != nil {
++		return err
++	}
++	launchBytes, err := os.ReadFile(filepath.Join(root, "launch.json"))
++	if err != nil {
++		return err
++	}
++	var manifest struct {
++		Files []struct {
++			Path string
++			Size int
++			SHA  string `json:"sha256"`
++			Mode string
++		}
++		Launch string `json:"launch_sha256"`
++	}
++	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
++		return err
++	}
++	if len(manifest.Files) != 1 || manifest.Files[0].Path != "home/config/muse/AGENTS.md" || manifest.Files[0].Mode != "0600" {
++		return fmt.Errorf("unexpected frozen closure")
++	}
++	if digest(launchBytes) != manifest.Launch {
++		return fmt.Errorf("descriptor identity differs")
++	}
++	entry := manifest.Files[0]
++	count := 0
++	err = filepath.WalkDir(filepath.Join(root, "home"), func(path string, d os.DirEntry, err error) error {
++		if err != nil {
++			return err
++		}
++		if d.IsDir() {
++			return nil
++		}
++		count++
++		info, err := d.Info()
++		if err != nil {
++			return err
++		}
++		rel, err := filepath.Rel(root, path)
++		if err != nil {
++			return err
++		}
++		if filepath.ToSlash(rel) != entry.Path || !info.Mode().IsRegular() || (private && info.Mode().Perm() != 0600) {
++			return fmt.Errorf("fixture entry type/mode/set")
++		}
++		b, err := os.ReadFile(path)
++		if err != nil {
++			return err
++		}
++		if len(b) != entry.Size || digest(b) != entry.SHA || digest(b) != rootSHA {
++			return fmt.Errorf("fixture byte identity")
++		}
++		return nil
++	})
++	if err != nil {
++		return err
++	}
++	if count != 1 {
++		return fmt.Errorf("fixture entry set")
++	}
++	return nil
++}
++
++// Frozen metadata binds the actual root-only fixture, then private copies pair
++// valid regular files with altered bytes, extra files and both review link attacks.
++func TestFrozenSnapshot(t *testing.T) {
++	if err := checkFrozenSnapshot("testdata/snapshot", false); err != nil {
++		t.Fatal(err)
++	}
++	for _, shape := range []string{"regular", "altered", "extra", "listed-symlink", "unlisted-dangling-link", "missing"} {
++		t.Run(shape, func(t *testing.T) {
++			root := snapshotCase(t, shape)
++			err := checkFrozenSnapshot(root, true)
++			if shape == "regular" {
++				if err != nil {
++					t.Fatal(err)
++				}
++				return
++			}
++			if err == nil {
++				t.Fatalf("%s snapshot admitted", shape)
++			}
++			refusal := "fixture entry type/mode/set"
++			switch shape {
++			case "altered":
++				refusal = "fixture byte identity"
++			case "missing":
++				refusal = "fixture entry set"
++			}
++			if err.Error() != refusal {
++				t.Fatalf("%s unrelated refusal: %v", shape, err)
++			}
++			assertSnapshotPlantUnchanged(t, root, shape)
++		})
++	}
++}
++
++// Drive TestFrozenSnapshot itself against physical source fixtures: rebuilding
++// pristine root bytes instead of checking its source must fail these controls.
++func TestFrozenSnapshotSourceInputs(t *testing.T) {
++	self, err := os.Executable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, shape := range []string{"regular", "listed-symlink", "unlisted-dangling-link"} {
++		t.Run(shape, func(t *testing.T) {
++			bundle := snapshotCase(t, shape)
++			dir := t.TempDir()
++			if err := os.MkdirAll(filepath.Join(dir, "testdata"), 0700); err != nil {
++				t.Fatal(err)
++			}
++			root := filepath.Join(dir, "testdata/snapshot")
++			if err := os.Rename(bundle, root); err != nil {
++				t.Fatal(err)
++			}
++			out, code := command(t, dir, os.Environ(), self, "-test.run=^TestFrozenSnapshot$/^regular$", "-test.v")
++			if shape == "regular" {
++				if code != 0 {
++					t.Fatalf("regular fixture exit=%d: %s", code, out)
++				}
++			} else {
++				if code != 1 || !bytes.Contains(out, []byte("fixture entry type/mode/set")) {
++					t.Fatalf("%s source fixture exit=%d: %s", shape, code, out)
++				}
++				assertSnapshotPlantUnchanged(t, root, shape)
++			}
++		})
++	}
++}
++
++func snapshotCase(t *testing.T, shape string) string {
++	t.Helper()
++	root := t.TempDir()
++	for _, name := range []string{"manifest.json", "launch.json", "home/config/muse/AGENTS.md"} {
++		write(t, filepath.Join(root, name), read(t, filepath.Join("testdata/snapshot", name)))
++	}
++	file := filepath.Join(root, "home/config/muse/AGENTS.md")
++	switch shape {
++	case "altered":
++		write(t, file, []byte("MUSE1411_FORGED_ROOT\n"))
++	case "extra":
++		write(t, filepath.Join(root, "home/extra"), []byte("extra"))
++	case "listed-symlink":
++		target := filepath.Join(t.TempDir(), "root.md")
++		write(t, target, read(t, file))
++		if err := os.Remove(file); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Symlink(target, file); err != nil {
++			t.Fatal(err)
++		}
++	case "unlisted-dangling-link":
++		if err := os.Symlink("missing-target", filepath.Join(root, "home/hidden-link")); err != nil {
++			t.Fatal(err)
++		}
++	case "missing":
++		if err := os.Remove(file); err != nil {
++			t.Fatal(err)
++		}
++	}
++	return root
++}
++
++func assertSnapshotPlantUnchanged(t *testing.T, root, shape string) {
++	t.Helper()
++	file := filepath.Join(root, "home/config/muse/AGENTS.md")
++	switch shape {
++	case "listed-symlink":
++		info, err := os.Lstat(file)
++		if err != nil || info.Mode()&os.ModeSymlink == 0 {
++			t.Fatal("listed link changed")
++		}
++		if digest(read(t, file)) != rootSHA {
++			t.Fatal("link target changed")
++		}
++	case "unlisted-dangling-link":
++		target, err := os.Readlink(filepath.Join(root, "home/hidden-link"))
++		if err != nil || target != "missing-target" {
++			t.Fatal("dangling link changed")
++		}
++	case "altered":
++		if string(read(t, file)) != "MUSE1411_FORGED_ROOT\n" {
++			t.Fatal("altered bytes changed")
++		}
++	case "extra":
++		if string(read(t, filepath.Join(root, "home/extra"))) != "extra" {
++			t.Fatal("extra bytes changed")
++		}
++	case "missing":
++		if _, err := os.Lstat(file); !os.IsNotExist(err) {
++			t.Fatal("missing file changed")
++		}
++	}
++}
++
++// The independent reference CLI accepts regular closure and refuses physical
++// links, including dangling unlisted entries, without changing the rejected input.
++func TestReferenceSnapshotPhysicalClosure(t *testing.T) {
++	python, spec := os.Getenv("MUSE1411_SPEC_PYTHON"), os.Getenv("MUSE1411_SPEC")
++	if python == "" || spec == "" {
++		t.Skip("set MUSE1411_SPEC_PYTHON and MUSE1411_SPEC for the published reference CLI")
++	}
++	if err := checkFrozenSnapshot("testdata/snapshot", false); err != nil {
++		t.Fatal(err)
++	}
++	for _, shape := range []string{"regular", "listed-symlink", "unlisted-dangling-link"} {
++		t.Run(shape, func(t *testing.T) {
++			root := snapshotCase(t, shape)
++			out, code := command(t, ".", os.Environ(), python, "-B", "reference-snapshot-check.py", spec, root)
++			if shape == "regular" {
++				if code != 0 || !bytes.Contains(out, []byte("complete regular-file closure")) {
++					t.Fatalf("regular reference exit=%d: %s", code, out)
++				}
++			} else {
++				if code != 1 || !bytes.Contains(out, []byte("ValueError: physical-entry-type")) {
++					t.Fatalf("%s reference exit=%d: %s", shape, code, out)
++				}
++				assertSnapshotPlantUnchanged(t, root, shape)
++			}
++		})
++	}
++}
++func mustJSON(t *testing.T, v any) []byte {
++	t.Helper()
++	b, e := json.Marshal(v)
++	if e != nil {
++		t.Fatal(e)
++	}
++	return append(b, '\n')
++}
++
++func (p *probe) tui(t *testing.T, dir string, args []string) ([]byte, int) {
++	t.Helper()
++	tmux, err := exec.LookPath("tmux")
++	if err != nil {
++		t.Fatal(err)
++	}
++	// Relative AF_UNIX address avoids the platform path-length limit, while
++	// keeping the socket inside the task-local worktree.
++	socket := "tui.sock"
++	call := func(a ...string) []byte {
++		t.Helper()
++		b, c := command(t, dir, os.Environ(), tmux, append([]string{"-S", socket}, a...)...)
++		if c != 0 {
++			t.Fatalf("tmux exit=%d: %s", c, b)
++		}
++		return b
++	}
++	var quoted []string
++	for _, arg := range append([]string{"/usr/bin/sandbox-exec"}, args...) {
++		quoted = append(quoted, quote(arg))
++	}
++	// Publish the status atomically; an empty in-progress file is not an exit.
++	cmd := "cd " + quote(filepath.Join(dir, "work")) + " && " + strings.Join(quoted, " ") + "; printf '%s\\n' \"$?\" > " + quote(filepath.Join(dir, "tui-exit.pending")) + " && mv " + quote(filepath.Join(dir, "tui-exit.pending")) + " " + quote(filepath.Join(dir, "tui-exit.txt"))
++	call("new-session", "-d", "-x", "220", "-y", "70", "-s", "probe", cmd)
++	pid := call("display-message", "-p", "#{pid} #{pane_pid}")
++	write(t, filepath.Join(dir, "pids.txt"), pid)
++	t.Cleanup(func() { command(t, dir, os.Environ(), tmux, "-S", socket, "kill-server") })
++	deadline := time.Now().Add(15 * time.Second)
++	var pane []byte
++	for time.Now().Before(deadline) {
++		pane = call("capture-pane", "-p", "-S", "-1000")
++		if strings.Contains(string(pane), "Voice input") {
++			break
++		}
++		time.Sleep(100 * time.Millisecond)
++	}
++	if !strings.Contains(string(pane), "Voice input") {
++		t.Fatalf("TUI not ready: %s", pane)
++	}
++	// Start a local echo turn so Muse binds and flushes its startup loader
++	// diagnostics. The OS network deny remains active for the whole process.
++	call("send-keys", "-l", "MUSE1411_OFFLINE_CONTROL")
++	time.Sleep(200 * time.Millisecond)
++	call("send-keys", "Enter")
++	deadline = time.Now().Add(10 * time.Second)
++	for time.Now().Before(deadline) {
++		pane = call("capture-pane", "-p", "-S", "-1000")
++		if strings.Contains(string(pane), "echo: MUSE1411_OFFLINE_CONTROL") {
++			break
++		}
++		time.Sleep(100 * time.Millisecond)
++	}
++	if !strings.Contains(string(pane), "echo: MUSE1411_OFFLINE_CONTROL") {
++		t.Fatalf("missing offline echo control: %s", pane)
++	}
++	call("send-keys", "-l", "/rules")
++	time.Sleep(200 * time.Millisecond)
++	call("send-keys", "Enter")
++	deadline = time.Now().Add(5 * time.Second)
++	for time.Now().Before(deadline) {
++		pane = call("capture-pane", "-p", "-S", "-1000")
++		if strings.Contains(string(pane), "Rules loaded this session") {
++			break
++		}
++		time.Sleep(100 * time.Millisecond)
++	}
++	if !strings.Contains(string(pane), "Rules loaded this session") {
++		t.Fatalf("missing real /rules observation: %s", pane)
++	}
++	call("send-keys", "-l", "/exit")
++	time.Sleep(200 * time.Millisecond)
++	call("send-keys", "Enter")
++	deadline = time.Now().Add(5 * time.Second)
++	for time.Now().Before(deadline) {
++		if b, e := os.ReadFile(filepath.Join(dir, "tui-exit.txt")); e == nil {
++			n, e := strconv.Atoi(strings.TrimSpace(string(b)))
++			if e != nil {
++				t.Fatal(e)
++			}
++			return pane, n
++		}
++		time.Sleep(100 * time.Millisecond)
++	}
++	t.Fatal("TUI did not exit normally")
++	return nil, -1
++}
++
++// The real parser rejects the exec-only flag and a JSON string separately;
++// the matrix below supplies the accepted boolean and exec positive controls.
++func TestMuse1411ParserRefusals(t *testing.T) {
++	p := setup(t)
++	for name, arg := range map[string][]string{"interactive-exec-flag": {"--no-foreign-personal-context"}, "interactive-string-false": {"-c", `context.foreign_personal_skills="false"`}} {
++		t.Run(name, func(t *testing.T) {
++			o := p.run(t, "interactive", "absent", "none", false, false, "", arg...)
++			refusal := "invalid TUI options"
++			if name == "interactive-string-false" {
++				refusal = "the JSON type does not fit this setting"
++			}
++			if o.Exit != 2 || !strings.Contains(o.Output, refusal) {
++				t.Fatalf("expected parser refusal exit=2, got %d: %s", o.Exit, o.Output)
++			}
++			if strings.Contains(o.Log, `event="rules.context_load"`) {
++				t.Fatal("rejected parser input reached loader")
++			}
++		})
++	}
++}
++
++// The matrix pairs root and exclusion states for each isolated foreign source.
++// Counts pin observed behavior, including the interactive exclusion FAILURE on
++// this exact build; green replay is not qualification. See the qualification record.
++func TestMuse1411LoaderMatrix(t *testing.T) {
++	p := setup(t)
++	link := p.fixture(t)
++	for _, form := range []string{"exec", "interactive"} {
++		for _, root := range []string{"absent", "linked", "snapshot"} {
++			for _, foreign := range []string{"claude-rules", "codex-rules", "skills"} {
++				for _, exclude := range []bool{false, true} {
++					name := fmt.Sprintf("%s/%s/%s/exclude-%t", form, root, foreign, exclude)
++					t.Run(name, func(t *testing.T) {
++						o := p.run(t, form, root, foreign, exclude, false, link)
++						if o.Exit != 0 {
++							t.Fatalf("vendor exit=%d: %s", o.Exit, o.Output)
++						}
++						users, fr, skills := 0, 0, 0
++						if root != "absent" {
++							users = 1
++						}
++						suppressed := exclude && (form == "exec" || root != "absent")
++						if strings.HasSuffix(foreign, "rules") && root == "absent" && !suppressed {
++							users = 1
++							fr = 1
++						}
++						if foreign == "skills" && (!suppressed || form == "interactive") {
++							skills = 1
++						}
++						if err := checkCounts(o.Log, "rules.context_load", map[string]int{"user_sources": users, "foreign_sources": fr, "project_sources": 0}); err != nil {
++							t.Fatal(err)
++						}
++						if err := checkCounts(o.Log, "skills.catalog_load", map[string]int{"user_skills": skills, "project_skills": 0}); err != nil {
++							t.Fatal(err)
++						}
++						t.Logf("vendor exit=0; user_sources=%d foreign_sources=%d user_skills=%d; no model claim", users, fr, skills)
++					})
++				}
++			}
++		}
++	}
++}
++
++// Both native-root representations retain the foreign skill despite the valid
++// boolean. A corrected loader must fail this exact-build regression witness,
++// prompting a new record, never silently turning this evidence into admission.
++func TestMuse1411InteractiveExclusionRegression(t *testing.T) {
++	p := setup(t)
++	link := p.fixture(t)
++	for _, root := range []string{"linked", "snapshot"} {
++		t.Run(root, func(t *testing.T) {
++			o := p.run(t, "interactive", root, "skills", true, false, link)
++			const record = "docs/qualification/muse-1.4.11-R6667.1.md"
++			if o.Exit != 0 {
++				t.Fatalf("vendor exit=%d; re-evaluate %s: %s", o.Exit, record, o.Output)
++			}
++			if err := checkCounts(o.Log, "rules.context_load", map[string]int{"user_sources": 1, "foreign_sources": 0}); err != nil {
++				t.Fatal(err)
++			}
++			if err := checkCounts(o.Log, "skills.catalog_load", map[string]int{"user_skills": 1, "project_skills": 0}); err != nil {
++				t.Fatalf("interactive exclusion observation changed; re-evaluate %s: %v", record, err)
++			}
++			if !strings.Contains(o.Output, "Including your 1 Claude Code personal skill") {
++				t.Fatalf("retained-skill banner changed; re-evaluate %s: %s", record, o.Output)
++			}
++			t.Logf("vendor exit=0; required interactive exclusion FAILED (user_skills=1); see %s", record)
++		})
++	}
++}
++
++// /rules and loader counts establish enumeration only. No model precedence
++// or conflict resolution claim follows from both native and workspace loading.
++func TestMuse1411WorkspaceResidual(t *testing.T) {
++	p := setup(t)
++	link := p.fixture(t)
++	for _, form := range []string{"exec", "interactive"} {
++		for _, root := range []string{"linked", "snapshot"} {
++			t.Run(form+"/"+root, func(t *testing.T) {
++				o := p.run(t, form, root, "skills", true, true, link)
++				if o.Exit != 0 {
++					t.Fatalf("exit=%d", o.Exit)
++				}
++				if err := checkCounts(o.Log, "rules.context_load", map[string]int{"user_sources": 1, "foreign_sources": 0}); err != nil {
++					t.Fatal(err)
++				}
++				// Interactive startup lists both sources, then a subsequent echo
++				// reload reports project_sources=0. Preserve that residual rather
++				// than asserting invariant workspace inclusion or precedence.
++				observedProject := false
++				for _, line := range strings.Split(o.Log, "\n") {
++					if strings.Contains(line, `event="rules.context_load"`) && strings.Contains(line, " project_sources=1 ") {
++						observedProject = true
++					}
++				}
++				if !observedProject {
++					t.Fatal("no observed native/workspace loader conflict")
++				}
++				if form == "interactive" && (!strings.Contains(o.Output, "project: AGENTS.md") || !strings.Contains(o.Output, "$CONFIG_DIR/AGENTS.md")) {
++					t.Fatalf("missing /rules native/workspace order: %s", o.Output)
++				}
++			})
++		}
++	}
++}
++
++// Unlike the brief's expected refusal, this exact build accepts the interactive
++// config spelling on exec. This records parser acceptance only, not exclusion.
++func TestMuse1411ExecInteractiveKeyObservation(t *testing.T) {
++	p := setup(t)
++	o := p.run(t, "exec", "absent", "none", false, false, "", "-c", "context.foreign_personal_skills=false")
++	if o.Exit != 0 {
++		t.Fatalf("exec config-key observation changed, exit=%d: %s", o.Exit, o.Output)
++	}
++	if err := checkCounts(o.Log, "rules.context_load", map[string]int{"user_sources": 0, "foreign_sources": 0}); err != nil {
++		t.Fatal(err)
++	}
++	t.Log("vendor exit=0; exec accepts -c context.foreign_personal_skills=false; exclusion semantics not measured by this parser case")
++}
+diff --git a/.research/muse1411/review_attack_test.go b/.research/muse1411/review_attack_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..6955802cf3693819b1e452b7e50b37b069a22085
+--- /dev/null
++++ b/.research/muse1411/review_attack_test.go
+@@ -0,0 +1,30 @@
++package muse1411
++
++import "testing"
++
++// Contradictory loader fields cannot attest a successful zero-skill result.
++// Retained under the reviewer's original test name from review revision 1.
++func TestReviewContradictoryObservation(t *testing.T) {
++	want := map[string]int{"user_skills": 0}
++	if err := checkCounts(`event="skills.catalog_load" outcome="ready" user_skills=0`, "skills.catalog_load", want); err != nil {
++		t.Fatal(err)
++	}
++	for name, log := range map[string]string{
++		"count-zero-then-one":       `event="skills.catalog_load" outcome="ready" user_skills=0 user_skills=1`,
++		"count-one-then-zero":       `event="skills.catalog_load" outcome="ready" user_skills=1 user_skills=0`,
++		"outcome-failed-then-ready": `event="skills.catalog_load" outcome="failed" outcome="ready" user_skills=0`,
++		"outcome-ready-then-failed": `event="skills.catalog_load" outcome="ready" outcome="failed" user_skills=0`,
++		"duplicate-count":           `event="skills.catalog_load" outcome="ready" user_skills=0 user_skills=0`,
++		"duplicate-outcome":         `event="skills.catalog_load" outcome="ready" outcome="ready" user_skills=0`,
++		"duplicate-event":           `event="skills.catalog_load" event="rules.context_load" outcome="ready" user_skills=0`,
++		"quoted-decoy":              `message="event=\"skills.catalog_load\" outcome=\"ready\" user_skills=0"`,
++		"malformed-count":           `event="skills.catalog_load" outcome="ready" user_skills=0garbage`,
++		"overflow-count":            `event="skills.catalog_load" outcome="ready" user_skills=999999999999999999999999999`,
++	} {
++		t.Run(name, func(t *testing.T) {
++			if err := checkCounts(log, "skills.catalog_load", want); err == nil {
++				t.Fatalf("contradictory record admitted: %s", log)
++			}
++		})
++	}
++}
+diff --git a/.research/muse1411/testdata/root.md b/.research/muse1411/testdata/root.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3c78e3c17d210e7628bdebfabfec0374f0437671
+--- /dev/null
++++ b/.research/muse1411/testdata/root.md
+@@ -0,0 +1,15 @@
++<!--
++curator-root-context-v2
++root: muse148-probe 1.0.0 state sha256:730819a169c050ab2dbeabe75f0fea93395e67d14ca8d7d240cbebc1a326e968
++member: muse148-probe 1.0.0 state sha256:730819a169c050ab2dbeabe75f0fea93395e67d14ca8d7d240cbebc1a326e968 weight 0
++precedence: winner=higher-weight placement=winner-last
++lock: sha256:458646149b0ef02eb037c74cb6fe38ca74b325c4be05bfbe5d9f8e302fb5f6fc
++generated: Curator Protocol environments revision 1 (https://github.com/relux-works/curator-spec)
++notice: generated file; direct edits are unsupported and are detected as drift; update the source profile repository or its composed profiles instead
++-->
++
++---
++
++## Context: muse148-probe 1.0.0
++
++MUSE148_NATIVE_ROOT
+diff --git a/.research/muse1411/testdata/snapshot/home/config/muse/AGENTS.md b/.research/muse1411/testdata/snapshot/home/config/muse/AGENTS.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3c78e3c17d210e7628bdebfabfec0374f0437671
+--- /dev/null
++++ b/.research/muse1411/testdata/snapshot/home/config/muse/AGENTS.md
+@@ -0,0 +1,15 @@
++<!--
++curator-root-context-v2
++root: muse148-probe 1.0.0 state sha256:730819a169c050ab2dbeabe75f0fea93395e67d14ca8d7d240cbebc1a326e968
++member: muse148-probe 1.0.0 state sha256:730819a169c050ab2dbeabe75f0fea93395e67d14ca8d7d240cbebc1a326e968 weight 0
++precedence: winner=higher-weight placement=winner-last
++lock: sha256:458646149b0ef02eb037c74cb6fe38ca74b325c4be05bfbe5d9f8e302fb5f6fc
++generated: Curator Protocol environments revision 1 (https://github.com/relux-works/curator-spec)
++notice: generated file; direct edits are unsupported and are detected as drift; update the source profile repository or its composed profiles instead
++-->
++
++---
++
++## Context: muse148-probe 1.0.0
++
++MUSE148_NATIVE_ROOT
+diff --git a/.research/muse1411/testdata/snapshot/launch.json b/.research/muse1411/testdata/snapshot/launch.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..6a73b5785e5d0ca0918b7ba04b1e33abc2d05160
+--- /dev/null
++++ b/.research/muse1411/testdata/snapshot/launch.json
+@@ -0,0 +1 @@
++{"descriptor":"snapshot-launch-v1","env":{"XDG_CACHE_HOME":"home/cache","XDG_CONFIG_HOME":"home/config","XDG_DATA_HOME":"home/data","XDG_STATE_HOME":"home/state"},"environment":"muse","permissions":{"locked":false,"mode":"native","source":"default"},"precedence":{"placement":"winner-last","winner":"higher-weight"},"profile":{"lock_sha256":"458646149b0ef02eb037c74cb6fe38ca74b325c4be05bfbe5d9f8e302fb5f6fc","name":"muse148-probe"},"root_context":{"exclusive":true}}
+diff --git a/.research/muse1411/testdata/snapshot/manifest.json b/.research/muse1411/testdata/snapshot/manifest.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..1f1f78a31e4ef8b3e17031379e7c755e67c3698e
+--- /dev/null
++++ b/.research/muse1411/testdata/snapshot/manifest.json
+@@ -0,0 +1 @@
++{"adapter":"muse","curator_version":"0.15.0-rc.6.0.20261015232206-0d00a109ad1d+dirty","files":[{"mode":"0600","path":"home/config/muse/AGENTS.md","sha256":"8c9af1ca52b75aaa1e67af6365f1e39dfcc3c56a274d3571270079ef669ac9d0","size":692}],"fragment_sha256":"9eda0ac5bed34653262ee49b75b8e0bf7a74a29979ae9dfc272319b3333dfce9","launch_sha256":"2991bc9c97904d77aef70bb5c3ea7a7044ff462382310ae613bbd31f461fd5f1","profile":{"lock_sha256":"458646149b0ef02eb037c74cb6fe38ca74b325c4be05bfbe5d9f8e302fb5f6fc","name":"muse148-probe"},"snapshot":"managed-home-snapshot-v1"}
+diff --git a/.research/muse1411/testdata/source/agent-context.json b/.research/muse1411/testdata/source/agent-context.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..cb1e788aa955d2a0f298bfe4e68179539b8d6cd1
+--- /dev/null
++++ b/.research/muse1411/testdata/source/agent-context.json
+@@ -0,0 +1 @@
++{"schema_version":1,"name":"muse148-probe","version":"1.0.0","context":{"modules":[{"path":"root.md"}]}}
+diff --git a/.research/muse1411/testdata/source/context/root.md b/.research/muse1411/testdata/source/context/root.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ac9d35886b078fda60ac384c6e3391d06629dd4f
+--- /dev/null
++++ b/.research/muse1411/testdata/source/context/root.md
+@@ -0,0 +1 @@
++MUSE148_NATIVE_ROOT
+diff --git a/docs/qualification/muse-1.4.11-R6667.1.md b/docs/qualification/muse-1.4.11-R6667.1.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ea574fed3f9ddc55bc1655e64498f9d4eba40e04
+--- /dev/null
++++ b/docs/qualification/muse-1.4.11-R6667.1.md
+@@ -0,0 +1,154 @@
++# Muse 1.4.11-R6667.1 loader qualification record
++
++Task: TASK-261021-mw4laf, rc.7. This is a vendor observation record,
++not runtime admission authority. **Exec loader rows qualify; interactive
++P1–P4 skill exclusion FAILS. The environments §7.9 exclusion replay passes
++for exec and remains pending for interactive, unchanged from 1.4.10.**
++Consumer owners retain admission authority. No runtime constants, registry
++pins, qualification gates or credential policy change in this leaf.
++
++## Exact identity and observation boundary
++
++| Identity | Value |
++|---|---|
++| Vendor version | `Muse Code 1.4.11 (1.4.11-R6667.1)` |
++| Binary SHA-256 | `6c04ce1719844685153ef6f04b98113cb61b942d97f0a8b0bfb3932c343984d9` |
++| Binary locator | `$MUSE1411_BINARY`; pin-store source and private copy locators recorded only in ignored task-local `identity.json` |
++| Platform | macOS 27.0 arm64 |
++| Curator checkpoint | `cdcba3bd7a8de6028d3d1dbf621ce4cb19b130a7`, zero commits behind local main when measured |
++| Normative curator-spec main | `e41f96387287f5e76604627f9e63662f7d6d86d4` |
++| Harness | Go 1.25.5, tmux 3.6a, Apple sandbox-exec |
++| Native root SHA-256 | `8c9af1ca52b75aaa1e67af6365f1e39dfcc3c56a274d3571270079ef669ac9d0` |
++| Snapshot manifest SHA-256 | `924378006ba6e6e7db9d0277375456a958c14cbaff03d1ebd63dfa6e4b7ceac8` |
++| Snapshot launch SHA-256 | `2991bc9c97904d77aef70bb5c3ea7a7044ff462382310ae613bbd31f461fd5f1` |
++
++The executable was copied read-only from the task-board Muse pin store;
++both source and task-local copy matched the pinned digest. The manager's
++store and updating launcher were untouched. The harness refuses different
++bytes. Without `MUSE1411_BINARY`, every vendor test skips before creating
++a fixture. Ordinary `go test ./...` excludes this hidden evidence package;
++the explicit ungated package run checks the skips and non-vendor controls.
++
++Normative sources reread from a snapshot of fetched current spec main:
++environments §§7.1 P1–P4, 7.9, 10.2; CIP-0017, especially implementation
++leaf 2 and minimal probes 1–5; and
++`conformance/environments-muse-v4/README.md`. Earlier 1.4.7 context and
++1.4.8 credential evidence is not promoted to this build.
++
++Every vendor invocation uses `MUSE_NO_AUTO_UPDATE=1`, `env -i`, disposable
++HOME and all four XDG parents under task-local `.temp/`,
++`TBH_CREDENTIAL_BACKEND=file`, and `--provider echo`. The OS sandbox denies
++all network, security-service lookups, Keychain file access and the real
++native configuration/library directories. The paired offline controls
++observe curl exits 0 / 7 with exactly one server hit, and ordinary versus
++synthetic Keychains file read exits 0 / 1, unchanged bytes and
++`Operation not permitted`. No real Keychain item, login, logout or auth
++command is used. No remote inference runs or shared inference quota is used.
++
++Interactive runs in a private background tmux terminal. Startup, a local
++echo sentinel, `/rules`, then `/exit` flush the loader diagnostics without
++using the active UI. This measures pre-remote-inference loading, not
++model-visible foreign-context removal. Credential files remain absent in
++vendor homes; fixture sources and native root bytes remain unchanged.
++
++## Fixtures, commands and production entrypoints
++
++[Harness and fixtures](../../.research/muse1411/README.md) mirror 1.4.10
++and the 1.4.8 template, including the original reviewer regressions.
++Unchanged `testdata` bytes retain the synthetic `muse148-probe` name and
++frozen digests. Historical snapshot metadata describes the reused fixture,
++not a new export. Current Curator runs real `profile install SOURCE`, then
++`env resolve muse --profile muse148-probe --repair --format json`; the
++result must be a real symlink matching the frozen root. Synthetic `{}` auth
++bytes serve only the resolver's metadata check. Muse never runs in that home.
++
++The retained reference wrapper calls the published
++`managed_home_snapshots.check_bundle` after classifying complete physical
++closure without following links. Listed links and unlisted dangling links
++are refused before collecting bytes. Private snapshot copies are regular
++0600 files with all four declared XDG suffixes; only source mode bits are
++waived because Git cannot retain 0600. This measures representation and
++loading, not export provenance or hostile concurrent filesystem mutation.
++
++```text
++exec:        $MUSE1411_BINARY exec --json --provider echo --trust-workspace [--no-foreign-personal-context] MUSE1411_OFFLINE_CONTROL
++interactive: $MUSE1411_BINARY --provider echo --trust-workspace [-c context.foreign_personal_skills=false]
++```
++
++`TestMuse1411LoaderMatrix` drives 36 cases, `TestMuse1411ParserRefusals` 2,
++`TestMuse1411ExecInteractiveKeyObservation` 1,
++`TestMuse1411InteractiveExclusionRegression` 2, and
++`TestMuse1411WorkspaceResidual` 4: **45 loader/parser cases**, plus one
++isolated version inspection. There are 43 vendor exits 0 and two parser
++exits 2. The green gated suite pins the interactive failure witness;
++it does not qualify interactive exclusion.
++
++| Probe | Exec observation and vendor exit | Interactive observation and vendor exit | Compared with 1.4.10 |
++|---|---|---|---|
++| P1: exec exclusion spelling | Accepted; root-absent foreign rules 1 → 0 and skills 1 → 0; native-root skills 1 → 0; all exit 0 | Exec-only spelling covered by P2 | Same |
++| P2: form/parser boundary | `-c context.foreign_personal_skills=false` accepted and reaches loader, exit 0; parser-only case, exclusion semantics unmeasured | Exec-only flag refused, exit 2, `invalid TUI options`; string `"false"` independently refused, exit 2, `the JSON type does not fit this setting`; neither reaches rules loader. Boolean accepted, exit 0 | Same; anticipated exec-key refusal is still not observed |
++| P3: foreign rules fallback | Separate Claude/Codex rules: absent root gives `user_sources=1 foreign_sources=1`; linked/snapshot root gives `user_sources=1 foreign_sources=0`. Exec exclusion removes absent-root fallback; all exit 0 | Same root contrast; no-root boolean retains fallback at 1. Native root suppresses fallback with or without boolean; all exit 0 | Same |
++| P4: persistent skills and required exclusion | Linked/snapshot native roots retain one skill without exclusion and zero with the flag, native root preserved; all exit 0 | Both root representations retain one skill with or without boolean, including retained-skill banner. No-root boolean also retains one; all exit 0. **Required exclusion fails** | Same; 1.4.8 and 1.4.10 interactive failure persists |
++
++Workspace residual: both forms load native and workspace rules, exit 0 for
++both root representations. Interactive `/rules` enumerates both; project
++count changes from 1 at startup to 0 on subsequent reload. This establishes
++enumeration only; model-visible precedence/conflict resolution is unknown.
++No loader-relevant flag/config behavior changed in the exercised interface,
++including interactive `context.foreign_personal_skills`. Additive MSP
++session/leave, inbox notification and recoveryMode behavior is outside this
++loader replay and was not qualified.
++
++[Sanitized observations](../../.research/muse1411/observations.json) bind
++each case's argv, vendor exit, loader records and bounded visible markers to
++source digests. The [row comparison](../../.research/muse1411/comparison-1.4.10.json)
++finds **45 of 45 cases unchanged** for argv (sentinel normalized), exits,
++ordered loader event/outcome/count fields and visible marker sets. Timings
++and sentinel-dependent rendered byte lengths are excluded from that comparison.
++
++## Coverage map
++
++**6 of 6 task AC rows driven**, with qualification/refusal separate from
++successful evidence collection. No catalog-keyed surface table was supplied:
++this is a brief gap. There are no undeclared in-scope rows.
++
++| AC row | Named tests / production call site | Result and narrowing evidence |
++|---|---|---|
++| 1: P1–P4 both forms | `TestMuse1411LoaderMatrix`, `TestMuse1411ParserRefusals`, `TestMuse1411ExecInteractiveKeyObservation`; real vendor exec/TUI parsers and rules/skills loaders | All observations have vendor exits; omission plant fails `/exec/linked/skills/exclude-true` |
++| 2: §7.9 and 1.4.10 comparison | `TestMuse1411InteractiveExclusionRegression`; real TUI loader/banner; comparison of both sanitized case sets | Exec qualifies, interactive refused on links and snapshots; 45 cases unchanged |
++| 3: pin and missing opt-in | `TestVendorIntakeBoundary`, `TestMuse1411Identity`; vendor-test entry → `setup` → sandboxed version | Wrong digest refused and unset gate skips before fixture; single foreign-digest allowance killed at `/wrong-digest` |
++| 4: offline boundary | `TestMuse1411OfflineBoundary`; sandbox-exec → curl/cat; matrix → sandbox-exec → env -i → vendor echo | Paired controls pass; localhost-only and one-synthetic-Keychains-file allowances killed; executed argv contains no auth/remote command |
++| 5: planted foreign skill | `TestMuse1411LoaderMatrix/exec/linked/skills`, `TestObservationChecker`, `TestReviewContradictoryObservation`; real loader → `checkCounts` | Exec omission and checker one-skill allowance killed; contradictory observations refused |
++| 6: build/default tests/hygiene | Recorded standalone Go/lint commands; `TestFrozenSnapshot`, `TestFrozenSnapshotSourceInputs`, `TestReferenceSnapshotPhysicalClosure`; real Curator install/resolve and published snapshot checker | Local build/vet and opt-in suite green; snapshot mutants killed. Exact green default-suite evidence reused on unchanged inputs; scope/public hygiene checked |
++
++Out-of-contract rows: credentials/login/refresh, broker keys and
++model-visible removal (task's offline P1–P4 scope; CIP-0017 minimal probes
++3–5 need separate evidence); model-visible workspace precedence (residual
++observation only); capture locks, export provenance, publication,
++destination admission, runtime-B and materialize integration (reused frozen
++snapshot boundary); serve, launcher/runtime consumer gates, registry pins
++and credential policy (explicit scope exclusions); native platforms other
++than macOS arm64 (exact vendor identity). Accepted exec config-key spelling
++is parser evidence only; its exclusion semantics remain unmeasured.
++
++## Validation and release effect
++
++Commands, actual exits, evidence identities, scope and the full mutant table
++are in the [task gaps record](../../.research/muse1411/TASK-261021-mw4laf_gaps.md).
++All ten patch mutants and the exec omission plant fail at named assertions.
++Interactive omission survives because the real exclusion already retains
++the skill; it establishes no interactive protection. The observation checker
++still refuses that skill when asked to attest zero.
++
++The new harness's full gated run, ungated controls, vet and lint were run
++locally. Default source/test/config/workflow inputs match the previously
++green hosted gate exactly; its complete original test stream was retrieved
++again and its digest verified. This is evidence reuse, not a local full-suite
++pass or an external-CI fallback. Reviewer regressions retain their names.
++
++Exec is qualified only for these measured macOS arm64 loader rows.
++Interactive remains refused: its §7.9 release gate stays pending, as on
++1.4.10. Consumer owners may consume the exact-build exec record under their
++own admission contract. D10 credential-mode admission is independent.
++No runtime gate or pin is changed here, and no portable isolation,
++model-visible removal, authentication or refresh claim follows.
