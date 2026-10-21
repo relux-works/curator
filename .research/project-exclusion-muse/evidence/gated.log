@@ -1,0 +1,199 @@
+Full matrix (gated-04)
+=== RUN   TestChecker
+--- PASS: TestChecker (0.21s)
+=== RUN   TestP1RootAndAncestors
+=== RUN   TestP1RootAndAncestors/AGENTS.md/root/trusted-true
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:1 user_sources:1]
+=== RUN   TestP1RootAndAncestors/AGENTS.md/root/trusted-false
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+=== RUN   TestP1RootAndAncestors/AGENTS.md/ancestor/trusted-true
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:1 user_sources:1]
+=== RUN   TestP1RootAndAncestors/AGENTS.md/ancestor/trusted-false
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+=== RUN   TestP1RootAndAncestors/CLAUDE.md/root/trusted-true
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:1 user_sources:1]
+=== RUN   TestP1RootAndAncestors/CLAUDE.md/root/trusted-false
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+=== RUN   TestP1RootAndAncestors/CLAUDE.md/ancestor/trusted-true
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:1 user_sources:1]
+=== RUN   TestP1RootAndAncestors/CLAUDE.md/ancestor/trusted-false
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+=== RUN   TestP1RootAndAncestors/.agents_AGENTS.md/root/trusted-true
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:1 user_sources:1]
+=== RUN   TestP1RootAndAncestors/.agents_AGENTS.md/root/trusted-false
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+=== RUN   TestP1RootAndAncestors/.agents_AGENTS.md/ancestor/trusted-true
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:1 user_sources:1]
+=== RUN   TestP1RootAndAncestors/.agents_AGENTS.md/ancestor/trusted-false
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+=== RUN   TestP1RootAndAncestors/.claude_CLAUDE.md/root/trusted-true
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:1 user_sources:1]
+=== RUN   TestP1RootAndAncestors/.claude_CLAUDE.md/root/trusted-false
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+=== RUN   TestP1RootAndAncestors/.claude_CLAUDE.md/ancestor/trusted-true
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:1 user_sources:1]
+=== RUN   TestP1RootAndAncestors/.claude_CLAUDE.md/ancestor/trusted-false
+    replay_test.go:336: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+--- PASS: TestP1RootAndAncestors (41.04s)
+    --- PASS: TestP1RootAndAncestors/AGENTS.md/root/trusted-true (3.01s)
+    --- PASS: TestP1RootAndAncestors/AGENTS.md/root/trusted-false (2.67s)
+    --- PASS: TestP1RootAndAncestors/AGENTS.md/ancestor/trusted-true (3.33s)
+    --- PASS: TestP1RootAndAncestors/AGENTS.md/ancestor/trusted-false (5.27s)
+    --- PASS: TestP1RootAndAncestors/CLAUDE.md/root/trusted-true (2.15s)
+    --- PASS: TestP1RootAndAncestors/CLAUDE.md/root/trusted-false (2.70s)
+    --- PASS: TestP1RootAndAncestors/CLAUDE.md/ancestor/trusted-true (1.93s)
+    --- PASS: TestP1RootAndAncestors/CLAUDE.md/ancestor/trusted-false (1.89s)
+    --- PASS: TestP1RootAndAncestors/.agents_AGENTS.md/root/trusted-true (2.38s)
+    --- PASS: TestP1RootAndAncestors/.agents_AGENTS.md/root/trusted-false (2.45s)
+    --- PASS: TestP1RootAndAncestors/.agents_AGENTS.md/ancestor/trusted-true (2.35s)
+    --- PASS: TestP1RootAndAncestors/.agents_AGENTS.md/ancestor/trusted-false (2.14s)
+    --- PASS: TestP1RootAndAncestors/.claude_CLAUDE.md/root/trusted-true (2.01s)
+    --- PASS: TestP1RootAndAncestors/.claude_CLAUDE.md/root/trusted-false (1.73s)
+    --- PASS: TestP1RootAndAncestors/.claude_CLAUDE.md/ancestor/trusted-true (2.65s)
+    --- PASS: TestP1RootAndAncestors/.claude_CLAUDE.md/ancestor/trusted-false (2.17s)
+=== RUN   TestP2NestedStartup
+=== RUN   TestP2NestedStartup/true
+    replay_test.go:358: rules.context_load outcome=ready map[foreign_sources:0 project_sources:2 user_sources:1]
+=== RUN   TestP2NestedStartup/false
+    replay_test.go:358: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+--- PASS: TestP2NestedStartup (4.31s)
+    --- PASS: TestP2NestedStartup/true (1.71s)
+    --- PASS: TestP2NestedStartup/false (2.40s)
+=== RUN   TestP3Skills
+=== RUN   TestP3Skills/.agents/true
+    replay_test.go:374: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:379: skills.catalog_load outcome=ready map[invalid:0 project_skills:1 user_skills:1]
+=== RUN   TestP3Skills/.agents/false
+    replay_test.go:374: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:379: skills.catalog_load outcome=ready map[invalid:0 project_skills:0 user_skills:1]
+=== RUN   TestP3Skills/.claude/true
+    replay_test.go:374: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:379: skills.catalog_load outcome=ready map[invalid:0 project_skills:1 user_skills:1]
+=== RUN   TestP3Skills/.claude/false
+    replay_test.go:374: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:379: skills.catalog_load outcome=ready map[invalid:0 project_skills:0 user_skills:1]
+=== RUN   TestP3Skills/.codex/true
+    replay_test.go:374: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:379: skills.catalog_load outcome=ready map[invalid:0 project_skills:1 user_skills:1]
+=== RUN   TestP3Skills/.codex/false
+    replay_test.go:374: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:379: skills.catalog_load outcome=ready map[invalid:0 project_skills:0 user_skills:1]
+--- PASS: TestP3Skills (18.28s)
+    --- PASS: TestP3Skills/.agents/true (1.94s)
+    --- PASS: TestP3Skills/.agents/false (1.41s)
+    --- PASS: TestP3Skills/.claude/true (2.12s)
+    --- PASS: TestP3Skills/.claude/false (4.54s)
+    --- PASS: TestP3Skills/.codex/true (6.05s)
+    --- PASS: TestP3Skills/.codex/false (1.97s)
+=== RUN   TestP4Hooks
+=== RUN   TestP4Hooks/true
+    replay_test.go:395: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:402: hook.admission outcome=ready map[diagnostics:0 handlers:2 inactive:0 runnable:2]
+=== RUN   TestP4Hooks/false
+    replay_test.go:395: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:402: hook.admission outcome=partial map[diagnostics:0 handlers:2 inactive:1 runnable:1]
+--- PASS: TestP4Hooks (5.53s)
+    --- PASS: TestP4Hooks/true (2.39s)
+    --- PASS: TestP4Hooks/false (2.86s)
+=== RUN   TestP4Plugins
+=== RUN   TestP4Plugins/raw
+    replay_test.go:452: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:457: plugin_capability_snapshot.compose outcome=ready map[commands:1 diagnostics:0 installed_plugins:0]
+=== RUN   TestP4Plugins/project-install
+    replay_test.go:452: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:457: plugin_capability_snapshot.compose outcome=ready map[commands:1 diagnostics:0 installed_plugins:0]
+=== RUN   TestP4Plugins/trusted-project-install
+    replay_test.go:452: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:457: plugin_capability_snapshot.compose outcome=ready map[commands:2 diagnostics:0 installed_plugins:1]
+=== RUN   TestP4Plugins/approved-install
+    replay_test.go:452: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:457: plugin_capability_snapshot.compose outcome=ready map[commands:2 diagnostics:0 installed_plugins:1]
+--- PASS: TestP4Plugins (11.76s)
+    --- PASS: TestP4Plugins/raw (3.20s)
+    --- PASS: TestP4Plugins/project-install (2.95s)
+    --- PASS: TestP4Plugins/trusted-project-install (2.59s)
+    --- PASS: TestP4Plugins/approved-install (2.75s)
+=== RUN   TestP5MCP
+=== RUN   TestP5MCP/empty-true/trusted-true
+    replay_test.go:477: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:485: mcp.config.resolve outcome=ready map[server_count:1 server_failure_count:0 trusted_project_source_count:1 user_settings_source_count:1]
+=== RUN   TestP5MCP/empty-true/trusted-false
+    replay_test.go:477: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:485: mcp.config.resolve outcome=ready map[server_count:1 server_failure_count:0 trusted_project_source_count:0 user_settings_source_count:1]
+=== RUN   TestP5MCP/empty-false/trusted-true
+    replay_test.go:477: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:485: mcp.config.resolve outcome=ready map[server_count:2 server_failure_count:0 trusted_project_source_count:1 user_settings_source_count:1]
+=== RUN   TestP5MCP/empty-false/trusted-false
+    replay_test.go:477: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:485: mcp.config.resolve outcome=ready map[server_count:1 server_failure_count:0 trusted_project_source_count:0 user_settings_source_count:1]
+=== RUN   TestP5MCP/empty-home-with-nonempty-project
+    replay_test.go:494: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:495: mcp.config.resolve outcome=ready map[server_count:1 trusted_project_source_count:1]
+    replay_test.go:496: empty home MCP is NOT an exclusive set in a trusted checkout
+--- PASS: TestP5MCP (16.35s)
+    --- PASS: TestP5MCP/empty-true/trusted-true (3.19s)
+    --- PASS: TestP5MCP/empty-true/trusted-false (2.27s)
+    --- PASS: TestP5MCP/empty-false/trusted-true (2.95s)
+    --- PASS: TestP5MCP/empty-false/trusted-false (3.92s)
+    --- PASS: TestP5MCP/empty-home-with-nonempty-project (3.79s)
+=== RUN   TestP6SettingsCandidates
+=== RUN   TestP6SettingsCandidates/.muse_settings.json
+    replay_test.go:511: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:512: run_preset.resolve outcome=ready map[]
+=== RUN   TestP6SettingsCandidates/.claude_settings.json
+    replay_test.go:511: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:512: run_preset.resolve outcome=ready map[]
+=== RUN   TestP6SettingsCandidates/.claude_settings.local.json
+    replay_test.go:511: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    replay_test.go:512: run_preset.resolve outcome=ready map[]
+=== RUN   TestP6SettingsCandidates/poison-user-control
+--- PASS: TestP6SettingsCandidates (9.62s)
+    --- PASS: TestP6SettingsCandidates/.muse_settings.json (3.38s)
+    --- PASS: TestP6SettingsCandidates/.claude_settings.json (2.91s)
+    --- PASS: TestP6SettingsCandidates/.claude_settings.local.json (2.69s)
+    --- PASS: TestP6SettingsCandidates/poison-user-control (0.41s)
+=== RUN   TestOfflineBoundary
+--- PASS: TestOfflineBoundary (0.69s)
+=== RUN   TestP1OutsideGitBoundary
+=== RUN   TestP1OutsideGitBoundary/true
+    replay_test.go:569: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+=== RUN   TestP1OutsideGitBoundary/false
+    replay_test.go:569: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+--- PASS: TestP1OutsideGitBoundary (5.11s)
+    --- PASS: TestP1OutsideGitBoundary/true (2.56s)
+    --- PASS: TestP1OutsideGitBoundary/false (2.28s)
+=== RUN   TestP7ResumeTrustGate
+    tui_test.go:114: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    tui_test.go:134: skills.catalog_load outcome=ready map[project_skills:1 user_skills:1]
+    tui_test.go:135: hook.admission outcome=ready map[handlers:2 inactive:0 runnable:2]
+    tui_test.go:136: mcp.config.resolve outcome=ready map[server_count:2 trusted_project_source_count:1 user_settings_source_count:1]
+    tui_test.go:140: resume retains root snapshot but trusting revives project skill/hook/MCP catalogs; child execution unmeasured
+--- PASS: TestP7ResumeTrustGate (6.86s)
+=== RUN   TestP8LateRoot
+    tui_test.go:166: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    tui_test.go:168: rules.context_load outcome=ready map[foreign_sources:0 project_sources:1 user_sources:1]
+    tui_test.go:169: late source created between echo turns; /rules snapshots retained (1714/1852 bytes); no lazy-tool claim
+--- PASS: TestP8LateRoot (7.30s)
+=== RUN   TestP7ChildAvailability
+    tui_test.go:182: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    tui_test.go:183: native child invocation: unmeasured; offline echo emits text only
+--- PASS: TestP7ChildAvailability (2.57s)
+PASS
+ok  	github.com/relux-works/curator/.research/project-exclusion-muse	129.828s
+
+
+Final checker with contradictory-event control
+=== RUN   TestChecker
+--- PASS: TestChecker (0.23s)
+PASS
+ok  	github.com/relux-works/curator/.research/project-exclusion-muse	0.403s
+
+
+Final distinct late-file observations
+=== RUN   TestP8LateRoot
+    tui_test.go:175: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    tui_test.go:177: rules.context_load outcome=ready map[foreign_sources:0 project_sources:1 user_sources:1]
+    tui_test.go:178: late source created between echo turns; /rules snapshots retained (1715/1853 bytes); no lazy-tool claim
+--- PASS: TestP8LateRoot (6.67s)
+PASS
+ok  	github.com/relux-works/curator/.research/project-exclusion-muse	6.960s
