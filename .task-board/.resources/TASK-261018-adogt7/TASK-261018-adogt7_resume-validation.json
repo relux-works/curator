@@ -1,0 +1,67 @@
+{
+  "base": "e88fdf2dbec7f94c48b0232a350a0a9f9484fdeb",
+  "scope_sha256": "52db2b21092c2969c7f0f2a1279358e62f9b7600d48784b4a6fa6a96db72a8f4",
+  "regular_source_files_verified": 1985,
+  "source_changes": false,
+  "commands": [
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=2m",
+        "-v",
+        "-run",
+        "^Test(ReviewSkillDirectory(NumericDiscriminants|StringWeight)|LegacyLockNumericCarrierTypes)$",
+        "./internal/contextpkg"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=8m",
+        "-v",
+        "-run",
+        "^TestSkillDirectoryNarrowingMutants$",
+        "./internal/envprofile"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "go",
+        "build",
+        "./..."
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "go",
+        "vet",
+        "./..."
+      ],
+      "exit": 0
+    }
+  ],
+  "hosted_prior_failure": {
+    "run": 39489266966,
+    "candidate": "d1632a62a5334fef127bcd2a1129666f59f9d812",
+    "gate_exit": 1,
+    "job": "Race (macos-latest)",
+    "annotation": "The job was not acquired by Runner of type hosted even after multiple attempts",
+    "verdict": "infrastructure failure; not green"
+  },
+  "local_full_suite": "Round-8 unchanged-tree receipts reused, not rerun",
+  "log_hashes": {
+    "resume-numeric-01.log": "fb44740b57cc80cae570baf40b03ae0d692a621ad52d8d0a9cc641016427e38a",
+    "resume-mutants-01.log": "b352fa20a567b4ec3ecaebdc8f56d288261c97fd02ce505aff7c059ded28bd9f",
+    "resume-build-01.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "resume-vet-01.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rev4-validation.log": "e3277477bcd7555852750335ea63862d89f6efca8bbe48dc5613f88d1cf4abd9",
+    "rev4-race-annotations.json": "340934a5ad0e1fd68417d90c3bafdf17a87652606ee6ccbeba56b9513ef95787"
+  }
+}

@@ -1,0 +1,1602 @@
+{
+  "run_id": 39104875153,
+  "url": "https://github.com/relux-works/curator/actions/runs/39104875153",
+  "candidate": "4b199445d921d1959962b8210b028d1644165b4c",
+  "tree": "da9e7c31917d4c50609650dcd5495d06ce4321b8",
+  "signature": "G",
+  "status": "completed",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "id": 117608444605,
+      "name": "Gate self-test (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444605",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Self-test the CI gates",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444613,
+      "name": "Gate self-test (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444613",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Self-test the CI gates",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444618,
+      "name": "Gate self-test (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444618",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Self-test the CI gates",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444653,
+      "name": "Race (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444653",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify pnpm pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned pnpm via npm",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify rust pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Rust toolchain via rustup",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "go test -race + platform-case gate",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload race evidence",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444657,
+      "name": "Go 1.27.1 driver (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444657",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444660,
+      "name": "Naming gate",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444660",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Employer name gate",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444681,
+      "name": "Test (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444681",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify pnpm pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned pnpm via npm",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify rust pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Rust toolchain via rustup",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify versioned Go install compatibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "gofmt check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "go vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Ledger consistency",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "go test + platform-case gate",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload gate evidence",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444692,
+      "name": "Test (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444692",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify pnpm pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned pnpm via npm",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify rust pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Rust toolchain via rustup",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify versioned Go install compatibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "gofmt check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "go vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Ledger consistency",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "go test + platform-case gate",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload gate evidence",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444710,
+      "name": "Go 1.26.0 driver (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444710",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444724,
+      "name": "Lint",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444724",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run golangci/golangci-lint-action@v7",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Linux CI isolation",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "No broad suppression",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify GoReleaser rc channel values",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run golangci/golangci-lint-action@v7",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444752,
+      "name": "Test (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444752",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify pnpm pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned pnpm via npm",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify rust pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Rust toolchain via rustup",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify versioned Go install compatibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "gofmt check",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "go vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Ledger consistency",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "go test + platform-case gate",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload gate evidence",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444765,
+      "name": "Go 1.27.1 driver (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444765",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444780,
+      "name": "Race (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444780",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify pnpm pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned pnpm via npm",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify rust pin matches Go constant",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Rust toolchain via rustup",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "go test -race + platform-case gate",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload race evidence",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444782,
+      "name": "Go 1.26.0 driver (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444782",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444798,
+      "name": "Interop conformance gate",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444798",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify Go toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Shared protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444803,
+      "name": "Go 1.25.5 driver (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444803",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444831,
+      "name": "Go 1.25.5 driver (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444831",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444855,
+      "name": "Go 1.26.0 driver (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444855",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444863,
+      "name": "Go 1.27.1 driver (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444863",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608444872,
+      "name": "Go 1.25.5 driver (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608444872",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize private Go state",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify family toolchain identity",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver qualification and reproducibility",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Driver vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build manager",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout authoritative protocol suite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete runner",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117608445491,
+      "name": "Candidate suite (${{ matrix.os }})",
+      "status": "completed",
+      "conclusion": "skipped",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608445491",
+      "steps": []
+    },
+    {
+      "id": 117608445577,
+      "name": "Test (rose-air)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "url": "https://github.com/relux-works/curator/actions/runs/39104875153/job/117608445577",
+      "steps": []
+    }
+  ],
+  "policy_skips": {
+    "Test (rose-air)": "main-branch-only push lane",
+    "Candidate suite (${{ matrix.os }})": "non-default workflow_dispatch candidate lane"
+  },
+  "workflow": "https://github.com/relux-works/curator/blob/4b199445d921d1959962b8210b028d1644165b4c/.github/workflows/ci.yml"
+}

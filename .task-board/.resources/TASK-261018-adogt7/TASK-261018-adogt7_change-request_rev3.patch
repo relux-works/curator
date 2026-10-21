@@ -1,0 +1,4165 @@
+diff --git a/docs/profile-skill-directories.md b/docs/profile-skill-directories.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4358cb84a4908f4d4756ecca0363dbeab344f152
+--- /dev/null
++++ b/docs/profile-skill-directories.md
+@@ -0,0 +1,77 @@
++# Profile skill directories
++
++CIP-0021 (curator-spec PR #162, commit
++`e41f96387287f5e76604627f9e63662f7d6d86d4`) permits Git skill requirements
++in context manifest schema 2 to select a package within a repository:
++
++```json
++{
++  "schema_version": 2,
++  "name": "sample-profile",
++  "version": "1.0.0",
++  "requires": {
++    "skills": {
++      "formatter": {
++        "git": "https://github.com/example/skill-packages.git",
++        "tag": "v1.0.0",
++        "directory": "skills/formatter"
++      }
++    }
++  }
++}
++```
++
++Omit `directory` for repository-root selection. All requirers must agree
++on the canonical source and directory, including root omission. Disagreement
++reports `context_range_conflict` with each requirer's source and directory.
++A selector must be a portable relative path: no absolute paths, dot/parent
++components, empty components or symlink traversal. The directory must exist.
++Snapshot violations report `profile_source_invalid`; missing required skill
++content reports `manifest_invalid`. A manifestless context skill remains valid.
++With an explicit directory, `SKILL.md` frontmatter uses the source-package
++reader, including its name, description and triggers; its name must match the
++required skill name before any profile or store entry is published.
++
++Schema 1 still rejects skill `directory` as `context_manifest_invalid`.
++Schema 2 retains closed fields and admits only absent or empty
++`codex_settings`; it does not admit machine policy. Successor locks use schema
++4/hash version 2, bind the directory and effective precedence, and retain
++required empty settings and contributions. Lock schemas 1–2 remain readable
++and reject skill directories. Draft lock schema 3 remains unsupported.
++
++Audit content identity, manifest capabilities and findings use the selected
++package tree. Markdown guidance participates in network-declaration detection
++alongside scripts and the skill manifest. Detector ruleset 5 uses a new verdict
++cache namespace, so allowances from rulesets 1–4 (including ruleset 4, which did
++not inspect Markdown) are cache misses and the package is scanned again. Old
++records remain untouched; fresh verdicts bind the current ruleset. Root and
++sibling files
++cannot lend capabilities or contribute findings to the selected skill.
++Successor installation audits the whole closure before publishing store
++entries. Managed-home and in-place skill links both use the selected package
++root. Existing in-place destinations are unchanged by this amendment.
++Legacy global migration remains repository-root addressed and never infers a
++directory from layout.
++
++## Verification
++
++The exact spec corpus is vendored at
++`internal/contextpkg/testdata/profile-skill-directories-v1/`. The structural
++suite drives 56 published cases through `contextpkg.ParseManifest` and
++`contextlock.Parse`; the identity suite checks two independent canonical locks.
++The lifecycle suite substitutes real fixture Git commits for symbolic pins
++and drives install, update, sync, migration, managed resolve and in-place use
++with temporary homes. Rejections assert diagnostics and preservation of
++profile files and surfaces. The narrowing harness uses Go overlays, including
++an inside-snapshot symlink control whose target contains valid skill content.
++Additional metadata regression cases pair valid frontmatter with malformed,
++missing, mismatched-name, empty-description and invalid-trigger refusals.
++
++```sh
++go test ./internal/contextpkg -run TestSkillDirectory -count=1
++go test ./internal/envprofile -run TestSkillDirectory -count=1
++```
++
++The broader CI entry points and artifact locations remain documented in
++[ci-gates.md](ci-gates.md). Tests above print their results to stdout; redirect
++local evidence under `.temp/` when needed. No operator home is used.
+diff --git a/internal/audit/audit.go b/internal/audit/audit.go
+index abf78d2117990716bd47cff59b819f1712342bf4..ab98bd440c6b93c4e7a446e29b0d8df74a5aa332 100644
+--- a/internal/audit/audit.go
++++ b/internal/audit/audit.go
+@@ -50,7 +50,7 @@ var severityRank = map[string]int{
+ // backend and model (Spec §12.1).
+ const (
+ 	PromptVersion  = "1"
+-	RulesetVersion = "4"
++	RulesetVersion = "5"
+ )
+ 
+ // findingOpaqueNUL is the shared opaque-NUL finding id: every v1
+@@ -829,7 +829,9 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
+ 			return nil
+ 		}
+ 		posix := filepath.ToSlash(rel)
+-		if !strings.HasPrefix(posix, "scripts/") && posix != manifestName {
++		// Markdown is package source too: URLs in SKILL.md and guidance
++		// files must not bypass network declarations (CIP-0021 vectors).
++		if !strings.HasPrefix(posix, "scripts/") && posix != manifestName && !strings.EqualFold(filepath.Ext(posix), ".md") {
+ 			return nil
+ 		}
+ 		payload, readErr := os.ReadFile(path) // #nosec G304 -- walked snapshot
+diff --git a/internal/audit/capability_cache_mutants_test.go b/internal/audit/capability_cache_mutants_test.go
+index 0bbe286d64c9174cb3c8b9775a91b5bcf63fcfd7..ef862de58d9555d90b735ef849652654ccfc2e50 100644
+--- a/internal/audit/capability_cache_mutants_test.go
++++ b/internal/audit/capability_cache_mutants_test.go
+@@ -45,7 +45,7 @@ func TestCapabilityCacheNarrowingMutants(t *testing.T) {
+ 		}
+ 	}
+ 	mutants = append(mutants,
+-		mutation{"reuse-ruleset-two", "internal/audit/audit.go", `RulesetVersion = "4"`, `RulesetVersion = "2"`, "./internal/audit", "^TestCapabilityCacheRulesetRetainsOldRecords$", "TestCapabilityCacheRulesetRetainsOldRecords", "want block, cache hit=false"},
++		mutation{"reuse-ruleset-two", "internal/audit/audit.go", `RulesetVersion = "5"`, `RulesetVersion = "2"`, "./internal/audit", "^TestCapabilityCacheRulesetRetainsOldRecords$", "TestCapabilityCacheRulesetRetainsOldRecords", "want block, cache hit=false"},
+ 		mutation{"accept-null-scope", "internal/capabilities/capabilities.go", `if rawScope, present := obj["prompt_scope"]; present {`, `if rawScope, present := obj["prompt_scope"]; present && rawScope != nil {`, "./internal/skillspec", "^TestCapabilitiesNullRejectedFromV3$", "TestCapabilitiesNullRejectedFromV3/v3/agent-skill.json/null-scope", "want refusal naming capabilities.prompt_scope"},
+ 		mutation{"accept-null-schema-three", "internal/skillspec/parse.go", `if data["capabilities"] == nil {`, `if data["capabilities"] == nil && schema != 3 {`, "./internal/skillspec", "^TestCapabilitiesNullRejectedFromV3$", "TestCapabilitiesNullRejectedFromV3/v3/agent-skill.json/null ", "want refusal naming capabilities"},
+ 	)
+diff --git a/internal/audit/markdown_cache_test.go b/internal/audit/markdown_cache_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..f0718756707a2b3c87e09e0f259d1a5a93f92142
+--- /dev/null
++++ b/internal/audit/markdown_cache_test.go
+@@ -0,0 +1,159 @@
++package audit
++
++import (
++	"bytes"
++	"encoding/json"
++	"fmt"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"regexp"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/capabilities"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++// A real pre-Markdown Gate allowance cannot bypass either public gate after
++// upgrade, in either hash framing. New clean and declared-host allowances still
++// cache; old records remain byte-identical. This covers the detector's former
++// scripts/manifest surface, not every historical detector implementation.
++func TestReviewPriorMarkdownAllowance(t *testing.T) {
++	const seedEnv = "CURATOR_TEST_PRIOR_MARKDOWN_CACHE"
++	versions := []hashing.Version{hashing.VersionV1, hashing.VersionV2}
++	if root := os.Getenv(seedEnv); root != "" {
++		for _, version := range versions {
++			cfg, subject := priorMarkdownFixture(t, root, version)
++			if warnings, errs := Gate(cfg, []Subject{subject}); len(warnings) != 0 || len(errs) != 0 {
++				t.Fatalf("pre-Markdown Gate seed refused: warnings=%v errors=%v", warnings, errs)
++			}
++			report, err := auditSubject(cfg, subject, false)
++			if err != nil || !report.CacheHit || report.Decision != DecisionAllow || len(report.Findings) != 0 {
++				t.Fatalf("pre-Markdown Gate did not persist an allowance: %+v, %v", report, err)
++			}
++		}
++		return
++	}
++
++	root := t.TempDir()
++	sourcePath, err := filepath.Abs("audit.go")
++	if err != nil {
++		t.Fatal(err)
++	}
++	payload, err := os.ReadFile(sourcePath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	source := strings.ReplaceAll(string(payload), "\r\n", "\n")
++	versionPattern := regexp.MustCompile(`RulesetVersion = "[0-9]+"`)
++	markdown := ` && !strings.EqualFold(filepath.Ext(posix), ".md")`
++	if len(versionPattern.FindAllString(source, -1)) != 1 || strings.Count(source, markdown) != 1 {
++		t.Fatal("pre-Markdown overlay anchors are not unique")
++	}
++	oldSource := versionPattern.ReplaceAllString(source, `RulesetVersion = "4"`)
++	oldSource = strings.Replace(oldSource, markdown, "", 1)
++	replacement := filepath.Join(root, "old-audit.go")
++	if err := os.WriteFile(replacement, []byte(oldSource), 0600); err != nil {
++		t.Fatal(err)
++	}
++	overlay, err := json.Marshal(map[string]any{"Replace": map[string]string{sourcePath: replacement}})
++	if err != nil {
++		t.Fatal(err)
++	}
++	overlayPath := filepath.Join(root, "old.json")
++	if err := os.WriteFile(overlayPath, overlay, 0600); err != nil {
++		t.Fatal(err)
++	}
++	command := exec.Command("go", "test", "-overlay", overlayPath, "-count=1", "-timeout=2m", "-v", "-run", "^TestReviewPriorMarkdownAllowance$", ".")
++	command.Env = append(os.Environ(), seedEnv+"="+root)
++	output, err := command.CombinedOutput()
++	if err != nil || !strings.Contains(string(output), "--- PASS: TestReviewPriorMarkdownAllowance") {
++		t.Fatalf("pre-Markdown Gate seed failed: %v\n%s", err, output)
++	}
++	t.Logf("pre-Markdown Gate seed exit 0:\n%s", output)
++
++	for _, version := range versions {
++		t.Run(fmt.Sprintf("v%d", version), func(t *testing.T) {
++			cfg, subject := priorMarkdownFixture(t, root, version)
++			digest, err := hashing.ContentSHA256WithVersion(subject.Snapshot, nil, version)
++			if err != nil {
++				t.Fatal(err)
++			}
++			oldPath := filepath.Join(trustDir(cfg.Home(), digest), "verdict-"+strings.Join([]string{cfg.Audit.Backend, cfg.Audit.Model, PromptVersion, "4"}, "-")+".json")
++			old, err := os.ReadFile(oldPath)
++			if err != nil {
++				t.Fatal(err)
++			}
++			assertBlock := func(warnings, errs []string) {
++				t.Helper()
++				if len(warnings) != 0 || len(errs) != 1 || !strings.Contains(errs[0], "audit.capability.network-undeclared") || !strings.Contains(errs[0], "notes.md") || !strings.Contains(errs[0], "undeclared.example.net") {
++					t.Fatalf("prior ruleset-4 allowance bypassed current Markdown network gate: warnings=%v errors=%v", warnings, errs)
++				}
++			}
++			assertBlock(GateReadOnly(cfg, []Subject{subject}))
++			if _, err := os.Stat(verdictPath(cfg, digest)); !os.IsNotExist(err) {
++				t.Fatalf("read-only gate wrote a current verdict: %v", err)
++			}
++			for _, wantHit := range []bool{false, true} {
++				report, err := auditSubject(cfg, subject, false)
++				if err != nil || report.CacheHit != wantHit || report.Decision != DecisionBlock {
++					t.Fatalf("upgraded audit: %+v error=%v, want block, cache hit=%v", report, err, wantHit)
++				}
++				assertBlock(Gate(cfg, []Subject{subject}))
++				assertBlock(GateReadOnly(cfg, []Subject{subject}))
++			}
++			if retained, err := os.ReadFile(oldPath); err != nil || !bytes.Equal(retained, old) {
++				t.Fatalf("old allowance changed: %v", err)
++			}
++
++			for _, control := range []string{"clean", "declared-host"} {
++				t.Run(control, func(t *testing.T) {
++					cfg, subject := priorMarkdownFixture(t, t.TempDir(), version)
++					if control == "clean" {
++						if err := os.WriteFile(filepath.Join(subject.Snapshot, "notes.md"), []byte("Local formatting guidance.\n"), 0600); err != nil {
++							t.Fatal(err)
++						}
++					} else {
++						subject.Capabilities = capabilities.Manifest{Network: []string{"undeclared.example.net"}}
++					}
++					for _, wantHit := range []bool{false, true} {
++						report, err := auditSubject(cfg, subject, false)
++						if err != nil || report.CacheHit != wantHit || report.Decision != DecisionAllow || len(report.Findings) != 0 {
++							t.Fatalf("fresh control: %+v error=%v, want allow, cache hit=%v", report, err, wantHit)
++						}
++						if warnings, errs := Gate(cfg, []Subject{subject}); len(warnings) != 0 || len(errs) != 0 {
++							t.Fatalf("fresh control gate refused: warnings=%v errors=%v", warnings, errs)
++						}
++					}
++				})
++			}
++		})
++	}
++}
++
++func priorMarkdownFixture(t *testing.T, root string, version hashing.Version) (*config.Config, Subject) {
++	t.Helper()
++	root = filepath.Join(root, fmt.Sprintf("v%d", version))
++	snapshot := filepath.Join(root, "snapshot")
++	if err := os.MkdirAll(snapshot, 0700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(snapshot, "notes.md"), []byte("curl https://undeclared.example.net/x\n"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	cfg := newCfg(t, "strict", "high")
++	cfg.Path = filepath.Join(root, "home", "config.json")
++	subject := Subject{
++		Name: "formatter", Source: "example.com/skills", Git: "https://example.com/skills.git",
++		Commit: strings.Repeat("1", 40), Snapshot: snapshot, SchemaVersion: 3,
++		Capabilities: capabilities.ImplicitNone(), HashVersion: version, Directory: "skills/formatter",
++	}
++	var ok bool
++	subject.Package, ok = SkillPackage(subject.Source, "", subject.Name, subject.Commit, subject.Directory)
++	if !ok {
++		t.Fatal("fixture package identity invalid")
++	}
++	return cfg, subject
++}
+diff --git a/internal/audit/network_contacts_mutants_test.go b/internal/audit/network_contacts_mutants_test.go
+index ae8a72ee0318abc3decff6d78edfa2559b67bb48..11a171c9e8ce9fb5fce1d7fd6539d9aa50c814a6 100644
+--- a/internal/audit/network_contacts_mutants_test.go
++++ b/internal/audit/network_contacts_mutants_test.go
+@@ -23,7 +23,7 @@ func TestNetworkContactNarrowingMutants(t *testing.T) {
+ 		{"exempt-example-com", "internal/audit/audit.go", `switch host[lastDot+1:] {`, `if host == "example.com" { return host, true }; switch host[lastDot+1:] {`, "./internal/audit", "^TestNetworkContactVectors$/^documentation-com$", "TestNetworkContactVectors/documentation-com", "Gate pass=false"},
+ 		{"exempt-bare-test", "internal/audit/audit.go", `if lastDot <= 0 {`, `if host == "test" { return host, true }; if lastDot <= 0 {`, "./internal/audit", "^TestNetworkContactVectors$/^bare-test$", "TestNetworkContactVectors/bare-test", "Gate pass=false"},
+ 		{"reserved-clears-file", "internal/audit/audit.go", `if exempt || declaredHost(declaredHosts, host) {`, `if exempt { return nil }; if exempt || declaredHost(declaredHosts, host) {`, "./internal/audit", "^TestNetworkContactVectors$/^mixed-reserved-first$", "TestNetworkContactVectors/mixed-reserved-first", "Gate pass=false"},
+-		{"reuse-ruleset-three", "internal/audit/audit.go", `RulesetVersion = "4"`, `RulesetVersion = "3"`, "./internal/audit", "^TestNetworkContactCacheInvalidatesRulesetThree$", "TestNetworkContactCacheInvalidatesRulesetThree/", "stale ruleset reused"},
++		{"reuse-ruleset-three", "internal/audit/audit.go", `RulesetVersion = "5"`, `RulesetVersion = "3"`, "./internal/audit", "^TestNetworkContactCacheInvalidatesRulesetThree$", "TestNetworkContactCacheInvalidatesRulesetThree/", "stale ruleset reused"},
+ 	}
+ 	for _, mutant := range mutants {
+ 		t.Run(mutant.name, func(t *testing.T) {
+diff --git a/internal/audit/network_contacts_test.go b/internal/audit/network_contacts_test.go
+index 2854d125bb0660462fdcf05a809a82302ccb6d46..768b41f107628261a168adc36e1f6fe0fd9f9296 100644
+--- a/internal/audit/network_contacts_test.go
++++ b/internal/audit/network_contacts_test.go
+@@ -101,7 +101,7 @@ func TestNetworkContactVectors(t *testing.T) {
+ }
+ 
+ // A genuine ruleset-3 refusal (or stale allow for a real host) cannot mask
+-// ruleset-4 classification in either hash framing; old bytes are retained.
++// current classification in either hash framing; old bytes are retained.
+ func TestNetworkContactCacheInvalidatesRulesetThree(t *testing.T) {
+ 	for _, version := range []hashing.Version{hashing.VersionV1, hashing.VersionV2} {
+ 		for _, host := range []string{"api.test", "api.example.com"} {
+diff --git a/internal/contextlock/contextlock.go b/internal/contextlock/contextlock.go
+index 8bee2c2ecf58693f67f939fd76a2ce756724f062..6a39d9807a84ea84eade819ce324d0d74000a99f 100644
+--- a/internal/contextlock/contextlock.go
++++ b/internal/contextlock/contextlock.go
+@@ -1,5 +1,5 @@
+ // Package contextlock is the profile lock of the agent-environments
+-// capability, context-lock-v1/v2 (environments §1.3): the strict schema
++// capability, context-lock-v1/v2/v4 (environments §1.3): the strict schema
+ // object naming the root and every closure member, its canonical CCJ-1 bytes,
+ // and the lock hash that is the profile's effective pin.
+ package contextlock
+@@ -31,6 +31,15 @@ const SchemaVersion = 1
+ // 2. Production writes select it only when the shared v2 writer switch is on.
+ const SchemaVersion2 = 2
+ 
++// SchemaVersion4 is the closed rc.7 successor admitting skill directories.
++const SchemaVersion4 = 4
++
++// Precedence binds the effective composition policy into a schema-4 lock.
++type Precedence struct {
++	Winner    string `json:"winner"`
++	Placement string `json:"placement"`
++}
++
+ // Member kinds, in their bytewise order.
+ const (
+ 	KindContext = "context"
+@@ -71,8 +80,9 @@ func (m Member) PinKey() string {
+ 	return m.StateHash
+ }
+ 
+-// Lock is one context-lock-v1 object.
++// Lock is one versioned context-lock object.
+ type Lock struct {
++	Precedence    Precedence
+ 	SchemaVersion int
+ 	HashVersion   int
+ 	Root          string
+@@ -131,7 +141,7 @@ func ResolvedDelta(oldLock, newLock *Lock) []Delta {
+ 		case !hasNew:
+ 			copyMember := oldMember
+ 			deltas = append(deltas, Delta{Old: &copyMember})
+-		case oldMember.Version != newMember.Version || deltaMemberPin(oldMember) != deltaMemberPin(newMember) ||
++		case oldMember.Directory != newMember.Directory || oldMember.Source != newMember.Source || oldMember.Version != newMember.Version || deltaMemberPin(oldMember) != deltaMemberPin(newMember) ||
+ 			(oldMember.StateHash != "" && newMember.StateHash != "" && lockHashVersion(oldLock) != lockHashVersion(newLock)):
+ 			oldCopy, newCopy := oldMember, newMember
+ 			deltas = append(deltas, Delta{Old: &oldCopy, New: &newCopy})
+@@ -219,12 +229,15 @@ var (
+ 	hex256RE = regexp.MustCompile(`^[0-9a-f]{64}$`)
+ )
+ 
+-// Validate applies the context-lock-v1/v2 schema rules.
++// Validate applies the context-lock-v1/v2/v4 schema rules.
+ func (lock *Lock) Validate() error {
+ 	schemaVersion, hashVersion := lockVersions(lock)
+-	if (schemaVersion != SchemaVersion || hashVersion != 1) && (schemaVersion != SchemaVersion2 || hashVersion != 2) {
++	if (schemaVersion != SchemaVersion || hashVersion != 1) && (schemaVersion != SchemaVersion2 || hashVersion != 2) && (schemaVersion != SchemaVersion4 || hashVersion != 2) {
+ 		return fmt.Errorf("lock schema_version %d and hash_version %d are incompatible", schemaVersion, hashVersion)
+ 	}
++	if schemaVersion == SchemaVersion4 && ((lock.Precedence.Winner != "higher-weight" && lock.Precedence.Winner != "lower-weight") || (lock.Precedence.Placement != "winner-last" && lock.Precedence.Placement != "winner-first")) {
++		return fmt.Errorf("schema-4 lock has invalid precedence")
++	}
+ 	if !identifiers.Valid(lock.Root) {
+ 		return fmt.Errorf("lock root %q is not a portable identifier", lock.Root)
+ 	}
+@@ -280,7 +293,7 @@ func (lock *Lock) Validate() error {
+ 			return fmt.Errorf("member %s directory %q is not a portable path", member.Name, member.Directory)
+ 		}
+ 		if member.Kind == KindSkill {
+-			if member.Directory != "" {
++			if member.Directory != "" && schemaVersion != SchemaVersion4 {
+ 				return fmt.Errorf("skill member %s carries a directory", member.Name)
+ 			}
+ 		} else if member.Version == "" {
+@@ -350,9 +363,14 @@ func (lock *Lock) Object() map[string]any {
+ 		"root":           lock.Root,
+ 		"members":        members,
+ 	}
+-	if schemaVersion == SchemaVersion2 {
++	if schemaVersion == SchemaVersion2 || schemaVersion == SchemaVersion4 {
+ 		object["hash_version"] = hashVersion
+ 	}
++	if schemaVersion == SchemaVersion4 {
++		object["codex_settings"] = map[string]any{}
++		object["codex_settings_contributions"] = []any{}
++		object["precedence"] = map[string]any{"winner": lock.Precedence.Winner, "placement": lock.Precedence.Placement}
++	}
+ 	return object
+ }
+ 
+@@ -417,20 +435,23 @@ func Parse(payload []byte) (*Lock, error) {
+ 	decoder := json.NewDecoder(bytes.NewReader(payload))
+ 	decoder.UseNumber()
+ 	var raw struct {
+-		SchemaVersion json.Number `json:"schema_version"`
+-		HashVersion   json.Number `json:"hash_version"`
+-		Root          string      `json:"root"`
++		SchemaVersion json.Number     `json:"schema_version"`
++		HashVersion   json.Number     `json:"hash_version"`
++		CodexSettings json.RawMessage `json:"codex_settings"`
++		Contributions json.RawMessage `json:"codex_settings_contributions"`
++		Precedence    *Precedence     `json:"precedence"`
++		Root          string          `json:"root"`
+ 		Members       []struct {
+-			Kind       string      `json:"kind"`
+-			Name       string      `json:"name"`
+-			Source     string      `json:"source"`
+-			Directory  string      `json:"directory"`
+-			Version    string      `json:"version"`
+-			Commit     string      `json:"commit"`
+-			StateHash  string      `json:"state_sha256"`
+-			Weight     json.Number `json:"weight"`
+-			RequiredBy []string    `json:"required_by"`
+-			Overlay    *bool       `json:"overlay"`
++			Kind       string          `json:"kind"`
++			Name       string          `json:"name"`
++			Source     string          `json:"source"`
++			Directory  json.RawMessage `json:"directory"`
++			Version    string          `json:"version"`
++			Commit     string          `json:"commit"`
++			StateHash  string          `json:"state_sha256"`
++			Weight     json.Number     `json:"weight"`
++			RequiredBy []string        `json:"required_by"`
++			Overlay    *bool           `json:"overlay"`
+ 		} `json:"members"`
+ 	}
+ 	decoder.DisallowUnknownFields()
+@@ -438,20 +459,34 @@ func Parse(payload []byte) (*Lock, error) {
+ 		return nil, fmt.Errorf("invalid lock: %w", err)
+ 	}
+ 	schemaVersion, err := strconv.Atoi(raw.SchemaVersion.String())
+-	if err != nil || (schemaVersion != SchemaVersion && schemaVersion != SchemaVersion2) {
+-		return nil, fmt.Errorf("invalid lock: schema_version must be %d or %d", SchemaVersion, SchemaVersion2)
++	if err != nil || (schemaVersion != SchemaVersion && schemaVersion != SchemaVersion2 && schemaVersion != SchemaVersion4) {
++		return nil, fmt.Errorf("invalid lock: schema_version must be %d, %d or %d", SchemaVersion, SchemaVersion2, SchemaVersion4)
+ 	}
+ 	hashVersion := 1
+-	if schemaVersion == SchemaVersion2 {
++	if schemaVersion == SchemaVersion2 || schemaVersion == SchemaVersion4 {
+ 		parsed, parseErr := strconv.Atoi(raw.HashVersion.String())
+ 		if parseErr != nil || parsed != 2 {
+-			return nil, fmt.Errorf("invalid lock: schema_version 2 requires hash_version 2")
++			return nil, fmt.Errorf("invalid lock: schema_version %d requires hash_version 2", schemaVersion)
+ 		}
+ 		hashVersion = parsed
+ 	} else if raw.HashVersion.String() != "" {
+ 		return nil, fmt.Errorf("invalid lock: schema_version 1 does not carry hash_version")
+ 	}
++	var present map[string]json.RawMessage
++	if err := json.Unmarshal(payload, &present); err != nil {
++		return nil, fmt.Errorf("invalid lock: %w", err)
++	}
+ 	lock := &Lock{SchemaVersion: schemaVersion, HashVersion: hashVersion, Root: raw.Root}
++	if schemaVersion == SchemaVersion4 {
++		var settings map[string]any
++		var contributions []any
++		if json.Unmarshal(raw.CodexSettings, &settings) != nil || settings == nil || len(settings) != 0 || json.Unmarshal(raw.Contributions, &contributions) != nil || contributions == nil || len(contributions) != 0 || raw.Precedence == nil {
++			return nil, fmt.Errorf("invalid lock: schema 4 requires empty settings, empty contributions and precedence")
++		}
++		lock.Precedence = *raw.Precedence
++	} else if raw.CodexSettings != nil || raw.Contributions != nil || present["precedence"] != nil {
++		return nil, fmt.Errorf("invalid lock: successor fields on legacy schema")
++	}
+ 	for _, member := range raw.Members {
+ 		weight, err := strconv.ParseInt(member.Weight.String(), 10, 64)
+ 		if err != nil {
+@@ -460,8 +495,14 @@ func Parse(payload []byte) (*Lock, error) {
+ 		if member.RequiredBy == nil || member.Overlay == nil {
+ 			return nil, fmt.Errorf("invalid lock: member %s lacks required_by or overlay", member.Name)
+ 		}
++		var directory string
++		if member.Directory != nil {
++			if err := json.Unmarshal(member.Directory, &directory); err != nil || !identifiers.PortablePath(directory) {
++				return nil, fmt.Errorf("invalid lock: member %s directory must be a portable path", member.Name)
++			}
++		}
+ 		lock.Members = append(lock.Members, Member{
+-			Kind: member.Kind, Name: member.Name, Source: member.Source, Directory: member.Directory,
++			Kind: member.Kind, Name: member.Name, Source: member.Source, Directory: directory,
+ 			Version: member.Version, Commit: member.Commit, StateHash: member.StateHash, Weight: weight,
+ 			RequiredBy: member.RequiredBy, Overlay: *member.Overlay,
+ 		})
+diff --git a/internal/contextpkg/contextpkg.go b/internal/contextpkg/contextpkg.go
+index 5e173aff6372b7f7c334430e4fc11e6faa50015e..854cf0a30abc3510a46540016526d4ef4814e60d 100644
+--- a/internal/contextpkg/contextpkg.go
++++ b/internal/contextpkg/contextpkg.go
+@@ -103,10 +103,11 @@ func (m Module) Applies(environment string) bool {
+ 
+ // Manifest is a validated agent-context.json.
+ type Manifest struct {
+-	Name    string
+-	Version string
+-	Weight  int64
+-	Weights map[string]int64
++	SchemaVersion int
++	Name          string
++	Version       string
++	Weight        int64
++	Weights       map[string]int64
+ 	// HasContext is true when the "context" member is present; a package
+ 	// without it is a pure umbrella and declares no root-context surface.
+ 	HasContext bool
+@@ -171,13 +172,25 @@ func ParseManifest(payload []byte) (*Manifest, error) {
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	if err := requireKeys(object, DiagManifestInvalid, "", "schema_version", "name", "version", "weight", "weights", "context", "requires"); err != nil {
+-		return nil, err
++	schema, ok := object["schema_version"].(json.Number)
++	if !ok || (schema.String() != "1" && schema.String() != "2") {
++		return nil, invalid(DiagManifestInvalid, "schema_version must be 1 or 2")
++	}
++	version, _ := strconv.Atoi(schema.String())
++	allowed := []string{"schema_version", "name", "version", "weight", "weights", "context", "requires"}
++	if version == 2 {
++		allowed = append(allowed, "codex_settings")
+ 	}
+-	if err := requireSchemaVersion(object, DiagManifestInvalid); err != nil {
++	if err := requireKeys(object, DiagManifestInvalid, "", allowed...); err != nil {
+ 		return nil, err
+ 	}
+-	manifest := &Manifest{}
++	if raw, present := object["codex_settings"]; present {
++		settings, ok := raw.(map[string]any)
++		if !ok || len(settings) != 0 {
++			return nil, invalid(DiagManifestInvalid, "codex_settings must be an empty object")
++		}
++	}
++	manifest := &Manifest{SchemaVersion: version}
+ 	if manifest.Name, err = requireIdentifier(object, "name", DiagManifestInvalid); err != nil {
+ 		return nil, err
+ 	}
+@@ -243,13 +256,13 @@ func ParseManifest(payload []byte) (*Manifest, error) {
+ 		if err := requireKeys(requires, DiagManifestInvalid, "requires.", "contexts", "skills", "mcp"); err != nil {
+ 			return nil, err
+ 		}
+-		if manifest.Contexts, err = parseRequirements(requires["contexts"], "contexts"); err != nil {
++		if manifest.Contexts, err = parseRequirements(requires["contexts"], "contexts", version); err != nil {
+ 			return nil, err
+ 		}
+-		if manifest.Skills, err = parseRequirements(requires["skills"], "skills"); err != nil {
++		if manifest.Skills, err = parseRequirements(requires["skills"], "skills", version); err != nil {
+ 			return nil, err
+ 		}
+-		if manifest.MCP, err = parseRequirements(requires["mcp"], "mcp"); err != nil {
++		if manifest.MCP, err = parseRequirements(requires["mcp"], "mcp", version); err != nil {
+ 			return nil, err
+ 		}
+ 	}
+@@ -286,7 +299,7 @@ func parseModule(entry any, index int) (Module, error) {
+ 	return module, nil
+ }
+ 
+-func parseRequirements(raw any, family string) (map[string]Requirement, error) {
++func parseRequirements(raw any, family string, schemaVersion int) (map[string]Requirement, error) {
+ 	if raw == nil {
+ 		return nil, nil
+ 	}
+@@ -310,6 +323,9 @@ func parseRequirements(raw any, family string) (map[string]Requirement, error) {
+ 			allowed = append(allowed, "directory", "weight")
+ 		case "skills":
+ 			allowed = append(allowed, "mode", "commands")
++			if schemaVersion == 2 {
++				allowed = append(allowed, "directory")
++			}
+ 		case "mcp":
+ 			allowed = append(allowed, "directory")
+ 		}
+diff --git a/internal/contextpkg/skill_directory_vectors_test.go b/internal/contextpkg/skill_directory_vectors_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..3c6bc03568ad11f2db13f8124a7a1789bc40a802
+--- /dev/null
++++ b/internal/contextpkg/skill_directory_vectors_test.go
+@@ -0,0 +1,185 @@
++package contextpkg_test
++
++import (
++	"encoding/json"
++	"os"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextpkg"
++)
++
++// The 56 published structural vectors exercise the actual strict readers,
++// including the frozen schema-1 refusals. They do not prove lifecycle behavior.
++func TestSkillDirectorySchemaVectors(t *testing.T) {
++	payload, err := os.ReadFile("testdata/profile-skill-directories-v1/schema-cases.json")
++	if err != nil {
++		t.Fatal(err)
++	}
++	var cases []struct {
++		Name, Schema string
++		Instance     json.RawMessage
++		Valid        bool
++	}
++	if err := json.Unmarshal(payload, &cases); err != nil {
++		t.Fatal(err)
++	}
++	if len(cases) != 56 {
++		t.Fatalf("vector count = %d", len(cases))
++	}
++	for _, tc := range cases {
++		t.Run(tc.Name, func(t *testing.T) {
++			var err error
++			if strings.Contains(tc.Schema, "agent-context") {
++				_, err = contextpkg.ParseManifest(tc.Instance)
++			} else {
++				_, err = contextlock.Parse(tc.Instance)
++			}
++			if (err == nil) != tc.Valid {
++				t.Fatalf("valid=%v, reader error=%v", tc.Valid, err)
++			}
++		})
++	}
++}
++
++// The independently published canonical bytes and pins change only directory.
++func TestSkillDirectoryLockIdentityVectors(t *testing.T) {
++	payload, err := os.ReadFile("testdata/profile-skill-directories-v1/lock-identity.json")
++	if err != nil {
++		t.Fatal(err)
++	}
++	var cases map[string]struct {
++		Lock json.RawMessage
++		CCJ1 string
++		Hash string `json:"lock_sha256"`
++	}
++	var raw map[string]json.RawMessage
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		t.Fatal(err)
++	}
++	delete(raw, "difference")
++	payload, _ = json.Marshal(raw)
++	if err := json.Unmarshal(payload, &cases); err != nil {
++		t.Fatal(err)
++	}
++	for name, tc := range cases {
++		t.Run(name, func(t *testing.T) {
++			lock, err := contextlock.Parse(tc.Lock)
++			if err != nil {
++				t.Fatal(err)
++			}
++			bytes, err := lock.Canonical()
++			if err != nil {
++				t.Fatal(err)
++			}
++			hash, err := lock.Hash()
++			if err != nil {
++				t.Fatal(err)
++			}
++			if string(bytes) != tc.CCJ1 || hash != tc.Hash {
++				t.Fatalf("canonical or identity mismatch: %s %s", bytes, hash)
++			}
++		})
++	}
++}
++
++// Successor readers keep the complete closed carriers; a discriminator cannot
++// lend schema-4 fields to frozen locks, or machine settings to packages.
++func TestSkillDirectoryClosedSuccessors(t *testing.T) {
++	payload, err := os.ReadFile("testdata/profile-skill-directories-v1/fixtures.json")
++	if err != nil {
++		t.Fatal(err)
++	}
++	var fixture struct {
++		Manifest json.RawMessage `json:"profile_manifest"`
++		Lock     json.RawMessage `json:"candidate_lock"`
++	}
++	if err = json.Unmarshal(payload, &fixture); err != nil {
++		t.Fatal(err)
++	}
++	for _, tc := range []struct {
++		name string
++		lock bool
++		edit func(map[string]any)
++	}{
++		{"manifest-nonempty-settings", false, func(m map[string]any) { m["codex_settings"] = map[string]any{"settings": map[string]any{}} }},
++		{"manifest-null-settings", false, func(m map[string]any) { m["codex_settings"] = nil }},
++		{"manifest-schema-one-settings", false, func(m map[string]any) {
++			m["schema_version"] = 1
++			delete(m, "requires")
++			m["codex_settings"] = map[string]any{}
++		}},
++		{"manifest-unsupported-three", false, func(m map[string]any) { m["schema_version"] = 3 }},
++		{"manifest-unknown-top-level", false, func(m map[string]any) { m["unexpected"] = true }},
++		{"lock-no-precedence", true, func(m map[string]any) { delete(m, "precedence") }},
++		{"lock-no-settings", true, func(m map[string]any) { delete(m, "codex_settings") }},
++		{"lock-no-contributions", true, func(m map[string]any) { delete(m, "codex_settings_contributions") }},
++		{"lock-null-settings", true, func(m map[string]any) { m["codex_settings"] = nil }},
++		{"lock-null-contributions", true, func(m map[string]any) { m["codex_settings_contributions"] = nil }},
++		{"lock-nonempty-settings", true, func(m map[string]any) { m["codex_settings"] = map[string]any{"model": "unowned"} }},
++		{"lock-nonempty-contributions", true, func(m map[string]any) { m["codex_settings_contributions"] = []any{map[string]any{}} }},
++		{"lock-invalid-precedence", true, func(m map[string]any) { m["precedence"].(map[string]any)["winner"] = "unknown" }},
++		{"lock-unknown-precedence", true, func(m map[string]any) { m["precedence"].(map[string]any)["extra"] = true }},
++		{"lock-wrong-hash-version", true, func(m map[string]any) { m["hash_version"] = 1 }},
++		{"lock-draft-three", true, func(m map[string]any) { m["schema_version"] = 3 }},
++		{"lock-empty-directory", true, func(m map[string]any) { m["members"].([]any)[1].(map[string]any)["directory"] = "" }},
++		{"lock-null-directory", true, func(m map[string]any) { m["members"].([]any)[1].(map[string]any)["directory"] = nil }},
++		{"lock-frozen-two-directory", true, func(m map[string]any) {
++			m["schema_version"] = 2
++			delete(m, "precedence")
++			delete(m, "codex_settings")
++			delete(m, "codex_settings_contributions")
++		}},
++		{"lock-frozen-two-null-precedence", true, func(m map[string]any) {
++			m["schema_version"] = 2
++			m["precedence"] = nil
++			delete(m, "codex_settings")
++			delete(m, "codex_settings_contributions")
++			delete(m["members"].([]any)[1].(map[string]any), "directory")
++		}},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			raw := fixture.Manifest
++			if tc.lock {
++				raw = fixture.Lock
++			}
++			var m map[string]any
++			if err = json.Unmarshal(raw, &m); err != nil {
++				t.Fatal(err)
++			}
++			tc.edit(m)
++			raw, err = json.Marshal(m)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if tc.lock {
++				_, err = contextlock.Parse(raw)
++			} else {
++				_, err = contextpkg.ParseManifest(raw)
++			}
++			if err == nil {
++				t.Fatal("closed carrier admitted forbidden mutation")
++			}
++		})
++	}
++	// Nearby valid controls exercise both empty settings and frozen lock 2.
++	var m map[string]any
++	_ = json.Unmarshal(fixture.Manifest, &m)
++	m["codex_settings"] = map[string]any{}
++	raw, _ := json.Marshal(m)
++	if _, err = contextpkg.ParseManifest(raw); err != nil {
++		t.Fatal(err)
++	}
++	m = nil
++	_ = json.Unmarshal(fixture.Lock, &m)
++	m["schema_version"] = 2
++	delete(m, "precedence")
++	delete(m, "codex_settings")
++	delete(m, "codex_settings_contributions")
++	delete(m["members"].([]any)[1].(map[string]any), "directory")
++	raw, _ = json.Marshal(m)
++	if _, err = contextlock.Parse(raw); err != nil {
++		t.Fatal(err)
++	}
++}
+diff --git a/internal/contextpkg/testdata/profile-skill-directories-v1/fixtures.json b/internal/contextpkg/testdata/profile-skill-directories-v1/fixtures.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..43bf734af5292dcd8c04aa0ecd63a4b448b592a5
+--- /dev/null
++++ b/internal/contextpkg/testdata/profile-skill-directories-v1/fixtures.json
+@@ -0,0 +1,78 @@
++{
++  "repository": "https://github.com/example/skill-packages.git",
++  "commit_symbol": "0123456789abcdef0123456789abcdef01234567",
++  "profile_manifest": {
++    "schema_version": 2,
++    "name": "sample-profile",
++    "version": "1.0.0",
++    "requires": {
++      "skills": {
++        "formatter": {
++          "git": "https://github.com/example/skill-packages.git",
++          "revision": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/formatter"
++        }
++      }
++    }
++  },
++  "snapshot": {
++    "files": {
++      "agent-skill.json": "{\"schema_version\":3,\"commands\":{},\"capabilities\":{\"network\":[\"api.example.net\"]}}\n",
++      "SKILL.md": "---\nname: unrelated\ndescription: Repository root control\n---\n",
++      "skills/formatter/SKILL.md": "---\nname: formatter\ndescription: Format sample documents\n---\nUse format when requested.\n",
++      "skills/formatter/agent-skill.json": "{\"schema_version\":3,\"commands\":{\"format\":{\"type\":\"system\",\"command\":\"format\"}},\"capabilities\":{\"network\":[\"api.example.net\"]}}\n",
++      "skills/formatter/notes.md": "Contact https://api.example.net for formatting guidance.\n",
++      "skills/sibling/notes.md": "Contact https://other.example.net for unrelated guidance.\n"
++    },
++    "symlinks": {}
++  },
++  "root_skill_snapshot": {
++    "files": {
++      "SKILL.md": "---\nname: formatter\ndescription: Format sample documents\n---\nUse format when requested.\n",
++      "agent-skill.json": "{\"schema_version\":3,\"commands\":{\"format\":{\"type\":\"system\",\"command\":\"format\"}},\"capabilities\":{\"network\":[\"api.example.net\"]}}\n",
++      "notes.md": "Contact https://api.example.net for formatting guidance.\n"
++    },
++    "symlinks": {}
++  },
++  "context_skill_snapshot": {
++    "files": {
++      "skills/formatter/SKILL.md": "---\nname: formatter\ndescription: Context-only formatter\n---\nFormatting guidance.\n"
++    },
++    "symlinks": {}
++  },
++  "candidate_lock": {
++    "schema_version": 4,
++    "hash_version": 2,
++    "root": "sample-profile",
++    "members": [
++      {
++        "kind": "context",
++        "name": "sample-profile",
++        "source": "github.com/example/sample-profile",
++        "commit": "1111111111111111111111111111111111111111",
++        "version": "1.0.0",
++        "weight": 0,
++        "required_by": [],
++        "overlay": false
++      },
++      {
++        "kind": "skill",
++        "name": "formatter",
++        "source": "github.com/example/skill-packages",
++        "commit": "0123456789abcdef0123456789abcdef01234567",
++        "directory": "skills/formatter",
++        "weight": 0,
++        "required_by": [
++          "sample-profile"
++        ],
++        "overlay": false
++      }
++    ],
++    "codex_settings": {},
++    "codex_settings_contributions": [],
++    "precedence": {
++      "winner": "higher-weight",
++      "placement": "winner-last"
++    }
++  }
++}
+diff --git a/internal/contextpkg/testdata/profile-skill-directories-v1/lock-identity.json b/internal/contextpkg/testdata/profile-skill-directories-v1/lock-identity.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..e7d68800edd70641cd7749d3a257e8405e511448
+--- /dev/null
++++ b/internal/contextpkg/testdata/profile-skill-directories-v1/lock-identity.json
+@@ -0,0 +1,81 @@
++{
++  "selected": {
++    "lock": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "ccj1": "{\"codex_settings\":{},\"codex_settings_contributions\":[],\"hash_version\":2,\"members\":[{\"commit\":\"1111111111111111111111111111111111111111\",\"kind\":\"context\",\"name\":\"sample-profile\",\"overlay\":false,\"required_by\":[],\"source\":\"github.com/example/sample-profile\",\"version\":\"1.0.0\",\"weight\":0},{\"commit\":\"0123456789abcdef0123456789abcdef01234567\",\"directory\":\"skills/formatter\",\"kind\":\"skill\",\"name\":\"formatter\",\"overlay\":false,\"required_by\":[\"sample-profile\"],\"source\":\"github.com/example/skill-packages\",\"weight\":0}],\"precedence\":{\"placement\":\"winner-last\",\"winner\":\"higher-weight\"},\"root\":\"sample-profile\",\"schema_version\":4}",
++    "lock_sha256": "sha256:c60b77a330a42eb7c23e8eb7797d25955efcdf6355cf0d18558f1368fee73007"
++  },
++  "alternate": {
++    "lock": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/alternate",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "ccj1": "{\"codex_settings\":{},\"codex_settings_contributions\":[],\"hash_version\":2,\"members\":[{\"commit\":\"1111111111111111111111111111111111111111\",\"kind\":\"context\",\"name\":\"sample-profile\",\"overlay\":false,\"required_by\":[],\"source\":\"github.com/example/sample-profile\",\"version\":\"1.0.0\",\"weight\":0},{\"commit\":\"0123456789abcdef0123456789abcdef01234567\",\"directory\":\"skills/alternate\",\"kind\":\"skill\",\"name\":\"formatter\",\"overlay\":false,\"required_by\":[\"sample-profile\"],\"source\":\"github.com/example/skill-packages\",\"weight\":0}],\"precedence\":{\"placement\":\"winner-last\",\"winner\":\"higher-weight\"},\"root\":\"sample-profile\",\"schema_version\":4}",
++    "lock_sha256": "sha256:802ffb39a6ea1add365b1dd9ecc54e13e51fb85c0a151271d03a95d48deb91c9"
++  },
++  "difference": "Only members[1].directory changes; lock_sha256 MUST differ."
++}
+diff --git a/internal/contextpkg/testdata/profile-skill-directories-v1/schema-cases.json b/internal/contextpkg/testdata/profile-skill-directories-v1/schema-cases.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..547437dfc47f13f04a111754b579da29a70a9615
+--- /dev/null
++++ b/internal/contextpkg/testdata/profile-skill-directories-v1/schema-cases.json
+@@ -0,0 +1,1572 @@
++[
++  {
++    "name": "manifest-v2-retargeted-selected-skill",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/formatter"
++          }
++        }
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "manifest-v2-retargeted-tag-selected-skill",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "directory": "skills/formatter",
++            "tag": "v1.0.0"
++          }
++        }
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "manifest-v2-retargeted-range-selected-skill",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "directory": "skills/formatter",
++            "range": "^1"
++          }
++        }
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "manifest-v2-retargeted-root-skill",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567"
++          }
++        }
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "manifest-v2-retargeted-runtime-selection",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/formatter",
++            "mode": "runtime",
++            "commands": [
++              "format"
++            ]
++          }
++        }
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "manifest-v2-retargeted-parent-prefix",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "../formatter"
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-retargeted-parent-component",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/../formatter"
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-retargeted-absolute",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "/skills/formatter"
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-retargeted-drive",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "C:/skills/formatter"
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-retargeted-backslash",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills\\formatter"
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-retargeted-dot",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "."
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-retargeted-empty",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": ""
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-retargeted-null",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": null
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-retargeted-double-slash",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills//formatter"
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-retargeted-path-source",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "path": "/snapshot",
++            "directory": "skills/formatter"
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-retargeted-unknown-member",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/formatter",
++            "unexpected": true
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "context_manifest_invalid"
++  },
++  {
++    "name": "manifest-v2-retargeted-commands-with-context",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/formatter",
++            "mode": "context",
++            "commands": [
++              "format"
++            ]
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "context_manifest_invalid"
++  },
++  {
++    "name": "manifest-v2-selected-skill",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/formatter"
++          }
++        }
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "manifest-v2-tag-selected-skill",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "directory": "skills/formatter",
++            "tag": "v1.0.0"
++          }
++        }
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "manifest-v2-range-selected-skill",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "directory": "skills/formatter",
++            "range": "^1"
++          }
++        }
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "manifest-v2-root-skill",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567"
++          }
++        }
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "manifest-v2-runtime-selection",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/formatter",
++            "mode": "runtime",
++            "commands": [
++              "format"
++            ]
++          }
++        }
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "manifest-v2-parent-prefix",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "../formatter"
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-parent-component",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/../formatter"
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-absolute",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "/skills/formatter"
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-drive",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "C:/skills/formatter"
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-backslash",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills\\formatter"
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-dot",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "."
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-empty",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": ""
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-null",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": null
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-double-slash",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills//formatter"
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-path-source",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "path": "/snapshot",
++            "directory": "skills/formatter"
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "profile_source_invalid"
++  },
++  {
++    "name": "manifest-v2-unknown-member",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/formatter",
++            "unexpected": true
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "context_manifest_invalid"
++  },
++  {
++    "name": "manifest-v2-commands-with-context",
++    "schema": "schemas/rc7-carriers-v1/agent-context-v2.schema.json",
++    "instance": {
++      "schema_version": 2,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/formatter",
++            "mode": "context",
++            "commands": [
++              "format"
++            ]
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "context_manifest_invalid"
++  },
++  {
++    "name": "lock-v4-retargeted-selected-skill",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "lock-v4-retargeted-versioned-selected-skill",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false,
++          "version": "1.0.0"
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "lock-v4-retargeted-root-skill",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "lock-v4-retargeted-parent-prefix",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "../formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "environment_store_untrusted"
++  },
++  {
++    "name": "lock-v4-retargeted-parent-component",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/../formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "environment_store_untrusted"
++  },
++  {
++    "name": "lock-v4-retargeted-absolute",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "/skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "environment_store_untrusted"
++  },
++  {
++    "name": "lock-v4-retargeted-state-skill",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false,
++          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "environment_store_untrusted"
++  },
++  {
++    "name": "lock-v4-retargeted-overlay-skill",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": true
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "environment_store_untrusted"
++  },
++  {
++    "name": "lock-v4-retargeted-unknown-member",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false,
++          "unexpected": true
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "environment_store_untrusted"
++  },
++  {
++    "name": "lock-v4-retargeted-context-needs-version",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "environment_store_untrusted"
++  },
++  {
++    "name": "lock-v4-selected-skill",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "lock-v4-versioned-selected-skill",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false,
++          "version": "1.0.0"
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "lock-v4-root-skill",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": true,
++    "expected_diagnostic": null
++  },
++  {
++    "name": "lock-v4-parent-prefix",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "../formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "environment_store_untrusted"
++  },
++  {
++    "name": "lock-v4-parent-component",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/../formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "environment_store_untrusted"
++  },
++  {
++    "name": "lock-v4-absolute",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "/skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "environment_store_untrusted"
++  },
++  {
++    "name": "lock-v4-state-skill",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false,
++          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "environment_store_untrusted"
++  },
++  {
++    "name": "lock-v4-overlay-skill",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": true
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "environment_store_untrusted"
++  },
++  {
++    "name": "lock-v4-unknown-member",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false,
++          "unexpected": true
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "environment_store_untrusted"
++  },
++  {
++    "name": "lock-v4-context-needs-version",
++    "schema": "schemas/rc7-carriers-v1/context-lock-v4.schema.json",
++    "instance": {
++      "schema_version": 4,
++      "hash_version": 2,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false
++        }
++      ],
++      "codex_settings": {},
++      "codex_settings_contributions": [],
++      "precedence": {
++        "winner": "higher-weight",
++        "placement": "winner-last"
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "environment_store_untrusted"
++  },
++  {
++    "name": "historical-lock-v1-rejects-skill-directory",
++    "schema": "schemas/v1/context-lock-v1.schema.json",
++    "instance": {
++      "schema_version": 1,
++      "root": "sample-profile",
++      "members": [
++        {
++          "kind": "context",
++          "name": "sample-profile",
++          "source": "github.com/example/sample-profile",
++          "commit": "1111111111111111111111111111111111111111",
++          "version": "1.0.0",
++          "weight": 0,
++          "required_by": [],
++          "overlay": false
++        },
++        {
++          "kind": "skill",
++          "name": "formatter",
++          "source": "github.com/example/skill-packages",
++          "commit": "0123456789abcdef0123456789abcdef01234567",
++          "directory": "skills/formatter",
++          "weight": 0,
++          "required_by": [
++            "sample-profile"
++          ],
++          "overlay": false
++        }
++      ]
++    },
++    "valid": false,
++    "expected_diagnostic": "environment_store_untrusted"
++  },
++  {
++    "name": "manifest-v1-still-refuses-skill-directory",
++    "schema": "schemas/v1/agent-context-v1.schema.json",
++    "instance": {
++      "schema_version": 1,
++      "name": "sample-profile",
++      "version": "1.0.0",
++      "requires": {
++        "skills": {
++          "formatter": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/formatter"
++          }
++        }
++      }
++    },
++    "valid": false,
++    "expected_diagnostic": "context_manifest_invalid"
++  }
++]
+diff --git a/internal/contextpkg/testdata/profile-skill-directories-v1/vectors.json b/internal/contextpkg/testdata/profile-skill-directories-v1/vectors.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..c67adcd3ff9e40183e96bc0dad530860c0f8ff6f
+--- /dev/null
++++ b/internal/contextpkg/testdata/profile-skill-directories-v1/vectors.json
+@@ -0,0 +1,528 @@
++{
++  "schema_version": 1,
++  "capability": "agent-environments",
++  "amendment": "CIP-0021",
++  "released_corpus": false,
++  "cases": [
++    {
++      "name": "profile-install-selected-root",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {},
++      "expected": {
++        "outcome": "materialized",
++        "diagnostic": null,
++        "skill_lock_directory": "skills/formatter",
++        "skill_lock_sha256": "sha256:c60b77a330a42eb7c23e8eb7797d25955efcdf6355cf0d18558f1368fee73007",
++        "skill_audit_root": "skills/formatter",
++        "skill_capabilities_from": "skills/formatter/agent-skill.json",
++        "skill_content_paths": [
++          "SKILL.md",
++          "agent-skill.json",
++          "notes.md"
++        ],
++        "undeclared_network_findings": [],
++        "skill_link_targets": {
++          "managed-home": "skills/formatter",
++          "in-place": "skills/formatter"
++        }
++      },
++      "forbidden_observations": [
++        "repository root or sibling contributes skill content, capabilities or findings",
++        "directory dropped from skill lock member",
++        "either surface links the repository root"
++      ]
++    },
++    {
++      "name": "profile-update-selected-root",
++      "entry": "profile update",
++      "fixture": "fixtures.json",
++      "changes": {},
++      "expected": {
++        "outcome": "materialized",
++        "diagnostic": null,
++        "skill_lock_directory": "skills/formatter",
++        "skill_lock_sha256": "sha256:c60b77a330a42eb7c23e8eb7797d25955efcdf6355cf0d18558f1368fee73007",
++        "skill_audit_root": "skills/formatter",
++        "skill_capabilities_from": "skills/formatter/agent-skill.json",
++        "skill_content_paths": [
++          "SKILL.md",
++          "agent-skill.json",
++          "notes.md"
++        ],
++        "undeclared_network_findings": [],
++        "skill_link_targets": {
++          "managed-home": "skills/formatter",
++          "in-place": "skills/formatter"
++        }
++      },
++      "forbidden_observations": [
++        "repository root or sibling contributes skill content, capabilities or findings",
++        "directory dropped from skill lock member",
++        "either surface links the repository root"
++      ]
++    },
++    {
++      "name": "profile-sync-selected-root",
++      "entry": "profile sync",
++      "fixture": "fixtures.json",
++      "changes": {},
++      "expected": {
++        "outcome": "materialized",
++        "diagnostic": null,
++        "skill_lock_directory": "skills/formatter",
++        "skill_lock_sha256": "sha256:c60b77a330a42eb7c23e8eb7797d25955efcdf6355cf0d18558f1368fee73007",
++        "skill_audit_root": "skills/formatter",
++        "skill_capabilities_from": "skills/formatter/agent-skill.json",
++        "skill_content_paths": [
++          "SKILL.md",
++          "agent-skill.json",
++          "notes.md"
++        ],
++        "undeclared_network_findings": [],
++        "skill_link_targets": {
++          "managed-home": "skills/formatter",
++          "in-place": "skills/formatter"
++        }
++      },
++      "forbidden_observations": [
++        "repository root or sibling contributes skill content, capabilities or findings",
++        "directory dropped from skill lock member",
++        "either surface links the repository root"
++      ]
++    },
++    {
++      "name": "selected-root-undeclared-contact",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "snapshot.files.skills/formatter/agent-skill.json": "{\"schema_version\":3,\"commands\":{},\"capabilities\":{\"network\":\"none\"}}\n"
++      },
++      "expected": {
++        "outcome": "refused",
++        "diagnostic": "audit.capability.network-undeclared",
++        "finding_file": "notes.md",
++        "finding_host": "api.example.net",
++        "published_writes": []
++      },
++      "forbidden_observations": [
++        "repository-root or sibling capabilities clear the selected finding",
++        "lock or surfaces published after audit refusal"
++      ]
++    },
++    {
++      "name": "root-addressing-unchanged",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "requirement.remove": [
++          "directory"
++        ],
++        "snapshot": "root_skill_snapshot"
++      },
++      "expected": {
++        "outcome": "materialized",
++        "diagnostic": null,
++        "skill_lock_directory_present": false,
++        "skill_audit_root": ".",
++        "skill_link_targets": {
++          "managed-home": ".",
++          "in-place": "."
++        }
++      },
++      "forbidden_observations": []
++    },
++    {
++      "name": "manifestless-context-selected-root",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "snapshot": "context_skill_snapshot",
++        "requirement.mode": "context"
++      },
++      "expected": {
++        "outcome": "materialized",
++        "diagnostic": null,
++        "skill_manifest": null,
++        "skill_commands": [],
++        "skill_link_targets": {
++          "managed-home": "skills/formatter",
++          "in-place": "skills/formatter"
++        }
++      },
++      "forbidden_observations": []
++    },
++    {
++      "name": "parent-prefix-refused",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "requirement.directory": "../formatter"
++      },
++      "expected": {
++        "outcome": "refused",
++        "diagnostic": "profile_source_invalid",
++        "published_writes": []
++      },
++      "forbidden_observations": []
++    },
++    {
++      "name": "parent-component-refused",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "requirement.directory": "skills/../formatter"
++      },
++      "expected": {
++        "outcome": "refused",
++        "diagnostic": "profile_source_invalid",
++        "published_writes": []
++      },
++      "forbidden_observations": []
++    },
++    {
++      "name": "absolute-refused",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "requirement.directory": "/skills/formatter"
++      },
++      "expected": {
++        "outcome": "refused",
++        "diagnostic": "profile_source_invalid",
++        "published_writes": []
++      },
++      "forbidden_observations": []
++    },
++    {
++      "name": "symlinked-component-refused",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "snapshot.symlinks": {
++          "skills": "packages"
++        }
++      },
++      "expected": {
++        "outcome": "refused",
++        "diagnostic": "profile_source_invalid",
++        "published_writes": []
++      },
++      "forbidden_observations": [
++        "following a link whose target remains inside the snapshot"
++      ]
++    },
++    {
++      "name": "symlinked-leaf-inside-refused",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "snapshot.symlinks": {
++          "skills/formatter": "../sibling"
++        }
++      },
++      "expected": {
++        "outcome": "refused",
++        "diagnostic": "profile_source_invalid",
++        "published_writes": []
++      },
++      "forbidden_observations": [
++        "following a link whose target remains inside the snapshot"
++      ]
++    },
++    {
++      "name": "symlinked-leaf-outside-refused",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "snapshot.symlinks": {
++          "skills/formatter": "../../outside"
++        }
++      },
++      "expected": {
++        "outcome": "refused",
++        "diagnostic": "profile_source_invalid",
++        "published_writes": []
++      },
++      "forbidden_observations": [
++        "following a link whose target remains inside the snapshot"
++      ]
++    },
++    {
++      "name": "missing-directory-refused",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "requirement.directory": "skills/missing"
++      },
++      "expected": {
++        "outcome": "refused",
++        "diagnostic": "profile_source_invalid",
++        "published_writes": []
++      },
++      "forbidden_observations": []
++    },
++    {
++      "name": "missing-skill-md-refused",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "snapshot.remove": [
++          "skills/formatter/SKILL.md"
++        ]
++      },
++      "expected": {
++        "outcome": "refused",
++        "diagnostic": "manifest_invalid",
++        "published_writes": []
++      },
++      "forbidden_observations": [
++        "fall back to repository-root SKILL.md"
++      ]
++    },
++    {
++      "name": "missing-runtime-manifest-refused",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "snapshot.remove": [
++          "skills/formatter/agent-skill.json"
++        ],
++        "requirement.mode": "runtime",
++        "requirement.commands": [
++          "format"
++        ]
++      },
++      "expected": {
++        "outcome": "refused",
++        "diagnostic": "manifest_invalid",
++        "published_writes": []
++      },
++      "forbidden_observations": [
++        "use repository-root manifest",
++        "silently accept requested command absent from selected package"
++      ]
++    },
++    {
++      "name": "invalid-selected-manifest-refused",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "snapshot.files.skills/formatter/agent-skill.json": "{\n"
++      },
++      "expected": {
++        "outcome": "refused",
++        "diagnostic": "manifest_invalid",
++        "published_writes": []
++      },
++      "forbidden_observations": [
++        "treat invalid selected manifest as absent",
++        "read repository-root manifest instead"
++      ]
++    },
++    {
++      "name": "directory-disagreement-refused",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "requirers": {
++          "consumer-a": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/formatter"
++          },
++          "consumer-b": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/alternate"
++          }
++        }
++      },
++      "expected": {
++        "outcome": "refused",
++        "diagnostic": "context_range_conflict",
++        "diagnostic_requirers": [
++          "consumer-a",
++          "consumer-b"
++        ],
++        "diagnostic_fields": [
++          "source",
++          "directory"
++        ],
++        "published_writes": []
++      },
++      "forbidden_observations": []
++    },
++    {
++      "name": "source-disagreement-refused",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "requirers": {
++          "consumer-a": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/formatter"
++          },
++          "consumer-b": {
++            "git": "https://github.com/example/other-skills.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/formatter"
++          }
++        }
++      },
++      "expected": {
++        "outcome": "refused",
++        "diagnostic": "context_range_conflict",
++        "diagnostic_requirers": [
++          "consumer-a",
++          "consumer-b"
++        ],
++        "diagnostic_fields": [
++          "source",
++          "directory"
++        ],
++        "published_writes": []
++      },
++      "forbidden_observations": []
++    },
++    {
++      "name": "omitted-versus-selected-disagreement-refused",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "requirers": {
++          "consumer-a": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/formatter"
++          },
++          "consumer-b": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567"
++          }
++        }
++      },
++      "expected": {
++        "outcome": "refused",
++        "diagnostic": "context_range_conflict",
++        "diagnostic_requirers": [
++          "consumer-a",
++          "consumer-b"
++        ],
++        "diagnostic_fields": [
++          "source",
++          "directory"
++        ],
++        "published_writes": []
++      },
++      "forbidden_observations": []
++    },
++    {
++      "name": "agreeing-requirers-unify",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "requirers": {
++          "consumer-a": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/formatter"
++          },
++          "consumer-b": {
++            "git": "https://github.com/example/skill-packages.git",
++            "revision": "0123456789abcdef0123456789abcdef01234567",
++            "directory": "skills/formatter"
++          }
++        }
++      },
++      "expected": {
++        "outcome": "materialized",
++        "diagnostic": null,
++        "skill_members": 1,
++        "skill_lock_directory": "skills/formatter",
++        "skill_required_by": [
++          "consumer-a",
++          "consumer-b"
++        ]
++      },
++      "forbidden_observations": []
++    },
++    {
++      "name": "path-source-directory-refused",
++      "entry": "profile install",
++      "fixture": "fixtures.json",
++      "changes": {
++        "requirement": {
++          "path": "/snapshot",
++          "directory": "skills/formatter"
++        }
++      },
++      "expected": {
++        "outcome": "refused",
++        "diagnostic": "profile_source_invalid",
++        "published_writes": []
++      },
++      "forbidden_observations": []
++    },
++    {
++      "name": "legacy-migration-keeps-root",
++      "entry": "first profile-surface use",
++      "fixture": "fixtures.json",
++      "changes": {
++        "legacy_install_record": {
++          "name": "formatter",
++          "git": "https://github.com/example/skill-packages.git",
++          "revision": "0123456789abcdef0123456789abcdef01234567"
++        },
++        "snapshot": "root_skill_snapshot"
++      },
++      "expected": {
++        "outcome": "migrated",
++        "diagnostic": null,
++        "profile": "default",
++        "skill_lock_directory_present": false,
++        "skill_audit_root": ".",
++        "skill_link_targets": {
++          "managed-home": ".",
++          "in-place": "."
++        },
++        "inferred_directory": false
++      },
++      "forbidden_observations": []
++    },
++    {
++      "name": "sibling-edit-preserves-skill-identity",
++      "entry": "profile update",
++      "fixture": "fixtures.json",
++      "changes": {
++        "snapshot.files.skills/sibling/notes.md": "Unrelated changed bytes.\n"
++      },
++      "expected": {
++        "outcome": "materialized",
++        "diagnostic": null,
++        "skill_content_sha256_equal_to_base": true,
++        "skill_content_paths": [
++          "SKILL.md",
++          "agent-skill.json",
++          "notes.md"
++        ]
++      },
++      "forbidden_observations": []
++    },
++    {
++      "name": "selected-edit-changes-skill-identity",
++      "entry": "profile update",
++      "fixture": "fixtures.json",
++      "changes": {
++        "snapshot.files.skills/formatter/notes.md": "Changed formatting guidance.\n"
++      },
++      "expected": {
++        "outcome": "materialized",
++        "diagnostic": null,
++        "skill_content_sha256_equal_to_base": false
++      },
++      "forbidden_observations": []
++    }
++  ]
++}
+diff --git a/internal/contextresolve/contextresolve.go b/internal/contextresolve/contextresolve.go
+index 535784c168900cb28bb66158defe28f281b6aa98..ac3385bc634211c7cf37e738588e8fce32a0ebc3 100644
+--- a/internal/contextresolve/contextresolve.go
++++ b/internal/contextresolve/contextresolve.go
+@@ -34,7 +34,7 @@ const (
+ 	DiagWeightUnknown        = "context_weight_unknown"
+ 	DiagCompositionInvalid   = "environment_composition_invalid"
+ 	DiagMCPPackageNotAllowed = "mcp_package_not_allowed"
+-	DiagSourceMismatch       = "context_source_mismatch"
++	DiagSourceMismatch       = DiagRangeConflict
+ 	DiagSourceUnsigned       = "context_source_unsigned"
+ 	DiagSourceSignerRejected = "context_source_signer_rejected"
+ 	DiagSourceSignersMissing = "context_source_signers_missing"
+@@ -46,6 +46,8 @@ const MachineRequirer = "machine"
+ 
+ // Requirement is one constraint-contributing declaration.
+ type Requirement struct {
++	Mode      string
++	Commands  []string
+ 	Kind      string
+ 	Name      string
+ 	Source    string // canonical network identity, or "" to take the source's own
+@@ -76,10 +78,12 @@ func (r Requirement) exact() bool { return r.Range == "" }
+ // Package is the manifest of one package at one commit as resolution reads
+ // it. Version is empty for a skill.
+ type Package struct {
+-	Version  string
+-	Weight   int64
+-	Weights  map[string]int64
+-	Requires []Requirement
++	SchemaVersion int
++	SkillCommands map[string]bool
++	Version       string
++	Weight        int64
++	Weights       map[string]int64
++	Requires      []Requirement
+ }
+ 
+ // Candidate is one version tag of a source peeled to its commit.
+@@ -157,6 +161,7 @@ type Overlay struct {
+ 
+ // Input is one resolution request.
+ type Input struct {
++	Precedence contextlock.Precedence
+ 	// Root is the install declaration: kind context.
+ 	Root Requirement
+ 	// RootState is set for a path or local root; Root then carries only Name.
+@@ -180,6 +185,8 @@ type Input struct {
+ type RequirerConstraint struct {
+ 	Requirer   string `json:"requirer"`
+ 	Constraint string `json:"constraint"`
++	Source     string `json:"source"`
++	Directory  string `json:"directory"`
+ }
+ 
+ // RequirerWeight is one requirer's edge weight in a weight-conflict detail.
+@@ -208,7 +215,7 @@ func (e *Error) Error() string {
+ 		parts = append(parts, e.Name)
+ 	}
+ 	for _, requirer := range e.Requirers {
+-		parts = append(parts, fmt.Sprintf("%s requires %s", requirer.Requirer, requirer.Constraint))
++		parts = append(parts, fmt.Sprintf("%s requires %s source %s directory %q", requirer.Requirer, requirer.Constraint, requirer.Source, requirer.Directory))
+ 	}
+ 	for _, requirer := range e.WeightRequirers {
+ 		parts = append(parts, fmt.Sprintf("%s declares weight %d", requirer.Requirer, requirer.Weight))
+@@ -476,28 +483,29 @@ func (r *resolver) selectName(name string) error {
+ 	// Source identity and directory must agree across every requirer.
+ 	// Comparison is over the core §6.1 canonical identity (environments
+ 	// §1.4): two spellings of one repository are one identity and never a
+-	// spurious context_source_mismatch. File:// remotes (no network
++	// spurious context_range_conflict. File:// remotes (no network
+ 	// identity) compare as their raw URLs so distinct test remotes stay
+ 	// distinct.
+ 	declaredSource, directory := "", ""
+ 	declaredCanonical := ""
++	directorySeen := false
+ 	for _, c := range constraints {
+ 		if c.requirement.Source != "" {
+ 			canonical := canonicalForAgreement(c.requirement.Source)
+ 			if declaredSource != "" && declaredCanonical != canonical {
+-				return &Error{Diagnostic: DiagSourceMismatch, Name: name,
+-					Detail: fmt.Sprintf("requirers disagree on the source identity (%s vs %s)", declaredSource, c.requirement.Source)}
++				conflict := r.conflict(name, []string{})
++				conflict.Detail = "requirers disagree on source identity"
++				return conflict
+ 			}
+ 			declaredSource = c.requirement.Source
+ 			declaredCanonical = canonical
+ 		}
+-		if c.requirement.Directory != "" {
+-			if directory != "" && directory != c.requirement.Directory {
+-				return &Error{Diagnostic: DiagSourceMismatch, Name: name,
+-					Detail: fmt.Sprintf("requirers disagree on the directory (%s vs %s)", directory, c.requirement.Directory)}
+-			}
+-			directory = c.requirement.Directory
++		if directorySeen && directory != c.requirement.Directory {
++			conflict := r.conflict(name, []string{})
++			conflict.Detail = "requirers disagree on directory"
++			return conflict
+ 		}
++		directory, directorySeen = c.requirement.Directory, true
+ 	}
+ 
+ 	// A path or local package has exactly one candidate: its state.
+@@ -593,8 +601,8 @@ func (r *resolver) selectName(name string) error {
+ 				return r.conflict(name, considered)
+ 			}
+ 		}
+-		if current != nil && current.commit == exactCommit {
+-			return nil
++		if current != nil && current.commit == exactCommit && current.directory == directory && current.source == source {
++			return r.validateSkillRequirements(name, current)
+ 		}
+ 		if r.hasCeiling[name] && chosen.hasVer && pkgversion.Compare(chosen.version, r.ceiling[name]) > 0 {
+ 			return r.conflict(name, []string{chosen.version.String()})
+@@ -635,12 +643,18 @@ func (r *resolver) selectName(name string) error {
+ 		}
+ 		return r.conflict(name, considered)
+ 	}
+-	if current != nil && current.commit == best.Commit {
++	if current != nil && current.commit == best.Commit && current.directory == directory && current.source == source {
++		if err := r.validateSkillRequirements(name, current); err != nil {
++			return err
++		}
+ 		return r.verifyCandidate(current)
+ 	}
+ 	if current != nil && pkgversion.Compare(best.Version, current.version) > 0 {
+ 		// Rule 3: a selection never increases; keep the current one while it
+ 		// still satisfies every constraint.
++		if err := r.validateSkillRequirements(name, current); err != nil {
++			return err
++		}
+ 		return r.verifyCandidate(current)
+ 	}
+ 	chosen = &selection{kind: kind, name: name, source: source, directory: directory, commit: best.Commit,
+@@ -820,6 +834,10 @@ func (r *resolver) admits(requirement Requirement, sel *selection) bool {
+ 
+ // install records a selection, dropping and re-expanding as rule 3 requires.
+ func (r *resolver) install(name string, sel *selection) error {
++	if err := r.validateSkillRequirements(name, sel); err != nil {
++		return err
++	}
++
+ 	if previous := r.selected[name]; previous != nil {
+ 		for _, changed := range r.drop(previous.key()) {
+ 			if _, still := r.constraints[changed]; !still {
+@@ -861,7 +879,7 @@ func (r *resolver) conflict(name string, candidates []string) *Error {
+ 		err.Candidates = []string{}
+ 	}
+ 	for _, c := range constraints {
+-		err.Requirers = append(err.Requirers, RequirerConstraint{Requirer: c.requirer, Constraint: c.requirement.Form()})
++		err.Requirers = append(err.Requirers, RequirerConstraint{Requirer: c.requirer, Constraint: c.requirement.Form(), Source: c.requirement.Source, Directory: c.requirement.Directory})
+ 	}
+ 	return err
+ }
+@@ -906,7 +924,19 @@ func (r *resolver) build() (*Result, error) {
+ 		lockSchema = contextlock.SchemaVersion2
+ 		lockHashVersion = 2
+ 	}
+-	lock := &contextlock.Lock{SchemaVersion: lockSchema, HashVersion: lockHashVersion, Root: rootName}
++	for _, sel := range r.selected {
++		if (sel.pkg != nil && sel.pkg.SchemaVersion == 2) || (sel.kind == contextlock.KindSkill && sel.directory != "") {
++			lockSchema, lockHashVersion = contextlock.SchemaVersion4, 2
++		}
++	}
++	precedence := r.input.Precedence
++	if precedence.Winner == "" {
++		precedence.Winner = "higher-weight"
++	}
++	if precedence.Placement == "" {
++		precedence.Placement = "winner-last"
++	}
++	lock := &contextlock.Lock{SchemaVersion: lockSchema, HashVersion: lockHashVersion, Root: rootName, Precedence: precedence}
+ 	names := make([]string, 0, len(r.selected))
+ 	for name := range r.selected {
+ 		names = append(names, name)
+@@ -977,7 +1007,7 @@ func (r *resolver) build() (*Result, error) {
+ 		member.Weight = weight
+ 		lock.Members = append(lock.Members, member)
+ 		result.Members[Key(sel.kind, name)] = Resolved{Kind: sel.kind, Name: name, Source: sel.source, Directory: sel.directory,
+-			Commit: sel.commit, StateHash: member.StateHash, HashVersion: hashVersion, Version: member.Version, Package: sel.pkg}
++			Commit: sel.commit, StateHash: member.StateHash, HashVersion: hashing.Version(lockHashVersion), Version: member.Version, Package: sel.pkg}
+ 	}
+ 	lock.Sort()
+ 	hash, err := lock.Hash()
+@@ -987,3 +1017,17 @@ func (r *resolver) build() (*Result, error) {
+ 	result.Lock, result.LockHash, result.Warnings = lock, hash, warnings
+ 	return result, nil
+ }
++
++func (r *resolver) validateSkillRequirements(name string, sel *selection) error {
++	if sel.kind == contextlock.KindSkill && sel.pkg != nil && sel.pkg.SkillCommands != nil {
++		for _, constraint := range r.constraints[name] {
++			for _, command := range constraint.requirement.Commands {
++				if !sel.pkg.SkillCommands[command] {
++					return fmt.Errorf("manifest_invalid: skill %s has no requested command %s", name, command)
++				}
++			}
++		}
++	}
++
++	return nil
++}
+diff --git a/internal/contextresolve/skill_directory_test.go b/internal/contextresolve/skill_directory_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..b14e88f24afe28451a583cf6696ae03dea1b2ecc
+--- /dev/null
++++ b/internal/contextresolve/skill_directory_test.go
+@@ -0,0 +1,56 @@
++package contextresolve
++
++import (
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++)
++
++// Resolve itself must reject conflicting selectors before acquisition/audit
++// can mask the agreement error. An agreeing diamond produces one member.
++func TestSkillDirectoryAgreement(t *testing.T) {
++	for _, tc := range []struct {
++		name, directory, source string
++		valid                   bool
++	}{
++		{"agreeing", "skills/formatter", "example.com/skills", true},
++		{"omitted-selector", "", "example.com/skills", false},
++		{"different-selector", "skills/alternate", "example.com/skills", false},
++		{"different-source", "skills/formatter", "example.com/other", false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			rootID, aID, bID, skillID := strings.Repeat("1", 40), strings.Repeat("2", 40), strings.Repeat("3", 40), strings.Repeat("4", 40)
++			first := Requirement{Kind: contextlock.KindSkill, Name: "formatter", Source: "example.com/skills", Revision: skillID, Directory: "skills/formatter"}
++			second := first
++			second.Directory = tc.directory
++			second.Source = tc.source
++			source := &stubSource{manifests: map[string]*Package{
++				rootID: {SchemaVersion: 2, Version: "1.0.0", Requires: []Requirement{{Kind: contextlock.KindContext, Name: "consumer-a", Source: "example.com/a", Revision: aID}, {Kind: contextlock.KindContext, Name: "consumer-b", Source: "example.com/b", Revision: bID}}},
++				aID:    {SchemaVersion: 2, Version: "1.0.0", Requires: []Requirement{first}}, bID: {SchemaVersion: 2, Version: "1.0.0", Requires: []Requirement{second}}, skillID: {},
++			}}
++			result, err := Resolve(source, Input{Root: Requirement{Kind: contextlock.KindContext, Name: "root", Source: "example.com/root", Revision: rootID}, Precedence: contextlock.Precedence{Winner: "lower-weight", Placement: "winner-first"}})
++			if !tc.valid {
++				if err == nil || !strings.Contains(err.Error(), DiagRangeConflict) {
++					t.Fatalf("want context_range_conflict, got %v", err)
++				}
++				for _, part := range []string{"consumer-a", "consumer-b", "source", "directory"} {
++					if !strings.Contains(err.Error(), part) {
++						t.Fatalf("conflict omits %s: %v", part, err)
++					}
++				}
++				return
++			}
++			if err != nil {
++				t.Fatal(err)
++			}
++			member, ok := result.Lock.Find(contextlock.KindSkill, "formatter")
++			if !ok || member.Directory != "skills/formatter" || len(member.RequiredBy) != 2 || len(result.Lock.Members) != 4 {
++				t.Fatalf("diamond did not unify: %+v", result.Lock)
++			}
++			if result.Lock.SchemaVersion != 4 || result.Lock.Precedence.Winner != "lower-weight" || result.Lock.Precedence.Placement != "winner-first" {
++				t.Fatalf("lock lost actual precedence: %+v", result.Lock)
++			}
++		})
++	}
++}
+diff --git a/internal/envprofile/envprofile.go b/internal/envprofile/envprofile.go
+index ed97bbb4dc18213a3a5e80032c7df6efbe966115..3a2efcc22dae54e52e7f5ea28f32379528bccec6 100644
+--- a/internal/envprofile/envprofile.go
++++ b/internal/envprofile/envprofile.go
+@@ -865,6 +865,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
+ 	}
+ 	input.Overlays = overlays
+ 	input.MCPAllowlist = options.Policy.MCPAllowlist
++	input.Precedence = contextlock.Precedence{Winner: options.Policy.Precedence().Winner, Placement: options.Policy.Precedence().Placement}
+ 	overlayInputDefaults(&input, options.Policy)
+ 	result, err := contextresolve.Resolve(manager, input)
+ 	if err != nil {
+@@ -968,6 +969,7 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input
+ 	}
+ 	input.Overlays = overlays
+ 	input.MCPAllowlist = policy.MCPAllowlist
++	input.Precedence = contextlock.Precedence{Winner: policy.Precedence().Winner, Placement: policy.Precedence().Placement}
+ 	overlayInputDefaults(&input, policy)
+ 	result, err := contextresolve.Resolve(manager, input)
+ 	if err != nil {
+@@ -1277,6 +1279,7 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
+ 	}
+ 	input.Overlays = overlays
+ 	input.MCPAllowlist = policy.MCPAllowlist
++	input.Precedence = contextlock.Precedence{Winner: policy.Precedence().Winner, Placement: policy.Precedence().Placement}
+ 	overlayInputDefaults(&input, policy)
+ 	result, err := contextresolve.Resolve(manager, input)
+ 	if err != nil {
+@@ -1511,6 +1514,19 @@ func overlayOwner(home, name string) (string, bool, error) {
+ // blocking), revocation, and the deterministic detectors — regardless of any
+ // enabled flag. An advisory profile install does not exist.
+ func auditAndStore(home string, manager *gitManager, result *contextresolve.Result, policy Policy) ([]string, error) {
++	// Successor installs validate the entire closure before publishing stores.
++	if result.Lock.SchemaVersion == contextlock.SchemaVersion4 {
++		warnings, err := auditCandidates(home, manager, result, policy)
++		if err != nil {
++			return nil, err
++		}
++		for _, member := range result.Lock.Members {
++			if _, err := manager.ensureEntry(home, result.Members[contextresolve.Key(member.Kind, member.Name)]); err != nil {
++				return nil, err
++			}
++		}
++		return warnings, nil
++	}
+ 	return auditMembers(home, manager, result, policy, true)
+ }
+ 
+diff --git a/internal/envprofile/gitsource.go b/internal/envprofile/gitsource.go
+index e7c63fae43705e64cf5fc3c9e71ea182e66d9ae1..2cf33da176df54e55413539ed9884897ff656576 100644
+--- a/internal/envprofile/gitsource.go
++++ b/internal/envprofile/gitsource.go
+@@ -16,7 +16,9 @@ import (
+ 	"github.com/relux-works/curator/internal/contextresolve"
+ 	"github.com/relux-works/curator/internal/contextstore"
+ 	"github.com/relux-works/curator/internal/gitops"
++	"github.com/relux-works/curator/internal/identifiers"
+ 	"github.com/relux-works/curator/internal/identity"
++	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/pkgversion"
+ 	"github.com/relux-works/curator/internal/stateread"
+ )
+@@ -248,13 +250,27 @@ func (m *gitManager) Manifest(kind, name, source, directory, commit string) (*co
+ 	if err := gitops.Extract(dir, commit, snapshot); err != nil {
+ 		return nil, fmt.Errorf("%s: extract %s at %s: %v", DiagSourceInvalid, name, commit, err)
+ 	}
+-	root := snapshot
+-	if directory != "" {
+-		root = filepath.Join(snapshot, filepath.FromSlash(directory))
++	root, err := selectedPackageRoot(snapshot, directory)
++	if err != nil {
++		return nil, err
+ 	}
+ 	switch kind {
+ 	case contextlock.KindSkill:
+-		return &contextresolve.Package{}, nil
++		if directory == "" {
++			return &contextresolve.Package{}, nil
++		} // Legacy root-addressed migration is unchanged.
++		skillName, spec, err := manifest.ReadSkillPackage(root)
++		if err != nil {
++			return nil, fmt.Errorf("manifest_invalid: %w", err)
++		}
++		if skillName != name {
++			return nil, fmt.Errorf("manifest_invalid: SKILL.md name %s differs from required skill %s", skillName, name)
++		}
++		commands := map[string]bool{}
++		for command := range spec.Commands {
++			commands[command] = true
++		}
++		return &contextresolve.Package{SkillCommands: commands}, nil
+ 	case contextlock.KindMCP:
+ 		manifest, err := contextpkg.LoadMCP(root)
+ 		if err != nil {
+@@ -612,9 +628,9 @@ func (m *gitManager) contextManifestAt(dir, commit, directory string) (*contextp
+ 	if err := gitops.Extract(dir, commit, snapshot); err != nil {
+ 		return nil, fmt.Errorf("%s: extract at %s: %v", DiagSourceInvalid, commit, err)
+ 	}
+-	root := snapshot
+-	if directory != "" {
+-		root = filepath.Join(snapshot, filepath.FromSlash(directory))
++	root, err := selectedPackageRoot(snapshot, directory)
++	if err != nil {
++		return nil, err
+ 	}
+ 	manifest, err := contextpkg.LoadManifest(root)
+ 	if err != nil {
+@@ -629,6 +645,29 @@ func (m *gitManager) contextManifestAt(dir, commit, directory string) (*contextp
+ // directory when one is declared. A third call site must reuse this helper
+ // rather than re-spelling the join, so directory-addressed packages cannot
+ // drift out of any consumer's scope (environments §9.1).
++// selectedPackageRoot validates every selector component before package reads.
++// Extract rejects symlink entries too; this check also protects stored snapshots.
++func selectedPackageRoot(entry, directory string) (string, error) {
++	if directory == "" {
++		return entry, nil
++	}
++	if !identifiers.PortablePath(directory) {
++		return "", fmt.Errorf("%s: invalid directory %q", DiagSourceInvalid, directory)
++	}
++	root := entry
++	for _, component := range strings.Split(directory, "/") {
++		root = filepath.Join(root, component)
++		info, err := stateread.Lstat(root)
++		if err != nil {
++			return "", fmt.Errorf("%s: selected directory: %w", DiagSourceInvalid, err)
++		}
++		if info.Kind != stateread.KindPresent || info.Info == nil || info.Info.Mode()&os.ModeSymlink != 0 || !info.Info.IsDir() {
++			return "", fmt.Errorf("%s: selected directory traverses a link or non-directory", DiagSourceInvalid)
++		}
++	}
++	return root, nil
++}
++
+ func packageRoot(entry, directory string) string {
+ 	if directory != "" {
+ 		return filepath.Join(entry, filepath.FromSlash(directory))
+@@ -719,7 +758,7 @@ func (m *gitManager) inspectEntry(home string, resolved contextresolve.Resolved)
+ // and is rejected at the Identity boundary with profile_source_invalid, as
+ // is a file:// requirement source, which carries no network identity.
+ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
+-	pkg := &contextresolve.Package{Version: manifest.Version, Weight: manifest.Weight, Weights: manifest.Weights}
++	pkg := &contextresolve.Package{SchemaVersion: manifest.SchemaVersion, Version: manifest.Version, Weight: manifest.Weight, Weights: manifest.Weights}
+ 	for _, name := range contextpkg.SortedNames(manifest.Contexts) {
+ 		requirement := manifest.Contexts[name]
+ 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
+@@ -733,6 +772,7 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
+ 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
+ 			Kind: contextlock.KindSkill, Name: name, Source: canonicalRequirementSource(requirement.Git),
+ 			Range: requirement.Range, Tag: requirement.Tag, Revision: requirement.Revision,
++			Directory: requirement.Directory, Mode: requirement.Mode, Commands: requirement.Commands,
+ 		})
+ 	}
+ 	for _, name := range contextpkg.SortedNames(manifest.MCP) {
+diff --git a/internal/envprofile/global.go b/internal/envprofile/global.go
+index 314409daad9aa6c75bf1bd7cdac6d131420056a5..9ebc61f73eeb2af349096db382453d8dde534a45 100644
+--- a/internal/envprofile/global.go
++++ b/internal/envprofile/global.go
+@@ -192,7 +192,7 @@ func globalSkillInput(home, profile string, source Source, oldLock *contextlock.
+ 			return contextresolve.Input{}, fmt.Errorf("%s: skill %q in profile %q lock has no replayable Git pin", DiagSourceInvalid, member.Name, profile)
+ 		}
+ 		input.Direct = append(input.Direct, contextresolve.Requirement{
+-			Kind: contextlock.KindSkill, Name: member.Name, Source: member.Source, Revision: member.Commit,
++			Kind: contextlock.KindSkill, Name: member.Name, Source: member.Source, Revision: member.Commit, Directory: member.Directory,
+ 		})
+ 	}
+ 	if addition != nil {
+diff --git a/internal/envprofile/skill_directory_mutants_test.go b/internal/envprofile/skill_directory_mutants_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..1a56e1285955d41cd2ea418dee1ca16d2d84d1f0
+--- /dev/null
++++ b/internal/envprofile/skill_directory_mutants_test.go
+@@ -0,0 +1,124 @@
++package envprofile
++
++import (
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++type directoryMutation struct{ file, before, after string }
++
++// Overlays narrow real production gates; only go test exit 1 plus the named
++// behavioral assertion counts as a kill. No deletion-only plants or static
++// source checks stand in for the lifecycle suite.
++func TestSkillDirectoryNarrowingMutants(t *testing.T) {
++	root, err := filepath.Abs("../..")
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, tc := range []struct {
++		name, pkg, run, fails, message string
++		changes                        []directoryMutation
++	}{
++		{"reuse-pre-markdown-ruleset", "audit", "^TestReviewPriorMarkdownAllowance$", "TestReviewPriorMarkdownAllowance/v1", "prior ruleset-4 allowance bypassed current Markdown network gate", []directoryMutation{
++			{"audit/audit.go", `RulesetVersion = "5"`, `RulesetVersion = "4"`},
++		}},
++		{"schema-one-directory", "contextpkg", "^TestSkillDirectorySchemaVectors$/^manifest-v1-still-refuses-skill-directory$", "TestSkillDirectorySchemaVectors/manifest-v1-still-refuses-skill-directory", "valid=false", []directoryMutation{
++			{"contextpkg/contextpkg.go", `if schemaVersion == 2 {`, `if schemaVersion == 2 || schemaVersion == 1 {`},
++		}},
++		{"selected-frontmatter-description", "envprofile", "^TestSkillDirectoryMetadata$/^empty-description$", "TestSkillDirectoryMetadata/empty-description", "want refusal manifest_invalid", []directoryMutation{
++			{"manifest/expand.go", `if !ok || strings.TrimSpace(description) == "" {`, `if !ok || (strings.TrimSpace(description) == "" && name != "formatter") {`},
++		}},
++		{"selected-frontmatter-name", "envprofile", "^TestSkillDirectoryMetadata$/^wrong-name$", "TestSkillDirectoryMetadata/wrong-name", "want refusal manifest_invalid", []directoryMutation{
++			{"envprofile/gitsource.go", `if skillName != name {`, `if skillName != name && !(name == "formatter" && skillName == "sibling") {`},
++		}},
++		{"root-versus-selected-agreement", "contextresolve", "^TestSkillDirectoryAgreement$/^omitted-selector$", "TestSkillDirectoryAgreement/omitted-selector", "want context_range_conflict, got <nil>", []directoryMutation{
++			{"contextresolve/contextresolve.go", `if directorySeen && directory != c.requirement.Directory {`, `if directorySeen && directory != c.requirement.Directory && directory != "" && c.requirement.Directory != "" {`},
++		}},
++		{"parent-component", "envprofile", "^TestSkillDirectoryLifecycleVectors$/^parent-component-refused$", "TestSkillDirectoryLifecycleVectors/parent-component-refused", "got <nil>", []directoryMutation{
++			{"contextpkg/contextpkg.go", `if !ok || !identifiers.PortablePath(text) {`, `if !ok || (!identifiers.PortablePath(text) && text != "skills/../formatter") {`},
++			{"envprofile/gitsource.go", `if !identifiers.PortablePath(directory) {`, `if !identifiers.PortablePath(directory) && directory != "skills/../formatter" {`},
++			{"contextlock/contextlock.go", `if member.Directory != "" && !identifiers.PortablePath(member.Directory) {`, `if member.Directory != "" && !identifiers.PortablePath(member.Directory) && member.Directory != "skills/../formatter" {`},
++			{"contextlock/contextlock.go", `if err := json.Unmarshal(member.Directory, &directory); err != nil || !identifiers.PortablePath(directory) {`, `if err := json.Unmarshal(member.Directory, &directory); err != nil || (!identifiers.PortablePath(directory) && directory != "skills/../formatter") {`},
++		}},
++		{"inside-directory-symlink", "envprofile", "^TestSkillDirectoryLifecycleVectors$/^symlinked-leaf-inside-refused$", "TestSkillDirectoryLifecycleVectors/symlinked-leaf-inside-refused", "got <nil>", []directoryMutation{
++			// Admit only this one tree link, preserving all other link refusals.
++			// Expand its valid in-snapshot target as an unsafe following extractor
++			// would; otherwise the directory-exists gate would mask the witness.
++			{"gitops/gitops.go", `case entry.mode == "120000":`, `case entry.mode == "120000" && entry.path == "skills/formatter":
++ entry.mode = "100644"
++ case entry.mode == "120000":`},
++			{"gitops/gitops.go", `plan, err := planWrites(destRoot, entries)`, `var admitted []treeEntry
++ for _, entry := range entries {
++ if entry.path != "skills/formatter" { admitted = append(admitted, entry); continue }
++ for _, target := range entries { if strings.HasPrefix(target.path, "sibling/") { target.path = "skills/formatter/" + strings.TrimPrefix(target.path, "sibling/"); admitted = append(admitted, target) } }
++ }
++ entries = admitted
++ plan, err := planWrites(destRoot, entries)`},
++		}},
++		{"borrow-root-capabilities", "envprofile", "^TestSkillDirectoryLifecycleVectors$/^selected-root-undeclared-contact$", "TestSkillDirectoryLifecycleVectors/selected-root-undeclared-contact", "want refusal audit.capability.network-undeclared", []directoryMutation{
++			{"envprofile/envprofile.go", `declared = spec.Capabilities`, `declared = spec.Capabilities
++ if resolved.Directory == "skills/formatter" && len(declared.Network) == 0 {
++ rootSpec, rootErr := skillspec.Load(entry); if rootErr == nil { declared = rootSpec.Capabilities }
++ }`},
++		}},
++		{"markdown-contact-ignored", "envprofile", "^TestSkillDirectoryLifecycleVectors$/^selected-root-undeclared-contact$", "TestSkillDirectoryLifecycleVectors/selected-root-undeclared-contact", "want refusal audit.capability.network-undeclared", []directoryMutation{
++			{"audit/audit.go", `if !strings.HasPrefix(posix, "scripts/") && posix != manifestName && !strings.EqualFold(filepath.Ext(posix), ".md") {`, `if !strings.HasPrefix(posix, "scripts/") && posix != manifestName && (!strings.EqualFold(filepath.Ext(posix), ".md") || posix == "notes.md") {`},
++		}},
++		{"alternate-directory-identity", "contextpkg", "^TestSkillDirectoryLockIdentityVectors$/^alternate$", "TestSkillDirectoryLockIdentityVectors/alternate", "canonical or identity mismatch", []directoryMutation{
++			{"contextlock/contextlock.go", `object["directory"] = member.Directory`, `object["directory"] = member.Directory
++ if member.Kind == KindSkill && member.Directory == "skills/alternate" { object["directory"] = "skills/formatter" }`},
++		}},
++		{"materialize-repository-root", "envprofile", "^TestSkillDirectoryLifecycleVectors$/^profile-install-selected-root$", "TestSkillDirectoryLifecycleVectors/profile-install-selected-root", "skill target=", []directoryMutation{
++			{"envprofile/managed.go", `root := packageRoot(entry, member.Directory)`, `root := packageRoot(entry, member.Directory)
++ if member.Name == "formatter" && member.Directory == "skills/formatter" { root = entry }`},
++		}},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			dir := t.TempDir()
++			sources := map[string]string{}
++			for _, change := range tc.changes {
++				path := filepath.Join(root, "internal", filepath.FromSlash(change.file))
++				source, ok := sources[path]
++				if !ok {
++					b, e := os.ReadFile(path)
++					if e != nil {
++						t.Fatal(e)
++					}
++					source = strings.ReplaceAll(string(b), "\r\n", "\n")
++				}
++				if strings.Count(source, change.before) != 1 {
++					t.Fatalf("mutation anchor is not unique: %s", change.file)
++				}
++				sources[path] = strings.Replace(source, change.before, change.after, 1)
++			}
++			replacements := map[string]string{}
++			for path, source := range sources {
++				replacement := filepath.Join(dir, filepath.Base(path))
++				if e := os.WriteFile(replacement, []byte(source), 0600); e != nil {
++					t.Fatal(e)
++				}
++				replacements[path] = replacement
++			}
++			overlay, e := json.Marshal(map[string]any{"Replace": replacements})
++			if e != nil {
++				t.Fatal(e)
++			}
++			overlayPath := filepath.Join(dir, "overlay.json")
++			if e := os.WriteFile(overlayPath, overlay, 0600); e != nil {
++				t.Fatal(e)
++			}
++			command := exec.Command("go", "test", "-overlay", overlayPath, "-count=1", "-timeout=2m", "-v", "-run", tc.run, "./internal/"+tc.pkg)
++			command.Dir = root
++			output, e := command.CombinedOutput()
++			exit, ok := e.(*exec.ExitError)
++			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "--- FAIL: "+tc.fails+" ") || !strings.Contains(string(output), tc.message) {
++				t.Fatalf("mutant survived or lacked intended behavioral failure: %v\n%s", e, output)
++			}
++			t.Logf("expected-red go test exit %d:\n%s", exit.ExitCode(), output)
++		})
++	}
++}
+diff --git a/internal/envprofile/skill_directory_test.go b/internal/envprofile/skill_directory_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..7f60a830e7d1ee616ece60103b2b558030f20a94
+--- /dev/null
++++ b/internal/envprofile/skill_directory_test.go
+@@ -0,0 +1,527 @@
++package envprofile
++
++import (
++	"bytes"
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"reflect"
++	"sort"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/contextstore"
++	"github.com/relux-works/curator/internal/envregistry"
++	"github.com/relux-works/curator/internal/hashing"
++)
++
++type directorySnapshot struct {
++	Files    map[string]string
++	Symlinks map[string]string
++}
++type directoryFixture struct {
++	CandidateLock   json.RawMessage `json:"candidate_lock"`
++	Repository      string
++	ProfileManifest map[string]any `json:"profile_manifest"`
++	Snapshot        directorySnapshot
++	RootSkill       directorySnapshot `json:"root_skill_snapshot"`
++	ContextSkill    directorySnapshot `json:"context_skill_snapshot"`
++}
++type directoryVector struct {
++	Name, Entry       string
++	Changes, Expected map[string]any
++}
++
++func readDirectoryJSON(t *testing.T, name string, out any) {
++	t.Helper()
++	b, err := os.ReadFile(filepath.Join("../contextpkg/testdata/profile-skill-directories-v1", name))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := json.Unmarshal(b, out); err != nil {
++		t.Fatal(err)
++	}
++}
++func directoryJSON(t *testing.T, v any) string {
++	t.Helper()
++	b, err := json.Marshal(v)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return string(b)
++}
++func directoryFixtureLoad(t *testing.T) directoryFixture {
++	t.Helper()
++	var f directoryFixture
++	readDirectoryJSON(t, "fixtures.json", &f)
++	return f
++}
++func directoryRequirement(f directoryFixture) map[string]any {
++	return f.ProfileManifest["requires"].(map[string]any)["skills"].(map[string]any)["formatter"].(map[string]any)
++}
++
++// Every published lifecycle vector drives Install/Update/Sync/EnsureDefault,
++// followed by Use and Resolve for successful materialization. Git OIDs replace
++// symbolic fixture pins; no network or real operator home is used.
++func TestSkillDirectoryLifecycleVectors(t *testing.T) {
++	var corpus struct{ Cases []directoryVector }
++	readDirectoryJSON(t, "vectors.json", &corpus)
++	if len(corpus.Cases) != 24 {
++		t.Fatalf("vector count=%d", len(corpus.Cases))
++	}
++	for _, tc := range corpus.Cases {
++		t.Run(tc.Name, func(t *testing.T) { driveDirectoryVector(t, tc) })
++	}
++}
++
++// Selected skill metadata must satisfy core section 3 before any profile or
++// store publication; the valid control retains the same production install.
++func TestSkillDirectoryMetadata(t *testing.T) {
++	for _, tc := range []struct {
++		name, skill string
++		valid       bool
++	}{
++		{"valid", "---\nname: formatter\ndescription: Valid skill\n---\n# Formatter\n", true},
++		{"missing-frontmatter", "# Formatter\n", false},
++		{"invalid-yaml", "---\nname: [\ndescription: Test\n---\n", false},
++		{"wrong-name", "---\nname: sibling\ndescription: Test\n---\n", false},
++		{"empty-description", "---\nname: formatter\ndescription: ''\n---\n", false},
++		{"invalid-trigger", "---\nname: formatter\ndescription: Test\ntriggers: ['']\n---\n", false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			expected := map[string]any{"outcome": "materialized"}
++			if !tc.valid {
++				expected = map[string]any{"outcome": "refused", "diagnostic": "manifest_invalid"}
++			}
++			driveDirectoryVector(t, directoryVector{Name: tc.name, Entry: "profile install", Changes: map[string]any{"snapshot.files.skills/formatter/SKILL.md": tc.skill}, Expected: expected})
++		})
++	}
++}
++
++func driveDirectoryVector(t *testing.T, tc directoryVector) {
++	t.Helper()
++	f := directoryFixtureLoad(t)
++	home := t.TempDir()
++	operator := t.TempDir()
++	pinOperatorHome(t, operator)
++	native := pinHomes(t)
++	ids := newGitIdentities(t)
++	if tc.Entry != "first profile-surface use" {
++		if err := EnsureDefaultWithPolicy(home, Policy{}); err != nil {
++			t.Fatal(err)
++		}
++	}
++	req := directoryRequirement(f)
++	snapshot := f.Snapshot
++	if alternate, ok := tc.Changes["snapshot"].(string); ok {
++		switch alternate {
++		case "root_skill_snapshot":
++			snapshot = f.RootSkill
++		case "context_skill_snapshot":
++			snapshot = f.ContextSkill
++		default:
++			t.Fatal(alternate)
++		}
++	}
++	baseFiles := map[string]string{}
++	for p, b := range snapshot.Files {
++		baseFiles[p] = b
++	}
++	for key, value := range tc.Changes {
++		switch {
++		case strings.HasPrefix(key, "requirement."):
++			field := strings.TrimPrefix(key, "requirement.")
++			if field == "remove" {
++				for _, k := range value.([]any) {
++					delete(req, k.(string))
++				}
++			} else {
++				req[field] = value
++			}
++		case key == "requirement":
++			req = value.(map[string]any)
++			f.ProfileManifest["requires"].(map[string]any)["skills"].(map[string]any)["formatter"] = req
++		case strings.HasPrefix(key, "snapshot.files."):
++			snapshot.Files[strings.TrimPrefix(key, "snapshot.files.")] = value.(string)
++		case key == "snapshot.remove":
++			for _, p := range value.([]any) {
++				delete(snapshot.Files, p.(string))
++			}
++		case key == "snapshot.symlinks":
++			for p, target := range value.(map[string]any) {
++				snapshot.Symlinks[p] = target.(string)
++			}
++		}
++	}
++	// The parent-component witness also has a valid normalized target,
++	// so grammar admission cannot be masked by a missing-directory error.
++	if req["directory"] == "skills/../formatter" {
++		for p, b := range snapshot.Files {
++			if strings.HasPrefix(p, "skills/formatter/") {
++				snapshot.Files[strings.TrimPrefix(p, "skills/")] = b
++			}
++		}
++	}
++	// Inside-link controls contain a valid selected package at their target.
++	for link, target := range snapshot.Symlinks {
++		destination := filepath.ToSlash(filepath.Clean(filepath.Join(filepath.Dir(link), target)))
++		for p, b := range baseFiles {
++			if strings.HasPrefix(p, link+"/") {
++				delete(snapshot.Files, p)
++				snapshot.Files[destination+strings.TrimPrefix(p, link)] = b
++			}
++		}
++	}
++	// update vectors preinstall the exact base, then publish a new immutable
++	// skill and root commit; sync reuses its existing lock without re-resolving.
++	initialFiles := snapshot.Files
++	if tc.Entry == "profile update" {
++		initialFiles = baseFiles
++	}
++	skillRepo := gitRepo(t, initialFiles, "v1.0.0")
++	gitRun(t, skillRepo, "tag", "-d", "v1.0.0")
++	ids.serve(skillRepo, f.Repository)
++	ids.serve(skillRepo, strings.TrimSuffix(f.Repository, ".git"))
++	commit := fixtureGitOutput(t, skillRepo, "rev-parse", "HEAD")
++	if len(snapshot.Symlinks) > 0 {
++		for link, target := range snapshot.Symlinks {
++			c := exec.Command("git", "hash-object", "-w", "--stdin")
++			c.Dir = skillRepo
++			c.Stdin = strings.NewReader(target)
++			out, err := c.Output()
++			if err != nil {
++				t.Fatal(err)
++			}
++			gitRun(t, skillRepo, "update-index", "--add", "--cacheinfo", "120000,"+strings.TrimSpace(string(out))+","+link)
++		}
++		gitRun(t, skillRepo, "commit", "-m", "link fixture")
++		commit = fixtureGitOutput(t, skillRepo, "rev-parse", "HEAD")
++	}
++	req["revision"] = commit
++	if _, ok := req["path"]; ok {
++		delete(req, "revision")
++	}
++	if consumers, ok := tc.Changes["requirers"].(map[string]any); ok {
++		delete(f.ProfileManifest["requires"].(map[string]any), "skills")
++		contexts := map[string]any{}
++		for name, v := range consumers {
++			r := v.(map[string]any)
++			r["revision"] = commit
++			if r["git"] != f.Repository {
++				ids.serve(skillRepo, strings.TrimSuffix(r["git"].(string), ".git"))
++			}
++			manifest := map[string]any{"schema_version": 2, "name": name, "version": "1.0.0", "requires": map[string]any{"skills": map[string]any{"formatter": r}}}
++			repo := gitRepo(t, map[string]string{"agent-context.json": directoryJSON(t, manifest)}, "v1.0.0")
++			operand := ids.serve(repo, "https://github.com/example/"+name)
++			contexts[name] = map[string]any{"git": operand, "revision": fixtureGitOutput(t, repo, "rev-parse", "HEAD")}
++		}
++		f.ProfileManifest["requires"].(map[string]any)["contexts"] = contexts
++	}
++	rootRepo := gitRepo(t, map[string]string{"agent-context.json": directoryJSON(t, f.ProfileManifest)}, "v1.0.0")
++	operand := ids.serve(rootRepo, "https://github.com/example/sample-profile.git")
++	var info Info
++	var err error
++	if tc.Entry == "first profile-surface use" {
++		global := filepath.Join(home, "global")
++		writeGitFile(t, global, "Skillfile.json", directoryJSON(t, map[string]any{"schema_version": 1, "skills": []any{map[string]any{"name": "formatter", "git": f.Repository, "revision": commit}}}))
++		err = EnsureDefaultWithPolicy(home, Policy{})
++		if err == nil {
++			info.Lock, info.LockHash, err = readLock(home, DefaultProfile)
++			info.Name = DefaultProfile
++		}
++	} else {
++		info, _, _, err = Install(home, InstallOptions{Operand: operand, Range: "*"})
++		if err == nil && tc.Entry == "profile update" {
++			oldRoot, readErr := os.ReadFile(lockPath(home, info.Name))
++			if readErr != nil {
++				t.Fatal(readErr)
++			}
++			before := directoryContentHash(t, home, info.Lock)
++			for p, b := range snapshot.Files {
++				writeGitFile(t, skillRepo, p, b)
++			}
++			gitRun(t, skillRepo, "add", "--all")
++			gitRun(t, skillRepo, "commit", "--allow-empty", "-m", "updated skill")
++			req["revision"] = fixtureGitOutput(t, skillRepo, "rev-parse", "HEAD")
++			f.ProfileManifest["version"] = "1.0.1"
++			writeGitFile(t, rootRepo, "agent-context.json", directoryJSON(t, f.ProfileManifest))
++			gitRun(t, rootRepo, "add", "--all")
++			gitRun(t, rootRepo, "commit", "-m", "updated profile")
++			gitRun(t, rootRepo, "tag", "v1.0.1")
++			info, _, err = UpdateWithPolicy(home, info.Name, Policy{})
++			if err != nil {
++				after, _ := os.ReadFile(lockPath(home, "sample-profile"))
++				if !bytes.Equal(oldRoot, after) {
++					t.Fatal("refused update changed lock")
++				}
++			}
++			if err == nil {
++				if equal, ok := tc.Expected["skill_content_sha256_equal_to_base"].(bool); ok && (before == directoryContentHash(t, home, info.Lock)) != equal {
++					t.Fatal("selected content identity comparison mismatch")
++				}
++			}
++		}
++		if err == nil && tc.Entry == "profile sync" {
++			before, errRead := os.ReadFile(lockPath(home, info.Name))
++			if errRead != nil {
++				t.Fatal(errRead)
++			}
++			_, err = SyncWithPolicy(home, Policy{})
++			after, _ := os.ReadFile(lockPath(home, info.Name))
++			if !bytes.Equal(before, after) {
++				t.Fatal("sync changed lock")
++			}
++		}
++	}
++	if tc.Expected["outcome"] == "refused" {
++		diagnostic := tc.Expected["diagnostic"].(string)
++		if err == nil || !strings.Contains(err.Error(), diagnostic) {
++			t.Fatalf("want refusal %s; got %v", diagnostic, err)
++		}
++		for _, field := range []string{"finding_file", "finding_host"} {
++			if value, ok := tc.Expected[field].(string); ok && !strings.Contains(err.Error(), value) {
++				t.Fatalf("refusal missing %s %s: %v", field, value, err)
++			}
++		}
++		if required, ok := tc.Expected["diagnostic_requirers"].([]any); ok {
++			for _, name := range required {
++				if !strings.Contains(err.Error(), name.(string)) {
++					t.Fatalf("missing requirer: %v", err)
++				}
++			}
++			for _, field := range []string{"source", "directory"} {
++				if !strings.Contains(err.Error(), field) {
++					t.Fatalf("missing conflict field: %v", err)
++				}
++			}
++		}
++		if _, err := os.Stat(lockPath(home, "sample-profile")); !os.IsNotExist(err) {
++			t.Fatalf("refusal published profile lock: %v", err)
++		}
++		for _, kind := range []string{"context", "skill"} {
++			name := "sample-profile"
++			if kind == "skill" {
++				name = "formatter"
++			}
++			path := filepath.Join(contextstore.Root(home), kind, name)
++			if entries, e := os.ReadDir(path); e == nil && len(entries) != 0 {
++				t.Fatalf("refusal published store: %s", path)
++			}
++		}
++		if _, err := os.Stat(sourcePath(home, "sample-profile")); !os.IsNotExist(err) {
++			t.Fatalf("refusal published source: %v", err)
++		}
++		for _, path := range native {
++			entries, e := os.ReadDir(path)
++			if e == nil && len(entries) > 0 {
++				t.Fatalf("refusal published native surface: %s", path)
++			}
++		}
++		return
++	}
++	if err != nil {
++		t.Fatalf("valid vector refused: %v", err)
++	}
++	member, ok := info.Lock.Find(contextlock.KindSkill, "formatter")
++	if !ok {
++		t.Fatal("formatter missing")
++	}
++	directory, _ := req["directory"].(string)
++	if tc.Entry == "first profile-surface use" {
++		directory = ""
++	}
++	if consumers, ok := tc.Changes["requirers"].(map[string]any); ok {
++		directory, _ = consumers["consumer-a"].(map[string]any)["directory"].(string)
++	}
++	if member.Directory != directory {
++		t.Fatalf("selected directory=%q want %q", member.Directory, directory)
++	}
++	if _, ok := tc.Expected["skill_lock_sha256"]; ok {
++		expected, e := contextlock.Parse(f.CandidateLock)
++		if e != nil {
++			t.Fatal(e)
++		}
++		for i := range expected.Members {
++			m := &expected.Members[i]
++			if m.Kind == contextlock.KindContext {
++				m.Commit = fixtureGitOutput(t, rootRepo, "rev-parse", "HEAD")
++				m.Version = f.ProfileManifest["version"].(string)
++			} else {
++				m.Commit = req["revision"].(string)
++			}
++		}
++		expectedPin, e := expected.Hash()
++		if e != nil {
++			t.Fatal(e)
++		}
++		if expectedPin != info.LockHash {
++			t.Fatalf("substituted fixture lock identity mismatch: want %s got %s; lock=%s", expectedPin, info.LockHash, directoryJSON(t, info.Lock.Object()))
++		}
++	}
++	if directory != "" && info.Lock.SchemaVersion != 4 {
++		t.Fatalf("schema=%d want 4", info.Lock.SchemaVersion)
++	}
++	if _, ok := tc.Changes["requirers"]; ok {
++		if !reflect.DeepEqual(member.RequiredBy, []string{"consumer-a", "consumer-b"}) {
++			t.Fatalf("required_by=%v", member.RequiredBy)
++		}
++		n := 0
++		for _, m := range info.Lock.Members {
++			if m.Kind == contextlock.KindSkill {
++				n++
++			}
++		}
++		if n != 1 {
++			t.Fatalf("skill count=%d", n)
++		}
++	}
++	// Pin is computed from the actual emitted complete carrier, then round-trips.
++	canonical, e := info.Lock.Canonical()
++	if e != nil {
++		t.Fatal(e)
++	}
++	if contextlock.HashBytes(canonical) != info.LockHash {
++		t.Fatal("lock pin mismatch")
++	}
++	if _, e := contextlock.Parse(canonical); e != nil {
++		t.Fatal(e)
++	}
++	root := packageRoot(newGitManager(home).entryPath(home, resolvedOf(member)), directory)
++	if paths, ok := tc.Expected["skill_content_paths"].([]any); ok {
++		var got []string
++		err := filepath.WalkDir(root, func(p string, d os.DirEntry, e error) error {
++			if e != nil {
++				return e
++			}
++			if !d.IsDir() {
++				r, _ := filepath.Rel(root, p)
++				got = append(got, filepath.ToSlash(r))
++			}
++			return nil
++		})
++		if err != nil {
++			t.Fatal(err)
++		}
++		sort.Strings(got)
++		want := []string{}
++		for _, p := range paths {
++			want = append(want, p.(string))
++		}
++		sort.Strings(want)
++		if !reflect.DeepEqual(got, want) {
++			t.Fatalf("content paths %v want %v", got, want)
++		}
++	}
++	directoryAssertAudit(t, home, info.Lock, root, member)
++	directoryAssertLinks(t, home, info.Name, native, root)
++}
++func directoryContentHash(t *testing.T, home string, lock *contextlock.Lock) string {
++	t.Helper()
++	m, ok := lock.Find(contextlock.KindSkill, "formatter")
++	if !ok {
++		t.Fatal("missing formatter")
++	}
++	root := packageRoot(newGitManager(home).entryPath(home, resolvedOf(m)), m.Directory)
++	h, err := hashing.ContentSHA256WithVersion(root, nil, lock.ContentHashVersion())
++	if err != nil {
++		t.Fatal(err)
++	}
++	return h
++}
++func directoryAssertLinks(t *testing.T, home, profile string, native map[string]string, root string) {
++	t.Helper()
++	results, err := UseWithPolicy(home, profile, "codex_cli", "", false, Policy{})
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, r := range results {
++		if !r.OK {
++			t.Fatalf("in-place materialization: %+v", r)
++		}
++	}
++	// NATSKILL places Codex skills directly in its native skills directory.
++	nativeLink := filepath.Join(native["codex_cli"], "skills", "formatter")
++	// Symlinks are preferred; Windows may use the protected fallback copy.
++	check := func(path string) {
++		t.Helper()
++		target, e := os.Readlink(path)
++		if e == nil {
++			if !filepath.IsAbs(target) {
++				target = filepath.Join(filepath.Dir(path), target)
++			}
++			if filepath.Clean(target) != filepath.Clean(root) {
++				t.Fatalf("skill target=%s want %s", target, root)
++			}
++			return
++		}
++		got, e := os.ReadFile(filepath.Join(path, "SKILL.md"))
++		want, we := os.ReadFile(filepath.Join(root, "SKILL.md"))
++		if e != nil || we != nil || !bytes.Equal(got, want) {
++			t.Fatalf("skill target=copy at %s has wrong root content: %v %v", path, e, we)
++		}
++	}
++	check(nativeLink)
++	req := ResolveRequest{Home: home, Profile: profile, EnvID: "codex_cli", LaunchDir: t.TempDir(), Repair: true, Machine: envregistry.DefaultMachineConfig(), Detect: func(envregistry.Adapter) string { return "unknown" }, NativeHomeOf: func(id string) (string, error) { return native[id], nil }, OperatorXDG: t.TempDir()}
++	if _, err := Resolve(req); err != nil {
++		t.Fatalf("managed materialization: %v", err)
++	}
++	check(filepath.Join(ManagedHomeDir(home, profile, "codex_cli"), "skills", "formatter"))
++}
++
++// Persisted audit evidence must bind the selected content, directory and
++// capability declaration. Root/sibling files must not supply findings.
++func directoryAssertAudit(t *testing.T, home string, lock *contextlock.Lock, root string, member contextlock.Member) {
++	t.Helper()
++	hash := directoryContentHash(t, home, lock)
++	found := false
++	err := filepath.WalkDir(home, func(path string, d os.DirEntry, err error) error {
++		if err != nil {
++			return err
++		}
++		if d.IsDir() || !strings.HasPrefix(d.Name(), "verdict-") || !strings.HasSuffix(d.Name(), ".json") {
++			return nil
++		}
++		b, e := os.ReadFile(path)
++		if e != nil {
++			return e
++		}
++		var r struct {
++			Skill, Commit, Directory string
++			Hash                     string `json:"content_sha256"`
++			Capabilities             struct{ Network []string }
++			Findings                 []struct{ ID, File, Evidence string }
++		}
++		if e = json.Unmarshal(b, &r); e != nil {
++			return e
++		}
++		if r.Skill != "formatter" || r.Commit != member.Commit {
++			return nil
++		}
++		found = true
++		directory := member.Directory
++		if directory == "" {
++			directory = "."
++		}
++		if r.Directory != directory || r.Hash != hash {
++			t.Fatalf("audit identity does not bind selected tree: %s", b)
++		}
++		manifest, e := os.ReadFile(filepath.Join(root, "agent-skill.json"))
++		if e == nil && bytes.Contains(manifest, []byte("api.example.net")) && !reflect.DeepEqual(r.Capabilities.Network, []string{"api.example.net"}) {
++			t.Fatalf("capabilities not read from selected manifest: %s", b)
++		}
++		for _, f := range r.Findings {
++			if f.ID == "audit.capability.network-undeclared" || strings.HasPrefix(f.File, "skills/") || strings.Contains(f.Evidence, "other.example.net") {
++				t.Fatalf("root or sibling contributes a finding: %+v", f)
++			}
++		}
++		return nil
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !found {
++		t.Fatal("no selected-skill audit verdict persisted")
++	}
++}
+diff --git a/internal/manifest/expand.go b/internal/manifest/expand.go
+index 917a66a615d921809bacaf02a255bf1a7300cd3e..76dcbb035c0cc2e21258a4248344cdccbb8158ee 100644
+--- a/internal/manifest/expand.go
++++ b/internal/manifest/expand.go
+@@ -390,6 +390,12 @@ func generatedPath(candidate string, outputs []string) bool {
+ 	return false
+ }
+ 
++// ReadSkillPackage validates a selected package's core section 3 frontmatter
++// and section 4 manifest using the same reader as source expansion.
++func ReadSkillPackage(dir string) (string, *skillspec.Spec, error) {
++	return selectedPackage(dir)
++}
++
+ func selectedPackage(dir string) (string, *skillspec.Spec, error) {
+ 	file := filepath.Join(dir, "SKILL.md")
+ 	info, err := os.Lstat(file)

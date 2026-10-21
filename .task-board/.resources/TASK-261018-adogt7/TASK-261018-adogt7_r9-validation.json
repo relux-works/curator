@@ -1,0 +1,66 @@
+{
+  "base": "e88fdf2dbec7f94c48b0232a350a0a9f9484fdeb",
+  "scope_sha256": "52db2b21092c2969c7f0f2a1279358e62f9b7600d48784b4a6fa6a96db72a8f4",
+  "files_verified": 1985,
+  "source_test_docs_changed": false,
+  "commands": [
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=2m",
+        "-v",
+        "-run",
+        "^Test(ReviewSkillDirectory(NumericDiscriminants|StringWeight)|LegacyLockNumericCarrierTypes)$",
+        "./internal/contextpkg"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 1.178
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=8m",
+        "-v",
+        "-run",
+        "^TestSkillDirectoryNarrowingMutants$",
+        "./internal/envprofile"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 29.172
+    },
+    {
+      "command": [
+        "go",
+        "build",
+        "./..."
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "go",
+        "vet",
+        "./..."
+      ],
+      "exit": 0
+    }
+  ],
+  "narrowing_mutants": {
+    "killed": 12,
+    "total": 12,
+    "child_exit": 1,
+    "survivors": 0
+  },
+  "reused_full_suite": {
+    "round": 8,
+    "packages": 85,
+    "verified_command_log_hashes": 71,
+    "full_log_hash_verified": true
+  },
+  "hosted_validation": "Not run locally; configured post-handoff validation remains outstanding",
+  "log_sha256": "f211f9f594463ccc26a1fb79cbae832a685e57e4b34cad6f8eb1d5a8a2bf7f3f"
+}

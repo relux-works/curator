@@ -1,0 +1,151 @@
+{
+  "task": "TASK-261018-adogt7",
+  "round": 7,
+  "platform": "darwin/arm64",
+  "go_version": "go version go1.25.5 darwin/arm64",
+  "candidate": {
+    "base": "e88fdf2dbec7f94c48b0232a350a0a9f9484fdeb",
+    "files_sha256": {
+      "docs/profile-skill-directories.md": "45ecc09bbb30cce90aa4fcf437c1edd57f7cf6576f92ee4213858507cb54ba08",
+      "internal/audit/audit.go": "0b44b8db26ced993ad7372ddab7a5a5ddc51bf9530ea074f831eadf8b8bc7964",
+      "internal/audit/capability_cache_mutants_test.go": "a729041817d76be8c175bebdbe2120f59559c6a6302811b4debead0dc5affc27",
+      "internal/audit/markdown_cache_test.go": "eafd2b3d2b8bc08169ee49e23edb46a475d4a255ae4c73e54b0112579082cbb7",
+      "internal/audit/network_contacts_mutants_test.go": "e81ec48459ce83696c90ca690ad1bfbfa40cf72940cdfbe5c65d6088aef09a67",
+      "internal/audit/network_contacts_test.go": "143a72a70e078be8f7e27d498be67f1a0766900b823da1d786d12078fc9f0b88",
+      "internal/contextlock/contextlock.go": "02bf0ae4b015f784f7dd18cf512184cddc85e8a0c1ddaab86363aee1b41a607a",
+      "internal/contextpkg/contextpkg.go": "607f4221b001b6f38ff809976b0b8fedf9b083b42f280cca485d2c5754360691",
+      "internal/contextpkg/skill_directory_vectors_test.go": "5c42723944a8de5adb6bc28924fe4ad50b9971aaacf5581b253f553ad5314d3b",
+      "internal/contextpkg/testdata/profile-skill-directories-v1/fixtures.json": "5da6d372930afa2c8c3bcdf48c93daa4fa572adc74824fec81d07c8af2ffccf3",
+      "internal/contextpkg/testdata/profile-skill-directories-v1/lock-identity.json": "947ffd4d2b6b2644af3f3aa00bf2643891ac3a4100da3d75eeb7897f2503e59f",
+      "internal/contextpkg/testdata/profile-skill-directories-v1/schema-cases.json": "f5d177a0809093d41725fea04a63c8d93b543492638fb25bcb1699a81335910c",
+      "internal/contextpkg/testdata/profile-skill-directories-v1/vectors.json": "8053e3e837569242c3a1ecc2681fb64d0a0b587f5121d0f71b14b01d61134b56",
+      "internal/contextresolve/contextresolve.go": "98ea5433e1cdc2750814d231d11fb088cbd198c3dc596de6fa5497873414c152",
+      "internal/contextresolve/skill_directory_test.go": "f047aedf5bb686b39d03b315d5ff851849f1c75afe3718b2a7795ebbb5a2b7a4",
+      "internal/envprofile/envprofile.go": "27ea06115f55546f02be90335cc182d58652cc5664122c621929b4a51020ebb9",
+      "internal/envprofile/gitsource.go": "eb365a505259bc3119729ef7cb9b11199175acba0e9ef2bde4f9c4e7282807a9",
+      "internal/envprofile/global.go": "b0b9c6d765109118748f0b1c2b22e2227577dbce44ba9e38ec8de44760a56d8b",
+      "internal/envprofile/skill_directory_mutants_test.go": "5fcc18d848935cd3dbe91a7d7567c5f41556599f095c5bb07192a314beaebc2d",
+      "internal/envprofile/skill_directory_test.go": "f4645b91cc8ab47438271553a2cfc32a157ee31cdd2b84023bc612b9dc7ca831",
+      "internal/manifest/expand.go": "f96b4170c2561f26ad1724800fe9c50dae724626586acdf61588f5e073289b43"
+    },
+    "scope_digest": "9c15a87f39297845bd52f2e8893adaf4e71752d03742f3c1c433690a0f06bb4d"
+  },
+  "commands": [
+    {
+      "command": "go test -count=1 -timeout=3m -v -run '^TestReviewPriorMarkdownAllowance$' ./internal/audit",
+      "exit_code": 1,
+      "raw_log": "markdown-cache-before-01.log",
+      "sanitized_log_sha256": "c2277ecb36e86750352744749b6c6eeddbb239a324400e6c40fe8bb220fd8b99",
+      "note": "Expected-red regression before the fix; real pre-Markdown Gate seed exits 0, current Gate incorrectly admits both hash framings."
+    },
+    {
+      "command": "go test -count=1 -timeout=3m -v -run '^TestReviewPriorMarkdownAllowance$' ./internal/audit",
+      "exit_code": 0,
+      "raw_log": "markdown-cache-after-01.log",
+      "sanitized_log_sha256": "560890ea3329a05353c01186a6dd6f6928811c540d14bc92ac07ee447e284874",
+      "note": "Ruleset 5; old allowance refused; clean and declared-host controls pass."
+    },
+    {
+      "command": "go test -json -count=1 -timeout=6m ./internal/audit ./internal/contextpkg ./internal/contextresolve ./internal/contextlock ./internal/manifest",
+      "exit_code": 0,
+      "raw_log": "r7-core-tests-01.jsonl",
+      "sanitized_log_sha256": "2596d38e981288728a163c61438185652d19009f4d0e496e1606768af61cbac3",
+      "note": "Complete five-package suites, including existing audit mutants and reviewer regression."
+    },
+    {
+      "command": "go test -json -count=1 -timeout=6m -run 'Test(SkillDirectory|StrictAudit|Migrated|EnsureDefaultMigratesGlobalSkills|InstallDirectoryRejectsSecretUnderSubdirectory|InstallTransitiveDirectoryRejectsSecret|ResolveReportsRecordedContextSurfaceHashDrift|SkillsOfRefusesV1NULBeforeHashing|NativeSkills|ClaudeRepair)' ./internal/envprofile",
+      "exit_code": 1,
+      "raw_log": "r7-envprofile-tests-01.jsonl",
+      "sanitized_log_sha256": "68d05ee3873ee84320c1f23bbf8b8c47a421c98c7c7202eda99244cc95f895a1",
+      "note": "Diagnostic failure: new mutant was killed by v1/v2 but harness expected a non-existent /v name. All other selected tests passed; not a green package run."
+    },
+    {
+      "command": "go test -count=1 -timeout=3m -v -run '^TestSkillDirectoryNarrowingMutants$/^reuse-pre-markdown-ruleset$' ./internal/envprofile",
+      "exit_code": 0,
+      "raw_log": "r7-markdown-mutant-02.log",
+      "sanitized_log_sha256": "36778758c63e2106ab13a6e024b11b9b7429b84bf4b1cabe8f034584d0da23bd",
+      "note": "Corrected matcher names /v1. Child go test exits 1 with the intended bypass assertion in both v1 and v2; harness exits 0."
+    },
+    {
+      "command": "go test -json -count=1 -timeout=4m -run '^TestSkillDirectory' ./internal/envprofile",
+      "exit_code": 0,
+      "raw_log": "r7-directory-tests-02.jsonl",
+      "sanitized_log_sha256": "6958de0edad31052f8599f6c6fc6fec38b87ebcbe63d14b705acbbb242017d54",
+      "note": "Final candidate directory suites, all 11 narrowing mutants killed; 24 lifecycle and 6 metadata cases green."
+    },
+    {
+      "command": "go test -count=1 -timeout=2m -run '^TestNetworkContactCacheInvalidatesRulesetThree$' ./internal/audit",
+      "exit_code": 0,
+      "raw_log": "r7-network-cache-01.log",
+      "sanitized_log_sha256": "ac9ad74402400bcbc965b3fa25774f17566eadd7e07cacf8375da1a32b524181",
+      "note": "Replay after comment-only change to this existing test; behavior unchanged."
+    },
+    {
+      "command": "go build ./...",
+      "exit_code": 0,
+      "raw_log": "r7-build-01.log",
+      "sanitized_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "note": "Initial build."
+    },
+    {
+      "command": "go vet ./...",
+      "exit_code": 0,
+      "raw_log": "r7-vet-01.log",
+      "sanitized_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "note": "Initial vet."
+    },
+    {
+      "command": "GOLANGCI_LINT_CACHE=\"$PWD/.temp/r7-lint-cache\" golangci-lint run",
+      "exit_code": 0,
+      "raw_log": "r7-lint-01.log",
+      "sanitized_log_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47",
+      "note": "Initial private-cache lint."
+    },
+    {
+      "command": "go build ./...",
+      "exit_code": 0,
+      "raw_log": "r7-build-02.log",
+      "sanitized_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "note": "Final candidate build."
+    },
+    {
+      "command": "go vet ./...",
+      "exit_code": 0,
+      "raw_log": "r7-vet-02.log",
+      "sanitized_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "note": "Final candidate vet."
+    },
+    {
+      "command": "GOLANGCI_LINT_CACHE=\"$PWD/.temp/r7-lint-cache\" golangci-lint run",
+      "exit_code": 0,
+      "raw_log": "r7-lint-02.log",
+      "sanitized_log_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47",
+      "note": "Final candidate lint, zero issues."
+    }
+  ],
+  "standalone_checks": [
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": "git diff --exit-code HEAD -- README.md CHANGELOG.md",
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": "git diff --exit-code main -- README.md CHANGELOG.md",
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": "git diff --cached --exit-code",
+      "exit_code": 0,
+      "output": ""
+    }
+  ],
+  "format_output": "",
+  "hosted_gate": "Not run in this producer turn; configured post-turn validation owns the full gate on the signed snapshot.",
+  "historical_evidence": "Earlier full-suite/hosted results do not attest this changed candidate."
+}

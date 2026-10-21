@@ -1,0 +1,122 @@
+{
+  "task": "TASK-261018-adogt7",
+  "run": "RUN-261018-015fe5",
+  "identity": {
+    "base": "892dab098aef1497df9ccacdb173faaf4f8b8418",
+    "tree": "4cf404c658fdb199f5da12568ad7dbfe7a351239",
+    "matches_previous_candidate": true,
+    "refresh_exit": 1,
+    "prepared_tree": "4b0d82cc6a7997ac15f1ce0d41ecedd3b52729d8",
+    "real_index_clean": true
+  },
+  "platform": "darwin/arm64",
+  "toolchain": "go1.25.5",
+  "commands": [
+    {
+      "command": [
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=6m",
+        "./internal/audit",
+        "./internal/contextpkg",
+        "./internal/contextresolve",
+        "./internal/contextlock",
+        "./internal/manifest"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 111.854,
+      "public_log_sha256": "2acb46d30d2f5b15d71f28a89db9d7decbb7a7d82a9955835511cc8b2c512116"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=6m",
+        "-run",
+        "Test(SkillDirectory|StrictAudit|Migrated|EnsureDefaultMigratesGlobalSkills|InstallDirectoryRejectsSecretUnderSubdirectory|InstallTransitiveDirectoryRejectsSecret|ResolveReportsRecordedContextSurfaceHashDrift|SkillsOfRefusesV1NULBeforeHashing|NativeSkills)",
+        "./internal/envprofile"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 328.52,
+      "public_log_sha256": "b4851412e13b72dba51b965ac27ae5f5ad4cf7980fcdb100fd5cd8c28a6ce5b6"
+    },
+    {
+      "command": [
+        "go",
+        "build",
+        "./..."
+      ],
+      "exit": 0,
+      "elapsed_seconds": 4.712,
+      "public_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "vet",
+        "./internal/audit",
+        "./internal/contextpkg",
+        "./internal/contextresolve",
+        "./internal/contextlock",
+        "./internal/manifest",
+        "./internal/envprofile"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 2.856,
+      "public_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "golangci-lint",
+        "run"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 4.638,
+      "public_log_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--exit-code",
+        "HEAD",
+        "--",
+        "CHANGELOG.md",
+        "README.md"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 0.037,
+      "public_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 0.069,
+      "public_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "direct_subtests_passed": {
+    "TestSkillDirectorySchemaVectors": 56,
+    "TestSkillDirectoryLifecycleVectors": 24,
+    "TestSkillDirectoryLockIdentityVectors": 2,
+    "TestSkillDirectoryMetadata": 6,
+    "TestSkillDirectoryAgreement": 4,
+    "TestSkillDirectoryNarrowingMutants": 10
+  },
+  "ac_fresh": "8 of 9",
+  "full_suite_and_hosted": "Not rerun; configured post-handoff validation owns the new exact signed candidate. Prior full evidence is historical.",
+  "refresh": {
+    "exit": 1,
+    "refusal": "change_request_candidate_drift: candidate refresh would leave tracked board paths outside its file transaction stale; synchronize the board with the prepared checkpoint before retrying (paths=.task-board/.activity/BUG-261018-uoisfe/events.ndjson, .task-board/.activity/EPIC-261016-stqc77/events.ndjson, .task-board/.activity/STORY-261018-k5yd2n/events.ndjson, .task-board/EPIC-261016-stqc77_curator-rc7-code-wave/STORY-261018-k5yd2n_native-skills-in-place/BUG-261018-uoisfe_in-place-profile-skills-miss-native-surface/README.md, .task-board/EPIC-261016-stqc77_curator-rc7-code-wave/STORY-261018-k5yd2n_native-skills-in-place/BUG-261018-uoisfe_in-place-profile-skills-miss-native-surface/progress.md, .task-board/EPIC-261016-stqc77_curator-rc7-code-wave/STORY-261018-k5yd2n_native-skills-in-place/README.md, .task-board/EPIC-261016-stqc77_curator-rc7-code-wave/STORY-261018-k5yd2n_native-skills-in-place/progress.md, .task-board/EPIC-261016-stqc77_curator-rc7-code-wave/progress.md, prepared_tree_oid=4b0d82cc6a7997ac15f1ce0d41ecedd3b52729d8, workspace_tree_oid=4cf404c658fdb199f5da12568ad7dbfe7a351239)\n"
+  },
+  "out_of_contract_rows": [],
+  "surface_table": "Not supplied; retained brief-input gap."
+}

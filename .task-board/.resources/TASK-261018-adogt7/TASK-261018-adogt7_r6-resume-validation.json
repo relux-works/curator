@@ -1,0 +1,62 @@
+{
+  "task": "TASK-261018-adogt7",
+  "run": "RUN-261019-2d5868",
+  "identity": {
+    "base": "5ecb68da8f8ceab4dda118f2263abfb3da63ab8c",
+    "tree": "6c0d63c9f4f562e89b8164212f7dcd567a10f01f",
+    "files_verified": 17,
+    "prior_raw_logs_verified": 12,
+    "toolchain": "go version go1.25.5 darwin/arm64",
+    "environment_reuse": "Same darwin/arm64 toolchain, source, tests and config; original logs verified; full core and affected envprofile/migration/Claude repair evidence retained. No new full-suite or hosted pass claimed."
+  },
+  "commands": [
+    {
+      "command": "go test -json -count=1 -timeout=6m -run '^TestSkillDirectory' ./internal/contextpkg ./internal/contextresolve ./internal/envprofile",
+      "exit": 0,
+      "raw_log": "resume-directory-tests-01.jsonl",
+      "raw_sha256": "9e11e165731ea6e0045fb2723de374d2158b44678277278874ae2e9b02268099",
+      "public_sha256": "000b9e5d650a7af3f422d555e2c95d0e35705e7717bfe9dd1455b79437e75ada"
+    },
+    {
+      "command": "go build ./...",
+      "exit": 0,
+      "raw_log": "resume-build-01.log",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "go vet ./...",
+      "exit": 0,
+      "raw_log": "resume-vet-01.log",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "git diff --exit-code HEAD -- CHANGELOG.md README.md",
+      "exit": 0,
+      "raw_log": "resume-release-files-01.log",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "git diff --check",
+      "exit": 0,
+      "raw_log": "resume-diff-check-01.log",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "direct_subtests_passed": {
+    "TestSkillDirectorySchemaVectors": 56,
+    "TestSkillDirectoryLockIdentityVectors": 2,
+    "TestSkillDirectoryClosedSuccessors": 20,
+    "TestSkillDirectoryAgreement": 4,
+    "TestSkillDirectoryNarrowingMutants": 10,
+    "TestSkillDirectoryLifecycleVectors": 24,
+    "TestSkillDirectoryMetadata": 6
+  },
+  "reused_evidence": "TASK-261018-adogt7_r6-validation.json and .log: raw logs and all 17 candidate file hashes verified. Full core suites, broader envprofile migration/native/Claude repair checks, and private-cache lint remain unchanged green evidence.",
+  "ac_driven": "8 of 9; AC 9 exact signed full local/hosted validation is configured after handoff, no fresh full-gate pass claimed.",
+  "mutants": "10 of 10 killed, no survivors. Child commands exit 1 with intended named assertions; enclosing harness exit 0. Retained gaps mutant table and production call sites apply unchanged.",
+  "scope": "No source/test/docs changes in successor; README and CHANGELOG equal trunk checkpoint; no refresh-specific refusal, refresh not run."
+}

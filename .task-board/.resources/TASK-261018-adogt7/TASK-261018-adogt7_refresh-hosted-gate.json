@@ -1,0 +1,4983 @@
+{
+  "candidate": "e57894d642993b9fce7ea23f7ccfdb1995c2ac38",
+  "run": {
+    "conclusion": "failure",
+    "headSha": "e57894d642993b9fce7ea23f7ccfdb1995c2ac38",
+    "jobs": [
+      {
+        "completedAt": "2026-10-18T11:56:22Z",
+        "conclusion": "failure",
+        "databaseId": 117666342555,
+        "name": "Race (ubuntu-latest)",
+        "startedAt": "2026-10-18T11:43:28Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:43:31Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:43:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:43:32Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:43:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:43:32Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:43:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:43:32Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:43:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:43:32Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:43:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:43:32Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@v4",
+            "number": 6,
+            "startedAt": "2026-10-18T11:43:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:43:32Z",
+            "conclusion": "success",
+            "name": "Verify pnpm pin matches Go constant",
+            "number": 7,
+            "startedAt": "2026-10-18T11:43:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:43:33Z",
+            "conclusion": "success",
+            "name": "Install pinned pnpm via npm",
+            "number": 8,
+            "startedAt": "2026-10-18T11:43:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:43:33Z",
+            "conclusion": "success",
+            "name": "Verify rust pin matches Go constant",
+            "number": 9,
+            "startedAt": "2026-10-18T11:43:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:43:33Z",
+            "conclusion": "success",
+            "name": "Install pinned Rust toolchain via rustup",
+            "number": 10,
+            "startedAt": "2026-10-18T11:43:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:43:33Z",
+            "conclusion": "success",
+            "name": "Verify Go toolchain identity",
+            "number": 11,
+            "startedAt": "2026-10-18T11:43:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:56:15Z",
+            "conclusion": "success",
+            "name": "go test -race + platform-case gate",
+            "number": 12,
+            "startedAt": "2026-10-18T11:43:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:56:17Z",
+            "conclusion": "success",
+            "name": "Upload race evidence",
+            "number": 13,
+            "startedAt": "2026-10-18T11:56:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:56:17Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@v4",
+            "number": 22,
+            "startedAt": "2026-10-18T11:56:17Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:56:17Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 23,
+            "startedAt": "2026-10-18T11:56:17Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:56:17Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 24,
+            "startedAt": "2026-10-18T11:56:17Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:56:17Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 25,
+            "startedAt": "2026-10-18T11:56:17Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:56:17Z",
+            "conclusion": "failure",
+            "name": "Complete runner",
+            "number": 26,
+            "startedAt": "2026-10-18T11:56:17Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:56:17Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 27,
+            "startedAt": "2026-10-18T11:56:17Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666342555"
+      },
+      {
+        "completedAt": "2026-10-18T11:05:46Z",
+        "conclusion": "success",
+        "databaseId": 117666343246,
+        "name": "Naming gate",
+        "startedAt": "2026-10-18T11:05:38Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:05:39Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:05:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:41Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:05:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:41Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:05:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:42Z",
+            "conclusion": "success",
+            "name": "Employer name gate",
+            "number": 4,
+            "startedAt": "2026-10-18T11:05:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:43Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 7,
+            "startedAt": "2026-10-18T11:05:42Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:43Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 8,
+            "startedAt": "2026-10-18T11:05:43Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:43Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-18T11:05:43Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666343246"
+      },
+      {
+        "completedAt": "2026-10-18T11:15:09Z",
+        "conclusion": "success",
+        "databaseId": 117666343835,
+        "name": "Test (ubuntu-latest)",
+        "startedAt": "2026-10-18T10:55:30Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T10:55:32Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T10:55:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:33Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T10:55:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:33Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T10:55:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T10:55:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@v4",
+            "number": 6,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Verify pnpm pin matches Go constant",
+            "number": 7,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Install pinned pnpm via npm",
+            "number": 8,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Verify rust pin matches Go constant",
+            "number": 9,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Install pinned Rust toolchain via rustup",
+            "number": 10,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Verify Go toolchain identity",
+            "number": 11,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Verify versioned Go install compatibility",
+            "number": 12,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "gofmt check",
+            "number": 13,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:42Z",
+            "conclusion": "success",
+            "name": "go vet",
+            "number": 14,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:43Z",
+            "conclusion": "success",
+            "name": "Ledger consistency",
+            "number": 15,
+            "startedAt": "2026-10-18T10:55:42Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:02Z",
+            "conclusion": "success",
+            "name": "go test + platform-case gate",
+            "number": 16,
+            "startedAt": "2026-10-18T10:55:43Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:04Z",
+            "conclusion": "success",
+            "name": "Upload gate evidence",
+            "number": 17,
+            "startedAt": "2026-10-18T11:15:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:04Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@v4",
+            "number": 30,
+            "startedAt": "2026-10-18T11:15:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:04Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 31,
+            "startedAt": "2026-10-18T11:15:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:04Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 32,
+            "startedAt": "2026-10-18T11:15:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:04Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 33,
+            "startedAt": "2026-10-18T11:15:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:04Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 34,
+            "startedAt": "2026-10-18T11:15:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:04Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 35,
+            "startedAt": "2026-10-18T11:15:04Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666343835"
+      },
+      {
+        "completedAt": "2026-10-18T11:42:16Z",
+        "conclusion": "success",
+        "databaseId": 117666343849,
+        "name": "Test (windows-latest)",
+        "startedAt": "2026-10-18T10:43:02Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T10:43:05Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T10:43:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:26Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T10:43:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:26Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T10:43:26Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:30Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T10:43:26Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:08Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T10:43:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:13Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@v4",
+            "number": 6,
+            "startedAt": "2026-10-18T10:44:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:13Z",
+            "conclusion": "success",
+            "name": "Verify pnpm pin matches Go constant",
+            "number": 7,
+            "startedAt": "2026-10-18T10:44:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:20Z",
+            "conclusion": "success",
+            "name": "Install pinned pnpm via npm",
+            "number": 8,
+            "startedAt": "2026-10-18T10:44:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:21Z",
+            "conclusion": "success",
+            "name": "Verify rust pin matches Go constant",
+            "number": 9,
+            "startedAt": "2026-10-18T10:44:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:32Z",
+            "conclusion": "success",
+            "name": "Install pinned Rust toolchain via rustup",
+            "number": 10,
+            "startedAt": "2026-10-18T10:44:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:32Z",
+            "conclusion": "success",
+            "name": "Verify Go toolchain identity",
+            "number": 11,
+            "startedAt": "2026-10-18T10:44:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:32Z",
+            "conclusion": "success",
+            "name": "Verify versioned Go install compatibility",
+            "number": 12,
+            "startedAt": "2026-10-18T10:44:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:32Z",
+            "conclusion": "skipped",
+            "name": "gofmt check",
+            "number": 13,
+            "startedAt": "2026-10-18T10:44:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:52Z",
+            "conclusion": "success",
+            "name": "go vet",
+            "number": 14,
+            "startedAt": "2026-10-18T10:44:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:41Z",
+            "conclusion": "success",
+            "name": "Ledger consistency",
+            "number": 15,
+            "startedAt": "2026-10-18T10:44:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:42:05Z",
+            "conclusion": "success",
+            "name": "go test + platform-case gate",
+            "number": 16,
+            "startedAt": "2026-10-18T10:45:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:42:07Z",
+            "conclusion": "success",
+            "name": "Upload gate evidence",
+            "number": 17,
+            "startedAt": "2026-10-18T11:42:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:42:07Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@v4",
+            "number": 31,
+            "startedAt": "2026-10-18T11:42:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:42:08Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 32,
+            "startedAt": "2026-10-18T11:42:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:42:10Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 33,
+            "startedAt": "2026-10-18T11:42:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:42:13Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 34,
+            "startedAt": "2026-10-18T11:42:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:42:13Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 35,
+            "startedAt": "2026-10-18T11:42:13Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666343849"
+      },
+      {
+        "completedAt": "2026-10-18T11:09:41Z",
+        "conclusion": "success",
+        "databaseId": 117666343859,
+        "name": "Gate self-test (macos-latest)",
+        "startedAt": "2026-10-18T11:09:18Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:09:20Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:09:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:30Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:09:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:30Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:09:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:38Z",
+            "conclusion": "success",
+            "name": "Self-test the CI gates",
+            "number": 4,
+            "startedAt": "2026-10-18T11:09:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:38Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 8,
+            "startedAt": "2026-10-18T11:09:38Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:39Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-18T11:09:38Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666343859"
+      },
+      {
+        "completedAt": "2026-10-18T11:10:40Z",
+        "conclusion": "success",
+        "databaseId": 117666344191,
+        "name": "Go 1.26.0 driver (macos-latest)",
+        "startedAt": "2026-10-18T11:08:44Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:08:46Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:08:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:08:54Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:08:46Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:08:54Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:08:54Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:08:55Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:08:54Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:13Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:08:55Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:13Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T11:09:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:22Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T11:09:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:23Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T11:10:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:34Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T11:10:23Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:34Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 16,
+            "startedAt": "2026-10-18T11:10:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:35Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 17,
+            "startedAt": "2026-10-18T11:10:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:35Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 18,
+            "startedAt": "2026-10-18T11:10:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:36Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T11:10:35Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666344191"
+      },
+      {
+        "completedAt": "2026-10-18T10:45:34Z",
+        "conclusion": "success",
+        "databaseId": 117666359742,
+        "name": "Go 1.27.1 driver (windows-latest)",
+        "startedAt": "2026-10-18T10:43:02Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T10:43:04Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T10:43:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:15Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T10:43:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:15Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T10:43:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:18Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T10:43:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:38Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T10:43:18Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:39Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T10:43:38Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:14Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T10:43:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:17Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T10:45:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:29Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T10:45:17Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:29Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 16,
+            "startedAt": "2026-10-18T10:45:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:31Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 17,
+            "startedAt": "2026-10-18T10:45:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:32Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 18,
+            "startedAt": "2026-10-18T10:45:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:32Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T10:45:32Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666359742"
+      },
+      {
+        "completedAt": "2026-10-18T11:06:06Z",
+        "conclusion": "success",
+        "databaseId": 117666360738,
+        "name": "Go 1.27.1 driver (ubuntu-latest)",
+        "startedAt": "2026-10-18T11:05:47Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:05:50Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:05:48Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:51Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:05:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:51Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:05:51Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:52Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:05:51Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:52Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:05:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:52Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T11:05:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:57Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T11:05:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:58Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T11:05:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:02Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T11:05:58Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:02Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 15,
+            "startedAt": "2026-10-18T11:06:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:02Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 16,
+            "startedAt": "2026-10-18T11:06:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:02Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 17,
+            "startedAt": "2026-10-18T11:06:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:02Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 18,
+            "startedAt": "2026-10-18T11:06:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:02Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T11:06:02Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666360738"
+      },
+      {
+        "completedAt": "2026-10-18T11:06:06Z",
+        "conclusion": "success",
+        "databaseId": 117666360983,
+        "name": "Lint",
+        "startedAt": "2026-10-18T11:05:32Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:05:35Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:05:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:36Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:05:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:36Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:05:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:37Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 4,
+            "startedAt": "2026-10-18T11:05:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:37Z",
+            "conclusion": "success",
+            "name": "Verify Go toolchain identity",
+            "number": 5,
+            "startedAt": "2026-10-18T11:05:37Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:52Z",
+            "conclusion": "success",
+            "name": "Run golangci/golangci-lint-action@v7",
+            "number": 6,
+            "startedAt": "2026-10-18T11:05:37Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:53Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@v4",
+            "number": 7,
+            "startedAt": "2026-10-18T11:05:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:00Z",
+            "conclusion": "success",
+            "name": "Verify Linux CI isolation",
+            "number": 8,
+            "startedAt": "2026-10-18T11:05:53Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:00Z",
+            "conclusion": "success",
+            "name": "No broad suppression",
+            "number": 9,
+            "startedAt": "2026-10-18T11:06:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:00Z",
+            "conclusion": "success",
+            "name": "Verify GoReleaser rc channel values",
+            "number": 10,
+            "startedAt": "2026-10-18T11:06:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:00Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@v4",
+            "number": 16,
+            "startedAt": "2026-10-18T11:06:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:01Z",
+            "conclusion": "success",
+            "name": "Post Run golangci/golangci-lint-action@v7",
+            "number": 17,
+            "startedAt": "2026-10-18T11:06:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:01Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 18,
+            "startedAt": "2026-10-18T11:06:01Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:01Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 19,
+            "startedAt": "2026-10-18T11:06:01Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:01Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 20,
+            "startedAt": "2026-10-18T11:06:01Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:01Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 21,
+            "startedAt": "2026-10-18T11:06:01Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666360983"
+      },
+      {
+        "completedAt": "2026-10-18T10:43:00Z",
+        "conclusion": "skipped",
+        "databaseId": 117666361120,
+        "name": "Candidate suite (${{ matrix.os }})",
+        "startedAt": "2026-10-18T11:43:33Z",
+        "status": "completed",
+        "steps": [],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666361120"
+      },
+      {
+        "completedAt": "2026-10-18T11:29:11Z",
+        "conclusion": "success",
+        "databaseId": 117666361819,
+        "name": "Race (macos-latest)",
+        "startedAt": "2026-10-18T10:52:36Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T10:52:37Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T10:52:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:52:49Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T10:52:37Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:52:49Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T10:52:49Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:52:50Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T10:52:49Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:53:29Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T10:52:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:53:30Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@v4",
+            "number": 6,
+            "startedAt": "2026-10-18T10:53:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:53:30Z",
+            "conclusion": "success",
+            "name": "Verify pnpm pin matches Go constant",
+            "number": 7,
+            "startedAt": "2026-10-18T10:53:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:53:32Z",
+            "conclusion": "success",
+            "name": "Install pinned pnpm via npm",
+            "number": 8,
+            "startedAt": "2026-10-18T10:53:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:53:32Z",
+            "conclusion": "success",
+            "name": "Verify rust pin matches Go constant",
+            "number": 9,
+            "startedAt": "2026-10-18T10:53:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:53:40Z",
+            "conclusion": "success",
+            "name": "Install pinned Rust toolchain via rustup",
+            "number": 10,
+            "startedAt": "2026-10-18T10:53:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:53:41Z",
+            "conclusion": "success",
+            "name": "Verify Go toolchain identity",
+            "number": 11,
+            "startedAt": "2026-10-18T10:53:40Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:29:01Z",
+            "conclusion": "success",
+            "name": "go test -race + platform-case gate",
+            "number": 12,
+            "startedAt": "2026-10-18T10:53:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:29:03Z",
+            "conclusion": "success",
+            "name": "Upload race evidence",
+            "number": 13,
+            "startedAt": "2026-10-18T11:29:01Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:29:03Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@v4",
+            "number": 23,
+            "startedAt": "2026-10-18T11:29:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:29:04Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 24,
+            "startedAt": "2026-10-18T11:29:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:29:05Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 25,
+            "startedAt": "2026-10-18T11:29:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:29:06Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 26,
+            "startedAt": "2026-10-18T11:29:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:29:08Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 27,
+            "startedAt": "2026-10-18T11:29:06Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666361819"
+      },
+      {
+        "completedAt": "2026-10-18T11:07:04Z",
+        "conclusion": "success",
+        "databaseId": 117666362526,
+        "name": "Go 1.27.1 driver (macos-latest)",
+        "startedAt": "2026-10-18T11:04:48Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:04:49Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:04:48Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:04:57Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:04:49Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:04:57Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:04:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:04:59Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:04:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:19Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:04:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:19Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T11:05:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:42Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T11:05:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:44Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T11:06:42Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:57Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T11:06:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:57Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 16,
+            "startedAt": "2026-10-18T11:06:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:58Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 17,
+            "startedAt": "2026-10-18T11:06:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:59Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 18,
+            "startedAt": "2026-10-18T11:06:58Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:07:00Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T11:06:59Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666362526"
+      },
+      {
+        "completedAt": "2026-10-18T11:05:19Z",
+        "conclusion": "success",
+        "databaseId": 117666362988,
+        "name": "Interop conformance gate",
+        "startedAt": "2026-10-18T11:05:07Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:05:09Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:05:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:09Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:05:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:09Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:05:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:10Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:05:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:10Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:05:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:10Z",
+            "conclusion": "success",
+            "name": "Verify Go toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T11:05:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:15Z",
+            "conclusion": "success",
+            "name": "Shared protocol suite",
+            "number": 7,
+            "startedAt": "2026-10-18T11:05:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:15Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 11,
+            "startedAt": "2026-10-18T11:05:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:15Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 12,
+            "startedAt": "2026-10-18T11:05:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:15Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 13,
+            "startedAt": "2026-10-18T11:05:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:15Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 14,
+            "startedAt": "2026-10-18T11:05:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:15Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 15,
+            "startedAt": "2026-10-18T11:05:15Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666362988"
+      },
+      {
+        "completedAt": "2026-10-18T11:06:24Z",
+        "conclusion": "success",
+        "databaseId": 117666363479,
+        "name": "Go 1.25.5 driver (ubuntu-latest)",
+        "startedAt": "2026-10-18T11:06:07Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:06:09Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:06:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:10Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:06:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:10Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:06:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:10Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:06:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:10Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:06:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:10Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T11:06:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:15Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T11:06:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:15Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T11:06:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:20Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T11:06:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:20Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 15,
+            "startedAt": "2026-10-18T11:06:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:20Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 16,
+            "startedAt": "2026-10-18T11:06:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:20Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 17,
+            "startedAt": "2026-10-18T11:06:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:20Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 18,
+            "startedAt": "2026-10-18T11:06:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:20Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T11:06:20Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666363479"
+      },
+      {
+        "completedAt": "2026-10-18T10:43:00Z",
+        "conclusion": "skipped",
+        "databaseId": 117666363605,
+        "name": "Test (rose-air)",
+        "startedAt": "2026-10-18T11:43:33Z",
+        "status": "completed",
+        "steps": [],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666363605"
+      },
+      {
+        "completedAt": "2026-10-18T11:05:36Z",
+        "conclusion": "success",
+        "databaseId": 117666363718,
+        "name": "Go 1.26.0 driver (ubuntu-latest)",
+        "startedAt": "2026-10-18T11:05:21Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:05:23Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:05:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:24Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:05:23Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:24Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:05:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:24Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:05:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:25Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:05:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:25Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T11:05:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:29Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T11:05:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:29Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T11:05:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:33Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T11:05:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:33Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 15,
+            "startedAt": "2026-10-18T11:05:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:33Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 16,
+            "startedAt": "2026-10-18T11:05:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:33Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 17,
+            "startedAt": "2026-10-18T11:05:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:33Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 18,
+            "startedAt": "2026-10-18T11:05:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:33Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T11:05:33Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666363718"
+      },
+      {
+        "completedAt": "2026-10-18T11:31:16Z",
+        "conclusion": "success",
+        "databaseId": 117666366421,
+        "name": "Test (macos-latest)",
+        "startedAt": "2026-10-18T11:09:46Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:09:48Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:09:46Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:59Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:09:48Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:59Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:09:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:00Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:09:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:21Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:10:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:22Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@v4",
+            "number": 6,
+            "startedAt": "2026-10-18T11:10:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:22Z",
+            "conclusion": "success",
+            "name": "Verify pnpm pin matches Go constant",
+            "number": 7,
+            "startedAt": "2026-10-18T11:10:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:24Z",
+            "conclusion": "success",
+            "name": "Install pinned pnpm via npm",
+            "number": 8,
+            "startedAt": "2026-10-18T11:10:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:24Z",
+            "conclusion": "success",
+            "name": "Verify rust pin matches Go constant",
+            "number": 9,
+            "startedAt": "2026-10-18T11:10:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:31Z",
+            "conclusion": "success",
+            "name": "Install pinned Rust toolchain via rustup",
+            "number": 10,
+            "startedAt": "2026-10-18T11:10:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:31Z",
+            "conclusion": "success",
+            "name": "Verify Go toolchain identity",
+            "number": 11,
+            "startedAt": "2026-10-18T11:10:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:31Z",
+            "conclusion": "success",
+            "name": "Verify versioned Go install compatibility",
+            "number": 12,
+            "startedAt": "2026-10-18T11:10:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:31Z",
+            "conclusion": "success",
+            "name": "gofmt check",
+            "number": 13,
+            "startedAt": "2026-10-18T11:10:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:41Z",
+            "conclusion": "success",
+            "name": "go vet",
+            "number": 14,
+            "startedAt": "2026-10-18T11:10:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:50Z",
+            "conclusion": "success",
+            "name": "Ledger consistency",
+            "number": 15,
+            "startedAt": "2026-10-18T11:10:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:31:06Z",
+            "conclusion": "success",
+            "name": "go test + platform-case gate",
+            "number": 16,
+            "startedAt": "2026-10-18T11:10:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:31:08Z",
+            "conclusion": "success",
+            "name": "Upload gate evidence",
+            "number": 17,
+            "startedAt": "2026-10-18T11:31:06Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:31:08Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@v4",
+            "number": 31,
+            "startedAt": "2026-10-18T11:31:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:31:09Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 32,
+            "startedAt": "2026-10-18T11:31:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:31:09Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 33,
+            "startedAt": "2026-10-18T11:31:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:31:10Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 34,
+            "startedAt": "2026-10-18T11:31:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:31:13Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 35,
+            "startedAt": "2026-10-18T11:31:10Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666366421"
+      },
+      {
+        "completedAt": "2026-10-18T11:09:12Z",
+        "conclusion": "success",
+        "databaseId": 117666368279,
+        "name": "Go 1.25.5 driver (macos-latest)",
+        "startedAt": "2026-10-18T11:07:11Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:07:13Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:07:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:07:21Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:07:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:07:21Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:07:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:07:22Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:07:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:07:45Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:07:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:07:45Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T11:07:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:08:53Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T11:07:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:08:54Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T11:08:53Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:06Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T11:08:54Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:06Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 16,
+            "startedAt": "2026-10-18T11:09:06Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:07Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 17,
+            "startedAt": "2026-10-18T11:09:06Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:07Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 18,
+            "startedAt": "2026-10-18T11:09:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:08Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T11:09:07Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666368279"
+      },
+      {
+        "completedAt": "2026-10-18T11:05:05Z",
+        "conclusion": "success",
+        "databaseId": 117666368848,
+        "name": "Gate self-test (ubuntu-latest)",
+        "startedAt": "2026-10-18T11:04:58Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:05:00Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:04:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:00Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:05:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:00Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:05:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:02Z",
+            "conclusion": "success",
+            "name": "Self-test the CI gates",
+            "number": 4,
+            "startedAt": "2026-10-18T11:05:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:02Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 7,
+            "startedAt": "2026-10-18T11:05:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:02Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 8,
+            "startedAt": "2026-10-18T11:05:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:02Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-18T11:05:02Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666368848"
+      },
+      {
+        "completedAt": "2026-10-18T10:46:46Z",
+        "conclusion": "success",
+        "databaseId": 117666371537,
+        "name": "Go 1.26.0 driver (windows-latest)",
+        "startedAt": "2026-10-18T10:43:03Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T10:43:05Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T10:43:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:21Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T10:43:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:21Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T10:43:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:25Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T10:43:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:56Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T10:43:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:57Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T10:43:56Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:16Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T10:43:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:20Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T10:46:16Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:38Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T10:46:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:39Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 16,
+            "startedAt": "2026-10-18T10:46:38Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:41Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 17,
+            "startedAt": "2026-10-18T10:46:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:43Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 18,
+            "startedAt": "2026-10-18T10:46:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:43Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T10:46:43Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666371537"
+      },
+      {
+        "completedAt": "2026-10-18T10:44:18Z",
+        "conclusion": "success",
+        "databaseId": 117666372559,
+        "name": "Gate self-test (windows-latest)",
+        "startedAt": "2026-10-18T10:43:03Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T10:43:04Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T10:43:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:19Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T10:43:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:19Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T10:43:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:14Z",
+            "conclusion": "success",
+            "name": "Self-test the CI gates",
+            "number": 4,
+            "startedAt": "2026-10-18T10:43:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:17Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 8,
+            "startedAt": "2026-10-18T10:44:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:17Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-18T10:44:17Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666372559"
+      },
+      {
+        "completedAt": "2026-10-18T10:46:22Z",
+        "conclusion": "success",
+        "databaseId": 117666372655,
+        "name": "Go 1.25.5 driver (windows-latest)",
+        "startedAt": "2026-10-18T10:43:02Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T10:43:03Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T10:43:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:18Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T10:43:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:18Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T10:43:18Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:20Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T10:43:18Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:52Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T10:43:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:52Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T10:43:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:59Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T10:43:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:02Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T10:45:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:16Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T10:46:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:16Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 16,
+            "startedAt": "2026-10-18T10:46:16Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:18Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 17,
+            "startedAt": "2026-10-18T10:46:16Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:20Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 18,
+            "startedAt": "2026-10-18T10:46:18Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:20Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T10:46:20Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117666372655"
+      }
+    ],
+    "status": "completed",
+    "url": "https://github.com/relux-works/curator/actions/runs/39120346079"
+  },
+  "hosted_gate_green": false,
+  "verified_external_failure": {
+    "job_id": 117654505603,
+    "repository_test_step_exit": 0,
+    "platform_case_gate_exit": 0,
+    "infrastructure_step": "Complete runner",
+    "administrator_hook_exit": 1,
+    "diagnostic": "Administrator job-completed cleanup hook cannot delete protected pnpm test directories: Permission denied.",
+    "raw_job_log_sha256": "f0426d616520ddb09465fe3e5a572e9fb46352981aaed644b5ff696b5d721176"
+  },
+  "retry": {
+    "command": "gh run rerun 39120346079 --job 117654505603",
+    "exit": 1,
+    "direct_api_exit": 1,
+    "http_status": 403,
+    "message": "The workflow run containing this job is already running"
+  },
+  "status_bound": "Final observed workflow result is failure: 19 jobs green, one infrastructure failure, two policy skips. No job remains running. The ordinary failed-job retry reproduced the external blocker.",
+  "attempt_1_terminal": {
+    "conclusion": "failure",
+    "headSha": "e57894d642993b9fce7ea23f7ccfdb1995c2ac38",
+    "jobs": [
+      {
+        "completedAt": "2026-10-18T11:17:38Z",
+        "conclusion": "failure",
+        "databaseId": 117654505603,
+        "name": "Race (ubuntu-latest)",
+        "startedAt": "2026-10-18T10:58:28Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T10:58:30Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T10:58:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:58:31Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T10:58:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:58:31Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T10:58:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:58:32Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T10:58:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:58:32Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T10:58:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:58:32Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@v4",
+            "number": 6,
+            "startedAt": "2026-10-18T10:58:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:58:32Z",
+            "conclusion": "success",
+            "name": "Verify pnpm pin matches Go constant",
+            "number": 7,
+            "startedAt": "2026-10-18T10:58:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:58:32Z",
+            "conclusion": "success",
+            "name": "Install pinned pnpm via npm",
+            "number": 8,
+            "startedAt": "2026-10-18T10:58:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:58:32Z",
+            "conclusion": "success",
+            "name": "Verify rust pin matches Go constant",
+            "number": 9,
+            "startedAt": "2026-10-18T10:58:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:58:33Z",
+            "conclusion": "success",
+            "name": "Install pinned Rust toolchain via rustup",
+            "number": 10,
+            "startedAt": "2026-10-18T10:58:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:58:33Z",
+            "conclusion": "success",
+            "name": "Verify Go toolchain identity",
+            "number": 11,
+            "startedAt": "2026-10-18T10:58:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:17:31Z",
+            "conclusion": "success",
+            "name": "go test -race + platform-case gate",
+            "number": 12,
+            "startedAt": "2026-10-18T10:58:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:17:34Z",
+            "conclusion": "success",
+            "name": "Upload race evidence",
+            "number": 13,
+            "startedAt": "2026-10-18T11:17:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:17:34Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@v4",
+            "number": 22,
+            "startedAt": "2026-10-18T11:17:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:17:34Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 23,
+            "startedAt": "2026-10-18T11:17:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:17:34Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 24,
+            "startedAt": "2026-10-18T11:17:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:17:34Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 25,
+            "startedAt": "2026-10-18T11:17:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:17:34Z",
+            "conclusion": "failure",
+            "name": "Complete runner",
+            "number": 26,
+            "startedAt": "2026-10-18T11:17:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:17:34Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 27,
+            "startedAt": "2026-10-18T11:17:34Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505603"
+      },
+      {
+        "completedAt": "2026-10-18T11:15:09Z",
+        "conclusion": "success",
+        "databaseId": 117654505690,
+        "name": "Test (ubuntu-latest)",
+        "startedAt": "2026-10-18T10:55:30Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T10:55:32Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T10:55:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:33Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T10:55:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:33Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T10:55:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T10:55:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@v4",
+            "number": 6,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Verify pnpm pin matches Go constant",
+            "number": 7,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Install pinned pnpm via npm",
+            "number": 8,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Verify rust pin matches Go constant",
+            "number": 9,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Install pinned Rust toolchain via rustup",
+            "number": 10,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Verify Go toolchain identity",
+            "number": 11,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "Verify versioned Go install compatibility",
+            "number": 12,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:34Z",
+            "conclusion": "success",
+            "name": "gofmt check",
+            "number": 13,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:42Z",
+            "conclusion": "success",
+            "name": "go vet",
+            "number": 14,
+            "startedAt": "2026-10-18T10:55:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:55:43Z",
+            "conclusion": "success",
+            "name": "Ledger consistency",
+            "number": 15,
+            "startedAt": "2026-10-18T10:55:42Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:02Z",
+            "conclusion": "success",
+            "name": "go test + platform-case gate",
+            "number": 16,
+            "startedAt": "2026-10-18T10:55:43Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:04Z",
+            "conclusion": "success",
+            "name": "Upload gate evidence",
+            "number": 17,
+            "startedAt": "2026-10-18T11:15:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:04Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@v4",
+            "number": 30,
+            "startedAt": "2026-10-18T11:15:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:04Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 31,
+            "startedAt": "2026-10-18T11:15:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:04Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 32,
+            "startedAt": "2026-10-18T11:15:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:04Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 33,
+            "startedAt": "2026-10-18T11:15:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:04Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 34,
+            "startedAt": "2026-10-18T11:15:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:15:04Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 35,
+            "startedAt": "2026-10-18T11:15:04Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505690"
+      },
+      {
+        "completedAt": "2026-10-18T11:05:19Z",
+        "conclusion": "success",
+        "databaseId": 117654505743,
+        "name": "Interop conformance gate",
+        "startedAt": "2026-10-18T11:05:07Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:05:09Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:05:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:09Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:05:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:09Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:05:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:10Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:05:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:10Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:05:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:10Z",
+            "conclusion": "success",
+            "name": "Verify Go toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T11:05:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:15Z",
+            "conclusion": "success",
+            "name": "Shared protocol suite",
+            "number": 7,
+            "startedAt": "2026-10-18T11:05:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:15Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 11,
+            "startedAt": "2026-10-18T11:05:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:15Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 12,
+            "startedAt": "2026-10-18T11:05:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:15Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 13,
+            "startedAt": "2026-10-18T11:05:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:15Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 14,
+            "startedAt": "2026-10-18T11:05:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:15Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 15,
+            "startedAt": "2026-10-18T11:05:15Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505743"
+      },
+      {
+        "completedAt": "2026-10-18T11:42:16Z",
+        "conclusion": "success",
+        "databaseId": 117654505744,
+        "name": "Test (windows-latest)",
+        "startedAt": "2026-10-18T10:43:02Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T10:43:05Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T10:43:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:26Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T10:43:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:26Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T10:43:26Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:30Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T10:43:26Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:08Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T10:43:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:13Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@v4",
+            "number": 6,
+            "startedAt": "2026-10-18T10:44:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:13Z",
+            "conclusion": "success",
+            "name": "Verify pnpm pin matches Go constant",
+            "number": 7,
+            "startedAt": "2026-10-18T10:44:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:20Z",
+            "conclusion": "success",
+            "name": "Install pinned pnpm via npm",
+            "number": 8,
+            "startedAt": "2026-10-18T10:44:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:21Z",
+            "conclusion": "success",
+            "name": "Verify rust pin matches Go constant",
+            "number": 9,
+            "startedAt": "2026-10-18T10:44:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:32Z",
+            "conclusion": "success",
+            "name": "Install pinned Rust toolchain via rustup",
+            "number": 10,
+            "startedAt": "2026-10-18T10:44:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:32Z",
+            "conclusion": "success",
+            "name": "Verify Go toolchain identity",
+            "number": 11,
+            "startedAt": "2026-10-18T10:44:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:32Z",
+            "conclusion": "success",
+            "name": "Verify versioned Go install compatibility",
+            "number": 12,
+            "startedAt": "2026-10-18T10:44:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:32Z",
+            "conclusion": "skipped",
+            "name": "gofmt check",
+            "number": 13,
+            "startedAt": "2026-10-18T10:44:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:52Z",
+            "conclusion": "success",
+            "name": "go vet",
+            "number": 14,
+            "startedAt": "2026-10-18T10:44:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:41Z",
+            "conclusion": "success",
+            "name": "Ledger consistency",
+            "number": 15,
+            "startedAt": "2026-10-18T10:44:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:42:05Z",
+            "conclusion": "success",
+            "name": "go test + platform-case gate",
+            "number": 16,
+            "startedAt": "2026-10-18T10:45:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:42:07Z",
+            "conclusion": "success",
+            "name": "Upload gate evidence",
+            "number": 17,
+            "startedAt": "2026-10-18T11:42:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:42:07Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@v4",
+            "number": 31,
+            "startedAt": "2026-10-18T11:42:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:42:08Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 32,
+            "startedAt": "2026-10-18T11:42:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:42:10Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 33,
+            "startedAt": "2026-10-18T11:42:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:42:13Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 34,
+            "startedAt": "2026-10-18T11:42:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:42:13Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 35,
+            "startedAt": "2026-10-18T11:42:13Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505744"
+      },
+      {
+        "completedAt": "2026-10-18T11:29:11Z",
+        "conclusion": "success",
+        "databaseId": 117654505751,
+        "name": "Race (macos-latest)",
+        "startedAt": "2026-10-18T10:52:36Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T10:52:37Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T10:52:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:52:49Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T10:52:37Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:52:49Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T10:52:49Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:52:50Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T10:52:49Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:53:29Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T10:52:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:53:30Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@v4",
+            "number": 6,
+            "startedAt": "2026-10-18T10:53:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:53:30Z",
+            "conclusion": "success",
+            "name": "Verify pnpm pin matches Go constant",
+            "number": 7,
+            "startedAt": "2026-10-18T10:53:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:53:32Z",
+            "conclusion": "success",
+            "name": "Install pinned pnpm via npm",
+            "number": 8,
+            "startedAt": "2026-10-18T10:53:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:53:32Z",
+            "conclusion": "success",
+            "name": "Verify rust pin matches Go constant",
+            "number": 9,
+            "startedAt": "2026-10-18T10:53:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:53:40Z",
+            "conclusion": "success",
+            "name": "Install pinned Rust toolchain via rustup",
+            "number": 10,
+            "startedAt": "2026-10-18T10:53:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:53:41Z",
+            "conclusion": "success",
+            "name": "Verify Go toolchain identity",
+            "number": 11,
+            "startedAt": "2026-10-18T10:53:40Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:29:01Z",
+            "conclusion": "success",
+            "name": "go test -race + platform-case gate",
+            "number": 12,
+            "startedAt": "2026-10-18T10:53:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:29:03Z",
+            "conclusion": "success",
+            "name": "Upload race evidence",
+            "number": 13,
+            "startedAt": "2026-10-18T11:29:01Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:29:03Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@v4",
+            "number": 23,
+            "startedAt": "2026-10-18T11:29:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:29:04Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 24,
+            "startedAt": "2026-10-18T11:29:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:29:05Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 25,
+            "startedAt": "2026-10-18T11:29:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:29:06Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 26,
+            "startedAt": "2026-10-18T11:29:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:29:08Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 27,
+            "startedAt": "2026-10-18T11:29:06Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505751"
+      },
+      {
+        "completedAt": "2026-10-18T10:46:46Z",
+        "conclusion": "success",
+        "databaseId": 117654505762,
+        "name": "Go 1.26.0 driver (windows-latest)",
+        "startedAt": "2026-10-18T10:43:03Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T10:43:05Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T10:43:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:21Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T10:43:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:21Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T10:43:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:25Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T10:43:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:56Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T10:43:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:57Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T10:43:56Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:16Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T10:43:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:20Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T10:46:16Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:38Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T10:46:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:39Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 16,
+            "startedAt": "2026-10-18T10:46:38Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:41Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 17,
+            "startedAt": "2026-10-18T10:46:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:43Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 18,
+            "startedAt": "2026-10-18T10:46:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:43Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T10:46:43Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505762"
+      },
+      {
+        "completedAt": "2026-10-18T11:05:05Z",
+        "conclusion": "success",
+        "databaseId": 117654505764,
+        "name": "Gate self-test (ubuntu-latest)",
+        "startedAt": "2026-10-18T11:04:58Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:05:00Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:04:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:00Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:05:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:00Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:05:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:02Z",
+            "conclusion": "success",
+            "name": "Self-test the CI gates",
+            "number": 4,
+            "startedAt": "2026-10-18T11:05:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:02Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 7,
+            "startedAt": "2026-10-18T11:05:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:02Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 8,
+            "startedAt": "2026-10-18T11:05:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:02Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-18T11:05:02Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505764"
+      },
+      {
+        "completedAt": "2026-10-18T11:05:46Z",
+        "conclusion": "success",
+        "databaseId": 117654505798,
+        "name": "Naming gate",
+        "startedAt": "2026-10-18T11:05:38Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:05:39Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:05:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:41Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:05:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:41Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:05:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:42Z",
+            "conclusion": "success",
+            "name": "Employer name gate",
+            "number": 4,
+            "startedAt": "2026-10-18T11:05:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:43Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 7,
+            "startedAt": "2026-10-18T11:05:42Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:43Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 8,
+            "startedAt": "2026-10-18T11:05:43Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:43Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-18T11:05:43Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505798"
+      },
+      {
+        "completedAt": "2026-10-18T11:05:36Z",
+        "conclusion": "success",
+        "databaseId": 117654505816,
+        "name": "Go 1.26.0 driver (ubuntu-latest)",
+        "startedAt": "2026-10-18T11:05:21Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:05:23Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:05:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:24Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:05:23Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:24Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:05:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:24Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:05:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:25Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:05:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:25Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T11:05:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:29Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T11:05:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:29Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T11:05:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:33Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T11:05:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:33Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 15,
+            "startedAt": "2026-10-18T11:05:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:33Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 16,
+            "startedAt": "2026-10-18T11:05:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:33Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 17,
+            "startedAt": "2026-10-18T11:05:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:33Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 18,
+            "startedAt": "2026-10-18T11:05:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:33Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T11:05:33Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505816"
+      },
+      {
+        "completedAt": "2026-10-18T11:31:16Z",
+        "conclusion": "success",
+        "databaseId": 117654505829,
+        "name": "Test (macos-latest)",
+        "startedAt": "2026-10-18T11:09:46Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:09:48Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:09:46Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:59Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:09:48Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:59Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:09:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:00Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:09:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:21Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:10:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:22Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@v4",
+            "number": 6,
+            "startedAt": "2026-10-18T11:10:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:22Z",
+            "conclusion": "success",
+            "name": "Verify pnpm pin matches Go constant",
+            "number": 7,
+            "startedAt": "2026-10-18T11:10:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:24Z",
+            "conclusion": "success",
+            "name": "Install pinned pnpm via npm",
+            "number": 8,
+            "startedAt": "2026-10-18T11:10:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:24Z",
+            "conclusion": "success",
+            "name": "Verify rust pin matches Go constant",
+            "number": 9,
+            "startedAt": "2026-10-18T11:10:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:31Z",
+            "conclusion": "success",
+            "name": "Install pinned Rust toolchain via rustup",
+            "number": 10,
+            "startedAt": "2026-10-18T11:10:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:31Z",
+            "conclusion": "success",
+            "name": "Verify Go toolchain identity",
+            "number": 11,
+            "startedAt": "2026-10-18T11:10:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:31Z",
+            "conclusion": "success",
+            "name": "Verify versioned Go install compatibility",
+            "number": 12,
+            "startedAt": "2026-10-18T11:10:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:31Z",
+            "conclusion": "success",
+            "name": "gofmt check",
+            "number": 13,
+            "startedAt": "2026-10-18T11:10:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:41Z",
+            "conclusion": "success",
+            "name": "go vet",
+            "number": 14,
+            "startedAt": "2026-10-18T11:10:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:50Z",
+            "conclusion": "success",
+            "name": "Ledger consistency",
+            "number": 15,
+            "startedAt": "2026-10-18T11:10:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:31:06Z",
+            "conclusion": "success",
+            "name": "go test + platform-case gate",
+            "number": 16,
+            "startedAt": "2026-10-18T11:10:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:31:08Z",
+            "conclusion": "success",
+            "name": "Upload gate evidence",
+            "number": 17,
+            "startedAt": "2026-10-18T11:31:06Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:31:08Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@v4",
+            "number": 31,
+            "startedAt": "2026-10-18T11:31:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:31:09Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 32,
+            "startedAt": "2026-10-18T11:31:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:31:09Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 33,
+            "startedAt": "2026-10-18T11:31:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:31:10Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 34,
+            "startedAt": "2026-10-18T11:31:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:31:13Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 35,
+            "startedAt": "2026-10-18T11:31:10Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505829"
+      },
+      {
+        "completedAt": "2026-10-18T11:06:06Z",
+        "conclusion": "success",
+        "databaseId": 117654505835,
+        "name": "Lint",
+        "startedAt": "2026-10-18T11:05:32Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:05:35Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:05:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:36Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:05:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:36Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:05:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:37Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 4,
+            "startedAt": "2026-10-18T11:05:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:37Z",
+            "conclusion": "success",
+            "name": "Verify Go toolchain identity",
+            "number": 5,
+            "startedAt": "2026-10-18T11:05:37Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:52Z",
+            "conclusion": "success",
+            "name": "Run golangci/golangci-lint-action@v7",
+            "number": 6,
+            "startedAt": "2026-10-18T11:05:37Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:53Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@v4",
+            "number": 7,
+            "startedAt": "2026-10-18T11:05:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:00Z",
+            "conclusion": "success",
+            "name": "Verify Linux CI isolation",
+            "number": 8,
+            "startedAt": "2026-10-18T11:05:53Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:00Z",
+            "conclusion": "success",
+            "name": "No broad suppression",
+            "number": 9,
+            "startedAt": "2026-10-18T11:06:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:00Z",
+            "conclusion": "success",
+            "name": "Verify GoReleaser rc channel values",
+            "number": 10,
+            "startedAt": "2026-10-18T11:06:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:00Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@v4",
+            "number": 16,
+            "startedAt": "2026-10-18T11:06:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:01Z",
+            "conclusion": "success",
+            "name": "Post Run golangci/golangci-lint-action@v7",
+            "number": 17,
+            "startedAt": "2026-10-18T11:06:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:01Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 18,
+            "startedAt": "2026-10-18T11:06:01Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:01Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 19,
+            "startedAt": "2026-10-18T11:06:01Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:01Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 20,
+            "startedAt": "2026-10-18T11:06:01Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:01Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 21,
+            "startedAt": "2026-10-18T11:06:01Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505835"
+      },
+      {
+        "completedAt": "2026-10-18T11:07:04Z",
+        "conclusion": "success",
+        "databaseId": 117654505837,
+        "name": "Go 1.27.1 driver (macos-latest)",
+        "startedAt": "2026-10-18T11:04:48Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:04:49Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:04:48Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:04:57Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:04:49Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:04:57Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:04:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:04:59Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:04:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:19Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:04:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:19Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T11:05:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:42Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T11:05:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:44Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T11:06:42Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:57Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T11:06:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:57Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 16,
+            "startedAt": "2026-10-18T11:06:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:58Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 17,
+            "startedAt": "2026-10-18T11:06:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:59Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 18,
+            "startedAt": "2026-10-18T11:06:58Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:07:00Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T11:06:59Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505837"
+      },
+      {
+        "completedAt": "2026-10-18T10:44:18Z",
+        "conclusion": "success",
+        "databaseId": 117654505843,
+        "name": "Gate self-test (windows-latest)",
+        "startedAt": "2026-10-18T10:43:03Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T10:43:04Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T10:43:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:19Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T10:43:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:19Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T10:43:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:14Z",
+            "conclusion": "success",
+            "name": "Self-test the CI gates",
+            "number": 4,
+            "startedAt": "2026-10-18T10:43:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:17Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 8,
+            "startedAt": "2026-10-18T10:44:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:44:17Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-18T10:44:17Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505843"
+      },
+      {
+        "completedAt": "2026-10-18T11:09:41Z",
+        "conclusion": "success",
+        "databaseId": 117654505870,
+        "name": "Gate self-test (macos-latest)",
+        "startedAt": "2026-10-18T11:09:18Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:09:20Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:09:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:30Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:09:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:30Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:09:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:38Z",
+            "conclusion": "success",
+            "name": "Self-test the CI gates",
+            "number": 4,
+            "startedAt": "2026-10-18T11:09:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:38Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 8,
+            "startedAt": "2026-10-18T11:09:38Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:39Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-18T11:09:38Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505870"
+      },
+      {
+        "completedAt": "2026-10-18T11:06:24Z",
+        "conclusion": "success",
+        "databaseId": 117654505913,
+        "name": "Go 1.25.5 driver (ubuntu-latest)",
+        "startedAt": "2026-10-18T11:06:07Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:06:09Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:06:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:10Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:06:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:10Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:06:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:10Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:06:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:10Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:06:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:10Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T11:06:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:15Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T11:06:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:15Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T11:06:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:20Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T11:06:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:20Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 15,
+            "startedAt": "2026-10-18T11:06:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:20Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 16,
+            "startedAt": "2026-10-18T11:06:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:20Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 17,
+            "startedAt": "2026-10-18T11:06:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:20Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 18,
+            "startedAt": "2026-10-18T11:06:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:20Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T11:06:20Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505913"
+      },
+      {
+        "completedAt": "2026-10-18T11:10:40Z",
+        "conclusion": "success",
+        "databaseId": 117654505920,
+        "name": "Go 1.26.0 driver (macos-latest)",
+        "startedAt": "2026-10-18T11:08:44Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:08:46Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:08:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:08:54Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:08:46Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:08:54Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:08:54Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:08:55Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:08:54Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:13Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:08:55Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:13Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T11:09:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:22Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T11:09:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:23Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T11:10:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:34Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T11:10:23Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:34Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 16,
+            "startedAt": "2026-10-18T11:10:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:35Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 17,
+            "startedAt": "2026-10-18T11:10:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:35Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 18,
+            "startedAt": "2026-10-18T11:10:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:10:36Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T11:10:35Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505920"
+      },
+      {
+        "completedAt": "2026-10-18T11:06:06Z",
+        "conclusion": "success",
+        "databaseId": 117654505922,
+        "name": "Go 1.27.1 driver (ubuntu-latest)",
+        "startedAt": "2026-10-18T11:05:47Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:05:50Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:05:48Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:51Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:05:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:51Z",
+            "conclusion": "success",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:05:51Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:52Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:05:51Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:52Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:05:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:52Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T11:05:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:57Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T11:05:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:05:58Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T11:05:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:02Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T11:05:58Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:02Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 15,
+            "startedAt": "2026-10-18T11:06:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:02Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 16,
+            "startedAt": "2026-10-18T11:06:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:02Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 17,
+            "startedAt": "2026-10-18T11:06:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:02Z",
+            "conclusion": "success",
+            "name": "Complete runner",
+            "number": 18,
+            "startedAt": "2026-10-18T11:06:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:06:02Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T11:06:02Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505922"
+      },
+      {
+        "completedAt": "2026-10-18T10:46:22Z",
+        "conclusion": "success",
+        "databaseId": 117654505937,
+        "name": "Go 1.25.5 driver (windows-latest)",
+        "startedAt": "2026-10-18T10:43:02Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T10:43:03Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T10:43:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:18Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T10:43:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:18Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T10:43:18Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:20Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T10:43:18Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:52Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T10:43:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:52Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T10:43:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:59Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T10:43:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:02Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T10:45:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:16Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T10:46:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:16Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 16,
+            "startedAt": "2026-10-18T10:46:16Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:18Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 17,
+            "startedAt": "2026-10-18T10:46:16Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:20Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 18,
+            "startedAt": "2026-10-18T10:46:18Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:46:20Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T10:46:20Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505937"
+      },
+      {
+        "completedAt": "2026-10-18T11:09:12Z",
+        "conclusion": "success",
+        "databaseId": 117654505957,
+        "name": "Go 1.25.5 driver (macos-latest)",
+        "startedAt": "2026-10-18T11:07:11Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T11:07:13Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T11:07:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:07:21Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T11:07:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:07:21Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T11:07:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:07:22Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T11:07:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:07:45Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T11:07:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:07:45Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T11:07:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:08:53Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T11:07:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:08:54Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T11:08:53Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:06Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T11:08:54Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:06Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 16,
+            "startedAt": "2026-10-18T11:09:06Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:07Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 17,
+            "startedAt": "2026-10-18T11:09:06Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:07Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 18,
+            "startedAt": "2026-10-18T11:09:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T11:09:08Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T11:09:07Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654505957"
+      },
+      {
+        "completedAt": "2026-10-18T10:45:34Z",
+        "conclusion": "success",
+        "databaseId": 117654506015,
+        "name": "Go 1.27.1 driver (windows-latest)",
+        "startedAt": "2026-10-18T10:43:02Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-18T10:43:04Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-18T10:43:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:15Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-18T10:43:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:15Z",
+            "conclusion": "skipped",
+            "name": "Initialize private Go state",
+            "number": 3,
+            "startedAt": "2026-10-18T10:43:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:18Z",
+            "conclusion": "success",
+            "name": "Checkout authoritative protocol suite",
+            "number": 4,
+            "startedAt": "2026-10-18T10:43:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:38Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-go@v5",
+            "number": 5,
+            "startedAt": "2026-10-18T10:43:18Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:43:39Z",
+            "conclusion": "success",
+            "name": "Verify family toolchain identity",
+            "number": 6,
+            "startedAt": "2026-10-18T10:43:38Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:14Z",
+            "conclusion": "success",
+            "name": "Driver qualification and reproducibility",
+            "number": 7,
+            "startedAt": "2026-10-18T10:43:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:17Z",
+            "conclusion": "success",
+            "name": "Driver vet",
+            "number": 8,
+            "startedAt": "2026-10-18T10:45:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:29Z",
+            "conclusion": "success",
+            "name": "Build manager",
+            "number": 9,
+            "startedAt": "2026-10-18T10:45:17Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:29Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-go@v5",
+            "number": 16,
+            "startedAt": "2026-10-18T10:45:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:31Z",
+            "conclusion": "success",
+            "name": "Post Checkout authoritative protocol suite",
+            "number": 17,
+            "startedAt": "2026-10-18T10:45:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:32Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 18,
+            "startedAt": "2026-10-18T10:45:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-18T10:45:32Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-18T10:45:32Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654506015"
+      },
+      {
+        "completedAt": "2026-10-18T10:43:00Z",
+        "conclusion": "skipped",
+        "databaseId": 117654506565,
+        "name": "Candidate suite (${{ matrix.os }})",
+        "startedAt": "2026-10-18T10:43:01Z",
+        "status": "completed",
+        "steps": [],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654506565"
+      },
+      {
+        "completedAt": "2026-10-18T10:43:00Z",
+        "conclusion": "skipped",
+        "databaseId": 117654506706,
+        "name": "Test (rose-air)",
+        "startedAt": "2026-10-18T10:43:01Z",
+        "status": "completed",
+        "steps": [],
+        "url": "https://github.com/relux-works/curator/actions/runs/39120346079/job/117654506706"
+      }
+    ],
+    "status": "completed",
+    "url": "https://github.com/relux-works/curator/actions/runs/39120346079"
+  },
+  "attempt_1_verdict_command": {
+    "command": "gh run watch 39120346079 --exit-status",
+    "exit": 1
+  },
+  "retry_after_terminal": {
+    "command": "gh run rerun 39120346079 --failed",
+    "exit": 0
+  },
+  "retry_terminal_verdict": {
+    "command": "gh run watch 39120346079 --exit-status",
+    "exit": 1,
+    "job_id": 117666342555,
+    "repository_test_step_exit": 0,
+    "platform_case_gate_exit": 0,
+    "administrator_hook_exit": 1,
+    "raw_log_sha256": "19d8ad2cdf2980a218a270be0c1ecca6ab9843e81e046ded86cfdb6d918879d6",
+    "diagnostic": "Same persisted protected pnpm test tree as attempt 1; administrator job-completed cleanup still returns Permission denied."
+  }
+}

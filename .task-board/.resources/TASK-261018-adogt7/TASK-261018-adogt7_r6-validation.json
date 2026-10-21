@@ -1,0 +1,142 @@
+{
+  "task": "TASK-261018-adogt7",
+  "run": "RUN-261018-95f378",
+  "identity": {
+    "base": "5ecb68da8f8ceab4dda118f2263abfb3da63ab8c",
+    "tree": "6c0d63c9f4f562e89b8164212f7dcd567a10f01f",
+    "files_sha256": {
+      "docs/profile-skill-directories.md": "cc7e42b03eb2ee2ccbde49a17d25d15a03268368cba7dcabae1977c1e5f883b0",
+      "internal/contextpkg/skill_directory_vectors_test.go": "5c42723944a8de5adb6bc28924fe4ad50b9971aaacf5581b253f553ad5314d3b",
+      "internal/contextpkg/testdata/profile-skill-directories-v1/fixtures.json": "5da6d372930afa2c8c3bcdf48c93daa4fa572adc74824fec81d07c8af2ffccf3",
+      "internal/contextpkg/testdata/profile-skill-directories-v1/lock-identity.json": "947ffd4d2b6b2644af3f3aa00bf2643891ac3a4100da3d75eeb7897f2503e59f",
+      "internal/contextpkg/testdata/profile-skill-directories-v1/schema-cases.json": "f5d177a0809093d41725fea04a63c8d93b543492638fb25bcb1699a81335910c",
+      "internal/contextpkg/testdata/profile-skill-directories-v1/vectors.json": "8053e3e837569242c3a1ecc2681fb64d0a0b587f5121d0f71b14b01d61134b56",
+      "internal/contextresolve/skill_directory_test.go": "f047aedf5bb686b39d03b315d5ff851849f1c75afe3718b2a7795ebbb5a2b7a4",
+      "internal/envprofile/skill_directory_mutants_test.go": "4954b5c02493a06742da70db9b8196fc454bd624aec7b10053481742031ba83b",
+      "internal/envprofile/skill_directory_test.go": "f4645b91cc8ab47438271553a2cfc32a157ee31cdd2b84023bc612b9dc7ca831",
+      "internal/audit/audit.go": "2fda51e43a2ef318dce43974d7085349ad0f66773d6176c4947916ccbaf9d5f5",
+      "internal/contextlock/contextlock.go": "02bf0ae4b015f784f7dd18cf512184cddc85e8a0c1ddaab86363aee1b41a607a",
+      "internal/contextpkg/contextpkg.go": "607f4221b001b6f38ff809976b0b8fedf9b083b42f280cca485d2c5754360691",
+      "internal/contextresolve/contextresolve.go": "98ea5433e1cdc2750814d231d11fb088cbd198c3dc596de6fa5497873414c152",
+      "internal/envprofile/envprofile.go": "27ea06115f55546f02be90335cc182d58652cc5664122c621929b4a51020ebb9",
+      "internal/envprofile/gitsource.go": "eb365a505259bc3119729ef7cb9b11199175acba0e9ef2bde4f9c4e7282807a9",
+      "internal/envprofile/global.go": "b0b9c6d765109118748f0b1c2b22e2227577dbce44ba9e38ec8de44760a56d8b",
+      "internal/manifest/expand.go": "f96b4170c2561f26ad1724800fe9c50dae724626586acdf61588f5e073289b43"
+    },
+    "refresh_delta": "Only the existing skill-directory test expectation changed from the retired .agent-context/skills path to native skills, resolving NATSKILL convergence. Production and documentation files unchanged."
+  },
+  "platform": "darwin/arm64",
+  "toolchain": "go1.25.5",
+  "commands": [
+    {
+      "command": "go test ./internal/audit ./internal/contextlock ./internal/contextpkg ./internal/contextresolve ./internal/envprofile ./internal/manifest",
+      "log": "affected-tests-r6-01.log",
+      "exit": 1,
+      "bound": "Interrupted overbroad invocation; not passing/full-suite evidence.",
+      "raw_sha256": "e53048f3d6354ca34e3455cacf97aa32fe4b71ed20f95dd56acfa26a4d6bb509",
+      "sanitized_sha256": "e53048f3d6354ca34e3455cacf97aa32fe4b71ed20f95dd56acfa26a4d6bb509"
+    },
+    {
+      "command": "go test -json -count=1 -timeout=6m ./internal/audit ./internal/contextpkg ./internal/contextresolve ./internal/contextlock ./internal/manifest",
+      "log": "core-tests-r6-01.jsonl",
+      "exit": 0,
+      "bound": "Five full core package suites; unaffected by the later envprofile test-path correction.",
+      "raw_sha256": "b0b85de34ae9ff727207b11075d30a15de3c1a306288a555d5c44e4c3233d34f",
+      "sanitized_sha256": "b0b85de34ae9ff727207b11075d30a15de3c1a306288a555d5c44e4c3233d34f"
+    },
+    {
+      "command": "go test -json -count=1 -timeout=6m -run 'Test(SkillDirectory|StrictAudit|Migrated|EnsureDefaultMigratesGlobalSkills|InstallDirectoryRejectsSecretUnderSubdirectory|InstallTransitiveDirectoryRejectsSecret|ResolveReportsRecordedContextSurfaceHashDrift|SkillsOfRefusesV1NULBeforeHashing|NativeSkills|ClaudeRepair)' ./internal/envprofile",
+      "log": "envprofile-tests-r6-01.jsonl",
+      "exit": 1,
+      "bound": "Real convergence regression: successful vectors still expected retired native skills path.",
+      "raw_sha256": "b0839fad8db76b3ddd1000b748e9a6cdb339b3549d93b1db8c497d203dc12073",
+      "sanitized_sha256": "3cf7147223bcc7d549b8a1239bbf28f2f4f797bbfbee9d5dd3ca5f6361e3e8ac"
+    },
+    {
+      "command": "golangci-lint run",
+      "log": "lint-r6-01.log",
+      "exit": 1,
+      "bound": "Shared-cache diagnostics name files in other worktrees; not passing evidence.",
+      "raw_sha256": "74efdf1776c6e1e513a6a46eaebb43ca5e0f9420e633b51df9b6de94f7e4e4f4",
+      "sanitized_sha256": "f72358c3e70f6e843bd7d29db3ce8200570f1cc163c531fcc5e2facee55f9d8f"
+    },
+    {
+      "command": "GOLANGCI_LINT_CACHE=\"$PWD/.temp/TASK-261018-adogt7/lint-cache\" golangci-lint run",
+      "log": "lint-r6-02.log",
+      "exit": 0,
+      "bound": "Private cache; before the one test correction.",
+      "raw_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47",
+      "sanitized_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "command": "go test -json -count=1 -timeout=6m -run 'Test(SkillDirectory|StrictAudit|Migrated|EnsureDefaultMigratesGlobalSkills|InstallDirectoryRejectsSecretUnderSubdirectory|InstallTransitiveDirectoryRejectsSecret|ResolveReportsRecordedContextSurfaceHashDrift|SkillsOfRefusesV1NULBeforeHashing|NativeSkills|ClaudeRepair)' ./internal/envprofile",
+      "log": "envprofile-tests-r6-02.jsonl",
+      "exit": 0,
+      "bound": "Final candidate: directory, migration, native-skills and Claude repair checks, including narrowing harnesses.",
+      "raw_sha256": "cc64bdd8b63e8e413cc19de9996523cd156b0b31b9596daecc2ab9e6921f83c5",
+      "sanitized_sha256": "030823b556009a11248c437d2beb3186e2f5dd266c0f717fc39f1708870cc390"
+    },
+    {
+      "command": "go build ./...",
+      "log": "go-build-r6-02.log",
+      "exit": 0,
+      "bound": "After test correction.",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "go vet ./...",
+      "log": "go-vet-r6-02.log",
+      "exit": 0,
+      "bound": "After test correction.",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "GOLANGCI_LINT_CACHE=\"$PWD/.temp/TASK-261018-adogt7/lint-cache\" golangci-lint run",
+      "log": "lint-r6-03.log",
+      "exit": 0,
+      "bound": "After test correction; private cache.",
+      "raw_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47",
+      "sanitized_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "command": "git diff --check",
+      "log": "diff-check-r6-02.log",
+      "exit": 0,
+      "bound": "",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "git diff --exit-code HEAD -- CHANGELOG.md README.md",
+      "log": "release-files-r6-02.log",
+      "exit": 0,
+      "bound": "Both equal converged trunk checkpoint.",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "Candidate file-hash, HEAD and real-index invariants",
+      "log": "identity-invariants-r6-02.log",
+      "exit": 0,
+      "bound": "Scratch Git index used only to compute tree; real index untouched.",
+      "raw_sha256": "240efea752962fcd3e3345e8850ae8345a6d34a9e7e4f0e30a2acd1f45a9f63b",
+      "sanitized_sha256": "240efea752962fcd3e3345e8850ae8345a6d34a9e7e4f0e30a2acd1f45a9f63b"
+    }
+  ],
+  "direct_subtests_passed": {
+    "TestSkillDirectorySchemaVectors": 56,
+    "TestSkillDirectoryLockIdentityVectors": 2,
+    "TestSkillDirectoryAgreement": 4,
+    "TestSkillDirectoryLifecycleVectors": 24,
+    "TestSkillDirectoryMetadata": 6,
+    "TestSkillDirectoryNarrowingMutants": 10
+  },
+  "ac_fresh": "8 of 9",
+  "out_of_contract_rows": [],
+  "surface_table": "Not supplied; explicit brief-input gap.",
+  "full_suite_and_hosted": "Not rerun in this producer publication round; configured post-handoff validation owns the new exact signed candidate. Historical evidence is not a fresh pass.",
+  "mutants": "All 10 named directory narrowing plants killed on final candidate; each child exits 1 with intended named assertion, harness exits 0. No survivors.",
+  "public_log_sha256": "f96a4cbd0045b09ec440c45b7c79bfac5e0374415bc3b4228975b885ba26f181"
+}

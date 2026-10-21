@@ -1,0 +1,94 @@
+{
+  "task": "TASK-261018-adogt7",
+  "base": "892dab098aef1497df9ccacdb173faaf4f8b8418",
+  "candidate_tree": "4cf404c658fdb199f5da12568ad7dbfe7a351239",
+  "new_signed_candidate": "not created by this producer; managed handoff owns the snapshot",
+  "platform": "darwin/arm64",
+  "go": "go1.25.5",
+  "uncommitted": true,
+  "refresh_candidate_run": false,
+  "current_delta": "Restore CHANGELOG.md to checkpoint bytes; source/test/docs note unchanged during this run.",
+  "scope": [
+    "docs/profile-skill-directories.md",
+    "internal/audit/audit.go",
+    "internal/contextlock/contextlock.go",
+    "internal/contextpkg/contextpkg.go",
+    "internal/contextpkg/skill_directory_vectors_test.go",
+    "internal/contextpkg/testdata/profile-skill-directories-v1/fixtures.json",
+    "internal/contextpkg/testdata/profile-skill-directories-v1/lock-identity.json",
+    "internal/contextpkg/testdata/profile-skill-directories-v1/schema-cases.json",
+    "internal/contextpkg/testdata/profile-skill-directories-v1/vectors.json",
+    "internal/contextresolve/contextresolve.go",
+    "internal/contextresolve/skill_directory_test.go",
+    "internal/envprofile/envprofile.go",
+    "internal/envprofile/gitsource.go",
+    "internal/envprofile/global.go",
+    "internal/envprofile/skill_directory_mutants_test.go",
+    "internal/envprofile/skill_directory_test.go",
+    "internal/manifest/expand.go"
+  ],
+  "checks": [
+    {
+      "name": "packages",
+      "command": "env GOTOOLCHAIN=local GOENV=off CURATOR_CONFORMANCE_ROOT=<worktree>/.temp/TASK-261018-adogt7/spec/conformance/v1 go test -json -count=1 -p 2 -timeout=8m -skip 'Mutant' ./internal/audit ./internal/contextpkg ./internal/contextresolve ./internal/contextlock ./internal/manifest",
+      "exit_code": 0,
+      "raw_log_sha256": "f8861d050513112824f4be04d0b873189f646ac0d027bfacff8a1bec5e6cf5ce",
+      "public_log_sha256": "f8861d050513112824f4be04d0b873189f646ac0d027bfacff8a1bec5e6cf5ce",
+      "top_level_test_passes": 138,
+      "test_and_subtest_passes": 698
+    },
+    {
+      "name": "envprofile",
+      "command": "env -u GIT_CONFIG_COUNT GOTOOLCHAIN=local GOENV=off CURATOR_CONFORMANCE_ROOT=<worktree>/.temp/TASK-261018-adogt7/spec/conformance/v1 go test -json -count=1 -p 2 -timeout=8m -run '^Test(SkillDirectory(LifecycleVectors|Metadata)|EnsureDefaultMigratesGlobalSkills|MigratedGlobalSkill.*|MigratedSkillSourceIsCanonical|StrictAudit.*|SkillsOf.*|InstallDirectoryRejectsSecretUnderSubdirectory|InstallTransitiveDirectoryRejectsSecret|ResolveReportsRecordedContextSurfaceHashDrift)$' ./internal/envprofile",
+      "exit_code": 0,
+      "raw_log_sha256": "794c3549fce4d8c06fca0ab442956f2569fd6c1626241574a0c8841f3137cda2",
+      "public_log_sha256": "794c3549fce4d8c06fca0ab442956f2569fd6c1626241574a0c8841f3137cda2",
+      "top_level_test_passes": 20,
+      "test_and_subtest_passes": 98
+    },
+    {
+      "name": "audit-mutants",
+      "command": "env -u GIT_CONFIG_COUNT GOTOOLCHAIN=local GOENV=off CURATOR_CONFORMANCE_ROOT=<worktree>/.temp/TASK-261018-adogt7/spec/conformance/v1 go test -json -count=1 -p 1 -timeout=5m -run '^TestSkillDirectoryNarrowingMutants$/(borrow-root-capabilities|markdown-contact-ignored)$' ./internal/envprofile",
+      "exit_code": 0,
+      "raw_log_sha256": "39e2ae12fc0118c9a9525f278777482bb7d8d3f11877257389bf854f7a2bfb16",
+      "public_log_sha256": "39e2ae12fc0118c9a9525f278777482bb7d8d3f11877257389bf854f7a2bfb16",
+      "top_level_test_passes": 1,
+      "test_and_subtest_passes": 3
+    },
+    {
+      "name": "build",
+      "command": "env GOTOOLCHAIN=local GOENV=off go build ./...",
+      "exit_code": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "vet",
+      "command": "env GOTOOLCHAIN=local GOENV=off go vet ./internal/audit ./internal/contextpkg ./internal/contextresolve ./internal/contextlock ./internal/manifest ./internal/envprofile",
+      "exit_code": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "lint",
+      "command": "GOLANGCI_LINT_CACHE=<worktree>/.temp/TASK-261018-adogt7/lint-cache golangci-lint run",
+      "exit_code": 0,
+      "raw_log_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47",
+      "public_log_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "name": "release-files",
+      "command": "git diff --exit-code HEAD -- CHANGELOG.md README.md",
+      "exit_code": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "exit_code": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

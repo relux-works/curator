@@ -1,0 +1,74 @@
+{
+  "task": "TASK-261018-adogt7",
+  "run": "RUN-261018-7aa5d2",
+  "identity": {
+    "base": "892dab098aef1497df9ccacdb173faaf4f8b8418",
+    "tree": "4cf404c658fdb199f5da12568ad7dbfe7a351239",
+    "matches_predecessor_r4_tree": true,
+    "source_test_doc_edits_this_run": false,
+    "story_head_uncommitted": true,
+    "main_ahead_count": 0,
+    "root_readme_and_changelog_match_base": true,
+    "real_index_empty": true
+  },
+  "platform": "darwin/arm64",
+  "toolchain": "go1.25.5",
+  "commands": [
+    {
+      "command": "go test -json -count=1 -timeout=6m ./internal/audit ./internal/contextpkg ./internal/contextresolve ./internal/contextlock ./internal/manifest",
+      "exit": 0,
+      "raw_log_sha256": "4e7cc5f0b0560d98e037c8f303d67413ce9a23c3adfb15ccd4e14322d74fb8f6",
+      "public_log_sha256": "4e7cc5f0b0560d98e037c8f303d67413ce9a23c3adfb15ccd4e14322d74fb8f6"
+    },
+    {
+      "command": "go test -json -count=1 -timeout=6m -run 'Test(SkillDirectory|StrictAudit|Migrated|EnsureDefaultMigratesGlobalSkills|InstallDirectoryRejectsSecretUnderSubdirectory|InstallTransitiveDirectoryRejectsSecret|ResolveReportsRecordedContextSurfaceHashDrift|SkillsOfRefusesV1NULBeforeHashing)' ./internal/envprofile",
+      "exit": 0,
+      "raw_log_sha256": "702002961f99cf66cad62ef2621af4cc410272d4e9c34256e53bbf9fb30dcf53",
+      "public_log_sha256": "702002961f99cf66cad62ef2621af4cc410272d4e9c34256e53bbf9fb30dcf53"
+    },
+    {
+      "command": "go build ./...",
+      "exit": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "go vet ./internal/audit ./internal/contextpkg ./internal/contextresolve ./internal/contextlock ./internal/manifest ./internal/envprofile",
+      "exit": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "GOLANGCI_LINT_CACHE=\"$PWD/.temp/TASK-261018-adogt7/lint-cache\" golangci-lint run",
+      "exit": 0,
+      "raw_log_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47",
+      "public_log_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "command": "git diff --exit-code HEAD -- CHANGELOG.md README.md",
+      "exit": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "git diff --check",
+      "exit": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "passed_direct_subtests": {
+    "TestSkillDirectorySchemaVectors": 56,
+    "TestSkillDirectoryLifecycleVectors": 24,
+    "TestSkillDirectoryLockIdentityVectors": 2,
+    "TestSkillDirectoryMetadata": 6,
+    "TestSkillDirectoryAgreement": 4,
+    "TestSkillDirectoryNarrowingMutants": 10
+  },
+  "full_local_suite": "Not rerun in this successor; previous full-suite evidence is historical. r4 requests affected checks and build.",
+  "hosted_gate": "Pending configured post-handoff validation; no green claim for this new candidate.",
+  "ac_rows_driven_fresh": "8 of 9",
+  "out_of_contract_rows": [],
+  "surface_table": "Not supplied in brief; explicitly retained input gap.",
+  "notes": "Source, test, and documentation content unchanged from predecessor r4. All ten narrowing controls produced expected child go test exit 1 and the intended named behavioral failure; enclosing harness exit 0. No mutant survivors."
+}

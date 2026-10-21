@@ -1,0 +1,511 @@
+{
+  "candidate": "e57894d642993b9fce7ea23f7ccfdb1995c2ac38",
+  "tree": "cd1a903247725014af5726b39bee9b1e90482959",
+  "checkpoint": "9c1605a74436d2448f759bd4b66ae6685237d83b",
+  "suite_plan": {
+    "served": 85,
+    "deferred": 0,
+    "excluded": 0
+  },
+  "inventories": {
+    "curator": {
+      "enumerated": 425,
+      "observed": 425,
+      "terminal_actions": {
+        "pass": 425
+      }
+    },
+    "install": {
+      "enumerated": 371,
+      "observed": 371,
+      "terminal_actions": {
+        "pass": 369,
+        "skip": 2
+      }
+    },
+    "envprofile": {
+      "enumerated": 372,
+      "observed": 372,
+      "terminal_actions": {
+        "pass": 371,
+        "skip": 1
+      }
+    }
+  },
+  "mutants": {
+    "TestSkillDirectoryNarrowingMutants/schema-one-directory": "pass",
+    "TestSkillDirectoryNarrowingMutants/selected-frontmatter-description": "pass",
+    "TestSkillDirectoryNarrowingMutants/selected-frontmatter-name": "pass",
+    "TestSkillDirectoryNarrowingMutants/root-versus-selected-agreement": "pass",
+    "TestSkillDirectoryNarrowingMutants/parent-component": "pass",
+    "TestSkillDirectoryNarrowingMutants/inside-directory-symlink": "pass",
+    "TestSkillDirectoryNarrowingMutants/borrow-root-capabilities": "pass",
+    "TestSkillDirectoryNarrowingMutants/markdown-contact-ignored": "pass",
+    "TestSkillDirectoryNarrowingMutants/alternate-directory-identity": "pass",
+    "TestSkillDirectoryNarrowingMutants/materialize-repository-root": "pass"
+  },
+  "vector_counts": {
+    "TestSkillDirectorySchemaVectors": {
+      "passed": 56,
+      "expected": 56
+    },
+    "TestSkillDirectoryLifecycleVectors": {
+      "passed": 24,
+      "expected": 24
+    },
+    "TestSkillDirectoryLockIdentityVectors": {
+      "passed": 2,
+      "expected": 2
+    },
+    "TestSkillDirectoryMetadata": {
+      "passed": 6,
+      "expected": 6
+    }
+  },
+  "package_terminal_actions": {
+    "pass": 80,
+    "skip": 5
+  },
+  "commands": [
+    {
+      "name": "artifactpolicy",
+      "command": "go test -json -count=1 -p 1 -timeout=9m30s ./internal/artifactpolicy",
+      "exit": 0,
+      "log": "artifactpolicy.json",
+      "sha256": "7da7b45ece1787ee4070d8344f467fe933b3069515ee0c3448ccfb2c8b993f19"
+    },
+    {
+      "name": "batch-01",
+      "command": "go test -json -count=1 -p 2 -timeout=8m $(cat .temp/TASK-261018-adogt7/r2/packages-batch-01.txt)",
+      "exit": 0,
+      "log": "batch-01.json",
+      "sha256": "4d4718cfc63fbca86005fb305f202f52155aebc6373cb0670f0dc52922220244"
+    },
+    {
+      "name": "batch-02",
+      "command": "go test -json -count=1 -p 2 -timeout=8m $(cat .temp/TASK-261018-adogt7/packages-batch-02.txt)",
+      "exit": 0,
+      "log": "batch-02.json",
+      "sha256": "0c738fdf83e8aef1c77a0fc68b71910bd0505fa315795379b85d73ff015a2458"
+    },
+    {
+      "name": "batch-03",
+      "command": "go test -json -count=1 -p 2 -timeout=8m $(cat .temp/TASK-261018-adogt7/packages-batch-03.txt)",
+      "exit": 0,
+      "log": "batch-03.json",
+      "sha256": "8a4cdfd9d56d39ae77242ab6325079553d09bfd76e63614fcad7a2bb95e71ae7"
+    },
+    {
+      "name": "batch-04",
+      "command": "go test -json -count=1 -p 2 -timeout=8m $(cat .temp/TASK-261018-adogt7/packages-batch-04.txt)",
+      "exit": 0,
+      "log": "batch-04.json",
+      "sha256": "4f202507b2d7322f602fc5b767019be47c86f4b2fc8cdef0b83908ff1636ec15"
+    },
+    {
+      "name": "batch-05",
+      "command": "go test -json -count=1 -p 2 -timeout=8m $(cat .temp/TASK-261018-adogt7/packages-batch-05.txt)",
+      "exit": 0,
+      "log": "batch-05.json",
+      "sha256": "05fe438f3720a3462cd9a2f1ea13663972817962568844bf11087f71f51a909a"
+    },
+    {
+      "name": "install-01",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-01.txt)\" ./internal/install",
+      "exit": 0,
+      "log": "install-01.json",
+      "sha256": "7f498ac71bfee60455b43130bf1ba03497659b616ead4fef0ecfa45c62f62c60"
+    },
+    {
+      "name": "install-02",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-02.txt)\" ./internal/install",
+      "exit": 0,
+      "log": "install-02.json",
+      "sha256": "59a3bacebabcdba0be0c2bb5e539e546900dafb8d5665d0211a0b8c2802181df"
+    },
+    {
+      "name": "install-03",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-03.txt)\" ./internal/install",
+      "exit": 0,
+      "log": "install-03.json",
+      "sha256": "119c35fd897cd2493da7959e85fc34b368882f158b169c67d9661de037fa8e6c"
+    },
+    {
+      "name": "install-04",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-04.txt)\" ./internal/install",
+      "exit": 0,
+      "log": "install-04.json",
+      "sha256": "277154ebca2b89d471948ddf33cf04c34b11e300a2df2b4a741592cf30d6bb60"
+    },
+    {
+      "name": "install-05",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-05.txt)\" ./internal/install",
+      "exit": 0,
+      "log": "install-05.json",
+      "sha256": "8f469c0d57780ea25a79f911c52a19f92f1766898c802a0d9bd540fa0bc59a3d"
+    },
+    {
+      "name": "install-06",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-06.txt)\" ./internal/install",
+      "exit": 0,
+      "log": "install-06.json",
+      "sha256": "2ecf020445305b77d0ceabec96344baedb51b2544a8826556eb3e3835f791040"
+    },
+    {
+      "name": "install-07",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-07.txt)\" ./internal/install",
+      "exit": 0,
+      "log": "install-07.json",
+      "sha256": "8ce0aa72e986a868de9f79c9ee5d52b422135d53ad523974704bfc6da7f8f5a1"
+    },
+    {
+      "name": "install-08",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-08.txt)\" ./internal/install",
+      "exit": 0,
+      "log": "install-08.json",
+      "sha256": "86afb60f78182b6ea31c4e88bf5fd42b1fc058a1c633f883dd096ed19ae3a228"
+    },
+    {
+      "name": "install-09",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-09.txt)\" ./internal/install",
+      "exit": 0,
+      "log": "install-09.json",
+      "sha256": "e5706ad12e77d598e062ed8a296179e285271eac2a1ab443eb6f9dfa1a19ddcf"
+    },
+    {
+      "name": "install-10",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-10.txt)\" ./internal/install",
+      "exit": 0,
+      "log": "install-10.json",
+      "sha256": "b4853ef5aacb9963cb113ebef0cf27408529e1e8a1e2c7c2da632ef416f7468e"
+    },
+    {
+      "name": "envprofile-01",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-01.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "log": "envprofile-01.json",
+      "sha256": "0189e98e3d4bb558d6f353aba8e45c792d50c7af783011c5971220284cb348c0"
+    },
+    {
+      "name": "envprofile-02",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-02.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "log": "envprofile-02.json",
+      "sha256": "5e781eb2448b8916257860651587bc5c3e07f860942759b57b917845e8e61e9c"
+    },
+    {
+      "name": "envprofile-03",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-03.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "log": "envprofile-03.json",
+      "sha256": "6e426432828829f058631e8709586f4d7413a5d8ef290f38c70b669508fd656c"
+    },
+    {
+      "name": "envprofile-04",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-04.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "log": "envprofile-04.json",
+      "sha256": "101746b95f96eb28f11c7aa9c9b17c4b52e146587f3e13ffcd0b9d68fdaf1b1e"
+    },
+    {
+      "name": "envprofile-05",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-05.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "log": "envprofile-05.json",
+      "sha256": "9c3a7f2bddd53273c3219606d389f0af2af7bf70f792f9bf05970b0bdee57df4"
+    },
+    {
+      "name": "envprofile-06",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-06.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "log": "envprofile-06.json",
+      "sha256": "5ff016ef98ac71c6d6b67e566571c60e9bb344aa86d7bdbdc2d2d82d03376efd"
+    },
+    {
+      "name": "envprofile-07",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-07.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "log": "envprofile-07.json",
+      "sha256": "23934c079286d0885d5632529390de84742f43626fa5444e0f34ca469f84937d"
+    },
+    {
+      "name": "envprofile-08",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-08.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "log": "envprofile-08.json",
+      "sha256": "a345f8f594f36a495fd5dcf53bf6523024c67bf843d71882e13ae7325f901d29"
+    },
+    {
+      "name": "envprofile-09",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-09.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "log": "envprofile-09.json",
+      "sha256": "6320ffe85b6b9b44984e9b09008a7cf6294eb8ecb0f554c0ea1c5992d97876a8"
+    },
+    {
+      "name": "envprofile-10",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-10.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "log": "envprofile-10.json",
+      "sha256": "ed5f90cfcc288614472fb3af2202277be5519294b3da477702635ab224ee401f"
+    },
+    {
+      "name": "envprofile-11",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-11.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "log": "envprofile-11.json",
+      "sha256": "829c5953102d81400476aa3b50486e9264429a146c8f62e2cc1c7a7ecdb71c1b"
+    },
+    {
+      "name": "curator-01",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-01.txt)\" ./cmd/curator",
+      "accepted": false,
+      "diagnostic": "Host GOROOT lock acquisition timed out before any test ran; whole mask replayed serially.",
+      "exit": 1,
+      "log": "curator-01.json",
+      "sha256": "b60ed99365e6ca6eedf5df4ad337d0d0af84c118a845ac3f7ab5737750372130"
+    },
+    {
+      "name": "curator-02",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-02.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-02.json",
+      "sha256": "583e33394ee7a3bec038be894e0fc8f65291553c6eee5ff874d63959a763e47a"
+    },
+    {
+      "name": "curator-03",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-03.txt)\" ./cmd/curator",
+      "accepted": false,
+      "diagnostic": "Host GOROOT lock acquisition timed out before any test ran; whole mask replayed serially.",
+      "exit": 1,
+      "log": "curator-03.json",
+      "sha256": "8fc60ade81315268f5c74ff40d07c33b5ec79409a89ab3a4fbe2fee44afc0c1f"
+    },
+    {
+      "name": "curator-04",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-04.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-04.json",
+      "sha256": "4bcb02b36e85d97cfaee27df04e5ba5027cffc6d52479525ddbeb0b9dc6835d0"
+    },
+    {
+      "name": "curator-05",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-05.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-05.json",
+      "sha256": "2ea9c44528880dc74dc102208402c5a68667ef3e5736d9ffc451fee085a15bcb"
+    },
+    {
+      "name": "curator-06",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-06.txt)\" ./cmd/curator",
+      "accepted": false,
+      "diagnostic": "Host GOROOT lock acquisition timed out before any test ran; whole mask replayed serially.",
+      "exit": 1,
+      "log": "curator-06.json",
+      "sha256": "d82ee8846e30fbf9cc2a5877f3a1c9b7a8f22783a753c637cac518e5add551d0"
+    },
+    {
+      "name": "curator-07",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-07.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-07.json",
+      "sha256": "d8de5c1b936bc1683a5168ad2d87fcf4f3e16880fcf7da2b8e8f188d426efaf4"
+    },
+    {
+      "name": "curator-08",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-08.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-08.json",
+      "sha256": "b80b6b372b79858e8f71f96c3ed0bf3686066a9c82fa9ce4a029fb6d5baeb338"
+    },
+    {
+      "name": "curator-09",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-09.txt)\" ./cmd/curator",
+      "accepted": false,
+      "diagnostic": "Host GOROOT lock acquisition timed out before any test ran; whole mask replayed serially.",
+      "exit": 1,
+      "log": "curator-09.json",
+      "sha256": "6ecba578fc11e0b4b4fd41cd170bb63ae93f88569bc888fb408f6cafdeb82738"
+    },
+    {
+      "name": "curator-10",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-10.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-10.json",
+      "sha256": "ab41011decb6ea3cae13f99942d7a806d65d6b9e6fdd9d5bf37bbe7f227bd349"
+    },
+    {
+      "name": "curator-11",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-11.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-11.json",
+      "sha256": "238ab003df62afd25ae63baba631e402f22c067bb130e6e8f58936d85e03127a"
+    },
+    {
+      "name": "curator-12",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-12.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-12.json",
+      "sha256": "4cd03263d5788d3b962fc0532f17fe34f97a6e832c0f87054933c8312f203927"
+    },
+    {
+      "name": "curator-13",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-13.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-13.json",
+      "sha256": "13f4092b9a953db3e3f2a4b131c83b9315a8b92022d4a2af6c51a6660d16fea7"
+    },
+    {
+      "name": "curator-14",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-14.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-14.json",
+      "sha256": "f50b7dabf7578f045cefae12639ac473fe3fd29aeadea032eeb106e21f6ab1b1"
+    },
+    {
+      "name": "curator-15",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-15.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-15.json",
+      "sha256": "1a04eedf76b4c2ca353ce0a69570cf5c735c6402a39d59fdc6557d484af71b35"
+    },
+    {
+      "name": "curator-16",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-16.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-16.json",
+      "sha256": "501702859045a99057a883cbb5a4541710e0aa635dc74ae0def2db53a946b3c1"
+    },
+    {
+      "name": "curator-17",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-17.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-17.json",
+      "sha256": "c0a0da28624d16f846767f7bf3a68977e527869f14aa2cc8d3fed47a047bf4c7"
+    },
+    {
+      "name": "curator-18",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-18.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-18.json",
+      "sha256": "40bc3663a79f56d4205f25ad16c93001bb51debbdcf70a077d6204cf2767a2ad"
+    },
+    {
+      "name": "curator-19",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-19.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-19.json",
+      "sha256": "fa4c9294c83eaf669df638318da1026ff53d7244feba4916799ade66f0636153"
+    },
+    {
+      "name": "curator-20",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-20.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-20.json",
+      "sha256": "1c5b8ca82e90b90de315cab1023bc3aeaa35a304ac7834105446eb6c23dc35da"
+    },
+    {
+      "name": "curator-21",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-21.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-21.json",
+      "sha256": "440f3b5c850ef61c279862749d8dfeb95c323b701eeefe9b8db32508b8017a57"
+    },
+    {
+      "name": "curator-22",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-22.txt)\" ./cmd/curator",
+      "exit": 0,
+      "log": "curator-22.json",
+      "sha256": "e9c14884a32160e357874c925a1d8896d59e31a4e51a8dfde422e2b15db93d74"
+    },
+    {
+      "name": "install-trunk-extra",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run '^(TestGlobalCanonicalOwnershipPreservation|TestHybridCanonicalOwnershipPreservation|TestInstallDraftMarkerWriterCases|TestInstallDraftOwnershipCases|TestInstallOwnedCanonicalPositiveControls|TestInstallPreservesUnownedStaleStoreEntries|TestInstallRefusesUnownedSelectedCanonicalDestination|TestInstallRefusesUnprovenStaleOwnership)$' ./internal/install",
+      "exit": 0,
+      "log": "install-trunk-extra.json",
+      "sha256": "937597eb342b1b9519ec32324d52616cabb12fdfd30892eec2fe82daed480452"
+    },
+    {
+      "name": "curator-01-retry",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-01.txt)\" ./cmd/curator",
+      "replaces": "curator-01",
+      "exit": 0,
+      "log": "curator-01-retry.json",
+      "sha256": "5e945434f5ea7fb70e0eeef56584f85fa3d1aa757090de021d644ab90c00f519"
+    },
+    {
+      "name": "curator-03-retry",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-03.txt)\" ./cmd/curator",
+      "replaces": "curator-03",
+      "exit": 0,
+      "log": "curator-03-retry.json",
+      "sha256": "ca6990afdacaf6653a988acdbfba626c2a3bb0e332a3a0476006badb5cd15384"
+    },
+    {
+      "name": "curator-06-retry",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-06.txt)\" ./cmd/curator",
+      "replaces": "curator-06",
+      "exit": 0,
+      "log": "curator-06-retry.json",
+      "sha256": "84b6e8114d5d27fe4adae315ad274b6c9459ea474133a2dcb68df49a8454e135"
+    },
+    {
+      "name": "curator-09-retry",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-09.txt)\" ./cmd/curator",
+      "replaces": "curator-09",
+      "exit": 0,
+      "log": "curator-09-retry.json",
+      "sha256": "19fab3c94ed570ea0d04fb9544ea5774c6c4f16190930163c2f601564d8dc3ea"
+    }
+  ],
+  "aggregate_raw_sha256": "4e9c9d18f7429b8b04fdecd5c8dc45a5e4398cce20e02b918fa9e4bf590cd7f4",
+  "identity": {
+    "candidate": "e57894d642993b9fce7ea23f7ccfdb1995c2ac38",
+    "candidate_tree": "cd1a903247725014af5726b39bee9b1e90482959",
+    "worktree_tree": "cd1a903247725014af5726b39bee9b1e90482959",
+    "checkpoint": "9c1605a74436d2448f759bd4b66ae6685237d83b",
+    "signature": "G",
+    "remote_head": "e57894d642993b9fce7ea23f7ccfdb1995c2ac38",
+    "real_index_unchanged": true,
+    "README_unchanged": true,
+    "Story_uncommitted": true
+  },
+  "checks": {
+    "collect-01": 0,
+    "platform-gate-01": 0,
+    "suite-plan-01": 0,
+    "changelog-check-02": 0,
+    "build-01": 0,
+    "vet-01": 0,
+    "lint-01": 0,
+    "diff-check-01": 0
+  },
+  "environment": {
+    "platform": "darwin/arm64",
+    "go": "1.25.5",
+    "toolchain": "local",
+    "GOENV": "off",
+    "pnpm": "10.33.0",
+    "yarn_modern": "4.9.2",
+    "git_command_scope_overrides": "removed only from test subprocesses",
+    "test_PATH": "same task-local prerequisites and host provider filtering as revision 1"
+  },
+  "public_stream": {
+    "name": "TASK-261018-adogt7_refresh-local-events.jsonl",
+    "sha256": "ac0f1556a859e1638c552cc2e1c763f52e9a05f75231ef7a6cee9649b6d5b9ae",
+    "size_bytes": 12901772,
+    "redactions": [
+      "worktree path",
+      "operator home path",
+      "temporary-directory path",
+      "runner home path"
+    ],
+    "bounds": "Plain-text event stream; original raw logs remain task-local. Binary archive attachment was refused (exit 1); no encoding bypass used."
+  },
+  "failed_pretest_receipts": {
+    "curator-01": "{\"Time\":\"2026-10-18T14:56:52.17283+04:00\",\"Action\":\"start\",\"Package\":\"github.com/relux-works/curator/cmd/curator\"}\n{\"Time\":\"2026-10-18T15:01:52.741282+04:00\",\"Action\":\"output\",\"Package\":\"github.com/relux-works/curator/cmd/curator\",\"Output\":\"acquire package host GOROOT test lock: context deadline exceeded\\n\"}\n{\"Time\":\"2026-10-18T15:01:52.74258+04:00\",\"Action\":\"output\",\"Package\":\"github.com/relux-works/curator/cmd/curator\",\"Output\":\"FAIL\\tgithub.com/relux-works/curator/cmd/curator\\t300.568s\\n\"}\n{\"Time\":\"2026-10-18T15:01:52.74262+04:00\",\"Action\":\"fail\",\"Package\":\"github.com/relux-works/curator/cmd/curator\",\"Elapsed\":300.569}\n",
+    "curator-03": "{\"Time\":\"2026-10-18T14:57:48.207369+04:00\",\"Action\":\"start\",\"Package\":\"github.com/relux-works/curator/cmd/curator\"}\n{\"Time\":\"2026-10-18T15:02:49.149055+04:00\",\"Action\":\"output\",\"Package\":\"github.com/relux-works/curator/cmd/curator\",\"Output\":\"acquire package host GOROOT test lock: context deadline exceeded\\n\"}\n{\"Time\":\"2026-10-18T15:02:49.150216+04:00\",\"Action\":\"output\",\"Package\":\"github.com/relux-works/curator/cmd/curator\",\"Output\":\"FAIL\\tgithub.com/relux-works/curator/cmd/curator\\t300.942s\\n\"}\n{\"Time\":\"2026-10-18T15:02:49.164302+04:00\",\"Action\":\"fail\",\"Package\":\"github.com/relux-works/curator/cmd/curator\",\"Elapsed\":300.956}\n",
+    "curator-06": "{\"Time\":\"2026-10-18T14:59:38.715681+04:00\",\"Action\":\"start\",\"Package\":\"github.com/relux-works/curator/cmd/curator\"}\n{\"Time\":\"2026-10-18T15:04:38.989509+04:00\",\"Action\":\"output\",\"Package\":\"github.com/relux-works/curator/cmd/curator\",\"Output\":\"acquire package host GOROOT test lock: context deadline exceeded\\n\"}\n{\"Time\":\"2026-10-18T15:04:38.990903+04:00\",\"Action\":\"output\",\"Package\":\"github.com/relux-works/curator/cmd/curator\",\"Output\":\"FAIL\\tgithub.com/relux-works/curator/cmd/curator\\t300.274s\\n\"}\n{\"Time\":\"2026-10-18T15:04:38.990928+04:00\",\"Action\":\"fail\",\"Package\":\"github.com/relux-works/curator/cmd/curator\",\"Elapsed\":300.275}\n",
+    "curator-09": "{\"Time\":\"2026-10-18T15:00:56.099278+04:00\",\"Action\":\"start\",\"Package\":\"github.com/relux-works/curator/cmd/curator\"}\n{\"Time\":\"2026-10-18T15:05:56.456323+04:00\",\"Action\":\"output\",\"Package\":\"github.com/relux-works/curator/cmd/curator\",\"Output\":\"acquire package host GOROOT test lock: context deadline exceeded\\n\"}\n{\"Time\":\"2026-10-18T15:05:56.457431+04:00\",\"Action\":\"output\",\"Package\":\"github.com/relux-works/curator/cmd/curator\",\"Output\":\"FAIL\\tgithub.com/relux-works/curator/cmd/curator\\t300.357s\\n\"}\n{\"Time\":\"2026-10-18T15:05:56.457477+04:00\",\"Action\":\"fail\",\"Package\":\"github.com/relux-works/curator/cmd/curator\",\"Elapsed\":300.358}\n"
+  }
+}

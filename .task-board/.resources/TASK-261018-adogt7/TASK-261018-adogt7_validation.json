@@ -1,0 +1,503 @@
+{
+  "candidate": {
+    "candidate": "4b199445d921d1959962b8210b028d1644165b4c",
+    "candidate_tree": "da9e7c31917d4c50609650dcd5495d06ce4321b8",
+    "worktree_tree": "da9e7c31917d4c50609650dcd5495d06ce4321b8",
+    "checkpoint": "402fdbc9b77803cb2d6b11f4f1cfd83961e6897b",
+    "signature": "G",
+    "remote_head": "4b199445d921d1959962b8210b028d1644165b4c",
+    "real_index_unchanged": true,
+    "README_unchanged": true,
+    "reviewed_paths": [
+      "CHANGELOG.md",
+      "internal/audit/audit.go",
+      "internal/audit/capability_cache_mutants_test.go",
+      "internal/contextlock/contextlock.go",
+      "internal/contextpkg/contextpkg.go",
+      "internal/contextresolve/contextresolve.go",
+      "internal/envprofile/envprofile.go",
+      "internal/envprofile/gitsource.go",
+      "internal/envprofile/global.go",
+      "internal/manifest/expand.go",
+      "docs/profile-skill-directories.md",
+      "internal/contextpkg/skill_directory_vectors_test.go",
+      "internal/contextpkg/testdata/profile-skill-directories-v1",
+      "internal/contextresolve/skill_directory_test.go",
+      "internal/envprofile/skill_directory_mutants_test.go",
+      "internal/envprofile/skill_directory_test.go"
+    ]
+  },
+  "suite_plan": {
+    "served": 85,
+    "deferred": 0,
+    "excluded": 0
+  },
+  "inventories": {
+    "curator": {
+      "enumerated": 425,
+      "observed": 425,
+      "terminal_actions": {
+        "pass": 425
+      }
+    },
+    "install": {
+      "enumerated": 363,
+      "observed": 363,
+      "terminal_actions": {
+        "pass": 361,
+        "skip": 2
+      }
+    },
+    "envprofile": {
+      "enumerated": 372,
+      "observed": 372,
+      "terminal_actions": {
+        "pass": 371,
+        "skip": 1
+      }
+    }
+  },
+  "package_terminal_actions": {
+    "pass": 80,
+    "skip": 5
+  },
+  "event_actions": {
+    "start": 125,
+    "run": 12512,
+    "output": 27650,
+    "pass": 12599,
+    "pause": 478,
+    "cont": 478,
+    "skip": 38
+  },
+  "commands": [
+    {
+      "job": "current-install-01",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-01.txt)\" ./internal/install",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-install-01.json",
+      "raw_log_sha256": "e063685ce9d663440a7cbba77bdd3aac7daf4325ff071cd46cfbe9cb523493e3"
+    },
+    {
+      "job": "current-install-02",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-02.txt)\" ./internal/install",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-install-02.json",
+      "raw_log_sha256": "f971595372465d0bdc3c63bbf9fbc88144f126d4a616951af7be97fed4594338"
+    },
+    {
+      "job": "current-install-03",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-03.txt)\" ./internal/install",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-install-03.json",
+      "raw_log_sha256": "a86903ba4f69361f5245b37aa1b67b03526435028d72fe28b39114be8018192b"
+    },
+    {
+      "job": "current-install-04",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-04.txt)\" ./internal/install",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-install-04.json",
+      "raw_log_sha256": "2b8e7fff5eaa16ca10d6db73e40fb9590bd1684f19439e926736bf35e6c84a08"
+    },
+    {
+      "job": "current-install-05",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-05.txt)\" ./internal/install",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-install-05.json",
+      "raw_log_sha256": "a2849669a7d484276de64073a91efb610e640909f67d1d6ab6a9ef07a1de37b3"
+    },
+    {
+      "job": "current-install-06",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-06.txt)\" ./internal/install",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-install-06.json",
+      "raw_log_sha256": "2f0a6a05b14c9900897fa26699c9ac99da06aeaa9de54bb1c333a542d212d4c9"
+    },
+    {
+      "job": "current-install-07",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-07.txt)\" ./internal/install",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-install-07.json",
+      "raw_log_sha256": "17c68d01c1be13032ab19b0911d8620dbb4ebca323a90e7f46b99f459cf46555"
+    },
+    {
+      "job": "current-install-08",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-08.txt)\" ./internal/install",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-install-08.json",
+      "raw_log_sha256": "b93bb8275fb7112c994426f307b66e6c1e8f41696ffa6e75d5c733621410ad4b"
+    },
+    {
+      "job": "current-install-09",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-09.txt)\" ./internal/install",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-install-09.json",
+      "raw_log_sha256": "9e2f0c1d5da9ca20f740247cc3252cec73911e6284fd8430adf962ca1b5fc7b6"
+    },
+    {
+      "job": "current-install-10",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-install-mask-10.txt)\" ./internal/install",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-install-10.json",
+      "raw_log_sha256": "aa06b867260739f6b20b29abb3c9365140a657d2dc5e21087a35ac11b6e30e43"
+    },
+    {
+      "job": "current-batch-01",
+      "command": "go test -json -count=1 -p 2 -timeout=8m $(cat .temp/TASK-261018-adogt7/packages-batch-01.txt)",
+      "exit": 1,
+      "raw_log": ".temp/TASK-261018-adogt7/current-batch-01.json",
+      "raw_log_sha256": "27157504d8fea36882fb7901190781b5235c8d8bda79bfbda5b72b18ef88c1b1",
+      "accepted_package_bound": "All package-terminal green/skip results except artifactpolicy, replaced by full retry; command itself failed."
+    },
+    {
+      "job": "current-batch-02",
+      "command": "go test -json -count=1 -p 2 -timeout=8m $(cat .temp/TASK-261018-adogt7/packages-batch-02.txt)",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-batch-02.json",
+      "raw_log_sha256": "e07f6e72e14b067e9e13ebfa82fb95f8b4d64f98e351b16db597b5430253ec71"
+    },
+    {
+      "job": "current-batch-03",
+      "command": "go test -json -count=1 -p 2 -timeout=8m $(cat .temp/TASK-261018-adogt7/packages-batch-03.txt)",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-batch-03.json",
+      "raw_log_sha256": "dae5502aae344e10a29b0088b6ab0af2e198c1d3f404006842f68c23b2b45424"
+    },
+    {
+      "job": "current-batch-04",
+      "command": "go test -json -count=1 -p 2 -timeout=8m $(cat .temp/TASK-261018-adogt7/packages-batch-04.txt)",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-batch-04.json",
+      "raw_log_sha256": "26b845db0061db53bb73b08a7537f65d0429baf06b40115b88e04f8771318679"
+    },
+    {
+      "job": "current-batch-05",
+      "command": "go test -json -count=1 -p 2 -timeout=8m $(cat .temp/TASK-261018-adogt7/packages-batch-05.txt)",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-batch-05.json",
+      "raw_log_sha256": "43a0830887fc81367a5d01d5c21028f0bafdec4c348864093072c2e376449c64"
+    },
+    {
+      "job": "current-envprofile-01",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-01.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-envprofile-01.json",
+      "raw_log_sha256": "de4ee5bec386ef09a4e4d868b1f33349c0790064d83e6496efbe6a6ed2c2999d"
+    },
+    {
+      "job": "current-envprofile-02",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-02.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-envprofile-02.json",
+      "raw_log_sha256": "d919a7ddd8595577f4dc64a86de7e99d5f3fb423af40d42a450a78aabf9217b4"
+    },
+    {
+      "job": "current-envprofile-03",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-03.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-envprofile-03.json",
+      "raw_log_sha256": "b9b1c7bf8a742d39652c10095932651abc604907fd17ece9b941fa618fb651c7"
+    },
+    {
+      "job": "current-envprofile-04",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-04.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-envprofile-04.json",
+      "raw_log_sha256": "25c9c58f5d19c4aa2b3d56de63281751db1afe9eb0846abaa1bf29404a2e0550"
+    },
+    {
+      "job": "current-envprofile-05",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-05.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-envprofile-05.json",
+      "raw_log_sha256": "74db7d50a287de71227212dd4ff9e04e854b73e28642405d6d9f091570b9e01b"
+    },
+    {
+      "job": "current-envprofile-06",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-06.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-envprofile-06.json",
+      "raw_log_sha256": "5ff9d74b2526dd14eb7445ee7a563ef5aadbe3badbbe2ec0634b47c61257dad3"
+    },
+    {
+      "job": "current-envprofile-07",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-07.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-envprofile-07.json",
+      "raw_log_sha256": "9a59069962b88fad6f95e117abfd287e5775b706ba990f2729069d63668ba399"
+    },
+    {
+      "job": "current-envprofile-08",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-08.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-envprofile-08.json",
+      "raw_log_sha256": "7d493328136ae22a3cbd204ae22b8b6387f2473204b1040e63ee448841a0bcb0"
+    },
+    {
+      "job": "current-envprofile-09",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-09.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-envprofile-09.json",
+      "raw_log_sha256": "8ee72d26a914c37edd8aaf7d163f55a9b441f2206e5d7a9b7e205131d4af5be1"
+    },
+    {
+      "job": "current-envprofile-10",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-10.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-envprofile-10.json",
+      "raw_log_sha256": "7e02e1b5f3f41d507695ff47754e03843404186d626844397a85b3b3877c7bc0"
+    },
+    {
+      "job": "current-envprofile-11",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-envprofile-mask-11.txt)\" ./internal/envprofile",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-envprofile-11.json",
+      "raw_log_sha256": "c09358f4320af807efc1cde5730d70015280b3a56cb65344144dd14c751564cd"
+    },
+    {
+      "job": "current-curator-01",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-01.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-01.json",
+      "raw_log_sha256": "14d775849073e2df9f6a97559df0bc5fabb21ded15b63dbff7d5c804a1d4711d"
+    },
+    {
+      "job": "current-curator-02",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-02.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-02.json",
+      "raw_log_sha256": "42dd88979dae129a94628067673fe37ea089e2ab884bb42bc0226aacd01e16b2"
+    },
+    {
+      "job": "current-curator-03",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-03.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-03.json",
+      "raw_log_sha256": "c60599b579bfe7976363da374d46634f876987b293361223e17b4923dfd469b0"
+    },
+    {
+      "job": "current-curator-04",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-04.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-04.json",
+      "raw_log_sha256": "f918bfdaaec34c2906cc5c95e62d8890b3e923ad7eed724a86ef5727f2c86abe"
+    },
+    {
+      "job": "current-curator-05",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-05.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-05.json",
+      "raw_log_sha256": "5e51fd7f4d84c7a09715824ad179d25bcefef18e8c8cb798e11e01f027d7bacd"
+    },
+    {
+      "job": "current-curator-06",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-06.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-06.json",
+      "raw_log_sha256": "9228815562f293c9cb65ac3b1216f3d858db172f248c82436561fe4b3e28aee2"
+    },
+    {
+      "job": "current-curator-07",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-07.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-07.json",
+      "raw_log_sha256": "55850dfa92eec4a96638ac01a17f8b844f0459694f977fe475fa497190882e56"
+    },
+    {
+      "job": "current-curator-08",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-08.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-08.json",
+      "raw_log_sha256": "1d1a48ca1786229abcbf5e6645b295f5acf3dc9e8f11c1028fa1bb5e6430bc92"
+    },
+    {
+      "job": "current-curator-09",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-09.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-09.json",
+      "raw_log_sha256": "612aa57488a425dfa883f97aa816fbbce3caa1efde80590506e7fc6f326a91f9"
+    },
+    {
+      "job": "current-curator-10",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-10.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-10.json",
+      "raw_log_sha256": "3ef11d6fb94c43add762895fdcee87738cbca2d02825a3c8c8853308e96739a0"
+    },
+    {
+      "job": "current-curator-11",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-11.txt)\" ./cmd/curator",
+      "exit": 1,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-11.json",
+      "raw_log_sha256": "85ba90815611e22325b90e98ebdae76aa8ecccc8ce639d4230aca25941e19f27",
+      "accepted_test_bound": "All green test terminals except TestSignerRowsSurviveHostileGlobalGitConfig, replaced by isolated retry; command itself failed."
+    },
+    {
+      "job": "current-curator-12",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-12.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-12.json",
+      "raw_log_sha256": "9726d4fafebced1e37bdf8d4b11472901382691560b40bffb366a6e2f3ed9273"
+    },
+    {
+      "job": "current-curator-13",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-13.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-13.json",
+      "raw_log_sha256": "506e28d005afbbdda00385439794da834150bc59f776717c0c11d44b13f92c97"
+    },
+    {
+      "job": "current-curator-14",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-14.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-14.json",
+      "raw_log_sha256": "06b11a743ed267080b84027b00a1e05c0e8e0b0ba37c28d720054e2160c14b85"
+    },
+    {
+      "job": "current-curator-15",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-15.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-15.json",
+      "raw_log_sha256": "f214c81f87281055f9981be15e06b51ada72effa7785c74825480a5dea60a495"
+    },
+    {
+      "job": "current-curator-16",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-16.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-16.json",
+      "raw_log_sha256": "ebcb3f50fa52e1a4d1c9eeb7d6a67d1aadd60ed4c8b5d71cd5df76e4a7534d18"
+    },
+    {
+      "job": "current-curator-17",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-17.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-17.json",
+      "raw_log_sha256": "3d0f8e3868a620aca99d79a5fc6e91f1c69e384d411ffd8ec785d5c71ee9ece1"
+    },
+    {
+      "job": "current-curator-18",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-18.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-18.json",
+      "raw_log_sha256": "6c0a559374ff2069ebec265b2d1a943f2c53cb66cf9358e896d8fefffb45e5e5"
+    },
+    {
+      "job": "current-curator-19",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-19.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-19.json",
+      "raw_log_sha256": "e91f8d389829126216ef96d3728828e217ca9a9c93eb78526f6696b2eb072608"
+    },
+    {
+      "job": "current-curator-20",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-20.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-20.json",
+      "raw_log_sha256": "ec80d2cba69865d6831c5800ae98142b8396a06893599439a20e4d184c0b8a41"
+    },
+    {
+      "job": "current-curator-21",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-21.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-21.json",
+      "raw_log_sha256": "e4831af30e9a3183b046951a3d27d415ca2264939d035b74c83e0d21efc000c4"
+    },
+    {
+      "job": "current-curator-22",
+      "command": "go test -json -count=1 -p 2 -timeout=8m -run \"$(cat .temp/TASK-261018-adogt7/current-curator-mask-22.txt)\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-22.json",
+      "raw_log_sha256": "a08c74f309db17bfc1d146b2977f4ab83dbdcf4f4f728f081d67ebd2bb38b6d2"
+    },
+    {
+      "job": "current-artifactpolicy-retry",
+      "command": "go test -json -count=1 -p 1 -timeout=9m30s ./internal/artifactpolicy",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-artifactpolicy-retry.json",
+      "raw_log_sha256": "104982368eb2b55458334a8dca88afb8900d1312b93227afb2c6c68c341f640d"
+    },
+    {
+      "job": "current-curator-hostile-retry",
+      "command": "go test -json -count=1 -p 1 -timeout=8m -run \"^TestSignerRowsSurviveHostileGlobalGitConfig$\" ./cmd/curator",
+      "exit": 0,
+      "raw_log": ".temp/TASK-261018-adogt7/current-curator-hostile-retry.json",
+      "raw_log_sha256": "6485897ddb7c86b9f0c92abcfa44134afe7b30de5d027f588434778460fdb6c5",
+      "environment_delta": "Removed launcher GIT_CONFIG_COUNT and GIT_CONFIG_KEY_*/GIT_CONFIG_VALUE_* so the fixture hostile config can control its signing probe, matching hosted absence of host overrides."
+    }
+  ],
+  "aggregate_raw_sha256": "8136c2849094ceca76af66f280e83b4f8f48f377ea08e1848a579e68f06e608a",
+  "platform_gate": {
+    "command": "CI_DEFERRED_PKGS='' CI_EXCLUDED_PKGS='' bash .github/ci/platform-case-gate.sh .temp/TASK-261018-adogt7/current-go-test.json .temp/TASK-261018-adogt7/current-platform-evidence",
+    "exit": 0,
+    "required_cases": 480,
+    "test_skips": 33,
+    "report_sha256": "be90dde4e5c229fd4bfb2bcdb773220a633e2b907d81f695025948571b73b208",
+    "skip_classes": {
+      "platform-control": 20,
+      "root-content": 1,
+      "host-capability": 7,
+      "opt-in": 4,
+      "helper-process": 1
+    }
+  },
+  "additional_checks": [
+    {
+      "command": "GOLANGCI_LINT_CACHE=.temp/TASK-261018-adogt7/lint-cache golangci-lint run",
+      "exit": 0,
+      "log": ".temp/TASK-261018-adogt7/lint-05.log",
+      "log_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "command": "go vet ./...",
+      "exit": 0,
+      "log": ".temp/TASK-261018-adogt7/vet-03.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "go build ./cmd/curator",
+      "exit": 0,
+      "log": ".temp/TASK-261018-adogt7/build-03.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "git diff --check",
+      "exit": 0,
+      "log": ".temp/TASK-261018-adogt7/diff-check-03.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "vectors": {
+    "lifecycle": {
+      "driven": 24,
+      "total": 24
+    },
+    "schema": {
+      "driven": 56,
+      "total": 56
+    },
+    "identity": {
+      "driven": 2,
+      "total": 2
+    },
+    "metadata_controls": {
+      "driven": 6,
+      "total": 6
+    },
+    "narrowing_mutants": {
+      "killed": 10,
+      "total": 10,
+      "survivors": 0
+    }
+  },
+  "spec": {
+    "revision": "e41f96387287f5e76604627f9e63662f7d6d86d4",
+    "frozen_manifest_sha256": "6f832d813efc768ea154a7d5076b512ab4be6aa9409d92e11469d21ea9bc69f5",
+    "verified_corpus_files": 1294,
+    "vendored_vectors": {
+      "internal/contextpkg/testdata/profile-skill-directories-v1/fixtures.json": "5da6d372930afa2c8c3bcdf48c93daa4fa572adc74824fec81d07c8af2ffccf3",
+      "internal/contextpkg/testdata/profile-skill-directories-v1/lock-identity.json": "947ffd4d2b6b2644af3f3aa00bf2643891ac3a4100da3d75eeb7897f2503e59f",
+      "internal/contextpkg/testdata/profile-skill-directories-v1/schema-cases.json": "f5d177a0809093d41725fea04a63c8d93b543492638fb25bcb1699a81335910c",
+      "internal/contextpkg/testdata/profile-skill-directories-v1/vectors.json": "8053e3e837569242c3a1ecc2681fb64d0a0b587f5121d0f71b14b01d61134b56"
+    }
+  }
+}
