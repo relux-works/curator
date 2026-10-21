@@ -308,6 +308,12 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+The [Claude project-source exclusion harness](.research/project-exclusion-claude/README.md)
+uses Go, Python 3, Git and macOS `sandbox-exec`. Run
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-claude -count=1 -v`;
+vendor probes require the pinned binary opt-in and write evidence under `.temp/`.
+See its README for gated replay, MCP fixtures and expected-red controls.
+
 Run `go test ./cmd/curator -run 'Test(RegisteredSubcommandHelpNoWrites|CommandHelp)'`
 for built-in and nested command help, zero-write snapshots, the init positive
 control, provider passthrough, and narrowing mutants. Keep logs under `.temp/`.
