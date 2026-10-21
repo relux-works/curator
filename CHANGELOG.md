@@ -24,16 +24,30 @@ All notable implementation changes are recorded here.
   - Muse 1.4.10-R6427.1 and 1.4.11-R6667.1 foreign-context exclusion:
     qualified for exec, refused for interactive (P4);
   - Codex 0.162.1 project-source exclusion: complete strict exclusion is
-    refused, because late-created repository skills still load.
+    refused, because late-created repository skills still load;
+  - Claude Code 2.1.305 project-source exclusion: fresh-session sources are
+    selectively excludable with `--setting-sources user`, and explicit MCP
+    strictness works; contaminated resume/fork history is not scrubbed, and
+    late hook, plugin, MCP and settings reloads stay unqualified;
+  - Muse 1.4.11 project-source exclusion: complete strict exclusion is not
+    qualified; fresh untrusted headless launches exclude the measured startup
+    sources.
 
 ### Changed
 
 - Managed homes are owner-only: directories `0700` and manager-written files
   `0600`; copied seeds keep their source mode. `env resolve --repair` tightens
   existing wider homes.
-- The skill audit's network-declaration gate scans Markdown. The ruleset
-  version is bumped, so a cached allowance from before the change cannot pass
-  it.
+- The skill audit's network-declaration gate scans Markdown, limited to the
+  agent-facing context a package publishes (core §3.1): skill trees as
+  enumerated for publication, and context modules through their publication
+  reader. Build and runtime roots and other unpublished paths are out of scope.
+  Placeholder hosts such as `example.com` remain contacts; use a special-use
+  name such as `board.example`. The ruleset version (8) and subject kind enter
+  the audit cache key, so a cached allowance from before the change cannot pass.
+- Profile skills are published as the core §3.1 projection instead of the raw
+  package root, so build roots never reach an installed skill. Repair rebuilds
+  a missing, extra or changed projection through recoverable replacement.
 
 ### Fixed
 
@@ -43,6 +57,10 @@ All notable implementation changes are recorded here.
   failure).
 - Skill install never deletes or replaces store entries Curator does not own;
   ownership requires a valid matching `.csk-install.json`.
+- Exact-pin Git acquisition fetches a missing pinned object before signature
+  verification and authorizes it before publishing a dependency, profile or
+  lock. The fetch suppresses configured refmaps, so existing tags, tracking
+  refs and `FETCH_HEAD` stay unchanged, including when the signer is refused.
 - Hosts under reserved test TLDs (`test`, `example`, `invalid`, `localhost`)
   are not counted as audit network contacts; lookalikes stay contacts.
 - Tests leave no read-only temporary trees. Self-hosted Linux runners restore
