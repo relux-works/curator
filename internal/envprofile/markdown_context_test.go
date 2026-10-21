@@ -42,17 +42,7 @@ func TestProfileInstallMarkdownContextCLI(t *testing.T) {
 			pinOperatorHome(t, home)
 			homes := pinHomes(t)
 			profile := t.TempDir()
-			if err := os.Chmod(profile, 0700); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.Mkdir(filepath.Join(profile, "context"), 0700); err != nil {
-				t.Fatal(err)
-			}
-			for file, body := range map[string]string{"agent-context.json": `{"schema_version":1,"name":"review-context","version":"1.0.0","context":{"modules":[{"path":"a.md"}]}}`, "context/a.md": tc.body} {
-				if err := os.WriteFile(filepath.Join(profile, filepath.FromSlash(file)), []byte(body), 0600); err != nil {
-					t.Fatal(err)
-				}
-			}
+			writePackage(t, profile, "review-context", "1.0.0", tc.body)
 			configPath := filepath.Join(home, "config.json")
 			payload, err := json.Marshal(map[string]any{"schema_version": 1, "skills_root": filepath.Join(home, "skills"), "projects": map[string]any{}, "audit": map[string]any{"enabled": true, "mode": "strict", "fail_on": "high", "backend": "null"}})
 			if err != nil {

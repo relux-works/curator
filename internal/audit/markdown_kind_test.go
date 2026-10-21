@@ -112,6 +112,74 @@ func TestMarkdownScopeCacheBindsKind(t *testing.T) {
 	}
 }
 
+// rulesetSevenSource matches anchors with LF internally and restores the input's
+// line endings so Windows checkout fixtures remain CRLF when overlaid.
+func rulesetSevenSource(source string) (string, error) {
+	crlf := strings.Contains(source, "\r\n")
+	source = strings.ReplaceAll(source, "\r\n", "\n")
+	source = regexp.MustCompile(`RulesetVersion = "[0-9]+"`).ReplaceAllString(source, `RulesetVersion = "7"`)
+	for before, after := range map[string]string{
+		`if kind == contextlock.KindContext {`:                               `if false && kind == contextlock.KindContext {`,
+		`if kind == contextlock.KindSkill {`:                                 `if true {`,
+		`if markdown && (kind == contextlock.KindSkill || contextModules) {`: `if markdown || contextModules {`,
+		`"subject_kind":    subject.Kind,`:                                   ``,
+		"\tif data.Kind != subject.Kind {\n\t\treturn nil, false\n\t}":       "",
+	} {
+		if strings.Count(source, before) != 1 {
+			return "", fmt.Errorf("ruleset-7 anchor not unique: %q", before)
+		}
+		source = strings.Replace(source, before, after, 1)
+	}
+	if crlf {
+		source = strings.ReplaceAll(source, "\n", "\r\n")
+	}
+	return source, nil
+}
+
+// LF and CRLF fixtures retain their endings and receive the ruleset-7 changes.
+// Missing and duplicate multiline anchors must return the specific error rather
+// than silently producing an incomplete seed.
+func TestRulesetSevenSourceLineEndings(t *testing.T) {
+	payload, err := os.ReadFile("audit.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := strings.ReplaceAll(string(payload), "\r\n", "\n")
+	const anchor = "\tif data.Kind != subject.Kind {\n\t\treturn nil, false\n\t}"
+	for _, ending := range []struct{ name, value string }{{"LF", "\n"}, {"CRLF", "\r\n"}} {
+		for _, variant := range []string{"unique", "missing", "duplicate"} {
+			t.Run(ending.name+"/"+variant, func(t *testing.T) {
+				source := original
+				switch variant {
+				case "missing":
+					source = strings.Replace(source, anchor, "", 1)
+				case "duplicate":
+					source += anchor + "\n"
+				}
+				source = strings.ReplaceAll(source, "\n", ending.value)
+				got, err := rulesetSevenSource(source)
+				if variant != "unique" {
+					want := fmt.Sprintf("ruleset-7 anchor not unique: %q", anchor)
+					if err == nil || err.Error() != want || got != "" {
+						t.Fatalf("ambiguous anchor: seed empty=%t, error=%v; want %s", got == "", err, want)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				normalized := strings.ReplaceAll(got, "\r\n", "\n")
+				if got != strings.ReplaceAll(normalized, "\n", ending.value) {
+					t.Fatal("ruleset-7 seed changed source line endings")
+				}
+				if !strings.Contains(got, `RulesetVersion = "7"`) || strings.Contains(normalized, anchor) || strings.Contains(got, `"subject_kind":    subject.Kind,`) {
+					t.Fatal("ruleset-7 seed retained current ruleset or kind binding")
+				}
+			})
+		}
+	}
+}
+
 // A production Gate writes and reuses an empty ruleset-7 verdict with the r2
 // skill-only selection and without a kind binding. The current gates reject the
 // same context in both hash frames, leave the old record intact and cache the
@@ -132,19 +200,9 @@ func TestMarkdownScopeInvalidatesRulesetSevenAllowance(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		source := string(payload)
-		source = regexp.MustCompile(`RulesetVersion = "[0-9]+"`).ReplaceAllString(source, `RulesetVersion = "7"`)
-		for before, after := range map[string]string{
-			`if kind == contextlock.KindContext {`:                               `if false && kind == contextlock.KindContext {`,
-			`if kind == contextlock.KindSkill {`:                                 `if true {`,
-			`if markdown && (kind == contextlock.KindSkill || contextModules) {`: `if markdown || contextModules {`,
-			`"subject_kind":    subject.Kind,`:                                   ``,
-			"\tif data.Kind != subject.Kind {\n\t\treturn nil, false\n\t}":       "",
-		} {
-			if strings.Count(source, before) != 1 {
-				t.Fatalf("ruleset-7 anchor not unique: %q", before)
-			}
-			source = strings.Replace(source, before, after, 1)
+		source, err := rulesetSevenSource(string(payload))
+		if err != nil {
+			t.Fatal(err)
 		}
 		replacement := filepath.Join(root, "seven.go")
 		if err := os.WriteFile(replacement, []byte(source), 0600); err != nil {
