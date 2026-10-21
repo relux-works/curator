@@ -308,6 +308,15 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+For the pinned Codex project-source exclusion probes, use
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.
+Vendor tests skip unless `CODEX_EXCL_BINARY` selects the exact build and
+`CODEX_EXCL_RUN_ROOT` names a fresh task-local `.temp/` directory. The
+[harness guide](.research/project-exclusion-codex/README.md) documents Go,
+Seatbelt, stdio MCP, fixture outputs and expected-red controls; the
+[qualification record](docs/qualification/project-source-exclusion-codex.md)
+records the incomplete strict-context boundary.
+
 Run `go test ./cmd/curator -run 'Test(RegisteredSubcommandHelpNoWrites|CommandHelp)'`
 for built-in and nested command help, zero-write snapshots, the init positive
 control, provider passthrough, and narrowing mutants. Keep logs under `.temp/`.

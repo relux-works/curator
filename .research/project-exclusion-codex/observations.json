@@ -1,0 +1,556 @@
+{
+  "baseCommit": "cdcba3bd7a8de6028d3d1dbf621ce4cb19b130a7",
+  "boundary": {
+    "keychains-denied": {
+      "exit": 1,
+      "output": "cat: $RUN/Keychains/synthetic: Operation not permitted"
+    },
+    "loopback-denied": {
+      "exit": 7,
+      "output": "curl: (7) Failed to connect to 127.0.0.1 port 60972 after 0 ms: Couldn't connect to server"
+    },
+    "ordinary-readable": {
+      "exit": 0,
+      "output": "ordinary-fixture"
+    }
+  },
+  "configuration": {
+    "trusted": {
+      "approval_policy": "on-request",
+      "emptyProjectMCP": {
+        "approved": {
+          "args": [],
+          "command": "/usr/bin/true",
+          "enabled": true,
+          "environment_id": "local",
+          "tool_timeout_sec": null
+        }
+      },
+      "hookCatalog": [
+        {
+          "additionalContextLimit": null,
+          "async": false,
+          "command": "printf APPROVED_HOOK",
+          "currentHash": "sha256:a291855d04a8e3fd1fbb29222b36eb70af59b85bd06c4ab4e79df64f780c0739",
+          "displayOrder": 0,
+          "enabled": true,
+          "eventName": "sessionStart",
+          "handlerType": "command",
+          "isManaged": false,
+          "key": "$RUN/managed/config.toml:session_start:0:0",
+          "matcher": null,
+          "pluginId": null,
+          "source": "user",
+          "sourcePath": "$RUN/managed/config.toml",
+          "statusMessage": null,
+          "timeoutSec": 600,
+          "trustStatus": "untrusted"
+        },
+        {
+          "additionalContextLimit": null,
+          "async": false,
+          "command": "printf PROJECT_HOOK",
+          "currentHash": "sha256:0e266e787636f661768d0a2e763450cc92a55581a51bee95a3b9988dd9d7319f",
+          "displayOrder": 1,
+          "enabled": true,
+          "eventName": "sessionStart",
+          "handlerType": "command",
+          "isManaged": false,
+          "key": "$RUN/project/.codex/config.toml:session_start:0:0",
+          "matcher": null,
+          "pluginId": null,
+          "source": "project",
+          "sourcePath": "$RUN/project/.codex/config.toml",
+          "statusMessage": null,
+          "timeoutSec": 600,
+          "trustStatus": "untrusted"
+        }
+      ],
+      "mcp_servers": {
+        "approved": {
+          "args": [],
+          "command": "/usr/bin/true",
+          "enabled": true,
+          "environment_id": "local",
+          "tool_timeout_sec": null
+        },
+        "project": {
+          "args": [],
+          "command": "/usr/bin/false",
+          "enabled": true,
+          "environment_id": "local",
+          "tool_timeout_sec": null
+        }
+      },
+      "model_reasoning_effort": "high",
+      "plugins": {
+        "approved@fixture": {
+          "enabled": true
+        },
+        "project@fixture": {
+          "enabled": true
+        }
+      },
+      "sandbox_mode": "workspace-write",
+      "threadPolicy": {
+        "approvalPolicy": "on-request",
+        "reasoningEffort": "high",
+        "sandbox": {
+          "excludeSlashTmp": false,
+          "excludeTmpdirEnvVar": false,
+          "networkAccess": false,
+          "type": "workspaceWrite",
+          "writableRoots": []
+        }
+      }
+    },
+    "untrusted": {
+      "approval_policy": "never",
+      "emptyProjectMCP": {
+        "approved": {
+          "args": [],
+          "command": "/usr/bin/true",
+          "enabled": true,
+          "environment_id": "local",
+          "tool_timeout_sec": null
+        }
+      },
+      "hookCatalog": [
+        {
+          "additionalContextLimit": null,
+          "async": false,
+          "command": "printf APPROVED_HOOK",
+          "currentHash": "sha256:a291855d04a8e3fd1fbb29222b36eb70af59b85bd06c4ab4e79df64f780c0739",
+          "displayOrder": 0,
+          "enabled": true,
+          "eventName": "sessionStart",
+          "handlerType": "command",
+          "isManaged": false,
+          "key": "$RUN/managed/config.toml:session_start:0:0",
+          "matcher": null,
+          "pluginId": null,
+          "source": "user",
+          "sourcePath": "$RUN/managed/config.toml",
+          "statusMessage": null,
+          "timeoutSec": 600,
+          "trustStatus": "untrusted"
+        }
+      ],
+      "mcp_servers": {
+        "approved": {
+          "args": [],
+          "command": "/usr/bin/true",
+          "enabled": true,
+          "environment_id": "local",
+          "tool_timeout_sec": null
+        }
+      },
+      "model_reasoning_effort": "low",
+      "plugins": {
+        "approved@fixture": {
+          "enabled": true
+        }
+      },
+      "sandbox_mode": "read-only",
+      "threadPolicy": {
+        "approvalPolicy": "never",
+        "reasoningEffort": "low",
+        "sandbox": {
+          "networkAccess": false,
+          "type": "readOnly"
+        }
+      }
+    }
+  },
+  "gatedExit": 0,
+  "intake": {
+    "invalid-run-root": {
+      "exit": 1,
+      "specificVerdict": "replay_test.go:200: explicit absolute task-local .temp run root required"
+    },
+    "missing-opt-in": {
+      "exit": 0,
+      "specificVerdict": "replay_test.go:200: opt-in: CODEX_EXCL_BINARY required; no vendor fixture or process"
+    },
+    "wrong-digest": {
+      "exit": 1,
+      "specificVerdict": "replay_test.go:200: unqualified binary digest; refusing vendor execution"
+    }
+  },
+  "lateDiscovery": {
+    "approvedSkillRetained": true,
+    "distrustedLateMCPExcluded": true,
+    "entry": "skills/list forceReload=true and config/read cwd in one running server",
+    "lateProjectSkillObserved": true,
+    "waitClean": true
+  },
+  "mcp": {
+    "trusted/false": {
+      "approvedCalled": true,
+      "approvedProcessStarted": true,
+      "projectCalled": false,
+      "projectProcessStarted": false,
+      "status": {
+        "data": [
+          {
+            "authStatus": "unsupported",
+            "httpOrigin": null,
+            "name": "approved_tool",
+            "pluginId": null,
+            "resourceTemplates": [],
+            "resources": [],
+            "runtimeStatus": "starting",
+            "serverCapabilities": {
+              "tools": {}
+            },
+            "serverInfo": {
+              "description": null,
+              "icons": null,
+              "name": "approved_tool",
+              "title": null,
+              "version": "1",
+              "websiteUrl": null
+            },
+            "tools": {
+              "approved_tool": {
+                "description": "approved_tool",
+                "inputSchema": {
+                  "type": "object"
+                },
+                "name": "approved_tool"
+              }
+            },
+            "toolsError": null
+          }
+        ],
+        "nextCursor": null
+      },
+      "waitClean": true
+    },
+    "trusted/true": {
+      "approvedCalled": true,
+      "approvedProcessStarted": true,
+      "projectCalled": true,
+      "projectProcessStarted": true,
+      "status": {
+        "data": [
+          {
+            "authStatus": "unsupported",
+            "httpOrigin": null,
+            "name": "approved_tool",
+            "pluginId": null,
+            "resourceTemplates": [],
+            "resources": [],
+            "runtimeStatus": "connected",
+            "serverCapabilities": {
+              "tools": {}
+            },
+            "serverInfo": {
+              "description": null,
+              "icons": null,
+              "name": "approved_tool",
+              "title": null,
+              "version": "1",
+              "websiteUrl": null
+            },
+            "tools": {
+              "approved_tool": {
+                "description": "approved_tool",
+                "inputSchema": {
+                  "type": "object"
+                },
+                "name": "approved_tool"
+              }
+            },
+            "toolsError": null
+          },
+          {
+            "authStatus": "unsupported",
+            "httpOrigin": null,
+            "name": "project_tool",
+            "pluginId": null,
+            "resourceTemplates": [],
+            "resources": [],
+            "runtimeStatus": "connected",
+            "serverCapabilities": {
+              "tools": {}
+            },
+            "serverInfo": {
+              "description": null,
+              "icons": null,
+              "name": "project_tool",
+              "title": null,
+              "version": "1",
+              "websiteUrl": null
+            },
+            "tools": {
+              "project_tool": {
+                "description": "project_tool",
+                "inputSchema": {
+                  "type": "object"
+                },
+                "name": "project_tool"
+              }
+            },
+            "toolsError": null
+          }
+        ],
+        "nextCursor": null
+      },
+      "waitClean": true
+    },
+    "untrusted/false": {
+      "approvedCalled": true,
+      "approvedProcessStarted": true,
+      "projectCalled": false,
+      "projectProcessStarted": false,
+      "status": {
+        "data": [
+          {
+            "authStatus": "unsupported",
+            "httpOrigin": null,
+            "name": "approved_tool",
+            "pluginId": null,
+            "resourceTemplates": [],
+            "resources": [],
+            "runtimeStatus": "starting",
+            "serverCapabilities": {
+              "tools": {}
+            },
+            "serverInfo": {
+              "description": null,
+              "icons": null,
+              "name": "approved_tool",
+              "title": null,
+              "version": "1",
+              "websiteUrl": null
+            },
+            "tools": {
+              "approved_tool": {
+                "description": "approved_tool",
+                "inputSchema": {
+                  "type": "object"
+                },
+                "name": "approved_tool"
+              }
+            },
+            "toolsError": null
+          }
+        ],
+        "nextCursor": null
+      },
+      "waitClean": true
+    },
+    "untrusted/true": {
+      "approvedCalled": true,
+      "approvedProcessStarted": true,
+      "projectCalled": false,
+      "projectProcessStarted": false,
+      "status": {
+        "data": [
+          {
+            "authStatus": "unsupported",
+            "httpOrigin": null,
+            "name": "approved_tool",
+            "pluginId": null,
+            "resourceTemplates": [],
+            "resources": [],
+            "runtimeStatus": "connected",
+            "serverCapabilities": {
+              "tools": {}
+            },
+            "serverInfo": {
+              "description": null,
+              "icons": null,
+              "name": "approved_tool",
+              "title": null,
+              "version": "1",
+              "websiteUrl": null
+            },
+            "tools": {
+              "approved_tool": {
+                "description": "approved_tool",
+                "inputSchema": {
+                  "type": "object"
+                },
+                "name": "approved_tool"
+              }
+            },
+            "toolsError": null
+          }
+        ],
+        "nextCursor": null
+      },
+      "waitClean": true
+    }
+  },
+  "narrowing": [
+    {
+      "control": "drop-document-cap",
+      "exit": "1",
+      "verdict": "KILLED"
+    },
+    {
+      "control": "drop-skill-disable",
+      "exit": "1",
+      "verdict": "KILLED"
+    },
+    {
+      "control": "trust-project",
+      "exit": "1",
+      "verdict": "KILLED"
+    },
+    {
+      "control": "allow-loopback",
+      "exit": "1",
+      "verdict": "KILLED"
+    }
+  ],
+  "plugins": {
+    "trusted": {
+      "approvedPluginSkill": true,
+      "projectPluginSkill": true
+    },
+    "untrusted": {
+      "approvedPluginSkill": true,
+      "projectPluginSkill": false
+    }
+  },
+  "prompts": {
+    "TestInstructions/nested-baseline": {
+      "argv": "[\"$RUN/codex\" \"debug\" \"prompt-input\" \"EXCLUSION_PROBE\"]",
+      "exit": 0,
+      "presentMarkers": [
+        "APPROVED_ROOT",
+        "PROJECT_ROOT",
+        "PROJECT_NESTED"
+      ]
+    },
+    "TestInstructions/nested-excluded": {
+      "argv": "[\"$RUN/codex\" \"-c\" \"project_doc_max_bytes=0\" \"debug\" \"prompt-input\" \"EXCLUSION_PROBE\"]",
+      "exit": 0,
+      "presentMarkers": [
+        "APPROVED_ROOT"
+      ]
+    },
+    "TestInstructions/override-baseline": {
+      "argv": "[\"$RUN/codex\" \"debug\" \"prompt-input\" \"EXCLUSION_PROBE\"]",
+      "exit": 0,
+      "presentMarkers": [
+        "APPROVED_ROOT",
+        "PROJECT_OVERRIDE"
+      ]
+    },
+    "TestInstructions/override-excluded": {
+      "argv": "[\"$RUN/codex\" \"-c\" \"project_doc_max_bytes=0\" \"debug\" \"prompt-input\" \"EXCLUSION_PROBE\"]",
+      "exit": 0,
+      "presentMarkers": [
+        "APPROVED_ROOT"
+      ]
+    },
+    "TestInstructions/root-baseline": {
+      "argv": "[\"$RUN/codex\" \"debug\" \"prompt-input\" \"EXCLUSION_PROBE\"]",
+      "exit": 0,
+      "presentMarkers": [
+        "APPROVED_ROOT",
+        "PROJECT_ROOT"
+      ]
+    },
+    "TestSkills/known-paths-excluded": {
+      "argv": "[\"$RUN/codex\" \"-c\" \"skills.config=[{path=\\\"$RUN/project/.agents/skills/repo-agents/SKILL.md\\\",enabled=false},{path=\\\"$RUN/project/.codex/skills/repo-codex/SKILL.md\\\",enabled=false}]\" \"-c\" \"project_doc_max_bytes=0\" \"debug\" \"prompt-input\" \"EXCLUSION_PROBE\"]",
+      "exit": 0,
+      "presentMarkers": [
+        "APPROVED_SKILL"
+      ]
+    },
+    "TestSkills/late-path-bypasses-list": {
+      "argv": "[\"$RUN/codex\" \"-c\" \"skills.config=[{path=\\\"$RUN/project/.agents/skills/repo-agents/SKILL.md\\\",enabled=false},{path=\\\"$RUN/project/.codex/skills/repo-codex/SKILL.md\\\",enabled=false}]\" \"-c\" \"project_doc_max_bytes=0\" \"debug\" \"prompt-input\" \"EXCLUSION_PROBE\"]",
+      "exit": 0,
+      "presentMarkers": [
+        "APPROVED_SKILL",
+        "LATE_PROJECT_SKILL"
+      ]
+    },
+    "TestSkills/untrusted-baseline": {
+      "argv": "[\"$RUN/codex\" \"-c\" \"project_doc_max_bytes=0\" \"debug\" \"prompt-input\" \"EXCLUSION_PROBE\"]",
+      "exit": 0,
+      "presentMarkers": [
+        "APPROVED_SKILL",
+        "PROJECT_AGENTS_SKILL",
+        "PROJECT_CODEX_SKILL"
+      ]
+    }
+  },
+  "qualification": "incomplete; retained project skills and unmeasured lifecycle paths prevent strict-context certification",
+  "resume": {
+    "0": {
+      "exclusionQualified": false,
+      "reason": "project source missing from uncapped positive instrument baseline; no model turn or child",
+      "startAndResume": [
+        {
+          "approvalPolicy": "never",
+          "instructionSources": [
+            "$RUN/managed/AGENTS.md"
+          ],
+          "sandbox": {
+            "networkAccess": false,
+            "type": "readOnly"
+          }
+        },
+        {
+          "approvalPolicy": "never",
+          "instructionSources": [
+            "$RUN/managed/AGENTS.md"
+          ],
+          "sandbox": {
+            "networkAccess": false,
+            "type": "readOnly"
+          }
+        }
+      ],
+      "waitClean": true
+    },
+    "32768": {
+      "exclusionQualified": false,
+      "reason": "project source missing from uncapped positive instrument baseline; no model turn or child",
+      "startAndResume": [
+        {
+          "approvalPolicy": "never",
+          "instructionSources": [
+            "$RUN/managed/AGENTS.md"
+          ],
+          "sandbox": {
+            "networkAccess": false,
+            "type": "readOnly"
+          }
+        },
+        {
+          "approvalPolicy": "never",
+          "instructionSources": [
+            "$RUN/managed/AGENTS.md"
+          ],
+          "sandbox": {
+            "networkAccess": false,
+            "type": "readOnly"
+          }
+        }
+      ],
+      "waitClean": true
+    }
+  },
+  "sourceSHA256": {
+    ".research/project-exclusion-codex/mutants.sh": "2699fd08befed5e58d7b767f107a0890f248cc73a6cdf95f9c153ffe004fc187",
+    ".research/project-exclusion-codex/replay_test.go": "59c0105a6981a63589d4e15f2f2c7068ab16e6b8a7cdcf72ab4bd27b828df146",
+    ".research/project-exclusion-codex/testdata/mcp.py": "7ae250fa5b13bd9bff552bf8b8a5916500be616940fb8d38e8f55fcdd31ec9da"
+  },
+  "specInput": {
+    "sha256": "09e9800b31466bc4570519ce8e6234c15da7c15df681d05430612679db15522e",
+    "url": "https://raw.githubusercontent.com/relux-works/curator-spec/main/cips/CIP-0002-project-context-in-managed-launches.md"
+  },
+  "task": "TASK-261021-boww1n",
+  "vendor": {
+    "platform": "darwin/arm64",
+    "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+    "version": "codex-cli 0.162.1"
+  }
+}
