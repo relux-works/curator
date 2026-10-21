@@ -64,8 +64,34 @@ records remain untouched; fresh verdicts bind the current ruleset. Root and
 sibling files
 cannot lend capabilities or contribute findings to the selected skill.
 Successor installation audits the whole closure before publishing store
-entries. Managed-home and in-place skill links both use the selected package
-root. Existing in-place destinations are unchanged by this amendment.
+entries. Managed-home and native skill links now use a shared core section 3.1
+projection of the selected package, never its raw repository tree. The same
+`whitelist.WalkContext` selects audit Markdown and projection files;
+`whitelist.CopyContext` publishes that projection. Link and copy-fallback trees
+have identical paths and bytes. Repository-only files, fixed exclusions at any
+depth, runtime/build roots and exported scripts are absent from installed
+context; command-less scripts remain eligible.
+
+Projections live under `contexts/skill-context/core-3.1-v1/v<hash-version>/<digest>`.
+Planning and status only read files; materialization publishes a complete
+staged projection atomically and reuses its content-addressed store directory.
+Skills surface identities include `core-3.1-v1`, so old raw-root links and old
+markers become stale even when their file bytes happen to match. Native and
+managed repair replace Curator-recorded links without takeover. Missing
+projection stores are stale and rebuilt during repair. Identity migration also
+publishes projections before activating new links or fallback copies.
+
+The command publishers in `install/targets.go` and `runtimestore` continue to
+read snapshots and write independent runtime stores/build caches. No command
+dispatch path reads the profile skill link. Build inputs stay out of installed
+context and commit-keyed command runtime trees; generated artifacts stay in
+build caches. Legacy global/project context already uses `CopyContext` through
+`install.stageNode`; adapter discovery continues to publish that installed
+canonical tree. Profile-global operations share the profile publishers above.
+
+Audit ruleset 8 remains unchanged: this publication revision changes neither
+the audited bytes nor verdict cache identity. Publication identity is kept in
+projection paths and surface hashes, outside the audit cache key.
 Legacy global migration remains repository-root addressed and never infers a
 directory from layout.
 

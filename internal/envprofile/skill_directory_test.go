@@ -469,6 +469,17 @@ func directoryAssertLinks(t *testing.T, home, profile string, native map[string]
 			t.Fatalf("in-place materialization: %+v", r)
 		}
 	}
+	// Directory selection feeds the canonical core projection, shared by native
+	// and managed homes; sibling package bytes cannot become installed context.
+	lock, _, err := readLock(home, profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projection, err := projectSkill(home, root, lock.ContentHashVersion())
+	if err != nil {
+		t.Fatal(err)
+	}
+	root = projection.root
 	// NATSKILL places Codex skills directly in its native skills directory.
 	nativeLink := filepath.Join(native["codex_cli"], "skills", "formatter")
 	// Symlinks are preferred; Windows may use the protected fallback copy.

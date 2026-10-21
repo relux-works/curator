@@ -742,7 +742,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 			continue
 		}
 		skillLinks[path] = skill.root
-		skillHashes[path] = []byte(skill.hash)
+		skillHashes[path] = skillSurfaceIdentity(skill)
 		skillPaths = append(skillPaths, path)
 		want[path] = true
 	}
@@ -912,6 +912,11 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	}
 	if written {
 		marker.Surfaces[envmarker.SurfaceRootContext] = surface
+	}
+	for _, skill := range skills {
+		if err := publishSkillProjection(home, skill); err != nil {
+			return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
+		}
 	}
 	sort.Strings(skillPaths)
 	skillCopies := []envmarker.Copy{}

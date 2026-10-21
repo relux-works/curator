@@ -253,16 +253,20 @@ func mcpsOf(home string, manager *gitManager, lock *contextlock.Lock) ([]context
 	return servers, nil
 }
 
-// skillOf is one lock skill member with its store package root and content
-// hash.
+// skillOf plans one lock skill member: a raw source, projected store target,
+// projected content hash and the validated core context selection inputs.
 type skillOf struct {
-	name string
-	root string
-	hash string
+	name           string
+	root           string
+	hash           string
+	source         string
+	includeScripts bool
+	excludeRoots   []string
+	version        hashing.Version
 }
 
-// skillsOf loads the lock's skill members: entry package roots with their
-// store content hashes. A skill whose materialized name would collide with
+// skillsOf plans the lock's skill members as core context projections without
+// writing any store or installed state. A skill whose materialized name would collide with
 // the umbrella discovery namespace is refused with
 // environment_reserved_command_name (environments §9.4): profile-
 // materialized files must not be able to poison the PATH the §11 dispatch
@@ -283,11 +287,12 @@ func skillsOf(home string, manager *gitManager, lock *contextlock.Lock) ([]skill
 		if err := opaquescan.RefuseNULV1(root, lock.ContentHashVersion()); err != nil {
 			return nil, fmt.Errorf("%s: member %s %v", DiagRepairFailed, member.Name, err)
 		}
-		hash, err := hashing.ContentSHA256WithVersion(root, map[string]bool{}, lock.ContentHashVersion())
+		skill, err := projectSkill(home, root, lock.ContentHashVersion())
 		if err != nil {
 			return nil, fmt.Errorf("%s: member %s %v", DiagRepairFailed, member.Name, err)
 		}
-		skills = append(skills, skillOf{name: member.Name, root: root, hash: hash})
+		skill.name = member.Name
+		skills = append(skills, skill)
 	}
 	sort.Slice(skills, func(i, j int) bool { return skills[i].name < skills[j].name })
 	return skills, nil
@@ -303,6 +308,7 @@ func storeDocPath(home, profile, envID, rel string) string {
 // homePlan is the fully assembled managed home: every write, link, and
 // removal, with the marker recording them.
 type homePlan struct {
+	skillProjections []skillOf
 	credentialPolicy *effectiveCredentialPolicy
 	adapter          envregistry.Adapter
 	hashVersion      hashing.Version
@@ -357,6 +363,7 @@ func assembleHomeObserved(req *ResolveRequest, source Source, lock *contextlock.
 	}
 	isolation := credentialPolicy.isolation
 	plan := &homePlan{
+		skillProjections: skills,
 		credentialPolicy: credentialPolicy,
 		adapter:          adapter,
 		hashVersion:      lock.ContentHashVersion(),
@@ -1244,6 +1251,11 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	if _, err := managedDirectory(root, homeRel); err != nil {
 		return err
 	}
+	for _, skill := range plan.skillProjections {
+		if err := publishSkillProjection(req.Home, skill); err != nil {
+			return err
+		}
+	}
 	if err := plan.publishDocs(); err != nil {
 		return err
 	}
@@ -1834,6 +1846,12 @@ func verifyHomeObserved(req *ResolveRequest, adapter envregistry.Adapter, source
 	if err != nil {
 		verdict.reasons = append(verdict.reasons, fmt.Sprintf("expected home: %v", err))
 		return verdict
+	}
+	for _, skill := range plan.skillProjections {
+		if err := verifySkillProjection(req.Home, skill); err != nil {
+			verdict.reasons = append(verdict.reasons, "skill projection: "+err.Error())
+			verdict.mark(envmarker.SurfaceSkills, DiagSurfaceDrift)
+		}
 	}
 	verdict.plan = plan
 	if marker.HashVersion != plan.marker.HashVersion {
@@ -3046,8 +3064,8 @@ func (p *homePlan) systemPrompt(req *ResolveRequest, lock *contextlock.Lock, pre
 }
 
 // skills assembles the per-profile skills surface: one symlink per lock
-// skill member into its immutable store entry (§7.1, §7.4 matrix). The
-// surface hash binds each link to its entry's store content hash, so
+// skill member into its shared core context projection (§7.1, §7.4 matrix).
+// The surface hash binds the publication revision and projected bytes, so
 // identical inputs hash identically on every machine (§5.6). opencode
 // carries no skills surface: its skills target is the machine-global
 // native surface, split-brain by construction (§7.1).
@@ -3063,7 +3081,7 @@ func (p *homePlan) skills(req *ResolveRequest, skills []skillOf, surfaces map[st
 		path := p.adapter.SkillsDir + "/" + skill.name
 		paths = append(paths, path)
 		p.links[path] = skill.root
-		hashes[path] = []byte(skill.hash)
+		hashes[path] = skillSurfaceIdentity(skill)
 	}
 	surfaces[envmarker.SurfaceSkills] = envmarker.Surface{
 		Paths:         paths,
