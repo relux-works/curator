@@ -167,3 +167,32 @@ func TestDestinationReplaced(t *testing.T) {
 		t.Fatal("stale content survived the copy")
 	}
 }
+
+// Static path eligibility agrees with actual context copying for admitted
+// files, excluded descendants, root-name lookalikes and command-less scripts.
+func TestContextPathIncludedMatchesCopy(t *testing.T) {
+	files := map[string]string{
+		"SKILL.md": "guide", "references/guide.md": "guide", "references/README.md": "excluded",
+		"assets/build/a.md": "build", "assets/build-other/a.md": "guide", "references/runtime/a.md": "runtime",
+		"references/deep/tests/a.md": "excluded", "references-other/a.md": "outside", "notes.md": "outside",
+		"scripts/a.md": "script", "scripts/README.md": "excluded",
+	}
+	for _, scripts := range []bool{false, true} {
+		snapshot := t.TempDir()
+		lay(t, snapshot, files)
+		roots := ContextExcludedRoots([]string{"references/runtime"}, []string{"assets/build"})
+		copied, err := CopyContext(snapshot, filepath.Join(t.TempDir(), "ctx"), scripts, roots)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]bool{}
+		for _, file := range copied {
+			got[file] = true
+		}
+		for file := range files {
+			if eligible := ContextPathIncluded(file, scripts, roots); eligible != got[file] {
+				t.Errorf("%s: eligible=%v copied=%v", file, eligible, got[file])
+			}
+		}
+	}
+}

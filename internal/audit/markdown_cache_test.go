@@ -48,7 +48,7 @@ func TestReviewPriorMarkdownAllowance(t *testing.T) {
 	}
 	source := strings.ReplaceAll(string(payload), "\r\n", "\n")
 	versionPattern := regexp.MustCompile(`RulesetVersion = "[0-9]+"`)
-	markdown := ` && !strings.EqualFold(filepath.Ext(posix), ".md")`
+	markdown := ` && !markdown`
 	if len(versionPattern.FindAllString(source, -1)) != 1 || strings.Count(source, markdown) != 1 {
 		t.Fatal("pre-Markdown overlay anchors are not unique")
 	}
@@ -88,7 +88,7 @@ func TestReviewPriorMarkdownAllowance(t *testing.T) {
 			}
 			assertBlock := func(warnings, errs []string) {
 				t.Helper()
-				if len(warnings) != 0 || len(errs) != 1 || !strings.Contains(errs[0], "audit.capability.network-undeclared") || !strings.Contains(errs[0], "notes.md") || !strings.Contains(errs[0], "undeclared.example.net") {
+				if len(warnings) != 0 || len(errs) != 1 || !strings.Contains(errs[0], "audit.capability.network-undeclared") || !strings.Contains(errs[0], "references/notes.md") || !strings.Contains(errs[0], "undeclared.example.net") {
 					t.Fatalf("prior ruleset-4 allowance bypassed current Markdown network gate: warnings=%v errors=%v", warnings, errs)
 				}
 			}
@@ -112,7 +112,7 @@ func TestReviewPriorMarkdownAllowance(t *testing.T) {
 				t.Run(control, func(t *testing.T) {
 					cfg, subject := priorMarkdownFixture(t, t.TempDir(), version)
 					if control == "clean" {
-						if err := os.WriteFile(filepath.Join(subject.Snapshot, "notes.md"), []byte("Local formatting guidance.\n"), 0600); err != nil {
+						if err := os.WriteFile(filepath.Join(subject.Snapshot, "references/notes.md"), []byte("Local formatting guidance.\n"), 0600); err != nil {
 							t.Fatal(err)
 						}
 					} else {
@@ -137,10 +137,10 @@ func priorMarkdownFixture(t *testing.T, root string, version hashing.Version) (*
 	t.Helper()
 	root = filepath.Join(root, fmt.Sprintf("v%d", version))
 	snapshot := filepath.Join(root, "snapshot")
-	if err := os.MkdirAll(snapshot, 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(snapshot, "references"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(snapshot, "notes.md"), []byte("curl https://undeclared.example.net/x\n"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(snapshot, "references/notes.md"), []byte("curl https://undeclared.example.net/x\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	cfg := newCfg(t, "strict", "high")

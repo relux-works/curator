@@ -26,6 +26,7 @@ import (
 	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/scriptpolicy"
 	"github.com/relux-works/curator/internal/skillspec"
+	"github.com/relux-works/curator/internal/whitelist"
 )
 
 // Severities and decisions (Spec §12.1, §12.2).
@@ -50,7 +51,7 @@ var severityRank = map[string]int{
 // backend and model (Spec §12.1).
 const (
 	PromptVersion  = "1"
-	RulesetVersion = "5"
+	RulesetVersion = "6"
 )
 
 // findingOpaqueNUL is the shared opaque-NUL finding id: every v1
@@ -820,6 +821,16 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
 		manifestName = "csk-skill.json"
 	}
 
+	// Only a validated manifest can remove declared runtime/build subtrees.
+	// Invalid manifests are rejected by package validation; direct audit callers
+	// still get the conservative command-less context without root exclusions.
+	includeScripts := true
+	var excludeRoots []string
+	if spec, err := skillspec.Load(snapshot); err == nil {
+		includeScripts = len(spec.Commands) == 0
+		excludeRoots = whitelist.ContextExcludedRoots(spec.RuntimeRoots, spec.BuildRoots)
+	}
+
 	_ = filepath.WalkDir(snapshot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() {
 			return nil
@@ -829,9 +840,13 @@ func detectWithOpaquePaths(snapshot string, caps capabilities.Manifest, opaquePa
 			return nil
 		}
 		posix := filepath.ToSlash(rel)
-		// Markdown is package source too: URLs in SKILL.md and guidance
-		// files must not bypass network declarations (CIP-0021 vectors).
-		if !strings.HasPrefix(posix, "scripts/") && posix != manifestName && !strings.EqualFold(filepath.Ext(posix), ".md") {
+		// Markdown contacts matter only in agent-facing context (core §3).
+		// The historical non-Markdown scripts/manifest surface is unchanged.
+		markdown := strings.EqualFold(filepath.Ext(posix), ".md")
+		if markdown && !whitelist.ContextPathIncluded(posix, includeScripts, excludeRoots) {
+			return nil
+		}
+		if !strings.HasPrefix(posix, "scripts/") && posix != manifestName && !markdown {
 			return nil
 		}
 		payload, readErr := os.ReadFile(path) // #nosec G304 -- walked snapshot
