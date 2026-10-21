@@ -21,8 +21,10 @@ func TestNetworkContactNarrowingMutants(t *testing.T) {
 		{"markdown-scripts-always-visible", "internal/audit/audit.go", `includeScripts = len(spec.Commands) == 0`, `includeScripts = true`, "./internal/audit", "^TestMarkdownScopeScriptsAndManifest$/^exports$", "TestMarkdownScopeScriptsAndManifest/exports", "excluded Markdown refused"},
 		{"markdown-scripts-never-visible", "internal/audit/audit.go", `includeScripts = len(spec.Commands) == 0`, `includeScripts = false`, "./internal/audit", "^TestMarkdownScopeScriptsAndManifest$/^commandless$", "TestMarkdownScopeScriptsAndManifest/commandless", "visible Markdown verdict"},
 
-		{"markdown-everywhere", "internal/audit/audit.go", `if markdown && !whitelist.ContextPathIncluded(posix, includeScripts, excludeRoots) {`, `if markdown && false && !whitelist.ContextPathIncluded(posix, includeScripts, excludeRoots) {`, "./internal/audit", "^TestMarkdownScopeRepositoryNoise$", "TestMarkdownScopeRepositoryNoise", "excluded Markdown refused"},
-		{"markdown-drop-references", "internal/audit/audit.go", `if markdown && !whitelist.ContextPathIncluded(posix, includeScripts, excludeRoots) {`, `if markdown && (strings.HasPrefix(posix, "references/") || !whitelist.ContextPathIncluded(posix, includeScripts, excludeRoots)) {`, "./internal/audit", "^TestMarkdownScopeVisibleContacts$/^references/guide.md$", "TestMarkdownScopeVisibleContacts/references/guide.md", "visible Markdown verdict"},
+		{"markdown-everywhere", "internal/audit/audit.go", `if markdown {`, `if false && markdown {`, "./internal/audit", "^TestMarkdownScopeRepositoryNoise$", "TestMarkdownScopeRepositoryNoise", "excluded Markdown refused"},
+		{"markdown-drop-references", "internal/audit/audit.go", `return scan(path, posix) // Agent-facing Markdown.`, `if strings.HasPrefix(posix, "references/") { return nil }; return scan(path, posix) // Agent-facing Markdown.`, "./internal/audit", "^TestMarkdownScopeVisibleContacts$/^references/guide.md$", "TestMarkdownScopeVisibleContacts/references/guide.md", "visible Markdown verdict"},
+		{"markdown-case-sensitive-entry", "internal/audit/audit.go", "", "", "./internal/audit", "^TestMarkdownScopeCaseAliases$", "TestMarkdownScopeCaseAliases/", "visible Markdown verdict"},
+		{"markdown-reuse-ruleset-six", "internal/audit/audit.go", `RulesetVersion = "` + RulesetVersion + `"`, `RulesetVersion = "6"`, "./internal/audit", "^TestMarkdownScopeInvalidatesRulesetSixAllowance$", "TestMarkdownScopeInvalidatesRulesetSixAllowance/", "visible Markdown verdict"},
 		{"markdown-reuse-ruleset-five", "internal/audit/audit.go", `RulesetVersion = "` + RulesetVersion + `"`, `RulesetVersion = "5"`, "./internal/audit", "^TestMarkdownScopeInvalidatesRulesetFive$", "TestMarkdownScopeInvalidatesRulesetFive/", "stale Markdown refusal reused"},
 
 		{"full-url-percent-path", "internal/audit/audit.go", `\\\\/?#`, `\\\\`, "./internal/audit", "^TestNetworkContactNormalizationBoundaries$/^percent-path-real$", "TestNetworkContactNormalizationBoundaries/percent-path-real", "URL classification: []"},
@@ -34,18 +36,28 @@ func TestNetworkContactNarrowingMutants(t *testing.T) {
 	}
 	for _, mutant := range mutants {
 		t.Run(mutant.name, func(t *testing.T) {
+			if strings.Contains(mutant.name, "case-sensitive-entry") || strings.Contains(mutant.name, "ruleset-six") {
+				if !caseInsensitiveSnapshot(t, t.TempDir()) {
+					t.Skip("alias control requires a case-insensitive filesystem")
+				}
+			}
 			original := filepath.Join(root, filepath.FromSlash(mutant.file))
 			payload, err := os.ReadFile(original)
 			if err != nil {
 				t.Fatal(err)
 			}
 			source := strings.ReplaceAll(string(payload), "\r\n", "\n")
-			if strings.Count(source, mutant.before) != 1 {
-				t.Fatal("mutation anchor is not unique")
+			if mutant.name == "markdown-case-sensitive-entry" {
+				source = rulesetSixSource(t, source)
+			} else {
+				if strings.Count(source, mutant.before) != 1 {
+					t.Fatal("mutation anchor is not unique")
+				}
+				source = strings.Replace(source, mutant.before, mutant.after, 1)
 			}
 			dir := t.TempDir()
 			replacement := filepath.Join(dir, "replacement.go")
-			if err := os.WriteFile(replacement, []byte(strings.Replace(source, mutant.before, mutant.after, 1)), 0600); err != nil {
+			if err := os.WriteFile(replacement, []byte(source), 0600); err != nil {
 				t.Fatal(err)
 			}
 			overlay, err := json.Marshal(map[string]any{"Replace": map[string]string{original: replacement}})

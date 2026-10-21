@@ -45,13 +45,34 @@ func CopyContext(snapshot, destination string, includeScripts bool, excludeRoots
 		return nil, err
 	}
 
+	var copied []string
+	err := WalkContext(snapshot, includeScripts, excludeRoots, func(path, posix string) error {
+		if err := copyFile(path, filepath.Join(destination, filepath.FromSlash(posix))); err != nil {
+			return err
+		}
+		copied = append(copied, posix)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(copied)
+	return copied, nil
+}
+
+// WalkContext visits exactly the files CopyContext can publish, with their
+// source paths and destination-relative POSIX names. Root lookup uses the same
+// canonical names on every filesystem: aliases resolve only where the host
+// resolves them. Descendant names and exclusions retain case-sensitive protocol
+// comparison. Audit callers must use this walk rather than match directory-entry
+// spellings from a separate snapshot walk.
+func WalkContext(snapshot string, includeScripts bool, excludeRoots []string, visit func(path, posix string) error) error {
 	roots := append([]string(nil), IncludeRoots...)
 	if includeScripts {
 		roots = append(roots, "scripts")
 	}
 	sort.Strings(roots)
 
-	var copied []string
 	for _, root := range roots {
 		src := filepath.Join(snapshot, root)
 		info, err := os.Stat(src)
@@ -62,10 +83,9 @@ func CopyContext(snapshot, destination string, includeScripts bool, excludeRoots
 			continue
 		}
 		if !info.IsDir() {
-			if err := copyFile(src, filepath.Join(destination, root)); err != nil {
-				return nil, err
+			if err := visit(src, root); err != nil {
+				return err
 			}
-			copied = append(copied, root)
 			continue
 		}
 		err = filepath.WalkDir(src, func(path string, entry fs.DirEntry, err error) error {
@@ -86,18 +106,16 @@ func CopyContext(snapshot, destination string, includeScripts bool, excludeRoots
 			if !ContextPathIncluded(posix, includeScripts, excludeRoots) {
 				return nil
 			}
-			if err := copyFile(path, filepath.Join(destination, rel)); err != nil {
+			if err := visit(path, posix); err != nil {
 				return err
 			}
-			copied = append(copied, posix)
 			return nil
 		})
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	sort.Strings(copied)
-	return copied, nil
+	return nil
 }
 
 // ContextExcludedRoots returns the sorted union of runtime and build roots

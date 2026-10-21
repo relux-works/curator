@@ -1,8 +1,11 @@
 package envprofile
 
 import (
+	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -58,6 +61,140 @@ func TestProfileInstallMarkdownScope(t *testing.T) {
 			}
 			if _, err := os.Stat(lockPath(home, "scope-profile")); err != nil {
 				t.Fatalf("successful install published no lock: %v", err)
+			}
+		})
+	}
+}
+
+// The built CLI with explicit strict/high audit rejects all nine root aliases
+// before lock publication or native-context exposure on case-insensitive hosts.
+// Canonical undeclared contacts also refuse, whereas research noise and declared
+// contacts install and expose the expected bytes through the native Claude home.
+func TestProfileInstallMarkdownCaseAliasesCLI(t *testing.T) {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	binary := filepath.Join(t.TempDir(), "curator")
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
+	build := exec.Command("go", "build", "-o", binary, "./cmd/curator")
+	build.Dir = root
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build exact-source CLI: %v\n%s", err, output)
+	}
+	probe := t.TempDir()
+	if err := os.WriteFile(filepath.Join(probe, "case-probe"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	_, aliasErr := os.Stat(filepath.Join(probe, "CASE-PROBE"))
+	insensitive := aliasErr == nil
+	cases := []struct {
+		file, published          string
+		declared, allowed, alias bool
+	}{
+		{"SKILL.MD", "SKILL.md", false, false, true},
+		{"References/guide.md", "references/guide.md", false, false, true},
+		{"AGENTS/guide.md", "agents/guide.md", false, false, true},
+		{"ASSETS/guide.md", "assets/guide.md", false, false, true},
+		{".SKILL_TRIGGERS/guide.md", ".skill_triggers/guide.md", false, false, true},
+		{"Templates/guide.md", "templates/guide.md", false, false, true},
+		{"Examples/guide.md", "examples/guide.md", false, false, true},
+		{"Data/guide.md", "data/guide.md", false, false, true},
+		{"Scripts/guide.md", "scripts/guide.md", false, false, true},
+		{"SKILL.md", "SKILL.md", false, false, false},
+		{"references/guide.md", "references/guide.md", false, false, false},
+		{"assets/guide.md", "assets/guide.md", false, false, false},
+		{"references/guide.md", "references/guide.md", true, true, false},
+		{".research/notes.md", "", false, true, false},
+		{"References/guide.md", "references/guide.md", true, true, true},
+	}
+	for _, tc := range cases {
+		name := tc.file
+		if tc.declared {
+			name += "-declared"
+		}
+		t.Run(name, func(t *testing.T) {
+			if tc.alias && !insensitive {
+				t.Skip("root alias CLI witness requires a case-insensitive filesystem; gate/copy tests cover sensitive hosts")
+			}
+			home := t.TempDir()
+			pinOperatorHome(t, home)
+			homes := pinHomes(t)
+			ids := newGitIdentities(t)
+			caps := `{}`
+			if tc.declared {
+				caps = `{"network":["api.example.net"]}`
+			}
+			frontmatter := "---\nname: scoped-guide\ndescription: Markdown alias fixture\n---\n# Guide\n"
+			files := map[string]string{
+				"SKILL.md":                    frontmatter,
+				"agent-skill.json":            `{"schema_version":3,"capabilities":` + caps + `}`,
+				".research/history.md":        "Source https://history.example.net/notes\n",
+				".task-board/.resources/x.md": "Source https://history.example.net/board\n",
+			}
+			if tc.file == "SKILL.MD" {
+				delete(files, "SKILL.md")
+			}
+			if tc.published == "SKILL.md" {
+				files[tc.file] = frontmatter + "Read https://api.example.net/guide\n"
+			} else {
+				files[tc.file] = "Read https://api.example.net/guide\n"
+			}
+			skill := gitRepo(t, files, "v1.0.0")
+			operand := ids.serve(skill, "https://example.com/skills/scoped-guide")
+			profile := t.TempDir()
+			writeManifestPackage(t, profile, `{"schema_version":1,"name":"scope-profile","version":"1.0.0","requires":{"skills":{"scoped-guide":{"git":"`+operand+`","range":"*"}}}}`, nil)
+			configPath := filepath.Join(home, "config.json")
+			configBytes, err := json.Marshal(map[string]any{"schema_version": 1, "skills_root": filepath.Join(home, "skills"), "projects": map[string]any{}, "audit": map[string]any{"enabled": true, "mode": "strict", "fail_on": "high", "backend": "null"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(configPath, configBytes, 0600); err != nil {
+				t.Fatal(err)
+			}
+			systemPath := filepath.Join(home, "system.json")
+			if err := os.WriteFile(systemPath, []byte(`{"schema_version":1}`), 0600); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("CURATOR_CONFIG", configPath)
+			t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
+			command := exec.Command(binary, "profile", "install", profile)
+			output, err := command.CombinedOutput()
+			if !tc.allowed {
+				exit, ok := err.(*exec.ExitError)
+				if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "audit.capability.network-undeclared") || !strings.Contains(string(output), tc.published) {
+					t.Fatalf("CLI alias not specifically refused: %v\n%s", err, output)
+				}
+				for _, path := range []string{sourcePath(home, "scope-profile"), lockPath(home, "scope-profile")} {
+					if _, err := os.Stat(path); !os.IsNotExist(err) {
+						t.Fatalf("refused CLI published profile metadata: %v", err)
+					}
+				}
+				// Follow the expected native skill link, which would expose the attack
+				// bytes after a successful install; absence is required on refusal.
+				if _, err := os.Stat(filepath.Join(homes["claude_code"], "skills", "scoped-guide")); !os.IsNotExist(err) {
+					t.Fatalf("refused CLI exposed native skill context: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("CLI positive control refused: %v\n%s", err, output)
+			}
+			if _, err := os.Stat(lockPath(home, "scope-profile")); err != nil {
+				t.Fatalf("successful CLI omitted lock: %v", err)
+			}
+			native := filepath.Join(homes["claude_code"], "skills", "scoped-guide", "SKILL.md")
+			if tc.published != "" {
+				native = filepath.Join(homes["claude_code"], "skills", "scoped-guide", filepath.FromSlash(tc.published))
+			}
+			payload, err := os.ReadFile(native)
+			if err != nil {
+				t.Fatalf("successful control omitted native context: %v", err)
+			}
+			if tc.published != "" && !strings.Contains(string(payload), "https://api.example.net/guide") {
+				t.Fatal("declared control lost contact bytes")
 			}
 		})
 	}
