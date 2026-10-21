@@ -22,7 +22,11 @@ func caseInsensitiveSnapshot(t *testing.T, root string) bool {
 	if err := os.WriteFile(path, nil, 0600); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(path)
+	defer func() {
+		if err := os.Remove(path); err != nil {
+			t.Error(err)
+		}
+	}()
 	_, err := os.Stat(filepath.Join(root, "CASE-PROBE"))
 	return err == nil
 }
@@ -176,7 +180,7 @@ func TestMarkdownScopeInvalidatesRulesetSixAllowance(t *testing.T) {
 		root = t.TempDir()
 	}
 	if !caseInsensitiveSnapshot(t, root) {
-		t.Skip("ruleset-6 alias allowance requires a case-insensitive filesystem")
+		t.Skip("test filesystem is case-sensitive: ruleset-6 alias allowance requires case folding")
 	}
 	if seed == "" {
 		sourcePath, err := filepath.Abs("audit.go")

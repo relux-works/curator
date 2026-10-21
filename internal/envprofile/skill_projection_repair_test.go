@@ -312,7 +312,11 @@ func TestSkillProjectionRebuildRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer op.close()
+	defer func() {
+		if err := op.close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	pending, err = op.engine.PendingRecovery(op.lock)
 	if err != nil || pending {
 		t.Fatalf("recovery did not clear journal: %v %t", err, pending)

@@ -516,7 +516,11 @@ func TestSkillProjectionFallbackRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer op.close()
+	defer func() {
+		if err := op.close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	if err := publishSkillFallback(op, root, rel, source); err != nil {
 		t.Fatal(err)
 	}
@@ -589,7 +593,11 @@ func publishTestSkillProjection(t *testing.T, home string, skill skillOf) error 
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer op.close()
+	defer func() {
+		if err := op.close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	return publishSkillProjection(op, home, skill)
 }
 
@@ -599,6 +607,10 @@ func materializeTestScope(t *testing.T, home, profile, environment string, polic
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer op.close()
+	defer func() {
+		if err := op.close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	return materializeScopeWithNativeHome(op, home, profile, environment, policy, nativeHomeOf)
 }

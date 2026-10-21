@@ -43,7 +43,7 @@ func projectSkill(home, source string, version hashing.Version) (skillOf, error)
 		excludeRoots: whitelist.ContextExcludedRoots(spec.RuntimeRoots, spec.BuildRoots), version: version}
 	files := map[string][]byte{}
 	err = whitelist.WalkContext(source, skill.includeScripts, skill.excludeRoots, func(path, posix string) error {
-		body, err := os.ReadFile(path)
+		body, err := os.ReadFile(path) // #nosec G304 -- canonical file selected by the shared snapshot context walker
 		if err != nil {
 			return err
 		}
@@ -64,7 +64,7 @@ func projectSkill(home, source string, version hashing.Version) (skillOf, error)
 // publishSkillProjection runs only during materialization under its mutation
 // lock. A complete private staging tree is renamed into the shared store;
 // raw package snapshots and command/runtime stores remain untouched.
-func publishSkillProjection(op *operation, home string, skill skillOf) error {
+func publishSkillProjection(op *operation, home string, skill skillOf) (resultErr error) {
 	parent := filepath.Dir(skill.root)
 	if err := privatedir.MakeAll(parent); err != nil {
 		return err
@@ -92,7 +92,7 @@ func publishSkillProjection(op *operation, home string, skill skillOf) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(staging)
+	defer func() { resultErr = errors.Join(resultErr, os.RemoveAll(staging)) }()
 	if _, err := whitelist.CopyContext(skill.source, staging, skill.includeScripts, skill.excludeRoots); err != nil {
 		return err
 	}
@@ -158,7 +158,7 @@ func recordedSkillFallback(prior *envmarker.Marker, path string) bool {
 // Replace the complete copied tree through the existing recoverable entry
 // transaction. Overlay-copying would retain excluded files from the old tree;
 // renaming a symlink over a non-empty directory is unavailable on some hosts.
-func publishSkillFallback(op *operation, root, rel, source string) error {
+func publishSkillFallback(op *operation, root, rel, source string) (resultErr error) {
 	live, err := managedPath(root, rel, true)
 	if err != nil {
 		return err
@@ -167,7 +167,7 @@ func publishSkillFallback(op *operation, root, rel, source string) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(stage)
+	defer func() { resultErr = errors.Join(resultErr, os.RemoveAll(stage)) }()
 	stageRel, err := managedRelative(root, stage)
 	if err != nil {
 		return err

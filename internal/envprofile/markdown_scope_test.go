@@ -68,6 +68,7 @@ func TestProfileInstallMarkdownScope(t *testing.T) {
 
 // The built CLI with explicit strict/high audit rejects all nine root aliases
 // before lock publication or native-context exposure on case-insensitive hosts.
+// Case-sensitive directory aliases install without publishing their bytes.
 // Canonical undeclared contacts also refuse, whereas research noise and declared
 // contacts install and expose the expected bytes through the native Claude home.
 func TestProfileInstallMarkdownCaseAliasesCLI(t *testing.T) {
@@ -116,8 +117,12 @@ func TestProfileInstallMarkdownCaseAliasesCLI(t *testing.T) {
 			name += "-declared"
 		}
 		t.Run(name, func(t *testing.T) {
+			if tc.alias && !insensitive && tc.file == "SKILL.MD" {
+				t.Skip("test filesystem is case-sensitive: root entry alias requires case folding; copy test asserts missing canonical entry refusal")
+			}
+			allowed, published := tc.allowed, tc.published
 			if tc.alias && !insensitive {
-				t.Skip("root alias CLI witness requires a case-insensitive filesystem; gate/copy tests cover sensitive hosts")
+				allowed, published = true, ""
 			}
 			home := t.TempDir()
 			pinOperatorHome(t, home)
@@ -162,7 +167,7 @@ func TestProfileInstallMarkdownCaseAliasesCLI(t *testing.T) {
 			t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
 			command := exec.Command(binary, "profile", "install", profile)
 			output, err := command.CombinedOutput()
-			if !tc.allowed {
+			if !allowed {
 				exit, ok := err.(*exec.ExitError)
 				if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "audit.capability.network-undeclared") || !strings.Contains(string(output), tc.published) {
 					t.Fatalf("CLI alias not specifically refused: %v\n%s", err, output)
@@ -186,14 +191,24 @@ func TestProfileInstallMarkdownCaseAliasesCLI(t *testing.T) {
 				t.Fatalf("successful CLI omitted lock: %v", err)
 			}
 			native := filepath.Join(homes["claude_code"], "skills", "scoped-guide", "SKILL.md")
-			if tc.published != "" {
-				native = filepath.Join(homes["claude_code"], "skills", "scoped-guide", filepath.FromSlash(tc.published))
+			if published != "" {
+				native = filepath.Join(homes["claude_code"], "skills", "scoped-guide", filepath.FromSlash(published))
 			}
 			payload, err := os.ReadFile(native)
 			if err != nil {
 				t.Fatalf("successful control omitted native context: %v", err)
 			}
-			if tc.published != "" && !strings.Contains(string(payload), "https://api.example.net/guide") {
+			if tc.alias && !insensitive {
+				for _, path := range []string{tc.file, tc.published} {
+					if _, err := os.Stat(filepath.Join(homes["claude_code"], "skills", "scoped-guide", filepath.FromSlash(path))); !os.IsNotExist(err) {
+						t.Fatalf("case-sensitive alias reached native context: %s: %v", path, err)
+					}
+				}
+				if strings.Contains(string(payload), "https://api.example.net/guide") {
+					t.Fatal("case-sensitive alias contact reached native entry")
+				}
+			}
+			if published != "" && !strings.Contains(string(payload), "https://api.example.net/guide") {
 				t.Fatal("declared control lost contact bytes")
 			}
 		})
