@@ -99,11 +99,11 @@ func runMuseProducerOverlay(t *testing.T, file, before, after, pkg, test string)
 // on both repair and already-current resolve. This is a positive control.
 func TestMuseRootContextCopyFallback(t *testing.T) {
 	output, err := runMuseProducerOverlay(t, "internal/envprofile/managed.go",
-		"rel := managedJoin(homeRel, path)\n\t\tif err := atomicManagedLink(root, rel, target); err != nil {",
-		`rel := managedJoin(homeRel, path)
-        var linkErr error
+		"if err := atomicManagedLink(root, rel, target); err != nil {\n\t\t\tvar unavailable *errSymlinkUnavailable",
+		`var linkErr error
         if path == "config/muse/AGENTS.md" { linkErr = &errSymlinkUnavailable{err: os.ErrPermission} } else { linkErr = atomicManagedLink(root, rel, target) }
-        if err := linkErr; err != nil {`,
+        if err := linkErr; err != nil {
+            var unavailable *errSymlinkUnavailable`,
 		"./cmd/curator", "TestMuseRootContextVectors/monolithic")
 	if err != nil || !strings.Contains(string(output), "verified copied root") {
 		t.Fatalf("copy fallback did not qualify: %v\n%s", err, output)
