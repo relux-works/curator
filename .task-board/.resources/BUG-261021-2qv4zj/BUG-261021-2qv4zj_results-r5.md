@@ -1,0 +1,758 @@
+# BUG-261021-2qv4zj results r5
+
+Branch: fix/audit-markdown-scope
+Head: e32d101e1f29cc98be75f285554bd017d1e00568
+Round base: a2244ec13e223e3d6f5b96cc11ba22829bc6a2a2
+
+Changelog: Explicit profile repair now rebuilds damaged skill projections from pinned store entries through verified, recoverable whole-directory replacement.
+
+The assigned task and all ten precondition resources were verified and read before acknowledgment. The full r4 review and companion probe were read. The unchanged probe ran first and reproduced six repair-convergence failures, with four intact/missing-directory controls passing. Board status remains owned by the orchestrator.
+
+## Change
+
+Only an identity mismatch in a regular link-free projection enters rebuilding. Existing boundary and legacy-framing refusals still stop publication. Intact projections are reused. Rebuilding captures the old preimage, stages one canonical CopyContext projection from the pinned source, and checks the planned digest before preparing any transaction. A staged mismatch returns the identifiable sentinel ErrSkillProjectionIdentity, removes scratch, and preserves the old directory and source. No retry loop is added.
+
+The existing transaction engine replaces complete directories through durable staging, preimage checking, backup, commit and recovery. There is no in-place overlay copy. The held operation is passed through managed, native, global and identity-migration publishers so they use the same lock and journal. The managed repair wrapper preserves the error chain with %w. Shared consumers keep the same projected path and reuse it after one rebuild.
+
+Audit scope, ruleset 8, cache identity, commands and runtime sources are unchanged. Projection version core-3.1-v1 stays unchanged because valid bytes and surface identity are unchanged. This round changes recovery of a stale regular tree.
+
+## Files changed
+
+| Files | Purpose |
+| --- | --- |
+| internal/envprofile/skill_projection.go | Bounded rebuild, staged identity check, held transaction and identity sentinel. |
+| internal/envprofile/managed.go | Pass operation to publication/migration/native repair and preserve publication error chain. |
+| internal/envprofile/switch.go, native_skills.go, global.go, envprofile.go, identity_migration.go, migrate.go | Carry the already-held operation through existing publishers without reacquiring production locks. |
+| internal/envprofile/skill_projection_repair_test.go | Six new tests for repair, refusal, rollback, recovery, shared reuse and native publication. |
+| internal/envprofile/skill_projection_test.go | Real lock witnesses in helpers; changed-byte test now requires stale detection and rebuilding. Link, framing and fallback controls retained. |
+| internal/envprofile/skill_projection_mutants_test.go | Two new controls, adapted existing error anchors, exactly six required failures for omitted rebuild. |
+| internal/envprofile/credential_projection_test.go, nul_opaque_v1_commit_test.go | Supply operation through changed internal signatures, preserving original assertions. |
+| docs/profile-skill-directories.md | Document rebuilding, typed refusal and shared reuse. |
+
+## Test claims
+
+Each new test carries its claim beside the test. Fixtures use disposable homes and store entries.
+
+| Test | Claim and limits |
+| --- | --- |
+| Supplied TestReviewerProjectionRepair | Unchanged reviewer probe reproduces six failures at round base and passes all ten cases at final head. |
+| TestProfileSkillProjectionDamagedStore | Missing/extra/changed files for both adapters stay stale under plain resolve/status without changing the projection; explicit Resolve repair restores the complete original byte map. Intact/missing-directory controls pass. |
+| TestSkillProjectionRebuildSourceRefusal | Input changed after planning yields ErrSkillProjectionIdentity before transaction preparation, preserves old tree and input, removes staging, and clean retry succeeds. Tests the publisher guard, not arbitrary external repository reconstruction. |
+| TestSkillProjectionRebuildRollback | Faults after backup, installation and committed-state publication restore the exact old tree; clean retry verifies. Install hooks observe a complete correct target. |
+| TestSkillProjectionRebuildRecovery | Intended cleanup interruption leaves a verified tree and pending durable journal. Fresh operation recovers without source or caller staging. Persisted-journal recovery, not a process-kill experiment. |
+| TestSkillProjectionSharedRebuild | Two real profiles share a target. First repair commits one replacement; second resolves current and performs no rebuild on explicit repair. Both adapters covered. |
+| TestSkillProjectionNativeRebuild | Native materialization for both adapters diagnoses damage, rebuilds through the held operation, and converges native currentness plus projected identity. |
+| TestSkillProjectionStoreReuse | Intact reuse and changed-byte recovery; links/linked destinations retain intended refusal and untouched targets; changed source cannot publish under old pin. |
+| TestSkillProjectionNarrowingMutants | Fifteen overlays require exit 1 and the named intended assertion. Omitted rebuild must fail all six repair cases; bypassed staged identity must fail preservation/refusal coverage. Thirteen previous publication/currentness/framing controls remain. Setup errors do not count. |
+| Full default suite | Inventory reconciliation runs every discovered top-level test/example/fuzz target exactly once, including all previous audit, alias, context, cache, projection, migration, command/runtime and transaction regressions. Skips separate from passes. |
+
+## Validation environment
+
+Normal .git validation clone at e32d101e1f29cc98be75f285554bd017d1e00568, private HOME/GOCACHE/GOPATH/module cache, TMPDIR=GOTMPDIR=/tmp/cw-dev3. Go 1.25.5 on Darwin arm64. Every Go test unsets GIT_DIR/GIT_WORK_TREE. Test PATH excludes operator provider CLIs. No Windows or case-sensitive-filesystem run is claimed. This narrow r5 brief requires the full default suite; no new pinned conformance run or hosted-CI result is claimed.
+
+Build, vet and unchanged reviewer probe at final head: exit 0.
+
+{
+  "head": "e32d101e1f29cc98be75f285554bd017d1e00568",
+  "complete": true,
+  "packages": 85,
+  "expected": 3600,
+  "actual": 3600,
+  "missing": [],
+  "extra": [],
+  "counts": {
+    "pass": 11784,
+    "skip": 199,
+    "fail": 0
+  },
+  "failures": [],
+  "packageVerdicts": {
+    "pass": 80,
+    "skip": 5
+  },
+  "groups": 39
+}
+
+Initial new-test compilation had two incorrect test-only field references; that setup failure was corrected and earns no passing credit. Expected-red reviewer baseline also earns no passing credit. Preliminary and final command exits are listed below. No production changes occurred after the signed validation head.
+
+## Commands and exit codes
+
+Neutral path aliases: $WORKTREE is the owning checkout, $VALIDATION the disposable normal checkout, $SCRATCH task scratch. $CURATOR_GO is the pinned Go executable. Each test invocation is bounded below ten minutes. Four queues run package groups, CLI shards are serial, and the authoritative dry-run witness runs after every CLI-building queue.
+
+### baseline-reviewer
+
+CWD: `$WORKTREE`. Exit: 1. Duration: 15.76s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -overlay .temp/BUG-261021-2qv4zj/reviewer-overlay.json -count=1 -v ./internal/envprofile -run '^TestReviewerProjectionRepair$'
+```
+
+### default-env-guard
+
+CWD: `$WORKTREE`. Exit: 0. Duration: 0.14s.
+
+```sh
+/usr/bin/python3 -c 'import os,subprocess; flags=subprocess.check_output([os.environ["CURATOR_GO"],"env","GOFLAGS"],text=True); assert "overlay" not in flags; assert "GIT_DIR" not in os.environ and "GIT_WORK_TREE" not in os.environ; print("Default test context: no inherited Git target or Go overlay")'
+```
+
+### final-build
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 5.41s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO build ./...
+```
+
+### final-inventory
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 13.58s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -list . -timeout=8m ./...
+```
+
+### final-reviewer
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 9.85s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -overlay $SCRATCH/final-reviewer-overlay.json -count=1 -v ./internal/envprofile -run '^TestReviewerProjectionRepair$'
+```
+
+### final-vet
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 5.23s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO vet ./...
+```
+
+### focused-projection
+
+CWD: `$WORKTREE`. Exit: 0. Duration: 73.94s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -v -timeout=8m ./internal/envprofile -run '^(TestSkillProjection|TestProfileSkillProjection)'
+```
+
+### focused-rebuild-controls
+
+CWD: `$WORKTREE`. Exit: 0. Duration: 57.94s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -v -timeout=8m ./internal/envprofile -run '^(TestProfileSkillProjectionDamagedStore|TestSkillProjection(Rebuild|Shared|Native|Narrowing))'
+```
+
+### full-cmd-curator-00
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 52.05s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestAuditAllowPinsOnlySupportedContentIdentity|TestAuditAllowRefusalPrecedesConfigLoad|TestCLIAuditBindsDependencyDirectory|TestCLIStatusReportsLegacyPackageMarkerCurrent|TestReviewCLIStatusDetectsChangedTagAtSameCommit|TestAuditAllowRecordsPinCreationTime|TestCLIAuditEmitsScriptLabels|TestCLIAuditMixedSkillRecordsBothPolicies|TestCLIAuditJSONCarriesScriptLabels|TestCLIAuditJSONRecordsExplicitAbsence|TestClassifyBuildCommandMapsEveryCacheOutcomeToADistinctCode|TestUnusableToolchainRowsCarryTheDriverBoundaryCode|TestClassifyBuildCommandDetectsRecordedIdentityDrift|TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves|TestInputCausesAreDistinctAndDocumented|TestClassifySkillBuildsAcceptsOnlyAnExactlyCurrentInstallation|TestClassifySkillBuildsWithoutCompiledStateStaysSilent|TestClassifySkillBuildsDetectsContextExposure|TestClassifySkillBuildsDetectsCommandDriftInBothDirections|TestClassifySkillBuildsRefusesAMarkerThatCannotDescribeABuild|TestMarkerDigestsDistinguishesAbsentAndUnreadable|TestContextExposureDistinguishesAbsentAndUnreadableBuildRoots|TestMarkerRefusalSeparatesUnsupportedFromInvalid|TestCurrentnessCodesAreDistinctAndOnlyExactStatesPass|TestEveryCurrentnessCodeIsDocumented|TestCheckFailsForEveryNonCurrentCode|TestBuildReportsNeverPublishAnAbsolutePath|TestBuildReportDetailIsBounded|TestGoToolchainGuidanceNamesTheAcceptedSelectionAndTestedFamilies|TestRepairNoticesDistinguishRepairFromAPreservedInstallation|TestMarkerDigestsDetectAConcurrentInstallMarkerChange|TestStatusReportMarksCompiledStateThatMovedDuringTheCheck|TestStatusReportReportsCompiledCommandsOfAnUninstalledSkill|TestClassifySkillBuildsAcceptsEveryBuildBearingMarkerSchema|TestStatusReportFindsASchema8InstallationCurrent|TestCommandHelpNarrowingMutants|TestRegisteredSubcommandHelpNoWrites|TestCommandHelpInitPositiveControl|TestCommandHelpRunPassthrough|TestCommandHelpUnknownTopic)$' github.com/relux-works/curator/cmd/curator
+```
+
+### full-cmd-curator-01
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 65.74s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestWithDraftRemediationTable|TestDraftAttemptTransportTable|TestDraftAttemptClauseShape|TestEndpointExhaustionCarriesRemediation|TestDraftProjectResolveHelp|TestDraftInstallStatusHelpIncludesSchema2Workflow|TestDraftDocumentedLocalShapesThroughCLI|TestDraftRemediationThroughCLI|TestDraftMachinePolicySetupThroughCLI|TestDraftDocumentedGitRevisionThroughCLI|TestDraftFetchFailureSanitizedThroughCLI|TestDraftAvailabilityFallbackThroughCLI|TestDraftStripCloneFramingTable|TestDraftLaunchConsumesFrozenRuntimeThroughCLI|TestDraftRepairRestoresDriftedContentThroughCLI|TestDraftDocsPinExamples|TestProjectResolveLocalCreatesLockThroughCLI|TestProjectResolveSchema1KeepsReadOnlyMeaning|TestProjectResolveIgnoresRemovedSwitch|TestProjectResolveGitSelectionThroughCLI|TestProjectResolveGitRuntimeTamperRefusedThroughCLI|TestProjectResolveGitMissingMemberRefusedThroughCLI|TestProjectResolveTransitiveProviderUsesConfiguredRootThroughCLI|TestProjectResolveTransitiveProviderIgnoresProcessCWDThroughCLI|TestProjectResolveGitAliasSelectionThroughCLI|TestProjectResolveLegacyConfiguredGitThroughCLI|TestProjectResolveLegacyNetworkGitThroughCLI|TestProjectResolveLegacyMixedThroughCLI|TestProjectResolveGitTagDiffersFromHEADThroughCLI|TestProjectResolveCanonicalRepositorySourceThroughCLI|TestProjectResolveGitCollectionPinnedToTagThroughCLI|TestProjectRefreshGitBranchMembershipChangeThroughCLI|TestProjectResolveDraftAllowlistLegacyThroughCLI|TestProjectResolveDraftAllowlistTransitiveThroughCLI|TestProjectResolveGitRealInstallThroughCLI|TestProjectRefreshLegacyConfiguredGitBranchThroughCLI|TestProjectRefreshLegacyNetworkGitBranchThroughCLI|TestProjectRefreshTransitiveTagAdvanceThroughCLI|TestProjectRefreshFetchFailurePreservesStateThroughCLI|TestProjectRefreshRemoteEnumerationFailurePreservesStateThroughCLI)$' github.com/relux-works/curator/cmd/curator
+```
+
+### full-cmd-curator-02
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 141.84s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestProjectResolveOriginLessSkipsFetchThroughCLI|TestProjectRefreshAliasFetchDedupedThroughCLI|TestDraftStatusReportsUpToDateThroughCLI|TestDraftStatusNeedsInstallAfterRefreshWithoutInstall|TestDraftStatusLockOnlyChangeNeedsInstall|TestDraftStatusLegacyMarkerNeedsInstall|TestDraftStatusStaleManifestRefuses|TestDraftStatusStaleEmptyLockRefuses|TestDraftStatusStaleSwappedSelectionRefuses|TestDraftStatusContentDrift|TestDraftStatusNotInstalled|TestDraftStatusLiveMutationWithoutRefreshStaysCurrent|TestDraftStatusInvalidMarker|TestDraftStatusAppliesKeepsSchema1ProjectsUntouched|TestDraftStatusDriftFailsClosedWithoutFrozenInputs|TestDraftStatusDriftFailsClosedOnStaleLock|TestClassifyDraftMemberComparesExactCurrentness|TestClassifyDraftMemberPresenceRows|TestProductionExternalDepsAssignsTransportProvenanceSink|TestProductionExternalDepsFalseDrivesMirrorFetchToSink|TestDraftTransportLegacyGolden|TestDraftTransportResolvedMatrix|TestDraftTransportProviderAdmission|TestDraftTransportIdentityInvalidSurfacesThroughCLI|TestReviewProbeLegacyLaneIdentityInvalid|TestProductionBinaryDispatchesSSHWrapper|TestEnvResolveCredentialRecordProvisionAndRepair|TestEnvResolveCredentialRecordPathlessKeyring|TestEnvResolveCredentialRecordIsolatedKeychain|TestEnvResolveKeepsSchema1BytesForMetadataOnly|TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome|TestCredentialStoreCLIConfigRoundTrip|TestCredentialStoreCLIConfigRefusesMalformed|TestCredentialStoreCLIPromotion|TestCredentialStoreCLIResolveRefusesUnqualifiedDelivery|TestReviewDottedCredentialProfile|TestReviewDottedCredentialProfileExisting|TestCredentialStoreCLIDottedProfileRouting|TestCredentialStoreCLIInvalidProfileRouting|TestEnvMigratePlanApplyPi)$' github.com/relux-works/curator/cmd/curator
+```
+
+### full-cmd-curator-03
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 120.72s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestEnvMigrateConflictRefuses|TestEnvResolveRepairNeedsMigration|TestEnvMigrateUsage|TestEnvMigrateApplyRequiresPlan|TestEnvMigratePrintBeforeWrite|TestEnvResolveRepairFailedOnUninspectable|TestCuratorSpecMainLaunchEnvFragmentV2SchemaCases|TestEnvResolveEmitsPermissionsV2AtProductionEntry|TestEnvResolveBareStaleIsAFailure|TestEnvResolveRepairEmitsFragment|TestEnvResolveRejectsSwappedStoreEntry|TestEnvResolveUnknowns|TestEnvResolveIsolatedSystemLockUsesDirection|TestEnvResolveExplicitSharedConflictsWithIsolatedSystemLock|TestEnvResolveLockedIsolationRequiresMigration|TestEnvStatusMatrix|TestEnvStatusRegistryBoundaryPostureAndCheck|TestEnvStatusReportsDroppedSystemModuleThroughCLI|TestUmbrellaMissingProvider|TestUmbrellaDispatchesToProvider|TestUmbrellaPropagatesExitCode|TestUmbrellaInvalidNameIsUsage|TestImplementedCommandWinsOverProvider|TestEnvStatusS4Posture|TestEnvStatusEffectivePassableList|TestEnvResolvePreserveLockRequiresRepair|TestEnvResolvePreserveLockRepairBindsUnchangedLock|TestEnvResolvePreserveLockRefusesCurrentV1AndPlainRepairMigrates|TestEnvUnmanageTakeoverPreservesFileMode|TestEnvUnmanageTakeoverRestoresSymlink|TestEnvUnmanageSymlinkRestoreRefusesLinkedParent|TestEnvUnmanageSymlinkRestoreRefusesPlannedLinkedParent|TestEnvUnmanageBackupRecordVectors|TestEnvUnmanageDoesNotRestoreWithoutAnObservedRecord|TestEnvUnmanageRestoresNewestBackupGeneration|TestEnvUnmanageRestoresRecordedTakeoverBackup|TestEnvUnmanageLeavesBackupsWithoutRestoreFlag|TestEnvResolveAcceptsAliases|TestEnvResolveAliasAdjacentUnknownsRefused|TestProfileUseEnvAliases)$' github.com/relux-works/curator/cmd/curator
+```
+
+### full-cmd-curator-04
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 54.89s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestProfileUseUnknownEnvRefused|TestEnvStatusPrintsCanonicalAfterAliasUse|TestEnvConfigSetNormalizesEnvKnobs|TestEnvConfigSetNormalizesWholesaleValues|TestEnvConfigAliasOutputPrintsCanonicalKnob|TestEnvConfigAliasLockRefusalPrintsCanonicalKnob|TestRunDispatchNormalizesAliasOperand|TestNormalizeRunEnvOperand|TestUsageListsAliases|TestNormalizeEnvKnobPositions|TestEnvConfigShowPermissionsAtProductionEntry|TestEnvConfigShowPermissionsRejectsUnreadableConfig|TestEnvConfigShowPermissionsRejectsUnreadableInventoryAndCurrent|TestEnvConfigShowPermissionsRejectsUnreadableInventoryAncestor|TestEnvConfigShowPermissionsWithoutProfiles|TestEnvConfigShowDefaults|TestEnvConfigSetUnsetRoundTrip|TestEnvConfigSetListKnob|TestEnvConfigRefusals|TestEnvConfigProviderDirectoriesRoundTrip|TestEnvConfigProviderDirectoriesLockedRefuses|TestEnvConfigLockedKnobRefuses|TestProfileComposeAddListRemove|TestProfileComposeAddWarnsWhenOverlaysForbidden|TestProfileComposeRefusals|TestProfileUseLockedRequireRefuses|TestProfileInstallUseLockedRequireRefuses|TestProfileInstallFirstActivationLockedRequireRefuses|TestProfileUseClearOperandIsUsage|TestProfileScopedUseUnaffectedByLockedRequire|TestProfileImportUseLockedRequireRefuses|TestProfileUpdateResyncPassesLockedRequire|TestEnvStatusReportsLockedRequire|TestPrintEnvStatusShowsCodexSeedPostureAndNames|TestEnvStatusReportsNotInheritedNativeCodexServers|TestEnvResolveStripsAndReportsInlineNativeCodexMCPTable|TestGlobalInitCleanHomeRefusesWithBootstrapHint|TestGlobalInitMalformedConfigHasNoBootstrapHint|TestGlobalInitHelpWithoutConfig|TestGlobalInitSubcommandHelpWithoutConfigRefuses)$' github.com/relux-works/curator/cmd/curator
+```
+
+### full-cmd-curator-05
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 146.22s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestGlobalInitEnvResolveSubcommandHelpPreservesFlagSet|TestBootstrapDocsExampleRuns|TestEnvResolveStaleHintsRepair|TestEnvStatusCheckCurrentScopeOnly|TestPostureWarningOncePerProcessTree|TestGCPreservesRuntimeOnUncertainMarks|TestGCRetainsLiveProcessBuild|TestGCPrunesDeadConsumersUnderTheHomeLock|TestGCFailsClosedForUntrustedCurrentPathSource|TestGCWaitsForTheHomeLock|TestGCRunsSerializedAcrossConcurrentInvocations|TestSignerRowsSurviveHostileGlobalGitConfig|TestGlobalAdoptCLIAdoptsAndIsIdempotent|TestGlobalAdoptCLIRefusesByteMismatch|TestGlobalAdoptCLIRefusesUnknownAndMissingCommandsWithoutWrites|TestGlobalAddPublishesProfileLockBeforeNativeMaterialization|TestGlobalAddConflictRetainsLockAndProfileSyncTakeoverRecovers|TestGlobalInstallPublishesMigratedLockBeforeNativeMaterialization|TestGlobalInstallConflictRetainsMigratedLockAndTakeoverRecovers|TestGlobalStatusRejectsSchema2SkillfileThroughCLI|TestReviewGlobalStatusDetectsChangedTagAtSameCommit|TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck|TestGlobalStatusReportsATransitivelyResolvedCompiledCommand|TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands|TestGlobalStatusWithoutASkillfileStaysSilentAndCurrent|TestGlobalStatusFailsCheckWhenTheUserHomeCannotBeResolved|TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven|TestGlobalStatusRejectsPositionalArguments|TestStatusRecordedButMissingStaysInInventory|TestStatusUnreadableCandidatesKeepRecord|TestStatusUnreadableApprovalStateSurfaced|TestEnvStatusMissingAndUnreadableKeepRecord|TestEnvStatusUnreadableApprovalStateSurfaced|TestHookApprovalsUnreadableStateNamesReadFailure|TestHookApproveRecordsOperatorApproval|TestHookApproveFailsDistinctlyOnAbsentAndUnreadable|TestHookApproveReRecordsAfterChange|TestHookApproveIsIdempotentWhenRecordMatches|TestHookApproveResolvesSymlinkedOperand|TestHookApprovalsListsReadOnly)$' github.com/relux-works/curator/cmd/curator
+```
+
+### full-cmd-curator-06
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 90.27s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestHookApprovalsToleratesMalformedRecord|TestHookApprovalsOnAbsentStateIsEmpty|TestHookRevokeRemovesRecord|TestHookRevokeAbsentLeavesStateByteIdentical|TestHookUsageErrors|TestHookDiagnosticsAgreeWithShell|TestStatusReportsShellHookTrustPosture|TestStatusJSONCarriesShellHookTrust|TestStatusReportsRecordedPathsBeyondTheCurrentProject|TestEnvStatusReportsShellHookTrustPosture|TestHookApproveEndToEndWithGeneratedHook|TestProfileImportRow|TestProfileImportLossyRow|TestProfileImportNameTakenRow|TestProfileComposeAddPathRow|TestProfileComposeAddRefusesAFormOnAPathSource|TestPathOverlayFromMachineConfigJoinsTheClosure|TestOverlayFromMachineConfigIsRefusedByKind|TestProfileUseTakeoverRow|TestProfileInstallReinstallHonoursUseAndTakeover|TestResolveTakeoverRequiresRepair|TestSyncTakeoverFlagParses|TestInstallGitignoreEntryPoint|TestLegacyPackageStatusBindingAndRepair|TestAuthoritativeLifecycleBootstrapCasesAreExecutable|TestAuthoritativeLifecycleUpgradeCasesAreExecutable|TestEnforcedShimDispatchRefusesUnreadableSidecar|TestRunUsesInjectedConfigSourceAndWriters|TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt|TestCLIVerifiedCapabilityDriftStartsNothingAndAdoptsNoCache|TestCLIExecutionAssuranceSelectionIsPortableDefaultAndVerifiedFailClosed|TestProductionExternalDepsBindTrustedGitAndAudit|TestProductionExternalAuditReturnsAdvisoryWarnings|TestUsageEnumeratesDocumentedCommands|TestRunVersionExitsZero|TestRunNoArgsPrintsUsage|TestRunUnknownCommand|TestShellInitPrintsHooks|TestShellInitInstallCachesHookWithoutConfig|TestSkillCheckOnTempDir)$' github.com/relux-works/curator/cmd/curator
+```
+
+### full-cmd-curator-07
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 111.28s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestInstallFlagsAcceptTrailingOptions|TestInstallAuditFlagAcceptsOptionalMode|TestInstallFlagsCarryTheRunWideBuildSSHSelection|TestSelectProjectTargetsUsesAliasesAndStableAllOrder|TestStatusDriftDetectsContentTampering|TestBootstrapAndProjectCommands|TestBootstrapIfMissingKeepsExistingConfigWithoutParsing|TestBootstrapIfMissingCreatesAbsentConfig|TestBootstrapIfMissingRejectsForce|TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot|TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot|TestCLIEndToEndInstallStatusAndTamperCheck|TestHiddenWorkerModeIsNotAUserVisibleCommand|TestProductionBinaryDispatchesNetNSProbe|TestProductionBinaryDispatchesLandlockProbe|TestProductionBinaryDispatchesRustOracleBeforeAmbientCargoDiscovery|TestConfigBuildSSHAddListRemove|TestConfigBuildSSHListWithoutScopesPrintsNothing|TestConfigBuildSSHAddRejectsInvalidInvocations|TestConfigBuildSSHAgentFlagKeepsScopePositional|TestConfigBuildSSHRemoveRejectsMissingAndMalformedTargets|TestConfigBuildHTTPSAddListRemove|TestConfigBuildHTTPSListWithoutScopesPrintsNothing|TestConfigBuildHTTPSAddRejectsInvalidInvocations|TestConfigBuildHTTPSRemoveRejectsMissingAndMalformedTargets|TestConfigBuildHTTPSLoginRejectsInvalidInvocations|TestConfigBuildHTTPSLoginStoresThroughTheOperatorHelperAndSelectsIt|TestConfigBuildHTTPSRemoveNeverTouchesTheOperatorsOwnGitCredential|TestConfigHelpDocumentsPrecedenceAndSubcommands|TestConfigBuildHTTPSHelpDocumentsPrecedenceAndDisclosure|TestConfigSubcommandDispatch|TestTheCredentialPromptIsWiredOnlyWhereAnOperatorCanAnswerIt|TestThePromptPersistsThroughTheOrdinaryConfigWriter|TestSSHThisRunOnlyPromptNeverReachesTheSavedConfig|TestHTTPSThisRunOnlyPromptNeverReachesConfigOrCredentialStore|TestMuseCredentialPolicyNarrowingMutants|TestMuseRootContextCopyFallback|TestMuseRootContextVectors|TestMuseRootContextDrift|TestMuseRootContextRefusals)$' github.com/relux-works/curator/cmd/curator
+```
+
+### full-cmd-curator-08
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 272.75s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestMuseCredentialPolicyStatus|TestMuseRootContextStatus|TestMuseRootContextNarrowingMutants|TestMuseCLIFragmentAndFakeLaunch|TestMuseProfileSeedSecretAndCredentialRefusals|TestMuseFragmentV3PublishedCases|TestMuseCLIAuthParentBoundary|TestMuseFragmentV4PublishedCases|TestMuseCLIStorePolicy|TestNativeBlackboxExternalBuildLifecycle|TestNativeSkillsTakeoverEveryRegisteredCommand|TestNativeSkillsTakeoverArgumentDiscardRegression|TestNativeSkillsTakeoverActivationBoundary|TestReviewNativeTakeoverHelpBoundary|TestNativeSkillsTakeoverHelpCrossProduct|TestNativeSkillsTakeoverRegistryNarrowingMutant|TestNativeSkillsTakeoverHelpNarrowingMutant|TestNativeSkillsCLIOperations|TestNativeSkillsTakeoverFlagBoundary|TestProductionExternalAuditOpaqueNULFollowsHashVersion|TestCLIAuditOpaqueNULFollowsHashVersion|TestAuditAllowWritesWriterVersionPinCarrier|TestStatusCheckRefusesV1NULAppearingAfterInstall|TestStatusCheckAdmitsV2NULBearingInstall|TestProfileUpdateSystemDeltaConfirmationGolden|TestProfileUpdateMCPDeltaConfirmationGolden|TestProfileUpdateAllDeltaVectorsAtCLI|TestProfileUpdateAllStopsAtFirstUnconfirmedDelta|TestProfileInstallReinstallDeltaVectorsAtCLI|TestProfileGitReinstallHonoursUseAndTakeover|TestProfileInstallActivationMatrix|TestProfileInstallStopThenRetryConformanceVector|TestProfileInstallReinstallUsePreservesProjectScope|TestSourceSignerVectorsAtProfileInstall|TestRevisionDoesNotBorrowTagSignature|TestProfileInstallListsStdioCommands|TestProfileUpdateListsNewDeclaration|TestProfileInstallWarnsEmptyAllowlist|TestProfileInstallSurfacesBeforePublication|TestProfileUpdateSurfacesBeforePublication)$' github.com/relux-works/curator/cmd/curator
+```
+
+### full-cmd-curator-09
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 27.47s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestGitFileURLHasNoBackslash|TestProfileInstallListUse|TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable|TestProfileInstallRefusesPathMCPDeclarationThroughCLI|TestProfileUseUnknownIsAFailure|TestProfileRemoveInUseIsAFailure|TestProfileInstallRefConflictIsAFailure|TestProfileSyncCoversTheMachineScope|TestProfileComposeListsDeclaredOverlays|TestProfileUseUnknownEnvironmentIsAFailure|TestProfileUseTargetIsStageB|TestProfileUseTargetBoundToAdapter|TestProfileInstallWarnsOnSystemModule|TestProfileScopedUseAndClear|TestProfileUpdatePinnedTagIsUnchanged|TestProfileMachineUseSkipsScopedAdapter|TestProfileUseReportsAllAdaptersAlreadyScoped|TestProfileInstallFileOperandIsRefused|TestProfileListMigrationHonoursSystemPolicy|TestProfileInstallUseActivatesThroughSwitch|TestProfileInstallUsePartialLeavesCurrent|TestProfileInstallFirstActivationFailureReportsPersistedProfile|TestProfileReinstallActivationFailureKeepsUpdatedWording|TestSecurityPostureVectorsThroughCLI|TestHardenedRegistryOutageRefusesWithAdvisoryRegistryPolicy|TestPermissiveRegistryOutageWarnsWithArtifactIdentity|TestSecurityPostureWarningAndEnvStatusRows|TestSecurityPostureWarningIsNotEmittedByEnforcedShim|TestSecurityPostureHardenedContradictionFailsEnvStatusCheck|TestSecurityPostureSchema1EnvStatusHasNoPostureInventory|TestSecurityPostureCuratorStatusRows|TestSecurityPostureProfileInstallRefusesEmptySourceAllowlistBeforeWriting|TestSecurityPostureProfileInstallRefusesMCPDeclarations|TestSecurityPostureHardenedMCPContradictionFailsEnvStatusCheck|TestSecurityPostureHardenedEmptyMCPWithoutDeclarationsWarnsAndInstalls|TestSecurityPostureResolveRefusesExplicitUnboundedPassthrough|TestSecurityPostureRevisionBDefaultRefusesEmptySources|TestSecurityPostureExplicitPermissiveInstallsWithoutSourceAllowlist|TestSecurityPostureRevisionBDefaultEnvStatus|TestCLIHelperProcess)$' github.com/relux-works/curator/cmd/curator
+```
+
+### full-cmd-curator-10
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 172.3s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestCompiledProjectRepairsCorruptCompiledState|TestCompiledProjectRestoresCacheWhenCommitFails|TestStatusReportsATransitivelyResolvedCompiledCommand|TestStatusReportsAnUnusableToolchainPerCompiledCommand|TestStatusKeepsLegacyBehaviourWhenAPlanFailsWithoutCompiledCommands|TestGCRetainsAndReportsReferencedCompiledState|TestCompiledInstallFollowsTheNativeControlInventoryExactly|TestDryRunNeverClaimsACompletedCompilerCheck|TestStatusExplainsAnUnusableGoToolchain|TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands|TestCuratorStatusProviderPostureAndCheck|TestStatusAcceptsAnUnchangedLegacyMarkerSchema|TestHostGoToolchainIsSelectableOnAnInventoryPlatform|TestInstallPrintsTheRemedyAVersionManagerSelectionEarns|TestUmbrellaProviderResolutionVectors|TestActiveRevisionIsWarningRelease|TestUmbrellaHostilePathPlantWarnsUnderAEndToEnd|TestUmbrellaHostilePathPlantRefusedUnderB|TestUmbrellaTrustedRootSymlinkEscape|TestUmbrellaTrustRootSelectionBothRevisions|TestUmbrellaRefusedDirectoriesBothRevisions|TestUmbrellaSymlinkIntoManagedRefused|TestUmbrellaUnreadableRootNeverAbsence|TestUmbrellaMissingNamesRoots|TestUmbrellaWarningText|TestProviderPostureRows|TestProviderSubcommandParsing|TestExecutableCandidates|TestProviderInputsForHostScannedBinWarnsWithoutLedger|TestProviderInputsForHostPublishedBinRefuses|TestProviderPostureReportsUnreadablePublishedShimLedger|TestProviderInputsForHostExplicitBinRefuses|TestUmbrellaTrustRootCaseVariantIdentity)$' github.com/relux-works/curator/cmd/curator
+```
+
+### full-cmd-curator-special
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 409.69s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^TestCompiledProjectStatusAndUntrustedRecovery$' github.com/relux-works/curator/cmd/curator
+```
+
+### full-install-authoritative
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 1.37s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^TestAuthoritativeDryRunCasesMutateNothingPersistent$' github.com/relux-works/curator/internal/install
+```
+
+### full-internal-envprofile-00
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 119.06s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestInstallErrorRefusesTransitiveSystemModule|TestInstallErrorWaiverAdmits|TestUpdateErrorLeavesLockUnchanged|TestDropRepairWarnsAndFragmentFollowsAdmitted|TestDropAllDroppedOmitsFragmentSection|TestStatusReportsPolicyAndDropped|TestStatusErrorReportsPolicyWithoutDropped|TestStatusUnreadableTransitiveManifestDoesNotBecomeNoDrops|TestPolicyFromConfigCarriesAdmission|TestPathInstallAdmitsOrdinaryDirectory|TestLegacyPathInstallIgnoresStoreOverlap|TestPathOverlayAdmitsOrdinaryDirectory|TestStrictAuditMemberCapabilityCacheIsolation|TestClaudeSeedNarrowingMutants|TestClaudeRepairPreservesNumberText|TestClaudeRepairSatisfiedIsNoOp|TestClaudeAbsentSeedGolden|TestClaudeRepairRefusesUnsafeState|TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression|TestCodexSeedStripsInlineMCPTable|TestCodexSeedRejectsInvalidTOMLBeforePublishingHome|TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair|TestEnvironmentsCodexSeedVectors|TestSharedToIsolatedRemovesStaleLink|TestCredentialLinkRegularFileRefuses|TestStaleCredentialLinkRefusals|TestDanglingPiLinkReportedDetached|TestCodexIsolatedAdmission|TestCodexUnknownStoreSharedRefuses|TestPiProvisionTargetsAgentRoot|TestCredentialLinkDirectory|TestCredentialLinkUnrecordedSymlinkRefuses|TestReviewerDanglingExpectedTarget|TestReviewerLiteralCodexSelector|TestDanglingExpectedTargetRepairSucceeds)$' github.com/relux-works/curator/internal/envprofile
+```
+
+### full-internal-envprofile-01
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 38.22s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestCredentialLinkTargetInspectionFailure|TestCodexCredentialStoreTOMLSpellings|TestCodexMalformedStoreSharedRefuses|TestPiProvisionTargetsAgentRootV2WriterMode|TestCredentialStorePolicyActivation|TestCredentialStorePolicyNativeInspection|TestCredentialLinkInspectionRepairFails|TestMigrateApplyLockContention|TestCredentialProjectionSingleObservation|TestCredentialProjectionIsolationRefusals|TestCredentialProjectionStatusObservation|TestCredentialProjectionIdentitySubrequest|TestResolvePublishesCredentialMarkerThroughLockedJournal|TestResolveRecoversCredentialMarkerAfterRenameCrash|TestResolvePublishesCredentialMarkerThroughLockedJournalV2WriterMode|TestResolveRecoversCredentialMarkerAfterRenameCrashV2WriterMode|TestUpdateSystemDeltaRefusesBeforePublication|TestEnvironmentsEnvPassthroughVectors|TestMigrationHonoursSystemLockedAllowlist|TestMigrationHonoursSystemLockedRevocation|TestMigrationSucceedsWhenSystemPolicyPermits|TestMigrationHonoursConfigPathOverride|TestMachinePolicyLoadFailureFailsMigration|TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault|TestLoadMachinePolicyRejectsDanglingConfigSymlink|TestSourceAllowlistRejectsAdjacentPathSegment|TestRevokedSkillMemberIsRefused|TestRevokedMCPMemberIsRefused|TestStrictAuditCanaryFailureBlocksInstall|TestCanonicalGitRejectsFileRemote|TestGateSourceRejectsFileRemote|TestFileOperandIsRefused|TestFileRequirementSourceIsRefused|TestInstallUseSwitchesAndAgrees|TestInstallUsePartialLeavesCurrent)$' github.com/relux-works/curator/internal/envprofile
+```
+
+### full-internal-envprofile-02
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 32.66s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestOperandShadowedByDirectoryResolvesAsGit|TestAbsentPathOperandWithRequirementIsRefConflict|TestInstallOperandKindIsSyntactic|TestInstallNeverDemotesANetworkIdentityToAPath|TestInstallRefusesANonSourceOperand|TestMachineUseSkipsScopedAdapter|TestMachineUseClearsEveryScopeEqualToNewDefault|TestInstallUseSkipsScopedAdapter|TestScopedUseStillSwitchesOnlyThatHome|TestSyncWritesScopedHomeOnce|TestScopedRecordFilenameIsPortable|TestCanonicalIdentityUnifiesSpellings|TestCanonicalIdentityRejectsMalformedSource|TestSourceAllowlistRefusesBeforeClone|TestRevokedSourceIsRefused|TestMCPAllowlistRefusesOutsidePackage|TestStrictAuditCanaryPasses|TestMigratedSkillSourceIsCanonical|TestPolicyFromConfigCarriesEnvGates|TestPolicyFromConfigCarriesStateWaiverHashVersion|TestMachineClearReachesSeamGate|TestInstallPathAndList|TestInstallRejectsSecretMember|TestReinstallSameSourceIsAnUpdate|TestNameTaken|TestUseMaterializesLinkedHomes|TestUseReplacesWithBackup|TestUsePartialRecordsNothing|TestRemoveRefusesCurrent|TestRemovePurgeCleansHomes|TestUpdatePathLeavesLockInPlace|TestInstallGitResolvesNetworkIdentity|TestInstallSurfacesSystemModuleWarning|TestInstallSurfacesUnresolvedMCPCommand|TestUpdateDefaultIsBlocked)$' github.com/relux-works/curator/internal/envprofile
+```
+
+### full-internal-envprofile-03
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 155.73s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestScopedUseAndClear|TestListFailsOnCorruptRecord|TestInstallDirectoryRejectsSecretUnderSubdirectory|TestInstallTransitiveDirectoryRejectsSecret|TestEnsureDefaultCreatesLocalProfile|TestDefaultProfileMaterializesOnFreshHome|TestEnsureDefaultMigratesGlobalSkills|TestMutationLockContention|TestIncompleteJournalRecoversOnEntry|TestOperationsLeaveNoJournalResidue|TestGlobalSkillCapabilitiesNarrowingMutants|TestMigratedGlobalSkillNetworkCapabilities|TestMigratedGlobalSkillIgnoresPreManifestVerdictCache|TestMigratedGlobalSkillDeclarationKeepsOtherGates|TestMigratedGlobalSkillManifestErrorsBlock|TestInstalledMemberCapabilitiesStayKindScoped|TestMigratedGlobalSkillBinaryWriteVersion|TestMigratedGlobalSkillNetworkUndeclaredFollowUp|TestMigratedGlobalSkillPromptScopeValidation|TestMigratedGlobalSkillNullCapabilityDeclarations|TestImportLosslessInstallsThroughPathPipeline|TestImportNormalizesOrdersAndPins|TestNormalizeImportText|TestImportLossyStopsWithoutConsent|TestImportLossyProceedsWithConsent|TestImportUnreadableRootIsLoss|TestImportInvalidUTF8IsLoss|TestImportPartialActivationKeepsLock|TestImportNameTakenBeforeAnyWrite|TestImportSkillForeignPinnedByRevision|TestImportSkillMarkerRecovery|TestImportRecordsImportedFromNative|TestImportSkipsManagedRootContext|TestImportDivergentSkillsAreLoss|TestImportLedgerFailureIsLoss)$' github.com/relux-works/curator/internal/envprofile
+```
+
+### full-internal-envprofile-04
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 187.23s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestImportAbsentMarkerDetectsNative|TestImportCorruptMarkerIsLoss|TestImportUnreadableMarkerIsLoss|TestDotfileManagerVectors|TestUnreadableDotfileStateKeepsTakeoverQuiet|TestDotfileManagerTableMatchesSpecFixture|TestDotfileStatePathResolution|TestForeignManagerHintLstatDiscipline|TestDotfileManagerStateAloneDoesNotWarn|TestManagedModesNarrowingMutants|TestManagedFallbackPermissions|TestManagedSeedPreservesNativePermissions|TestManagedHomeRepairTightensDirectories|TestManagedAuthoredFilesArePrivate|TestManagedSeedRefusalsPreserved|TestResolveVerifiesGitStoreEntryAgainstPinnedTree|TestResolveRejectsGitPinMissingFromLocalObjectDatabase|TestResolveProvisionRepair|TestResolveReportsRecordedContextSurfaceHashDrift|TestResolveRejectsEnvironmentMarkerHashVersionMismatch|TestResolveStaleUnprovisioned|TestResolveUnknowns|TestResolveDefaultProfile|TestResolveDriftRepair|TestResolvePassthroughLiveness|TestClaudeRootAlwaysCopied|TestResolveClaudeProjectEntry|TestCodexKeyringAmbient|TestCodexUnreadableConfigFails|TestRepairNeverRefreshesSeeds|TestResolveIsolatedOpencode|TestResolveFormUnsupported|TestResolveLockContention|TestResolveFormats|TestProfileInstallMarkdownContextCLI)$' github.com/relux-works/curator/internal/envprofile
+```
+
+### full-internal-envprofile-05
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 113.03s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestProfileInstallMarkdownMCP|TestProfileInstallMarkdownScope|TestProfileInstallMarkdownCaseAliasesCLI|TestMaterializeCaptureCurrentAndRelease|TestMaterializeCaptureCredentialStoreAdmission|TestMaterializeCapturePendingDoesNotRecover|TestMaterializeCaptureBadRecoveryEvidence|TestMaterializeCaptureWaitReselectsAndTimeout|TestMaterializeCaptureSameFragmentDrift|TestMaterializeCaptureAndStatusNeverProbeVendor|TestMaterializeCaptureDoesNotProvision|TestMaterializeCaptureObjectBounds|TestMaterializeCaptureSerializesProfileWriters|TestMaterializeCaptureConcurrentRepair|TestMaterializeCaptureStoreObjectIdentity|TestMaterializeCaptureAuthorizingDrift|TestMaterializeCaptureUnreadableJournal|TestMaterializeCaptureExternalTornGeneration|TestMaterializeCaptureCredentialPolicyReleaseObservation|TestMaterializeCaptureCredentialPolicyReleaseCache|TestMigratePiWrongTargetToAgentRoot|TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker|TestMigrateNoSecretCopies|TestMigrateConflictsRefuse|TestMigratePiRootInspectionFailure|TestMigratePlanDriftRefuses|TestMigrateRollbackRestoresPriorState|TestMigrateOldRootBytesWarnAndProceed|TestMigratePendingNeedsNothing|TestMigrateUnknownOperands|TestMigrateInspectIsReadOnly|TestMigrateApplyRequiresPlan|TestMigratePrintFailureRefusesBeforeMutation|TestMigrateMarkerDriftRefuses|TestMigrateFailedRelinkKeepsOldLink)$' github.com/relux-works/curator/internal/envprofile
+```
+
+### full-internal-envprofile-06
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 195.03s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestMigrateSyscallFailureRollsBack|TestMigrateInterruptedApplyRecovers|TestMigratePublishFailureRevertsLinks|TestMigrateSealedJournalDeletesWithoutTouching|TestMigrateBrokenJournalRefuses|TestMigrateRecoveryRefusesUnexpectedTarget|TestMigrateRecoveryCleansOwnedTemp|TestMigrateSchema1UnlinkPublishesCompleteSchema3MarkerV2WriterMode|TestMuseCredentialPolicyMatrix|TestMuseMissingNativeFilePolicy|TestMusePolicySwitchPreservesCredentials|TestMusePolicyExplicitMigration|TestMusePublishedLinkStates|TestMuseForkRefusedRegression|TestMuseAuthParentBoundaryAtResolve|TestMuseDirectoriesAndIsolation|TestMuseAuthRepairAdditionalStates|TestMuseGlobalReconciliationUsesExplicitProvisioning|TestMuseStatusOptionalProvisioning|TestMusePublishedRegistryLayout|TestResolveRefusesMissingLockNamedStoreEntryAtBoundary|TestNativeSkillsNarrowingMutants|TestNativeSkillsUseAndSync|TestNativeSkillsTakeover|TestNativeSkillsLinkedParent|TestNativeSkillsLedger|TestNativeSkillsUnreadableMarker|TestNativeSkillsRepair|TestNativeSkillsConvergenceAndSwitch|TestNativeSkillsInstallAndUpdate|TestNativeSkillsBackupCollision|TestNativeSkillsUnrecordedLedger|TestNativeSkillsEmptyProfileLeavesUnnamedParent|TestGitFileURLForKeepsVolumesOutOfTheHost|TestServeWritesTheGitSafeRemote)$' github.com/relux-works/curator/internal/envprofile
+```
+
+### full-internal-envprofile-07
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 38.77s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestInstallBlocksBothV1CollidingSkillTrees|TestInstallBlocksDeepNULFileInContextPathSnapshot|TestUpdateBlocksDeepNULFileInNewContextMember|TestResolveRefusesV1CommitPinnedContextNUL|TestResolveCleanV1CommitContextStaysCurrent|TestResolveAdmitsV2CommitPinnedContextNUL|TestSwitchMaterializeRefusesV1CommitPinnedContextNUL|TestStrictAuditMemberRefusesV1NULBeforeHashing|TestValidateNamedStorePinsRefusesV1NULBeforeHashing|TestSkillsOfRefusesV1NULBeforeHashing|TestGuardedReadersV1NULRefusalComputesNoV1Identity|TestInstallAdmitsV1CollidingSkillTreesUnderV2|TestInstallAdmitsDeepNULFileInContextPathSnapshotUnderV2|TestPrecedencePrimitivesDriveEmission|TestPrecedenceTieKeepsTopologicalOrder|TestPathOverlayJoinsClosure|TestOverlayExplicitWeightOverridesDefault|TestGitOverlayJoinsClosure|TestPathOverlayFormIsSourceInvalid|TestOverlayInvalidSourceKindIsSourceInvalid|TestSCPOverlayResolvesAsGit|TestOverlayRepeatedNameIsCompositionInvalid|TestOverlayDuplicateNameIsCompositionInvalid|TestForbiddenOverlaysResolveAlone|TestRemoveRefusesOverlayOfAnotherProfile|TestWeightRulesApplyInOrder|TestWeightRulesAllFourDisagree|TestWeightDuplicateRefused|TestWeightUnknownRefused|TestNonRootWeightsMapRefused|TestWeightConflictErrorAndWarning|TestPathInstallCapturesDirtyUntrackedInsideGit|TestPathKindMCPVectorsDriveInstallEntry|TestPathKindBoundaryVectorsDriveProductionEntries|TestPathKindDryRunVectorsDriveReadOnlyResolve)$' github.com/relux-works/curator/internal/envprofile
+```
+
+### full-internal-envprofile-08
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 32.93s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestPathRootAndImportedMCPDeclarationsRefused|TestPathOverlayMCPDeclarationRefused|TestPathOverlayBoundaryRejectsEscapingAndInternalLinks|TestPathOverlayTrustedSystemModuleRemainsAdmitted|TestPathOverlayFailureBlocksResolveAndMakesStatusNonCurrent|TestPathSourceMutationsRejectUntrustedOverlayBeforeDefaultWrites|TestResolveRejectsGroupWritableOnlyPathOverlay|TestMissingPathOperandIsPathMissing|TestMissingOverlayPathIsPathMissing|TestNonDirectoryPathIsSourceInvalid|TestNestedGitIsSourceInvalid|TestSymlinkInPathIsUntrusted|TestFoldedPathsAreSourceInvalid|TestRootGitExcluded|TestUnreadablePathIsUnreadable|TestPathSnapshotImmutableAcrossUpdateSyncUse|TestPathUpdateAllSucceedsWithImportedProfile|TestUnreadablePathRootLeadsUnreadable|TestUpdatePathWithoutStatePinIsSourceInvalid|TestUpdatePathMissingSnapshotIsSourceInvalid|TestUpdatePathSnapshotNameMismatchIsSourceInvalid|TestPathReinstallBareAndNonCurrentMovesPin|TestUpdateBlocksSecretOverlayMember|TestReinstallBlocksSecretOverlayMember|TestUpdateBlocksRevokedOverlayMember|TestUpdateBlocksV1RevokedOverlayMemberUnderV1Writers|TestReinstallBlocksRevokedOverlayMember|TestPermissionsForProfileProperties|TestRepairPreserveLockVectors|TestPreserveLockRefusesBeforeStoreRebuild|TestPreserveLockRaceRefusesBeforeJournalRecovery|TestPreserveLockMigrationRefusalPrecedesBusyLock|TestPreserveLockRevalidationHoldsRepairLock|TestPlainRepairMigrationKeepsLockPrivate|TestSystemDeltaVectors)$' github.com/relux-works/curator/internal/envprofile
+```
+
+### full-internal-envprofile-09
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 329.24s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestRC14MigrationRehashesLegacyIdentities|TestRC14ResolveRepairMigratesSiblingHomes|TestRC14IdentityMigrationRollsBackEveryEntry|TestRC14IdentityMigrationRefusesSiblingPlanDrift|TestRC14IdentityMigrationRefusesVersionAndPinMismatch|TestRC14IdentityMigrationRecoversInterruptedCommit|TestRC14Schema1IdentityMigrationWithoutCredentialOperations|TestRC14IdentityMigrationPreservesFallbackCopies|TestRC14UseMigratesLegacyProfileBeforeNativePublication|TestEnvironmentsReadFailureVectors|TestPassthroughReadFailuresAreUnknownAndNeverRepaired|TestUnreadableLockIsUntrustedAcrossStatusResolveRepairAndUpdate|TestUnreadableLockRefusesUpdateWithoutRewriting|TestAbsentLockRemainsProfileUnknown|TestUnreadableCodexSeedDoesNotSelectAbsentDefault|TestReviewerRecoveryMarkerDrift|TestReviewerRecoveryPreservesRegularTemp|TestSkillDirectoryNarrowingMutants|TestSkillDirectoryLifecycleVectors|TestSkillDirectoryMarkdownDeclaredControl|TestSkillDirectoryMetadata|TestSkillProjectionNarrowingMutants|TestProfileSkillProjectionDamagedStore|TestSkillProjectionRebuildSourceRefusal|TestSkillProjectionRebuildRollback|TestSkillProjectionSharedRebuild|TestSkillProjectionRebuildRecovery|TestSkillProjectionNativeRebuild|TestSkillProjectionCoreSelection|TestProfileSkillProjectionPublication|TestProfileSkillProjectionRepair|TestSkillProjectionStoreReuse|TestProfileSkillProjectionMissingStore|TestSkillProjectionFallbackRollback|TestSkillProjectionLegacyFraming)$' github.com/relux-works/curator/internal/envprofile
+```
+
+### full-internal-envprofile-10
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 31.12s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestManagerOwnedAbsenceReadsAreGuarded|TestManagerReadScannerFindsAliasedNotExistCollapse|TestCurrentPointerAbsenceAndUnreadabilityDiffer|TestScopedCurrentAbsenceAndUnreadabilityDiffer|TestScopedCurrentReadFailureDoesNotFallBackToMachineCurrent|TestProfileSourceAbsenceAndUnreadabilityDiffer|TestUnreadableDefaultProfileSourceDoesNotRecreateDefault|TestOverlayOwnerLockAbsenceAndUnreadabilityDiffer|TestImportAbsentAndUnreadableRootSurfaceDiffer|TestImportAbsentAndUnreadableSkillsLedgerDiffer|TestImportAbsentAndUnreadableSkillsSurfaceDiffer|TestUpdatePathSnapshotUnreadableIsNotAbsent|TestStatusScopeMarkerAbsenceAndUnreadabilityDiffer|TestStatusOrphanMarkerAbsenceAndUnreadabilityDiffer|TestStatusUnreadableOrphanInventoryIsNotEmpty|TestStatusBackupInventoryAbsenceAndUnreadabilityDiffer|TestRemovePurgeMarkerAbsenceAndUnreadabilityDiffer|TestStatusSignerPostureUnknownWithoutCachedSource|TestStatusSignerPostureReadFailureIsNonCurrent|TestUpdateConfirmationPostureVectorAtStatus|TestSignerPostureVectorsAtStatus|TestStatusOrphanRetention|TestStatusShadowAcknowledgment|TestStatusProfileMembersAndUnregistered|TestSeedUnreadableStopsBeforeFirstWrite|TestReservedSkillName|TestProfilePathCollision|TestOpencodeFormFallback|TestRepairFailedMissingStore|TestOpencodeXDGSeeds|TestClaudeSeedMergePreservesToolState|TestStatusShellHookTrustFromLaunchProject|TestStatusShellHookTrustMissingUnreadableAndStateFailures|TestResolveRepairKeepsEnclosingStoreRootFailureClass|TestStoreBoundaryResolveVectorsDriveResolve)$' github.com/relux-works/curator/internal/envprofile
+```
+
+### full-internal-envprofile-11
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 66.7s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestStoreBoundaryDryRunVectorsDriveResolveRepairPlan|TestStoreBoundaryRepairVectorsDriveResolveRepair|TestStoreBoundaryStatusVectorsDriveStatus|TestStoreBoundaryCheckedRootsExcludeCuratorHome|TestInstallEmitsSurfacingBeforePublication|TestUpdateEmitsSurfacingBeforePublication|TestReinstallEmitsSurfacingBeforePublication|TestSurfacingEmittedDespitePublicationFailure|TestSurfacingSinkWriteFailureIsNonFatal|TestInstallSurfacesMCPDeclarations|TestInstallSurfacingSilentWithoutMCP|TestUpdateSurfacesCandidateMCPSet|TestAllowlistWarningOperations|TestEmptyAllowlistWarningLeavesCurrentStatusCurrent|TestResolvePassthroughKnobs|TestStatusS4Posture|TestSurfacingUnreadableManifest|TestUseWithoutTakeoverRefusesUnmanaged|TestUseTakeoverBacksUpAndNotifies|TestForeignSymlinkStopsSwitch|TestTakeoverWarnsDotfileHeuristic|TestTakeoverSymlinkedDotfileManagerStateDoesNotWarn|TestReadOnlyCommandsNeverOnboard|TestRepairTakeoverProvisionsManagedHome|TestUnmanageRestorePlanRetainsMetadata|TestUnmanageRestoreRefusesLinkedParent|TestUnmanageRestoreSymlinkReplacesDestinationEntry|TestEnvironmentWriteNofollowVectors|TestResolveRenderedDocumentReplacesStoreSymlinkWithoutFollowing)$' github.com/relux-works/curator/internal/envprofile
+```
+
+### full-internal-envprofile-special
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 149.58s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^TestProfileNetworkContactVectors$' github.com/relux-works/curator/internal/envprofile
+```
+
+### full-internal-install-00
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 41.13s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestProjectManifestABAAroundTheReadRestartsClosure|TestGlobalManifestABAAroundTheReadRestartsClosure|TestSubstitutionsABAAroundTheReadRestartsClosure|TestHybridActivationABAAroundTheReadRestartsClosure|TestByteIdenticalRewriteDuringTheReadDoesNotRestart|TestVerifiedBuildAuthorityCarriesOneBindingThroughCacheAndDispatch|TestAssuredToolchainProbeKeepsAuthorityAndInnerFailuresDisjoint|TestVerifiedBuildAuthorityFailsBeforeCacheOrDispatchOnProviderDrift|TestVerifiedBuildAuthorityRechecksProviderBeforeCacheAndDispatch|TestScriptAuditLabelsAtInstallEntry|TestScriptAuditLabelsAtGlobalInstallEntry|TestDeclaredOnlyWithHostsGlobalInstallsWithOnlyDeclaredOnly|TestDeclaredOnlyWithHostsInstallsWithOnlyDeclaredOnly|TestBuildHTTPSPrecedenceLongestScopeAndAnonymousFallback|TestBuildHTTPSDiscoveryOnlyListsAndNeverSelectsAHostCredential|TestBuildHTTPSHostPinMakesOtherHostsResolveWithoutTheOverride|TestCaptureBuildHTTPSSelectionFreezesAndRedactsSecrets|TestBuildHTTPSResolutionSkipsOtherEffectiveTransports|TestBuildHTTPSSelectedSourcesFailClosedWithExactRemedies|TestBuildHTTPSCredentialReadersMaterializeConfiguredSources|TestBuildHTTPSResolutionIsCarriedByTheExternalInstallPlan|TestPromptedBuildHTTPSAbortStopsTheProductionPlanBeforeAnyFetch|TestResolvedHTTPSCredentialIsBoundToOnlyItsEffectiveFetch|TestHTTPSPromptDefaultSelectsExistingCredentialAndNarrowestSavedScope|TestHTTPSPromptThisRunOnlyNeverReachesPersistenceOnEitherCredentialSurface|TestHTTPSPromptPersistsEnteredTokenOnlyAfterScopeChoice|TestHTTPSPromptAbortNeverPersistsOrSelects|TestRunWideSelectionCoversEveryRepositoryAheadOfConfiguredScopes|TestConfiguredScopesAreSelectedPerRepository|TestRepositoriesThatNeedNoCredentialSkipSelection|TestSubstitutionMovesARepositoryOffAndOntoTheSSHTransport|TestUnselectedSSHRepositoriesFailClosedWithTheProtocolCode|TestDefaultBuildSSHScopeIsTheRepositoryNamespace|TestCaptureBuildSSHSelectionPrefersFlagsOverTheEnvironment|TestConfiguredPathsExpandTheOperatorHome|TestKnownHostsFallBackFromScopeToRunWideToOperator|TestAgentUnsetDiagnosticIsIdenticalForRunWideAndScopedSelections|TestConfiguredAgentResolvesToTheLiveSocket|TestRunWideAgentAutoRequiresALiveSocket|TestEveryConfiguredShapeReachesTheWrapperPolicy|TestDiscoveryListsTheLiveAgentAndPublicIdentitiesOnly|TestDiscoveryDegradesWhenTheAgentCannotBeAsked|TestDiscoveryWithoutAnAgentOrAHomeFindsNothing|TestDiscoveryCapsTheIdentityListingAndReportsTheRemainder|TestAgentKeyCountReadsTheToolOutputRatherThanItsNoise|TestSSHAddKeyCountDegradesWhenTheSocketIsNotAnAgent|TestAddCommandsAreBuiltFromTheDiscoveredCandidates|TestUnselectedRepositoriesFailClosedWithCommandsBuiltFromTheCandidates|TestAHostWithoutCandidatesSaysSoRatherThanInventingAPath|TestAPromptedScopeCoversTheRepositoryAndIsReportedAsItsSource|TestProvenanceNamesEverySourceOnePerRepository|TestAResolverThatCoversNothingStillFailsClosed|TestAnAbortedResolverFailsTheRunWithItsOwnError|TestPromptedScopesDoNotMutateTheLoadedConfiguration|TestTheCredentialPrecheckRunsBeforeAnyFetch|TestADryRunReportsThePerRepositoryCredentialSource|TestTheCredentialReportIsLabelledByTheScopeThatProducedIt|TestPromptDefaultSelectionPinsTheAgentToTheFirstDiscoveredKey|TestPromptThisRunOnlyReturnsSSHCredentialWithoutPersisting|TestPromptNumberedSelectionAndAnExplicitScope)$' github.com/relux-works/curator/internal/install
+```
+
+### full-internal-install-01
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 93.21s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestPromptManualIdentityPathCoversAKeyDiscoveryDidNotList|TestPromptRejectsAMalformedManualPathAndAsksAgain|TestPromptRejectsAnUnofferedChoiceAndAMalformedScope|TestPromptAbortFailsClosedWithoutPersistingAnything|TestAbortCarriesTheProtocolCodeSoTheRunStillFailsClosed|TestOneScopeChoiceCoversEverySiblingRepository|TestPromptWithoutCandidatesStillOffersTheManualPath|TestPromptListsTheUnlistedIdentityCount|TestAPersistFailureStopsTheRunRatherThanContinuing|TestAuthoritativeCacheOutcomesDriveInstallation|TestAuthoritativeCacheRejectionsAreRebuiltNeverAdopted|TestCacheWrongTargetRebuildCompletesWithinDeadline|TestRunCommitRecheckRefusesDestinationInsideAdmitted|TestRunCommitRecheckRefusesSwappedParent|TestRunCommitRecheckPassesUnchangedBoundaries|TestRunCommitWithoutBoundariesSkipsRecheck|TestCommitOrdersTargetClassesWithConsumerLast|TestConsumerLedgerIsAbsentAfterAFailedFirstInstallAndCommitsLastOnSuccess|TestCachePublicationFailureLeavesInstallationAndProtectedCacheUntouched|TestAFailedCommitRestoresTheBuildCacheItReplaced|TestARolledBackTargetCommitRestoresTheBuildCacheItReplaced|TestAnInFlightTransactionKeepsThePublishedCacheEntry|TestAPublicationThatChangedTheCacheIsReportedAsRetained|TestAReversalThatDidNotCompleteIsReportedAsRetained|TestBuildPublicationFailuresAreRedactedInTheResult|TestConcurrentProjectInstallsPreserveBothConsumers|TestInstallHelperProcess|TestRollbackCannotRestoreOverAnotherProjectsCommittedSharedTargets|TestRecoveryCompletesBeforeAnyNewMutation|TestStaleInstalledGenerationRestartsInsteadOfApplyingTheOldPlan|TestMaintenanceFailureAfterCommitIsAWarning|TestNoSharedTargetChangesBeforeTheManagerHomeLock|TestGlobalCommitCarriesNoConsumerLedger|TestStagedPlanRejectsTwoProducersClaimingOneLivePath|TestAdapterLedgerCommitsAfterTheMirrorsItClaims|TestRedactDiagnosticReplacesEveryAbsoluteLocation|TestRedactDiagnosticCannotDriveATerminal|TestRedactDiagnosticIsBounded|TestRedactDiagnosticKeepsInvalidUTF8Out|TestPlanLinesRedactAnUntrustedReason|TestBuildFailuresAreRedactedInTheResult|TestGoToolchainRemedyReachesTheOperatorIntact|TestDraftFailureAtEveryTargetClassRestoresPriorState|TestDraftAuditStrictLocalRequiresAttestation|TestDraftAuditAdvisoryLocalPasses|TestDraftAuditBindingLifecycle|TestDraftAuditHostileContentBlocked|TestDraftAuditPinDoesNotWaiveStrictFindings|TestDraftAuditRevocationBlocks|TestDraftAuditBrokenReportRefuses|TestDraftAuditFirstIssuanceVsBrokenRecord|TestDraftAuditPolicyRenewalBrokenEvidence|TestDraftAuditRenewalNeverHidesRefusal|TestDraftAuditRenewalMarkersNeverRenewable|TestDraftAuditMalformedShapeRefuses|TestDraftAuditClosedPackageShapeRefuses|TestDraftAuditEnforcedScriptAdmitted|TestDraftAuditDuplicateKeysRefuse|TestDraftAuditUnreadableBindingRefuses|TestExternalAdoptionsListEveryPublishedEntryOnce)$' github.com/relux-works/curator/internal/install
+```
+
+### full-internal-install-02
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 102.86s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestAdoptExternalPublicationsWarnsWithoutCreatingAnything|TestDraftBuildsPublishReceipt3OnBothArms|TestDraftBuildKeyFollowsThePackageIdentity|TestDraftBuildRefusesASessionThatBindsTheLegacyDigest|TestDraftBuildToolchainFailureBehaviorIsPreserved|TestLegacyBuildsKeepReceipt1|TestDraftBuildFinalRootParentsAreStoreCreated|TestReviewExternalExecutionBindsExactReceipt3Input|TestDraftBuildRefusesCompilerViewDigest|TestDraftEvidenceExactMatch|TestDraftGitInstallWritesMarkerV5|TestDraftGitMarkerLockBindingRoundTrip|TestDraftGitRuntimeMaterializesUnderSourceV1Key|TestDraftGitInstallCarriesRegistryAttestation|TestDraftInstallRevokedEvidenceRefusesDespiteAttestedMarker|TestDraftLocalRejectsConfusedAttestation|TestDraftMarkerArmGuards|TestDraftSelectorSubstitutionForbidden|TestDraftGitBuildsPublishReceipt3|TestDraftDeclaredTagBumpIsNotAMovedTag|TestDraftSameTagMoveInstallsWithoutWarning|TestLegacyDeclaredTagBumpIsNotAMovedTag|TestDraftDryRunExposesResolvedAttestations|TestDraftRepairRevalidatesLockedSource|TestDraftRepairRestoresDriftedContent|TestDraftRefusedRepairPreservesLock|TestDraftInstallFailsStaleBindingsGeneration|TestDraftRefreshThenInstallReplacesLockAndMarker|TestDraftRetargetFailsAtWriteTimeAndRollsBack|TestDraftAdmittedReplacementFailsAtWriteTimeAndRollsBack|TestDraftUnmanagedAdapterDestinationRefuses|TestDraftLocalRuntimeMaterializesFromFrozenSnapshot|TestDraftLocalRefreshReplacesFrozenRuntime|TestDraftLocalTamperedFrozenRuntimeRefuses|TestDraftLocalMissingSnapshotReplays|TestDraftLocalEnforcedCommandRefused|TestDraftLocalMissingSystemCommandRefused|TestDraftLocalSkillDependencyRefused|TestDraftLocalInvalidCapabilitiesRefuseAtResolve|TestDraftMarkerPackageDigestMatchesLockDigest|TestDraftRuntimeKeysCoverAllArms|TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts|TestDraftInstallMissingLockFails|TestDraftInstallStaleLockFails|TestDraftInstallReplaysMissingLocalSnapshot|TestDraftReplayRefusesUnreadableGitSnapshotCache|TestDraftInstallRefusesUnreadableLocalSnapshotCache|TestDraftInstallUsesPinnedBytes|TestSchema2InstallRequiresLockAndLegacyStillWorks|TestDraftFreshMachineTransitiveReplaySourceGuards|TestDraftReplayFileURLUsesPortableGitConfigSyntax|TestDraftFreshMachineReplaysEverySourceThroughInstallAndUpgrade|TestDraftFreshMachineReplaysDeclaredGitSourceWithoutBindings|TestDraftReplaySeedSurvivesIsolatedFetch|TestDraftFreshGitSourceWithoutEndpointIsUnavailableAndPreservesLock|TestDraftFreshMachineMovedTagReplaysLockedCommitWithoutRefResolution|TestDraftFreshGitReplayChecksContentHashBeforePublishingSnapshot|TestDraftFreshPathMismatchAndUnreachableSourcePreserveLock|TestDraftInstallDoesNotIgnoreOrPrivatizeSkillfileLock|TestDraftInstallGitPinnedSubtree)$' github.com/relux-works/curator/internal/install
+```
+
+### full-internal-install-03
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 118.71s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestDraftInstallGitTamperRefused|TestAcquireDraftNetworkRevision2ProvenanceSink|TestDraftTransportEnabled|TestDraftTransportPlanConversion|TestDraftTransportAuth|TestDraftPlanNeedsSSH|TestDraftPlanNamesProvider|TestDraftSSHWrapperBase|TestDraftManagerExecutable|TestAcquireDraftNetworkSelection|TestAcquireDraftNetworkWindowsRefusesBeforeAnyProcess|TestDefaultAcquireFetchesTheDeclaredURL|TestAcquireDraftNetworkRevision2Positives|TestAcquireDraftNetworkRevision2ExhaustionSanitized|TestAcquireDraftNetworkRevision2Refusals|TestRevision1ReaderRejectsV2Shapes|TestUserConfigIgnoredByResolvedLane|TestDraftTransportPlanV2Conversion|TestDraftPlanNeedsSSHRevision2|TestDryRunEffectBindingsSeeWhatARealOperationWrites|TestLegacyMixedBuildProjectInstallProducesMarkerV3|TestExternalCommandNameCollisionFailsBeforeMutation|TestGlobalMixedBuildStagesExternalBeforeLocal|TestAuthoritativeMixedBuildCasesUseProjectInstallEntry|TestAuthoritativePathShimCasesUseProjectInstallEntry|TestAuthoritativeSigningCasesUseProjectInstallEntry|TestAuthoritativeTransactionCasesUseProjectInstallEntry|TestRevisionSubstitutionDerivesEffectiveObjectFormat|TestMarkerGenerationDistinguishesAbsentUnreadableAndInvalid|TestMovedTagReaderTreatsInvalidMarkerAsStaleButKeepsReadFailure|TestReadDocumentBindsGenerationToBytesRewrittenInPlace|TestReadDocumentBindsGenerationToBytesReplacedByRename|TestDeclarationGenerationIsContentAddressed|TestDocumentGenerationIsStableWhenUnreadable|TestObservationsRecheckDocumentsAgainstTheParsedBytes|TestGitFixtureRetriesOnceOnSpawnEACCES|TestGitFixtureRetriesOnceOnSpawnEAGAIN|TestGitFixtureNeverRetriesNonZeroExit|TestGitFixtureNeverRetriesWrappedExitError|TestGitFixtureRetryPredicate|TestGitFixturePersistentSpawnFailureCarriesDiagnostic|TestGitFixtureNonRetryableSpawnErrorFailsFastWithDiagnostic|TestGitFixtureRealSpawnEACCESRetriesOnce|TestGitFixtureUnresolvableGitFailsFastWithDiagnostic|TestGitFixtureOuterEntryRunsRealGit|TestGitFixtureOuterEntryLogsRetryOnTransientEACCES|TestProjectRefusesOnGitignoreSpawnFailure|TestProjectNonGitWithDevSubstitution|TestGlobalInstallRecognizesAdoptedForwardingShim|TestGlobalReconcilesOwnedLegacyForwardingLink|TestEndToEndInstall|TestProjectInstallRecordsShellHookApprovals|TestProjectDryRunRecordsNoShellHookApprovals|TestBuildRootExcludedBeforeLocaleRenderingWithoutCompilerExecution|TestRuntimeLauncherResolvesSkillDependencyWithoutShellHook|TestRuntimeLauncherCapturesDeclaredSystemDependency|TestSecondInstallIsUpToDate|TestTamperTriggersReinstall|TestRemovedSkillCleanedUp|TestDryRunTouchesNothing)$' github.com/relux-works/curator/internal/install
+```
+
+### full-internal-install-04
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 311.18s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestGitignoreGateSkips|TestMissingSystemCommandFails|TestMovedTagWarningAndStrict|TestRuntimeOnlyProviderGetsMarkerNoAdapter|TestRuntimeOnlyProviderStillRequiresSkillMd|TestHybridSkillActivatesWithoutTouchingProjectStore|TestHybridShadowedByProjectDeclaration|TestGlobalInstall|TestGlobalInstallRejectsSchema2Skillfile|TestGlobalUpgradeDryRunLeavesPersistentStateUnchanged|TestGlobalInstallUsesManifestLocaleAndAuditGate|TestGlobalStrictTagsDetectMovedTag|TestMcpRequirementGatesInstall|TestAuditGateBlocksUndeclaredNetwork|TestBrokenTransitiveManifestNamesTheBrokenSkill|TestAuditAdmitsVendoredThirdPartyText|TestInstallScriptSecurityRows|TestLegacyLaneBuildsPublishReceipt3|TestLegacyLaneBuildMarkerRebindsTamperedReceipt|TestLegacyLaneRecordsDependencyDirectory|TestLegacyLockPackageArms|TestBuildMarkerRecordsReceipt3ForMigratedLegacyNode|TestLegacyLaneRefusesGlobDependencyDirectory|TestLegacyLaneRejectsUnboundPreviousGeneration|TestLegacyLaneDependencyTagMovement|TestLegacyLaneMovedTagRefusesStrictSecondInstall|TestReviewChangedDeclaredTagIsNotMovedTag|TestLegacyLaneSameTagMoveWithAlias|TestLegacyLaneChangedTagAfterOldTagDeleted|TestLegacyLaneRuntimeMatchesPackageMarker|TestGlobalLaneRuntimeMatchesPackageMarker|TestPostCommitMaintenanceRunsUnderTheHeldHomeLock|TestPostCommitMaintenanceWarningsReachTheResult|TestPostCommitMaintenanceMarksInFlightJournals|TestDeclaredModuleRootsReachTheBuilder|TestASchemaSixCommandDeclaresNoModules|TestOpaqueNULIsBlockedAtProjectAndGlobalInstallWithAuditDisabled|TestV1ReinstallRefusesNULAppearingAfterInstall|TestV2InstallAdmitsNULBearingSkillAtProjectAndGlobal|TestV2InstallDistinguishesNULCollisionTwins|TestDraftLaneStillBlocksNULBearingMember|TestInstallDraftOwnershipCases|TestInstallPreservesUnownedStaleStoreEntries|TestInstallRefusesUnownedSelectedCanonicalDestination|TestInstallRefusesUnprovenStaleOwnership|TestInstallOwnedCanonicalPositiveControls|TestGlobalCanonicalOwnershipPreservation|TestHybridCanonicalOwnershipPreservation|TestInstallDraftMarkerWriterCases|TestProjectDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot|TestGlobalDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot|TestDryRunRemovesItsOperationPrivateRootOnFailure|TestGlobalDryRunRemovesItsOperationPrivateRootOnFailure|TestRealRunKeepsEveryEphemeralPathInOneOperationPrivateRoot|TestGlobalMcpFailureBlocksToolchainCacheAndBuild|TestGlobalRegistryFailureBlocksToolchainCacheAndBuild|TestGlobalMarkersCarryMcpAndAttestationEvidence|TestRegistryRevocationDeniesInstall|TestRegistryAttestationLandsInMarker|TestV1InstallRejectsV2RegistryEvidence)$' github.com/relux-works/curator/internal/install
+```
+
+### full-internal-install-05
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 163.17s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestV2RegistryAttestationUsesVersionedInstallPath|TestRegistryFirstUseReportsAndPersistsTOFUPosture|TestRegistryCheckpointPersistsBeforeTamperedNetworkSnapshot|TestRegistryInvalidFirstUseCheckpointFailsClosed|TestRegistryRebootstrapRegressionKeepsExistingHighWater|TestRegistryBootstrapVectorsDriveInstall|TestStrictRegistryPolicyFailsUnknown|TestRegistryMirrorComparisonVectorsDriveInstall|TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch|TestRegistrySnapshotMintedDuringFetchIsNotFuture|TestRegistrySnapshotSlowSiblingDoesNotFlipInstantRegistry|TestRegistrySnapshotTwoSecondsPastSkewStillRefuses|TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries|TestRegistrySnapshotWithinTheBoundIsAcceptedThroughInstall|TestStableDeclarationInputsCommitWithoutRestarting|TestProjectDeclarationRemovedBeforeHomeLockRestartsAndCommitsNoStaleState|TestProjectDeclarationAddedBeforeHomeLockRestartsAndCommitsTheNewClosure|TestGlobalDeclarationRemovedBeforeHomeLockRestartsAndCommitsNoStaleState|TestGlobalDeclarationAddedBeforeHomeLockRestartsAndCommitsTheNewClosure|TestDevSubstitutionAppearingBeforeHomeLockRestartsClosureResolution|TestEnforcedScriptCommandIsRefusedAtInstall|TestDeclaredOnlySchema8ScriptCommandInstallsUnchanged|TestActiveScriptCommandWritersSplitDeclaredOnlyAndEnforced|TestActiveEnforcedScriptCommandsAdmits|TestActiveEnforcedScriptCommandsRefusesUnavailableHost|TestEnforcedScriptCommandInstallsNativeLauncher|TestScriptOptInCasesAtInstallEntry|TestGlobalEnforcedInstallExcludesForwardingMirror|TestEnforcedInstallAndLaunchAtCLIEntry|TestEnforcedToDeclaredOnlyFlipRemovesNativeLauncher|TestStageProjectTargetsPopulatesBoundaries|TestStageProjectTargetsRefusesMirrorOverSnapshot|TestStageProjectTargetsRefusesProjectInsideSnapshot|TestStageProjectTargetsRefusesMissingSnapshot|TestStageGlobalTargetsPopulatesBoundaries|TestStageGlobalTargetsRefusesMirrorOverSnapshot|TestRunCommitWithRealStagingJournalsOneTransaction|TestRunCommitWithRealStagingRefusesOverlapBeforeJournaling|TestPerWriteGuardRefusesSwappedParentAndRollsBack|TestProjectInstallRefusesAdapterDestinationOverSnapshot|TestGlobalInstallRefusesAdapterDestinationOverSnapshot|TestDryRunPlansBuildsWithoutToolchainSessionOrPersistentState|TestGlobalDryRunPlansBuildsWithoutSessionOrPersistentState|TestGlobalStagingFailureLeavesGlobalScopeUnchanged|TestDryRunReportsCacheHitWithoutBuilding|TestCacheHitPerformsNoSourceAwareGoCommand|TestStagingRunsProviderFirstAndCommandLexical|TestStagedOutputsStayPrivateAndAreReleased|TestSecondBuildFailurePreservesPriorInstallationAndLiveCache|TestToolchainDriftAfterTheFinalBuildBlocksHandoffAndPreservesLiveState|TestGlobalToolchainDriftAfterTheFinalBuildPreservesGlobalScope|TestCacheHitOnlyPlanStillFinalizesToolchainTrust|TestCacheInspectionIsBracketedByTheFrozenSource|TestSourceMutationDuringStagingBlocksHandoffOfACacheHit|TestToolchainFailureBlocksEveryPersistentMutation|TestCorruptCacheEntryIsRebuiltAndNeverReused|TestUnsupportedCacheProtectionFailsClosed|TestIncompletePlansNeverClaimACompleteDiagnostic|TestToolchainFailurePlansAnInventoryOfEveryActiveCommand|TestUntrustedCacheEntryIsRebuiltAndNeverReused)$' github.com/relux-works/curator/internal/install
+```
+
+### full-internal-install-06
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 9.14s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 -run '^(TestScriptOnlyInstallPerformsNoToolchainOrCacheWork|TestInjectedClockAndGenerationReaderDriveInstallMarkers|TestPlannedBuildAccessorsAreImmutable|TestReleaseTakesNoToolchainVerdictAfterLiveMutation|TestGlobalReleaseTakesNoToolchainVerdictAfterLiveMutation|TestSessionReleaseFailureWarnsWithoutFailingACommittedInstall|TestDefaultToolchainProbeRemovesItsProbeRootOnFailure|TestDefaultToolchainProbeRemovesItsProbeRootOnSuccess|TestDefaultToolchainEstablishRemovesItsPrivateRootOnFailure|TestProjectWriteBlobsSpawnFailureIsWrapped)$' github.com/relux-works/curator/internal/install
+```
+
+### full-other-0
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 173.67s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 github.com/relux-works/curator/cmd/curator-spec-pin github.com/relux-works/curator/internal/adapters github.com/relux-works/curator/internal/artifactpolicy github.com/relux-works/curator/internal/artifactpolicy/conformance github.com/relux-works/curator/internal/audit github.com/relux-works/curator/internal/buildcache github.com/relux-works/curator/internal/buildmeta github.com/relux-works/curator/internal/buildrepo github.com/relux-works/curator/internal/buildsource github.com/relux-works/curator/internal/capabilities github.com/relux-works/curator/internal/closure github.com/relux-works/curator/internal/closureexec github.com/relux-works/curator/internal/closuregraph github.com/relux-works/curator/internal/config github.com/relux-works/curator/internal/conformancecoverage
+```
+
+### full-other-1
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 193.37s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 github.com/relux-works/curator/internal/contextaudit github.com/relux-works/curator/internal/contextlock github.com/relux-works/curator/internal/contextmaterialize github.com/relux-works/curator/internal/contextpkg github.com/relux-works/curator/internal/contextresolve github.com/relux-works/curator/internal/contextstore github.com/relux-works/curator/internal/crossconformance github.com/relux-works/curator/internal/devsub github.com/relux-works/curator/internal/envfiles github.com/relux-works/curator/internal/envfragment github.com/relux-works/curator/internal/envmarker github.com/relux-works/curator/internal/envregistry github.com/relux-works/curator/internal/envsnapshot github.com/relux-works/curator/internal/gitcred github.com/relux-works/curator/internal/gitignore
+```
+
+### full-other-2
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 110.29s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 github.com/relux-works/curator/internal/gitops github.com/relux-works/curator/internal/globalbins github.com/relux-works/curator/internal/godriver github.com/relux-works/curator/internal/hashing github.com/relux-works/curator/internal/hookapproval github.com/relux-works/curator/internal/identifiers github.com/relux-works/curator/internal/identity github.com/relux-works/curator/internal/install/atomicity github.com/relux-works/curator/internal/interop github.com/relux-works/curator/internal/interop/environments github.com/relux-works/curator/internal/locale github.com/relux-works/curator/internal/managerlock github.com/relux-works/curator/internal/manifest github.com/relux-works/curator/internal/marker github.com/relux-works/curator/internal/mcp
+```
+
+### full-other-3
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 168.53s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 github.com/relux-works/curator/internal/moduleroots github.com/relux-works/curator/internal/nodesource github.com/relux-works/curator/internal/npmsource github.com/relux-works/curator/internal/opaquescan github.com/relux-works/curator/internal/pathboundary github.com/relux-works/curator/internal/pkgversion github.com/relux-works/curator/internal/pnpmsource github.com/relux-works/curator/internal/privatedir github.com/relux-works/curator/internal/protocoljson github.com/relux-works/curator/internal/registry github.com/relux-works/curator/internal/runtimestore github.com/relux-works/curator/internal/rustsource github.com/relux-works/curator/internal/scopes github.com/relux-works/curator/internal/scriptpolicy github.com/relux-works/curator/internal/scriptworker
+```
+
+### full-other-4
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 122.58s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 github.com/relux-works/curator/internal/shell github.com/relux-works/curator/internal/skillcheck github.com/relux-works/curator/internal/skillspec github.com/relux-works/curator/internal/snapshot github.com/relux-works/curator/internal/sourcelock github.com/relux-works/curator/internal/staging github.com/relux-works/curator/internal/stateread github.com/relux-works/curator/internal/swiftpmbuild github.com/relux-works/curator/internal/swiftpminterop github.com/relux-works/curator/internal/swiftpmsource github.com/relux-works/curator/internal/testcli github.com/relux-works/curator/internal/testgitenv github.com/relux-works/curator/internal/testtoolchain github.com/relux-works/curator/internal/transaction github.com/relux-works/curator/internal/ui
+```
+
+### full-other-5
+
+CWD: `$VALIDATION`. Exit: 0. Duration: 49.78s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -timeout=8m -json -p=2 github.com/relux-works/curator/internal/verr github.com/relux-works/curator/internal/version github.com/relux-works/curator/internal/whitelist github.com/relux-works/curator/internal/yarnclassicsource github.com/relux-works/curator/internal/yarnmodernsource github.com/relux-works/curator/tools/ciworkflow github.com/relux-works/curator/tools/goreleaserconfig
+```
+
+### inventory
+
+CWD: `$WORKTREE`. Exit: 0. Duration: 12.59s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -list . -timeout=8m ./...
+```
+
+### native-recovery
+
+CWD: `$WORKTREE`. Exit: 0. Duration: 3.87s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -v ./internal/envprofile -run '^TestSkillProjection(NativeRebuild|RebuildRecovery)$'
+```
+
+### platform
+
+CWD: `$WORKTREE`. Exit: 0. Duration: 0.01s.
+
+```sh
+/usr/bin/uname -sm
+```
+
+### pre-build
+
+CWD: `$WORKTREE`. Exit: 0. Duration: 0.77s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO build ./...
+```
+
+### pre-vet
+
+CWD: `$WORKTREE`. Exit: 0. Duration: 2.05s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO vet ./...
+```
+
+### rebuild-tests-fixed
+
+CWD: `$WORKTREE`. Exit: 0. Duration: 14.5s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -v ./internal/envprofile -run '^(TestProfileSkillProjectionDamagedStore|TestSkillProjection(Rebuild|Shared))'
+```
+
+### rebuild-tests
+
+CWD: `$WORKTREE`. Exit: 1. Duration: 0.32s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -count=1 -v ./internal/envprofile -run '^(TestProfileSkillProjectionDamagedStore|TestSkillProjection(Rebuild|Shared))'
+```
+
+### reviewer-fixed
+
+CWD: `$WORKTREE`. Exit: 0. Duration: 9.63s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO test -overlay .temp/BUG-261021-2qv4zj/reviewer-overlay.json -count=1 -v ./internal/envprofile -run '^TestReviewerProjectionRepair$'
+```
+
+### tool-version
+
+CWD: `$WORKTREE`. Exit: 0. Duration: 0.02s.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE $CURATOR_GO version
+```
+
+## Conditional skips
+
+```text
+github.com/relux-works/curator/cmd/curator TestEnvUnmanageBackupRecordVectors
+github.com/relux-works/curator/cmd/curator TestSignerRowsSurviveHostileGlobalGitConfig
+github.com/relux-works/curator/cmd/curator TestAuthoritativeLifecycleUpgradeCasesAreExecutable
+github.com/relux-works/curator/cmd/curator TestAuthoritativeLifecycleBootstrapCasesAreExecutable
+github.com/relux-works/curator/cmd/curator TestMuseFragmentV3PublishedCases
+github.com/relux-works/curator/cmd/curator TestProfileUpdateAllDeltaVectorsAtCLI
+github.com/relux-works/curator/cmd/curator TestProfileUpdateAllStopsAtFirstUnconfirmedDelta
+github.com/relux-works/curator/cmd/curator TestProfileInstallReinstallDeltaVectorsAtCLI
+github.com/relux-works/curator/cmd/curator TestSourceSignerVectorsAtProfileInstall/unsigned-refused
+github.com/relux-works/curator/cmd/curator TestSourceSignerVectorsAtProfileInstall/wrong-signer-refused
+github.com/relux-works/curator/cmd/curator TestSourceSignerVectorsAtProfileInstall/ssh-tag-signature-accepted
+github.com/relux-works/curator/cmd/curator TestSourceSignerVectorsAtProfileInstall/empty-allowlist-signed-refused
+github.com/relux-works/curator/cmd/curator TestSecurityPostureVectorsThroughCLI
+github.com/relux-works/curator/cmd/curator TestUmbrellaProviderResolutionVectors
+github.com/relux-works/curator/internal/install TestAuthoritativeDryRunCasesMutateNothingPersistent
+github.com/relux-works/curator/internal/envprofile TestEnvironmentsCodexSeedVectors
+github.com/relux-works/curator/internal/envprofile TestEnvironmentsEnvPassthroughVectors
+github.com/relux-works/curator/internal/envprofile TestDotfileManagerVectors
+github.com/relux-works/curator/internal/envprofile TestMusePublishedLinkStates
+github.com/relux-works/curator/internal/envprofile TestMusePublishedRegistryLayout
+github.com/relux-works/curator/internal/envprofile TestPathKindMCPVectorsDriveInstallEntry
+github.com/relux-works/curator/internal/envprofile TestPathKindBoundaryVectorsDriveProductionEntries
+github.com/relux-works/curator/internal/envprofile TestPathKindDryRunVectorsDriveReadOnlyResolve
+github.com/relux-works/curator/internal/envprofile TestFoldedPathsAreSourceInvalid
+github.com/relux-works/curator/internal/envprofile TestSystemDeltaVectors
+github.com/relux-works/curator/internal/envprofile TestEnvironmentsReadFailureVectors
+github.com/relux-works/curator/internal/envprofile TestUpdateConfirmationPostureVectorAtStatus
+github.com/relux-works/curator/internal/envprofile TestSignerPostureVectorsAtStatus
+github.com/relux-works/curator/internal/envprofile TestStoreBoundaryResolveVectorsDriveResolve
+github.com/relux-works/curator/internal/envprofile TestStoreBoundaryDryRunVectorsDriveResolveRepairPlan
+github.com/relux-works/curator/internal/envprofile TestStoreBoundaryRepairVectorsDriveResolveRepair
+github.com/relux-works/curator/internal/envprofile TestStoreBoundaryStatusVectorsDriveStatus
+github.com/relux-works/curator/internal/envprofile TestEnvironmentWriteNofollowVectors
+github.com/relux-works/curator/internal/install TestInstallHelperProcess
+github.com/relux-works/curator/internal/install TestAuthoritativeCacheOutcomesDriveInstallation
+github.com/relux-works/curator/internal/install TestAuthoritativeCacheRejectionsAreRebuiltNeverAdopted
+github.com/relux-works/curator/internal/install TestAcquireDraftNetworkWindowsRefusesBeforeAnyProcess
+github.com/relux-works/curator/internal/install TestDryRunEffectBindingsSeeWhatARealOperationWrites
+github.com/relux-works/curator/internal/install TestAuthoritativeMixedBuildCasesUseProjectInstallEntry
+github.com/relux-works/curator/internal/install TestAuthoritativePathShimCasesUseProjectInstallEntry
+github.com/relux-works/curator/internal/install TestAuthoritativeSigningCasesUseProjectInstallEntry
+github.com/relux-works/curator/internal/install TestAuthoritativeTransactionCasesUseProjectInstallEntry
+github.com/relux-works/curator/internal/install TestRegistryBootstrapVectorsDriveInstall
+github.com/relux-works/curator/internal/install TestRegistryMirrorComparisonVectorsDriveInstall
+github.com/relux-works/curator/internal/buildcache TestProtectedCacheHitVector
+github.com/relux-works/curator/internal/buildcache TestCompilerFreeDryRunMissVector
+github.com/relux-works/curator/internal/buildcache TestCacheRejectionClustersMapToStableCuratorOutcomes
+github.com/relux-works/curator/internal/buildcache TestCandidateCacheOutcomeVocabulary
+github.com/relux-works/curator/internal/buildmeta TestPortableExecutionPolicyIsTheOnlyAdmittedBuildInput
+github.com/relux-works/curator/internal/buildmeta TestCandidateBuildMetadataArtifacts
+github.com/relux-works/curator/internal/buildmeta TestCandidateBuildReceiptSchemaCase
+github.com/relux-works/curator/internal/buildrepo TestExternalRepositoryAcquisitionConformance
+github.com/relux-works/curator/internal/buildrepo TestReleasedSkillBuildSchemaCases
+github.com/relux-works/curator/internal/buildrepo TestReleasedSourceIdentityVectors
+github.com/relux-works/curator/internal/buildrepo TestExternalReceiptV2CacheKeyVector
+github.com/relux-works/curator/internal/buildrepo TestVerifyPublishedReleasePinWhenConformanceRootIsSupplied
+github.com/relux-works/curator/internal/buildsource TestBuildSourceConformanceVectors
+github.com/relux-works/curator/internal/closure TestClosureOrderingConformanceVector
+github.com/relux-works/curator/internal/closure TestBuildCommandOrderingConformanceVector
+github.com/relux-works/curator/internal/buildrepo TestResolvedTransportWindowsRefusesBeforeAnyProcess
+github.com/relux-works/curator/internal/config TestManagerConfigV2SchemaCases
+github.com/relux-works/curator/internal/config TestManagerConfigV3SchemaCases
+github.com/relux-works/curator/internal/config TestSourceSignerMergeVectorsAtLoad
+github.com/relux-works/curator/internal/config TestSystemConfigV2SchemaCases
+github.com/relux-works/curator/internal/config TestSystemConfigV2IsolationDirectionsFromPinnedCases
+github.com/relux-works/curator/internal/config TestManagerConfigV2Vectors
+github.com/relux-works/curator/internal/config TestOverlayConformancePassesWithPermissionsAndSourceSigners
+github.com/relux-works/curator/internal/config TestSecurityPostureVectors
+github.com/relux-works/curator/internal/config TestSystemModuleSchemaSubset
+github.com/relux-works/curator/internal/conformancecoverage TestContentHashV2VectorsWhenPublished
+github.com/relux-works/curator/internal/conformancecoverage TestMuseCandidateHistoricalHashV2FamiliesAreKnownGapsWhenPublished
+github.com/relux-works/curator/internal/conformancecoverage TestMuseCandidateHistoricalHashV2VectorsAreKnownGapsWhenPublished
+github.com/relux-works/curator/internal/contextlock TestContextLockV2SchemaCases
+github.com/relux-works/curator/internal/contextlock TestParseRejectsHashVersionOnFrozenContextLock
+github.com/relux-works/curator/internal/contextmaterialize TestSystemModuleAdmissionVectors
+github.com/relux-works/curator/internal/contextresolve TestSourceSignerVectorsAtResolve
+github.com/relux-works/curator/internal/devsub TestSkillfileDevV2PublishedCasesUseCoverageRatchet
+github.com/relux-works/curator/internal/envfragment TestFragmentAuthoritativeSchemaCases
+github.com/relux-works/curator/internal/envmarker TestParseAuthoritativeEnvMarkerSchemaCases
+github.com/relux-works/curator/internal/envmarker TestParseAuthoritativeEnvMarkerV2SchemaCases
+github.com/relux-works/curator/internal/envmarker TestParseAuthoritativeEnvMarkerV3SchemaCases
+github.com/relux-works/curator/internal/godriver TestBuildFailsClosedWhenTheGoChildCannotStart
+github.com/relux-works/curator/internal/godriver TestPortableExecutionPolicyMatchesTheAcceptedVector
+github.com/relux-works/curator/internal/godriver TestMandatoryControlsMatchTheAcceptedVector
+github.com/relux-works/curator/internal/godriver TestNativeControlInventoryMatchesTheAcceptedVector
+github.com/relux-works/curator/internal/godriver TestCapabilityEvidenceRecordMatchesTheAcceptedVector
+github.com/relux-works/curator/internal/godriver TestCapabilityEvidenceCasesMatchTheAcceptedVector
+github.com/relux-works/curator/internal/godriver TestDeferredGuaranteesAndFailureBoundaryMatchTheAcceptedVector
+github.com/relux-works/curator/internal/godriver TestIdentityProtocolAndPackageInfluenceCodesMatchTheAcceptedVector
+github.com/relux-works/curator/internal/godriver TestCacheIdentityMatchesTheAcceptedVector
+github.com/relux-works/curator/internal/godriver TestCandidateGoV1SourceAwareContract
+github.com/relux-works/curator/internal/gitops TestExtractAdmitsDirectoryComponentFoldWhenCaseSensitive
+github.com/relux-works/curator/internal/hashing TestCrossCheckTree
+github.com/relux-works/curator/internal/hookapproval TestWindowsDriveIdentity
+github.com/relux-works/curator/internal/godriver TestRealGoV1VendoredBuildIsBoundedAndNotLaunched
+github.com/relux-works/curator/internal/godriver TestFixedEnvironmentAndFiveDirectArgvFormsVector
+github.com/relux-works/curator/internal/godriver TestToolchainIdentityVectors
+github.com/relux-works/curator/internal/godriver TestValidPackageGraphVectors
+github.com/relux-works/curator/internal/godriver TestDriverRejectionClustersMapToStableCuratorErrors
+github.com/relux-works/curator/internal/godriver TestCandidateRC4ToolchainArtifacts
+github.com/relux-works/curator/internal/godriver TestFingerprintRejectsInvalidUnicodePath
+github.com/relux-works/curator/internal/godriver TestRealGoV1ModuleRootsBuildIsBoundedAndNotLaunched
+github.com/relux-works/curator/internal/godriver TestModuleRootVectorsDriveTheWholeBuild
+github.com/relux-works/curator/internal/interop TestGoldenMarkerObject
+github.com/relux-works/curator/internal/interop TestGoldenSnapshotHash
+github.com/relux-works/curator/internal/interop TestGoldenContextCopy
+github.com/relux-works/curator/internal/interop TestGoldenRegistryObjects
+github.com/relux-works/curator/internal/interop TestCanonicalJSONVectors
+github.com/relux-works/curator/internal/interop TestSourceIdentityVectors
+github.com/relux-works/curator/internal/interop TestIdentifierVectors
+github.com/relux-works/curator/internal/interop TestLocaleSelectorVectors
+github.com/relux-works/curator/internal/interop TestManagerConfigVectors
+github.com/relux-works/curator/internal/interop TestGoldenFederationSemantics
+github.com/relux-works/curator/internal/godriver TestRealTrustedGoProbe
+github.com/relux-works/curator/internal/interop/environments TestConformanceContextDetectors
+github.com/relux-works/curator/internal/interop/environments TestConformanceEnvironmentsHeader
+github.com/relux-works/curator/internal/interop/environments TestConformanceEnvironmentsMonolithic
+github.com/relux-works/curator/internal/interop/environments TestConformanceContextResolution
+github.com/relux-works/curator/internal/interop/environments TestConformanceContextVersions
+github.com/relux-works/curator/internal/interop/environments TestConformanceEveryPathTheVectorsNameIsDeclared
+github.com/relux-works/curator/internal/interop/environments TestConformanceSnapshotAcquisition
+github.com/relux-works/curator/internal/marker TestReadRejectsHashVersionOnFrozenMarkerV3
+github.com/relux-works/curator/internal/marker TestReadAuthoritativeValidMarkers
+github.com/relux-works/curator/internal/marker TestReadAuthoritativeMarkerExternalCrossFields/install-marker-v3
+github.com/relux-works/curator/internal/marker TestReadAuthoritativeMarkerExternalCrossFields/install-marker-v4
+github.com/relux-works/curator/internal/marker TestAuthoritativeCompiledMarkerRoundTripsThroughV2Writer
+github.com/relux-works/curator/internal/marker TestAuthoritativeCompiledMarkerRoundTripsThroughWriter
+github.com/relux-works/curator/internal/marker TestReadAuthoritativeMarkerV2SchemaCases
+github.com/relux-works/curator/internal/marker TestReadAuthoritativeMarkerV3SchemaCases
+github.com/relux-works/curator/internal/marker TestReadAuthoritativeMarkerV4SchemaCases
+github.com/relux-works/curator/internal/marker TestReadAuthoritativeMarkerV5SchemaCases
+github.com/relux-works/curator/internal/moduleroots TestModuleRootVectors
+github.com/relux-works/curator/internal/npmsource TestVerifiedProviderObservesRealNodeLaunchedNPMBoundary
+github.com/relux-works/curator/internal/npmsource TestN01RealNPMCIUsesOnlyDerivedPrivateCache
+github.com/relux-works/curator/internal/registry TestPageBoundaryConformanceVectors
+github.com/relux-works/curator/internal/pnpmsource TestRealPinnedPNPMTargetPrunedUnreachableRejectsBeforeInstall
+github.com/relux-works/curator/internal/pnpmsource TestRealPinnedPNPMLockSupersetSnapshotDependencies
+github.com/relux-works/curator/internal/registry TestAuditRecordV2SchemaCases
+github.com/relux-works/curator/internal/registry TestRegistryV2CarrierSchemaCases
+github.com/relux-works/curator/internal/registry TestParseRecordRejectsHashVersionOnFrozenAuditRecord
+github.com/relux-works/curator/internal/registry TestParseRecordRejectsV2RecordInsideFrozenRegistryLogEntry
+github.com/relux-works/curator/internal/registry TestParseLogEntryRejectsV2RecordInsideFrozenRegistryLogEntry
+github.com/relux-works/curator/internal/runtimestore TestCandidateManagerLauncherContract
+github.com/relux-works/curator/internal/runtimestore TestAuthoritativeLauncherCasesForwardArgvPathRolesAndExitStatus
+github.com/relux-works/curator/internal/pnpmsource TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization
+github.com/relux-works/curator/internal/pnpmsource TestPNPMTemporaryTreeRemovable
+github.com/relux-works/curator/internal/pnpmsource TestPNPMTemporaryTreeChild
+github.com/relux-works/curator/internal/scopes TestAuthoritativeGarbageCollectionRootsAreRetained
+github.com/relux-works/curator/internal/scriptpolicy TestScriptHostExecutionPolicySectionsAreAllClassified
+github.com/relux-works/curator/internal/scriptpolicy TestScriptHostExecutionPolicyProductionConsumersCoverAllCases
+github.com/relux-works/curator/internal/scriptpolicy TestScriptExecutionPolicyIdentityMatchesTheSuite
+github.com/relux-works/curator/internal/scriptpolicy TestScriptExecutionOptInCases
+github.com/relux-works/curator/internal/scriptpolicy TestEnforcedShapesProceedPastAdmission
+github.com/relux-works/curator/internal/scriptpolicy TestMandatoryControlsMatchTheSuite
+github.com/relux-works/curator/internal/scriptpolicy TestPreflightRefusalCases
+github.com/relux-works/curator/internal/scriptpolicy TestScriptAuditLabelCases
+github.com/relux-works/curator/internal/scriptworker TestLandlockProbeCancellationKillsProcessGroup
+github.com/relux-works/curator/internal/scriptworker TestLandlockConstructionConfirmsTypedRules
+github.com/relux-works/curator/internal/scriptworker TestLinuxLandlockProbeFindsPresentControls
+github.com/relux-works/curator/internal/scriptworker TestLinuxLandlockProbeChildAnswersAtTheBoundary
+github.com/relux-works/curator/internal/scriptworker TestLinuxHostConditionalUnavailableSucceeds
+github.com/relux-works/curator/internal/scriptworker TestLinuxHostProbeAndEvidenceAreConsistent
+github.com/relux-works/curator/internal/scriptworker TestWindowsJobLimitsAppliedAndConfirmed
+github.com/relux-works/curator/internal/scriptworker TestLinuxLandlockConfinementMatchesProbe
+github.com/relux-works/curator/internal/scriptworker TestLinuxWriteConfinementTruncateMatchesProbe
+github.com/relux-works/curator/internal/scriptworker TestLinuxWriteConfinementDirectoryMutationMatchesProbe
+github.com/relux-works/curator/internal/scriptworker TestLinuxMissingDerivedPathRefusesWriteConfinement
+github.com/relux-works/curator/internal/scriptworker TestWindowsRealInterpretersRunDeclaredExec
+github.com/relux-works/curator/internal/shell TestShellHookTrustVectors
+github.com/relux-works/curator/internal/skillcheck TestBuildRootContentInContextVector
+github.com/relux-works/curator/internal/shell TestShellHookRefusesHostileCheckout/powershell
+github.com/relux-works/curator/internal/shell TestShellHookRejectsMalformedRecords/two-fields/powershell
+github.com/relux-works/curator/internal/shell TestShellHookRejectsMalformedRecords/five-fields/powershell
+github.com/relux-works/curator/internal/shell TestShellHookRejectsMalformedRecords/forged-approver/powershell
+github.com/relux-works/curator/internal/shell TestShellHookRejectsMalformedRecords/empty-approver/powershell
+github.com/relux-works/curator/internal/shell TestShellHookRejectsMalformedRecords/uppercase-approver/powershell
+github.com/relux-works/curator/internal/shell TestShellHookRejectsMalformedRecords/uppercase-digest/powershell
+github.com/relux-works/curator/internal/skillspec TestManifestAndFilesystemRejectionVectors
+github.com/relux-works/curator/internal/skillspec TestSchemaSixMixedScriptAndBuildCommandsVector
+github.com/relux-works/curator/internal/skillspec TestPortablePathConformanceVectors
+github.com/relux-works/curator/internal/skillspec TestReleasedSchemaCases
+github.com/relux-works/curator/internal/shell TestShellHookRejectsMalformedRecords/short-digest/powershell
+github.com/relux-works/curator/internal/shell TestShellHookRejectsMalformedRecords/nonhex-digest/powershell
+github.com/relux-works/curator/internal/shell TestShellHookRejectsMalformedRecords/bad-timestamp/powershell
+github.com/relux-works/curator/internal/shell TestShellHookRejectsMalformedRecords/empty-timestamp/powershell
+github.com/relux-works/curator/internal/shell TestShellHookRejectsMalformedRecords/month-13/powershell
+github.com/relux-works/curator/internal/shell TestShellHookRejectsMalformedRecords/february-30/powershell
+github.com/relux-works/curator/internal/shell TestShellHookRejectsMalformedRecords/second-60/powershell
+github.com/relux-works/curator/internal/shell TestShellHookRejectsMalformedRecords/lowercase-timestamp/powershell
+github.com/relux-works/curator/internal/shell TestShellHookTrustResolvesSymlinkedProject/powershell
+github.com/relux-works/curator/internal/shell TestShellHookTrustNativeRecordAuthorizesMSYSSpelling
+github.com/relux-works/curator/internal/shell TestPowerShellHookRunsOnEveryPrompt
+github.com/relux-works/curator/internal/whitelist TestBuildRootExcludedFromAgentContextVector
+github.com/relux-works/curator/internal/whitelist TestBuildRootContextExclusionConformanceFixture
+github.com/relux-works/curator/internal/yarnclassicsource TestRealPinnedYarnClassicReadsPrivateMirrorWithEmptyOrdinaryCache
+github.com/relux-works/curator/internal/yarnmodernsource TestModernRuntimeCyclesThroughRealPinnedYarn
+github.com/relux-works/curator/internal/yarnmodernsource TestN01RealPinnedYarnPnPInvokeThroughVerifiedExecutor
+github.com/relux-works/curator/internal/yarnmodernsource TestN10RealPinnedYarnWorkspacePeerPnPInvokeThroughVerifiedExecutor
+github.com/relux-works/curator/internal/yarnmodernsource TestN10RealPinnedYarnRemotePeerContextsThroughVerifiedExecutor
+```
+
+## Open decisions and delivery
+
+No open product decisions. One signed commit in this round. Feature push/readback, verified attachment and cleanup are recorded in the delivery ledger. Task scratch and private caches are removed after handover; results are retained.
+
+## Delivery ledger
+
+| Command or operation | Exit / observed result |
+| --- | --- |
+| a2a inbox; board get status/assignee/preconditions | 0; assigned task confirmed before work |
+| task-board resource get, all ten preconditions plus r4 review and companion probe | All 12 calls exit 0; each file read |
+| a2a ack in the assigned topic | 0 |
+| git fetch origin, before work and before feature publication | Both exit 0 |
+| git commit -S, the reviewed r5 scope | 0; e32d101e1f29cc98be75f285554bd017d1e00568 |
+| git log -1 --format='%G?' | 0; G |
+| git log 2c89fd46443d461e25bd377fb94a0c6754282838..HEAD --format='%H %G?' and assertion | 0; all ten introduced commits verify G |
+| git diff --check; clean owning and validation status | 0; no changes |
+| Local normal validation clone and detached checkout | 0; exact signed head |
+| Full-suite inventory reconciliation | 0; 39 groups, all 3600 top-level names exactly once, no missing or extra names |
+| git merge-base --is-ancestor origin/fix/audit-markdown-scope HEAD | 0 |
+| git push -u origin fix/audit-markdown-scope | 0 |
+| git ls-remote --exit-code origin refs/heads/fix/audit-markdown-scope and head assertion | 0; remote head equals e32d101e1f29cc98be75f285554bd017d1e00568 |
+
+A preliminary unquoted signature-format argument was rejected by the shell's glob expansion. The quoted exact command above was rerun and printed G; the rejected command earns no verification credit. Exploratory searches for nonexistent helper filenames returned no matches and were replaced by repository searches; they are not test evidence.
+
+The results attachment is added after this file is finalized. Its outcome-resource presence is checked by a separate board query before the handover, which records the verified resource name. Cleanup follows that handover; it removes only task-local material and preserves this results file.
