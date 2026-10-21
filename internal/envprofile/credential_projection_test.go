@@ -200,7 +200,11 @@ func TestCredentialProjectionIdentitySubrequest(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer op.close()
+			defer func() {
+				if err := op.close(); err != nil {
+					t.Error(err)
+				}
+			}()
 			migration, err := prepareIdentityMigration(op, &req, []string{fx.profile}, nil)
 			if err != nil {
 				t.Fatal(err)

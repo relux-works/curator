@@ -1716,6 +1716,52 @@ else
 fi
 
 echo ''
+# The four case-folding witnesses may skip on Linux only, with the existing
+# filesystem host-capability class. Wrong reasons and missing required witnesses
+# still fail; the CLI parent must execute on every platform.
+echo '=== platform-cases.tsv: Markdown alias controls retain platform obligations ==='
+for goos in linux darwin windows; do
+	stream="$WORK/markdown-alias-$goos.json"
+	awk '
+		!/"Test":"TestMarkdownScopeInvalidatesRulesetSixAllowance"/ &&
+		!/"Test":"TestNetworkContactNarrowingMutants\/markdown-(case-sensitive-entry|reuse-ruleset-six)"/ &&
+		!/"Test":"TestProfileInstallMarkdownCaseAliasesCLI\/SKILL.MD"/
+	' "$WORK/shipped-$goos.json" >"$stream"
+	for casekey in 'internal/audit TestMarkdownScopeInvalidatesRulesetSixAllowance' \
+		'internal/audit TestNetworkContactNarrowingMutants/markdown-case-sensitive-entry' \
+		'internal/audit TestNetworkContactNarrowingMutants/markdown-reuse-ruleset-six' \
+		'internal/envprofile TestProfileInstallMarkdownCaseAliasesCLI/SKILL.MD'; do
+		read -r pkg tst <<<"$casekey"
+		evout "$pkg" "$tst" 'test filesystem is case-sensitive: alias witness requires case folding' >>"$stream"
+		ev skip "$pkg" "$tst" >>"$stream"
+	done
+	want=1; [ "$goos" = linux ] && want=0
+	excluded=''; [ "$goos" = linux ] && excluded='internal/godriver'
+	assert "Markdown alias skips have the declared policy on $goos" "$want" \
+		env CI_GATE_GOOS="$goos" CI_EXCLUDED_PKGS="$excluded" CI_PLATFORM_CASES="$SHIPPED" \
+		CI_SKIP_CLASSES="$CLASSES" CI_GATE_MODULE="$MODULE_PATH" \
+		bash "$GATE" "$stream" "$WORK/markdown-alias-ev-$goos"
+	if [ "$goos" = linux ]; then
+		sed 's/test filesystem is case-sensitive: alias witness requires case folding/helper process/' "$stream" >"$WORK/markdown-wrong-class.json"
+		assert 'Markdown alias skips reject a different recognised class on linux' 1 \
+			env CI_GATE_GOOS=linux CI_EXCLUDED_PKGS="$excluded" CI_PLATFORM_CASES="$SHIPPED" \
+			CI_SKIP_CLASSES="$CLASSES" CI_GATE_MODULE="$MODULE_PATH" \
+			bash "$GATE" "$WORK/markdown-wrong-class.json" "$WORK/markdown-wrong-ev"
+		assert_contains 'Markdown alias wrong-class control fails for its intended reason' \
+			'ledger case skipped for the wrong reason' "$WORK/out.txt"
+		cp "$stream" "$WORK/markdown-directory-skip.json"
+		evout internal/envprofile TestProfileInstallMarkdownCaseAliasesCLI/References/guide.md \
+			'test filesystem is case-sensitive: directory alias must execute here' >>"$WORK/markdown-directory-skip.json"
+		ev skip internal/envprofile TestProfileInstallMarkdownCaseAliasesCLI/References/guide.md >>"$WORK/markdown-directory-skip.json"
+		assert 'Markdown directory alias cannot skip on linux' 1 \
+			env CI_GATE_GOOS=linux CI_EXCLUDED_PKGS="$excluded" CI_PLATFORM_CASES="$SHIPPED" \
+			CI_SKIP_CLASSES="$CLASSES" CI_GATE_MODULE="$MODULE_PATH" \
+			bash "$GATE" "$WORK/markdown-directory-skip.json" "$WORK/markdown-directory-ev"
+		assert_contains 'Markdown directory skip control fails for its intended reason' \
+			'ledger case skipped where the ledger does not tolerate it' "$WORK/out.txt"
+	fi
+done
+
 echo '=== platform-cases.tsv: the production rust cases run on darwin, tolerate host absence elsewhere ==='
 RUST_CASES='TestProductionManagerCapturesRegistryFromRawPaths TestProductionManagerCapturesGitWithoutCallerProjection'
 for rcase in $RUST_CASES; do

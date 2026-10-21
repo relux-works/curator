@@ -831,3 +831,19 @@ internal/envprofile	TestRC14IdentityMigrationRecoversInterruptedCommit	linux,dar
 internal/envprofile	TestRC14Schema1IdentityMigrationWithoutCredentialOperations	linux,darwin,windows	windows	host-capability	schema-1 metadata upgrades through both production migration entries when no credential link operation is needed
 internal/envprofile	TestRC14IdentityMigrationPreservesFallbackCopies	linux,darwin,windows	windows	host-capability	identity migration preserves directory copies and their symlink-fallback metadata
 internal/envprofile	TestRC14UseMigratesLegacyProfileBeforeNativePublication	linux,darwin,windows	windows	host-capability	Use rehashes the legacy profile before publishing v2 in-place markers and native generation headers
+
+# Markdown alias controls need case folding; directory counterparts run on every host.
+internal/audit	TestMarkdownScopeInvalidatesRulesetSixAllowance	darwin,windows	linux	host-capability	a real ruleset-6 alias allowance is invalidated on case-folding filesystems
+internal/audit	TestNetworkContactNarrowingMutants/markdown-case-sensitive-entry	darwin,windows	linux	host-capability	restoring the old matcher fails the case-folding alias witness
+internal/audit	TestNetworkContactNarrowingMutants/markdown-reuse-ruleset-six	darwin,windows	linux	host-capability	reusing ruleset 6 fails the case-folding cache witness
+internal/envprofile	TestProfileInstallMarkdownCaseAliasesCLI/SKILL.MD	darwin,windows	linux	host-capability	the canonical entry alias is refused by the audit on case-folding filesystems
+internal/envprofile	TestProfileInstallMarkdownCaseAliasesCLI	linux,darwin,windows	-	-	CLI directory aliases refuse on case-folding hosts and install without alias publication on case-sensitive hosts
+internal/envprofile	TestProfileInstallMarkdownCaseAliasesCLI/References/guide.md	linux,darwin,windows	-	-	directory aliases are tested on both case-sensitive and case-folding filesystems
+internal/envprofile	TestProfileInstallMarkdownCaseAliasesCLI/AGENTS/guide.md	linux,darwin,windows	-	-	directory aliases are tested on both case-sensitive and case-folding filesystems
+internal/envprofile	TestProfileInstallMarkdownCaseAliasesCLI/ASSETS/guide.md	linux,darwin,windows	-	-	directory aliases are tested on both case-sensitive and case-folding filesystems
+internal/envprofile	TestProfileInstallMarkdownCaseAliasesCLI/.SKILL_TRIGGERS/guide.md	linux,darwin,windows	-	-	directory aliases are tested on both case-sensitive and case-folding filesystems
+internal/envprofile	TestProfileInstallMarkdownCaseAliasesCLI/Templates/guide.md	linux,darwin,windows	-	-	directory aliases are tested on both case-sensitive and case-folding filesystems
+internal/envprofile	TestProfileInstallMarkdownCaseAliasesCLI/Examples/guide.md	linux,darwin,windows	-	-	directory aliases are tested on both case-sensitive and case-folding filesystems
+internal/envprofile	TestProfileInstallMarkdownCaseAliasesCLI/Data/guide.md	linux,darwin,windows	-	-	directory aliases are tested on both case-sensitive and case-folding filesystems
+internal/envprofile	TestProfileInstallMarkdownCaseAliasesCLI/Scripts/guide.md	linux,darwin,windows	-	-	directory aliases are tested on both case-sensitive and case-folding filesystems
+internal/envprofile	TestProfileInstallMarkdownCaseAliasesCLI/References/guide.md-declared	linux,darwin,windows	-	-	directory aliases are tested on both case-sensitive and case-folding filesystems

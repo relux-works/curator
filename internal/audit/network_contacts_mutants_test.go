@@ -44,7 +44,7 @@ func TestNetworkContactNarrowingMutants(t *testing.T) {
 		t.Run(mutant.name, func(t *testing.T) {
 			if strings.Contains(mutant.name, "case-sensitive-entry") || strings.Contains(mutant.name, "ruleset-six") {
 				if !caseInsensitiveSnapshot(t, t.TempDir()) {
-					t.Skip("alias control requires a case-insensitive filesystem")
+					t.Skip("test filesystem is case-sensitive: alias control requires case folding")
 				}
 			}
 			original := filepath.Join(root, filepath.FromSlash(mutant.file))
