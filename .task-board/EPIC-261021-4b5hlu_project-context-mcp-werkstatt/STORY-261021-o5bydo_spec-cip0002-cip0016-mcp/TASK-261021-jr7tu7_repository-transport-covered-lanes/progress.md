@@ -29,18 +29,22 @@ estimated(fibonacci(2))
 - [reviewer-TASK-261021-jr7tu7.md](file://TASK-261021-jr7tu7/reviewer-TASK-261021-jr7tu7.md)
 - [W-RTLANES-review-brief.md](file://TASK-261021-jr7tu7/W-RTLANES-review-brief.md)
 - [W-RTLANES-r3-brief.md](file://TASK-261021-jr7tu7/W-RTLANES-r3-brief.md)
+- [W-RTLANES-r3-review-brief.md](file://TASK-261021-jr7tu7/W-RTLANES-r3-review-brief.md)
 
 ## Outcome Resources
 - [TASK-261021-jr7tu7_draft-r1.patch](file://TASK-261021-jr7tu7/TASK-261021-jr7tu7_draft-r1.patch)
 - [TASK-261021-jr7tu7_results-r1.md](file://TASK-261021-jr7tu7/TASK-261021-jr7tu7_results-r1.md)
 - [TASK-261021-jr7tu7_results-r2.md](file://TASK-261021-jr7tu7/TASK-261021-jr7tu7_results-r2.md)
 - [TASK-261021-jr7tu7_review-r1.md](file://TASK-261021-jr7tu7/TASK-261021-jr7tu7_review-r1.md)
+- [TASK-261021-jr7tu7_frozen-inventory-r3.json](file://TASK-261021-jr7tu7/TASK-261021-jr7tu7_frozen-inventory-r3.json)
+- [TASK-261021-jr7tu7_results-r3.md](file://TASK-261021-jr7tu7/TASK-261021-jr7tu7_results-r3.md)
+- [TASK-261021-jr7tu7_review-r2.md](file://TASK-261021-jr7tu7/TASK-261021-jr7tu7_review-r2.md)
 
 ## Created
 2026-10-21T00:39:05Z
 
 ## Last Update
-2026-10-21T01:15:12Z
+2026-10-21T02:05:43Z
 
 ## Assigned To
 ivmbp_curator_dev4

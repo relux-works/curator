@@ -30,16 +30,18 @@ estimated(fibonacci(5))
 - [W-EXACT-brief.md](file://TASK-261021-vb3z6f/W-EXACT-brief.md)
 - [reviewer-TASK-261021-vb3z6f.md](file://TASK-261021-vb3z6f/reviewer-TASK-261021-vb3z6f.md)
 - [W-EXACT-review-brief.md](file://TASK-261021-vb3z6f/W-EXACT-review-brief.md)
+- [W-EXACT-r2-brief.md](file://TASK-261021-vb3z6f/W-EXACT-r2-brief.md)
 
 ## Outcome Resources
 - [TASK-261021-vb3z6f_results-r1.md](file://TASK-261021-vb3z6f/TASK-261021-vb3z6f_results-r1.md)
 - [TASK-261021-vb3z6f_review-r1.md](file://TASK-261021-vb3z6f/TASK-261021-vb3z6f_review-r1.md)
+- [TASK-261021-vb3z6f_results-r2.md](file://TASK-261021-vb3z6f/TASK-261021-vb3z6f_results-r2.md)
 
 ## Created
 2026-10-21T00:28:52Z
 
 ## Last Update
-2026-10-21T01:03:40Z
+2026-10-21T02:14:01Z
 
 ## Assigned To
 ivmbp_curator_dev1
