@@ -512,3 +512,61 @@ func TestSkillProjectionFallbackRollback(t *testing.T) {
 		t.Fatal("copy replacement retry retained old excluded files")
 	}
 }
+
+// Projection planning, staging and stored-tree verification refuse NUL under
+// legacy framing before computing any v1 hash. V2 copies the same bytes.
+func TestSkillProjectionLegacyFraming(t *testing.T) {
+	for _, phase := range []string{"plan", "stage", "verify"} {
+		t.Run(phase, func(t *testing.T) {
+			source, home := t.TempDir(), t.TempDir()
+			writeGitFile(t, source, "SKILL.md", "# Guide\n")
+			skill, err := projectSkill(home, source, hashing.VersionV1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if phase == "verify" {
+				if err := publishSkillProjection(home, skill); err != nil {
+					t.Fatal(err)
+				}
+			}
+			target := source
+			if phase == "verify" {
+				target = skill.root
+			}
+			writeGitFile(t, target, "SKILL.md", "# Guide\x00\n")
+			calls := hashing.CountV1Hashes(func() {
+				switch phase {
+				case "plan":
+					_, err = projectSkill(home, source, hashing.VersionV1)
+				case "stage":
+					err = publishSkillProjection(home, skill)
+				case "verify":
+					err = verifySkillProjection(home, skill)
+				}
+			})
+			if err == nil || !strings.Contains(err.Error(), "opaque") || calls != 0 {
+				t.Fatalf("legacy projection hashed or admitted NUL: err=%v calls=%d", err, calls)
+			}
+			if phase == "stage" {
+				if _, err := os.Lstat(skill.root); !os.IsNotExist(err) {
+					t.Fatalf("refusal published projection: %v", err)
+				}
+			}
+		})
+	}
+	source, home := t.TempDir(), t.TempDir()
+	writeGitFile(t, source, "SKILL.md", "# Guide\x00\n")
+	skill, err := projectSkill(home, source, hashing.VersionV2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := publishSkillProjection(home, skill); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifySkillProjection(home, skill); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(projectionFiles(t, source), projectionFiles(t, skill.root)) {
+		t.Fatal("v2 projection changed bytes")
+	}
+}

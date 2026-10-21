@@ -91,6 +91,9 @@ build caches. Legacy global/project context already uses `CopyContext` through
 `install.stageNode`; adapter discovery continues to publish that installed
 canonical tree. Profile-global operations share the profile publishers above.
 
+Projection planning and tree hashing retain the legacy refusal of NUL bytes
+before any v1 hash computation; v2 keeps its byte-preserving framing.
+
 Audit ruleset 8 remains unchanged: this publication revision changes neither
 the audited bytes nor verdict cache identity. Publication identity is kept in
 projection paths and surface hashes, outside the audit cache key.
