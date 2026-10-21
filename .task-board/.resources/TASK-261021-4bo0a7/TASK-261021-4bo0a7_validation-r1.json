@@ -1,0 +1,1555 @@
+{
+  "head": "9b657867a0c65f6e86caf85f6ff6fb7fa4235c0a",
+  "corrected_environment": {
+    "Go": "1.25.5",
+    "platform": "darwin/arm64",
+    "TMPDIR": "required short temporary root",
+    "GOTMPDIR": "same as TMPDIR",
+    "GOCACHE": "task-local workspace cache",
+    "PATH": "task-local Go/Rust tool links plus system and Homebrew bin directories; ambient provider executables excluded",
+    "rustc": "1.91.0",
+    "cargo": "1.91.0",
+    "research_binary_gate": "unset for default tests"
+  },
+  "initial_environment_exceptions": {
+    "runs": [
+      "default-rest-0",
+      "default-rest-1",
+      "default-curator-0",
+      "default-envprofile-0"
+    ],
+    "GOTMPDIR": "task-local long path; TMPDIR was already short",
+    "PATH": "ambient provider executables present",
+    "rust_tool_links": "added after initial rustsource failures; unavailable-tool skips are not qualification"
+  },
+  "coverage": {
+    "head": "9b657867a0c65f6e86caf85f6ff6fb7fa4235c0a",
+    "inventory_packages": 85,
+    "full_small_packages": 80,
+    "expected_small_packages": 80,
+    "missing_small_packages": [],
+    "partitioned": [
+      {
+        "package": "github.com/relux-works/curator/cmd/curator",
+        "expected": 434,
+        "completed": 434,
+        "remaining": []
+      },
+      {
+        "package": "github.com/relux-works/curator/internal/envprofile",
+        "expected": 393,
+        "completed": 393,
+        "remaining": []
+      },
+      {
+        "package": "github.com/relux-works/curator/internal/install",
+        "expected": 371,
+        "completed": 371,
+        "remaining": []
+      },
+      {
+        "package": "github.com/relux-works/curator/internal/artifactpolicy",
+        "expected": 60,
+        "completed": 60,
+        "remaining": []
+      },
+      {
+        "package": "github.com/relux-works/curator/internal/crossconformance",
+        "expected": 54,
+        "completed": 54,
+        "remaining": []
+      }
+    ],
+    "recorded_failures": [
+      {
+        "file": "default-artifactpolicy-flood.jsonl",
+        "package": "github.com/relux-works/curator/internal/artifactpolicy",
+        "test": null
+      },
+      {
+        "file": "default-envprofile-s3.jsonl",
+        "package": "github.com/relux-works/curator/internal/envprofile",
+        "test": null
+      },
+      {
+        "file": "default-envprofile-s7.jsonl",
+        "package": "github.com/relux-works/curator/internal/envprofile",
+        "test": null
+      },
+      {
+        "file": "default-envprofile-s2.jsonl",
+        "package": "github.com/relux-works/curator/internal/envprofile",
+        "test": null
+      },
+      {
+        "file": "default-curator-s1.jsonl",
+        "package": "github.com/relux-works/curator/cmd/curator",
+        "test": null
+      },
+      {
+        "file": "default-curator-remaining-2.jsonl",
+        "package": "github.com/relux-works/curator/cmd/curator",
+        "test": null
+      },
+      {
+        "file": "default-curator-tail.jsonl",
+        "package": "github.com/relux-works/curator/cmd/curator",
+        "test": null
+      },
+      {
+        "file": "default-rest-0.jsonl",
+        "package": "github.com/relux-works/curator/internal/artifactpolicy",
+        "test": null
+      },
+      {
+        "file": "default-curator-remaining-1.jsonl",
+        "package": "github.com/relux-works/curator/cmd/curator",
+        "test": null
+      },
+      {
+        "file": "default-rest-1.jsonl",
+        "package": "github.com/relux-works/curator/internal/crossconformance",
+        "test": null
+      },
+      {
+        "file": "default-rest-3.jsonl",
+        "package": "github.com/relux-works/curator/internal/rustsource",
+        "test": "TestProductionManagerCapturesRegistryFromRawPaths"
+      },
+      {
+        "file": "default-rest-3.jsonl",
+        "package": "github.com/relux-works/curator/internal/rustsource",
+        "test": "TestProductionManagerCapturesGitWithoutCallerProjection"
+      },
+      {
+        "file": "default-rest-3.jsonl",
+        "package": "github.com/relux-works/curator/internal/rustsource",
+        "test": null
+      }
+    ]
+  },
+  "matrix_expected": [
+    "TestProfileInstallActivationMatrix/git-collection/first-install/neither",
+    "TestProfileInstallActivationMatrix/git-collection/first-install/takeover",
+    "TestProfileInstallActivationMatrix/git-collection/first-install/use",
+    "TestProfileInstallActivationMatrix/git-collection/first-install/use-takeover",
+    "TestProfileInstallActivationMatrix/git-collection/same-source-changed-lock/neither",
+    "TestProfileInstallActivationMatrix/git-collection/same-source-changed-lock/takeover",
+    "TestProfileInstallActivationMatrix/git-collection/same-source-changed-lock/use",
+    "TestProfileInstallActivationMatrix/git-collection/same-source-changed-lock/use-takeover",
+    "TestProfileInstallActivationMatrix/git-collection/same-source-unchanged-lock/neither",
+    "TestProfileInstallActivationMatrix/git-collection/same-source-unchanged-lock/takeover",
+    "TestProfileInstallActivationMatrix/git-collection/same-source-unchanged-lock/use",
+    "TestProfileInstallActivationMatrix/git-collection/same-source-unchanged-lock/use-takeover",
+    "TestProfileInstallActivationMatrix/git-root/first-install/neither",
+    "TestProfileInstallActivationMatrix/git-root/first-install/takeover",
+    "TestProfileInstallActivationMatrix/git-root/first-install/use",
+    "TestProfileInstallActivationMatrix/git-root/first-install/use-takeover",
+    "TestProfileInstallActivationMatrix/git-root/same-source-changed-lock/neither",
+    "TestProfileInstallActivationMatrix/git-root/same-source-changed-lock/takeover",
+    "TestProfileInstallActivationMatrix/git-root/same-source-changed-lock/use",
+    "TestProfileInstallActivationMatrix/git-root/same-source-changed-lock/use-takeover",
+    "TestProfileInstallActivationMatrix/git-root/same-source-unchanged-lock/neither",
+    "TestProfileInstallActivationMatrix/git-root/same-source-unchanged-lock/takeover",
+    "TestProfileInstallActivationMatrix/git-root/same-source-unchanged-lock/use",
+    "TestProfileInstallActivationMatrix/git-root/same-source-unchanged-lock/use-takeover",
+    "TestProfileInstallActivationMatrix/path-root/first-install/neither",
+    "TestProfileInstallActivationMatrix/path-root/first-install/takeover",
+    "TestProfileInstallActivationMatrix/path-root/first-install/use",
+    "TestProfileInstallActivationMatrix/path-root/first-install/use-takeover",
+    "TestProfileInstallActivationMatrix/path-root/same-source-changed-lock/neither",
+    "TestProfileInstallActivationMatrix/path-root/same-source-changed-lock/takeover",
+    "TestProfileInstallActivationMatrix/path-root/same-source-changed-lock/use",
+    "TestProfileInstallActivationMatrix/path-root/same-source-changed-lock/use-takeover",
+    "TestProfileInstallActivationMatrix/path-root/same-source-unchanged-lock/neither",
+    "TestProfileInstallActivationMatrix/path-root/same-source-unchanged-lock/takeover",
+    "TestProfileInstallActivationMatrix/path-root/same-source-unchanged-lock/use",
+    "TestProfileInstallActivationMatrix/path-root/same-source-unchanged-lock/use-takeover"
+  ],
+  "network_expected": [
+    "TestProfileNetworkContactVectors/bare-example",
+    "TestProfileNetworkContactVectors/bare-invalid",
+    "TestProfileNetworkContactVectors/bare-test",
+    "TestProfileNetworkContactVectors/bare-test-dot",
+    "TestProfileNetworkContactVectors/canary-declared",
+    "TestProfileNetworkContactVectors/canary-undeclared",
+    "TestProfileNetworkContactVectors/declared-exact",
+    "TestProfileNetworkContactVectors/declared-glob",
+    "TestProfileNetworkContactVectors/declared-other-host",
+    "TestProfileNetworkContactVectors/documentation-case-dot",
+    "TestProfileNetworkContactVectors/documentation-com",
+    "TestProfileNetworkContactVectors/documentation-net",
+    "TestProfileNetworkContactVectors/documentation-org",
+    "TestProfileNetworkContactVectors/documentation-subdomain-com",
+    "TestProfileNetworkContactVectors/documentation-subdomain-net",
+    "TestProfileNetworkContactVectors/documentation-subdomain-org",
+    "TestProfileNetworkContactVectors/lookalike-case-dot",
+    "TestProfileNetworkContactVectors/lookalike-hyphen",
+    "TestProfileNetworkContactVectors/lookalike-idn-label",
+    "TestProfileNetworkContactVectors/lookalike-idn-real-tld",
+    "TestProfileNetworkContactVectors/lookalike-nested-example",
+    "TestProfileNetworkContactVectors/lookalike-nested-test",
+    "TestProfileNetworkContactVectors/lookalike-punycode-label",
+    "TestProfileNetworkContactVectors/loopback-case-dot",
+    "TestProfileNetworkContactVectors/loopback-ipv4",
+    "TestProfileNetworkContactVectors/loopback-ipv6",
+    "TestProfileNetworkContactVectors/loopback-localhost",
+    "TestProfileNetworkContactVectors/missing-manifest",
+    "TestProfileNetworkContactVectors/missing-network-declaration",
+    "TestProfileNetworkContactVectors/mixed-cross-file",
+    "TestProfileNetworkContactVectors/mixed-real-first",
+    "TestProfileNetworkContactVectors/mixed-reserved-first",
+    "TestProfileNetworkContactVectors/reserved-case-dot",
+    "TestProfileNetworkContactVectors/reserved-example",
+    "TestProfileNetworkContactVectors/reserved-idn",
+    "TestProfileNetworkContactVectors/reserved-invalid",
+    "TestProfileNetworkContactVectors/reserved-localhost",
+    "TestProfileNetworkContactVectors/reserved-nested",
+    "TestProfileNetworkContactVectors/reserved-punycode",
+    "TestProfileNetworkContactVectors/reserved-test"
+  ],
+  "commands": [
+    {
+      "name": "default-artifactpolicy-flood",
+      "exit": 1,
+      "seconds": 542.033,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=9m",
+        "-run",
+        "^(TestDirectoryEntryLimitStopsTheLiveWalker)$",
+        "./internal/artifactpolicy"
+      ],
+      "record": "default-artifactpolicy-flood-command.json"
+    },
+    {
+      "name": "default-artifactpolicy-flood-long",
+      "exit": 0,
+      "seconds": 1080.493,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=25m",
+        "-run",
+        "^TestDirectoryEntryLimitStopsTheLiveWalker$",
+        "./internal/artifactpolicy"
+      ],
+      "record": "default-artifactpolicy-flood-long-command.json"
+    },
+    {
+      "name": "default-artifactpolicy-rest",
+      "exit": 0,
+      "seconds": 34.59,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestCanonicalArtifactManifestCodec|TestCodecRejectsSemanticallyNoncanonicalArrays|TestConformanceCorpusBuildersAreDeterministic|TestFailClosedVectorsF07ThroughF14|TestNativeArchiveStructuralValidation|TestCompiledVectorsC01ELFResolution|TestEffectiveLabels|TestDefaultOversizedARStringTableIsBoundedBeforePayloadAllocation|TestReservedContainerSeparatorAndComposedPathLimit|TestPreExecutionAndPublicationTokensAreRoleBound|TestDeclaredSourceGrammarMustLexCompletely|TestPinnedCompiledFixtureProvenanceAndIdentity|TestTarMetadataRejectsLimitsMalformedRepeatedAndResolutionFeatures|TestFindingsSummaryRequiresCapSaturationAndCompleteVerifiableEvidence|TestResolvedTextUsesAreFailClosedWithoutBreakingScripts|TestMetadataFullPathBudgetsPrecedeSparsePayloadReads|TestBSDARNameAccountingAndManifestEvidenceAreExact|TestDependencyPatchIsClosedTextMetadata|TestDependencyDirectoryRejectsCompiledLinkAndBundleNodes|TestCodecRejectsOpenEnumsAndNoncanonicalNodeOrder|TestCodecRejectsSemanticallyImpossibleManifests|TestGZIPStreamingBudgetStopsAtFirstClosedLimit|TestDuplicateFloodUsesBoundedRecordedFindings|TestWheelRecordAndCompressionEnvelopeValidation|TestGZIPRootVirtualDirectoryRetainsStreamAccounting|TestCompiledVectorsC02ThroughC12|TestTarMetadataLimitsPrecedePayloadParsingAndHashing|TestDefaultOversizedBSDARNameIsBoundedBeforePayloadAllocation|TestAdmissionVectorsA01ThroughA08|TestManagerOwnedRoleAuthorizationCannotBeForgedOrReplayed|TestCanonicalTreeManifestRederivesCapturedIdentity|TestFatMachOCAFEBABEResolvesWithoutJVMError|TestELFDuplicateUseEdgesPrecedeSharedObjectResolution|TestNativeArchiveMetadataIsCanonicalAndRoleBound|TestGZIPExpansionUsesOnlyFirstStreamCompressedBytes|TestMetadataPathPreflightProducesCanonicalFailureEvidence|TestBSDExtendedSymbolTableNameRemainsExactMetadata|TestSelectedToolchainRecheckRejectsRealUnsafeNodesBeforeProcessStart|TestCentralManagerSelectsFingerprintsAndRechecksRuntimeGoToolchain|TestFindingsDigestBindsUntruncatedCanonicalSet|TestReusableArtifactManifestV1ConformanceCorpus|TestEntryLimitIsEnforcedByEveryWalkerDuringEnumeration|TestFailClosedVectorsF01ThroughF06|TestZIP64SourceTraversal|TestNodeProfileRecognizesBindingGYPAsInspectableMetadata|TestCompiledDetectorErrorsNeverAdmitOpaqueBytes|TestDefaultOversizedPAXMetadataIsBoundedBeforePayloadAllocation|TestPortableVirtualPathAndCollisionKey|TestTrustBoundaryVectorsT01ThroughT05AndV01|TestServiceZeroValueUsesClosedProductionConfiguration|TestPinnedJVMClassResolvesCAFEBABEStructurally|TestTarPhysicalMetadataIsCountedManifestedAndBound|TestCodecDerivesRejectedAndAdmittedNodeSemantics|TestDuplicateMembersAreInspectedIndependentlyOfPhysicalOrder|TestManagerSelectedToolchainModeMutationStopsAdapterExecution|TestGNUARStringTableValidatesEveryUnreferencedNameOrderIndependently|TestNodeManagerNPMRCIsClosedTextMetadata|TestDependencyDirectoryAdmissionAndPortableIdentity|TestExternalCallerCreatedRootsAndCopiedObjectsStayUntrusted)$",
+        "./internal/artifactpolicy"
+      ],
+      "record": "default-artifactpolicy-rest-command.json"
+    },
+    {
+      "name": "default-crossconformance-s0",
+      "exit": 0,
+      "seconds": 187.493,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestDraftSourcesBrokerAskpassDispatch|TestSkillfileSourcesPin|TestDraftTreeDigestIgnoresManagerLockFiles|TestDraftLiteralDropsGitProxyCommand|TestDraftSSHEmptyConfigIgnoresHostileFile|TestDraftSourcesCLIProjectPathWithSpaceAndUnicode|TestDraftSourcesPlaybookCollectionAcceptanceThroughProductionCLI|TestDraftExternalStatusFailsClosedWithoutSource|TestDraftSourcesSemanticCasesBatch1|TestDraftSourcesSemanticCasesBatch4|TestDraftLiteralRefreshIgnoresUserConfig|TestRequireCanonicalRejectsEveryNoncanonicalSpelling|TestDomainSeparationChangesIdentity|TestEmbeddedCorpusIsTheAcceptedBytes|TestAcceptedCorpusSatisfiesEveryPublishedStructuralClaim|TestProtocolExportMatchesTheCommittedGolden|TestIntegrationSurfaceStartsNoProcessOutsideTheSharedSeams|TestCrossAdapterConformance)$",
+        "github.com/relux-works/curator/internal/crossconformance"
+      ],
+      "record": "default-crossconformance-s0-command.json"
+    },
+    {
+      "name": "default-crossconformance-s1",
+      "exit": 0,
+      "seconds": 65.546,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestDraftSourcesCLILocalSkillScriptDependencies|TestSkillfileSourcesCorpusCounts|TestDraftLiteralIgnoresGitSSHCommand|TestDraftLiteralIgnoresGitExecPath|TestDraftLiteralIgnoresProxyEnvironment|TestDraftSourcesCLISymlinkMemberRefused|TestDraftSourcesSchemaCases|TestDraftSourcesReplayRejectsLockedObjectFormatMismatch|TestDraftSourcesSemanticCasesBatch2|TestDraftSourcesSemanticCoverage|TestDraftSourcesSnapshotVectors|TestCanonicalFormIsAFixedPointForEveryControlCharacter|TestSurrogateEscapesDecodeAndReemitLiterally|TestAllPublishedRecordsIndependentlyDeriveTheirHashes|TestValidatorRejectsEveryTamperedCorpus|TestProtocolExportIsCanonicalAndSelfDescribing|TestIntegrationProductionSourceImportsNoRepositoryPackage|TestRustUnavailableCoverageRejectsExtraRustGap)$",
+        "github.com/relux-works/curator/internal/crossconformance"
+      ],
+      "record": "default-crossconformance-s1-command.json"
+    },
+    {
+      "name": "default-crossconformance-s2",
+      "exit": 0,
+      "seconds": 120.946,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestDraftSourcesCLIDirectoryManifestDependencyInstallRefreshAndAudit|TestDraftDigestSkipsManagerLocksOnEverySeparator|TestDraftLiteralIgnoresGitSSH|TestDraftLiteralIgnoresUserSSHConfig|TestDraftLiteralKeepsAgentAndAskpass|TestDraftSourcesCrossCompile|TestDraftExternalExecutionPolicyInvalidMarkerReDerives|TestDraftSourcesSemanticCasesBatch0|TestDraftSourcesSemanticCasesBatch3|TestDraftTransportFallbackGate|TestDraftSourcesCLIInstallRestoresPriorState|TestIndependentEncoderMatchesProductionEncoderOnSharedValues|TestTypedAccessorsRefuseWrongKinds|TestIndependentOracleAgreesWithProductionIdentity|TestParseRejectsAPublishedHashThatDoesNotMatchItsBytes|TestDelegatedVectorsNameRealOwningPackages|TestDelegatedDiagnosticsAreDeclaredByTheirOwners|TestRustUnavailableCoverageRejectsNonRustGap)$",
+        "github.com/relux-works/curator/internal/crossconformance"
+      ],
+      "record": "default-crossconformance-s2-command.json"
+    },
+    {
+      "name": "default-curator-0",
+      "exit": 1,
+      "seconds": 482.908,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestAuditAllowPinsOnlySupportedContentIdentity|TestReviewCLIStatusDetectsChangedTagAtSameCommit|TestCLIAuditJSONCarriesScriptLabels|TestClassifyBuildCommandDetectsRecordedIdentityDrift|TestClassifySkillBuildsWithoutCompiledStateStaysSilent|TestMarkerDigestsDistinguishesAbsentAndUnreadable|TestEveryCurrentnessCodeIsDocumented|TestGoToolchainGuidanceNamesTheAcceptedSelectionAndTestedFamilies|TestStatusReportReportsCompiledCommandsOfAnUninstalledSkill|TestRegisteredSubcommandHelpNoWrites|TestWithDraftRemediationTable|TestDraftProjectResolveHelp|TestDraftMachinePolicySetupThroughCLI|TestDraftStripCloneFramingTable|TestProjectResolveLocalCreatesLockThroughCLI|TestProjectResolveGitRuntimeTamperRefusedThroughCLI|TestProjectResolveGitAliasSelectionThroughCLI|TestProjectResolveGitTagDiffersFromHEADThroughCLI|TestProjectResolveDraftAllowlistLegacyThroughCLI|TestProjectRefreshLegacyNetworkGitBranchThroughCLI|TestProjectResolveOriginLessSkipsFetchThroughCLI|TestDraftStatusLockOnlyChangeNeedsInstall|TestDraftStatusStaleSwappedSelectionRefuses|TestDraftStatusInvalidMarker|TestClassifyDraftMemberComparesExactCurrentness|TestDraftTransportLegacyGolden|TestReviewProbeLegacyLaneIdentityInvalid|TestEnvResolveCredentialRecordIsolatedKeychain|TestCredentialStoreCLIConfigRefusesMalformed|TestReviewDottedCredentialProfileExisting|TestEnvMigrateConflictRefuses|TestEnvMigratePrintBeforeWrite|TestEnvResolveBareStaleIsAFailure|TestEnvResolveIsolatedSystemLockUsesDirection|TestEnvStatusRegistryBoundaryPostureAndCheck|TestUmbrellaPropagatesExitCode|TestEnvStatusEffectivePassableList|TestEnvUnmanageTakeoverPreservesFileMode|TestEnvUnmanageBackupRecordVectors|TestEnvUnmanageLeavesBackupsWithoutRestoreFlag|TestProfileUseUnknownEnvRefused|TestEnvConfigAliasOutputPrintsCanonicalKnob|TestUsageListsAliases|TestEnvConfigShowPermissionsRejectsUnreadableInventoryAndCurrent|TestEnvConfigSetUnsetRoundTrip|TestEnvConfigProviderDirectoriesLockedRefuses|TestProfileComposeRefusals|TestProfileUseClearOperandIsUsage|TestEnvStatusReportsLockedRequire|TestGlobalInitCleanHomeRefusesWithBootstrapHint|TestGlobalInitEnvResolveSubcommandHelpPreservesFlagSet|TestPostureWarningOncePerProcessTree|TestGCFailsClosedForUntrustedCurrentPathSource|TestGlobalAdoptCLIAdoptsAndIsIdempotent|TestGlobalAddConflictRetainsLockAndProfileSyncTakeoverRecovers|TestReviewGlobalStatusDetectsChangedTagAtSameCommit|TestGlobalStatusWithoutASkillfileStaysSilentAndCurrent|TestStatusRecordedButMissingStaysInInventory|TestEnvStatusUnreadableApprovalStateSurfaced|TestHookApproveReRecordsAfterChange|TestHookApprovalsToleratesMalformedRecord|TestHookUsageErrors|TestStatusReportsRecordedPathsBeyondTheCurrentProject|TestProfileImportLossyRow|TestPathOverlayFromMachineConfigJoinsTheClosure|TestResolveTakeoverRequiresRepair|TestAuthoritativeLifecycleBootstrapCasesAreExecutable|TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt|TestProductionExternalAuditReturnsAdvisoryWarnings|TestRunUnknownCommand|TestInstallFlagsAcceptTrailingOptions|TestStatusDriftDetectsContentTampering|TestBootstrapIfMissingRejectsForce|TestHiddenWorkerModeIsNotAUserVisibleCommand|TestConfigBuildSSHAddListRemove|TestConfigBuildSSHRemoveRejectsMissingAndMalformedTargets|TestConfigBuildHTTPSRemoveRejectsMissingAndMalformedTargets|TestConfigHelpDocumentsPrecedenceAndSubcommands|TestThePromptPersistsThroughTheOrdinaryConfigWriter|TestMuseRootContextCopyFallback|TestMuseCredentialPolicyStatus|TestMuseProfileSeedSecretAndCredentialRefusals|TestMuseCLIStorePolicy|TestNativeSkillsTakeoverActivationBoundary|TestNativeSkillsTakeoverHelpNarrowingMutant|TestCLIAuditOpaqueNULFollowsHashVersion|TestProfileUpdateSystemDeltaConfirmationGolden|TestProfileInstallReinstallDeltaVectorsAtCLI|TestProfileInstallReinstallUsePreservesProjectScope|TestProfileUpdateListsNewDeclaration|TestGitFileURLHasNoBackslash|TestProfileUseUnknownIsAFailure|TestProfileComposeListsDeclaredOverlays|TestProfileInstallWarnsOnSystemModule|TestProfileUseReportsAllAdaptersAlreadyScoped|TestProfileInstallUsePartialLeavesCurrent|TestHardenedRegistryOutageRefusesWithAdvisoryRegistryPolicy|TestSecurityPostureHardenedContradictionFailsEnvStatusCheck|TestSecurityPostureProfileInstallRefusesMCPDeclarations|TestSecurityPostureRevisionBDefaultRefusesEmptySources|TestCompiledProjectStatusAndUntrustedRecovery|TestStatusReportsAnUnusableToolchainPerCompiledCommand|TestDryRunNeverClaimsACompletedCompilerCheck|TestStatusAcceptsAnUnchangedLegacyMarkerSchema|TestActiveRevisionIsWarningRelease|TestUmbrellaTrustRootSelectionBothRevisions|TestUmbrellaMissingNamesRoots|TestExecutableCandidates|TestProviderInputsForHostExplicitBinRefuses)$",
+        "github.com/relux-works/curator/cmd/curator"
+      ],
+      "record": "default-curator-0-command.json"
+    },
+    {
+      "name": "default-curator-last",
+      "exit": 0,
+      "seconds": 383.442,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestCompiledProjectStatusAndUntrustedRecovery)$",
+        "./cmd/curator"
+      ],
+      "record": "default-curator-last-command.json"
+    },
+    {
+      "name": "default-curator-matrix-tail",
+      "exit": 0,
+      "seconds": 34.229,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^TestProfileInstallActivationMatrix$/^git-collection$/^same-source-changed-lock$/^(takeover|use-takeover)$",
+        "./cmd/curator"
+      ],
+      "record": "default-curator-matrix-tail-command.json"
+    },
+    {
+      "name": "default-curator-remaining-1",
+      "exit": 1,
+      "seconds": 482.193,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestAuthoritativeLifecycleUpgradeCasesAreExecutable|TestBootstrapAndProjectCommands|TestBootstrapDocsExampleRuns|TestBootstrapIfMissingCreatesAbsentConfig|TestBuildReportDetailIsBounded|TestCLIAuditEmitsScriptLabels|TestCLIAuditJSONRecordsExplicitAbsence|TestCLIAuditMixedSkillRecordsBothPolicies|TestCLIAuditOpaqueNULFollowsHashVersion|TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt|TestCLIEndToEndInstallStatusAndTamperCheck|TestCLIExecutionAssuranceSelectionIsPortableDefaultAndVerifiedFailClosed|TestCLIStatusReportsLegacyPackageMarkerCurrent|TestCheckFailsForEveryNonCurrentCode|TestClassifyBuildCommandDetectsRecordedIdentityDrift|TestClassifyBuildCommandMapsEveryCacheOutcomeToADistinctCode|TestClassifySkillBuildsAcceptsEveryBuildBearingMarkerSchema|TestClassifySkillBuildsDetectsCommandDriftInBothDirections|TestClassifySkillBuildsWithoutCompiledStateStaysSilent|TestCompiledInstallFollowsTheNativeControlInventoryExactly|TestCompiledProjectRestoresCacheWhenCommitFails|TestCompiledProjectStatusAndUntrustedRecovery|TestConfigBuildHTTPSListWithoutScopesPrintsNothing|TestConfigBuildHTTPSLoginStoresThroughTheOperatorHelperAndSelectsIt|TestConfigBuildHTTPSRemoveRejectsMissingAndMalformedTargets|TestConfigBuildSSHAddRejectsInvalidInvocations|TestConfigBuildSSHListWithoutScopesPrintsNothing|TestConfigBuildSSHRemoveRejectsMissingAndMalformedTargets|TestConfigHelpDocumentsPrecedenceAndSubcommands|TestConfigSubcommandDispatch|TestCuratorStatusProviderPostureAndCheck|TestCurrentnessCodesAreDistinctAndOnlyExactStatesPass|TestDryRunNeverClaimsACompletedCompilerCheck|TestEnforcedShimDispatchRefusesUnreadableSidecar|TestEnvConfigAliasLockRefusalPrintsCanonicalKnob|TestEnvConfigProviderDirectoriesLockedRefuses|TestEnvConfigRefusals|TestEnvConfigSetNormalizesWholesaleValues|TestEnvConfigSetUnsetRoundTrip|TestEnvConfigShowPermissionsAtProductionEntry|TestEnvConfigShowPermissionsRejectsUnreadableInventoryAndCurrent|TestEnvConfigShowPermissionsWithoutProfiles|TestEnvMigrateApplyRequiresPlan|TestEnvMigratePrintBeforeWrite|TestEnvResolveAcceptsAliases|TestEnvResolveEmitsPermissionsV2AtProductionEntry|TestEnvResolveExplicitSharedConflictsWithIsolatedSystemLock|TestEnvResolveLockedIsolationRequiresMigration|TestEnvResolvePreserveLockRepairBindsUnchangedLock|TestEnvResolveRepairEmitsFragment|TestEnvResolveRepairFailedOnUninspectable|TestEnvResolveRepairNeedsMigration|TestEnvResolveStaleHintsRepair|TestEnvResolveStripsAndReportsInlineNativeCodexMCPTable|TestEnvResolveUnknowns|TestEnvStatusEffectivePassableList|TestEnvStatusMatrix|TestEnvStatusMissingAndUnreadableKeepRecord|TestEnvStatusPrintsCanonicalAfterAliasUse|TestEnvStatusReportsDroppedSystemModuleThroughCLI|TestEnvStatusReportsShellHookTrustPosture|TestEnvUnmanageBackupRecordVectors|TestEnvUnmanageDoesNotRestoreWithoutAnObservedRecord|TestEnvUnmanageLeavesBackupsWithoutRestoreFlag|TestEnvUnmanageRestoresRecordedTakeoverBackup|TestEnvUnmanageSymlinkRestoreRefusesLinkedParent|TestEnvUnmanageSymlinkRestoreRefusesPlannedLinkedParent|TestEnvUnmanageTakeoverPreservesFileMode|TestEveryCurrentnessCodeIsDocumented|TestExecutableCandidates|TestGCFailsClosedForUntrustedCurrentPathSource|TestGCRetainsAndReportsReferencedCompiledState|TestGCRetainsLiveProcessBuild|TestGCRunsSerializedAcrossConcurrentInvocations|TestGlobalAddConflictRetainsLockAndProfileSyncTakeoverRecovers|TestGlobalAddPublishesProfileLockBeforeNativeMaterialization|TestGlobalAdoptCLIAdoptsAndIsIdempotent|TestGlobalAdoptCLIRefusesUnknownAndMissingCommandsWithoutWrites|TestGlobalInitHelpWithoutConfig|TestGlobalInitMalformedConfigHasNoBootstrapHint|TestGlobalInitSubcommandHelpWithoutConfigRefuses|TestGlobalInstallPublishesMigratedLockBeforeNativeMaterialization|TestGlobalStatusFailsCheckWhenTheUserHomeCannotBeResolved|TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands|TestGlobalStatusRejectsPositionalArguments|TestGlobalStatusRejectsSchema2SkillfileThroughCLI|TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck|TestGoToolchainGuidanceNamesTheAcceptedSelectionAndTestedFamilies|TestHookApprovalsToleratesMalformedRecord|TestHookApprovalsUnreadableStateNamesReadFailure|TestHookApproveReRecordsAfterChange|TestHookApproveRecordsOperatorApproval|TestHookApproveResolvesSymlinkedOperand|TestHookRevokeRemovesRecord|TestHookUsageErrors|TestHostGoToolchainIsSelectableOnAnInventoryPlatform|TestImplementedCommandWinsOverProvider|TestInputCausesAreDistinctAndDocumented|TestInstallAuditFlagAcceptsOptionalMode|TestInstallFlagsAcceptTrailingOptions|TestInstallGitignoreEntryPoint|TestLegacyPackageStatusBindingAndRepair|TestMarkerDigestsDistinguishesAbsentAndUnreadable|TestMarkerRefusalSeparatesUnsupportedFromInvalid|TestMuseCLIAuthParentBoundary|TestMuseCLIFragmentAndFakeLaunch|TestMuseCredentialPolicyNarrowingMutants|TestMuseFragmentV3PublishedCases|TestMuseFragmentV4PublishedCases|TestMuseRootContextCopyFallback|TestMuseRootContextRefusals|TestMuseRootContextStatus|TestMuseRootContextVectors|TestNativeBlackboxExternalBuildLifecycle|TestNativeSkillsTakeoverActivationBoundary|TestNativeSkillsTakeoverEveryRegisteredCommand|TestNativeSkillsTakeoverFlagBoundary|TestNativeSkillsTakeoverHelpCrossProduct|TestNativeSkillsTakeoverHelpNarrowingMutant|TestNormalizeEnvKnobPositions|TestNormalizeRunEnvOperand|TestOverlayFromMachineConfigIsRefusedByKind|TestPermissiveRegistryOutageWarnsWithArtifactIdentity|TestPostureWarningOncePerProcessTree|TestPrintEnvStatusShowsCodexSeedPostureAndNames|TestProductionBinaryDispatchesLandlockProbe|TestProductionBinaryDispatchesNetNSProbe|TestProductionBinaryDispatchesRustOracleBeforeAmbientCargoDiscovery|TestProductionExternalAuditReturnsAdvisoryWarnings|TestProfileComposeAddListRemove|TestProfileComposeAddRefusesAFormOnAPathSource|TestProfileComposeAddWarnsWhenOverlaysForbidden|TestProfileComposeListsDeclaredOverlays|TestProfileComposeRefusals|TestProfileGitReinstallHonoursUseAndTakeover|TestProfileImportLossyRow|TestProfileImportNameTakenRow|TestProfileImportRow|TestProfileInstallFileOperandIsRefused|TestProfileInstallFirstActivationFailureReportsPersistedProfile|TestProfileInstallFirstActivationLockedRequireRefuses|TestProfileInstallListUse|TestProfileInstallListsStdioCommands|TestProfileInstallRefConflictIsAFailure|TestProfileInstallReinstallDeltaVectorsAtCLI|TestProfileInstallReinstallHonoursUseAndTakeover|TestProfileInstallStopThenRetryConformanceVector|TestProfileInstallSurfacesBeforePublication|TestProfileInstallUseActivatesThroughSwitch|TestProfileInstallUsePartialLeavesCurrent|TestProfileInstallWarnsEmptyAllowlist|TestProfileInstallWarnsOnSystemModule|TestProfileMachineUseSkipsScopedAdapter|TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable|TestProfileScopedUseUnaffectedByLockedRequire|TestProfileUpdateAllStopsAtFirstUnconfirmedDelta|TestProfileUpdateMCPDeltaConfirmationGolden|TestProfileUpdatePinnedTagIsUnchanged|TestProfileUpdateResyncPassesLockedRequire|TestProfileUpdateSurfacesBeforePublication|TestProfileUpdateSystemDeltaConfirmationGolden|TestProfileUseClearOperandIsUsage|TestProfileUseEnvAliases|TestProfileUseLockedRequireRefuses|TestProfileUseReportsAllAdaptersAlreadyScoped|TestProfileUseTargetIsStageB|TestProfileUseUnknownIsAFailure|TestProviderInputsForHostExplicitBinRefuses|TestProviderInputsForHostPublishedBinRefuses|TestProviderPostureRows|TestRepairNoticesDistinguishRepairFromAPreservedInstallation|TestReviewGlobalStatusDetectsChangedTagAtSameCommit|TestRunDispatchNormalizesAliasOperand|TestRunUnknownCommand|TestRunVersionExitsZero|TestSSHThisRunOnlyPromptNeverReachesTheSavedConfig|TestSecurityPostureCuratorStatusRows|TestSecurityPostureHardenedEmptyMCPWithoutDeclarationsWarnsAndInstalls|TestSecurityPostureHardenedMCPContradictionFailsEnvStatusCheck|TestSecurityPostureProfileInstallRefusesEmptySourceAllowlistBeforeWriting|TestSecurityPostureRevisionBDefaultEnvStatus|TestSecurityPostureRevisionBDefaultRefusesEmptySources|TestSecurityPostureSchema1EnvStatusHasNoPostureInventory|TestSecurityPostureVectorsThroughCLI|TestSecurityPostureWarningIsNotEmittedByEnforcedShim|TestSelectProjectTargetsUsesAliasesAndStableAllOrder|TestShellInitInstallCachesHookWithoutConfig|TestSkillCheckOnTempDir|TestSourceSignerVectorsAtProfileInstall|TestStatusAcceptsAnUnchangedLegacyMarkerSchema|TestStatusCheckAdmitsV2NULBearingInstall|TestStatusCheckRefusesV1NULAppearingAfterInstall|TestStatusDriftDetectsContentTampering|TestStatusExplainsAnUnusableGoToolchain|TestStatusJSONCarriesShellHookTrust|TestStatusReportMarksCompiledStateThatMovedDuringTheCheck|TestStatusReportsAnUnusableToolchainPerCompiledCommand|TestStatusReportsRecordedPathsBeyondTheCurrentProject|TestStatusReportsShellHookTrustPosture|TestStatusUnreadableApprovalStateSurfaced|TestStatusUnreadableCandidatesKeepRecord|TestSyncTakeoverFlagParses|TestTheCredentialPromptIsWiredOnlyWhereAnOperatorCanAnswerIt|TestThePromptPersistsThroughTheOrdinaryConfigWriter|TestUmbrellaHostilePathPlantWarnsUnderAEndToEnd|TestUmbrellaMissingProvider|TestUmbrellaPropagatesExitCode|TestUmbrellaProviderResolutionVectors|TestUmbrellaRefusedDirectoriesBothRevisions|TestUmbrellaSymlinkIntoManagedRefused|TestUmbrellaTrustedRootSymlinkEscape|TestUmbrellaUnreadableRootNeverAbsence|TestUmbrellaWarningText|TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot)$",
+        "./cmd/curator"
+      ],
+      "record": "default-curator-remaining-1-command.json"
+    },
+    {
+      "name": "default-curator-remaining-2",
+      "exit": 1,
+      "seconds": 543.375,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=9m",
+        "-run",
+        "^(TestAuthoritativeLifecycleUpgradeCasesAreExecutable|TestBootstrapAndProjectCommands|TestBootstrapIfMissingCreatesAbsentConfig|TestBuildReportDetailIsBounded|TestCLIAuditEmitsScriptLabels|TestCLIAuditJSONRecordsExplicitAbsence|TestCLIAuditMixedSkillRecordsBothPolicies|TestCLIAuditOpaqueNULFollowsHashVersion|TestCLIEndToEndInstallStatusAndTamperCheck|TestCLIStatusReportsLegacyPackageMarkerCurrent|TestCheckFailsForEveryNonCurrentCode|TestClassifyBuildCommandDetectsRecordedIdentityDrift|TestClassifyBuildCommandMapsEveryCacheOutcomeToADistinctCode|TestClassifySkillBuildsAcceptsEveryBuildBearingMarkerSchema|TestClassifySkillBuildsDetectsCommandDriftInBothDirections|TestClassifySkillBuildsWithoutCompiledStateStaysSilent|TestCompiledInstallFollowsTheNativeControlInventoryExactly|TestCompiledProjectRestoresCacheWhenCommitFails|TestCompiledProjectStatusAndUntrustedRecovery|TestConfigBuildHTTPSListWithoutScopesPrintsNothing|TestConfigBuildHTTPSRemoveRejectsMissingAndMalformedTargets|TestConfigBuildSSHAddRejectsInvalidInvocations|TestConfigBuildSSHListWithoutScopesPrintsNothing|TestConfigBuildSSHRemoveRejectsMissingAndMalformedTargets|TestConfigHelpDocumentsPrecedenceAndSubcommands|TestConfigSubcommandDispatch|TestCuratorStatusProviderPostureAndCheck|TestCurrentnessCodesAreDistinctAndOnlyExactStatesPass|TestDryRunNeverClaimsACompletedCompilerCheck|TestEveryCurrentnessCodeIsDocumented|TestExecutableCandidates|TestGCRetainsAndReportsReferencedCompiledState|TestGCRunsSerializedAcrossConcurrentInvocations|TestGlobalStatusFailsCheckWhenTheUserHomeCannotBeResolved|TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands|TestGlobalStatusRejectsPositionalArguments|TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck|TestGoToolchainGuidanceNamesTheAcceptedSelectionAndTestedFamilies|TestHookApprovalsToleratesMalformedRecord|TestHookApprovalsUnreadableStateNamesReadFailure|TestHookApproveReRecordsAfterChange|TestHookApproveRecordsOperatorApproval|TestHookApproveResolvesSymlinkedOperand|TestHookRevokeRemovesRecord|TestHookUsageErrors|TestHostGoToolchainIsSelectableOnAnInventoryPlatform|TestInputCausesAreDistinctAndDocumented|TestInstallAuditFlagAcceptsOptionalMode|TestInstallFlagsAcceptTrailingOptions|TestMarkerDigestsDistinguishesAbsentAndUnreadable|TestMarkerRefusalSeparatesUnsupportedFromInvalid|TestNativeBlackboxExternalBuildLifecycle|TestNativeSkillsTakeoverActivationBoundary|TestNativeSkillsTakeoverEveryRegisteredCommand|TestNativeSkillsTakeoverFlagBoundary|TestNativeSkillsTakeoverHelpCrossProduct|TestNativeSkillsTakeoverHelpNarrowingMutant|TestPermissiveRegistryOutageWarnsWithArtifactIdentity|TestProductionBinaryDispatchesLandlockProbe|TestProductionBinaryDispatchesNetNSProbe|TestProductionBinaryDispatchesRustOracleBeforeAmbientCargoDiscovery|TestProductionExternalAuditReturnsAdvisoryWarnings|TestProfileComposeListsDeclaredOverlays|TestProfileGitReinstallHonoursUseAndTakeover|TestProfileInstallFileOperandIsRefused|TestProfileInstallFirstActivationFailureReportsPersistedProfile|TestProfileInstallListUse|TestProfileInstallListsStdioCommands|TestProfileInstallRefConflictIsAFailure|TestProfileInstallReinstallDeltaVectorsAtCLI|TestProfileInstallStopThenRetryConformanceVector|TestProfileInstallSurfacesBeforePublication|TestProfileInstallUseActivatesThroughSwitch|TestProfileInstallUsePartialLeavesCurrent|TestProfileInstallWarnsEmptyAllowlist|TestProfileInstallWarnsOnSystemModule|TestProfileMachineUseSkipsScopedAdapter|TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable|TestProfileUpdateAllStopsAtFirstUnconfirmedDelta|TestProfileUpdateMCPDeltaConfirmationGolden|TestProfileUpdatePinnedTagIsUnchanged|TestProfileUpdateSurfacesBeforePublication|TestProfileUpdateSystemDeltaConfirmationGolden|TestProfileUseReportsAllAdaptersAlreadyScoped|TestProfileUseTargetIsStageB|TestProfileUseUnknownIsAFailure|TestProviderInputsForHostExplicitBinRefuses|TestProviderInputsForHostPublishedBinRefuses|TestProviderPostureRows|TestRepairNoticesDistinguishRepairFromAPreservedInstallation|TestReviewGlobalStatusDetectsChangedTagAtSameCommit|TestRunVersionExitsZero|TestSSHThisRunOnlyPromptNeverReachesTheSavedConfig|TestSecurityPostureCuratorStatusRows|TestSecurityPostureHardenedEmptyMCPWithoutDeclarationsWarnsAndInstalls|TestSecurityPostureHardenedMCPContradictionFailsEnvStatusCheck|TestSecurityPostureProfileInstallRefusesEmptySourceAllowlistBeforeWriting|TestSecurityPostureRevisionBDefaultEnvStatus|TestSecurityPostureRevisionBDefaultRefusesEmptySources|TestSecurityPostureSchema1EnvStatusHasNoPostureInventory|TestSecurityPostureVectorsThroughCLI|TestSecurityPostureWarningIsNotEmittedByEnforcedShim|TestSelectProjectTargetsUsesAliasesAndStableAllOrder|TestShellInitInstallCachesHookWithoutConfig|TestSkillCheckOnTempDir|TestSourceSignerVectorsAtProfileInstall|TestStatusAcceptsAnUnchangedLegacyMarkerSchema|TestStatusCheckAdmitsV2NULBearingInstall|TestStatusCheckRefusesV1NULAppearingAfterInstall|TestStatusDriftDetectsContentTampering|TestStatusExplainsAnUnusableGoToolchain|TestStatusJSONCarriesShellHookTrust|TestStatusReportMarksCompiledStateThatMovedDuringTheCheck|TestStatusReportsAnUnusableToolchainPerCompiledCommand|TestStatusReportsRecordedPathsBeyondTheCurrentProject|TestStatusReportsShellHookTrustPosture|TestStatusUnreadableApprovalStateSurfaced|TestStatusUnreadableCandidatesKeepRecord|TestTheCredentialPromptIsWiredOnlyWhereAnOperatorCanAnswerIt|TestThePromptPersistsThroughTheOrdinaryConfigWriter|TestUmbrellaHostilePathPlantWarnsUnderAEndToEnd|TestUmbrellaProviderResolutionVectors|TestUmbrellaRefusedDirectoriesBothRevisions|TestUmbrellaSymlinkIntoManagedRefused|TestUmbrellaTrustedRootSymlinkEscape|TestUmbrellaUnreadableRootNeverAbsence|TestUmbrellaWarningText|TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot)$",
+        "./cmd/curator"
+      ],
+      "record": "default-curator-remaining-2-command.json"
+    },
+    {
+      "name": "default-curator-s0",
+      "exit": 0,
+      "seconds": 198.852,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestAuditAllowPinsOnlySupportedContentIdentity|TestStatusReportReportsCompiledCommandsOfAnUninstalledSkill|TestProjectResolveGitAliasSelectionThroughCLI|TestClassifyDraftMemberComparesExactCurrentness|TestEnvResolveBareStaleIsAFailure|TestProfileUseUnknownEnvRefused|TestEnvStatusReportsLockedRequire|TestGlobalStatusWithoutASkillfileStaysSilentAndCurrent|TestPathOverlayFromMachineConfigJoinsTheClosure|TestBootstrapIfMissingRejectsForce|TestMuseCredentialPolicyStatus|TestProfileInstallReinstallUsePreservesProjectScope|TestHardenedRegistryOutageRefusesWithAdvisoryRegistryPolicy|TestActiveRevisionIsWarningRelease|TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves|TestDraftInstallStatusHelpIncludesSchema2Workflow|TestProjectRefreshTransitiveTagAdvanceThroughCLI|TestEnvResolveKeepsSchema1BytesForMetadataOnly|TestUmbrellaInvalidNameIsUsage|TestEnvConfigShowPermissionsRejectsUnreadableInventoryAncestor|TestGCPreservesRuntimeOnUncertainMarks|TestHookApproveIsIdempotentWhenRecordMatches|TestCLIVerifiedCapabilityDriftStartsNothingAndAdoptsNoCache|TestConfigBuildHTTPSAddListRemove|TestReviewNativeTakeoverHelpBoundary|TestProfileRemoveInUseIsAFailure|TestSecurityPostureExplicitPermissiveInstallsWithoutSourceAllowlist|TestProviderInputsForHostScannedBinWarnsWithoutLedger|TestBuildReportsNeverPublishAnAbsolutePath|TestProjectResolveIgnoresRemovedSwitch|TestDraftStatusNotInstalled|TestEnvMigrateUsage|TestEnvUnmanageRestoresNewestBackupGeneration|TestProfileInstallUseLockedRequireRefuses|TestGlobalInstallConflictRetainsMigratedLockAndTakeoverRecovers|TestHookApproveEndToEndWithGeneratedHook|TestInstallFlagsCarryTheRunWideBuildSSHSelection|TestHTTPSThisRunOnlyPromptNeverReachesConfigOrCredentialStore|TestProfileUpdateAllDeltaVectorsAtCLI|TestProfileListMigrationHonoursSystemPolicy|TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands|TestUnusableToolchainRowsCarryTheDriverBoundaryCode|TestEndpointExhaustionCarriesRemediation|TestProjectRefreshLegacyConfiguredGitBranchThroughCLI|TestEnvResolveCredentialRecordPathlessKeyring|TestUmbrellaDispatchesToProvider|TestEnvConfigShowPermissionsRejectsUnreadableConfig|TestEnvStatusCheckCurrentScopeOnly|TestHookApproveFailsDistinctlyOnAbsentAndUnreadable|TestRunUsesInjectedConfigSourceAndWriters|TestConfigBuildSSHAgentFlagKeepsScopePositional|TestNativeSkillsTakeoverArgumentDiscardRegression|TestProfileInstallRefusesPathMCPDeclarationThroughCLI|TestSecurityPostureResolveRefusesExplicitUnboundedPassthrough|TestProviderSubcommandParsing)$",
+        "github.com/relux-works/curator/cmd/curator"
+      ],
+      "record": "default-curator-s0-command.json"
+    },
+    {
+      "name": "default-curator-s1",
+      "exit": 1,
+      "seconds": 483.759,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestReviewCLIStatusDetectsChangedTagAtSameCommit|TestRegisteredSubcommandHelpNoWrites|TestProjectResolveGitTagDiffersFromHEADThroughCLI|TestDraftTransportLegacyGolden|TestEnvResolveIsolatedSystemLockUsesDirection|TestEnvConfigAliasOutputPrintsCanonicalKnob|TestGlobalInitCleanHomeRefusesWithBootstrapHint|TestStatusRecordedButMissingStaysInInventory|TestResolveTakeoverRequiresRepair|TestHiddenWorkerModeIsNotAUserVisibleCommand|TestMuseProfileSeedSecretAndCredentialRefusals|TestProfileUpdateListsNewDeclaration|TestSecurityPostureHardenedContradictionFailsEnvStatusCheck|TestUmbrellaTrustRootSelectionBothRevisions|TestClassifySkillBuildsDetectsContextExposure|TestDraftDocumentedGitRevisionThroughCLI|TestProjectRefreshAliasFetchDedupedThroughCLI|TestCredentialStoreCLIPromotion|TestEnvResolvePreserveLockRequiresRepair|TestEnvConfigSetListKnob|TestGCWaitsForTheHomeLock|TestHookApprovalsOnAbsentStateIsEmpty|TestUsageEnumeratesDocumentedCommands|TestConfigBuildHTTPSLoginRejectsInvalidInvocations|TestNativeSkillsCLIOperations|TestProfileUseUnknownEnvironmentIsAFailure|TestCompiledProjectRepairsCorruptCompiledState|TestUmbrellaTrustRootCaseVariantIdentity|TestMarkerDigestsDetectAConcurrentInstallMarkerChange|TestProjectResolveTransitiveProviderUsesConfiguredRootThroughCLI|TestDraftStatusDriftFailsClosedWithoutFrozenInputs|TestCuratorSpecMainLaunchEnvFragmentV2SchemaCases|TestEnvResolveAliasAdjacentUnknownsRefused|TestProfileImportUseLockedRequireRefuses|TestGlobalStatusReportsATransitivelyResolvedCompiledCommand|TestProfileComposeAddPathRow|TestBootstrapIfMissingKeepsExistingConfigWithoutParsing|TestMuseRootContextDrift|TestProfileInstallActivationMatrix|TestProfileReinstallActivationFailureKeepsUpdatedWording|TestInstallPrintsTheRemedyAVersionManagerSelectionEarns|TestClassifySkillBuildsAcceptsOnlyAnExactlyCurrentInstallation|TestDraftRemediationThroughCLI|TestProjectRefreshRemoteEnumerationFailurePreservesStateThroughCLI|TestCredentialStoreCLIConfigRoundTrip|TestEnvStatusS4Posture|TestEnvConfigShowDefaults|TestGCPrunesDeadConsumersUnderTheHomeLock|TestHookApprovalsListsReadOnly|TestProductionExternalDepsBindTrustedGitAndAudit|TestConfigBuildHTTPSAddRejectsInvalidInvocations|TestNativeSkillsTakeoverRegistryNarrowingMutant|TestProfileSyncCoversTheMachineScope|TestCLIHelperProcess|TestProviderPostureReportsUnreadablePublishedShimLedger)$",
+        "github.com/relux-works/curator/cmd/curator"
+      ],
+      "record": "default-curator-s1-command.json"
+    },
+    {
+      "name": "default-curator-s1-rest",
+      "exit": 0,
+      "seconds": 235.324,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestReviewCLIStatusDetectsChangedTagAtSameCommit|TestStatusRecordedButMissingStaysInInventory|TestHiddenWorkerModeIsNotAUserVisibleCommand|TestProfileUpdateListsNewDeclaration|TestSecurityPostureHardenedContradictionFailsEnvStatusCheck|TestUmbrellaTrustRootSelectionBothRevisions|TestClassifySkillBuildsDetectsContextExposure|TestGCWaitsForTheHomeLock|TestHookApprovalsOnAbsentStateIsEmpty|TestUsageEnumeratesDocumentedCommands|TestConfigBuildHTTPSLoginRejectsInvalidInvocations|TestProfileUseUnknownEnvironmentIsAFailure|TestCompiledProjectRepairsCorruptCompiledState|TestUmbrellaTrustRootCaseVariantIdentity|TestMarkerDigestsDetectAConcurrentInstallMarkerChange|TestGlobalStatusReportsATransitivelyResolvedCompiledCommand|TestBootstrapIfMissingKeepsExistingConfigWithoutParsing|TestProfileReinstallActivationFailureKeepsUpdatedWording|TestInstallPrintsTheRemedyAVersionManagerSelectionEarns|TestClassifySkillBuildsAcceptsOnlyAnExactlyCurrentInstallation|TestGCPrunesDeadConsumersUnderTheHomeLock|TestHookApprovalsListsReadOnly|TestProductionExternalDepsBindTrustedGitAndAudit|TestConfigBuildHTTPSAddRejectsInvalidInvocations|TestProfileSyncCoversTheMachineScope|TestCLIHelperProcess|TestProviderPostureReportsUnreadablePublishedShimLedger)$",
+        "github.com/relux-works/curator/cmd/curator"
+      ],
+      "record": "default-curator-s1-rest-command.json"
+    },
+    {
+      "name": "default-curator-s2",
+      "exit": 0,
+      "seconds": 378.7,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestCLIAuditJSONCarriesScriptLabels|TestWithDraftRemediationTable|TestProjectResolveDraftAllowlistLegacyThroughCLI|TestReviewProbeLegacyLaneIdentityInvalid|TestEnvStatusRegistryBoundaryPostureAndCheck|TestUsageListsAliases|TestGlobalInitEnvResolveSubcommandHelpPreservesFlagSet|TestEnvStatusUnreadableApprovalStateSurfaced|TestAuthoritativeLifecycleBootstrapCasesAreExecutable|TestConfigBuildSSHAddListRemove|TestMuseCLIStorePolicy|TestGitFileURLHasNoBackslash|TestSecurityPostureProfileInstallRefusesMCPDeclarations|TestUmbrellaMissingNamesRoots|TestContextExposureDistinguishesAbsentAndUnreadableBuildRoots|TestDraftLaunchConsumesFrozenRuntimeThroughCLI|TestDraftStatusLegacyMarkerNeedsInstall|TestCredentialStoreCLIDottedProfileRouting|TestEnvUnmanageTakeoverRestoresSymlink|TestEnvConfigLockedKnobRefuses|TestGlobalAdoptCLIRefusesByteMismatch|TestHookDiagnosticsAgreeWithShell|TestShellInitPrintsHooks|TestConfigBuildHTTPSHelpDocumentsPrecedenceAndDisclosure|TestAuditAllowWritesWriterVersionPinCarrier|TestProfileScopedUseAndClear|TestStatusKeepsLegacyBehaviourWhenAPlanFailsWithoutCompiledCommands|TestCLIAuditBindsDependencyDirectory|TestStatusReportFindsASchema8InstallationCurrent|TestProjectResolveLegacyNetworkGitThroughCLI|TestProductionExternalDepsAssignsTransportProvenanceSink|TestEnvResolveRejectsSwappedStoreEntry|TestEnvConfigSetNormalizesEnvKnobs|TestEnvStatusReportsNotInheritedNativeCodexServers|TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven|TestProfileUseTakeoverRow|TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot|TestMuseRootContextNarrowingMutants|TestRevisionDoesNotBorrowTagSignature|TestSecurityPostureWarningAndEnvStatusRows|TestUmbrellaHostilePathPlantRefusedUnderB|TestClassifySkillBuildsRefusesAMarkerThatCannotDescribeABuild|TestDraftAvailabilityFallbackThroughCLI|TestDraftStatusNeedsInstallAfterRefreshWithoutInstall|TestReviewDottedCredentialProfile|TestEnvResolvePreserveLockRefusesCurrentV1AndPlainRepairMigrates|TestEnvConfigProviderDirectoriesRoundTrip|TestSignerRowsSurviveHostileGlobalGitConfig|TestHookRevokeAbsentLeavesStateByteIdentical|TestRunNoArgsPrintsUsage|TestConfigBuildHTTPSRemoveNeverTouchesTheOperatorsOwnGitCredential|TestProductionExternalAuditOpaqueNULFollowsHashVersion|TestProfileUseTargetBoundToAdapter|TestStatusReportsATransitivelyResolvedCompiledCommand)$",
+        "github.com/relux-works/curator/cmd/curator"
+      ],
+      "record": "default-curator-s2-command.json"
+    },
+    {
+      "name": "default-curator-tail",
+      "exit": 1,
+      "seconds": 484.38,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestClassifyBuildCommandDetectsRecordedIdentityDrift|TestDraftProjectResolveHelp|TestProjectRefreshLegacyNetworkGitBranchThroughCLI|TestEnvResolveCredentialRecordIsolatedKeychain|TestUmbrellaPropagatesExitCode|TestEnvConfigShowPermissionsRejectsUnreadableInventoryAndCurrent|TestPostureWarningOncePerProcessTree|TestHookApproveReRecordsAfterChange|TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt|TestConfigBuildSSHRemoveRejectsMissingAndMalformedTargets|TestNativeSkillsTakeoverActivationBoundary|TestProfileUseUnknownIsAFailure|TestSecurityPostureRevisionBDefaultRefusesEmptySources|TestExecutableCandidates|TestCheckFailsForEveryNonCurrentCode|TestProjectResolveSchema1KeepsReadOnlyMeaning|TestDraftStatusContentDrift|TestEnvResolveRepairNeedsMigration|TestEnvUnmanageDoesNotRestoreWithoutAnObservedRecord|TestProfileUseLockedRequireRefuses|TestGlobalInstallPublishesMigratedLockBeforeNativeMaterialization|TestEnvStatusReportsShellHookTrustPosture|TestInstallAuditFlagAcceptsOptionalMode|TestSSHThisRunOnlyPromptNeverReachesTheSavedConfig|TestProfileUpdateMCPDeltaConfirmationGolden|TestProfileInstallFileOperandIsRefused|TestStatusExplainsAnUnusableGoToolchain|TestCLIAuditEmitsScriptLabels|TestCommandHelpRunPassthrough|TestProjectResolveGitCollectionPinnedToTagThroughCLI|TestDraftTransportProviderAdmission|TestEnvResolveLockedIsolationRequiresMigration|TestRunDispatchNormalizesAliasOperand|TestGlobalInitHelpWithoutConfig|TestStatusUnreadableApprovalStateSurfaced|TestInstallGitignoreEntryPoint|TestProductionBinaryDispatchesLandlockProbe|TestMuseCLIAuthParentBoundary|TestProfileInstallSurfacesBeforePublication|TestSecurityPostureCuratorStatusRows|TestUmbrellaSymlinkIntoManagedRefused|TestCurrentnessCodesAreDistinctAndOnlyExactStatesPass|TestDraftDocsPinExamples|TestDraftStatusStaleEmptyLockRefuses|TestEnvMigratePlanApplyPi|TestEnvUnmanageSymlinkRestoreRefusesPlannedLinkedParent|TestProfileComposeAddWarnsWhenOverlaysForbidden|TestGlobalAddPublishesProfileLockBeforeNativeMaterialization|TestStatusJSONCarriesShellHookTrust|TestSkillCheckOnTempDir|TestTheCredentialPromptIsWiredOnlyWhereAnOperatorCanAnswerIt|TestStatusCheckAdmitsV2NULBearingInstall|TestProfileMachineUseSkipsScopedAdapter|TestCompiledInstallFollowsTheNativeControlInventoryExactly|TestClassifySkillBuildsWithoutCompiledStateStaysSilent|TestDraftMachinePolicySetupThroughCLI|TestProjectResolveOriginLessSkipsFetchThroughCLI|TestCredentialStoreCLIConfigRefusesMalformed|TestEnvStatusEffectivePassableList|TestEnvConfigSetUnsetRoundTrip|TestGCFailsClosedForUntrustedCurrentPathSource|TestHookApprovalsToleratesMalformedRecord|TestProductionExternalAuditReturnsAdvisoryWarnings|TestConfigBuildHTTPSRemoveRejectsMissingAndMalformedTargets|TestNativeSkillsTakeoverHelpNarrowingMutant|TestProfileComposeListsDeclaredOverlays|TestCompiledProjectStatusAndUntrustedRecovery|TestProviderInputsForHostExplicitBinRefuses|TestRepairNoticesDistinguishRepairFromAPreservedInstallation|TestProjectResolveGitMissingMemberRefusedThroughCLI|TestDraftStatusAppliesKeepsSchema1ProjectsUntouched|TestEnvResolveRepairFailedOnUninspectable|TestEnvResolveAcceptsAliases|TestProfileScopedUseUnaffectedByLockedRequire|TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck|TestProfileImportNameTakenRow|TestBootstrapAndProjectCommands|TestMuseRootContextVectors|TestProfileGitReinstallHonoursUseAndTakeover|TestProfileInstallFirstActivationFailureReportsPersistedProfile|TestHostGoToolchainIsSelectableOnAnInventoryPlatform|TestClassifyBuildCommandMapsEveryCacheOutcomeToADistinctCode|TestDraftAttemptClauseShape|TestProjectResolveGitRealInstallThroughCLI|TestEnvResolveCredentialRecordProvisionAndRepair|TestUmbrellaMissingProvider|TestEnvConfigShowPermissionsAtProductionEntry|TestEnvResolveStaleHintsRepair|TestHookApproveRecordsOperatorApproval|TestEnforcedShimDispatchRefusesUnreadableSidecar|TestConfigBuildSSHAddRejectsInvalidInvocations|TestNativeSkillsTakeoverEveryRegisteredCommand|TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable|TestSecurityPostureHardenedEmptyMCPWithoutDeclarationsWarnsAndInstalls|TestProviderPostureRows|TestBuildReportDetailIsBounded|TestProjectResolveGitSelectionThroughCLI|TestDraftStatusLiveMutationWithoutRefreshStaysCurrent|TestEnvMigrateApplyRequiresPlan|TestEnvUnmanageRestoresRecordedTakeoverBackup|TestProfileInstallFirstActivationLockedRequireRefuses|TestGlobalStatusRejectsSchema2SkillfileThroughCLI|TestProfileImportRow|TestSelectProjectTargetsUsesAliasesAndStableAllOrder|TestMuseCredentialPolicyNarrowingMutants|TestProfileUpdateAllStopsAtFirstUnconfirmedDelta|TestProfileInstallUseActivatesThroughSwitch|TestCuratorStatusProviderPostureAndCheck|TestMarkerDigestsDistinguishesAbsentAndUnreadable|TestDraftStripCloneFramingTable|TestDraftStatusLockOnlyChangeNeedsInstall|TestReviewDottedCredentialProfileExisting|TestEnvUnmanageTakeoverPreservesFileMode|TestEnvConfigProviderDirectoriesLockedRefuses|TestGlobalAdoptCLIAdoptsAndIsIdempotent|TestHookUsageErrors|TestRunUnknownCommand|TestConfigHelpDocumentsPrecedenceAndSubcommands|TestCLIAuditOpaqueNULFollowsHashVersion|TestProfileInstallWarnsOnSystemModule|TestStatusReportsAnUnusableToolchainPerCompiledCommand|TestAuditAllowRefusalPrecedesConfigLoad|TestClassifySkillBuildsAcceptsEveryBuildBearingMarkerSchema|TestProjectResolveLegacyConfiguredGitThroughCLI|TestClassifyDraftMemberPresenceRows|TestEnvResolveRepairEmitsFragment|TestEnvStatusPrintsCanonicalAfterAliasUse|TestPrintEnvStatusShowsCodexSeedPostureAndNames|TestGlobalStatusFailsCheckWhenTheUserHomeCannotBeResolved|TestOverlayFromMachineConfigIsRefusedByKind|TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot|TestMuseRootContextStatus|TestSourceSignerVectorsAtProfileInstall|TestPermissiveRegistryOutageWarnsWithArtifactIdentity|TestUmbrellaHostilePathPlantWarnsUnderAEndToEnd|TestInputCausesAreDistinctAndDocumented|TestDraftDocumentedLocalShapesThroughCLI|TestProjectRefreshFetchFailurePreservesStateThroughCLI|TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome|TestImplementedCommandWinsOverProvider|TestEnvConfigShowPermissionsWithoutProfiles|TestGCRetainsLiveProcessBuild|TestHookApproveResolvesSymlinkedOperand|TestCLIExecutionAssuranceSelectionIsPortableDefaultAndVerifiedFailClosed|TestConfigBuildHTTPSListWithoutScopesPrintsNothing|TestNativeSkillsTakeoverHelpCrossProduct|TestProfileInstallRefConflictIsAFailure|TestSecurityPostureRevisionBDefaultEnvStatus|TestProviderInputsForHostPublishedBinRefuses|TestStatusReportMarksCompiledStateThatMovedDuringTheCheck|TestProjectResolveTransitiveProviderIgnoresProcessCWDThroughCLI|TestDraftStatusDriftFailsClosedOnStaleLock|TestEnvResolveEmitsPermissionsV2AtProductionEntry|TestProfileUseEnvAliases|TestProfileUpdateResyncPassesLockedRequire|TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands|TestProfileComposeAddRefusesAFormOnAPathSource|TestBootstrapIfMissingCreatesAbsentConfig|TestMuseRootContextRefusals|TestProfileInstallStopThenRetryConformanceVector|TestSecurityPostureVectorsThroughCLI|TestUmbrellaProviderResolutionVectors|TestEveryCurrentnessCodeIsDocumented|TestProjectResolveLocalCreatesLockThroughCLI|TestDraftStatusStaleSwappedSelectionRefuses|TestEnvMigrateConflictRefuses|TestEnvUnmanageBackupRecordVectors|TestProfileComposeRefusals|TestGlobalAddConflictRetainsLockAndProfileSyncTakeoverRecovers|TestStatusReportsRecordedPathsBeyondTheCurrentProject|TestInstallFlagsAcceptTrailingOptions|TestThePromptPersistsThroughTheOrdinaryConfigWriter|TestProfileUpdateSystemDeltaConfirmationGolden|TestProfileUseReportsAllAdaptersAlreadyScoped|TestDryRunNeverClaimsACompletedCompilerCheck|TestAuditAllowRecordsPinCreationTime|TestCommandHelpInitPositiveControl|TestProjectResolveCanonicalRepositorySourceThroughCLI|TestDraftTransportResolvedMatrix|TestEnvResolveExplicitSharedConflictsWithIsolatedSystemLock|TestEnvConfigAliasLockRefusalPrintsCanonicalKnob|TestGlobalInitMalformedConfigHasNoBootstrapHint|TestStatusUnreadableCandidatesKeepRecord|TestSyncTakeoverFlagParses|TestProductionBinaryDispatchesNetNSProbe|TestMuseFragmentV3PublishedCases|TestProfileInstallWarnsEmptyAllowlist|TestSecurityPostureSchema1EnvStatusHasNoPostureInventory|TestUmbrellaRefusedDirectoriesBothRevisions|TestClassifySkillBuildsDetectsCommandDriftInBothDirections|TestDraftFetchFailureSanitizedThroughCLI|TestDraftStatusReportsUpToDateThroughCLI|TestCredentialStoreCLIResolveRefusesUnqualifiedDelivery|TestEnvResolvePreserveLockRepairBindsUnchangedLock|TestEnvConfigRefusals|TestGCRunsSerializedAcrossConcurrentInvocations|TestHookRevokeRemovesRecord|TestRunVersionExitsZero|TestConfigBuildHTTPSLoginStoresThroughTheOperatorHelperAndSelectsIt|TestNativeSkillsTakeoverFlagBoundary|TestProfileUseTargetIsStageB|TestCompiledProjectRestoresCacheWhenCommitFails|TestCLIStatusReportsLegacyPackageMarkerCurrent|TestCommandHelpNarrowingMutants|TestProjectResolveLegacyMixedThroughCLI|TestProductionExternalDepsFalseDrivesMirrorFetchToSink|TestEnvResolveUnknowns|TestEnvConfigSetNormalizesWholesaleValues|TestEnvResolveStripsAndReportsInlineNativeCodexMCPTable|TestGlobalStatusRejectsPositionalArguments|TestProfileInstallReinstallHonoursUseAndTakeover|TestCLIEndToEndInstallStatusAndTamperCheck|TestMuseCLIFragmentAndFakeLaunch|TestProfileInstallListsStdioCommands|TestSecurityPostureWarningIsNotEmittedByEnforcedShim|TestUmbrellaTrustedRootSymlinkEscape|TestGoToolchainGuidanceNamesTheAcceptedSelectionAndTestedFamilies|TestProjectResolveGitRuntimeTamperRefusedThroughCLI|TestDraftStatusInvalidMarker|TestEnvMigratePrintBeforeWrite|TestEnvUnmanageLeavesBackupsWithoutRestoreFlag|TestProfileUseClearOperandIsUsage|TestReviewGlobalStatusDetectsChangedTagAtSameCommit|TestProfileImportLossyRow|TestStatusDriftDetectsContentTampering|TestMuseRootContextCopyFallback|TestProfileInstallReinstallDeltaVectorsAtCLI|TestProfileInstallUsePartialLeavesCurrent|TestStatusAcceptsAnUnchangedLegacyMarkerSchema|TestCLIAuditJSONRecordsExplicitAbsence|TestDraftAttemptTransportTable|TestProjectResolveDraftAllowlistTransitiveThroughCLI|TestProductionBinaryDispatchesSSHWrapper|TestEnvStatusReportsDroppedSystemModuleThroughCLI|TestNormalizeEnvKnobPositions|TestBootstrapDocsExampleRuns|TestHookApprovalsUnreadableStateNamesReadFailure|TestAuthoritativeLifecycleUpgradeCasesAreExecutable|TestConfigBuildSSHListWithoutScopesPrintsNothing|TestNativeBlackboxExternalBuildLifecycle|TestProfileInstallListUse|TestSecurityPostureHardenedMCPContradictionFailsEnvStatusCheck|TestUmbrellaWarningText|TestMarkerRefusalSeparatesUnsupportedFromInvalid|TestDraftRepairRestoresDriftedContentThroughCLI|TestDraftStatusStaleManifestRefuses|TestCredentialStoreCLIInvalidProfileRouting|TestEnvUnmanageSymlinkRestoreRefusesLinkedParent|TestProfileComposeAddListRemove|TestGlobalAdoptCLIRefusesUnknownAndMissingCommandsWithoutWrites|TestStatusReportsShellHookTrustPosture|TestShellInitInstallCachesHookWithoutConfig|TestConfigSubcommandDispatch|TestStatusCheckRefusesV1NULAppearingAfterInstall|TestProfileUpdatePinnedTagIsUnchanged|TestGCRetainsAndReportsReferencedCompiledState|TestCLIAuditMixedSkillRecordsBothPolicies|TestCommandHelpUnknownTopic|TestProjectRefreshGitBranchMembershipChangeThroughCLI|TestDraftTransportIdentityInvalidSurfacesThroughCLI|TestEnvStatusMatrix|TestNormalizeRunEnvOperand|TestGlobalInitSubcommandHelpWithoutConfigRefuses|TestEnvStatusMissingAndUnreadableKeepRecord|TestLegacyPackageStatusBindingAndRepair|TestProductionBinaryDispatchesRustOracleBeforeAmbientCargoDiscovery|TestMuseFragmentV4PublishedCases|TestProfileUpdateSurfacesBeforePublication|TestSecurityPostureProfileInstallRefusesEmptySourceAllowlistBeforeWriting|TestUmbrellaUnreadableRootNeverAbsence)$",
+        "./cmd/curator"
+      ],
+      "record": "default-curator-tail-command.json"
+    },
+    {
+      "name": "default-environment-witness",
+      "exit": 0,
+      "seconds": 214.239,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=3m",
+        "-run",
+        "^Test(DraftTransportLegacyGolden|EnvStatusRegistryBoundaryPostureAndCheck)$",
+        "./cmd/curator"
+      ],
+      "record": "default-environment-witness-command.json"
+    },
+    {
+      "name": "default-envprofile-0",
+      "exit": 1,
+      "seconds": 482.847,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestInstallErrorRefusesTransitiveSystemModule|TestDropAllDroppedOmitsFragmentSection|TestPolicyFromConfigCarriesAdmission|TestStrictAuditMemberCapabilityCacheIsolation|TestClaudeAbsentSeedGolden|TestCodexSeedRejectsInvalidTOMLBeforePublishingHome|TestCredentialLinkRegularFileRefuses|TestCodexUnknownStoreSharedRefuses|TestReviewerDanglingExpectedTarget|TestCodexCredentialStoreTOMLSpellings|TestCredentialStorePolicyNativeInspection|TestCredentialProjectionIsolationRefusals|TestResolveRecoversCredentialMarkerAfterRenameCrash|TestEnvironmentsEnvPassthroughVectors|TestMigrationHonoursConfigPathOverride|TestSourceAllowlistRejectsAdjacentPathSegment|TestCanonicalGitRejectsFileRemote|TestInstallUseSwitchesAndAgrees|TestInstallOperandKindIsSyntactic|TestMachineUseClearsEveryScopeEqualToNewDefault|TestScopedRecordFilenameIsPortable|TestRevokedSourceIsRefused|TestPolicyFromConfigCarriesEnvGates|TestInstallRejectsSecretMember|TestUseReplacesWithBackup|TestUpdatePathLeavesLockInPlace|TestUpdateDefaultIsBlocked|TestInstallTransitiveDirectoryRejectsSecret|TestMutationLockContention|TestMigratedGlobalSkillNetworkCapabilities|TestInstalledMemberCapabilitiesStayKindScoped|TestMigratedGlobalSkillNullCapabilityDeclarations|TestImportLossyStopsWithoutConsent|TestImportPartialActivationKeepsLock|TestImportRecordsImportedFromNative|TestImportAbsentMarkerDetectsNative|TestUnreadableDotfileStateKeepsTakeoverQuiet|TestDotfileManagerStateAloneDoesNotWarn|TestManagedHomeRepairTightensDirectories|TestResolveRejectsGitPinMissingFromLocalObjectDatabase|TestResolveStaleUnprovisioned|TestResolvePassthroughLiveness|TestCodexUnreadableConfigFails|TestResolveLockContention|TestMaterializeCapturePendingDoesNotRecover|TestMaterializeCaptureAndStatusNeverProbeVendor|TestMaterializeCaptureConcurrentRepair|TestMaterializeCaptureExternalTornGeneration|TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker|TestMigratePlanDriftRefuses|TestMigrateUnknownOperands|TestMigrateMarkerDriftRefuses|TestMigratePublishFailureRevertsLinks|TestMigrateRecoveryCleansOwnedTemp|TestMusePolicySwitchPreservesCredentials|TestMuseAuthParentBoundaryAtResolve|TestMuseStatusOptionalProvisioning|TestNativeSkillsUseAndSync|TestNativeSkillsUnreadableMarker|TestNativeSkillsBackupCollision|TestGitFileURLForKeepsVolumesOutOfTheHost|TestUpdateBlocksDeepNULFileInNewContextMember|TestSwitchMaterializeRefusesV1CommitPinnedContextNUL|TestGuardedReadersV1NULRefusalComputesNoV1Identity|TestPrecedenceTieKeepsTopologicalOrder|TestPathOverlayFormIsSourceInvalid|TestOverlayDuplicateNameIsCompositionInvalid|TestWeightRulesAllFourDisagree|TestWeightConflictErrorAndWarning|TestPathKindDryRunVectorsDriveReadOnlyResolve|TestPathOverlayTrustedSystemModuleRemainsAdmitted|TestMissingPathOperandIsPathMissing|TestSymlinkInPathIsUntrusted|TestPathSnapshotImmutableAcrossUpdateSyncUse|TestUpdatePathMissingSnapshotIsSourceInvalid|TestReinstallBlocksSecretOverlayMember|TestPermissionsForProfileProperties|TestPreserveLockMigrationRefusalPrecedesBusyLock|TestRC14MigrationRehashesLegacyIdentities|TestRC14IdentityMigrationRefusesVersionAndPinMismatch|TestRC14UseMigratesLegacyProfileBeforeNativePublication|TestUnreadableLockRefusesUpdateWithoutRewriting|TestReviewerRecoveryPreservesRegularTemp|TestScopedCurrentAbsenceAndUnreadabilityDiffer|TestOverlayOwnerLockAbsenceAndUnreadabilityDiffer|TestUpdatePathSnapshotUnreadableIsNotAbsent|TestStatusBackupInventoryAbsenceAndUnreadabilityDiffer|TestUpdateConfirmationPostureVectorAtStatus|TestStatusProfileMembersAndUnregistered|TestOpencodeFormFallback|TestStatusShellHookTrustFromLaunchProject|TestStoreBoundaryDryRunVectorsDriveResolveRepairPlan|TestInstallEmitsSurfacingBeforePublication|TestSurfacingSinkWriteFailureIsNonFatal|TestAllowlistWarningOperations|TestSurfacingUnreadableManifest|TestTakeoverWarnsDotfileHeuristic|TestUnmanageRestorePlanRetainsMetadata|TestResolveRenderedDocumentReplacesStoreSymlinkWithoutFollowing)$",
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "record": "default-envprofile-0-command.json"
+    },
+    {
+      "name": "default-envprofile-final",
+      "exit": 0,
+      "seconds": 32.263,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestImportAbsentAndUnreadableRootSurfaceDiffer|TestManagerReadScannerFindsAliasedNotExistCollapse|TestProfilePathCollision|TestRepairTakeoverProvisionsManagedHome|TestResolveRepairKeepsEnclosingStoreRootFailureClass|TestSurfacingUnreadableManifest|TestUnreadableLockIsUntrustedAcrossStatusResolveRepairAndUpdate|TestUpdateConfirmationPostureVectorAtStatus|TestUpdateEmitsSurfacingBeforePublication)$",
+        "./internal/envprofile"
+      ],
+      "record": "default-envprofile-final-command.json"
+    },
+    {
+      "name": "default-envprofile-network-0",
+      "exit": 0,
+      "seconds": 157.872,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^TestProfileNetworkContactVectors$/^(canary\\-declared|canary\\-undeclared|declared\\-exact|declared\\-glob|declared\\-other\\-host|missing\\-manifest|missing\\-network\\-declaration|mixed\\-cross\\-file)$",
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "record": "default-envprofile-network-0-command.json"
+    },
+    {
+      "name": "default-envprofile-network-1",
+      "exit": 0,
+      "seconds": 37.768,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^TestProfileNetworkContactVectors$/^(mixed\\-real\\-first|mixed\\-reserved\\-first)$",
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "record": "default-envprofile-network-1-command.json"
+    },
+    {
+      "name": "default-envprofile-s0",
+      "exit": 0,
+      "seconds": 286.334,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestInstallErrorRefusesTransitiveSystemModule|TestReviewerDanglingExpectedTarget|TestCanonicalGitRejectsFileRemote|TestUseReplacesWithBackup|TestImportLossyStopsWithoutConsent|TestResolveStaleUnprovisioned|TestMigrateSchema1UnlinkPublishesCompleteSchema2Marker|TestMuseStatusOptionalProvisioning|TestPrecedenceTieKeepsTopologicalOrder|TestSymlinkInPathIsUntrusted|TestRC14UseMigratesLegacyProfileBeforeNativePublication|TestStatusProfileMembersAndUnregistered|TestTakeoverWarnsDotfileHeuristic|TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair|TestMigrationHonoursSystemLockedAllowlist|TestMCPAllowlistRefusesOutsidePackage|TestMigratedGlobalSkillIgnoresPreManifestVerdictCache|TestManagedModesNarrowingMutants|TestMaterializeCaptureDoesNotProvision|TestMigrateSchema1UnlinkPublishesCompleteSchema3MarkerV2WriterMode|TestResolveRefusesV1CommitPinnedContextNUL|TestPathRootAndImportedMCPDeclarationsRefused|TestPreserveLockRevalidationHoldsRepairLock|TestStatusScopeMarkerAbsenceAndUnreadabilityDiffer|TestInstallSurfacesMCPDeclarations|TestClaudeRepairPreservesNumberText|TestCredentialProjectionIdentitySubrequest|TestScopedUseStillSwitchesOnlyThatHome|TestDefaultProfileMaterializesOnFreshHome|TestImportUnreadableMarkerIsLoss|TestMaterializeCaptureCurrentAndRelease|TestMigrateSyscallFailureRollsBack|TestNativeSkillsEmptyProfileLeavesUnnamedParent|TestWeightUnknownRefused|TestUpdateBlocksV1RevokedOverlayMemberUnderV1Writers|TestProfileSourceAbsenceAndUnreadabilityDiffer|TestStoreBoundaryStatusVectorsDriveStatus|TestStatusUnreadableTransitiveManifestDoesNotBecomeNoDrops|TestCredentialStorePolicyActivation|TestAbsentPathOperandWithRequirementIsRefConflict|TestInstallSurfacesUnresolvedMCPCommand|TestImportSkillMarkerRecovery|TestCodexKeyringAmbient|TestMigratePendingNeedsNothing|TestNativeSkillsLedger|TestOverlayRepeatedNameIsCompositionInvalid|TestUpdatePathWithoutStatePinIsSourceInvalid|TestReviewerRecoveryMarkerDrift|TestClaudeSeedMergePreservesToolState|TestEnvironmentWriteNofollowVectors)$",
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "record": "default-envprofile-s0-command.json"
+    },
+    {
+      "name": "default-envprofile-s1",
+      "exit": 0,
+      "seconds": 358.343,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestDropAllDroppedOmitsFragmentSection|TestCodexCredentialStoreTOMLSpellings|TestInstallUseSwitchesAndAgrees|TestUpdatePathLeavesLockInPlace|TestImportPartialActivationKeepsLock|TestResolvePassthroughLiveness|TestMigratePlanDriftRefuses|TestNativeSkillsUseAndSync|TestPathOverlayFormIsSourceInvalid|TestPathSnapshotImmutableAcrossUpdateSyncUse|TestUnreadableLockRefusesUpdateWithoutRewriting|TestOpencodeFormFallback|TestUnmanageRestorePlanRetainsMetadata|TestStaleCredentialLinkRefusals|TestMachinePolicyLoadFailureFailsMigration|TestPolicyFromConfigCarriesStateWaiverHashVersion|TestMigratedGlobalSkillBinaryWriteVersion|TestManagedAuthoredFilesArePrivate|TestMaterializeCaptureStoreObjectIdentity|TestMusePolicyExplicitMigration|TestStrictAuditMemberRefusesV1NULBeforeHashing|TestPathOverlayFailureBlocksResolveAndMakesStatusNonCurrent|TestRC14ResolveRepairMigratesSiblingHomes|TestRemovePurgeMarkerAbsenceAndUnreadabilityDiffer|TestEmptyAllowlistWarningLeavesCurrentStatusCurrent|TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression|TestResolveRecoversCredentialMarkerAfterRenameCrashV2WriterMode|TestCanonicalIdentityRejectsMalformedSource|TestOperationsLeaveNoJournalResidue|TestDotfileStatePathResolution|TestMaterializeCaptureWaitReselectsAndTimeout|TestMigrateBrokenJournalRefuses|TestInstallBlocksBothV1CollidingSkillTrees|TestPathKindMCPVectorsDriveInstallEntry|TestPreserveLockRefusesBeforeStoreRebuild|TestImportAbsentAndUnreadableSkillsLedgerDiffer|TestReinstallEmitsSurfacingBeforePublication|TestPathOverlayAdmitsOrdinaryDirectory|TestCredentialProjectionSingleObservation|TestMachineUseSkipsScopedAdapter|TestInstallDirectoryRejectsSecretUnderSubdirectory|TestImportLedgerFailureIsLoss|TestResolveFormUnsupported|TestMigratePrintFailureRefusesBeforeMutation|TestNativeSkillsInstallAndUpdate|TestWeightRulesApplyInOrder|TestUpdateBlocksSecretOverlayMember|TestCurrentPointerAbsenceAndUnreadabilityDiffer|TestStoreBoundaryResolveVectorsDriveResolve)$",
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "record": "default-envprofile-s1-command.json"
+    },
+    {
+      "name": "default-envprofile-s2",
+      "exit": 1,
+      "seconds": 483.357,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestPolicyFromConfigCarriesAdmission|TestCredentialStorePolicyNativeInspection|TestInstallOperandKindIsSyntactic|TestUpdateDefaultIsBlocked|TestImportRecordsImportedFromNative|TestCodexUnreadableConfigFails|TestMigrateUnknownOperands|TestNativeSkillsUnreadableMarker|TestOverlayDuplicateNameIsCompositionInvalid|TestUpdatePathMissingSnapshotIsSourceInvalid|TestReviewerRecoveryPreservesRegularTemp|TestStatusShellHookTrustFromLaunchProject|TestResolveRenderedDocumentReplacesStoreSymlinkWithoutFollowing|TestPiProvisionTargetsAgentRoot|TestRevokedSkillMemberIsRefused|TestReinstallSameSourceIsAnUpdate|TestImportLosslessInstallsThroughPathPipeline|TestResolveProvisionRepair|TestMaterializeCaptureCredentialPolicyReleaseObservation|TestMuseDirectoriesAndIsolation|TestInstallAdmitsV1CollidingSkillTreesUnderV2|TestMissingOverlayPathIsPathMissing|TestRC14IdentityMigrationRecoversInterruptedCommit|TestSignerPostureVectorsAtStatus|TestUseWithoutTakeoverRefusesUnmanaged|TestEnvironmentsCodexSeedVectors|TestMigrationHonoursSystemLockedRevocation|TestStrictAuditCanaryPasses|TestMigratedGlobalSkillDeclarationKeepsOtherGates|TestManagedFallbackPermissions|TestMaterializeCaptureObjectBounds|TestMuseCredentialPolicyMatrix|TestResolveCleanV1CommitContextStaysCurrent|TestPathOverlayMCPDeclarationRefused|TestPlainRepairMigrationKeepsLockPrivate|TestStatusOrphanMarkerAbsenceAndUnreadabilityDiffer|TestInstallSurfacingSilentWithoutMCP|TestClaudeRepairSatisfiedIsNoOp|TestResolvePublishesCredentialMarkerThroughLockedJournal|TestSyncWritesScopedHomeOnce|TestEnsureDefaultMigratesGlobalSkills|TestDotfileManagerVectors|TestMaterializeCaptureCredentialStoreAdmission|TestMigrateInterruptedApplyRecovers|TestProfileNetworkContactVectors|TestNonRootWeightsMapRefused|TestReinstallBlocksRevokedOverlayMember|TestUnreadableDefaultProfileSourceDoesNotRecreateDefault|TestStoreBoundaryCheckedRootsExcludeCuratorHome)$",
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "record": "default-envprofile-s2-command.json"
+    },
+    {
+      "name": "default-envprofile-s2-rest",
+      "exit": 0,
+      "seconds": 141.638,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestOverlayDuplicateNameIsCompositionInvalid|TestUpdatePathMissingSnapshotIsSourceInvalid|TestReviewerRecoveryPreservesRegularTemp|TestStatusShellHookTrustFromLaunchProject|TestResolveRenderedDocumentReplacesStoreSymlinkWithoutFollowing|TestInstallAdmitsV1CollidingSkillTreesUnderV2|TestMissingOverlayPathIsPathMissing|TestRC14IdentityMigrationRecoversInterruptedCommit|TestSignerPostureVectorsAtStatus|TestUseWithoutTakeoverRefusesUnmanaged|TestResolveCleanV1CommitContextStaysCurrent|TestPathOverlayMCPDeclarationRefused|TestPlainRepairMigrationKeepsLockPrivate|TestStatusOrphanMarkerAbsenceAndUnreadabilityDiffer|TestInstallSurfacingSilentWithoutMCP|TestNonRootWeightsMapRefused|TestReinstallBlocksRevokedOverlayMember|TestUnreadableDefaultProfileSourceDoesNotRecreateDefault|TestStoreBoundaryCheckedRootsExcludeCuratorHome)$",
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "record": "default-envprofile-s2-rest-command.json"
+    },
+    {
+      "name": "default-envprofile-s3",
+      "exit": 1,
+      "seconds": 484.877,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestStrictAuditMemberCapabilityCacheIsolation|TestCredentialProjectionIsolationRefusals|TestMachineUseClearsEveryScopeEqualToNewDefault|TestInstallTransitiveDirectoryRejectsSecret|TestImportAbsentMarkerDetectsNative|TestResolveLockContention|TestMigrateMarkerDriftRefuses|TestNativeSkillsBackupCollision|TestWeightRulesAllFourDisagree|TestReinstallBlocksSecretOverlayMember|TestScopedCurrentAbsenceAndUnreadabilityDiffer|TestStoreBoundaryDryRunVectorsDriveResolveRepairPlan|TestInstallErrorWaiverAdmits|TestReviewerLiteralCodexSelector|TestGateSourceRejectsFileRemote|TestUsePartialRecordsNothing|TestImportLossyProceedsWithConsent|TestResolveUnknowns|TestMigrateNoSecretCopies|TestMusePublishedRegistryLayout|TestPathOverlayJoinsClosure|TestFoldedPathsAreSourceInvalid|TestEnvironmentsReadFailureVectors|TestSeedUnreadableStopsBeforeFirstWrite|TestTakeoverSymlinkedDotfileManagerStateDoesNotWarn|TestDanglingPiLinkReportedDetached|TestLoadMachinePolicyTreatsOnlyAbsentConfigAsDefault|TestMachineClearReachesSeamGate|TestMigratedGlobalSkillNetworkUndeclaredFollowUp|TestManagedSeedRefusalsPreserved|TestMaterializeCaptureAuthorizingDrift|TestMusePublishedLinkStates|TestValidateNamedStorePinsRefusesV1NULBeforeHashing|TestPathSourceMutationsRejectUntrustedOverlayBeforeDefaultWrites|TestRC14IdentityMigrationRollsBackEveryEntry|TestStatusSignerPostureUnknownWithoutCachedSource|TestResolvePassthroughKnobs|TestCodexSeedStripsInlineMCPTable|TestUpdateSystemDeltaRefusesBeforePublication|TestSourceAllowlistRefusesBeforeClone|TestGlobalSkillCapabilitiesNarrowingMutants|TestForeignManagerHintLstatDiscipline|TestMaterializeCaptureSameFragmentDrift|TestMigrateRecoveryRefusesUnexpectedTarget|TestInstallBlocksDeepNULFileInContextPathSnapshot|TestPathKindBoundaryVectorsDriveProductionEntries|TestPreserveLockRaceRefusesBeforeJournalRecovery|TestImportAbsentAndUnreadableSkillsSurfaceDiffer|TestSurfacingEmittedDespitePublicationFailure)$",
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "record": "default-envprofile-s3-command.json"
+    },
+    {
+      "name": "default-envprofile-s3-rest",
+      "exit": 0,
+      "seconds": 90.219,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestScopedCurrentAbsenceAndUnreadabilityDiffer|TestStoreBoundaryDryRunVectorsDriveResolveRepairPlan|TestEnvironmentsReadFailureVectors|TestSeedUnreadableStopsBeforeFirstWrite|TestTakeoverSymlinkedDotfileManagerStateDoesNotWarn|TestRC14IdentityMigrationRollsBackEveryEntry|TestStatusSignerPostureUnknownWithoutCachedSource|TestResolvePassthroughKnobs|TestImportAbsentAndUnreadableSkillsSurfaceDiffer|TestSurfacingEmittedDespitePublicationFailure)$",
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "record": "default-envprofile-s3-rest-command.json"
+    },
+    {
+      "name": "default-envprofile-s4",
+      "exit": 0,
+      "seconds": 421.571,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestClaudeAbsentSeedGolden|TestResolveRecoversCredentialMarkerAfterRenameCrash|TestScopedRecordFilenameIsPortable|TestMutationLockContention|TestUnreadableDotfileStateKeepsTakeoverQuiet|TestMaterializeCapturePendingDoesNotRecover|TestMigratePublishFailureRevertsLinks|TestGitFileURLForKeepsVolumesOutOfTheHost|TestWeightConflictErrorAndWarning|TestPermissionsForProfileProperties|TestOverlayOwnerLockAbsenceAndUnreadabilityDiffer|TestInstallEmitsSurfacingBeforePublication|TestStatusReportsPolicyAndDropped|TestCodexMalformedStoreSharedRefuses|TestInstallUsePartialLeavesCurrent|TestInstallGitResolvesNetworkIdentity|TestImportNameTakenBeforeAnyWrite|TestClaudeRootAlwaysCopied|TestMigrateRollbackRestoresPriorState|TestNativeSkillsTakeover|TestOverlayInvalidSourceKindIsSourceInvalid|TestPathUpdateAllSucceedsWithImportedProfile|TestAbsentLockRemainsProfileUnknown|TestRepairFailedMissingStore|TestUnmanageRestoreRefusesLinkedParent|TestCredentialLinkDirectory|TestRevokedMCPMemberIsRefused|TestNameTaken|TestImportNormalizesOrdersAndPins|TestResolveReportsRecordedContextSurfaceHashDrift|TestMaterializeCaptureCredentialPolicyReleaseCache|TestMuseAuthRepairAdditionalStates|TestInstallAdmitsDeepNULFileInContextPathSnapshotUnderV2|TestNonDirectoryPathIsSourceInvalid|TestRC14Schema1IdentityMigrationWithoutCredentialOperations|TestStatusOrphanRetention|TestUseTakeoverBacksUpAndNotifies|TestSharedToIsolatedRemovesStaleLink|TestMigrationSucceedsWhenSystemPolicyPermits|TestMigratedSkillSourceIsCanonical|TestMigratedGlobalSkillManifestErrorsBlock|TestManagedSeedPreservesNativePermissions|TestMaterializeCaptureSerializesProfileWriters|TestMuseMissingNativeFilePolicy|TestResolveAdmitsV2CommitPinnedContextNUL|TestPathOverlayBoundaryRejectsEscapingAndInternalLinks|TestSystemDeltaVectors|TestStatusUnreadableOrphanInventoryIsNotEmpty|TestUpdateSurfacesCandidateMCPSet)$",
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "record": "default-envprofile-s4-command.json"
+    },
+    {
+      "name": "default-envprofile-s5",
+      "exit": 0,
+      "seconds": 305.78,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestCodexSeedRejectsInvalidTOMLBeforePublishingHome|TestEnvironmentsEnvPassthroughVectors|TestRevokedSourceIsRefused|TestMigratedGlobalSkillNetworkCapabilities|TestDotfileManagerStateAloneDoesNotWarn|TestMaterializeCaptureAndStatusNeverProbeVendor|TestMigrateRecoveryCleansOwnedTemp|TestUpdateBlocksDeepNULFileInNewContextMember|TestPathKindDryRunVectorsDriveReadOnlyResolve|TestPreserveLockMigrationRefusalPrecedesBusyLock|TestUpdatePathSnapshotUnreadableIsNotAbsent|TestSurfacingSinkWriteFailureIsNonFatal|TestPathInstallAdmitsOrdinaryDirectory|TestCredentialLinkInspectionRepairFails|TestInstallNeverDemotesANetworkIdentityToAPath|TestScopedUseAndClear|TestImportSkipsManagedRootContext|TestRepairNeverRefreshesSeeds|TestMigrateInspectIsReadOnly|TestNativeSkillsRepair|TestForbiddenOverlaysResolveAlone|TestUpdatePathSnapshotNameMismatchIsSourceInvalid|TestManagerOwnedAbsenceReadsAreGuarded|TestStatusShellHookTrustMissingUnreadableAndStateFailures|TestUpdateErrorLeavesLockUnchanged|TestDanglingExpectedTargetRepairSucceeds|TestFileOperandIsRefused|TestRemoveRefusesCurrent|TestImportUnreadableRootIsLoss|TestResolveDefaultProfile|TestMigrateConflictsRefuse|TestResolveRefusesMissingLockNamedStoreEntryAtBoundary|TestOverlayExplicitWeightOverridesDefault|TestRootGitExcluded|TestPassthroughReadFailuresAreUnknownAndNeverRepaired|TestReservedSkillName|TestReadOnlyCommandsNeverOnboard|TestCodexIsolatedAdmission|TestLoadMachinePolicyRejectsDanglingConfigSymlink|TestInstallPathAndList|TestMigratedGlobalSkillPromptScopeValidation|TestResolveVerifiesGitStoreEntryAgainstPinnedTree|TestMaterializeCaptureUnreadableJournal|TestMuseForkRefusedRegression|TestSkillsOfRefusesV1NULBeforeHashing|TestResolveRejectsGroupWritableOnlyPathOverlay|TestRC14IdentityMigrationRefusesSiblingPlanDrift|TestStatusSignerPostureReadFailureIsNonCurrent|TestStatusS4Posture)$",
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "record": "default-envprofile-s5-command.json"
+    },
+    {
+      "name": "default-envprofile-s6",
+      "exit": 0,
+      "seconds": 273.336,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestCredentialLinkRegularFileRefuses|TestMigrationHonoursConfigPathOverride|TestPolicyFromConfigCarriesEnvGates|TestInstalledMemberCapabilitiesStayKindScoped|TestManagedHomeRepairTightensDirectories|TestMaterializeCaptureConcurrentRepair|TestMusePolicySwitchPreservesCredentials|TestSwitchMaterializeRefusesV1CommitPinnedContextNUL|TestPathOverlayTrustedSystemModuleRemainsAdmitted|TestRC14MigrationRehashesLegacyIdentities|TestStatusBackupInventoryAbsenceAndUnreadabilityDiffer|TestAllowlistWarningOperations|TestClaudeSeedNarrowingMutants|TestCredentialProjectionStatusObservation|TestInstallUseSkipsScopedAdapter|TestEnsureDefaultCreatesLocalProfile|TestImportCorruptMarkerIsLoss|TestResolveFormats|TestMigrateFailedRelinkKeepsOldLink|TestNativeSkillsUnrecordedLedger|TestWeightDuplicateRefused|TestUpdateBlocksRevokedOverlayMember|TestScopedCurrentReadFailureDoesNotFallBackToMachineCurrent|TestStoreBoundaryRepairVectorsDriveResolveRepair|TestStatusErrorReportsPolicyWithoutDropped|TestPiProvisionTargetsAgentRootV2WriterMode|TestOperandShadowedByDirectoryResolvesAsGit|TestInstallSurfacesSystemModuleWarning|TestImportSkillForeignPinnedByRevision|TestResolveClaudeProjectEntry|TestMigrateOldRootBytesWarnAndProceed|TestNativeSkillsLinkedParent|TestSCPOverlayResolvesAsGit|TestUnreadablePathRootLeadsUnreadable|TestUnreadableCodexSeedDoesNotSelectAbsentDefault|TestOpencodeXDGSeeds|TestUnmanageRestoreSymlinkReplacesDestinationEntry|TestCredentialLinkUnrecordedSymlinkRefuses|TestStrictAuditCanaryFailureBlocksInstall|TestUseMaterializesLinkedHomes|TestNormalizeImportText|TestResolveRejectsEnvironmentMarkerHashVersionMismatch|TestMigratePiWrongTargetToAgentRoot|TestMuseGlobalReconciliationUsesExplicitProvisioning|TestPrecedencePrimitivesDriveEmission|TestNestedGitIsSourceInvalid|TestRC14IdentityMigrationPreservesFallbackCopies|TestStatusShadowAcknowledgment|TestForeignSymlinkStopsSwitch)$",
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "record": "default-envprofile-s6-command.json"
+    },
+    {
+      "name": "default-envprofile-s7",
+      "exit": 1,
+      "seconds": 482.846,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestCodexUnknownStoreSharedRefuses|TestSourceAllowlistRejectsAdjacentPathSegment|TestInstallRejectsSecretMember|TestMigratedGlobalSkillNullCapabilityDeclarations|TestResolveRejectsGitPinMissingFromLocalObjectDatabase|TestMaterializeCaptureExternalTornGeneration|TestMuseAuthParentBoundaryAtResolve|TestGuardedReadersV1NULRefusalComputesNoV1Identity|TestMissingPathOperandIsPathMissing|TestRC14IdentityMigrationRefusesVersionAndPinMismatch|TestUpdateConfirmationPostureVectorAtStatus|TestSurfacingUnreadableManifest|TestClaudeRepairRefusesUnsafeState|TestResolvePublishesCredentialMarkerThroughLockedJournalV2WriterMode|TestCanonicalIdentityUnifiesSpellings|TestIncompleteJournalRecoversOnEntry|TestDotfileManagerTableMatchesSpecFixture|TestMaterializeCaptureBadRecoveryEvidence|TestMigrateSealedJournalDeletesWithoutTouching|TestServeWritesTheGitSafeRemote|TestPathInstallCapturesDirtyUntrackedInsideGit|TestRepairPreserveLockVectors|TestImportAbsentAndUnreadableRootSurfaceDiffer|TestUpdateEmitsSurfacingBeforePublication|TestLegacyPathInstallIgnoresStoreOverlap|TestMigrateApplyLockContention|TestInstallRefusesANonSourceOperand|TestListFailsOnCorruptRecord|TestImportDivergentSkillsAreLoss|TestResolveIsolatedOpencode|TestMigrateApplyRequiresPlan|TestNativeSkillsConvergenceAndSwitch|TestRemoveRefusesOverlayOfAnotherProfile|TestPathReinstallBareAndNonCurrentMovesPin|TestManagerReadScannerFindsAliasedNotExistCollapse|TestResolveRepairKeepsEnclosingStoreRootFailureClass|TestDropRepairWarnsAndFragmentFollowsAdmitted|TestCredentialLinkTargetInspectionFailure|TestFileRequirementSourceIsRefused|TestRemovePurgeCleansHomes|TestImportInvalidUTF8IsLoss|TestResolveDriftRepair|TestMigratePiRootInspectionFailure|TestNativeSkillsNarrowingMutants|TestGitOverlayJoinsClosure|TestUnreadablePathIsUnreadable|TestUnreadableLockIsUntrustedAcrossStatusResolveRepairAndUpdate|TestProfilePathCollision|TestRepairTakeoverProvisionsManagedHome)$",
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "record": "default-envprofile-s7-command.json"
+    },
+    {
+      "name": "default-install-s0",
+      "exit": 0,
+      "seconds": 419.201,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestProjectManifestABAAroundTheReadRestartsClosure|TestDefaultBuildSSHScopeIsTheRepositoryNamespace|TestAbortCarriesTheProtocolCodeSoTheRunStillFailsClosed|TestRedactDiagnosticCannotDriveATerminal|TestDraftBuildRefusesCompilerViewDigest|TestDraftRuntimeKeysCoverAllArms|TestAcquireDraftNetworkRevision2Positives|TestGitFixtureUnresolvableGitFailsFastWithDiagnostic|TestAuditAdmitsVendoredThirdPartyText|TestHybridCanonicalOwnershipPreservation|TestDevSubstitutionAppearingBeforeHomeLockRestartsClosureResolution|TestCacheHitOnlyPlanStillFinalizesToolchainTrust|TestBuildHTTPSPrecedenceLongestScopeAndAnonymousFallback|TestSSHAddKeyCountDegradesWhenTheSocketIsNotAnAgent|TestConsumerLedgerIsAbsentAfterAFailedFirstInstallAndCommitsLastOnSuccess|TestDraftAuditBrokenReportRefuses|TestLegacyDeclaredTagBumpIsNotAMovedTag|TestDraftReplaySeedSurvivesIsolatedFetch|TestAuthoritativePathShimCasesUseProjectInstallEntry|TestSecondInstallIsUpToDate|TestLegacyLaneChangedTagAfterOldTagDeleted|TestV2RegistryAttestationUsesVersionedInstallPath|TestStageProjectTargetsRefusesProjectInsideSnapshot|TestGlobalReleaseTakesNoToolchainVerdictAfterLiveMutation|TestHTTPSPromptAbortNeverPersistsOrSelects|TestPromptThisRunOnlyReturnsSSHCredentialWithoutPersisting|TestMaintenanceFailureAfterCommitIsAWarning|TestDraftBuildKeyFollowsThePackageIdentity|TestDraftLocalMissingSnapshotReplays|TestDraftPlanNamesProvider|TestGitFixtureNeverRetriesNonZeroExit|TestGlobalUpgradeDryRunLeavesPersistentStateUnchanged|TestInstallDraftOwnershipCases|TestRegistrySnapshotWithinTheBoundIsAcceptedThroughInstall|TestCacheHitPerformsNoSourceAwareGoCommand|TestVerifiedBuildAuthorityFailsBeforeCacheOrDispatchOnProviderDrift|TestEveryConfiguredShapeReachesTheWrapperPolicy|TestCacheWrongTargetRebuildCompletesWithinDeadline|TestDraftAuditStrictLocalRequiresAttestation|TestDraftLocalRejectsConfusedAttestation|TestDraftInstallUsesPinnedBytes|TestAuthoritativeDryRunCasesMutateNothingPersistent|TestEndToEndInstall|TestLegacyLaneRefusesGlobDependencyDirectory|TestGlobalMcpFailureBlocksToolchainCacheAndBuild|TestScriptOptInCasesAtInstallEntry|TestToolchainFailurePlansAnInventoryOfEveryActiveCommand)$",
+        "github.com/relux-works/curator/internal/install"
+      ],
+      "record": "default-install-s0-command.json"
+    },
+    {
+      "name": "default-install-s1",
+      "exit": 0,
+      "seconds": 249.755,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestByteIdenticalRewriteDuringTheReadDoesNotRestart|TestAgentUnsetDiagnosticIsIdenticalForRunWideAndScopedSelections|TestAPersistFailureStopsTheRunRatherThanContinuing|TestBuildFailuresAreRedactedInTheResult|TestDraftGitRuntimeMaterializesUnderSourceV1Key|TestDraftInstallReplaysMissingLocalSnapshot|TestUserConfigIgnoredByResolvedLane|TestProjectNonGitWithDevSubstitution|TestLegacyLaneRecordsDependencyDirectory|TestDryRunRemovesItsOperationPrivateRootOnFailure|TestActiveEnforcedScriptCommandsAdmits|TestCorruptCacheEntryIsRebuiltAndNeverReused|TestBuildHTTPSResolutionSkipsOtherEffectiveTransports|TestAPromptedScopeCoversTheRepositoryAndIsReportedAsItsSource|TestAnInFlightTransactionKeepsThePublishedCacheEntry|TestDraftAuditRenewalMarkersNeverRenewable|TestDraftRefusedRepairPreservesLock|TestDraftFreshPathMismatchAndUnreachableSourcePreserveLock|TestMarkerGenerationDistinguishesAbsentUnreadableAndInvalid|TestGitignoreGateSkips|TestPostCommitMaintenanceWarningsReachTheResult|TestRegistryRebootstrapRegressionKeepsExistingHighWater|TestRunCommitWithRealStagingJournalsOneTransaction|TestDefaultToolchainEstablishRemovesItsPrivateRootOnFailure|TestSubstitutionMovesARepositoryOffAndOntoTheSSHTransport|TestPromptRejectsAnUnofferedChoiceAndAMalformedScope|TestAdapterLedgerCommitsAfterTheMirrorsItClaims|TestDraftBuildFinalRootParentsAreStoreCreated|TestDraftLocalInvalidCapabilitiesRefuseAtResolve|TestAcquireDraftNetworkWindowsRefusesBeforeAnyProcess|TestGitFixtureNonRetryableSpawnErrorFailsFastWithDiagnostic|TestAuditGateBlocksUndeclaredNetwork|TestInstallOwnedCanonicalPositiveControls|TestGlobalDeclarationRemovedBeforeHomeLockRestartsAndCommitsNoStaleState|TestToolchainDriftAfterTheFinalBuildBlocksHandoffAndPreservesLiveState|TestDeclaredOnlyWithHostsGlobalInstallsWithOnlyDeclaredOnly|TestDiscoveryCapsTheIdentityListingAndReportsTheRemainder|TestRunCommitWithoutBoundariesSkipsRecheck|TestDraftAuditPinDoesNotWaiveStrictFindings|TestDraftDeclaredTagBumpIsNotAMovedTag|TestDraftFreshMachineReplaysEverySourceThroughInstallAndUpgrade|TestGlobalMixedBuildStagesExternalBeforeLocal|TestRuntimeLauncherResolvesSkillDependencyWithoutShellHook|TestReviewChangedDeclaredTagIsNotMovedTag|TestRegistryAttestationLandsInMarker|TestStageProjectTargetsPopulatesBoundaries|TestPlannedBuildAccessorsAreImmutable)$",
+        "github.com/relux-works/curator/internal/install"
+      ],
+      "record": "default-install-s1-command.json"
+    },
+    {
+      "name": "default-install-s2",
+      "exit": 0,
+      "seconds": 313.431,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestVerifiedBuildAuthorityRechecksProviderBeforeCacheAndDispatch|TestDiscoveryListsTheLiveAgentAndPublicIdentitiesOnly|TestRunCommitRecheckRefusesDestinationInsideAdmitted|TestDraftAuditAdvisoryLocalPasses|TestDraftMarkerArmGuards|TestSchema2InstallRequiresLockAndLegacyStillWorks|TestDryRunEffectBindingsSeeWhatARealOperationWrites|TestProjectInstallRecordsShellHookApprovals|TestLegacyLaneRejectsUnboundPreviousGeneration|TestGlobalRegistryFailureBlocksToolchainCacheAndBuild|TestGlobalEnforcedInstallExcludesForwardingMirror|TestUntrustedCacheEntryIsRebuiltAndNeverReused|TestPromptedBuildHTTPSAbortStopsTheProductionPlanBeforeAnyFetch|TestPromptedScopesDoNotMutateTheLoadedConfiguration|TestConcurrentProjectInstallsPreserveBothConsumers|TestDraftAuditDuplicateKeysRefuse|TestDraftAdmittedReplacementFailsAtWriteTimeAndRollsBack|TestAcquireDraftNetworkRevision2ProvenanceSink|TestDeclarationGenerationIsContentAddressed|TestRuntimeOnlyProviderStillRequiresSkillMd|TestOpaqueNULIsBlockedAtProjectAndGlobalInstallWithAuditDisabled|TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch|TestGlobalInstallRefusesAdapterDestinationOverSnapshot|TestSubstitutionsABAAroundTheReadRestartsClosure|TestConfiguredPathsExpandTheOperatorHome|TestPromptWithoutCandidatesStillOffersTheManualPath|TestRedactDiagnosticKeepsInvalidUTF8Out|TestDraftGitInstallWritesMarkerV5|TestDraftInstallMissingLockFails|TestAcquireDraftNetworkRevision2Refusals|TestGitFixtureOuterEntryLogsRetryOnTransientEACCES|TestLegacyLaneBuildsPublishReceipt3|TestProjectDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot|TestDeclaredOnlySchema8ScriptCommandInstallsUnchanged|TestSourceMutationDuringStagingBlocksHandoffOfACacheHit|TestBuildHTTPSHostPinMakesOtherHostsResolveWithoutTheOverride|TestUnselectedRepositoriesFailClosedWithCommandsBuiltFromTheCandidates|TestAFailedCommitRestoresTheBuildCacheItReplaced|TestDraftAuditPolicyRenewalBrokenEvidence|TestDraftRepairRevalidatesLockedSource|TestDraftFreshMachineMovedTagReplaysLockedCommitWithoutRefResolution|TestAuthoritativeTransactionCasesUseProjectInstallEntry|TestRemovedSkillCleanedUp|TestGlobalLaneRuntimeMatchesPackageMarker|TestRegistryCheckpointPersistsBeforeTamperedNetworkSnapshot|TestStageGlobalTargetsPopulatesBoundaries|TestDefaultToolchainProbeRemovesItsProbeRootOnFailure)$",
+        "github.com/relux-works/curator/internal/install"
+      ],
+      "record": "default-install-s2-command.json"
+    },
+    {
+      "name": "default-install-s3",
+      "exit": 0,
+      "seconds": 441.7,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestDeclaredOnlyWithHostsInstallsWithOnlyDeclaredOnly|TestAgentKeyCountReadsTheToolOutputRatherThanItsNoise|TestCommitOrdersTargetClassesWithConsumerLast|TestDraftAuditRevocationBlocks|TestDraftSameTagMoveInstallsWithoutWarning|TestDraftFreshMachineReplaysDeclaredGitSourceWithoutBindings|TestAuthoritativeMixedBuildCasesUseProjectInstallEntry|TestRuntimeLauncherCapturesDeclaredSystemDependency|TestLegacyLaneSameTagMoveWithAlias|TestV1InstallRejectsV2RegistryEvidence|TestStageProjectTargetsRefusesMirrorOverSnapshot|TestReleaseTakesNoToolchainVerdictAfterLiveMutation|TestHTTPSPromptPersistsEnteredTokenOnlyAfterScopeChoice|TestPromptDefaultSelectionPinsTheAgentToTheFirstDiscoveredKey|TestStaleInstalledGenerationRestartsInsteadOfApplyingTheOldPlan|TestDraftBuildsPublishReceipt3OnBothArms|TestDraftLocalTamperedFrozenRuntimeRefuses|TestDraftPlanNeedsSSH|TestGitFixtureRetriesOnceOnSpawnEAGAIN|TestGlobalInstallRejectsSchema2Skillfile|TestDraftLaneStillBlocksNULBearingMember|TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries|TestDryRunReportsCacheHitWithoutBuilding|TestAssuredToolchainProbeKeepsAuthorityAndInnerFailuresDisjoint|TestRunWideAgentAutoRequiresALiveSocket|TestAuthoritativeCacheRejectionsAreRebuiltNeverAdopted|TestDraftFailureAtEveryTargetClassRestoresPriorState|TestDraftInstallRevokedEvidenceRefusesDespiteAttestedMarker|TestDraftInstallRefusesUnreadableLocalSnapshotCache|TestDraftPlanNeedsSSHRevision2|TestGlobalReconcilesOwnedLegacyForwardingLink|TestBuildMarkerRecordsReceipt3ForMigratedLegacyNode|TestRealRunKeepsEveryEphemeralPathInOneOperationPrivateRoot|TestEnforcedScriptCommandInstallsNativeLauncher|TestIncompletePlansNeverClaimACompleteDiagnostic|TestBuildHTTPSCredentialReadersMaterializeConfiguredSources|TestAResolverThatCoversNothingStillFailsClosed|TestAReversalThatDidNotCompleteIsReportedAsRetained|TestDraftAuditClosedPackageShapeRefuses|TestDraftRefreshThenInstallReplacesLockAndMarker|TestDraftInstallGitPinnedSubtree|TestReadDocumentBindsGenerationToBytesRewrittenInPlace|TestMovedTagWarningAndStrict|TestDeclaredModuleRootsReachTheBuilder|TestStrictRegistryPolicyFailsUnknown|TestPerWriteGuardRefusesSwappedParentAndRollsBack)$",
+        "github.com/relux-works/curator/internal/install"
+      ],
+      "record": "default-install-s3-command.json"
+    },
+    {
+      "name": "default-install-s4",
+      "exit": 0,
+      "seconds": 463.512,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestCaptureBuildHTTPSSelectionFreezesAndRedactsSecrets|TestAHostWithoutCandidatesSaysSoRatherThanInventingAPath|TestARolledBackTargetCommitRestoresTheBuildCacheItReplaced|TestDraftAuditRenewalNeverHidesRefusal|TestDraftRepairRestoresDriftedContent|TestDraftFreshGitReplayChecksContentHashBeforePublishingSnapshot|TestRevisionSubstitutionDerivesEffectiveObjectFormat|TestDryRunTouchesNothing|TestPostCommitMaintenanceRunsUnderTheHeldHomeLock|TestRegistryInvalidFirstUseCheckpointFailsClosed|TestStageGlobalTargetsRefusesMirrorOverSnapshot|TestDefaultToolchainProbeRemovesItsProbeRootOnSuccess|TestRepositoriesThatNeedNoCredentialSkipSelection|TestPromptRejectsAMalformedManualPathAndAsksAgain|TestStagedPlanRejectsTwoProducersClaimingOneLivePath|TestLegacyBuildsKeepReceipt1|TestDraftLocalSkillDependencyRefused|TestAcquireDraftNetworkSelection|TestGitFixturePersistentSpawnFailureCarriesDiagnostic|TestMcpRequirementGatesInstall|TestInstallRefusesUnprovenStaleOwnership|TestProjectDeclarationAddedBeforeHomeLockRestartsAndCommitsTheNewClosure|TestSecondBuildFailurePreservesPriorInstallationAndLiveCache|TestScriptAuditLabelsAtGlobalInstallEntry|TestDiscoveryWithoutAnAgentOrAHomeFindsNothing|TestRunCommitRecheckPassesUnchangedBoundaries|TestDraftAuditHostileContentBlocked|TestDraftGitBuildsPublishReceipt3|TestDraftReplayFileURLUsesPortableGitConfigSyntax|TestExternalCommandNameCollisionFailsBeforeMutation|TestBuildRootExcludedBeforeLocaleRenderingWithoutCompilerExecution|TestLegacyLaneMovedTagRefusesStrictSecondInstall|TestRegistryRevocationDeniesInstall|TestEnforcedToDeclaredOnlyFlipRemovesNativeLauncher|TestInjectedClockAndGenerationReaderDriveInstallMarkers|TestHTTPSPromptDefaultSelectsExistingCredentialAndNarrowestSavedScope|TestADryRunReportsThePerRepositoryCredentialSource|TestRollbackCannotRestoreOverAnotherProjectsCommittedSharedTargets|TestExternalAdoptionsListEveryPublishedEntryOnce|TestDraftLocalRuntimeMaterializesFromFrozenSnapshot|TestDraftTransportPlanConversion|TestObservationsRecheckDocumentsAgainstTheParsedBytes|TestHybridShadowedByProjectDeclaration|TestV2InstallAdmitsNULBearingSkillAtProjectAndGlobal|TestRegistrySnapshotSlowSiblingDoesNotFlipInstantRegistry|TestGlobalDryRunPlansBuildsWithoutSessionOrPersistentState)$",
+        "github.com/relux-works/curator/internal/install"
+      ],
+      "record": "default-install-s4-command.json"
+    },
+    {
+      "name": "default-install-s5",
+      "exit": 0,
+      "seconds": 284.276,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestBuildHTTPSResolutionIsCarriedByTheExternalInstallPlan|TestAnAbortedResolverFailsTheRunWithItsOwnError|TestBuildPublicationFailuresAreRedactedInTheResult|TestDraftAuditEnforcedScriptAdmitted|TestDraftRetargetFailsAtWriteTimeAndRollsBack|TestDraftInstallGitTamperRefused|TestReadDocumentBindsGenerationToBytesReplacedByRename|TestRuntimeOnlyProviderGetsMarkerNoAdapter|TestASchemaSixCommandDeclaresNoModules|TestRegistryMirrorComparisonVectorsDriveInstall|TestProjectInstallRefusesAdapterDestinationOverSnapshot|TestGlobalManifestABAAroundTheReadRestartsClosure|TestCaptureBuildSSHSelectionPrefersFlagsOverTheEnvironment|TestOneScopeChoiceCoversEverySiblingRepository|TestRedactDiagnosticIsBounded|TestDraftEvidenceExactMatch|TestLockedNetworkRepositoryDistinguishesAbsentAndUnreadableCheckouts|TestAcquireDraftNetworkRevision2ExhaustionSanitized|TestGitFixtureOuterEntryRunsRealGit|TestInstallScriptSecurityRows|TestInstallDraftMarkerWriterCases|TestEnforcedScriptCommandIsRefusedAtInstall|TestCacheInspectionIsBracketedByTheFrozenSource|TestBuildHTTPSDiscoveryOnlyListsAndNeverSelectsAHostCredential|TestAddCommandsAreBuiltFromTheDiscoveredCandidates|TestCachePublicationFailureLeavesInstallationAndProtectedCacheUntouched|TestDraftAuditFirstIssuanceVsBrokenRecord|TestDraftDryRunExposesResolvedAttestations|TestDraftFreshGitSourceWithoutEndpointIsUnavailableAndPreservesLock|TestAuthoritativeSigningCasesUseProjectInstallEntry|TestTamperTriggersReinstall|TestLegacyLaneRuntimeMatchesPackageMarker|TestRegistryFirstUseReportsAndPersistsTOFUPosture|TestStageProjectTargetsRefusesMissingSnapshot|TestSessionReleaseFailureWarnsWithoutFailingACommittedInstall|TestRunWideSelectionCoversEveryRepositoryAheadOfConfiguredScopes|TestPromptNumberedSelectionAndAnExplicitScope|TestNoSharedTargetChangesBeforeTheManagerHomeLock|TestDraftBuildRefusesASessionThatBindsTheLegacyDigest|TestDraftLocalEnforcedCommandRefused|TestDraftSSHWrapperBase|TestGitFixtureNeverRetriesWrappedExitError|TestGlobalInstallUsesManifestLocaleAndAuditGate|TestInstallPreservesUnownedStaleStoreEntries|TestStableDeclarationInputsCommitWithoutRestarting|TestStagingRunsProviderFirstAndCommandLexical)$",
+        "github.com/relux-works/curator/internal/install"
+      ],
+      "record": "default-install-s5-command.json"
+    },
+    {
+      "name": "default-install-s6",
+      "exit": 0,
+      "seconds": 108.46,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestHTTPSPromptThisRunOnlyNeverReachesPersistenceOnEitherCredentialSurface|TestTheCredentialReportIsLabelledByTheScopeThatProducedIt|TestRecoveryCompletesBeforeAnyNewMutation|TestAdoptExternalPublicationsWarnsWithoutCreatingAnything|TestDraftLocalRefreshReplacesFrozenRuntime|TestDraftTransportAuth|TestGitFixtureRetriesOnceOnSpawnEACCES|TestGlobalInstall|TestV2InstallDistinguishesNULCollisionTwins|TestRegistrySnapshotTwoSecondsPastSkewStillRefuses|TestGlobalStagingFailureLeavesGlobalScopeUnchanged|TestVerifiedBuildAuthorityCarriesOneBindingThroughCacheAndDispatch|TestConfiguredAgentResolvesToTheLiveSocket|TestAuthoritativeCacheOutcomesDriveInstallation|TestGoToolchainRemedyReachesTheOperatorIntact|TestDraftGitInstallCarriesRegistryAttestation|TestDraftReplayRefusesUnreadableGitSnapshotCache|TestDraftTransportPlanV2Conversion|TestGlobalInstallRecognizesAdoptedForwardingShim|TestLegacyLockPackageArms|TestGlobalDryRunRemovesItsOperationPrivateRootOnFailure|TestActiveEnforcedScriptCommandsRefusesUnavailableHost|TestUnsupportedCacheProtectionFailsClosed|TestBuildHTTPSSelectedSourcesFailClosedWithExactRemedies|TestProvenanceNamesEverySourceOnePerRepository|TestAPublicationThatChangedTheCacheIsReportedAsRetained|TestDraftAuditMalformedShapeRefuses|TestDraftInstallFailsStaleBindingsGeneration|TestDraftInstallDoesNotIgnoreOrPrivatizeSkillfileLock|TestMovedTagReaderTreatsInvalidMarkerAsStaleButKeepsReadFailure|TestMissingSystemCommandFails|TestPostCommitMaintenanceMarksInFlightJournals|TestRegistryBootstrapVectorsDriveInstall|TestRunCommitWithRealStagingRefusesOverlapBeforeJournaling|TestProjectWriteBlobsSpawnFailureIsWrapped|TestUnselectedSSHRepositoriesFailClosedWithTheProtocolCode|TestPromptAbortFailsClosedWithoutPersistingAnything|TestRedactDiagnosticReplacesEveryAbsoluteLocation|TestReviewExternalExecutionBindsExactReceipt3Input|TestDraftMarkerPackageDigestMatchesLockDigest|TestDefaultAcquireFetchesTheDeclaredURL|TestGitFixtureRealSpawnEACCESRetriesOnce|TestBrokenTransitiveManifestNamesTheBrokenSkill|TestGlobalCanonicalOwnershipPreservation|TestGlobalDeclarationAddedBeforeHomeLockRestartsAndCommitsTheNewClosure|TestGlobalToolchainDriftAfterTheFinalBuildPreservesGlobalScope)$",
+        "github.com/relux-works/curator/internal/install"
+      ],
+      "record": "default-install-s6-command.json"
+    },
+    {
+      "name": "default-install-s7",
+      "exit": 0,
+      "seconds": 371.152,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "-run",
+        "^(TestConfiguredScopesAreSelectedPerRepository|TestPromptManualIdentityPathCoversAKeyDiscoveryDidNotList|TestGlobalCommitCarriesNoConsumerLedger|TestDraftBuildToolchainFailureBehaviorIsPreserved|TestDraftLocalMissingSystemCommandRefused|TestDraftManagerExecutable|TestGitFixtureRetryPredicate|TestGlobalStrictTagsDetectMovedTag|TestInstallRefusesUnownedSelectedCanonicalDestination|TestProjectDeclarationRemovedBeforeHomeLockRestartsAndCommitsNoStaleState|TestStagedOutputsStayPrivateAndAreReleased|TestScriptAuditLabelsAtInstallEntry|TestDiscoveryDegradesWhenTheAgentCannotBeAsked|TestRunCommitRecheckRefusesSwappedParent|TestDraftAuditBindingLifecycle|TestDraftSelectorSubstitutionForbidden|TestDraftFreshMachineTransitiveReplaySourceGuards|TestLegacyMixedBuildProjectInstallProducesMarkerV3|TestProjectDryRunRecordsNoShellHookApprovals|TestLegacyLaneDependencyTagMovement|TestGlobalMarkersCarryMcpAndAttestationEvidence|TestEnforcedInstallAndLaunchAtCLIEntry|TestScriptOnlyInstallPerformsNoToolchainOrCacheWork|TestResolvedHTTPSCredentialIsBoundToOnlyItsEffectiveFetch|TestTheCredentialPrecheckRunsBeforeAnyFetch|TestInstallHelperProcess|TestDraftAuditUnreadableBindingRefuses|TestDraftUnmanagedAdapterDestinationRefuses|TestDraftTransportEnabled|TestDocumentGenerationIsStableWhenUnreadable|TestHybridSkillActivatesWithoutTouchingProjectStore|TestV1ReinstallRefusesNULAppearingAfterInstall|TestRegistrySnapshotMintedDuringFetchIsNotFuture|TestDryRunPlansBuildsWithoutToolchainSessionOrPersistentState|TestHybridActivationABAAroundTheReadRestartsClosure|TestKnownHostsFallBackFromScopeToRunWideToOperator|TestPromptListsTheUnlistedIdentityCount|TestPlanLinesRedactAnUntrustedReason|TestDraftGitMarkerLockBindingRoundTrip|TestDraftInstallStaleLockFails|TestRevision1ReaderRejectsV2Shapes|TestProjectRefusesOnGitignoreSpawnFailure|TestLegacyLaneBuildMarkerRebindsTamperedReceipt|TestGlobalDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot|TestActiveScriptCommandWritersSplitDeclaredOnlyAndEnforced|TestToolchainFailureBlocksEveryPersistentMutation)$",
+        "github.com/relux-works/curator/internal/install"
+      ],
+      "record": "default-install-s7-command.json"
+    },
+    {
+      "name": "default-list",
+      "exit": 0,
+      "seconds": 1.15,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "list",
+        "./..."
+      ],
+      "record": "default-list-command.json"
+    },
+    {
+      "name": "default-rest-0",
+      "exit": 1,
+      "seconds": 486.066,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "github.com/relux-works/curator/cmd/curator-spec-pin",
+        "github.com/relux-works/curator/internal/adapters",
+        "github.com/relux-works/curator/internal/artifactpolicy",
+        "github.com/relux-works/curator/internal/artifactpolicy/conformance",
+        "github.com/relux-works/curator/internal/audit",
+        "github.com/relux-works/curator/internal/buildcache",
+        "github.com/relux-works/curator/internal/buildmeta",
+        "github.com/relux-works/curator/internal/buildrepo",
+        "github.com/relux-works/curator/internal/buildsource",
+        "github.com/relux-works/curator/internal/capabilities",
+        "github.com/relux-works/curator/internal/closure",
+        "github.com/relux-works/curator/internal/closureexec",
+        "github.com/relux-works/curator/internal/closuregraph",
+        "github.com/relux-works/curator/internal/config",
+        "github.com/relux-works/curator/internal/conformancecoverage",
+        "github.com/relux-works/curator/internal/contextaudit",
+        "github.com/relux-works/curator/internal/contextlock",
+        "github.com/relux-works/curator/internal/contextmaterialize"
+      ],
+      "record": "default-rest-0-command.json"
+    },
+    {
+      "name": "default-rest-1",
+      "exit": 1,
+      "seconds": 485.597,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "github.com/relux-works/curator/internal/contextpkg",
+        "github.com/relux-works/curator/internal/contextresolve",
+        "github.com/relux-works/curator/internal/contextstore",
+        "github.com/relux-works/curator/internal/crossconformance",
+        "github.com/relux-works/curator/internal/devsub",
+        "github.com/relux-works/curator/internal/envfiles",
+        "github.com/relux-works/curator/internal/envfragment",
+        "github.com/relux-works/curator/internal/envmarker",
+        "github.com/relux-works/curator/internal/envregistry",
+        "github.com/relux-works/curator/internal/envsnapshot",
+        "github.com/relux-works/curator/internal/gitcred",
+        "github.com/relux-works/curator/internal/gitignore",
+        "github.com/relux-works/curator/internal/gitops",
+        "github.com/relux-works/curator/internal/globalbins",
+        "github.com/relux-works/curator/internal/godriver",
+        "github.com/relux-works/curator/internal/hashing",
+        "github.com/relux-works/curator/internal/hookapproval",
+        "github.com/relux-works/curator/internal/identifiers"
+      ],
+      "record": "default-rest-1-command.json"
+    },
+    {
+      "name": "default-rest-2",
+      "exit": 0,
+      "seconds": 178.81,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "github.com/relux-works/curator/internal/identity",
+        "github.com/relux-works/curator/internal/install/atomicity",
+        "github.com/relux-works/curator/internal/interop",
+        "github.com/relux-works/curator/internal/interop/environments",
+        "github.com/relux-works/curator/internal/locale",
+        "github.com/relux-works/curator/internal/managerlock",
+        "github.com/relux-works/curator/internal/manifest",
+        "github.com/relux-works/curator/internal/marker",
+        "github.com/relux-works/curator/internal/mcp",
+        "github.com/relux-works/curator/internal/moduleroots",
+        "github.com/relux-works/curator/internal/nodesource",
+        "github.com/relux-works/curator/internal/npmsource",
+        "github.com/relux-works/curator/internal/opaquescan",
+        "github.com/relux-works/curator/internal/pathboundary",
+        "github.com/relux-works/curator/internal/pkgversion",
+        "github.com/relux-works/curator/internal/pnpmsource",
+        "github.com/relux-works/curator/internal/privatedir",
+        "github.com/relux-works/curator/internal/protocoljson"
+      ],
+      "record": "default-rest-2-command.json"
+    },
+    {
+      "name": "default-rest-3",
+      "exit": 1,
+      "seconds": 209.728,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "github.com/relux-works/curator/internal/registry",
+        "github.com/relux-works/curator/internal/runtimestore",
+        "github.com/relux-works/curator/internal/rustsource",
+        "github.com/relux-works/curator/internal/scopes",
+        "github.com/relux-works/curator/internal/scriptpolicy",
+        "github.com/relux-works/curator/internal/scriptworker",
+        "github.com/relux-works/curator/internal/shell",
+        "github.com/relux-works/curator/internal/skillcheck",
+        "github.com/relux-works/curator/internal/skillspec",
+        "github.com/relux-works/curator/internal/snapshot",
+        "github.com/relux-works/curator/internal/sourcelock",
+        "github.com/relux-works/curator/internal/staging",
+        "github.com/relux-works/curator/internal/stateread",
+        "github.com/relux-works/curator/internal/swiftpmbuild",
+        "github.com/relux-works/curator/internal/swiftpminterop",
+        "github.com/relux-works/curator/internal/swiftpmsource",
+        "github.com/relux-works/curator/internal/testcli",
+        "github.com/relux-works/curator/internal/testgitenv"
+      ],
+      "record": "default-rest-3-command.json"
+    },
+    {
+      "name": "default-rest-3-retry",
+      "exit": 0,
+      "seconds": 221.811,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "github.com/relux-works/curator/internal/registry",
+        "github.com/relux-works/curator/internal/runtimestore",
+        "github.com/relux-works/curator/internal/rustsource",
+        "github.com/relux-works/curator/internal/scopes",
+        "github.com/relux-works/curator/internal/scriptpolicy",
+        "github.com/relux-works/curator/internal/scriptworker",
+        "github.com/relux-works/curator/internal/shell",
+        "github.com/relux-works/curator/internal/skillcheck",
+        "github.com/relux-works/curator/internal/skillspec",
+        "github.com/relux-works/curator/internal/snapshot",
+        "github.com/relux-works/curator/internal/sourcelock",
+        "github.com/relux-works/curator/internal/staging",
+        "github.com/relux-works/curator/internal/stateread",
+        "github.com/relux-works/curator/internal/swiftpmbuild",
+        "github.com/relux-works/curator/internal/swiftpminterop",
+        "github.com/relux-works/curator/internal/swiftpmsource",
+        "github.com/relux-works/curator/internal/testcli",
+        "github.com/relux-works/curator/internal/testgitenv"
+      ],
+      "record": "default-rest-3-retry-command.json"
+    },
+    {
+      "name": "default-rest-4",
+      "exit": 0,
+      "seconds": 147.37,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-timeout=8m",
+        "github.com/relux-works/curator/internal/testtoolchain",
+        "github.com/relux-works/curator/internal/transaction",
+        "github.com/relux-works/curator/internal/ui",
+        "github.com/relux-works/curator/internal/verr",
+        "github.com/relux-works/curator/internal/version",
+        "github.com/relux-works/curator/internal/whitelist",
+        "github.com/relux-works/curator/internal/yarnclassicsource",
+        "github.com/relux-works/curator/internal/yarnmodernsource",
+        "github.com/relux-works/curator/tools/ciworkflow",
+        "github.com/relux-works/curator/tools/goreleaserconfig"
+      ],
+      "record": "default-rest-4-command.json"
+    },
+    {
+      "name": "exact-head-ungated",
+      "exit": 0,
+      "seconds": 2.234,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "./.research/project-exclusion-muse"
+      ],
+      "record": "exact-head-ungated-command.json"
+    },
+    {
+      "exit": 0,
+      "owned_fixture_roots_removed": 2,
+      "seconds": 199.798,
+      "ownership": "unique test-start birthtime match within 0.003s; ended failing process; only empty invalid-name files",
+      "record": "flood-cleanup-command.json"
+    },
+    {
+      "name": "list-artifactpolicy",
+      "exit": 0,
+      "seconds": 0.874,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-list",
+        ".",
+        "github.com/relux-works/curator/internal/artifactpolicy"
+      ],
+      "record": "list-artifactpolicy-command.json"
+    },
+    {
+      "name": "list-crossconformance",
+      "exit": 0,
+      "seconds": 1.734,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-list",
+        ".",
+        "github.com/relux-works/curator/internal/crossconformance"
+      ],
+      "record": "list-crossconformance-command.json"
+    },
+    {
+      "name": "list-curator",
+      "exit": 0,
+      "seconds": 7.903,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-list",
+        ".",
+        "github.com/relux-works/curator/cmd/curator"
+      ],
+      "record": "list-curator-command.json"
+    },
+    {
+      "name": "list-envprofile",
+      "exit": 0,
+      "seconds": 3.603,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-list",
+        ".",
+        "github.com/relux-works/curator/internal/envprofile"
+      ],
+      "record": "list-envprofile-command.json"
+    },
+    {
+      "name": "list-install",
+      "exit": 0,
+      "seconds": 3.033,
+      "command": [
+        "env",
+        "-u",
+        "GIT_DIR",
+        "-u",
+        "GIT_WORK_TREE",
+        "go",
+        "test",
+        "-list",
+        ".",
+        "github.com/relux-works/curator/internal/install"
+      ],
+      "record": "list-install-command.json"
+    }
+  ],
+  "recorded_failures": [
+    {
+      "run": "default-artifactpolicy-flood",
+      "package": "github.com/relux-works/curator/internal/artifactpolicy",
+      "test": null
+    },
+    {
+      "run": "default-curator-0",
+      "package": "github.com/relux-works/curator/cmd/curator",
+      "test": "TestDraftTransportLegacyGolden"
+    },
+    {
+      "run": "default-curator-0",
+      "package": "github.com/relux-works/curator/cmd/curator",
+      "test": "TestEnvStatusRegistryBoundaryPostureAndCheck"
+    },
+    {
+      "run": "default-curator-0",
+      "package": "github.com/relux-works/curator/cmd/curator",
+      "test": "TestEnvStatusUnreadableApprovalStateSurfaced"
+    },
+    {
+      "run": "default-curator-0",
+      "package": "github.com/relux-works/curator/cmd/curator",
+      "test": null
+    },
+    {
+      "run": "default-curator-remaining-1",
+      "package": "github.com/relux-works/curator/cmd/curator",
+      "test": null
+    },
+    {
+      "run": "default-curator-remaining-2",
+      "package": "github.com/relux-works/curator/cmd/curator",
+      "test": null
+    },
+    {
+      "run": "default-curator-s1",
+      "package": "github.com/relux-works/curator/cmd/curator",
+      "test": null
+    },
+    {
+      "run": "default-curator-tail",
+      "package": "github.com/relux-works/curator/cmd/curator",
+      "test": null
+    },
+    {
+      "run": "default-envprofile-0",
+      "package": "github.com/relux-works/curator/internal/envprofile",
+      "test": null
+    },
+    {
+      "run": "default-envprofile-s2",
+      "package": "github.com/relux-works/curator/internal/envprofile",
+      "test": null
+    },
+    {
+      "run": "default-envprofile-s3",
+      "package": "github.com/relux-works/curator/internal/envprofile",
+      "test": null
+    },
+    {
+      "run": "default-envprofile-s7",
+      "package": "github.com/relux-works/curator/internal/envprofile",
+      "test": null
+    },
+    {
+      "run": "default-rest-0",
+      "package": "github.com/relux-works/curator/internal/artifactpolicy",
+      "test": null
+    },
+    {
+      "run": "default-rest-1",
+      "package": "github.com/relux-works/curator/internal/crossconformance",
+      "test": null
+    },
+    {
+      "run": "default-rest-3",
+      "package": "github.com/relux-works/curator/internal/rustsource",
+      "test": "TestProductionManagerCapturesRegistryFromRawPaths"
+    },
+    {
+      "run": "default-rest-3",
+      "package": "github.com/relux-works/curator/internal/rustsource",
+      "test": "TestProductionManagerCapturesGitWithoutCallerProjection"
+    },
+    {
+      "run": "default-rest-3",
+      "package": "github.com/relux-works/curator/internal/rustsource",
+      "test": null
+    }
+  ],
+  "unique_observed_test_paths": 11537,
+  "test_paths_with_pass": 11357,
+  "test_paths_with_skip": 180,
+  "fixture_cleanup": {
+    "exit": 0,
+    "owned_fixture_roots_removed": 2,
+    "seconds": 199.798,
+    "ownership": "unique test-start birthtime match within 0.003s; ended failing process; only empty invalid-name files"
+  },
+  "delivery_verification": {
+    "head": "9b657867a0c65f6e86caf85f6ff6fb7fa4235c0a",
+    "signature": "G",
+    "source_clean": true,
+    "remote_head": "9b657867a0c65f6e86caf85f6ff6fb7fa4235c0a",
+    "validation_head": "9b657867a0c65f6e86caf85f6ff6fb7fa4235c0a",
+    "validation_clean": true,
+    "validation_clone_removed": true,
+    "task_process_residuals": [],
+    "commands": [
+      {
+        "command": [
+          "git",
+          "rev-parse",
+          "HEAD"
+        ],
+        "exit": 0
+      },
+      {
+        "command": [
+          "git",
+          "log",
+          "-1",
+          "--format=%G?"
+        ],
+        "exit": 0
+      },
+      {
+        "command": [
+          "git",
+          "status",
+          "--porcelain"
+        ],
+        "exit": 0
+      },
+      {
+        "command": [
+          "git",
+          "diff",
+          "--quiet",
+          "cdcba3bd7a8de6028d3d1dbf621ce4cb19b130a7",
+          "HEAD",
+          "--",
+          "cmd",
+          "internal",
+          "tools",
+          "go.mod",
+          "go.sum"
+        ],
+        "exit": 0
+      },
+      {
+        "command": [
+          "git",
+          "ls-remote",
+          "origin",
+          "refs/heads/research/project-source-exclusion-muse"
+        ],
+        "exit": 0
+      },
+      {
+        "command": [
+          "git",
+          "-C",
+          "$VALIDATION_CLONE",
+          "rev-parse",
+          "HEAD"
+        ],
+        "exit": 0
+      },
+      {
+        "command": [
+          "git",
+          "-C",
+          "$VALIDATION_CLONE",
+          "status",
+          "--porcelain"
+        ],
+        "exit": 0
+      }
+    ],
+    "exit": 0
+  }
+}
