@@ -228,7 +228,9 @@ func TestInstalledMemberCapabilitiesStayKindScoped(t *testing.T) {
 			files := map[string]string{"agent-context.json": `{"schema_version":1,"name":"clean","version":"1.0.0"}`, "README.md": "clean\n"}
 			declared := `{"schema_version":3,"capabilities":{"network":["downloads.example.com"]}}`
 			if tc.skill {
-				skill := gitRepo(t, map[string]string{"agent-skill.json": declared, "scripts/fetch.sh": "curl https://downloads.example.com/a\n"}, "v1.0.0")
+				// This admission control is a core skill package, including its
+				// required context entry; the assertion concerns capabilities.
+				skill := gitRepo(t, map[string]string{"SKILL.md": "---\nname: declared\ndescription: Kind-scoped capability fixture\n---\n# Guide\n", "agent-skill.json": declared, "scripts/fetch.sh": "curl https://downloads.example.com/a\n"}, "v1.0.0")
 				operand := ids.serve(skill, "https://example.com/skills/declared")
 				files["agent-context.json"] = `{"schema_version":1,"name":"clean","version":"1.0.0","requires":{"skills":{"declared":{"git":"` + operand + `","range":"*"}}}}`
 			} else if tc.network {

@@ -8,6 +8,7 @@ import (
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/skillspec"
@@ -27,6 +28,9 @@ func skillSurfaceIdentity(skill skillOf) []byte {
 // projectSkill plans without writing. Both the digest and the eventual copy
 // use the same core context walker, including canonical filesystem aliases.
 func projectSkill(home, source string, version hashing.Version) (skillOf, error) {
+	if err := opaquescan.RefuseNULV1(source, version); err != nil {
+		return skillOf{}, err
+	}
 	spec, err := skillspec.Load(source)
 	if err != nil {
 		return skillOf{}, err
@@ -79,7 +83,7 @@ func publishSkillProjection(home string, skill skillOf) error {
 	if _, err := whitelist.CopyContext(skill.source, staging, skill.includeScripts, skill.excludeRoots); err != nil {
 		return err
 	}
-	digest, err := hashing.ContentSHA256WithVersion(staging, map[string]bool{}, skill.version)
+	digest, err := skillProjectionHash(staging, skill.version)
 	if err != nil {
 		return err
 	}
@@ -106,7 +110,7 @@ func verifySkillProjection(home string, skill skillOf) error {
 	if !info.IsDir() {
 		return fmt.Errorf("skill context projection is not a directory")
 	}
-	digest, err := hashing.ContentSHA256WithVersion(skill.root, map[string]bool{}, skill.version)
+	digest, err := skillProjectionHash(skill.root, skill.version)
 	if err != nil {
 		return err
 	}
@@ -167,4 +171,13 @@ func publishSkillFallback(op *operation, root, rel, source string) error {
 		return err
 	}
 	return op.engine.Commit(op.lock, plan.TransactionID)
+}
+
+// Every projection-tree identity retains the legacy no-v1-hash-over-NUL
+// invariant, including changed staging input and a damaged projected store.
+func skillProjectionHash(root string, version hashing.Version) (string, error) {
+	if err := opaquescan.RefuseNULV1(root, version); err != nil {
+		return "", err
+	}
+	return hashing.ContentSHA256WithVersion(root, map[string]bool{}, version)
 }
