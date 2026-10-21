@@ -21,11 +21,17 @@ func TestNetworkContactNarrowingMutants(t *testing.T) {
 		{"markdown-scripts-always-visible", "internal/audit/audit.go", `includeScripts = len(spec.Commands) == 0`, `includeScripts = true`, "./internal/audit", "^TestMarkdownScopeScriptsAndManifest$/^exports$", "TestMarkdownScopeScriptsAndManifest/exports", "excluded Markdown refused"},
 		{"markdown-scripts-never-visible", "internal/audit/audit.go", `includeScripts = len(spec.Commands) == 0`, `includeScripts = false`, "./internal/audit", "^TestMarkdownScopeScriptsAndManifest$/^commandless$", "TestMarkdownScopeScriptsAndManifest/commandless", "visible Markdown verdict"},
 
-		{"markdown-everywhere", "internal/audit/audit.go", `if markdown {`, `if false && markdown {`, "./internal/audit", "^TestMarkdownScopeRepositoryNoise$", "TestMarkdownScopeRepositoryNoise", "excluded Markdown refused"},
+		{"markdown-everywhere", "internal/audit/audit.go", `if markdown && (kind == contextlock.KindSkill || contextModules) {`, `if false && markdown && (kind == contextlock.KindSkill || contextModules) {`, "./internal/audit", "^TestMarkdownScopeRepositoryNoise$", "TestMarkdownScopeRepositoryNoise", "excluded Markdown refused"},
 		{"markdown-drop-references", "internal/audit/audit.go", `return scan(path, posix) // Agent-facing Markdown.`, `if strings.HasPrefix(posix, "references/") { return nil }; return scan(path, posix) // Agent-facing Markdown.`, "./internal/audit", "^TestMarkdownScopeVisibleContacts$/^references/guide.md$", "TestMarkdownScopeVisibleContacts/references/guide.md", "visible Markdown verdict"},
 		{"markdown-case-sensitive-entry", "internal/audit/audit.go", "", "", "./internal/audit", "^TestMarkdownScopeCaseAliases$", "TestMarkdownScopeCaseAliases/", "visible Markdown verdict"},
 		{"markdown-reuse-ruleset-six", "internal/audit/audit.go", `RulesetVersion = "` + RulesetVersion + `"`, `RulesetVersion = "6"`, "./internal/audit", "^TestMarkdownScopeInvalidatesRulesetSixAllowance$", "TestMarkdownScopeInvalidatesRulesetSixAllowance/", "visible Markdown verdict"},
 		{"markdown-reuse-ruleset-five", "internal/audit/audit.go", `RulesetVersion = "` + RulesetVersion + `"`, `RulesetVersion = "5"`, "./internal/audit", "^TestMarkdownScopeInvalidatesRulesetFive$", "TestMarkdownScopeInvalidatesRulesetFive/", "stale Markdown refusal reused"},
+
+		{"markdown-drop-context-modules", "internal/audit/audit.go", `for _, module := range manifest.Modules {`, `for _, module := range manifest.Modules[:0] {`, "./internal/envprofile", "^TestProfileInstallMarkdownContextCLI$", "TestProfileInstallMarkdownContextCLI/undeclared", "CLI context not specifically refused"},
+		{"markdown-reuse-ruleset-seven", "internal/audit/audit.go", `RulesetVersion = "` + RulesetVersion + `"`, `RulesetVersion = "7"`, "./internal/audit", "^TestMarkdownScopeInvalidatesRulesetSevenAllowance$", "TestMarkdownScopeInvalidatesRulesetSevenAllowance/", "old ruleset-7 record changed"},
+		{"markdown-kind-cache-borrow", "internal/audit/audit.go", `if data.Kind != subject.Kind {`, `if false && data.Kind != subject.Kind {`, "./internal/audit", "^TestMarkdownScopeCacheBindsKind$", "TestMarkdownScopeCacheBindsKind/", "kind cache borrowed allowance"},
+
+		{"markdown-ignore-missing-context-module", "internal/audit/audit.go", `Severity: SeverityCritical, File: posix, Evidence: "cannot read declared context module"`, `Severity: SeverityInfo, File: posix, Evidence: "cannot read declared context module"`, "./internal/audit", "^TestMarkdownScopeContextMissingModule$", "TestMarkdownScopeContextMissingModule", "missing module verdict"},
 
 		{"full-url-percent-path", "internal/audit/audit.go", `\\\\/?#`, `\\\\`, "./internal/audit", "^TestNetworkContactNormalizationBoundaries$/^percent-path-real$", "TestNetworkContactNormalizationBoundaries/percent-path-real", "URL classification: []"},
 		{"contains-test", "internal/audit/audit.go", `switch host[lastDot+1:] {`, `if strings.Contains(host, ".test") { return host, true }; switch host[lastDot+1:] {`, "./internal/audit", "^TestNetworkContactVectors$/^lookalike-nested-test$", "TestNetworkContactVectors/lookalike-nested-test", "Gate pass=false"},
@@ -70,6 +76,10 @@ func TestNetworkContactNarrowingMutants(t *testing.T) {
 			}
 			command := exec.Command("go", "test", "-overlay", overlayPath, "-count=1", "-timeout=2m", "-v", "-run", mutant.run, mutant.pkg)
 			command.Dir = root
+			if mutant.name == "markdown-drop-context-modules" {
+				// The CLI regression builds a child binary; carry the same source overlay into it.
+				command.Env = append(os.Environ(), "GOFLAGS=-overlay="+overlayPath)
+			}
 			output, err := command.CombinedOutput()
 			exit, ok := err.(*exec.ExitError)
 			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "--- FAIL: "+mutant.fails) || !strings.Contains(string(output), mutant.message) {

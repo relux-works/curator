@@ -666,7 +666,7 @@ func loadMaterial(home string, manager *gitManager, lock *contextlock.Lock) (map
 		}
 		pkg := contextmaterialize.Package{HasContext: manifest.HasContext}
 		for _, module := range manifest.Modules {
-			payload, err := os.ReadFile(filepath.Join(root, contextpkg.ContextDir, filepath.FromSlash(module.Path))) // #nosec G304 -- module of the store entry
+			payload, err := contextpkg.ReadModule(root, module)
 			if err != nil {
 				return nil, fmt.Errorf("module %s of %s: %v", module.Path, member.Name, err)
 			}

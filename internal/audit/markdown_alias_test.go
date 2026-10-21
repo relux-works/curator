@@ -146,7 +146,7 @@ func TestMarkdownScopeExclusionCaseLeaves(t *testing.T) {
 // detector, Gate, hashing and cache writer remain production code.
 func rulesetSixSource(t *testing.T, source string) string {
 	t.Helper()
-	start := strings.Index(source, "\t_ = whitelist.WalkContext(snapshot,")
+	start := strings.Index(source, "\tif kind == contextlock.KindSkill {")
 	if start < 0 {
 		t.Fatal("ruleset-6 walk anchor missing")
 	}

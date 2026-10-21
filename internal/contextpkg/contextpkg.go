@@ -557,6 +557,13 @@ func ParseMCP(payload []byte) (*MCPManifest, error) {
 	return manifest, nil
 }
 
+// ReadModule reads one declared module using the publication path shared by
+// validation, source audit and context materialization. Callers supply a module
+// from a validated manifest, whose path is a portable relative path.
+func ReadModule(root string, module Module) ([]byte, error) {
+	return os.ReadFile(filepath.Join(root, ContextDir, filepath.FromSlash(module.Path))) // #nosec G304 -- validated declared module
+}
+
 // ValidateModules checks every declared module file of a context package at
 // root under environments §3: presence, regular-file shape, UTF-8, LF-only
 // line endings, and exactly one trailing LF. registered is the adapter
@@ -576,7 +583,7 @@ func ValidateModules(root string, manifest *Manifest, registered map[string]bool
 		if !info.Mode().IsRegular() {
 			return warnings, invalid(DiagModuleMissing, "module %s of %s is not a regular file", module.Path, manifest.Name)
 		}
-		payload, err := os.ReadFile(path) // #nosec G304 -- path is a declared module below the package root
+		payload, err := ReadModule(root, module)
 		if err != nil {
 			return warnings, fmt.Errorf("read module %s of %s: %w", module.Path, manifest.Name, err)
 		}
