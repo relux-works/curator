@@ -1,0 +1,1467 @@
+{
+  "source_commit": "8900129d",
+  "cases": [
+    {
+      "name": "composition-valid",
+      "record": "composition",
+      "file": "bytes/composition-valid.json",
+      "bytes_sha256": "921b55398a76784599176b165cc196a5ab13e861f10dc880b351a50b40e4e6bb",
+      "expected": null,
+      "claim": "composition: accepts this closed record",
+      "record_sha256": "921b55398a76784599176b165cc196a5ab13e861f10dc880b351a50b40e4e6bb"
+    },
+    {
+      "name": "composition-missing-kind",
+      "record": "composition",
+      "file": "bytes/composition-missing-kind.json",
+      "bytes_sha256": "04aacd69dd10a478cbe418f8e82aef8da9b2d8b044158edc5bc1b48ae831f6f4",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-kind",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "registration_ref",
+          "registration_sha256",
+          "generation_sha256",
+          "profile",
+          "environment",
+          "adapter_ref",
+          "adapter_sha256",
+          "policy_ref",
+          "policy_sha256",
+          "memory",
+          "home_ref",
+          "worktree_ref",
+          "materialization_sha256",
+          "command_owners",
+          "omitted"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-kind",
+      "record": "composition",
+      "file": "bytes/composition-null-kind.json",
+      "bytes_sha256": "62b9f332f98e16fc8fc94ff390687037e19e3d8e60f8f60b8cef7da1195c7b7a",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-kind",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "kind"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "const": "project-composition/1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-missing-registration_ref",
+      "record": "composition",
+      "file": "bytes/composition-missing-registration_ref.json",
+      "bytes_sha256": "a2c91f8fe74767b0b3de7ba76ea27b4587cc049845e530aa9f8a8b3c66ef16b5",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-registration_ref",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "kind",
+          "registration_sha256",
+          "generation_sha256",
+          "profile",
+          "environment",
+          "adapter_ref",
+          "adapter_sha256",
+          "policy_ref",
+          "policy_sha256",
+          "memory",
+          "home_ref",
+          "worktree_ref",
+          "materialization_sha256",
+          "command_owners",
+          "omitted"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-registration_ref",
+      "record": "composition",
+      "file": "bytes/composition-null-registration_ref.json",
+      "bytes_sha256": "8f8435272cb39e57f69ca30cdb0e750deebb637b3bcaa88b2b47d6448e8ed4f8",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-registration_ref",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "registration_ref"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/registration_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-missing-registration_sha256",
+      "record": "composition",
+      "file": "bytes/composition-missing-registration_sha256.json",
+      "bytes_sha256": "090d3d661fb618cf38d5dad84399fb12ce867205ad570e9a0134c84f61e16f58",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-registration_sha256",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "kind",
+          "registration_ref",
+          "generation_sha256",
+          "profile",
+          "environment",
+          "adapter_ref",
+          "adapter_sha256",
+          "policy_ref",
+          "policy_sha256",
+          "memory",
+          "home_ref",
+          "worktree_ref",
+          "materialization_sha256",
+          "command_owners",
+          "omitted"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-registration_sha256",
+      "record": "composition",
+      "file": "bytes/composition-null-registration_sha256.json",
+      "bytes_sha256": "786ba27b84c43e43fa079014be3186113c38e0a7847ab1150e3c17e30880f7ab",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-registration_sha256",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "registration_sha256"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/hex"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-missing-generation_sha256",
+      "record": "composition",
+      "file": "bytes/composition-missing-generation_sha256.json",
+      "bytes_sha256": "7b75d2541fa1490c210a80c27f6bce30b39e5ba562737159f0a573d6c8220f15",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-generation_sha256",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "kind",
+          "registration_ref",
+          "registration_sha256",
+          "profile",
+          "environment",
+          "adapter_ref",
+          "adapter_sha256",
+          "policy_ref",
+          "policy_sha256",
+          "memory",
+          "home_ref",
+          "worktree_ref",
+          "materialization_sha256",
+          "command_owners",
+          "omitted"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-generation_sha256",
+      "record": "composition",
+      "file": "bytes/composition-null-generation_sha256.json",
+      "bytes_sha256": "1342f0de797a3e502a58605a679b75ce782093d3dfa4f57d6fa97defc441d13d",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-generation_sha256",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "generation_sha256"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/hex"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-missing-profile",
+      "record": "composition",
+      "file": "bytes/composition-missing-profile.json",
+      "bytes_sha256": "22e573a93bed55d9f8c857668ef8f1044ddfa824d39573fbc38ece1c9ce08473",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-profile",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "kind",
+          "registration_ref",
+          "registration_sha256",
+          "generation_sha256",
+          "environment",
+          "adapter_ref",
+          "adapter_sha256",
+          "policy_ref",
+          "policy_sha256",
+          "memory",
+          "home_ref",
+          "worktree_ref",
+          "materialization_sha256",
+          "command_owners",
+          "omitted"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-profile",
+      "record": "composition",
+      "file": "bytes/composition-null-profile.json",
+      "bytes_sha256": "0c6d5f0d480f463df09e3086c6414f19ff4234a6d6e9cf81e5f480b654ea019a",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-profile",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "profile"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/profile"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-missing-environment",
+      "record": "composition",
+      "file": "bytes/composition-missing-environment.json",
+      "bytes_sha256": "d31124b76308c2cfa2425a95ac3dd2eaba5a13a7d4b1644078f3cf323cd9ce31",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-environment",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "kind",
+          "registration_ref",
+          "registration_sha256",
+          "generation_sha256",
+          "profile",
+          "adapter_ref",
+          "adapter_sha256",
+          "policy_ref",
+          "policy_sha256",
+          "memory",
+          "home_ref",
+          "worktree_ref",
+          "materialization_sha256",
+          "command_owners",
+          "omitted"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-environment",
+      "record": "composition",
+      "file": "bytes/composition-null-environment.json",
+      "bytes_sha256": "88d397be4c449727c2d415455ad3615fc19a3520203a7e4c76840c4558bc0853",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-environment",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "environment"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/environment"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-missing-adapter_ref",
+      "record": "composition",
+      "file": "bytes/composition-missing-adapter_ref.json",
+      "bytes_sha256": "a8f63e7d8f1b9fda0ef7e3b0d77422d05a8b7c54e7eae7d9597785e9f864f719",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-adapter_ref",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "kind",
+          "registration_ref",
+          "registration_sha256",
+          "generation_sha256",
+          "profile",
+          "environment",
+          "adapter_sha256",
+          "policy_ref",
+          "policy_sha256",
+          "memory",
+          "home_ref",
+          "worktree_ref",
+          "materialization_sha256",
+          "command_owners",
+          "omitted"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-adapter_ref",
+      "record": "composition",
+      "file": "bytes/composition-null-adapter_ref.json",
+      "bytes_sha256": "e6179700b44792769322da4521c0f96b3069968f2bb6ba7ed4eb1da866bd0d83",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-adapter_ref",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "adapter_ref"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/adapter_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-missing-adapter_sha256",
+      "record": "composition",
+      "file": "bytes/composition-missing-adapter_sha256.json",
+      "bytes_sha256": "3f52b02b33d4ccbff6b101e29d2c5b5a6800efef96f3311653631ccb97a93735",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-adapter_sha256",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "kind",
+          "registration_ref",
+          "registration_sha256",
+          "generation_sha256",
+          "profile",
+          "environment",
+          "adapter_ref",
+          "policy_ref",
+          "policy_sha256",
+          "memory",
+          "home_ref",
+          "worktree_ref",
+          "materialization_sha256",
+          "command_owners",
+          "omitted"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-adapter_sha256",
+      "record": "composition",
+      "file": "bytes/composition-null-adapter_sha256.json",
+      "bytes_sha256": "3a150172c16b52717e235a54289c3b8686e905fcf6d0567700e9205d70f66caa",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-adapter_sha256",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "adapter_sha256"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/hex"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-missing-policy_ref",
+      "record": "composition",
+      "file": "bytes/composition-missing-policy_ref.json",
+      "bytes_sha256": "752a0f865c4b328f37c6fd0dc5792d0f7a30ea713ce8490db87067f0914fac36",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-policy_ref",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "kind",
+          "registration_ref",
+          "registration_sha256",
+          "generation_sha256",
+          "profile",
+          "environment",
+          "adapter_ref",
+          "adapter_sha256",
+          "policy_sha256",
+          "memory",
+          "home_ref",
+          "worktree_ref",
+          "materialization_sha256",
+          "command_owners",
+          "omitted"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-policy_ref",
+      "record": "composition",
+      "file": "bytes/composition-null-policy_ref.json",
+      "bytes_sha256": "0fcd40ed1a51e0ca59879564668c4f1847da101852a03b687225474c32168c31",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-policy_ref",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "policy_ref"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/policy_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-missing-policy_sha256",
+      "record": "composition",
+      "file": "bytes/composition-missing-policy_sha256.json",
+      "bytes_sha256": "a26f512c1bde35309e94ac9e47ddbfab4064b7fe31145c464d9788e8a8c226c2",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-policy_sha256",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "kind",
+          "registration_ref",
+          "registration_sha256",
+          "generation_sha256",
+          "profile",
+          "environment",
+          "adapter_ref",
+          "adapter_sha256",
+          "policy_ref",
+          "memory",
+          "home_ref",
+          "worktree_ref",
+          "materialization_sha256",
+          "command_owners",
+          "omitted"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-policy_sha256",
+      "record": "composition",
+      "file": "bytes/composition-null-policy_sha256.json",
+      "bytes_sha256": "dfc82b7c3ad6983e8bae4418d062f7db9651867355f09236dfbf7b7c8127fbe4",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-policy_sha256",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "policy_sha256"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/hex"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-missing-memory",
+      "record": "composition",
+      "file": "bytes/composition-missing-memory.json",
+      "bytes_sha256": "ea7b166716b9c023d3ae553f720d86ce50505cf94699d163fdac2a0b9322d50e",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-memory",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "kind",
+          "registration_ref",
+          "registration_sha256",
+          "generation_sha256",
+          "profile",
+          "environment",
+          "adapter_ref",
+          "adapter_sha256",
+          "policy_ref",
+          "policy_sha256",
+          "home_ref",
+          "worktree_ref",
+          "materialization_sha256",
+          "command_owners",
+          "omitted"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-memory",
+      "record": "composition",
+      "file": "bytes/composition-null-memory.json",
+      "bytes_sha256": "e14e1679df602bc37ced424686613bfea0cbe9e5e710e908e09f700a19354fad",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-memory",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "memory"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "const": "off"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-missing-home_ref",
+      "record": "composition",
+      "file": "bytes/composition-missing-home_ref.json",
+      "bytes_sha256": "71d03cb4d309bee45afb124fc8c222eead76b47b234ce9abe2c980ad37e87be6",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-home_ref",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "kind",
+          "registration_ref",
+          "registration_sha256",
+          "generation_sha256",
+          "profile",
+          "environment",
+          "adapter_ref",
+          "adapter_sha256",
+          "policy_ref",
+          "policy_sha256",
+          "memory",
+          "worktree_ref",
+          "materialization_sha256",
+          "command_owners",
+          "omitted"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-home_ref",
+      "record": "composition",
+      "file": "bytes/composition-null-home_ref.json",
+      "bytes_sha256": "3ad13d1dd5964750d955d9b9ed9438c22a962809d3a0ec3cb6e9ac6fbffca0b9",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-home_ref",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "home_ref"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/home_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-missing-worktree_ref",
+      "record": "composition",
+      "file": "bytes/composition-missing-worktree_ref.json",
+      "bytes_sha256": "45961514f03331d3e38899b75ac1115449cc2721290567011bcaf436463ccbfb",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-worktree_ref",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "kind",
+          "registration_ref",
+          "registration_sha256",
+          "generation_sha256",
+          "profile",
+          "environment",
+          "adapter_ref",
+          "adapter_sha256",
+          "policy_ref",
+          "policy_sha256",
+          "memory",
+          "home_ref",
+          "materialization_sha256",
+          "command_owners",
+          "omitted"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-worktree_ref",
+      "record": "composition",
+      "file": "bytes/composition-null-worktree_ref.json",
+      "bytes_sha256": "4061859dc751737db46c453b0d79cc2ca831e5088c38d96db68497aea0553f42",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-worktree_ref",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "worktree_ref"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/worktree_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-missing-materialization_sha256",
+      "record": "composition",
+      "file": "bytes/composition-missing-materialization_sha256.json",
+      "bytes_sha256": "1d30c1206d9a325d754f9decf102fbe72d1799e3eab4a38cd229667a3dbb4b75",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-materialization_sha256",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "kind",
+          "registration_ref",
+          "registration_sha256",
+          "generation_sha256",
+          "profile",
+          "environment",
+          "adapter_ref",
+          "adapter_sha256",
+          "policy_ref",
+          "policy_sha256",
+          "memory",
+          "home_ref",
+          "worktree_ref",
+          "command_owners",
+          "omitted"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-materialization_sha256",
+      "record": "composition",
+      "file": "bytes/composition-null-materialization_sha256.json",
+      "bytes_sha256": "c52b351a42c753f6b6e11b6e9bb25fe4e67ab1f6a3ba6831f2cec292f0b3f50f",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-materialization_sha256",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "materialization_sha256"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/hex"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-missing-command_owners",
+      "record": "composition",
+      "file": "bytes/composition-missing-command_owners.json",
+      "bytes_sha256": "f61c69732eece662c63db6d1875afa567a7dc6ee6b1cd1968bf8767e86fe2e0a",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-command_owners",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "kind",
+          "registration_ref",
+          "registration_sha256",
+          "generation_sha256",
+          "profile",
+          "environment",
+          "adapter_ref",
+          "adapter_sha256",
+          "policy_ref",
+          "policy_sha256",
+          "memory",
+          "home_ref",
+          "worktree_ref",
+          "materialization_sha256",
+          "omitted"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-command_owners",
+      "record": "composition",
+      "file": "bytes/composition-null-command_owners.json",
+      "bytes_sha256": "82874c9a1aeec27b84e7ad212fc5d8259d4068a6c08c7357bb4e9b1cf4baa194",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-command_owners",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "command_owners"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "item_id",
+                  "artifact_sha256"
+                ],
+                "properties": {
+                  "name": {
+                    "$ref": "../v1/common.schema.json#/$defs/identifier"
+                  },
+                  "item_id": {
+                    "$ref": "common.schema.json#/$defs/id"
+                  },
+                  "artifact_sha256": {
+                    "$ref": "common.schema.json#/$defs/hex"
+                  }
+                }
+              },
+              "maxItems": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-missing-omitted",
+      "record": "composition",
+      "file": "bytes/composition-missing-omitted.json",
+      "bytes_sha256": "06d2b38d70396ec8446b2f24ff1b82653b8c8be038400aae4986ebf3e0dfc137",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-missing-omitted",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "required"
+        ],
+        "value": [
+          "kind",
+          "registration_ref",
+          "registration_sha256",
+          "generation_sha256",
+          "profile",
+          "environment",
+          "adapter_ref",
+          "adapter_sha256",
+          "policy_ref",
+          "policy_sha256",
+          "memory",
+          "home_ref",
+          "worktree_ref",
+          "materialization_sha256",
+          "command_owners"
+        ]
+      }
+    },
+    {
+      "name": "composition-null-omitted",
+      "record": "composition",
+      "file": "bytes/composition-null-omitted.json",
+      "bytes_sha256": "aa6dc38cd372921e97932b404fe1bcd129733bb09437bf84ac82bf66b6f421fc",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-null-omitted",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "omitted"
+        ],
+        "value": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "item_id",
+                  "reason"
+                ],
+                "properties": {
+                  "item_id": {
+                    "$ref": "common.schema.json#/$defs/id"
+                  },
+                  "reason": {
+                    "enum": [
+                      "disabled",
+                      "unsupported"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-unknown",
+      "record": "composition",
+      "file": "bytes/composition-unknown.json",
+      "bytes_sha256": "d34f1590fd152bb245cdd2e2bfb7dbe25a421777de0643a2e66a01bd97ba1b1d",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-unknown",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "future"
+        ],
+        "value": {
+          "type": "boolean"
+        }
+      }
+    },
+    {
+      "name": "composition-future-version",
+      "record": "composition",
+      "file": "bytes/composition-future-version.json",
+      "bytes_sha256": "4f613ea2d063adb736e24e48e7772766d7f01688883cffc56d73ab75b03c36f7",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-future-version",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "kind"
+        ],
+        "value": {
+          "enum": [
+            "project-composition/1",
+            "project-future/2"
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-later-environment",
+      "record": "composition",
+      "file": "bytes/composition-later-environment.json",
+      "bytes_sha256": "37da1dd2f7da082e6d4f6a79c9ba1769e810859a2e83a270524bc768ea32e227",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-later-environment",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "common",
+        "path": [
+          "$defs",
+          "environment",
+          "enum"
+        ],
+        "value": [
+          "claude_code",
+          "codex_cli",
+          "muse",
+          "pi"
+        ]
+      }
+    },
+    {
+      "name": "composition-claude_code",
+      "record": "composition",
+      "file": "bytes/composition-claude_code.json",
+      "bytes_sha256": "c7d8e29841e73e6ad1552e310330fce255f08f650a6b5c867e70d78b50b9c30f",
+      "expected": null,
+      "claim": "composition: accepts this closed record",
+      "record_sha256": "c7d8e29841e73e6ad1552e310330fce255f08f650a6b5c867e70d78b50b9c30f"
+    },
+    {
+      "name": "composition-muse",
+      "record": "composition",
+      "file": "bytes/composition-muse.json",
+      "bytes_sha256": "896de15276a5d29326f22e424f5805eb6ca0ef1e08222b7f4354e65ff79dd2e5",
+      "expected": null,
+      "claim": "composition: accepts this closed record",
+      "record_sha256": "896de15276a5d29326f22e424f5805eb6ca0ef1e08222b7f4354e65ff79dd2e5"
+    },
+    {
+      "name": "composition-nested-command_owners-0-unknown",
+      "record": "composition",
+      "file": "bytes/composition-nested-command_owners-0-unknown.json",
+      "bytes_sha256": "bea500296f9e2c178787486472130cf59c3e877dd6f7daaf7b93db21a2920367",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-nested-command_owners-0-unknown",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "command_owners",
+          "items",
+          "properties",
+          "future"
+        ],
+        "value": {
+          "type": "boolean"
+        }
+      }
+    },
+    {
+      "name": "composition-nested-command_owners-0-missing-name",
+      "record": "composition",
+      "file": "bytes/composition-nested-command_owners-0-missing-name.json",
+      "bytes_sha256": "1a017319e9383d0b405b2c1d83f290d06ed2a297fc0cd28f30db8aacbca2e57a",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-nested-command_owners-0-missing-name",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "command_owners",
+          "items",
+          "required"
+        ],
+        "value": [
+          "item_id",
+          "artifact_sha256"
+        ]
+      }
+    },
+    {
+      "name": "composition-nested-command_owners-0-missing-item_id",
+      "record": "composition",
+      "file": "bytes/composition-nested-command_owners-0-missing-item_id.json",
+      "bytes_sha256": "509b80d05be9aa8926b15d675f3b9b2f5523c4ab83f51681742e39614ab29091",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-nested-command_owners-0-missing-item_id",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "command_owners",
+          "items",
+          "required"
+        ],
+        "value": [
+          "name",
+          "artifact_sha256"
+        ]
+      }
+    },
+    {
+      "name": "composition-nested-command_owners-0-missing-artifact_sha256",
+      "record": "composition",
+      "file": "bytes/composition-nested-command_owners-0-missing-artifact_sha256.json",
+      "bytes_sha256": "6e2b409bd1a475bf9d5f84d0430cfc3567d4dc1c500924f45e66700944c0d0cc",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-nested-command_owners-0-missing-artifact_sha256",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "command_owners",
+          "items",
+          "required"
+        ],
+        "value": [
+          "name",
+          "item_id"
+        ]
+      }
+    },
+    {
+      "name": "composition-nested-omitted-0-unknown",
+      "record": "composition",
+      "file": "bytes/composition-nested-omitted-0-unknown.json",
+      "bytes_sha256": "a94624ca5febab9b591369647ff17b6afaf0e96430d24a784a496cee25f49bd8",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-nested-omitted-0-unknown",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "omitted",
+          "items",
+          "properties",
+          "future"
+        ],
+        "value": {
+          "type": "boolean"
+        }
+      }
+    },
+    {
+      "name": "composition-nested-omitted-0-missing-item_id",
+      "record": "composition",
+      "file": "bytes/composition-nested-omitted-0-missing-item_id.json",
+      "bytes_sha256": "661ee0c9dc08c710b917c134fcbf3a84a4e98df2d1fb7adc37469847231cfe82",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-nested-omitted-0-missing-item_id",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "omitted",
+          "items",
+          "required"
+        ],
+        "value": [
+          "reason"
+        ]
+      }
+    },
+    {
+      "name": "composition-nested-omitted-0-missing-reason",
+      "record": "composition",
+      "file": "bytes/composition-nested-omitted-0-missing-reason.json",
+      "bytes_sha256": "d5819317892099637eabf44fca4ee7da44c3a2a994e94b520ce813747dfaf460",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-nested-omitted-0-missing-reason",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "omitted",
+          "items",
+          "required"
+        ],
+        "value": [
+          "item_id"
+        ]
+      }
+    },
+    {
+      "name": "composition-no-command",
+      "record": "composition",
+      "file": "bytes/composition-no-command.json",
+      "bytes_sha256": "9554a673d072491c899ced49a2a29122f9658a822bce2e661db732e783d4809a",
+      "expected": null,
+      "claim": "composition: accepts this closed record",
+      "record_sha256": "9554a673d072491c899ced49a2a29122f9658a822bce2e661db732e783d4809a"
+    },
+    {
+      "name": "ref-adapter-wrong-tag",
+      "record": "composition",
+      "file": "bytes/ref-adapter-wrong-tag.json",
+      "bytes_sha256": "e1b612525fdbc4d61c757f6fec053d70c4d5525d65a8f833046c979059108fec",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses ref-adapter-wrong-tag",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "common",
+        "path": [
+          "$defs",
+          "adapter_ref",
+          "pattern"
+        ],
+        "value": "^(?:adapter|command):[a-z][a-z0-9_-]{0,63}$(?![\\s\\S])"
+      }
+    },
+    {
+      "name": "ref-policy-wrong-tag",
+      "record": "composition",
+      "file": "bytes/ref-policy-wrong-tag.json",
+      "bytes_sha256": "389d61ba35f03df12c8a304be4860933478789835dcbedfaa69a6c350f5864e3",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses ref-policy-wrong-tag",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "common",
+        "path": [
+          "$defs",
+          "policy_ref",
+          "pattern"
+        ],
+        "value": "^(?:policy|command):[a-z][a-z0-9_-]{0,63}$(?![\\s\\S])"
+      }
+    },
+    {
+      "name": "composition-memory-on",
+      "record": "composition",
+      "file": "bytes/composition-memory-on.json",
+      "bytes_sha256": "56d5517dcbd36f7fec5eaffd839d6e819c846d0f1ecdbc1fc188ae56ab8cc856",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-memory-on",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "memory"
+        ],
+        "value": {
+          "enum": [
+            "off",
+            "on"
+          ]
+        }
+      }
+    },
+    {
+      "name": "composition-too-many-commands",
+      "record": "composition",
+      "file": "bytes/composition-too-many-commands.json",
+      "bytes_sha256": "f66c90265668d4721e8d243b3c0f842a8831af8eb321429b205dcbaa3c82a467",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-too-many-commands",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "command_owners",
+          "maxItems"
+        ],
+        "value": 2
+      }
+    },
+    {
+      "name": "composition-forbidden-reason",
+      "record": "composition",
+      "file": "bytes/composition-forbidden-reason.json",
+      "bytes_sha256": "4b03df6891fd0499c10998a3a77de4a8d42e9f1d74094c59e224ea30dc50a389",
+      "expected": {
+        "code": "project_context_invalid",
+        "gate": "schema"
+      },
+      "claim": "composition: refuses composition-forbidden-reason",
+      "positive": "composition-valid",
+      "mutant": {
+        "schema": "composition",
+        "path": [
+          "properties",
+          "omitted",
+          "items",
+          "properties",
+          "reason",
+          "enum"
+        ],
+        "value": [
+          "disabled",
+          "unsupported",
+          "missing"
+        ]
+      }
+    }
+  ]
+}
