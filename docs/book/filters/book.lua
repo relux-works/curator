@@ -115,6 +115,9 @@ local tall = {
   ["werkstatt"] = true,
   ["project-admission"] = true,
   ["launch-route"] = true,
+  ["launch-routes-comparison"] = true,
+  ["mcp-delivery"] = true,
+  ["trust-boundaries"] = true,
 }
 
 function Image(img)
