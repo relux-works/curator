@@ -286,6 +286,9 @@ func validateJournalWithResolver(journal *Journal, resolveTarget func(string, bo
 		if !target.Kind.valid() {
 			return journalf("target %d kind %q is invalid", index, target.Kind)
 		}
+		if target.Kind == KindExchange && (!exchangeSupported || target.PreimageDigest == "" || target.PreimageDigest == DigestAbsent || target.DesiredDigest == DigestAbsent || target.GenerationPath != "" || target.ExpectedGeneration != "") {
+			return journalf("target %d exchange requires supported present byte preimages and replacements", index)
+		}
 		if target.Kind == KindEntry && (target.ExpectedGeneration != "" || target.GenerationPath != "") {
 			return journalf("target %d owns a directory entry and cannot carry a generation expectation", index)
 		}

@@ -396,6 +396,9 @@ func (engine *Engine) commit(journal *Journal) error {
 
 func (engine *Engine) commitTarget(journal *Journal, index int) error {
 	target := &journal.Targets[index]
+	if target.Kind == KindExchange {
+		return engine.commitExchange(journal, index)
+	}
 	switch target.State {
 	case StatePending:
 		if err := engine.recoverPendingBackup(target); err != nil {
@@ -733,6 +736,9 @@ func (engine *Engine) rollback(journal *Journal) error {
 
 func (engine *Engine) rollbackTarget(journal *Journal, index int) error {
 	target := &journal.Targets[index]
+	if target.Kind == KindExchange {
+		return engine.rollbackExchange(journal, index)
+	}
 	if target.State == StatePending {
 		if backup, err := target.digest(target.BackupPath); err != nil {
 			return err

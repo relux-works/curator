@@ -86,6 +86,13 @@ verifies its identity and replaces the complete directory through the existing
 recoverable transaction. A staged identity mismatch returns
 `ErrSkillProjectionIdentity` without replacing the old directory; linked store
 routes remain refused. Shared projections are rebuilt once for all consumers.
+On macOS and Linux, repair of an existing projection atomically exchanges the
+published directory and a freshly staged sibling. Readers resolving the shared
+link see the old or new tree without a missing-directory interval. The journal
+retains the old tree until commit cleanup and restores it by exchange on rollback.
+Published bytes, private permissions and link targets do not change. Windows
+and other platforms retain the existing recoverable backup/install sequence,
+including its brief missing-directory interval; repair adds no new refusal there.
 Identity migration also publishes projections before activating new links or fallback copies.
 
 The command publishers in `install/targets.go` and `runtimestore` continue to
