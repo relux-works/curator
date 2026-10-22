@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -149,7 +150,7 @@ func (m *gitManager) recordRaw(canonical, raw string) {
 	if m.fetchRaw == nil {
 		m.fetchRaw = map[string]string{}
 	}
-	trimmed := strings.TrimSpace(raw)
+	trimmed := strings.TrimSpace(safeGitDeclaration(raw))
 	if canonical == "" || trimmed == "" || trimmed == canonical {
 		return
 	}
@@ -159,6 +160,25 @@ func (m *gitManager) recordRaw(canonical, raw string) {
 	if _, exists := m.fetchRaw[canonical]; !exists {
 		m.fetchRaw[canonical] = trimmed
 	}
+}
+
+// safeGitDeclaration removes username-only HTTP(S) credentials before a
+// declaration can reach acquisition metadata or resolver diagnostics. Password
+// sources remain intact so the existing identity validation still refuses them;
+// SSH usernames are transport hints and remain intact as well.
+func safeGitDeclaration(raw string) string {
+	if _, err := canonicalGit(raw); err != nil {
+		return raw
+	}
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.User == nil || (!strings.EqualFold(parsed.Scheme, "http") && !strings.EqualFold(parsed.Scheme, "https")) {
+		return raw
+	}
+	if _, password := parsed.User.Password(); password {
+		return raw
+	}
+	parsed.User = nil
+	return parsed.String()
 }
 
 // fetch updates the cached clone.
@@ -809,8 +829,9 @@ func (m *gitManager) inspectEntry(home string, resolved contextresolve.Resolved)
 }
 
 // packageOf maps a validated context manifest onto the resolution package.
-// Requirement sources remain declared here: the resolver calls Identity to
-// record their transport and compare canonical identities (environments §1).
+// Requirement sources retain their declared transport after HTTP(S) credential
+// stripping: the resolver calls Identity to record that transport and compare
+// canonical identities (environments §1).
 // Malformed network and file:// sources also pass through here and are
 // rejected at that Identity boundary with profile_source_invalid.
 func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
@@ -818,7 +839,7 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 	for _, name := range contextpkg.SortedNames(manifest.Contexts) {
 		requirement := manifest.Contexts[name]
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
-			Kind: contextlock.KindContext, Name: name, Source: requirement.Git,
+			Kind: contextlock.KindContext, Name: name, Source: safeGitDeclaration(requirement.Git),
 			Range: requirement.Range, Tag: requirement.Tag, Revision: requirement.Revision,
 			Directory: requirement.Directory, Weight: requirement.Weight,
 		})
@@ -826,7 +847,7 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 	for _, name := range contextpkg.SortedNames(manifest.Skills) {
 		requirement := manifest.Skills[name]
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
-			Kind: contextlock.KindSkill, Name: name, Source: requirement.Git,
+			Kind: contextlock.KindSkill, Name: name, Source: safeGitDeclaration(requirement.Git),
 			Range: requirement.Range, Tag: requirement.Tag, Revision: requirement.Revision,
 			Directory: requirement.Directory, Mode: requirement.Mode, Commands: requirement.Commands,
 		})
@@ -834,7 +855,7 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 	for _, name := range contextpkg.SortedNames(manifest.MCP) {
 		requirement := manifest.MCP[name]
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
-			Kind: contextlock.KindMCP, Name: name, Source: requirement.Git,
+			Kind: contextlock.KindMCP, Name: name, Source: safeGitDeclaration(requirement.Git),
 			Range: requirement.Range, Tag: requirement.Tag, Revision: requirement.Revision,
 			Directory: requirement.Directory,
 		})
