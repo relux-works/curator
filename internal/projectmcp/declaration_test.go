@@ -136,3 +136,22 @@ func TestDeclarationDigests(t *testing.T) {
 		t.Fatal("selector omitted")
 	}
 }
+
+// A failed set exposes valid siblings only as refusal evidence; it never
+// returns a partially admitted map. Valid sets retain their ordinary result.
+func TestSetRefusalSiblings(t *testing.T) {
+	valid := map[string]any{"a-valid": "https://safe.example/mcp", "z-valid": "https://safe.example/mcp"}
+	if admitted, err := ParseSet(valid); err != nil || len(admitted) != 2 {
+		t.Fatalf("valid set: %v %v", admitted, err)
+	}
+	valid["bad"] = map[string]any{"server": nil}
+	admitted, err := ParseSet(valid)
+	var partial *SetError
+	if admitted != nil || !errors.As(err, &partial) || len(partial.Valid) != 2 {
+		t.Fatalf("partial admission or lost siblings: %v %v", admitted, err)
+	}
+	var refusal *Error
+	if !errors.As(err, &refusal) || refusal.Code != Invalid {
+		t.Fatalf("lost refusal class: %v", err)
+	}
+}

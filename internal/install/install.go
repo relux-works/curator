@@ -332,6 +332,10 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	// declaration at any point during this run.
 	projectManifest, projectManifestGeneration, projectManifestPayload, err := readProjectManifestDocument(projectRoot)
 	if err != nil {
+		result.MCPPlan = projectmcpstate.FailurePlan(alias, projectManifestPayload, nil, opts.DryRun, err)
+		if result.MCPPlan != nil {
+			result.Messages = append(result.Messages, result.MCPPlan.Lines()...)
+		}
 		result.failf("%v", err)
 		return result, nil
 	}
