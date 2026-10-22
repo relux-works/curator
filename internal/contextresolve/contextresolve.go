@@ -262,6 +262,43 @@ type Resolved struct {
 	Package     *Package
 }
 
+// VerifyMCPPin rechecks signer policy against an exact locked commit without
+// enumerating tags or selecting a different candidate during preview/status.
+func VerifyMCPPin(source Source, pin Requirement, signers map[string][]Signer, required bool) error {
+	r := &resolver{source: source, input: Input{SourceSigners: signers, RequireSourceSigners: required}}
+	return r.verifyCandidate(&selection{kind: contextlock.KindMCP, name: pin.Name, source: pin.Source, tag: pin.Tag, commit: pin.Revision})
+}
+
+// ResolveMCP resolves standalone MCP declaration roots through the same source,
+// signer, version and MCP-allowlist gates as a profile closure. It creates no
+// synthetic context package or profile lock.
+func ResolveMCP(source Source, requirements []Requirement, policy Input) (map[string]Resolved, error) {
+	r := &resolver{source: source, input: policy, constraints: map[string][]constraint{}, kinds: map[string]string{}, selected: map[string]*selection{}, ceiling: map[string]pkgversion.Version{}, hasCeiling: map[string]bool{}, pending: map[string]bool{}, overlays: map[string]*Overlay{}}
+	for _, requirement := range requirements {
+		requirement.Kind = contextlock.KindMCP
+		r.add(requirement, MachineRequirer, "")
+	}
+	for {
+		name, more := r.nextPending()
+		if !more {
+			break
+		}
+		if err := r.selectName(name); err != nil {
+			return nil, err
+		}
+	}
+	out := map[string]Resolved{}
+	for name, selected := range r.selected {
+		for _, constraint := range r.constraints[name] {
+			if !r.admits(constraint.requirement, selected) {
+				return nil, r.conflict(name, r.candidateVersions(selected))
+			}
+		}
+		out[name] = Resolved{Kind: contextlock.KindMCP, Name: name, Source: selected.source, Directory: selected.directory, Commit: selected.commit, HashVersion: hashing.WriteVersion(), Version: selected.version.String(), Package: selected.pkg}
+	}
+	return out, nil
+}
+
 // Key joins kind and name.
 func Key(kind, name string) string { return kind + ":" + name }
 

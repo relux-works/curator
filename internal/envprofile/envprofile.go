@@ -1800,7 +1800,11 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
 		Package:       packageIdentity,
 		Directory:     directory,
 	}
-	warnings, errs := audit.Gate(cfg, []audit.Subject{subject})
+	gate := audit.Gate
+	if manager.readOnlyAudit {
+		gate = audit.GateReadOnly
+	}
+	warnings, errs := gate(cfg, []audit.Subject{subject})
 	if len(errs) > 0 {
 		return warnings, fmt.Errorf("audit blocked: %s", strings.Join(errs, "; "))
 	}

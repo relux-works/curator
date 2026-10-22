@@ -44,6 +44,13 @@ const (
 // installation in these tests runs the real identity-verified process graph
 // instead of a mock.
 func TestMain(m *testing.M) {
+	if strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe") == "mcp-stage-a-tripwire" {
+		if path := os.Getenv("CURATOR_TEST_MCP_TRIPWIRE"); path != "" {
+			_ = os.WriteFile(path, []byte("invoked"), 0600)
+		}
+		os.Exit(97)
+	}
+
 	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
 		os.Exit(runNativeBuildWorker())
 	}

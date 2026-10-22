@@ -31,10 +31,10 @@ func TestSchema2PublishedSchemaCases(t *testing.T) {
 }
 
 func TestSchemaVersionAdmission(t *testing.T) {
-	for _, version := range []string{"0", "1", "2", "3", "2.5", "null", `"2"`, "1e100"} {
+	for _, version := range []string{"0", "1", "2", "3", "4", "2.5", "null", `"2"`, "1e100"} {
 		payload := []byte(`{"schema_version":` + version + `,"skills":[]}`)
 		_, err := ParseBytes(payload, "/missing/Skillfile.json")
-		want := version == "1" || version == "2"
+		want := version == "1" || version == "2" || version == "3"
 		if (err == nil) != want {
 			t.Errorf("version=%s err=%v", version, err)
 		}
