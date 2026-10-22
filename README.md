@@ -162,6 +162,7 @@ curator list       # list configured projects and declared skills
 
 ```bash
 curator project add      # register a project alias and path in the machine configuration
+curator project register # bind a checkout identity for explicit project-context admission
 curator project resolve  # resolve transitive dependencies for a project closure
 ```
 
@@ -307,6 +308,13 @@ Curator conforms to an open specification. Independent implementations include [
 Curator uses an in-repository task board in `.task-board/`. Automated gates run under `.github/ci/` and mirror `Makefile` targets; see [docs/ci-gates.md](docs/ci-gates.md) for gate definitions, evidence paths, platform carve-out rules, and suite consumption requirements.
 
 ### Tools
+
+For explicit project-context packaging and approval, see
+[project admission](docs/project-admission.md). The new `project register`,
+`inspect`, `package`, `preview`, `approve`, `revoke` and `rebind` controls use Go
+and Git; they create protected admission state and perform no native launch.
+Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectcontext -count=1`
+and the documented opt-in Go-overlay mutation lane. Keep logs in `.temp/`.
 
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.
