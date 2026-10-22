@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/rustsource"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 func TestRawCaptureAPIContainsNoAuthorityOrDerivedSeam(t *testing.T) {
@@ -226,7 +227,7 @@ func git(t *testing.T, root string, args ...string) string {
 
 func rustHost(t *testing.T) string {
 	t.Helper()
-	payload, err := exec.Command("rustc", "-vV").Output()
+	payload, err := exec.Command(testtoolchain.Rustc(t, rustsource.SupportedRustToolchainVersion), "-vV").Output()
 	if err != nil {
 		t.Fatal(err)
 	}

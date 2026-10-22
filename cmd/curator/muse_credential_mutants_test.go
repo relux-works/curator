@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // Narrow one forbidden class at a time while retaining the surrounding gate.
@@ -85,7 +87,7 @@ func runMuseProducerOverlay(t *testing.T, file, before, after, pkg, test string)
 	for i := range parts {
 		parts[i] = "^" + parts[i] + "$"
 	}
-	command := exec.Command("go", "test", "-overlay", overlayPath, "-count=1", "-timeout=5m", "-v", "-run", strings.Join(parts, "/"), pkg)
+	command := exec.Command(testtoolchain.Go(t), "test", "-overlay", overlayPath, "-count=1", "-timeout=5m", "-v", "-run", strings.Join(parts, "/"), pkg)
 	command.Dir = root
 	// Reuse the CLI helper protocol: the parent already holds the
 	// package GOROOT lock, and these behavioral tests do not mutate it.

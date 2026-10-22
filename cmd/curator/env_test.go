@@ -16,6 +16,7 @@ import (
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // These tests drive the production run() entry point for the env rows and
@@ -786,7 +787,7 @@ func TestEnvResolvePreserveLockRefusesCurrentV1AndPlainRepairMigrates(t *testing
 	source, _ := profileHome(t)
 	// Keep optional provider discovery and version probes inside this fixture.
 	bin := statusProviderPath(t, "")
-	goRoot, err := exec.Command("go", "env", "GOROOT").Output()
+	goRoot, err := exec.Command(testtoolchain.Go(t), "env", "GOROOT").Output()
 	if err != nil {
 		t.Fatalf("locate fixture Go toolchain: %v", err)
 	}

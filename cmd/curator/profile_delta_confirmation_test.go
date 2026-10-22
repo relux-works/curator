@@ -83,9 +83,17 @@ func TestProfileUpdateSystemDeltaConfirmationGolden(t *testing.T) {
 	}
 }
 
+// Confirmation refusal leaves the installed lock/store unchanged, and explicit
+// confirmation publishes the MCP delta with the pinned transcript. The command
+// is a resolvable discovery fixture; this case never executes an MCP server.
 func TestProfileUpdateMCPDeltaConfirmationGolden(t *testing.T) {
 	requireGit(t)
 	source, home := profileHome(t)
+	commandBin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(commandBin, "npx"+productionBinarySuffix()), []byte("MCP command discovery fixture\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", commandBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	const rootSource = "https://example.com/mcp-root"
 	const toolSource = "https://example.com/mcp-tool"
 	rootRepo := t.TempDir()

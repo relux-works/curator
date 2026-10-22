@@ -1,7 +1,6 @@
 package main
 
 import (
-	"go/build"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -9,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/godriver"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // TestInstallPrintsTheRemedyAVersionManagerSelectionEarns drives the whole
@@ -19,12 +19,8 @@ import (
 // assertion is on what stderr actually says.
 func TestInstallPrintsTheRemedyAVersionManagerSelectionEarns(t *testing.T) {
 	t.Parallel()
+	realGo := testtoolchain.Go(t)
 	_, home := compiledProject(t)
-
-	realRoot := build.Default.GOROOT
-	if realRoot == "" {
-		t.Skip("this host reports no GOROOT to select a real launcher from")
-	}
 	launcher := "go"
 	if runtime.GOOS == "windows" {
 		launcher = "go.exe"
@@ -37,7 +33,7 @@ func TestInstallPrintsTheRemedyAVersionManagerSelectionEarns(t *testing.T) {
 		t.Fatal(err)
 	}
 	wrapper := filepath.Join(wrapperRoot, "bin", launcher)
-	if err := os.Symlink(filepath.Join(realRoot, "bin", launcher), wrapper); err != nil {
+	if err := os.Symlink(realGo, wrapper); err != nil {
 		t.Skipf("this host cannot create the symbolic link the case needs: %v", err)
 	}
 	code, _, stderr := captureWithEnv(t, filepath.Join(home, "config.json"), map[string]string{

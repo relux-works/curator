@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/relux-works/curator/internal/buildrepo"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 var binaryOnce struct {
@@ -47,6 +48,7 @@ func ModuleRoot(t *testing.T) string {
 // absolute path.
 func Binary(t *testing.T) string {
 	t.Helper()
+	goTool := testtoolchain.Go(t)
 	root := ModuleRoot(t)
 	binaryOnce.Lock()
 	defer binaryOnce.Unlock()
@@ -61,7 +63,7 @@ func Binary(t *testing.T) string {
 				name += ".exe"
 			}
 			bin := filepath.Join(dir, name)
-			cmd := exec.Command("go", "build", "-o", bin, "./cmd/curator") // #nosec G204 -- fixed test-harness build of the manager binary.
+			cmd := exec.Command(goTool, "build", "-o", bin, "./cmd/curator") // #nosec G204 -- fixed test-harness build of the manager binary.
 			cmd.Dir = root
 			if out, err := cmd.CombinedOutput(); err != nil {
 				binaryOnce.err = fmt.Errorf("build curator: %v\n%s", err, out)
@@ -180,7 +182,7 @@ func GoBuild(t *testing.T, dir, output string, extraEnv []string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "go", "build", "-o", output, "./cmd/curator") // #nosec G204 -- fixed test-harness cross-compile of the manager binary.
+	cmd := exec.CommandContext(ctx, testtoolchain.Go(t), "build", "-o", output, "./cmd/curator") // #nosec G204 -- fixed test-harness cross-compile of the manager binary.
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), extraEnv...)
 	if out, err := cmd.CombinedOutput(); err != nil {
