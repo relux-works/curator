@@ -867,11 +867,14 @@ func sameClaudeSeedInput(prepared, fresh *claudeSeedPlan) bool {
 // publishClaudeSeed stages only validated output, then compares the exact input
 // (including absence) immediately before rename. Three total checks are allowed;
 // a mismatch rebuilds from that fresh input, never from the stale payload.
-// The tool does not hold our lock: the final read-to-rename interval remains a
-// non-cooperative-writer race, not an atomic filesystem compare-and-swap.
+// On macOS, Linux and Windows, path/handle preparation precedes the final
+// read; a matching input goes directly to the native rename. The tool does not hold our lock: scheduling
+// between the read and rename still prevents atomic filesystem compare-and-swap.
 func publishClaudeSeed(prepared *claudeSeedPlan, root, homeRel, launchDir, form string) (*claudeSeedPlan, error) {
 	for attempt := 0; attempt < 3; attempt++ {
 		var temp, full string
+		var rename func() error
+		var release func()
 		if prepared.payload != nil {
 			var err error
 			full, err = managedPath(root, managedJoin(homeRel, ".claude.json"), true)
@@ -899,16 +902,24 @@ func publishClaudeSeed(prepared *claudeSeedPlan, root, homeRel, launchDir, form 
 				_ = os.Remove(temp)
 				return nil, err
 			}
+			// Prepare paths, native handles and error metadata before the last read.
+			rename, release, err = prepareClaudeSeedRename(temp, full)
+			if err != nil {
+				_ = os.Remove(temp)
+				return nil, err
+			}
 		}
 		fresh, err := readClaudeSeedInput(root, homeRel)
 		if err != nil {
 			if temp != "" {
+				release()
 				_ = os.Remove(temp)
 			}
 			return nil, err
 		}
 		if !sameClaudeSeedInput(prepared, fresh) {
 			if temp != "" {
+				release()
 				_ = os.Remove(temp)
 			}
 			prepared, err = prepareClaudeSeed(root, homeRel, launchDir, form)
@@ -918,7 +929,8 @@ func publishClaudeSeed(prepared *claudeSeedPlan, root, homeRel, launchDir, form 
 			continue
 		}
 		if temp != "" {
-			err = replaceManagedEntry(temp, full)
+			err = rename()
+			release()
 			_ = os.Remove(temp)
 			if err != nil {
 				return nil, err
