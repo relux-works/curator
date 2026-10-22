@@ -196,9 +196,22 @@ func inventory(files map[string][]byte) map[string]Surface {
 	}
 	return result
 }
+func (m *Manager) verifyHome(c Composition) error {
+	root := filepath.Join(m.home, homeRelative(c))
+	if err := checkedRoute(m.home, root); err != nil {
+		return fmt.Errorf("project home unavailable: %w", err)
+	}
+	if err := privatedir.Validate(root); err != nil {
+		return fmt.Errorf("project home unavailable: %w", err)
+	}
+	return nil
+}
 func (m *Manager) verifyView(c Composition, v view) error {
 	if v.Composition.Ref != c.Ref || v.Composition.SHA256 != c.SHA256 || !reflect.DeepEqual(v.Surfaces, c.Generated) {
 		return fmt.Errorf("project home does not materialize the leased composition")
+	}
+	if err := m.verifyHome(c); err != nil {
+		return err
 	}
 	for path, surface := range v.Surfaces {
 		full := filepath.Join(m.home, homeRelative(c), filepath.FromSlash(path))
@@ -311,6 +324,18 @@ func (m *Manager) publishView(ctx context.Context, id, ref, sha, owner string, f
 					}
 				}
 				writes[target] = append([]byte(nil), data...)
+			}
+			// A generated receipt can be empty; the native writable home still
+			// exists before transfer. Existing directories are never hardened.
+			projectHome := filepath.Join(m.home, key)
+			if err = checkedRoute(m.home, projectHome); err != nil {
+				return err
+			}
+			if err = privatedir.MakeAll(projectHome); err != nil {
+				return err
+			}
+			if err = m.verifyHome(c); err != nil {
+				return err
 			}
 			l.Views[key] = view{Composition: c, Surfaces: expected}
 			return m.publish(l, lock, engine, writes, removals)
