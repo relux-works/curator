@@ -80,6 +80,9 @@ func (a Authority) PublishComposition(ctx context.Context, req ComposeRequest, e
 	if err = a.bound(op, req.CheckoutID); err != nil {
 		return Composition{}, err
 	}
+	// Normalize the inherited mode before retaining request metadata: explicit
+	// and inherited requests for the same record must publish identical bytes.
+	req.Mode = again.Preview.Record.Mode
 	envelope := compositionEnvelope{1, req, again.Preview, again.RuntimeEntries, again.BuildKeys}
 	b, err := canonical(envelope)
 	if err != nil {
