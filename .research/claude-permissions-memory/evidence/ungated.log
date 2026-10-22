@@ -1,0 +1,171 @@
+=== RUN   TestIntakeBoundary
+    boundary_test.go:22: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+--- SKIP: TestIntakeBoundary (0.00s)
+=== RUN   TestOfflineBoundary
+    boundary_test.go:63: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+--- SKIP: TestOfflineBoundary (0.00s)
+=== RUN   TestIdentity
+    replay_test.go:38: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+--- SKIP: TestIdentity (0.00s)
+=== RUN   TestPermissions
+=== RUN   TestPermissions/fresh
+=== RUN   TestPermissions/fresh/Bash/deny-false
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/fresh/Bash/deny-true
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/fresh/Edit/deny-false
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/fresh/Edit/deny-true
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/fresh/Write/deny-false
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/fresh/Write/deny-true
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/fresh/WebFetch/deny-false
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/fresh/WebFetch/deny-true
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/fresh/MCP/deny-false
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/fresh/MCP/deny-true
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/resume
+=== RUN   TestPermissions/resume/Bash/deny-false
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/resume/Bash/deny-true
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/resume/Edit/deny-false
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/resume/Edit/deny-true
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/resume/Write/deny-false
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/resume/Write/deny-true
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/resume/WebFetch/deny-false
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/resume/WebFetch/deny-true
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/resume/MCP/deny-false
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/resume/MCP/deny-true
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/child
+=== RUN   TestPermissions/child/Bash/deny-false
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/child/Bash/deny-true
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/child/Edit/deny-false
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/child/Edit/deny-true
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/child/Write/deny-false
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/child/Write/deny-true
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/child/WebFetch/deny-false
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/child/WebFetch/deny-true
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/child/MCP/deny-false
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestPermissions/child/MCP/deny-true
+    replay_test.go:62: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+--- PASS: TestPermissions (0.00s)
+    --- PASS: TestPermissions/fresh (0.00s)
+        --- SKIP: TestPermissions/fresh/Bash/deny-false (0.00s)
+        --- SKIP: TestPermissions/fresh/Bash/deny-true (0.00s)
+        --- SKIP: TestPermissions/fresh/Edit/deny-false (0.00s)
+        --- SKIP: TestPermissions/fresh/Edit/deny-true (0.00s)
+        --- SKIP: TestPermissions/fresh/Write/deny-false (0.00s)
+        --- SKIP: TestPermissions/fresh/Write/deny-true (0.00s)
+        --- SKIP: TestPermissions/fresh/WebFetch/deny-false (0.00s)
+        --- SKIP: TestPermissions/fresh/WebFetch/deny-true (0.00s)
+        --- SKIP: TestPermissions/fresh/MCP/deny-false (0.00s)
+        --- SKIP: TestPermissions/fresh/MCP/deny-true (0.00s)
+    --- PASS: TestPermissions/resume (0.00s)
+        --- SKIP: TestPermissions/resume/Bash/deny-false (0.00s)
+        --- SKIP: TestPermissions/resume/Bash/deny-true (0.00s)
+        --- SKIP: TestPermissions/resume/Edit/deny-false (0.00s)
+        --- SKIP: TestPermissions/resume/Edit/deny-true (0.00s)
+        --- SKIP: TestPermissions/resume/Write/deny-false (0.00s)
+        --- SKIP: TestPermissions/resume/Write/deny-true (0.00s)
+        --- SKIP: TestPermissions/resume/WebFetch/deny-false (0.00s)
+        --- SKIP: TestPermissions/resume/WebFetch/deny-true (0.00s)
+        --- SKIP: TestPermissions/resume/MCP/deny-false (0.00s)
+        --- SKIP: TestPermissions/resume/MCP/deny-true (0.00s)
+    --- PASS: TestPermissions/child (0.00s)
+        --- SKIP: TestPermissions/child/Bash/deny-false (0.00s)
+        --- SKIP: TestPermissions/child/Bash/deny-true (0.00s)
+        --- SKIP: TestPermissions/child/Edit/deny-false (0.00s)
+        --- SKIP: TestPermissions/child/Edit/deny-true (0.00s)
+        --- SKIP: TestPermissions/child/Write/deny-false (0.00s)
+        --- SKIP: TestPermissions/child/Write/deny-true (0.00s)
+        --- SKIP: TestPermissions/child/WebFetch/deny-false (0.00s)
+        --- SKIP: TestPermissions/child/WebFetch/deny-true (0.00s)
+        --- SKIP: TestPermissions/child/MCP/deny-false (0.00s)
+        --- SKIP: TestPermissions/child/MCP/deny-true (0.00s)
+=== RUN   TestProjectPermissions
+=== RUN   TestProjectPermissions/none
+    replay_test.go:164: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestProjectPermissions/project
+    replay_test.go:164: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestProjectPermissions/local
+    replay_test.go:164: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+--- PASS: TestProjectPermissions (0.00s)
+    --- SKIP: TestProjectPermissions/none (0.00s)
+    --- SKIP: TestProjectPermissions/project (0.00s)
+    --- SKIP: TestProjectPermissions/local (0.00s)
+=== RUN   TestBuiltinCeiling
+=== RUN   TestBuiltinCeiling/empty
+    replay_test.go:189: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestBuiltinCeiling/Read
+    replay_test.go:189: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+--- PASS: TestBuiltinCeiling (0.00s)
+    --- SKIP: TestBuiltinCeiling/empty (0.00s)
+    --- SKIP: TestBuiltinCeiling/Read (0.00s)
+=== RUN   TestMemory
+=== RUN   TestMemory/off-false/fresh
+    replay_test.go:254: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestMemory/off-false/resume
+    replay_test.go:254: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestMemory/off-false/child
+    replay_test.go:254: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestMemory/off-true/fresh
+    replay_test.go:254: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestMemory/off-true/resume
+    replay_test.go:254: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestMemory/off-true/child
+    replay_test.go:254: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+--- PASS: TestMemory (0.00s)
+    --- SKIP: TestMemory/off-false/fresh (0.00s)
+    --- SKIP: TestMemory/off-false/resume (0.00s)
+    --- SKIP: TestMemory/off-false/child (0.00s)
+    --- SKIP: TestMemory/off-true/fresh (0.00s)
+    --- SKIP: TestMemory/off-true/resume (0.00s)
+    --- SKIP: TestMemory/off-true/child (0.00s)
+=== RUN   TestMemoryDirectedWrite
+=== RUN   TestMemoryDirectedWrite/fresh/off-false
+    replay_test.go:346: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestMemoryDirectedWrite/fresh/off-true
+    replay_test.go:346: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestMemoryDirectedWrite/resume/off-false
+    replay_test.go:346: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestMemoryDirectedWrite/resume/off-true
+    replay_test.go:346: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestMemoryDirectedWrite/child/off-false
+    replay_test.go:346: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+=== RUN   TestMemoryDirectedWrite/child/off-true
+    replay_test.go:346: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+--- PASS: TestMemoryDirectedWrite (0.00s)
+    --- SKIP: TestMemoryDirectedWrite/fresh/off-false (0.00s)
+    --- SKIP: TestMemoryDirectedWrite/fresh/off-true (0.00s)
+    --- SKIP: TestMemoryDirectedWrite/resume/off-false (0.00s)
+    --- SKIP: TestMemoryDirectedWrite/resume/off-true (0.00s)
+    --- SKIP: TestMemoryDirectedWrite/child/off-false (0.00s)
+    --- SKIP: TestMemoryDirectedWrite/child/off-true (0.00s)
+=== RUN   TestMemoryResumeHistory
+    replay_test.go:382: opt-in: CLAUDE_QUAL_BINARY unset; no vendor process or fixture
+--- SKIP: TestMemoryResumeHistory (0.00s)
+PASS
+ok  	github.com/relux-works/curator/.research/claude-permissions-memory	0.269s
