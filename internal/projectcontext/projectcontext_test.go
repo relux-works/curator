@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/contextlock"
+	"github.com/relux-works/curator/internal/skillspec"
 )
 
 type fixture struct {
@@ -331,7 +332,7 @@ func TestDiscoveryIsInertAndMCPUnsupported(t *testing.T) {
 }
 
 // Claim: missing/unreadable/malformed manifests, duplicate keys, unknown
-// fields, selectors, globs and escaping paths refuse before admission; the
+// fields, imports, globs and escaping paths refuse before admission; the
 // adjacent valid package is a positive control. Failure leaves approval empty.
 func TestManifestAndPathFailures(t *testing.T) {
 	f := newFixture(t)
@@ -479,14 +480,14 @@ func TestClosureSnapshotsRejectTamper(t *testing.T) {
 }
 
 // Claim: the closed request reader rejects absent/null required booleans,
-// duplicate keys, unbounded records/depth and unknown capability fields.
+// duplicate keys, oversized records, reserved packaging and unknown fields.
 func TestClosedDeclarationReader(t *testing.T) {
 	good := `{"version":1,"items":[{"id":"guide","type":"context","environment":"codex_cli","required":false,"source":"package","dependencies":{}}]}`
 	if _, err := ParseDeclaration([]byte(good)); err != nil {
 		t.Fatal(err)
 	}
 	for _, bad := range []string{strings.Replace(good, `"required":false,`, "", 1), strings.Replace(good, `"required":false`, `"required":null`, 1), strings.Replace(good, `"required":false`, `"required":false,"required":true`, 1), strings.Replace(good, `"dependencies":{}`, `"permissions":{"allow":["*"]}`, 1),
-		strings.Replace(good, `"dependencies":{}`, `"dependencies":{},"permissions":{"allow":["*"]}`, 1), good + "{}", strings.Repeat(" ", MaxRecord) + good, `{"version":1,"items":null}`} {
+		strings.Replace(good, `"dependencies":{}`, `"dependencies":{},"permissions":{"allow":["*"]}`, 1), strings.Replace(good, `"dependencies":{}`, `"dependencies":{},"packaging":null`, 1), strings.Replace(good, `"dependencies":{}`, `"dependencies":{},"packaging":""`, 1), good + "{}", strings.Repeat(" ", MaxRecord) + good, `{"version":1,"items":null}`} {
 		if _, err := ParseDeclaration([]byte(bad)); err == nil {
 			t.Fatalf("invalid request accepted: %.100s", bad)
 		}
@@ -808,4 +809,40 @@ func TestProtectedSnapshotRejectsGitMetadata(t *testing.T) {
 	write(t, target, "Injected metadata.\n")
 	_, _, err = f.store.ReadSnapshot(f.registration.CheckoutID, "guide")
 	required(t, err, "project_context_drift")
+}
+
+// Claim: independently valid skill manifests with skill/MCP requirements or
+// external repositories refuse here until an owning activation closure exists;
+// a manifest without those requirements remains admissible inert source.
+func TestWholeSkillUnsupportedClosureRefuses(t *testing.T) {
+	f := newFixture(t)
+	dir := filepath.Join(f.root, "skill")
+	write(t, filepath.Join(dir, "SKILL.md"), "# Review\n\nReview ordinary source data.\n")
+	caps := `"capabilities":{"network":"none","filesystem":"none","exec":"none","secrets":"none","env_read":"none","prompt_scope":"none"}`
+	control := `{"schema_version":3,"commands":{},` + caps + `}`
+	file := filepath.Join(dir, "agent-skill.json")
+	write(t, file, control)
+	d := declaration("review", "skill", false)
+	d.Items[0].Type = "skill"
+	if _, err := f.store.Preview(f.registration.CheckoutID, d); err != nil {
+		t.Fatal(err)
+	}
+	cases := map[string]string{
+		"skill":      `{"schema_version":4,` + caps + `,"dependencies":{"skills":{"dep":{"git":"https://example.invalid/skills/dep.git","ref":{"kind":"tag","value":"v1.0.0"}}}}}`,
+		"mcp":        `{"schema_version":5,` + caps + `,"dependencies":{"mcp_servers":{"sample":{"hint":"Separate server admission is required","transport":"http"}}}}`,
+		"repository": `{"schema_version":7,` + caps + `,"commands":{"tool":{"type":"build","driver":"go-repository-v1","repository":"tools","target":"sample-tool"}},"build_repositories":{"tools":{"git":"https://example.invalid/skills/tools.git","locked_commit":{"object_format":"sha1","hex":"0123456789abcdef0123456789abcdef01234567"}}}}`,
+	}
+	for name, body := range cases {
+		t.Run(name, func(t *testing.T) {
+			write(t, file, body)
+			if _, err := skillspec.Load(dir); err != nil {
+				t.Fatalf("owning manifest control: %v", err)
+			}
+			_, err := f.store.Preview(f.registration.CheckoutID, d)
+			if err == nil {
+				t.Fatal("unsupported closure was admitted")
+			}
+			required(t, err, "project_context_unsupported")
+		})
+	}
 }
