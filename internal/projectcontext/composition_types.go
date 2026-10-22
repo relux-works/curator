@@ -9,6 +9,7 @@ import (
 
 	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/projectadapter"
 )
 
 // CompositionRecord is the closed project-composition/1 wire record. The
@@ -101,11 +102,7 @@ type ComposeRequest struct {
 }
 
 // Surface and Composition are the resolver contract shared with I-LEASE.
-type Surface struct {
-	SHA256 string `json:"sha256"`
-	Size   int64  `json:"size"`
-	Mode   uint32 `json:"mode"`
-}
+type Surface = projectadapter.Surface
 
 // Composition is the protected projection consumed by the lease authority.
 type Composition struct {

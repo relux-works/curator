@@ -263,7 +263,7 @@ func compositionOf(plan compositionPlan) Composition {
 	c := Composition{Ref: p.Ref, SHA256: p.SHA256, CheckoutID: strings.TrimPrefix(p.Record.RegistrationRef, "registration:"), Profile: p.Record.Profile.Name, Environment: p.Record.Environment, HomeRef: p.Record.HomeRef, ConcurrentState: plan.ConcurrentState, BuildKeys: append([]string{}, plan.BuildKeys...), RuntimeEntries: append([]string{}, plan.RuntimeEntries...), Generated: map[string]Surface{}}
 	for _, f := range p.Receipt.Files {
 		mode, _ := strconv.ParseUint(f.Mode, 8, 32)
-		c.Generated[f.Path] = Surface{f.SHA256, f.Size, uint32(mode)}
+		c.Generated[f.Path] = Surface{SHA256: f.SHA256, Size: f.Size, Mode: uint32(mode)}
 	}
 	return c
 }

@@ -472,6 +472,10 @@ adds manager settings, explicit empty MCP, receipts and a version-bound launch
 contribution. Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectcontext -run TestClaude -count=1`
 and the documented `CURATOR_PROJECT_CLAUDE_MUTANTS=1` lane; store logs in `.temp/`.
 The typed certification report keeps unsupported strict tuples refused.
+The explicit `native-project` preparation uses dedicated profile-only document
+inputs and reports "project sources not isolated". Launch also refuses while
+manager permissions and memory-off remain unqualified; the adapter guide links
+the exact evidence gaps and proposed qualification probes.
 
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.

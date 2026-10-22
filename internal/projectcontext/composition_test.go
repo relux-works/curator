@@ -337,7 +337,7 @@ func TestCompositionAuthority(t *testing.T) {
 		t.Fatal(err)
 	}
 	required(t, authorizeComposition(t, a, c, "principal:other"), "project_item_unapproved")
-	c.Generated["AGENTS.md"] = Surface{strings.Repeat("0", 64), 1, 0600}
+	c.Generated["AGENTS.md"] = Surface{SHA256: strings.Repeat("0", 64), Size: 1, Mode: 0600}
 	required(t, authorizeComposition(t, a, c, owner), "project_context_drift")
 	other := a
 	other.CWD = t.TempDir()
