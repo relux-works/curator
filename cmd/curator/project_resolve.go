@@ -70,6 +70,7 @@ func (c cli) cmdProjectResolve(cfg *config.Config, target projectTarget, verb st
 	}
 	projectManifest, err := manifest.ParseBytes(payload, manifest.PathIn(target.Root))
 	if err != nil {
+		c.printMCPFailure(target.Alias, payload, nil, err)
 		_, _ = fmt.Fprintln(c.stderr, "curator:", withDraftRemediation(err.Error()))
 		return exitFail
 	}
@@ -81,6 +82,9 @@ func (c cli) cmdProjectResolve(cfg *config.Config, target projectTarget, verb st
 	}
 	plan, lockPath, bindingsPath, err := c.resolveDraftPlan(cfg, target, projectManifest, payload)
 	if err != nil {
+		if projectManifest.SchemaVersion == 3 {
+			c.printMCPFailure(target.Alias, payload, projectManifest.MCPServers, err)
+		}
 		_, _ = fmt.Fprintln(c.stderr, "curator:", withDraftRemediation(err.Error()))
 		return exitFail
 	}
@@ -344,4 +348,14 @@ func endpointExhaustion(resolution config.Resolution, classes []buildrepo.Failur
 func fetchExhaustion(resolution config.Resolution, class buildrepo.FailureClass) string {
 	return fmt.Sprintf("identity %s: fetch of the existing checkout failed (%s: %s); %s",
 		resolution.Identity, class, class.Reason(), draftEndpointRemediation)
+}
+
+// printMCPFailure emits known refused pairs only; it never acquires package
+// bytes to expand a declaration that failed admission.
+func (c cli) printMCPFailure(project string, payload []byte, decls map[string]projectmcp.Declaration, cause error) {
+	if plan := projectmcpstate.FailurePlan(project, payload, decls, false, cause); plan != nil {
+		for _, line := range plan.Lines() {
+			_, _ = fmt.Fprintln(c.stdout, line)
+		}
+	}
 }

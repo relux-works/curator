@@ -197,7 +197,10 @@ func TestProjectMCPInlineRefusalBeforeWrites(t *testing.T) {
 	writeProjectMCP(t, filepath.Join(project, "Skillfile.json"), map[string]any{"schema_version": 3, "skills": []any{}, "mcp_servers": map[string]any{"tool": map[string]any{"server": map[string]any{"transport": "http", "url": "https://service.example/mcp", "environments": []string{"codex_cli", "muse"}}, "install": map[string]any{"approval": true, "scope": "user"}}}})
 	before := readProjectMCP(t, filepath.Join(project, ".gitignore"))
 	for _, args := range [][]string{{"project", "resolve", "app"}, {"install", "app", "--dry-run"}, {"install", "app", "--fix-gitignore"}} {
-		code, _, stderr := capture(t, cfg, args...)
+		code, stdout, stderr := capture(t, cfg, args...)
+		if strings.Count(stdout, "refused: mcp_inline_approval_unsupported") != 2 {
+			t.Fatalf("missing inline pairs: %v: %s", args, stdout)
+		}
 		if code != exitFail || !strings.Contains(stderr, "mcp_inline_approval_unsupported") {
 			t.Fatalf("%v %d %s", args, code, stderr)
 		}
@@ -223,5 +226,55 @@ func TestProjectMCPGlobalDispatch(t *testing.T) {
 		if code, _, stderr := capture(t, cfg, "global", command); code != exitFail || !strings.Contains(stderr, "global scope requires schema 1") {
 			t.Fatalf("schema 3 %s: %d %s", command, code, stderr)
 		}
+	}
+}
+
+// An invalid declaration cannot hide independently parsed inline pairs on
+// either side of its NAME. Resolve/preview write nothing; actual install only
+// creates existing operation-lock bookkeeping. Consumer state stays unchanged,
+// and malformed inputs and ignored option values never enter output.
+func TestProjectMCPMalformedSiblingReporting(t *testing.T) {
+	cfg, project := setupCLIProject(t, t.TempDir())
+	writeProjectMCP(t, filepath.Join(project, "Skillfile.json"), map[string]any{"schema_version": 3, "skills": []any{}, "mcp_servers": map[string]any{
+		"a-valid": map[string]any{"server": map[string]any{"transport": "http", "url": "https://safe.example/mcp", "environments": []string{"codex_cli"}}},
+		"bad":     map[string]any{"server": map[string]any{"transport": "http", "url": "https://safe.example/mcp", "private": "AKIA1234567890ABCDEF"}},
+		"z-valid": map[string]any{"server": map[string]any{"transport": "http", "url": "https://safe.example/mcp", "environments": []string{"pi", "muse"}}},
+	}})
+	writeFile(t, filepath.Join(project, ".mcp.json"), `{"foreign":true}`)
+	writeFile(t, envprofile.ProjectMCPLockPath(project), `{"prior":true}`)
+	before := snapshotHelpTree(t, filepath.Dir(cfg))
+	projectBefore := snapshotHelpTree(t, project)
+	for _, args := range [][]string{{"project", "resolve", "app"}, {"install", "app", "--dry-run"}, {"install", "app", "--fix-gitignore"}} {
+		code, stdout, stderr := capture(t, cfg, args...)
+		if code != exitFail || !strings.Contains(stderr, "mcp_declaration_invalid") || strings.Count(stdout, "refused: mcp_inline_approval_unsupported") != 3 {
+			t.Fatalf("sibling report %v: %d %s %s", args, code, stdout, stderr)
+		}
+		if args[0] == "project" || args[len(args)-1] == "--dry-run" {
+			if !reflect.DeepEqual(before, snapshotHelpTree(t, filepath.Dir(cfg))) {
+				t.Fatal("read-only refusal wrote manager state")
+			}
+		}
+		if strings.Contains(stdout+stderr, "AKIA1234567890ABCDEF") || strings.Contains(stdout, "mcp bad ->") {
+			t.Fatal("invalid declaration material escaped")
+		}
+	}
+	// Real operations retain the existing manager lock footprint. All other
+	// manager bytes and every project entry must retain the post-plant state.
+	after := snapshotHelpTree(t, filepath.Dir(cfg))
+	for name, value := range after {
+		if name == "." || name == "state" || name == "state/locks" || strings.HasPrefix(name, "state/locks/") {
+			continue
+		}
+		if before[name] != value {
+			t.Fatalf("changed manager consumer entry %s", name)
+		}
+	}
+	for name, value := range before {
+		if after[name] != value && name != "." && name != "state" {
+			t.Fatalf("changed prior manager entry %s", name)
+		}
+	}
+	if !reflect.DeepEqual(projectBefore, snapshotHelpTree(t, project)) {
+		t.Fatal("refused sibling input changed project state")
 	}
 }

@@ -36,7 +36,8 @@ func readProjectManifestDocument(root string) (*manifest.Manifest, string, []byt
 	}
 	parsed, err := manifest.ParseBytes(current.payload, path)
 	if err != nil {
-		return nil, "", nil, err
+		// Retain the same observed bytes for read-only refusal reporting.
+		return nil, "", current.payload, err
 	}
 	return parsed, current.generation, current.payload, nil
 }
