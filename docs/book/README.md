@@ -2,8 +2,8 @@
 
 The book is Russian first. Its prose follows the supplied book editorial
 conventions, including the five status labels; other repository documentation
-keeps its existing English conventions. The [outline](OUTLINE.ru.md) separates
-complete chapters from planned chapters. Technical behavior is bounded to the
+keeps its existing English conventions. The [outline](OUTLINE.ru.md) maps the complete chapters, worked CLI
+scenarios, glossary and nine original figures. Technical behavior is bounded to the
 October 2026 implementation and accepted design, as stated in the chapters.
 
 ## Tools
@@ -32,3 +32,11 @@ bounded controls verify selected gates fail for their intended witnesses.
 Pandoc filter tests skip if pandoc is absent, so Go success alone does not replace
 the real PDF build. The renderer stand-ins used by build-order tests establish
 call ordering and prior-output preservation, not real rendering.
+
+The CLI chapter contains all 72 static command paths from `commandRegistry`
+in `cmd/curator/command_help.go`, grouped into a generated tree. It excludes
+installable umbrella providers from that static inventory. Recheck that
+registry when updating the chapter; provider-specific flags belong to the
+installed provider help. Runtime exclusion observations are bounded to the
+versions and surfaces documented in `docs/qualification/`; they do not certify
+a complete strict project adapter.
