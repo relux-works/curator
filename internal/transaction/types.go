@@ -111,6 +111,9 @@ type Target struct {
 
 // Plan binds one project identity, ordered target set, and referenced builds.
 type Plan struct {
+	// ReadInputs pins non-mutating input bytes across both commit and restart.
+	// Callers must capture these under the mutation lock before planning.
+	ReadInputs          map[string]string
 	TransactionID       string
 	ProjectIdentity     string
 	Targets             []Target
@@ -135,6 +138,7 @@ type Plan struct {
 // Journal is the canonical durable recovery record. Paths are absolute so
 // home-only restart recovery never depends on the invoking project.
 type Journal struct {
+	ReadInputs          map[string]string        `json:"read_inputs,omitempty"`
 	Schema              string                   `json:"schema"`
 	TransactionID       string                   `json:"transaction_id"`
 	ProjectIdentity     string                   `json:"project_identity"`
