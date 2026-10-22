@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -14,6 +15,9 @@ import (
 // for its intended assertion. A setup/compile failure is not a caught mutant.
 // Opt in explicitly; the ordinary suite keeps only production behavior tests.
 func TestCompositionNarrowingMutants(t *testing.T) {
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+		t.Skip("manager-backed witnesses require supported CIP filesystem binding")
+	}
 	if os.Getenv("CURATOR_PROJECT_COMPOSITION_MUTANTS") != "1" {
 		t.Skip("explicit bounded mutation lane")
 	}
