@@ -13,12 +13,39 @@ Profile closure verification uses the existing profile store boundary and pin
 checks before and after capture; commit members are read from their pinned Git
 objects without fetching or repairing.
 
-Root context is the profile's monolithic document followed by each admitted
+In `strict` mode, root context is the profile's monolithic document followed by each admitted
 project context document in generation order. Empty documents are skipped, and
 exactly one additional LF separates non-empty documents. System modules retain
 their separate channel and joining rule. An environment without the necessary
 system channel refuses. Claude Code, Codex and Muse use their registered
 instruction paths; this renderer does not qualify a native adapter.
+
+Source mode is bound into the closed registration and composition records and
+therefore their identities. `Register` defaults to `strict`; the explicit
+protected operator operation `RegisterMode` may select `native-project` when
+allocating a new registration. Existing registrations cannot silently change
+mode through `ComposeRequest`; a mismatched or unknown mode refuses. Missing
+mode in retained state refuses rather than upgrading old authority. This lane
+adds no in-place mode switch or lease/busy-update bypass.
+
+In `native-project`, the managed root and system documents contain only the
+selected profile. Selected project context items refuse
+`project_context_unsupported`, even when optional; operators must explicitly
+choose a generation without them. Disabled optional items retain the existing
+`disabled` omission. Whole skills and the existing MCP delivery boundaries
+remain unchanged. The non-wire `ProfileDocuments` and
+`ProfileDocumentReceipt` outputs expose protected profile-only bytes and their
+file inventory separately from the complete composed files. Adapters must
+report **project sources not isolated** at status/launch; this renderer launches
+no provider and does not claim source isolation.
+
+Adapter contracts carry a sorted unique `modes` advertisement. Both modes need
+permissions and memory-off; strict additionally needs native-source-exclusion.
+These are synthetic admission contracts, not native certification. Strict file
+bytes and file-inventory entries retain their existing rules; the newly required
+record/adapter mode fields necessarily change enclosing record and receipt
+identities. Old records are not silently rebaselined. Frozen launch carriers
+remain unchanged; this package emits none.
 
 Skills use derived v2 content pins over their complete selected snapshots;
 the selected profile lock independently retains commit provenance. Identical
@@ -68,8 +95,8 @@ env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectcontext -count=1
 env -u GIT_DIR -u GIT_WORK_TREE CURATOR_PROJECT_COMPOSITION_MUTANTS=1 go test ./internal/projectcontext -run '^TestCompositionNarrowingMutants$' -count=1 -v
 ```
 
-The production record reader runs all 51 pinned composition grammar fixtures
-from curator-spec `8900129d`. Pinned JSON Schemas independently validate generated
+The production record reader runs all 57 pinned composition grammar fixtures
+from curator-spec `2510171ca9e7a4a9d2b69e7b2e7ec23b6d11bb8a`. Pinned JSON Schemas independently validate generated
 composition, generation, adapter and control-receipt records; a bounded invalid
 memory-policy plant verifies that the schema checker rejects its intended rule.
 Root joining tests independently exercise the

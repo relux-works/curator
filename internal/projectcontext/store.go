@@ -193,7 +193,7 @@ func (op *operation) validate() error {
 			return fail("project_context_drift", "invalid retained precedence")
 		}
 		v := r.Record
-		if id != v.CheckoutID || !idRE.MatchString(id) || v.Kind != "project-registration/1" || !identifiers.Valid(r.Name) || !environment(v.Environment) || !validRoot(v.ProjectRoot) || !validRoot(r.Binding.Repository.Root) || v.RootIdentity != identity(r.Binding) || !identifiers.Valid(v.Profile.Name) || !hexRE.MatchString(v.Profile.LockSHA256) || v.HomeRef != "home:"+id || v.WorktreeRef != "worktree:"+id {
+		if id != v.CheckoutID || !idRE.MatchString(id) || v.Kind != "project-registration/1" || !identifiers.Valid(r.Name) || !environment(v.Environment) || !validSourceMode(v.Mode) || !validRoot(v.ProjectRoot) || !validRoot(r.Binding.Repository.Root) || v.RootIdentity != identity(r.Binding) || !identifiers.Valid(v.Profile.Name) || !hexRE.MatchString(v.Profile.LockSHA256) || v.HomeRef != "home:"+id || v.WorktreeRef != "worktree:"+id {
 			return fail("project_context_drift", "invalid protected registration")
 		}
 	}
