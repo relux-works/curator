@@ -58,6 +58,29 @@ local function take_marker(inlines, i)
   return nil
 end
 
+-- Give every opening marker its own Str boundary. Otherwise take_marker's
+-- trailing text can hide a second marker, including one spanning later words.
+local function split_marker_starts(inlines)
+  local out = pandoc.List()
+  for _, el in ipairs(inlines) do
+    if el.t == "Str" then
+      local start = 1
+      local marker = el.text:find(open_mark, start, true)
+      while marker do
+        if marker > start then
+          out:insert(pandoc.Str(el.text:sub(start, marker - 1)))
+        end
+        start = marker
+        marker = el.text:find(open_mark, marker + #open_mark, true)
+      end
+      out:insert(pandoc.Str(el.text:sub(start)))
+    else
+      out:insert(el)
+    end
+  end
+  return out
+end
+
 -- 4. Russian typesetting: a short preposition, conjunction or particle is
 --    bound to the next word, and an em dash to the word before it, so that
 --    neither is left hanging at the end or start of a line.
@@ -90,6 +113,7 @@ local function bind_spaces(inlines)
 end
 
 function Inlines(inlines)
+  inlines = split_marker_starts(inlines)
   local out = pandoc.List()
   local i = 1
   while i <= #inlines do
