@@ -4,7 +4,7 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
-## v0.15.0-rc.8 — 2026-10-21
+## v0.15.0-rc.8 — 2026-10-22
 
 ### Added
 
@@ -55,6 +55,10 @@ All notable implementation changes are recorded here.
   including floating-point numbers, and only adds or updates the
   launch-directory entry (previously a `CCJ-1 does not support float64`
   failure).
+- Managed-home repair validates Claude Code's state before writing: an invalid
+  or truncated `.claude.json` refuses with every managed file left byte-exact,
+  and a fresh seed that changed during recovery is compared again and refused
+  instead of overwritten.
 - Skill install never deletes or replaces store entries Curator does not own;
   ownership requires a valid matching `.csk-install.json`.
 - Exact-pin Git acquisition fetches a missing pinned object before signature
