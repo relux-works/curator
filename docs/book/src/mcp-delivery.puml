@@ -1,0 +1,27 @@
+@startuml
+!theme plain
+skinparam defaultFontName PT Sans
+skinparam dpi 160
+skinparam shadowing false
+title MCP delivery — принятый project design
+start
+:Project Skillfile schema 3;
+if (Форма декларации?) then (package)
+  :Stage A: Git package\nallowlists + audit + exact lock\nagent-mcp.json: name match;
+else (inline / URL)
+  :Только Stage B\nstrict parse + normalized digest\nprotected project/NAME approval;
+  note right
+    В Stage A inline/URL
+    отказывают до writer:
+    mcp_inline_approval_unsupported.
+  end note
+endif
+:Общий preflight до publication\npolicy / ownership / native preimages;
+:Per-environment writer\nconfig + fragment channel;
+:Qualified launch\napproved effective set\n+ native project source exclusion;
+stop
+legend bottom
+  ⟦решено⟧. Stage B требует отдельной approval capability.
+  Config installation не запускает server и не проверяет authentication.
+endlegend
+@enduml

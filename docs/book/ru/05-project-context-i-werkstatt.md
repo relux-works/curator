@@ -224,7 +224,7 @@ release требует совместной готовности Claude Code, Co
 молча запустить native harness с другим окружением. После квалификации
 exact capability с detached form выбор и retirement delegated выполняются
 по runtime, а не на основании успеха другого harness. Детальные carriers
-и CLI будут разобраны в главе «Environments и запуск». ⟦решено⟧
+и CLI будут разобраны в главе «Запуски и жизнь сессии». ⟦решено⟧
 
 ## Что ещё не определено
 

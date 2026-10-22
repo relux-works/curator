@@ -1,0 +1,18 @@
+@startsalt
+skinparam defaultFontName PT Sans
+skinparam dpi 160
+{+
+  <b>Сравнение маршрутов: composition и источник содержимого</b>
+  {#
+  Роль | Native | Delegated hosted | Exact-plan hosted
+  Composer | Launcher | Caller-side manager | Caller до handoff
+  Construction | Общий site | Тот же site | Тот же site
+  Home | Managed home | Live managed home | Private snapshot
+  Binding | Fragment | Pin + fragment digest | Sealed plan + receipts
+  Host | Нет | Lifetime + native state | Lifetime + snapshot refs
+  Предел | Native lifecycle | Нет immutable input | Нужна qualification
+  }
+  Hosted направления — ⟦решено⟧, не activation certificate.
+  Hosted refusal не разрешает native fallback.
+}
+@endsalt

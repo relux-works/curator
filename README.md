@@ -87,8 +87,9 @@ Canonical skill stores preserve unmanaged content. Install refuses named stale s
 ## Book
 
 The standalone Russian [Curator book](docs/book/ru/00-dlya-kogo.md) explains
-context layers, profiles, managed homes and the accepted project-context design.
-The [outline](docs/book/OUTLINE.ru.md) includes later chapters.
+context layers, profiles, managed homes, environments, launch routes, MCP and
+the accepted project-context design. The [outline](docs/book/OUTLINE.ru.md) maps
+the chapters, CLI scenarios and glossary.
 
 Build with `docs/book/build.sh` (pandoc 3.x, WeasyPrint 69+, PT fonts).
 The output is `docs/book/curator-book.ru.pdf`, which is ignored by Git.
