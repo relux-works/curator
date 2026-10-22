@@ -1,0 +1,36 @@
+@startuml
+!theme plain
+skinparam defaultFontName PT Sans
+skinparam dpi 160
+skinparam shadowing false
+title Маршрут запуска — принятый дизайн
+start
+:curator run\nprofile / fragment / policy resolution;
+if (Qualified exact capability\nдля runtime и формы?) then (нет)
+  :Delegated request\nprofile pin + fragment digest;
+  :Caller-side manager component\nобщий launch construction site;
+  :Live managed home;
+  note right
+    Базовый delegated маршрут:
+    нет session snapshot.
+    Immutable session content
+    не подтверждено.
+  end note
+else (да)
+  :Prepare session resources;
+  :Approved context → verified snapshot;
+  :Общий launch construction site\nполный immutable process plan;
+  :Host проверяет exact plan\nбез recomposition;
+  note right
+    Квалификация на runtime/build/platform:
+    attached + detached,
+    resume и notifications.
+  end note
+endif
+:Host владеет жизненным циклом процесса;
+stop
+legend bottom
+  ⟦решено⟧. Project-aware delivery сохраняет approval и lease gates.
+  Refusal не разрешает fallback к native launch.
+endlegend
+@enduml

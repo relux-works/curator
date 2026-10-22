@@ -1,0 +1,28 @@
+@startuml
+!theme plain
+skinparam defaultFontName PT Sans
+skinparam dpi 160
+skinparam shadowing false
+title Werkstatt: checkout × profile × environment
+top to bottom direction
+folder "Source checkout\nкод как work data\ncontrol files как candidates" as repo
+artifact "Выбранный profile lock" as profile
+database "Protected manager records\nregistration / approvals\ngeneration / composition / lease" as records
+package "Werkstatt — постоянное рабочее место" {
+  folder "Managed home\napproved overlay\n+ profile root\n+ native mutable state" as home
+  folder "Sparse Werkstatt worktree\nвне source tree\nи authority/store roots" as worktree
+  rectangle "Harness session" as harness
+}
+repo --> records : inspect / approve
+profile --> records : bind
+records --> home : materialize
+repo --> worktree : explicit preparation
+home --> harness : control inputs
+worktree --> harness : work data
+records ..> harness : lease binding
+note bottom of records
+  ⟦решено⟧
+  Busy home: wait либо refusal.
+  Sparse worktree не является sandbox.
+end note
+@enduml
