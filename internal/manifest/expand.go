@@ -43,7 +43,7 @@ type Selection struct {
 // and UTF-8 folder byte order within collections. No partial result is returned
 // on failure. The returned units retain dependencies in their individual Spec.
 func Expand(m *Manifest, opts ExpansionOptions) ([]Selection, error) {
-	if m == nil || m.SchemaVersion != 2 {
+	if m == nil || (m.SchemaVersion != 2 && m.SchemaVersion != 3) {
 		return nil, fmt.Errorf("source_selection_invalid: expansion requires draft Skillfile schema 2")
 	}
 	project, err := filepath.Abs(filepath.Dir(m.Path))

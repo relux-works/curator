@@ -42,6 +42,7 @@ import (
 // and never reach this cache.
 type gitManager struct {
 	home           string
+	readOnlyAudit  bool
 	fetchRaw       map[string]string
 	allowedSources []string
 	// Non-nil only during new-profile installation. Each missing exact pin

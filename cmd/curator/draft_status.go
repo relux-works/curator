@@ -1,7 +1,7 @@
 package main
 
 // Draft source currentness (skillfile-sources §4): `curator status` for a
-// schema-2 project on the draft lane.
+// schema-2/3 project on the draft lane.
 //
 // The legacy drift surface resolves live checkouts and compares legacy
 // identity fields, neither of which exists here: status consumes the
@@ -31,10 +31,10 @@ import (
 )
 
 // errDraftManifestMoved fails a draft status check closed when the
-// manifest no longer parses as the schema-2 document the caller peeked.
+// manifest no longer parses as the schema-2/3 document the caller peeked.
 var errDraftManifestMoved = errors.New("the Skillfile changed while status was classifying it; re-run status")
 
-// draftStatusApplies reports whether one project takes the schema-2 status
+// draftStatusApplies reports whether one project takes the schema-2/3 status
 // lane. Schema 1 and missing manifests keep the legacy surface.
 func draftStatusApplies(manifestRoot string) bool {
 	payload, err := os.ReadFile(manifest.PathIn(manifestRoot)) // #nosec G304 -- operator-selected project Skillfile
@@ -47,7 +47,7 @@ func draftStatusApplies(manifestRoot string) bool {
 	if json.Unmarshal(payload, &peek) != nil {
 		return false
 	}
-	return peek.SchemaVersion == 2
+	return peek.SchemaVersion == 2 || peek.SchemaVersion == 3
 }
 
 // draftStatusDrift compares every locked member against its installed
@@ -66,9 +66,9 @@ func draftStatusDrift(manifestRoot, skillsDir string, effective map[string]*mark
 	if err != nil {
 		return nil, err
 	}
-	if projectManifest.SchemaVersion != 2 {
+	if projectManifest.SchemaVersion < 2 {
 		// The manifest moved under the status check (the caller only
-		// diverts schema-2 projects here): no verdict, fail closed.
+		// diverts schema-2/3 projects here): no verdict, fail closed.
 		return nil, errDraftManifestMoved
 	}
 	lock, err := sourcelock.Read(sourcelock.PathIn(manifestRoot))

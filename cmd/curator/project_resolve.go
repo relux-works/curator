@@ -29,10 +29,14 @@ import (
 	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/projectmcp"
+	"github.com/relux-works/curator/internal/projectmcpstate"
+	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/sourcelock"
 )
 
@@ -69,7 +73,7 @@ func (c cli) cmdProjectResolve(cfg *config.Config, target projectTarget, verb st
 		_, _ = fmt.Fprintln(c.stderr, "curator:", withDraftRemediation(err.Error()))
 		return exitFail
 	}
-	if projectManifest.SchemaVersion != 2 {
+	if projectManifest.SchemaVersion < 2 {
 		// Frozen v1: read-only path report, exactly as before.
 		_, _ = fmt.Fprintf(c.stdout, "alias: %s\npath: %s\nskillfile: %s\n", target.Alias, target.Root, filepath.Join(target.Root, manifest.Name))
 		_, _ = fmt.Fprintf(c.stdout, "skills: %s\nbin: %s\n", filepath.Join(target.Root, ".agents", "skills"), filepath.Join(target.Root, ".agents", "bin"))
@@ -93,6 +97,11 @@ func (c cli) resolveDraftPlan(cfg *config.Config, target projectTarget, projectM
 	policy, err := config.LoadSourcePolicy("")
 	if err != nil {
 		return nil, "", "", err
+	}
+	if projectManifest.SchemaVersion == 3 {
+		if err := envprofile.PreflightProjectMCP(projectManifest.MCPServers, envprofile.PolicyFromConfig(cfg)); err != nil {
+			return nil, "", "", err
+		}
 	}
 	roots, err := acquireDraftGitRoots(home, target.Root, projectManifest, policy, cfg.AllowedSources, c.stderr)
 	if err != nil {
@@ -132,6 +141,42 @@ func (c cli) resolveDraftPlan(cfg *config.Config, target projectTarget, projectM
 	}
 	lockPath := sourcelock.PathIn(target.Root)
 	bindingsPath := install.DraftBindingsPath(home, target.Root)
+	if projectManifest.SchemaVersion == 3 {
+		entries, warnings, err := envprofile.ResolveProjectMCP(home, projectManifest.MCPServers, envprofile.PolicyFromConfig(cfg))
+		if err != nil {
+			return nil, "", "", err
+		}
+		plan, err := closure.ResolveDraft(resolveCfg)
+		if err != nil {
+			return nil, "", "", err
+		}
+		lock := &projectmcpstate.Lock{SchemaVersion: 1, Capability: projectmcp.Capability, ProjectID: target.Alias, ManifestSHA256: plan.ManifestSHA, SkillsLock: plan.Lock.Object(), Entries: entries}
+		if err := lock.Seal(); err != nil {
+			return nil, "", "", err
+		}
+		mcpPlan, err := projectmcpstate.NewPlan(target.Alias, plan.ManifestSHA, projectManifest.MCPServers, entries, &lock.LockSHA256, false, nil)
+		if err != nil {
+			return nil, "", "", err
+		}
+		sourceBytes, err := protocoljson.MarshalCanonical(plan.Lock.Object())
+		if err != nil {
+			return nil, "", "", err
+		}
+		bindingBytes, err := plan.Bindings.Canonical()
+		if err != nil {
+			return nil, "", "", err
+		}
+		if err := envprofile.PublishProjectMCPLock(home, target.Root, lock, map[string][]byte{lockPath: sourceBytes, bindingsPath: bindingBytes}); err != nil {
+			return nil, "", "", err
+		}
+		for _, warning := range warnings {
+			_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
+		}
+		for _, line := range mcpPlan.Lines() {
+			_, _ = fmt.Fprintln(c.stdout, line)
+		}
+		return plan, lockPath, bindingsPath, nil
+	}
 	plan, err := closure.RefreshDraft(resolveCfg, lockPath, bindingsPath)
 	if err != nil {
 		return nil, "", "", err

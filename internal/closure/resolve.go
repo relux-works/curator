@@ -94,7 +94,7 @@ type draftAcquired struct {
 // The returned lock is sorted by UTF-8 skill name with root selection
 // indexes preserved.
 func ResolveDraft(cfg DraftResolveConfig) (*DraftPlan, error) {
-	if cfg.Manifest == nil || cfg.Manifest.SchemaVersion != 2 {
+	if cfg.Manifest == nil || (cfg.Manifest.SchemaVersion != 2 && cfg.Manifest.SchemaVersion != 3) {
 		return nil, fmt.Errorf("source_selection_invalid: draft resolution requires Skillfile schema 2")
 	}
 	if cfg.ProjectRoot == "" || cfg.Home == "" {
