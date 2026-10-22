@@ -15,6 +15,7 @@ import (
 
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -148,12 +149,22 @@ func (m *Manager) acquireUnderLock(ctx context.Context, r Request, l *ledger, lo
 			return fmt.Errorf("%s: %s owns the home; wait or end the owning session", Busy, e.Binding.SessionRef)
 		}
 	}
+	if err = lock.Held().Validate(m.home); err != nil {
+		return err
+	}
+	// Authority and session callbacks may have observed artifacts earlier.
+	// Recheck presence while the exact-home lock excludes the collector, before
+	// a durable lease can claim roots that no longer exist.
+	if err = m.verifyArtifacts(c); err != nil {
+		return err
+	}
 	l.Leases[b.LeaseID] = entry{Binding: b, Composition: c, State: Prepared}
 	raw, err := canonical(b)
 	if err != nil {
 		return err
 	}
-	if _, err = os.Lstat(bindingPath(m.home, b.LeaseID)); !os.IsNotExist(err) {
+	allocation, err := stateread.Lstat(bindingPath(m.home, b.LeaseID))
+	if err != nil || allocation.Kind != stateread.KindAbsent {
 		return fmt.Errorf("immutable lease allocation already exists or is unreadable")
 	}
 	if err = m.publish(l, lock, engine, map[string][]byte{bindingPath(m.home, b.LeaseID): raw}, nil); err != nil {
@@ -236,6 +247,35 @@ func (m *Manager) verifyView(c Composition, v view) error {
 	return nil
 }
 
+// Idle repair trusts ownership from the protected receipt, not drifted bytes.
+// It still refuses unsafe routes and replacement directories; native state
+// cannot be adopted by repairing a previously inventoried file name.
+func (m *Manager) verifyRepairView(v view) error {
+	if !reflect.DeepEqual(v.Surfaces, v.Composition.Generated) {
+		return fmt.Errorf("project generated inventory differs from protected receipt")
+	}
+	if err := m.verifyHome(v.Composition); err != nil {
+		return err
+	}
+	for path := range v.Surfaces {
+		full := filepath.Join(m.home, homeRelative(v.Composition), filepath.FromSlash(path))
+		if err := checkedRoute(m.home, full); err != nil {
+			return err
+		}
+		observed, err := stateread.Lstat(full)
+		if err != nil {
+			return err
+		}
+		if observed.Kind == stateread.KindAbsent {
+			continue
+		}
+		if !observed.Info.Mode().IsRegular() {
+			return fmt.Errorf("project generated surface is not a regular file: %s", path)
+		}
+	}
+	return nil
+}
+
 // PublishPrepared transactionally replaces only inventoried generated files.
 // Native login/state files are neither copied nor replaced. The protected
 // composition receipt, supplied by Authority, must match the complete output.
@@ -303,7 +343,12 @@ func (m *Manager) publishView(ctx context.Context, id, ref, sha, owner string, f
 			writes := map[string][]byte{}
 			removals := []string{}
 			if exists {
-				if err = m.verifyView(old.Composition, old); err != nil {
+				if id == "" {
+					err = m.verifyRepairView(old)
+				} else {
+					err = m.verifyView(old.Composition, old)
+				}
+				if err != nil {
 					return err
 				}
 				for path := range old.Surfaces {
@@ -319,7 +364,11 @@ func (m *Manager) publishView(ctx context.Context, id, ref, sha, owner string, f
 				target := filepath.Join(m.home, key, filepath.FromSlash(path))
 				_, recorded := old.Surfaces[path]
 				if !recorded {
-					if _, err = os.Lstat(target); !os.IsNotExist(err) {
+					observed, inspectErr := stateread.Lstat(target)
+					if inspectErr != nil {
+						return inspectErr
+					}
+					if observed.Kind != stateread.KindAbsent {
 						return fmt.Errorf("unmanaged native state blocks generated surface: %s", path)
 					}
 				}
@@ -543,6 +592,13 @@ func ReferencesUnderLock(home string, lock transaction.HomeLock) (Roots, error) 
 	if err := lock.AssertHeld(); err != nil {
 		return Roots{}, err
 	}
+	witness, ok := lock.(interface{ Held() managerlock.Held })
+	if !ok {
+		return Roots{}, fmt.Errorf("project reference read requires an acquisition witness: %w", managerlock.ErrNotHeld)
+	}
+	if err := witness.Held().Validate(home); err != nil {
+		return Roots{}, err
+	}
 	if !HasState(home) {
 		return Roots{}, nil
 	}
@@ -594,8 +650,8 @@ func ReferencesUnderLock(home string, lock transaction.HomeLock) (Roots, error) 
 // is treated as present; project-aware callers must use locked collection.
 func HasState(home string) bool {
 	for _, p := range []string{filepath.Dir(statePath(home)), filepath.Join(home, "environments", "project-views")} {
-		_, err := os.Lstat(p)
-		if !errors.Is(err, os.ErrNotExist) {
+		observed, err := stateread.Lstat(p)
+		if err != nil || observed.Kind != stateread.KindAbsent {
 			return true
 		}
 	}

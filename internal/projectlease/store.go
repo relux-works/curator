@@ -16,6 +16,7 @@ import (
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -74,13 +75,14 @@ func checkedRoute(root, path string) error {
 			continue
 		}
 		current = filepath.Join(current, part)
-		info, e := os.Lstat(current)
-		if os.IsNotExist(e) {
-			return nil
-		}
+		observed, e := stateread.Lstat(current)
 		if e != nil {
 			return e
 		}
+		if observed.Kind == stateread.KindAbsent {
+			return nil
+		}
+		info := observed.Info
 		if info.IsDir() {
 			if e = pathboundary.ValidateRoot(current); e != nil {
 				return e
