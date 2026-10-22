@@ -26,6 +26,7 @@ func TestAdmissionNarrowingMutants(t *testing.T) {
 		{"cross-checkout-hash", "admission.go", "TestSameHashOtherCheckoutRefuses", "a, ok := op.state.Approvals[id+\":\"+c.Item.ID]", "a, ok := op.state.Approvals[id+\":\"+c.Item.ID]\n if !ok { for _, other := range op.state.Approvals { if other.Record.ItemSHA256 == c.ItemSHA256 { a,ok=other,true; break } } }", "want project_item_unapproved"},
 		{"root-path-only", "registration.go", "TestRegistrationBindingAndNestedCWD", "identity(b) != r.Record.RootIdentity", "b.Repository.Root != r.Record.ProjectRoot", "want project_registration_mismatch"},
 		{"unknown-fields", "types.go", "TestClosedDeclarationReader", "d.DisallowUnknownFields()", "// unknown members incorrectly accepted", "invalid request accepted"},
+		{"stored-git-exclusion", "store.go", "TestProtectedSnapshotRejectsGitMetadata", "captureTree(r, \"files\", false)", "captureTree(r, \"files\", true)", "want project_context_drift"},
 		{"hardlink-read", "files.go", "TestHardlinkCandidateRefuses", " || !singleLink(before)", "", "want project_context_invalid"},
 	}
 	for _, tc := range cases {
