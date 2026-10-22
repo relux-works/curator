@@ -176,6 +176,17 @@ and XDG seed links retain their native targets; the manager does not copy login
 bytes. On Windows the existing private-file backend uses protected owner-only
 DACLs; POSIX permission-bit preservation is a Unix guarantee.
 
+Claude `.claude.json` trust repair compares the tool-owned input again before
+publication. On macOS and Linux, it prepares native paths before that read and
+publishes with `renameat` (`renameat2` with zero flags on Linux architectures
+without `renameat`). On Windows, it prepares the source handle, rename buffer
+and procedure address before the read and publishes with
+`SetFileInformationByHandle`. There is no destination stat or handle setup
+between the matching comparison and the native rename. Other platforms retain
+the existing rename helper and its residual preparation window. External writers
+do not share the manager lock: scheduling between the final read and rename can
+still race, so this is not an atomic compare-and-swap guarantee.
+
 ## Logging in to managed homes
 
 See [Agent logins](agent-logins.md) for versioned Claude Code, Codex CLI and
