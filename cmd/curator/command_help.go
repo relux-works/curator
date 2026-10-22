@@ -29,8 +29,16 @@ var commandRegistry = []commandSpec{
 	{"upgrade", "[path] [--all] [--dry-run] [--fix-gitignore] [--strict-tags] [--verbose] [--audit[=advisory|strict]] [--build-ssh-identity <path>] [--build-ssh-agent <socket>] [--build-ssh-known-hosts <path>]", "Fetch the selected dependency closure, then install it.", draftWorkflowSection, func(c cli, args []string) int { return c.cmdInstallMode(args, true) }},
 	{"status", "[path] [--all] [--check] [--json] [--attest]", "Report manifest, installed, and compiled state.", draftWorkflowSection, cli.cmdStatus},
 	{"list", "", "List configured projects and declared skills.", "", func(c cli, _ []string) int { return c.cmdList() }},
-	{"project", "<add|resolve|refresh> [arguments]", "Register projects or resolve their dependency closures.", "", cli.cmdProject},
+	{"project", "<add|resolve|refresh|register|rebind|inspect|package|preview|approve|revoke> [arguments]", "Register projects or resolve their dependency closures.", "", cli.cmdProject},
 	{"project add", "<alias> <path> [--agents <ids>]", "Register a project and initialize its declarative files.", "", nil},
+	{"project register", "<path> [--name <name>] --profile <profile> --environment <environment>", "Bind a checkout to a new opaque manager identity without modifying its repository.", "Admission only; launch integration is not advertised.\n", nil},
+	{"project rebind", "<checkout-id> <path>", "Retire a checkout binding and allocate a fresh identity without carrying approvals.", "", nil},
+	{"project inspect", "<checkout-id>", "Report bounded inert project candidates; import no permissions or memory.", "", nil},
+	{"project package", "<checkout-id> <item-id> --source <relative-instruction-file> [--optional]", "Explicitly package one inventoried AGENTS.md or CLAUDE.md for review.", "Preserves exact LF Markdown bytes; does not approve or launch.\n", nil},
+	{"project preview", "<checkout-id> [--declaration <file>]", "Show the exact itemized review package, snapshots, selected bytes and digest.", "Without --declaration, shows the protected retained package. Never executes, fetches, installs or connects.\n", nil},
+	{"project approve", "<checkout-id> <item-id> --digest <item-digest> --package-digest <review-digest>", "Record approval of one exact protected item within manager policy.", "Repository approval files and hashes alone have no authority.\n", nil},
+	{"project revoke", "<checkout-id> <item-id>", "Revoke the protected item approval.", "", nil},
+
 	{"project resolve", "[path]", "Resolve transitive dependencies for a project closure.", projectResolveUsage, nil},
 	{"project refresh", "[path]", "Refresh the frozen project source lock.", projectResolveUsage, nil},
 	{"skill", "check <dir> [--locale <locale>] [--json]", "Validate a skill package.", "", func(c cli, args []string) int {
