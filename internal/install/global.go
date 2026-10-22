@@ -12,8 +12,10 @@ import (
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/devsub"
 	"github.com/relux-works/curator/internal/envfiles"
+	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/globalbins"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/hashing"
@@ -549,9 +551,23 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
 	targets.plan.Merge(envPlan)
 
 	sort.Strings(contextNames)
-	mirror, err := adapters.StageGlobal(
+	identities := map[string]*contextlock.Member{}
+	for _, node := range request.nodes {
+		directory := normalizedNodeDirectory(node)
+		if directory == "." {
+			directory = ""
+		}
+		identities[node.Name] = &contextlock.Member{
+			Kind: contextlock.KindSkill, Name: node.Name, Source: node.Identity,
+			Commit: node.Resolved.Commit, Directory: directory,
+		}
+	}
+	mirror, err := adapters.StageGlobalWithOwnership(
 		stageRoot, request.home, request.userHome, request.agents, contextNames, request.cfg.AdapterMode,
-		contextSources(targets.plan, request.skillsDir, contextNames), admitted)
+		contextSources(targets.plan, request.skillsDir, contextNames), admitted,
+		func(adapterRoot, name string) (bool, error) {
+			return envprofile.OwnsNativeSkill(request.home, adapterRoot, name, identities[name])
+		})
 	if err != nil {
 		return scopeTargets{}, err
 	}

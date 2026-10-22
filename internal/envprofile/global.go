@@ -2,6 +2,7 @@ package envprofile
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/manifest"
 )
 
 // DirectSkill is one machine-level direct skill declaration accepted by the
@@ -181,11 +183,39 @@ func globalSkillInput(home, profile string, source Source, oldLock *contextlock.
 	}
 	input.Overlays = overlays
 	input.MCPAllowlist = policy.MCPAllowlist
+	// Exact Skillfile declarations constrain the selected profile alongside its
+	// requirements (§9.4). Resolve disagreements before any surface is written;
+	// a late adapter conflict would already have rematerialized the old profile.
+	declared := map[string]bool{}
+	global, err := manifest.Load(filepath.Join(home, "global"))
+	if err != nil {
+		return contextresolve.Input{}, fmt.Errorf("%s: global Skillfile: %v", DiagSourceInvalid, err)
+	}
+	if global != nil {
+		for _, decl := range global.Skills {
+			if decl.Git == "" || (decl.Ref.Kind != "tag" && decl.Ref.Kind != "revision") || (addition != nil && decl.Name == addition.Name) {
+				continue
+			}
+			identity, err := canonicalGit(decl.Git)
+			if err != nil {
+				return contextresolve.Input{}, fmt.Errorf("%s: global skill %q: %v", DiagSourceInvalid, decl.Name, err)
+			}
+			manager.recordRaw(identity, decl.Git)
+			requirement := contextresolve.Requirement{Kind: contextlock.KindSkill, Name: decl.Name, Source: identity}
+			if decl.Ref.Kind == "tag" {
+				requirement.Tag = decl.Ref.Value
+			} else {
+				requirement.Revision = decl.Ref.Value
+			}
+			input.Direct = append(input.Direct, requirement)
+			declared[decl.Name] = true
+		}
+	}
 	for _, member := range oldLock.Members {
 		if member.Kind != contextlock.KindSkill {
 			continue
 		}
-		if addition != nil && member.Name == addition.Name {
+		if declared[member.Name] || (addition != nil && member.Name == addition.Name) {
 			continue
 		}
 		if member.Source == "" || member.Commit == "" {
