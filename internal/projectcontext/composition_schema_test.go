@@ -64,7 +64,7 @@ func compositionSchemas(t *testing.T) map[string]*jsonschema.Schema {
 		}
 	}
 	out := map[string]*jsonschema.Schema{}
-	for _, name := range []string{"composition", "generation", "adapter", "control-receipt"} {
+	for _, name := range []string{"composition", "generation", "adapter", "control-receipt", "registration"} {
 		schema, err := c.Compile("https://relux-works.github.io/curator-spec/schemas/project-context-leaf1-v1/" + name + ".schema.json")
 		if err != nil {
 			t.Fatal(err)

@@ -20,6 +20,7 @@ type CompositionRecord struct {
 	GenerationSHA256      string                `json:"generation_sha256"`
 	Profile               Profile               `json:"profile"`
 	Environment           string                `json:"environment"`
+	Mode                  string                `json:"mode"`
 	AdapterRef            string                `json:"adapter_ref"`
 	AdapterSHA256         string                `json:"adapter_sha256"`
 	PolicyRef             string                `json:"policy_ref"`
@@ -57,6 +58,7 @@ type AdapterContract struct {
 	ProviderVersion string   `json:"provider_version"`
 	Platform        string   `json:"platform"`
 	Surfaces        []string `json:"surfaces"`
+	Modes           []string `json:"modes"`
 }
 type MaterializationReceipt struct {
 	Version       int    `json:"version"`
@@ -75,6 +77,7 @@ type CompositionPolicy struct {
 }
 type ComposeRequest struct {
 	CheckoutID      string
+	Mode            string
 	Selections      []Selection
 	Adapter         AdapterContract
 	Policy          CompositionPolicy
@@ -105,10 +108,13 @@ type CompositionPreview struct {
 	PolicyRecord json.RawMessage
 	Receipt      MaterializationReceipt
 	Files        map[string][]byte `json:"-"`
-	Modules      []OrderedModule
-	Skills       []EffectiveSkill
-	Ref          string
-	SHA256       string
+	// Profile-only documents are recomputed from protected profile inputs.
+	ProfileDocuments       map[string][]byte `json:"-"`
+	ProfileDocumentReceipt []File            `json:"-"`
+	Modules                []OrderedModule
+	Skills                 []EffectiveSkill
+	Ref                    string
+	SHA256                 string
 }
 type OrderedModule struct {
 	ItemID  string
@@ -152,13 +158,13 @@ func ParseCompositionRecord(b []byte) (CompositionRecord, error) {
 	}
 	var raw map[string]json.RawMessage
 	_ = json.Unmarshal(b, &raw)
-	need := []string{"kind", "registration_ref", "registration_sha256", "generation_sha256", "profile", "environment", "adapter_ref", "adapter_sha256", "policy_ref", "policy_sha256", "memory", "home_ref", "worktree_ref", "materialization_sha256", "command_owners", "omitted"}
+	need := []string{"kind", "mode", "registration_ref", "registration_sha256", "generation_sha256", "profile", "environment", "adapter_ref", "adapter_sha256", "policy_ref", "policy_sha256", "memory", "home_ref", "worktree_ref", "materialization_sha256", "command_owners", "omitted"}
 	for _, k := range need {
 		if len(raw[k]) == 0 || bytes.Equal(raw[k], []byte("null")) {
 			return out, fail("project_context_invalid", "missing or null composition member")
 		}
 	}
-	valid := out.Kind == "project-composition/1" && out.Memory == "off" && environment(out.Environment) && identifiers.Valid(out.Profile.Name) && hexRE.MatchString(out.Profile.LockSHA256)
+	valid := out.Kind == "project-composition/1" && validSourceMode(out.Mode) && out.Memory == "off" && environment(out.Environment) && identifiers.Valid(out.Profile.Name) && hexRE.MatchString(out.Profile.LockSHA256)
 	for _, h := range []string{out.RegistrationSHA256, out.GenerationSHA256, out.AdapterSHA256, out.PolicySHA256, out.MaterializationSHA256} {
 		valid = valid && hexRE.MatchString(h)
 	}
@@ -194,9 +200,27 @@ func ParseCompositionRecord(b []byte) (CompositionRecord, error) {
 	}
 	return out, nil
 }
-func (a AdapterContract) validate(env string) error {
+func validSourceMode(mode string) bool { return mode == "strict" || mode == "native-project" }
+
+func (a AdapterContract) validate(env, mode string) error {
+	if !validSourceMode(mode) {
+		return fail("project_context_invalid", "unknown source mode")
+	}
 	if a.Kind != "project-adapter/1" || a.Environment != env || (a.Platform != "macos" && a.Platform != "linux") || invalidProviderVersion(a.ProviderVersion) || !sort.StringsAreSorted(a.Surfaces) {
 		return fail("project_context_invalid", "invalid adapter release contract")
+	}
+	advertised := false
+	if a.Modes == nil || !sort.StringsAreSorted(a.Modes) {
+		return fail("project_context_invalid", "invalid adapter modes")
+	}
+	for i, m := range a.Modes {
+		if !validSourceMode(m) || (i > 0 && m == a.Modes[i-1]) {
+			return fail("project_context_invalid", "invalid adapter modes")
+		}
+		advertised = advertised || m == mode
+	}
+	if !advertised {
+		return fail("project_context_unsupported", "adapter does not advertise requested mode")
 	}
 	seen := map[string]bool{}
 	for _, s := range a.Surfaces {
@@ -205,7 +229,11 @@ func (a AdapterContract) validate(env string) error {
 		}
 		seen[s] = true
 	}
-	for _, s := range []string{"context", "permissions", "memory-off", "native-source-exclusion"} {
+	required := []string{"context", "permissions", "memory-off"}
+	if mode == "strict" {
+		required = append(required, "native-source-exclusion")
+	}
+	for _, s := range required {
 		if !seen[s] {
 			return fail("project_context_unsupported", "adapter cannot reproduce required surface: "+s)
 		}
