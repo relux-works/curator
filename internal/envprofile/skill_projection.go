@@ -106,8 +106,12 @@ func publishSkillProjection(op *operation, home string, skill skillOf) (resultEr
 	if err := privatedir.ProtectTree(staging); err != nil {
 		return err
 	}
+	kind := transaction.KindBytes
+	if preimage != transaction.DigestAbsent {
+		kind = skillProjectionReplacementKind
+	}
 	plan := transaction.Plan{TransactionID: newTransactionID(), ProjectIdentity: "profile-skill-projection", Targets: []transaction.Target{{
-		Class: "skill-projection", Identifier: skill.hash, LivePath: skill.root,
+		Class: "skill-projection", Identifier: skill.hash, Kind: kind, LivePath: skill.root,
 		StagedSource: staging, PreimageDigest: preimage,
 	}}}
 	if _, err := op.engine.Prepare(op.lock, plan); err != nil {

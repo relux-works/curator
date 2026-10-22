@@ -57,7 +57,8 @@ type CommitState string
 const (
 	// StatePending records a target whose live preimage has not been moved.
 	StatePending CommitState = "pending"
-	// StateBackedUp records a durable backup before the desired swap.
+	// StateBackedUp records a durable backup before the desired swap. For
+	// KindExchange, BackupPath holds the desired partner until that swap.
 	StateBackedUp CommitState = "backed_up"
 	// StateCommitted records a durable desired consumer target.
 	StateCommitted CommitState = "committed"
@@ -81,11 +82,16 @@ const (
 	// its complete content is its destination string. Entries inside a directory
 	// tree are still refused, exactly as for KindBytes.
 	KindEntry TargetKind = "entry"
+	// KindExchange owns the same bytes as KindBytes, but replaces a present
+	// preimage with a present staged target using an atomic name exchange.
+	// It is supported on Darwin and Linux. The old object remains at the
+	// backup name until durable commit cleanup; rollback also exchanges names.
+	KindExchange TargetKind = "exchange"
 )
 
 func (kind TargetKind) valid() bool {
 	switch kind {
-	case KindBytes, KindEntry:
+	case KindBytes, KindEntry, KindExchange:
 		return true
 	default:
 		return false
@@ -97,7 +103,8 @@ func (kind TargetKind) valid() bool {
 // absence. Exactly one preimage expectation is required: PreimageDigest, or
 // ExpectedGeneration read from GenerationPath (relative to LivePath, or the
 // live file itself when empty). A KindEntry target must use PreimageDigest,
-// because a link carries no generation file.
+// because a link carries no generation file. A KindExchange target requires
+// a present PreimageDigest and present StagedSource, with no generation fields.
 type Target struct {
 	Class              string
 	Identifier         string
@@ -209,11 +216,13 @@ const (
 	PointDuringStagingCopy Point = "during_staging_copy"
 	// PointPrepared follows durable preparation.
 	PointPrepared Point = "prepared"
-	// PointBeforeBackup precedes the live-to-backup rename.
+	// PointBeforeBackup precedes the live-to-backup rename, or the desired
+	// staging-to-backup rename for KindExchange (whose live name stays put).
 	PointBeforeBackup Point = "before_backup"
 	// PointAfterBackup follows the durable rename but precedes its state write.
 	PointAfterBackup Point = "after_backup"
-	// PointBeforeInstall follows durable backed-up state.
+	// PointBeforeInstall follows durable backed-up state. KindExchange retains
+	// the old tree at the live name until the atomic install exchange.
 	PointBeforeInstall Point = "before_install"
 	// PointAfterInstall follows the durable desired rename but precedes its state write.
 	PointAfterInstall Point = "after_install"
