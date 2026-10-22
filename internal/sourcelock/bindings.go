@@ -218,6 +218,15 @@ func ReadBindings(path string) (*Bindings, error) {
 	return bindings, nil
 }
 
+// Canonical returns the unchanged source-binding carrier for publication in a
+// larger manager transaction. It uses exactly the WriteBindings encoding.
+func (b *Bindings) Canonical() ([]byte, error) {
+	if err := b.Validate(); err != nil {
+		return nil, err
+	}
+	return protocoljson.MarshalCanonical(b.object())
+}
+
 // WriteBindings validates the bindings and stores their canonical bytes at
 // path atomically with owner-only permissions.
 func WriteBindings(path string, bindings *Bindings) error {

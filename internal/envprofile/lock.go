@@ -14,6 +14,7 @@ import (
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/projectlease"
+	"github.com/relux-works/curator/internal/staging"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -134,6 +135,12 @@ func (op *operation) close() error {
 // mid-publication resumes from the journal on the next operation instead of
 // stranding a half-written record set.
 func (op *operation) publish(files map[string][]byte, removals ...string) error {
+	return op.publishProtected(files, nil, nil, removals...)
+}
+
+// publishProtected adds planning-time boundary identities and a current-input
+// check to the existing journal publisher. Legacy profile calls remain nil.
+func (op *operation) publishProtected(files map[string][]byte, boundaries *staging.Boundaries, validate func() error, removals ...string) error {
 	for path := range files {
 		if err := op.capture(path); err != nil {
 			return err
@@ -206,6 +213,23 @@ func (op *operation) publish(files map[string][]byte, removals ...string) error 
 			target.StagedSource = temp.Name()
 		}
 		plan.Targets = append(plan.Targets, target)
+	}
+	if boundaries != nil {
+		plan.BoundaryProof = &boundaries.Durable
+		plan.BoundaryCheck = func(index int, path string) error {
+			if err := staging.RecheckOne(staging.Target{LivePath: path, Kind: staging.KindBytes}, boundaries.Snapshot, boundaries.Admitted); err != nil {
+				return err
+			}
+			if validate != nil {
+				return validate()
+			}
+			return nil
+		}
+	}
+	if validate != nil {
+		if err := validate(); err != nil {
+			return err
+		}
 	}
 	if _, err := op.engine.Prepare(op.lock, plan); err != nil {
 		return fmt.Errorf("prepare profile records: %w", err)

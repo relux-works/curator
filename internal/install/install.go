@@ -33,6 +33,7 @@ import (
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/mcp"
 	"github.com/relux-works/curator/internal/opaquescan"
+	"github.com/relux-works/curator/internal/projectmcpstate"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/scopes"
@@ -113,6 +114,8 @@ func (o Options) context() context.Context {
 
 // Result reports one project installation.
 type Result struct {
+	// MCPPlan is a read-only stage-A observation, never native ownership.
+	MCPPlan     *projectmcpstate.Plan
 	Alias       string
 	Path        string
 	Status      string // ok | skipped | failed
@@ -339,6 +342,46 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 		return result, nil
 	}
 
+	// Stage-A admission precedes even optional gitignore repair. A repository
+	// lock is insufficient without the manager's protected local authorization.
+	if projectManifest.SchemaVersion == 3 {
+		hash, hashErr := sourcelock.ManifestDigest(projectManifestPayload)
+		if hashErr != nil {
+			result.failf("%v", hashErr)
+			return result, nil
+		}
+		var entries []projectmcpstate.Entry
+		var lockHash *string
+		if len(projectManifest.MCPServers) > 0 {
+			replay := envprofile.ReplayProjectMCP
+			if !opts.DryRun {
+				replay = envprofile.RestoreProjectMCP
+			}
+			lock, warnings, replayErr := replay(cfg.Home(), projectRoot, alias, hash, projectManifest.MCPServers, envprofile.PolicyFromConfig(cfg))
+			result.Messages = append(result.Messages, warnings...)
+			if replayErr != nil {
+				var knownEntries []projectmcpstate.Entry
+				var knownHash *string
+				if lock != nil {
+					knownEntries, knownHash = lock.Entries, &lock.LockSHA256
+				}
+				result.MCPPlan, _ = projectmcpstate.NewPlan(alias, hash, projectManifest.MCPServers, knownEntries, knownHash, opts.DryRun, projectmcpstate.Refusals(projectManifest.MCPServers, replayErr))
+				if result.MCPPlan != nil {
+					result.Messages = append(result.Messages, result.MCPPlan.Lines()...)
+				}
+				result.failf("%v", replayErr)
+				return result, nil
+			}
+			entries, lockHash = lock.Entries, &lock.LockSHA256
+		}
+		result.MCPPlan, err = projectmcpstate.NewPlan(alias, hash, projectManifest.MCPServers, entries, lockHash, opts.DryRun, nil)
+		if err != nil {
+			result.failf("%v", err)
+			return result, nil
+		}
+		result.Messages = append(result.Messages, result.MCPPlan.Lines()...)
+	}
+
 	// 2. Effective agents.
 	agents := projectManifest.Agents
 	if len(agents) == 0 {
@@ -485,7 +528,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	fetchedBefore := copySet(opts.FetchedRepos)
 	var nodes []*closure.Node
 	var draftLock *sourcelock.Lock
-	if effectiveManifest.SchemaVersion == 2 {
+	if effectiveManifest.SchemaVersion >= 2 {
 		if len(hybridDirect) > 0 {
 			result.failf("source_selection_invalid: hybrid activation is not admitted with a draft lock; resolve it explicitly")
 			return result, nil
