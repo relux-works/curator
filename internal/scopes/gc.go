@@ -11,6 +11,7 @@ import (
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/projectlease"
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -23,6 +24,9 @@ import (
 // It collects the runtime store only. Collect is the locked maintenance entry
 // point that also sweeps the protected build cache.
 func CollectRuntime(home string) ([]string, error) {
+	if projectlease.HasState(home) {
+		return nil, fmt.Errorf("project leases require serialized Collect; runtime sweep skipped")
+	}
 	marked := markScopes(home)
 	if err := pruneConsumers(home, marked); err != nil {
 		return nil, err
@@ -91,7 +95,14 @@ func Collect(request MaintenanceRequest) (MaintenanceResult, error) {
 	if err := requireHomeLock(request.Lock); err != nil {
 		return MaintenanceResult{}, err
 	}
+	leaseRoots, err := projectlease.ReferencesUnderLock(request.Home, request.Lock)
+	if err != nil {
+		return MaintenanceResult{}, fmt.Errorf("project lease references unreadable; runtime and build sweeps skipped: %w", err)
+	}
 	marked := markScopes(request.Home)
+	for _, entry := range leaseRoots.RuntimeEntries {
+		marked.runtime[entry] = true
+	}
 	result := MaintenanceResult{Warnings: marked.warnings()}
 
 	// Consumer pruning stays inside this pass, under the caller's lock.
@@ -119,6 +130,7 @@ func Collect(request MaintenanceRequest) (MaintenanceResult, error) {
 		cache = store
 	}
 	referenced := append(append([]string(nil), marked.builds...), request.JournalKeys...)
+	referenced = append(referenced, leaseRoots.BuildKeys...)
 	sweep, err := cache.Sweep(buildcache.SweepRequest{
 		Referenced: referenced,
 		Now:        request.Now,

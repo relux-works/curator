@@ -352,6 +352,12 @@ semantics and refuse known native login-state files before snapshot publication.
 Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectcontext -count=1`
 and the documented opt-in Go-overlay mutation lane. Keep logs in `.temp/`.
 
+The [project lease manager](docs/project-leases.md) provides stable Werkstatt
+homes and protected session lifetime operations for composition integration.
+Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectlease ./internal/scopes`
+for lease, transaction, GC and bounded narrowing controls. Store local logs and
+private build caches under `.temp/`; no project launch CLI is exposed yet.
+
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.
 Vendor tests skip unless `CODEX_EXCL_BINARY` selects the exact build and
