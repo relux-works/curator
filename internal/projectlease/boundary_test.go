@@ -296,3 +296,74 @@ func TestPublicationSerializesLeaseAcquisition(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Invalid witness authority is refused before callbacks or allocations. A real
+// same-home acquisition reaches both protected callbacks and becomes stale on
+// owner release; a lock on another home cannot authorize this manager's reads.
+func TestAuthorityRequiresHeldWitness(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	resolve := func(held managerlock.Held) error {
+		_, err := f.m.resolve(ctx, held, f.c.Ref, f.c.SHA256, "principal:operator")
+		return err
+	}
+	if !errors.Is(resolve(managerlock.Held{}), managerlock.ErrNotHeld) {
+		t.Fatal("zero witness reached authority")
+	}
+	if len(f.a.witnesses) != 0 {
+		t.Fatal("zero witness invoked callbacks")
+	}
+	lm, err := managerlock.New(f.home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock, err := lm.AcquireHomeOnly(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	held := lock.Held()
+	defer func() { _ = lock.Close() }()
+	if err := resolve(held); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.a.witnesses) != 2 {
+		t.Fatalf("callbacks=%d", len(f.a.witnesses))
+	}
+	if err := lock.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !errors.Is(resolve(held), managerlock.ErrNotHeld) {
+		t.Fatal("stale witness reached authority")
+	}
+	other, err := managerlock.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	foreign, err := other.AcquireHomeOnly(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = foreign.Close() }()
+	if !errors.Is(resolve(foreign.Held()), managerlock.ErrNotHeld) {
+		t.Fatal("wrong-home witness reached authority")
+	}
+	if len(f.a.witnesses) != 2 {
+		t.Fatal("invalid witness invoked callbacks")
+	}
+	if _, err := os.Stat(statePath(f.home)); !os.IsNotExist(err) {
+		t.Fatalf("invalid witness allocated state: %v", err)
+	}
+	for _, observed := range f.a.witnesses {
+		if !errors.Is(observed.Validate(f.home), managerlock.ErrNotHeld) {
+			t.Fatal("callback witness extended owner lifetime")
+		}
+	}
+	// Existing fixture callbacks validate every witness across the full lifecycle.
+	activate(t, f, "witness")
+	if _, err := f.m.Resume(ctx, "witness"); err != nil {
+		t.Fatal(err)
+	}
+	if status(t, f, "witness").AuthorityUnknown {
+		t.Fatal("status omitted valid witness")
+	}
+}

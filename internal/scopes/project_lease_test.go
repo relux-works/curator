@@ -15,10 +15,10 @@ import (
 
 type leaseAuthority struct{ c projectlease.Composition }
 
-func (a leaseAuthority) Resolve(context.Context, string, string) (projectlease.Composition, error) {
+func (a leaseAuthority) Resolve(context.Context, managerlock.Held, string, string) (projectlease.Composition, error) {
 	return a.c, nil
 }
-func (a leaseAuthority) Authorize(context.Context, projectlease.Composition, string) error {
+func (a leaseAuthority) Authorize(context.Context, managerlock.Held, projectlease.Composition, string) error {
 	return nil
 }
 func (a leaseAuthority) Observe(context.Context, string, int64) (projectlease.Evidence, error) {

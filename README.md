@@ -354,7 +354,7 @@ and the documented opt-in Go-overlay mutation lane. Keep logs in `.temp/`.
 
 The [project lease manager](docs/project-leases.md) provides stable Werkstatt
 homes and protected session lifetime operations for composition integration.
-Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectlease ./internal/scopes`
+Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/managerlock ./internal/projectlease ./internal/scopes`
 for lease, transaction, GC and bounded narrowing controls. Store local logs and
 private build caches under `.temp/`; no project launch CLI is exposed yet.
 

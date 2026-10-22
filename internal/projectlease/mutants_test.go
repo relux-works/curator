@@ -32,11 +32,16 @@ func TestLeaseNarrowingMutants(t *testing.T) {
 		{"ignore-busy-update", "internal/projectlease/manager.go", "if len(sessions) == 0 {", "if true || len(sessions) == 0 {", "projectlease", "TestBusyUpdateAndIdleReuse", "refusal <nil>, want project_view_busy"},
 		{"ignore-concurrency-capability", "internal/projectlease/manager.go", "(!c.ConcurrentState || !e.Composition.ConcurrentState ||", "(false ||", "projectlease", "TestStableHomesAndConcurrentSessions", "refusal <nil>, want project_view_busy"},
 		{"ignore-receipt", "internal/projectlease/manager.go", "if !reflect.DeepEqual(expected, c.Generated) {", "if false && !reflect.DeepEqual(expected, c.Generated) {", "projectlease", "TestPublicationReceiptAndRollback", "refusal <nil>, want receipt"},
-		{"ignore-revocation", "internal/projectlease/manager.go", "if err = m.authority.Authorize(ctx, c, owner); err != nil {", "if err = m.authority.Authorize(ctx, c, owner); false && err != nil {", "projectlease", "TestRecoveryResumeAndRevocation", "revoked acquire=<nil>"},
+		{"ignore-revocation", "internal/projectlease/manager.go", "if err = m.authority.Authorize(ctx, held, c, owner); err != nil {", "if err = m.authority.Authorize(ctx, held, c, owner); false && err != nil {", "projectlease", "TestRecoveryResumeAndRevocation", "revoked acquire=<nil>"},
 		{"ignore-mode-drift", "internal/projectlease/manager.go", "if runtime.GOOS != \"windows\" && uint32(info.Mode().Perm()) != surface.Mode {", "if false && runtime.GOOS != \"windows\" && uint32(info.Mode().Perm()) != surface.Mode {", "projectlease", "TestGeneratedModesAndInventory", "refusal <nil>, want mode drift"},
 		{"omit-runtime-gc-roots", "internal/scopes/gc.go", "marked.runtime[entry] = true", "marked.runtime[entry] = false", "scopes", "TestCollectProjectLeaseReferencesAndUnknown", "GC="},
 		{"omit-build-gc-roots", "internal/scopes/gc.go", "referenced = append(referenced, leaseRoots.BuildKeys...)", "referenced = append(referenced, []string{}...)", "scopes", "TestCollectProjectLeaseReferencesAndUnknown", "GC="},
 		{"missing-ledger-is-absence", "internal/projectlease/store.go", "if HasState(home) {", "if false && HasState(home) {", "projectlease", "TestLinksDriftAndMissingState", "missing ledger became no leases"},
+		{"zero-held-witness", "internal/managerlock/managerlock.go", "if h.lock == nil {\n\t\treturn ErrNotHeld\n\t}", "if h.lock == nil {return nil}", "managerlock", "TestHeldWitnessScopeAndLifetime", "zero witness accepted"},
+		{"stale-held-witness", "internal/managerlock/managerlock.go", "if err := h.lock.AssertCurrent(); err != nil {", "if err := h.lock.AssertCurrent(); false && err != nil {", "managerlock", "TestHeldWitnessScopeAndLifetime", "stale witness accepted"},
+		{"wrong-home-held-witness", "internal/managerlock/managerlock.go", "if canonical != h.lock.home {", "if false && canonical != h.lock.home {", "managerlock", "TestHeldWitnessScopeAndLifetime", "wrong-home witness accepted"},
+		{"missing-authority-witness", "internal/projectlease/manager.go", "m.authority.Resolve(ctx, held, ref, sha)", "m.authority.Resolve(ctx, managerlock.Held{}, ref, sha)", "projectlease", "TestAuthorityRequiresHeldWitness", "manager lock is not held"},
+		{"callback-before-witness-validation", "internal/projectlease/manager.go", "if err := held.Validate(m.home); err != nil {", "if err := held.Validate(m.home); false && err != nil {", "projectlease", "TestAuthorityRequiresHeldWitness", "zero witness invoked callbacks"},
 	}
 	controls := map[string]bool{}
 	for _, tc := range cases {
