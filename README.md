@@ -477,6 +477,15 @@ inputs and reports "project sources not isolated". Launch also refuses while
 manager permissions and memory-off remain unqualified; the adapter guide links
 the exact evidence gaps and proposed qualification probes.
 
+The [Codex composition delivery API](docs/project-adapter-codex.md) uses Go
+and Git to render protected I-COMP outputs into an explicitly enabled native-project home with profile-only instructions,
+produce final receipt metadata and native launch contribution data, and refuse
+uncertified strict exclusion. Status and launch report project sources not isolated. Run
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectadapter ./internal/projectcontext -count=1`
+and its documented opt-in narrowing controls; keep logs in task-local `.temp/`.
+This API starts no provider; the delegated consumer still enforces authority
+and leases. Strict launch remains refused.
+
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.
 Vendor tests skip unless `CODEX_EXCL_BINARY` selects the exact build and

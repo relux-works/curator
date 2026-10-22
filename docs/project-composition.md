@@ -101,6 +101,13 @@ Its result types and revocation sentinel remain local mirrors of the lease
 contract. Wiring them to the owning package is a separate integration step;
 it must not introduce a reverse dependency.
 
+For native-project delivery, the non-wire preview also returns
+`ProfileDocuments` and `ProfileDocumentReceipt`, derived separately from the
+selected protected profile closure. Adapters use these profile-only root and
+system outputs rather than splitting the strict composition's additive prose.
+They do not change the closed composition record, its receipt or strict adapter
+admission. See [Codex delivery](project-adapter-codex.md) for mode boundaries.
+
 ## Verification
 
 Run the package tests and bounded Go-overlay controls:
