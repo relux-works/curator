@@ -90,6 +90,8 @@ type CompositionPolicy struct {
 
 // ComposeRequest selects protected inputs for one derived composition.
 type ComposeRequest struct {
+	// Claude enables manager-controlled native outputs before receipt hashing.
+	Claude          *ClaudeControls `json:",omitempty"`
 	CheckoutID      string
 	Mode            string
 	Selections      []Selection
@@ -121,6 +123,7 @@ type Composition struct {
 
 // CompositionPreview retains the derived records and in-memory output bytes.
 type CompositionPreview struct {
+	MCPEnvNames  []string `json:",omitempty"`
 	Record       CompositionRecord
 	Generation   Generation
 	PolicyRecord json.RawMessage
