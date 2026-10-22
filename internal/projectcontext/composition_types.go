@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/identifiers"
@@ -82,31 +83,32 @@ type ComposeRequest struct {
 
 // Surface and Composition are the resolver contract shared with I-LEASE.
 type Surface struct {
-	SHA256 string
-	Size   int64
-	Mode   uint32
+	SHA256 string `json:"sha256"`
+	Size   int64  `json:"size"`
+	Mode   uint32 `json:"mode"`
 }
 type Composition struct {
-	Ref             string
-	SHA256          string
-	CheckoutID      string
-	Profile         string
-	Environment     string
-	HomeRef         string
-	ConcurrentState bool
-	BuildKeys       []string
-	RuntimeEntries  []string
-	Generated       map[string]Surface
+	Ref             string             `json:"ref"`
+	SHA256          string             `json:"sha256"`
+	CheckoutID      string             `json:"checkout_id"`
+	Profile         string             `json:"profile"`
+	Environment     string             `json:"environment"`
+	HomeRef         string             `json:"home_ref"`
+	ConcurrentState bool               `json:"concurrent_state"`
+	BuildKeys       []string           `json:"build_keys"`
+	RuntimeEntries  []string           `json:"runtime_entries"`
+	Generated       map[string]Surface `json:"generated"`
 }
 type CompositionPreview struct {
-	Record     CompositionRecord
-	Generation Generation
-	Receipt    MaterializationReceipt
-	Files      map[string][]byte `json:"-"`
-	Modules    []OrderedModule
-	Skills     []EffectiveSkill
-	Ref        string
-	SHA256     string
+	Record       CompositionRecord
+	Generation   Generation
+	PolicyRecord json.RawMessage
+	Receipt      MaterializationReceipt
+	Files        map[string][]byte `json:"-"`
+	Modules      []OrderedModule
+	Skills       []EffectiveSkill
+	Ref          string
+	SHA256       string
 }
 type OrderedModule struct {
 	ItemID  string
@@ -193,7 +195,7 @@ func ParseCompositionRecord(b []byte) (CompositionRecord, error) {
 	return out, nil
 }
 func (a AdapterContract) validate(env string) error {
-	if a.Kind != "project-adapter/1" || a.Environment != env || (a.Platform != "macos" && a.Platform != "linux") || a.ProviderVersion == "" || len(a.ProviderVersion) > 256 || strings.ContainsAny(a.ProviderVersion, " \t\n\r*<>=^~|,") || !sort.StringsAreSorted(a.Surfaces) {
+	if a.Kind != "project-adapter/1" || a.Environment != env || (a.Platform != "macos" && a.Platform != "linux") || invalidProviderVersion(a.ProviderVersion) || !sort.StringsAreSorted(a.Surfaces) {
 		return fail("project_context_invalid", "invalid adapter release contract")
 	}
 	seen := map[string]bool{}
@@ -209,4 +211,8 @@ func (a AdapterContract) validate(env string) error {
 		}
 	}
 	return nil
+}
+
+func invalidProviderVersion(v string) bool {
+	return v == "" || len(v) > 256 || strings.ContainsAny(v, "*<>=^~|,\ufeff") || strings.IndexFunc(v, unicode.IsSpace) >= 0
 }
