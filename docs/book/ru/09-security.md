@@ -68,10 +68,11 @@ Project-shipped permission bytes **никогда не применяются**,
 поставка откладывает private-memory delivery. Наличие native каталога
 `memory/` у runtime само по себе не реализует эту policy. ⟦решено⟧
 
-Retention, перенос между домами, удаление и дальнейшая судьба private
-memory требуют отдельных решений. Нельзя обещать, что repair автоматически
-сохранит всё полезное или что logout уничтожит все производные сведения.
-⟦открыто⟧
+После явного opt-in private memory хранится отдельно в своей Werkstatt
+до явного удаления. Её нельзя публиковать, переиспользовать между
+Werkstätten или превращать в repository knowledge. Grammar opt-in delivery
+и native qualification остаются последующей инженерной работой.
+⟦решено⟧
 
 ## Audit, network declarations и allowlists
 
