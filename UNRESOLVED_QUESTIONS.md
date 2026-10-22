@@ -45,3 +45,9 @@
   A vendor control or separately qualified manager policy boundary must remove
   this effect before the leaf can advertise native-project launch support.
   [Controls, receipt lifecycle and executable regressions](docs/project-adapter-codex.md).
+- TASK-261022-iixe6f: Muse has no qualification for manager permissions or
+  memory-off, so both strict and native-project launches remain refused.
+  Strict additionally lacks complete native-source exclusion. Native-project
+  profile-only composition receipts require the separate mode-aware I-COMP
+  follow-up; existing additive receipts must not be rebaselined.
+  [Offline adapter scope and evidence](docs/project-adapter-muse.md).
