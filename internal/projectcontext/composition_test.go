@@ -22,6 +22,10 @@ import (
 )
 
 func compositionFixture(t *testing.T, env string, skillSources map[string]string, system ...bool) fixture {
+	return compositionModeFixture(t, env, skillSources, "strict", system...)
+}
+
+func compositionModeFixture(t *testing.T, env string, skillSources map[string]string, mode string, system ...bool) fixture {
 	t.Helper()
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
 		t.Skip("CIP filesystem binding supports macOS/Linux; pure composition contracts remain portable")
@@ -67,14 +71,14 @@ func compositionFixture(t *testing.T, env string, skillSources map[string]string
 	}
 	write(t, filepath.Join(home, "profiles", "base", "lock.json"), string(b))
 	store := Store{Home: home}
-	reg, err := store.Register("fixture", root, "base", env)
+	reg, err := store.RegisterMode("fixture", root, "base", env, mode)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return fixture{store, root, reg}
 }
 func compositionRequest(f fixture) ComposeRequest {
-	return ComposeRequest{CheckoutID: f.registration.CheckoutID, Selections: []Selection{{"guide", false}}, Adapter: AdapterContract{"project-adapter/1", f.registration.Environment, "1.2.3", "macos", []string{"commands", "context", "mcp", "memory-off", "native-source-exclusion", "permissions", "skills"}}, Policy: CompositionPolicy{Version: 1, Memory: "off"}}
+	return ComposeRequest{CheckoutID: f.registration.CheckoutID, Selections: []Selection{{"guide", false}}, Adapter: AdapterContract{"project-adapter/1", f.registration.Environment, "1.2.3", "macos", []string{"commands", "context", "mcp", "memory-off", "native-source-exclusion", "permissions", "skills"}, []string{"native-project", "strict"}}, Policy: CompositionPolicy{Version: 1, Memory: "off"}}
 }
 func principal(t *testing.T, f fixture) string {
 	t.Helper()
@@ -692,16 +696,16 @@ func TestCompositionHeldAuthority(t *testing.T) {
 // comparison operators, empty and oversized versions refuse beside valid
 // stable and prerelease controls, including non-ASCII whitespace neighbors.
 func TestCompositionAdapterRelease(t *testing.T) {
-	good := AdapterContract{"project-adapter/1", "codex_cli", "1.2.3", "macos", []string{"context", "memory-off", "native-source-exclusion", "permissions"}}
+	good := AdapterContract{"project-adapter/1", "codex_cli", "1.2.3", "macos", []string{"context", "memory-off", "native-source-exclusion", "permissions"}, []string{"strict"}}
 	for _, version := range []string{"1.2.3", "0.162.1-preview.2+build"} {
 		good.ProviderVersion = version
-		if err := good.validate("codex_cli"); err != nil {
+		if err := good.validate("codex_cli", "strict"); err != nil {
 			t.Fatal(err)
 		}
 	}
 	for _, version := range []string{"", "1 2", "1\t2", "1\v2", "1\f2", "1\u00a02", "1\ufeff2", "1\u20282", "^1.2.3", ">=1", strings.Repeat("a", 257)} {
 		bad := good
 		bad.ProviderVersion = version
-		required(t, bad.validate("codex_cli"), "invalid adapter release contract")
+		required(t, bad.validate("codex_cli", "strict"), "invalid adapter release contract")
 	}
 }

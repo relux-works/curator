@@ -60,7 +60,13 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 	if err != nil {
 		return result, err
 	}
-	if err = req.Adapter.validate(r.Record.Environment); err != nil {
+	if req.Mode == "" {
+		req.Mode = r.Record.Mode
+	}
+	if !validSourceMode(req.Mode) || req.Mode != r.Record.Mode {
+		return result, fail("project_context_invalid", "source mode differs from protected registration")
+	}
+	if err = req.Adapter.validate(r.Record.Environment, req.Mode); err != nil {
 		return result, err
 	}
 	if req.Policy.Version != 1 || req.Policy.Memory != "off" {
@@ -73,7 +79,7 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 	if err != nil {
 		return result, err
 	}
-	out := CompositionPreview{Files: map[string][]byte{}, Modules: []OrderedModule{}, Skills: []EffectiveSkill{}}
+	out := CompositionPreview{Files: map[string][]byte{}, ProfileDocuments: map[string][]byte{}, Modules: []OrderedModule{}, Skills: []EffectiveSkill{}}
 	generation := Generation{"project-generation/1", "registration:" + r.Record.CheckoutID, identity(r.Record), []GenerationItem{}}
 	for _, c := range admitted.Items {
 		a := op.state.Approvals[r.Record.CheckoutID+":"+c.Item.ID]
@@ -197,6 +203,9 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 			}
 			// Project snapshots remain protected through the retained generation; they are not runtime-cache entries.
 		case "context":
+			if req.Mode == "native-project" {
+				return result, fail("project_context_unsupported", "native-project cannot select context items")
+			}
 			b, e := op.lockBytes(c.Item.Payload.LockRef, c.Item.Payload.LockSHA256)
 			if e != nil {
 				return result, e
@@ -270,6 +279,12 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 			}
 		}
 		return false
+	}
+	if len(profileRoot) > 0 {
+		out.ProfileDocuments[adapter.RootTarget] = append([]byte(nil), profileRoot...)
+	}
+	if len(profileSystem) > 0 {
+		out.ProfileDocuments[".agent-context/system-prompt.md"] = append([]byte(nil), profileSystem...)
 	}
 	root := JoinRootDocuments(profileRoot, projectRoots...)
 	if len(root) > 0 {
@@ -352,11 +367,16 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 		return result, err
 	}
 
+	profileReceipt, err := compositionReceipt(out.ProfileDocuments, map[string]bool{}, identity(req.Adapter), policyHash, r.Record.WorktreeRef)
+	if err != nil {
+		return result, err
+	}
+	out.ProfileDocumentReceipt = profileReceipt.Files
 	omitted := []CompositionOmission{}
 	for _, v := range admitted.Omitted {
 		omitted = append(omitted, CompositionOmission{v.ItemID, v.Reason})
 	}
-	record := CompositionRecord{"project-composition/1", generation.RegistrationRef, generation.RegistrationSHA256, identity(generation), r.Record.Profile, r.Record.Environment, "adapter:" + hashID(identity(req.Adapter)), identity(req.Adapter), "policy:" + hashID(policyHash), policyHash, "off", r.Record.HomeRef, r.Record.WorktreeRef, identity(receipt), owners, omitted}
+	record := CompositionRecord{"project-composition/1", generation.RegistrationRef, generation.RegistrationSHA256, identity(generation), r.Record.Profile, r.Record.Environment, req.Mode, "adapter:" + hashID(identity(req.Adapter)), identity(req.Adapter), "policy:" + hashID(policyHash), policyHash, "off", r.Record.HomeRef, r.Record.WorktreeRef, identity(receipt), owners, omitted}
 	b, err := canonical(record)
 	if err != nil {
 		return result, err

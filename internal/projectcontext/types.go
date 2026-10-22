@@ -46,6 +46,7 @@ type Registration struct {
 	RootIdentity string  `json:"root_identity"`
 	Profile      Profile `json:"profile"`
 	Environment  string  `json:"environment"`
+	Mode         string  `json:"mode"`
 	HomeRef      string  `json:"home_ref"`
 	WorktreeRef  string  `json:"worktree_ref"`
 }
