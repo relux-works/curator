@@ -1,5 +1,6 @@
 // Package projectcontext owns CIP-0002 project registrations and inert item
-// admission. It does not compose profiles, create leases, or launch providers.
+// admission, plus derived compositions over immutable selected profile locks.
+// It creates no leases and launches no providers.
 // Admitted root context is additive: the composition consumer must append it
 // after the selected profile document, never replace that document.
 package projectcontext

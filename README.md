@@ -378,6 +378,16 @@ Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/managerlock ./internal/p
 for lease, transaction, GC and bounded narrowing controls. Store local logs and
 private build caches under `.temp/`; no project launch CLI is exposed yet.
 
+The derived composition API and its refusal boundaries are documented in
+[project composition](docs/project-composition.md). It uses Go and Git to render
+profile-first instructions and metadata-only receipts from protected inputs.
+Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectcontext -run TestComposition -count=1`
+and `env -u GIT_DIR -u GIT_WORK_TREE CURATOR_PROJECT_COMPOSITION_MUTANTS=1 go test ./internal/projectcontext -run '^TestCompositionNarrowingMutants$' -count=1 -v`
+for its behavior, 51 pinned grammar vectors and bounded mutation controls.
+Keep logs and private caches under `.temp/`; preview outputs remain in memory
+and publication retains supporting records under the manager's project-context
+namespace without changing the selected profile lock.
+
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.
 Vendor tests skip unless `CODEX_EXCL_BINARY` selects the exact build and

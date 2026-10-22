@@ -29,6 +29,7 @@ func TestCompositionNarrowingMutants(t *testing.T) {
 		{"allow-mcp-replacement", "composition.go", "TestCompositionMCPConflict", "ok && identity(prior) != identity(next)", "ok && identity(prior) != identity(next) && false", "want same-ID MCP replacement"},
 		{"ignore-receipt-drift", "composition_authority.go", "TestCompositionAuthority", "identity(fresh) != identity(saved)", "identity(fresh) != identity(saved) && false", "want project_context_drift"},
 		{"ignore-preview-digest", "composition_authority.go", "TestCompositionAuthority", "!hexRE.MatchString(expected) || plan.Preview.SHA256 != expected", "(!hexRE.MatchString(expected) || plan.Preview.SHA256 != expected) && false", "want project_context_drift"},
+		{"allow-adapter-range", "composition_types.go", "TestCompositionAdapterRelease", "invalidProviderVersion(a.ProviderVersion)", "false", "want invalid adapter release contract"},
 		{"allow-memory-on", "composition.go", "TestCompositionClosedPreparation", `req.Policy.Version != 1 || req.Policy.Memory != "off"`, `req.Policy.Version != 1`, "want project_context_invalid"},
 	}
 

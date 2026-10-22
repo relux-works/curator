@@ -129,7 +129,11 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 			if e != nil {
 				return e
 			}
-			skills[m.Name] = compositionSkill{EffectiveSkill{"profile", m.Name, "state " + mustContentPin(capt.Bytes), m.Name, identity(capt.Manifest)}, m, spec, capt.Bytes}
+			contentPin, e := hashing.ContentSHA256Files(capt.Bytes, hashing.VersionV2)
+			if e != nil {
+				return e
+			}
+			skills[m.Name] = compositionSkill{EffectiveSkill{"profile", m.Name, "state " + contentPin, m.Name, identity(capt.Manifest)}, m, spec, capt.Bytes}
 		case "mcp":
 			mcpMembers[m.Name] = m
 			man, e := contextpkg.ParseMCP(capt.Bytes[contextpkg.MCPManifestName])
@@ -337,21 +341,17 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 		Commands        []CommandOwner
 		ConcurrentState bool
 	}{req.Policy, r.Precedence, out.Modules, out.Skills, owners, req.ConcurrentState}
-	policyHash := identity(policyObject)
-	receipt := MaterializationReceipt{1, []File{}, identity(req.Adapter), policyHash, r.Record.WorktreeRef}
-	total := int64(0)
-	for _, p := range sortedKeys(out.Files) {
-		b := out.Files[p]
-		total += int64(len(b))
-		if !relative(p) || len(b) > MaxFileBytes || total > MaxTotalBytes {
-			return result, fail("project_context_invalid", "generated surface exceeds inventory bounds")
-		}
-		mode := "0600"
-		if commandModes[p] {
-			mode = "0700"
-		}
-		receipt.Files = append(receipt.Files, File{p, int64(len(b)), digest(b), mode})
+	policyBytes, err := canonical(policyObject)
+	if err != nil {
+		return result, err
 	}
+	out.PolicyRecord = policyBytes
+	policyHash := digest(policyBytes)
+	receipt, err := compositionReceipt(out.Files, commandModes, identity(req.Adapter), policyHash, r.Record.WorktreeRef)
+	if err != nil {
+		return result, err
+	}
+
 	omitted := []CompositionOmission{}
 	for _, v := range admitted.Omitted {
 		omitted = append(omitted, CompositionOmission{v.ItemID, v.Reason})
@@ -469,8 +469,11 @@ func checkCompositionRequirements(reqs []compositionRequirement, skills map[stri
 			if !ok {
 				return fail("project_context_unsupported", "required MCP provider missing: "+r.name)
 			}
-			if (r.transport != "" && r.transport != server.Transport) || (r.environment != "" && !contextmaterialize.MCPApplies(server, r.environment)) {
+			if r.transport != "" && r.transport != server.Transport {
 				return fail("project_context_unsupported", "required MCP transport differs: "+r.name)
+			}
+			if r.environment != "" && !contextmaterialize.MCPApplies(server, r.environment) {
+				return fail("project_context_unsupported", "required MCP environment differs: "+r.name)
 			}
 			member = mcpMembers[r.name]
 		} else {
@@ -526,6 +529,9 @@ func compositionCommands(skills map[string]compositionSkill) ([]CommandOwner, er
 			}
 			artifact := s.ArtifactSHA256
 			if c := s.spec.Commands[command]; c.Type == "script" {
+				if c.UnixPath == "" {
+					return nil, fail("project_context_unsupported", "command has no applicable Unix artifact")
+				}
 				b, ok := s.files[c.UnixPath]
 				if !ok {
 					return nil, fail("project_context_drift", "command artifact missing")
@@ -542,6 +548,9 @@ func compositionCommands(skills map[string]compositionSkill) ([]CommandOwner, er
 	return out, nil
 }
 func mergeCompositionMCP(set map[string]contextmaterialize.MCPServer, next contextmaterialize.MCPServer) error {
+	next.Args = append([]string{}, next.Args...)
+	next.EnvNames = append([]string{}, next.EnvNames...)
+	sort.Strings(next.EnvNames)
 	if prior, ok := set[next.Name]; ok && identity(prior) != identity(next) {
 		return fail("project_context_unsupported", "same-ID MCP replacement has no explicit approval: "+next.Name)
 	}
@@ -549,12 +558,21 @@ func mergeCompositionMCP(set map[string]contextmaterialize.MCPServer, next conte
 	return nil
 }
 
-// The profile lock independently binds commit provenance; this derived content
-// pin permits deduplication with an identically captured project skill.
-func mustContentPin(files map[string][]byte) string {
-	h, err := hashing.ContentSHA256Files(files, hashing.VersionV2)
-	if err != nil {
-		panic(err)
+func compositionReceipt(files map[string][]byte, executable map[string]bool, adapterHash, policyHash, worktree string) (MaterializationReceipt, error) {
+	receipt := MaterializationReceipt{1, []File{}, adapterHash, policyHash, worktree}
+	if len(files) > MaxFiles {
+		return receipt, fail("project_context_invalid", "generated file bound exceeded")
 	}
-	return h
+	for _, p := range sortedKeys(files) {
+		b := files[p]
+		mode := "0600"
+		if executable[p] {
+			mode = "0700"
+		}
+		receipt.Files = append(receipt.Files, File{p, int64(len(b)), digest(b), mode})
+	}
+	if err := validateInventory(captured{Manifest: Snapshot{1, receipt.Files}, Bytes: files}); err != nil {
+		return MaterializationReceipt{}, err
+	}
+	return receipt, nil
 }
