@@ -529,7 +529,7 @@ func TestWholeSkillAdmissionUsesOwningReaders(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = f.store.Preview(f.registration.CheckoutID, d)
-	required(t, err, "project_context_unsupported")
+	required(t, err, "project_context_invalid")
 }
 
 // Claim: unreadable/malformed/missing protected state cannot reset the manager,

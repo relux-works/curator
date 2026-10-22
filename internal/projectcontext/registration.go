@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -71,20 +72,30 @@ func bind(p string) (binding, error) {
 	var b binding
 	abs, err := filepath.Abs(p)
 	if err != nil {
-		return b, err
+		return b, fail("project_registration_mismatch", "root path cannot be resolved")
 	}
 	canonical, err := filepath.EvalSymlinks(abs)
 	if err != nil {
-		return b, err
+		return b, fail("project_registration_mismatch", "root is missing, moved or unreadable; explicitly rebind")
 	}
 	// Explicit registration canonicalizes an operator path once. Use requires
 	// the saved canonical spelling and the retained filesystem identity.
-	if !utf8.ValidString(canonical) || len(canonical) > 4096 {
+	if !validRoot(canonical) {
 		return b, fail("project_registration_mismatch", "root path is invalid or exceeds its bound")
 	}
 	st, err := os.Lstat(canonical)
-	if err != nil || !st.IsDir() || st.Mode().Perm()&0500 == 0 {
+	if err != nil || !st.IsDir() || st.Mode().Perm()&0500 != 0500 {
 		return b, fail("project_registration_mismatch", "root is unreadable or not a directory")
+	}
+	f, err := os.Open(canonical)
+	if err != nil {
+		return b, fail("project_registration_mismatch", "root cannot be read; explicitly rebind")
+	}
+	_, readErr := f.Readdirnames(1)
+	opened, statErr := f.Stat()
+	_ = f.Close()
+	if (readErr != nil && readErr != io.EOF) || statErr != nil || !same(st, opened) {
+		return b, fail("project_registration_mismatch", "root cannot be verified; explicitly rebind")
 	}
 	fs, err := filesystemIdentity(st)
 	if err != nil {
@@ -126,6 +137,18 @@ func bind(p string) (binding, error) {
 	}
 	b = binding{repository{canonical, remote, commit}, fs}
 	return b, nil
+}
+
+func validRoot(p string) bool {
+	if !utf8.ValidString(p) || len(p) > 4096 || !filepath.IsAbs(p) || filepath.Clean(p) != p || strings.HasPrefix(p, "//") {
+		return false
+	}
+	for _, r := range p {
+		if r < 0x20 || r == 0x7f {
+			return false
+		}
+	}
+	return true
 }
 func contextCommit(s string) bool {
 	if len(s) != 40 && len(s) != 64 {
@@ -176,7 +199,8 @@ func profile(home, name string) (Profile, *contextlock.Lock, error) {
 	}
 	return Profile{name, digest(c)}, l, nil
 }
-func (s Store) Register(name, root, profileName, env string) (Registration, error) {
+func (s Store) Register(name, root, profileName, env string) (result Registration, resultErr error) {
+	defer func() { resultErr = projectError(resultErr) }()
 	if name == "" {
 		name = filepath.Base(filepath.Clean(root))
 	}
@@ -243,7 +267,8 @@ func (op *operation) register(name string, b binding, p Profile, env string) (Re
 
 // Rebind allocates a new checkout ID. Old approvals remain inert historical
 // records and cannot migrate merely because name, Git metadata or bytes agree.
-func (s Store) Rebind(id, root string) (Registration, error) {
+func (s Store) Rebind(id, root string) (result Registration, resultErr error) {
+	defer func() { resultErr = projectError(resultErr) }()
 	b, err := bind(root)
 	if err != nil {
 		return Registration{}, err
@@ -275,12 +300,16 @@ func (s Store) Rebind(id, root string) (Registration, error) {
 
 // Locate proves the real launch CWD belongs to the most specific registered
 // root. A stale nested binding refuses instead of falling back to its parent.
-func (s Store) Locate(cwd string) (Registration, error) { return s.LocateFor(cwd, "", "") }
+func (s Store) Locate(cwd string) (result Registration, resultErr error) {
+	defer func() { resultErr = projectError(resultErr) }()
+	return s.LocateFor(cwd, "", "")
+}
 
 // LocateFor disambiguates a checkout's separately registered profile/environment
 // slots using explicit manager selection. A deeper registered root shadows its
 // parent even when that deeper root has no slot for the requested environment.
-func (s Store) LocateFor(cwd, profileName, env string) (Registration, error) {
+func (s Store) LocateFor(cwd, profileName, env string) (result Registration, resultErr error) {
+	defer func() { resultErr = projectError(resultErr) }()
 	canonical, err := filepath.EvalSymlinks(cwd)
 	if err != nil {
 		return Registration{}, fail("project_registration_mismatch", "CWD is unreadable")
@@ -327,7 +356,8 @@ func (s Store) LocateFor(cwd, profileName, env string) (Registration, error) {
 	return r.Record, nil
 }
 
-func (s Store) Inspect(id string) (Inspection, error) {
+func (s Store) Inspect(id string) (result Inspection, resultErr error) {
+	defer func() { resultErr = projectError(resultErr) }()
 	op, err := s.begin(false)
 	if err != nil {
 		return Inspection{}, err

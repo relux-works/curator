@@ -34,6 +34,13 @@ previously approved bytes. Approval of an older preview refuses if its live
 selected source changed. A later candidate digest cannot reuse an old item
 approval. A digest identifies content; it does not grant authority.
 
+The protected approval retains its exact candidate independently of later
+previews. Changing a required candidate to optional in preview does not change
+its approved requiredness. Approve that optional candidate explicitly, or
+revoke the required approval, before removing it. File and semantic changes
+compare against retained approved content, so repeating a preview preserves
+the diff and package digest until the candidate or approval baseline changes.
+
 The admitted context's rendering intent is `append-after-profile`. The
 composition consumer must keep the selected profile's root/system context and
 append admitted project context in its recorded order. This package does not
@@ -105,6 +112,17 @@ requirements and external build repositories until their owning complete pinned
 activation closure is available. It does not replace command activation, build,
 capability or permission checks in a later consumer. An arbitrary directory is
 never sufficient executable admission.
+
+An explicitly optional, well-formed skill with an unsupported closure becomes
+a named `unsupported` omission bound to its full source inventory. Malformed,
+missing or unreadable candidates refuse even when optional. Whole-skill preview
+shows the retained manifest, UTF-8 instructions and executable source, complete
+inventory, command owners/declarations, normalized capability requests and
+permission effects. Supported skill candidates have no MCP endpoints; closures
+requiring MCP remain unsupported. Capabilities are inert requests; manager
+policy alone programs permissions. Semantic before/after details are included
+in the review package digest. Closed record and manifest member names match
+exactly, including case; case variants are unknown members.
 
 Inline MCP is inventoried and displayed by identity only. Stage-A admission
 refuses required MCP items as unsupported. Explicitly optional requests are

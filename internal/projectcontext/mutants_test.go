@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// Claim: these bounded source plants make the two required narrowing mutants
+// Claim: these bounded source plants make admission regressions
 // pass a forbidden operation, and the corresponding regression witness fails
 // for its intended assertion. A setup/compile failure is not a caught mutant.
 // Opt in explicitly; the ordinary suite keeps only production behavior tests.
@@ -27,8 +27,18 @@ func TestAdmissionNarrowingMutants(t *testing.T) {
 		{"root-path-only", "registration.go", "TestRegistrationBindingAndNestedCWD", "identity(b) != r.Record.RootIdentity", "b.Repository.Root != r.Record.ProjectRoot", "want project_registration_mismatch"},
 		{"reserved-packaging", "types.go", "TestClosedDeclarationReader", "if _, present := raw.Items[i][\"packaging\"]; present {", "if false {", "invalid request accepted"},
 		{"skill-activation-closure", "skill.go", "TestWholeSkillUnsupportedClosureRefuses", "if len(spec.Requirements) != 0 || len(spec.McpServers) != 0 || len(spec.BuildRepositories) != 0 {", "if false {", "unsupported closure was admitted"},
-		{"unknown-fields", "types.go", "TestClosedDeclarationReader", "d.DisallowUnknownFields()", "// unknown members incorrectly accepted", "invalid request accepted"},
+		{"unknown-fields", "types.go", "TestClosedDeclarationReader", "if err := exactMembers(b, reflect.TypeOf(v)); err != nil {", "if err := exactMembers(b, reflect.TypeOf(v)); false && err != nil {", "invalid request accepted"},
 		{"stored-git-exclusion", "store.go", "TestProtectedSnapshotRejectsGitMetadata", "captureTree(r, \"files\", false)", "captureTree(r, \"files\", true)", "want project_context_drift"},
+		{"approved-requiredness", "admission.go", "TestRequiredApprovalSurvivesPreview", "if a.Candidate != nil {", "for _, c := range op.state.Reviews[id].Review.Items { if c.Item.ID == itemID { return &c, nil } }; if a.Candidate != nil {", "two-preview required removal accepted"},
+		{"required-admission", "admission.go", "TestAdmissionRetainsRequiredAuthority", "if !found {", "if false && !found {", "want project_item_unapproved"},
+		{"legacy-skill-exact-case", "skill.go", "TestLegacySkillClosedMembers", "if schema != 1 {", "if schema != 0 {", "want project_context_invalid"},
+		{"exact-case", "types.go", "TestExactCaseProjectRecords", "if err := exactMembers(b, reflect.TypeOf(v)); err != nil {", "if err := exactMembers(b, reflect.TypeOf(v)); false && err != nil {", "case alias accepted"},
+		{"skill-semantic-owners", "skill.go", "TestSkillSemanticReview", "for _, name := range names {", "for _, name := range names[:0] {", "skill semantic review omitted command owners"},
+		{"optional-unsupported", "admission.go", "TestOptionalUnsupportedSkillClosures", "if !req.Required && isCode(err, \"project_context_unsupported\") {", "if false && !req.Required && isCode(err, \"project_context_unsupported\") {", "optional unsupported closure aborted"},
+		{"root-access", "registration.go", "TestExecuteOnlyRootRefuses", "st.Mode().Perm()&0500 != 0500", "st.Mode().Perm()&0500 == 0", "want project_registration_mismatch"},
+		{"root-controls", "registration.go", "TestRootPathGrammar", "if r < 0x20 || r == 0x7f {", "if false && (r < 0x20 || r == 0x7f) {", "want project_registration_mismatch"},
+		{"preview-baseline", "admission.go", "TestPreviewUsesApprovedBaseline", "if c, err := op.approvedCandidate(id, next.Item.ID); err != nil {", "candidate := func() (*Candidate,error) { for _, c := range op.state.Reviews[id].Review.Items { if c.Item.ID == next.Item.ID { return &c,nil } }; return nil,nil }; if c, err := candidate(); err != nil {", "preview lost approved file delta"},
+		{"canonical-diagnostics", "diagnostic.go", "TestCanonicalProjectDiagnostics", "if err == nil {", "if err != nil { return err }; if err == nil {", "want project_context_unreadable"},
 		{"hardlink-read", "files.go", "TestHardlinkCandidateRefuses", " || !singleLink(before)", "", "want project_context_invalid"},
 	}
 	for _, tc := range cases {
@@ -42,6 +52,17 @@ func TestAdmissionNarrowingMutants(t *testing.T) {
 				t.Fatalf("plant anchor count differs: %s", tc.name)
 			}
 			mutant := strings.Replace(string(source), tc.old, tc.new, 1)
+			if tc.name == "root-access" {
+				for old, replacement := range map[string]string{"f, err := os.Open(canonical)": "if false { f, err := os.Open(canonical)", "fs, err := filesystemIdentity(st)": "}; fs, err := filesystemIdentity(st)"} {
+					if strings.Count(mutant, old) != 1 {
+						t.Fatal("root access secondary anchor differs")
+					}
+					mutant = strings.Replace(mutant, old, replacement, 1)
+				}
+			}
+			if tc.name == "unknown-fields" {
+				mutant = strings.Replace(mutant, "d.DisallowUnknownFields()", "// unknown members accepted", 1)
+			}
 			if tc.name == "cross-checkout-hash" {
 				old := " || a.Record.CheckoutID != r.Record.CheckoutID"
 				if strings.Count(mutant, old) != 1 {

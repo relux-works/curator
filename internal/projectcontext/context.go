@@ -209,7 +209,10 @@ func manifest(c captured) (*contextpkg.Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !m.HasContext || len(m.Skills) != 0 || len(m.MCP) != 0 {
+	if !m.HasContext {
+		return nil, fail("project_context_invalid", "context requires an explicit module selection")
+	}
+	if len(m.Skills) != 0 || len(m.MCP) != 0 {
 		return nil, fail("project_context_unsupported", "context requires explicit modules and context-only dependencies")
 	}
 	if len(c.Bytes["config/muse/auth.json"]) > 0 {
