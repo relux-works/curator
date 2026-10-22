@@ -71,7 +71,11 @@ func MuseLaunch(version, platform, mode, form string) (LaunchContribution, error
 		return LaunchContribution{}, &Unsupported{LaunchForm, "unknown_composition_mode"}
 	}
 	if form != "exec" {
-		return LaunchContribution{}, &Unsupported{LaunchForm, "interactive_and_resume_unqualified"}
+		reason := "interactive_and_resume_unqualified"
+		if report.Notice != "" {
+			reason += "; " + report.Notice
+		}
+		return LaunchContribution{}, &Unsupported{LaunchForm, reason}
 	}
 	if mode == ModeNativeProject {
 		return LaunchContribution{}, &Unsupported{Permissions, "manager_permissions_unqualified; project sources not isolated"}

@@ -55,7 +55,7 @@ memory-off. The [exec foreign-context observations](qualification/muse-1.4.11-R6
 do not substitute for those guarantees. Interactive and resume refuse first;
 strict exec refuses native-source-exclusion. Native-project exec also refuses
 because manager permissions and memory-off remain mandatory and unqualified.
-Native-project status and its exec refusal say `project sources not isolated`.
+Native-project status and every form's refusal say `project sources not isolated`.
 Every failed `MuseLaunch` returns a typed `Unsupported` and no env or argv;
 there is no native fallback or automatic downgrade.
 

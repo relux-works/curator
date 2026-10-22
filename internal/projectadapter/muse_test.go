@@ -387,6 +387,9 @@ func TestMuseLaunchRefused(t *testing.T) {
 							if report.Notice != "project sources not isolated" {
 								t.Fatal("native source warning missing")
 							}
+							if !strings.Contains(err.Error(), "project sources not isolated") {
+								t.Fatal("native launch warning missing")
+							}
 							if form == "exec" && (unsupported.Surface != Permissions || !strings.Contains(err.Error(), "project sources not isolated")) {
 								t.Fatal("mandatory permissions gate not applied")
 							}
