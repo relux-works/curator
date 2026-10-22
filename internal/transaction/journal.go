@@ -374,6 +374,9 @@ func validateJournalWithResolver(journal *Journal, resolveTarget func(string, bo
 	if err := validateBoundaryProof(journal); err != nil {
 		return err
 	}
+	if err := validateReadInputs(journal); err != nil {
+		return err
+	}
 	return nil
 }
 
