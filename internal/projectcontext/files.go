@@ -82,6 +82,12 @@ type captured struct {
 }
 
 func capture(root *os.Root, prefix string) (captured, error) {
+	return captureTree(root, prefix, true)
+}
+
+// A source package may contain its own Git metadata; protected snapshots may
+// contain only their declared portable content, without that source exclusion.
+func captureTree(root *os.Root, prefix string, sourceGitMetadata bool) (captured, error) {
 	out := captured{Manifest: Snapshot{Version: 1, Files: []File{}}, Bytes: map[string][]byte{}}
 	aliases := map[string]bool{}
 	total := int64(0)
@@ -124,7 +130,7 @@ func capture(root *os.Root, prefix string) (captured, error) {
 				return fail("project_context_invalid", "inventory node bound exceeded")
 			}
 			if e.Name() == ".git" {
-				if rel == "" {
+				if rel == "" && sourceGitMetadata {
 					continue
 				}
 				return fail("project_context_invalid", "nested Git metadata is not snapshot content")
