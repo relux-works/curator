@@ -382,6 +382,9 @@ func (s Store) LocateFor(cwd, profileName, env string) (result Registration, res
 	if err != nil || !st.IsDir() {
 		return Registration{}, op.observeUnavailableCWD(cwd)
 	}
+	return op.locateFor(canonical, profileName, env)
+}
+func (op *operation) locateFor(canonical, profileName, env string) (Registration, error) {
 	best := ""
 	matches := []registered{}
 	for _, id := range sortedRegistrationIDs(op.state) {
