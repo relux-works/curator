@@ -326,6 +326,14 @@ Keep logs and private caches under `.temp/`; preview outputs remain in memory
 and publication retains supporting records under the manager's project-context
 namespace without changing the selected profile lock.
 
+The [offline Muse project adapter](docs/project-adapter-muse.md) copies retained
+strict composition bytes into a new four-XDG allocation and checks its complete
+receipt. Both strict and native-project launch contributions currently refuse
+missing mandatory native qualification. Run
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectadapter ./internal/projectcontext -run TestMuse -count=1`
+and `env -u GIT_DIR -u GIT_WORK_TREE CURATOR_MUSE_ADAPTER_MUTANTS=1 go test ./internal/projectadapter -run '^TestMuseNarrowingMutants$' -count=1 -v`.
+These use Go and Git with disposable fixtures; store logs/caches under `.temp/`.
+
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.
 Vendor tests skip unless `CODEX_EXCL_BINARY` selects the exact build and

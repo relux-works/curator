@@ -23,3 +23,10 @@
   needs proven excluded-origin session state, fresh sessions or refusal.
   Broader late hook/settings/plugin/MCP reloads also remain unqualified.
   [Measured controls and bounds](docs/qualification/project-source-exclusion-claude.md).
+
+- TASK-261022-iixe6f: Muse has no qualification for manager permissions or
+  memory-off, so both strict and native-project launches remain refused.
+  Strict additionally lacks complete native-source exclusion. Native-project
+  profile-only composition receipts require the separate mode-aware I-COMP
+  follow-up; existing additive receipts must not be rebaselined.
+  [Offline adapter scope and evidence](docs/project-adapter-muse.md).
