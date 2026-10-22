@@ -294,6 +294,9 @@ func (s Store) LocateFor(cwd, profileName, env string) (Registration, error) {
 		return Registration{}, err
 	}
 	defer op.close()
+	return op.locateFor(canonical, profileName, env)
+}
+func (op *operation) locateFor(canonical, profileName, env string) (Registration, error) {
 	best := ""
 	matches := []registered{}
 	for _, id := range sortedRegistrationIDs(op.state) {
