@@ -84,6 +84,18 @@ Registry requests use bounded per-attempt and total deadlines. GET requests retr
 
 Canonical skill stores preserve unmanaged content. Install refuses named stale siblings or selected destinations without proven preceding ownership before publishing installation targets. Source ownership requires a readable regular marker, reached without links, whose JSON object carries recognized schema 5 or 6 and names that node. Invalid build evidence remains repairable; missing, unreadable or mismatching ownership evidence refuses with `source_ownership_unproven`. Owned content can still be updated or removed. Adapter takeover and backup rules remain unchanged.
 
+## Book
+
+The standalone Russian [Curator book](docs/book/ru/00-dlya-kogo.md) explains
+context layers, profiles, managed homes and the accepted project-context design.
+The [outline](docs/book/OUTLINE.ru.md) includes later chapters.
+
+Build with `docs/book/build.sh` (pandoc 3.x, WeasyPrint 69+, PT fonts).
+The output is `docs/book/curator-book.ru.pdf`, which is ignored by Git.
+Run `docs/book/check-figures.sh` to verify figure inventory and source hashes.
+PlantUML/Graphviz render commands, tooling tests and artifact locations are in
+[book tooling](docs/book/README.md).
+
 ## Commands without profile setup
 
 Shell profile changes are not required. After `curator install`, agents can invoke project commands through `.agents/bin/<command>` on Unix and `.agents\bin\<command>.cmd` on Windows. Global installation publishes non-destructive forwarding shims to a safe user directory already on `PATH` when one is available; otherwise Curator reports the canonical global bin location. Installed launchers carry the project command directory and resolved system dependency directories themselves, preserve the inherited `PATH`, and return the child command status.

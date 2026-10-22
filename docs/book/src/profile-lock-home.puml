@@ -1,0 +1,27 @@
+@startuml
+!theme plain
+skinparam defaultFontName PT Sans
+skinparam dpi 160
+skinparam shadowing false
+title Profile → lock → managed home
+top to bottom direction
+rectangle "Context package\nagent-context.json\n+ modules + requirements" as source
+rectangle "Machine overlays\nи policy" as policy
+rectangle "Resolve closure\nsource / signer / audit gates" as resolve
+artifact "Profile lock\nточные members и pins" as lock
+database "Immutable store\nпроверенные snapshots" as store
+rectangle "Materialize\nlock + environment + form" as materialize
+folder "Managed home\nroot instructions\nskill projections\nmanaged channels + marker" as home
+source --> resolve
+policy --> resolve
+resolve --> lock
+resolve --> store
+lock --> materialize
+store --> materialize
+materialize --> home
+note bottom of home
+  ⟦работает сегодня⟧
+  Seeds и native mutable state
+  имеют отдельное владение.
+end note
+@enduml
