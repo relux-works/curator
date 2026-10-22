@@ -349,6 +349,12 @@ uses Go, Python 3, Git and macOS `sandbox-exec`. Run
 vendor probes require the pinned binary opt-in and write evidence under `.temp/`.
 See its README for gated replay, MCP fixtures and expected-red controls.
 
+The [Claude permissions and memory replay](.research/claude-permissions-memory/README.md)
+measures 2.1.305 and 2.1.307 separately using the same offline tools. Run
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/claude-permissions-memory -count=1 -v`.
+Its guide lists exact-digest opt-ins, per-atom verdicts, Python collectors and
+narrowing controls; private fixtures go under `.temp/`.
+
 Run `go test ./cmd/curator -run 'Test(RegisteredSubcommandHelpNoWrites|CommandHelp)'`
 for built-in and nested command help, zero-write snapshots, the init positive
 control, provider passthrough, and narrowing mutants. Keep logs under `.temp/`.

@@ -1,0 +1,93 @@
+{
+  "platform": "macOS 27.0 (26A428), darwin/arm64",
+  "go": "go1.25.5 darwin/arm64",
+  "base": "3fd0ab21550879d7196abffe3e8456a784263970",
+  "sources": "source-sha256.txt",
+  "releases": [
+    {
+      "identity": {
+        "platform": "darwin/arm64",
+        "sha256": "ea3ea3c08d2a9634a4651e687fcf900d410c489bce2b00f22bd7352b91ba704f",
+        "version": "2.1.305 (Claude Code)"
+      },
+      "replay": {
+        "name": "replay305final",
+        "version": "2.1.305",
+        "command": [
+          "env",
+          "-u",
+          "GIT_DIR",
+          "-u",
+          "GIT_WORK_TREE",
+          "<CURATOR_GO>",
+          "test",
+          "./.research/claude-permissions-memory",
+          "-run",
+          ".",
+          "-count=1",
+          "-v",
+          "-timeout=9m"
+        ],
+        "exit": 0,
+        "seconds": 49.439
+      },
+      "mutants": {
+        "version": "2.1.305",
+        "exit": 0,
+        "seconds": 35.098,
+        "command": "suite-slot.sh python3 .research/claude-permissions-memory/mutants.py"
+      },
+      "controls": 19,
+      "native_turns": 63,
+      "requests": 160,
+      "top_level_passes": 9,
+      "subtest_passes": 52
+    },
+    {
+      "identity": {
+        "platform": "darwin/arm64",
+        "sha256": "5b113a7752119470f1da419cb0e608af3361cae25b614216b13022093958fb2a",
+        "version": "2.1.307 (Claude Code)"
+      },
+      "replay": {
+        "name": "replay307final",
+        "version": "2.1.307",
+        "command": [
+          "env",
+          "-u",
+          "GIT_DIR",
+          "-u",
+          "GIT_WORK_TREE",
+          "<CURATOR_GO>",
+          "test",
+          "./.research/claude-permissions-memory",
+          "-run",
+          ".",
+          "-count=1",
+          "-v",
+          "-timeout=9m"
+        ],
+        "exit": 0,
+        "seconds": 57.085
+      },
+      "mutants": {
+        "version": "2.1.307",
+        "exit": 0,
+        "seconds": 32.014,
+        "command": "suite-slot.sh python3 .research/claude-permissions-memory/mutants.py"
+      },
+      "controls": 19,
+      "native_turns": 63,
+      "requests": 160,
+      "top_level_passes": 9,
+      "subtest_passes": 52
+    }
+  ],
+  "slot": {
+    "total_seconds": 1068.798,
+    "queue_seconds": 1001.686,
+    "batch_seconds": 67.112,
+    "shared_run_cap": 2,
+    "queue_method": "Outer elapsed minus both measured batch durations; includes wrapper overhead."
+  }
+}
