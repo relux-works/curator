@@ -42,6 +42,8 @@ func TestLeaseNarrowingMutants(t *testing.T) {
 		{"wrong-home-held-witness", "internal/managerlock/managerlock.go", "if canonical != h.lock.home {", "if false && canonical != h.lock.home {", "managerlock", "TestHeldWitnessScopeAndLifetime", "wrong-home witness accepted"},
 		{"missing-authority-witness", "internal/projectlease/manager.go", "m.authority.Resolve(ctx, held, ref, sha)", "m.authority.Resolve(ctx, managerlock.Held{}, ref, sha)", "projectlease", "TestAuthorityRequiresHeldWitness", "manager lock is not held"},
 		{"callback-before-witness-validation", "internal/projectlease/manager.go", "if err := held.Validate(m.home); err != nil {", "if err := held.Validate(m.home); false && err != nil {", "projectlease", "TestAuthorityRequiresHeldWitness", "zero witness invoked callbacks"},
+		{"omit-empty-home-creation", "internal/projectlease/manager.go", "if err = privatedir.MakeAll(projectHome); err != nil {", "if err = error(nil); err != nil {", "projectlease", "TestEmptyGeneratedHome", "empty generated publication:"},
+		{"ignore-missing-empty-home", "internal/projectlease/manager.go", "if err := m.verifyHome(c); err != nil {", "if err := m.verifyHome(c); false && err != nil {", "projectlease", "TestEmptyGeneratedHome", "missing empty home admitted resume"},
 	}
 	controls := map[string]bool{}
 	for _, tc := range cases {
