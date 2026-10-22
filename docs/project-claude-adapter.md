@@ -6,6 +6,53 @@ seam for a trusted Werkstatt. It advertises no complete strict launch tuple.
 The [native qualification record](qualification/project-source-exclusion-claude.md)
 retains the exact executable digest, macOS arm64 identity and bounded probes.
 
+## Explicit operator modes
+
+`native-project` intentionally allows the harness to discover project files
+natively. Its status and launch refusal carry **project sources not isolated**.
+The managed root document is profile-only; project instruction documents are
+not concatenated into either managed instruction channel. Curator's approved
+whole-skill and MCP outputs remain in the offline candidate.
+
+`PrepareClaudeMode` requires the explicit mode, a consistent composition byte
+map/receipt, matching manager controls, and a `ClaudeProfileDocumentSource`.
+The source's `ProfileDocuments(ctx, compositionRef, compositionSHA256)` must
+return I-COMP's dedicated `CompositionPreview.ProfileDocuments` and
+`ProfileDocumentReceipt` for that protected composition. It must never split
+the combined instruction text. The interface deliberately has no fallback;
+`ClaudeProfileDocumentsUnavailable` returns a typed refusal until the owning
+I-COMP r3 implementation is connected. Tests use a dedicated source fixture,
+not an assertion that r3 protected resolution has already shipped.
+
+Only `CLAUDE.md` and the optional additive system document are accepted from
+that source, with exact receipt bytes and private data-file modes. The plan
+retains whole approved skill files and MCP, regenerates the same manager
+settings/marker, excludes command activation outputs, and copies all bytes.
+Its candidate receipt binds mode, form and the profile-only document receipt.
+It differs from the strict receipt and cannot be substituted for the original
+protected composition or published through its lease. Preparation is inert:
+there is no filesystem writer, lease publisher, native argv or environment.
+
+`Authority.ClaudeLaunchMode` uses the shared launch-result shape and currently
+returns no argv/environment for any mode. Native-project's mandatory manager
+permissions and memory-off remain unqualified; its typed diagnostic names
+both and preserves the notice even for resume/fork attempts. `strict` retains
+the complete-tuple typed refusal; an absent/unknown mode is invalid rather than
+an implicit native-project opt-in. The r1 strict rendering/construction seam
+below remains available as internal preparation, never launch authorization.
+
+All report fields use the candidate shared `projectadapter.Certification`
+shape, including Mode, Form and Notice. `ClaudeCertification` only embeds it
+to retain the provider's strict-gate method. Shared `types.go` matches the
+published Muse candidate exactly; mode constants live separately. The receipt
+Surface alias uses the same shared projection mirroring I-LEASE.
+
+The [qualification gap inventory](../.research/project-claude-native-project-gaps.md)
+identifies P6's exact limited permission evidence, the unprobed memory-off
+precondition, and the discriminating native probes needed for either surface.
+This implementation performs no native experiment or login and makes no new
+native certification claim.
+
 ## Protected outputs
 
 Set `ComposeRequest.Claude` to manager-resolved `ClaudeControls{Version: 1}`
@@ -95,8 +142,8 @@ No CLI project launch or capability advertisement is enabled here.
 
 ## Certification and refusal
 
-`ClaudeCertificationReport` returns typed measured and unmeasured surface
-lists for the exact release/platform/architecture. Its measured entries are
+`ClaudeCertificationReport` returns shared Certified and Refused surface
+lists for strict mode at the exact release/platform/architecture. Its measured entries are
 bounded by the linked native record: six startup instruction locations, three
 nested Read instruction paths, selected skill/reload cases, explicit stdio
 MCP, startup permission atoms, excluded-origin resume and one background Task
