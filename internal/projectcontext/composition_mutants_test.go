@@ -48,6 +48,7 @@ func TestCompositionNarrowingMutants(t *testing.T) {
 		{"allow-duplicate-modes", "composition_types.go", "TestCompositionAdapterModes", `(i > 0 && m == a.Modes[i-1])`, `(i > 0 && m == a.Modes[i-1] && false)`, "want project_context_invalid"},
 		{"allow-unknown-registration-mode", "registration.go", "TestCompositionRegistrationMode", `if !validSourceMode(mode) {`, `if !validSourceMode(mode) && false {`, "want project_context_invalid"},
 		{"ignore-retained-registration-mode", "store.go", "TestCompositionRegistrationMode", `!validSourceMode(v.Mode)`, `false`, "want project_context_drift"},
+		{"retain-implicit-mode-alias", "composition_authority.go", "TestCompositionNativeProfileOnly", `req.Mode = again.Preview.Record.Mode`, `_ = req.Mode`, "equivalent explicit mode changed publication"},
 	}
 
 	for _, tc := range cases {
