@@ -74,6 +74,8 @@ type CompositionPolicy struct {
 	System  contextmaterialize.Admission `json:"system"`
 }
 type ComposeRequest struct {
+	// Claude enables manager-controlled native outputs before receipt hashing.
+	Claude          *ClaudeControls `json:",omitempty"`
 	CheckoutID      string
 	Selections      []Selection
 	Adapter         AdapterContract
@@ -100,6 +102,7 @@ type Composition struct {
 	Generated       map[string]Surface `json:"generated"`
 }
 type CompositionPreview struct {
+	MCPEnvNames  []string `json:",omitempty"`
 	Record       CompositionRecord
 	Generation   Generation
 	PolicyRecord json.RawMessage
