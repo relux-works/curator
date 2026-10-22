@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -122,11 +123,27 @@ type FileChange struct {
 	After  string `json:"after"`
 }
 type Change struct {
-	ItemID string       `json:"item_id"`
-	Effect string       `json:"effect"`
-	Before string       `json:"before"`
-	After  string       `json:"after"`
-	Files  []FileChange `json:"files"`
+	ItemID    string          `json:"item_id"`
+	Effect    string          `json:"effect"`
+	Before    string          `json:"before"`
+	After     string          `json:"after"`
+	Files     []FileChange    `json:"files"`
+	Semantics *SemanticChange `json:"semantics,omitempty"`
+}
+type SemanticChange struct {
+	Before *SkillSemantics `json:"before,omitempty"`
+	After  *SkillSemantics `json:"after"`
+}
+type SkillSemantics struct {
+	CommandOwners         []CommandOwner `json:"command_owners"`
+	RequestedCapabilities map[string]any `json:"requested_capabilities"`
+	MCPEndpoints          []string       `json:"mcp_endpoints"`
+	PermissionEffects     string         `json:"permission_effects"`
+}
+type CommandOwner struct {
+	Name        string         `json:"name"`
+	ItemID      string         `json:"item_id"`
+	Declaration map[string]any `json:"declaration"`
 }
 type Review struct {
 	Version            int         `json:"version"`
@@ -208,13 +225,92 @@ func decode(b []byte, v any) error {
 		}
 	}
 	d = json.NewDecoder(bytes.NewReader(b))
+	if err := exactMembers(b, reflect.TypeOf(v)); err != nil {
+		return err
+	}
 	d.DisallowUnknownFields()
 	if err := d.Decode(v); err != nil {
 		return fail("project_context_invalid", err.Error())
 	}
 	return nil
 }
-func ParseDeclaration(b []byte) (Declaration, error) {
+
+// encoding/json matches struct fields without regard to case. Check raw
+// object members before typed decoding; map keys remain owning data names.
+func exactMembers(b []byte, typ reflect.Type) error {
+	for typ.Kind() == reflect.Pointer {
+		typ = typ.Elem()
+	}
+	if typ == reflect.TypeOf(json.RawMessage{}) || typ.Kind() == reflect.Interface {
+		return nil
+	}
+	switch typ.Kind() {
+	case reflect.Struct:
+		var obj map[string]json.RawMessage
+		if err := json.Unmarshal(b, &obj); err != nil || obj == nil {
+			return fail("project_context_invalid", "expected closed object")
+		}
+		fields := map[string]reflect.StructField{}
+		for i := 0; i < typ.NumField(); i++ {
+			f := typ.Field(i)
+			if !f.IsExported() {
+				continue
+			}
+			name := strings.Split(f.Tag.Get("json"), ",")[0]
+			if name == "-" {
+				continue
+			}
+			if name == "" {
+				name = f.Name
+			}
+			fields[name] = f
+		}
+		for name, raw := range obj {
+			f, ok := fields[name]
+			if !ok {
+				return fail("project_context_invalid", "unknown exact-case object member")
+			}
+			if bytes.Equal(raw, []byte("null")) && f.Type.Kind() == reflect.Pointer {
+				continue
+			}
+			if err := exactMembers(raw, f.Type); err != nil {
+				return err
+			}
+		}
+		for name, f := range fields {
+			if _, ok := obj[name]; !ok && !strings.Contains(f.Tag.Get("json"), ",omitempty") {
+				return fail("project_context_invalid", "missing object member: "+name)
+			}
+		}
+	case reflect.Map:
+		var obj map[string]json.RawMessage
+		if err := json.Unmarshal(b, &obj); err != nil || obj == nil {
+			return fail("project_context_invalid", "expected map")
+		}
+		for _, raw := range obj {
+			if err := exactMembers(raw, typ.Elem()); err != nil {
+				return err
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		var arr []json.RawMessage
+		if err := json.Unmarshal(b, &arr); err != nil || arr == nil {
+			return fail("project_context_invalid", "expected array")
+		}
+		for _, raw := range arr {
+			if err := exactMembers(raw, typ.Elem()); err != nil {
+				return err
+			}
+		}
+	default:
+		if bytes.Equal(b, []byte("null")) {
+			return fail("project_context_invalid", "null scalar")
+		}
+	}
+	return nil
+}
+func ParseDeclaration(b []byte) (result Declaration, resultErr error) {
+	defer func() { resultErr = projectError(resultErr) }()
 	var d Declaration
 	if err := decode(b, &d); err != nil {
 		return d, err
@@ -269,7 +365,8 @@ func relative(p string) bool {
 
 // ReadDeclaration reads an explicit operator request as bounded inert data.
 // It refuses links and non-regular files before opening the candidate.
-func ReadDeclaration(path string) (Declaration, error) {
+func ReadDeclaration(path string) (result Declaration, resultErr error) {
+	defer func() { resultErr = projectError(resultErr) }()
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return Declaration{}, err
