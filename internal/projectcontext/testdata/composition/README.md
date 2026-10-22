@@ -9,3 +9,9 @@ is separately tested against protocol/project-context section 3.
 
 The upstream corpus is Apache-2.0, like this repository. No native runtime or
 adapter qualification is claimed by these vectors.
+
+The six resources in `schemas/` are copied from that same commit, with byte
+hashes retained in `schemas-manifest.json`. The Go schema checker uses a closed
+loader over those resources and validates all four emitted record kinds for
+Claude Code, Codex and Muse. An invalid-memory control must fail specifically
+at the `memory` constant, then the restored valid record must pass.
