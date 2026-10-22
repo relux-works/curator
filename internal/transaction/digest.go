@@ -85,6 +85,12 @@ func digestLinkDestination(destination string) (string, error) {
 	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), nil
 }
 
+// DigestRegularPayload digests already observed regular bytes with their mode,
+// so a planner can bind a write to the bytes it actually inspected.
+func DigestRegularPayload(payload []byte, mode os.FileMode) (string, error) {
+	return digestRegularPayload(payload, mode)
+}
+
 func digestRegularPayload(payload []byte, mode os.FileMode) (string, error) {
 	hash := sha256.New()
 	_, _ = hash.Write(digestDomain)

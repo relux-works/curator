@@ -276,6 +276,19 @@ func UserPath() string {
 // SystemPath resolves the enforced system config path, honoring the env
 // override; returns "" when no system config exists.
 func SystemPath() string {
+	candidate := SystemCandidatePath()
+	if os.Getenv("CURATOR_SYSTEM_CONFIG") != "" {
+		return candidate
+	}
+	if _, err := os.Stat(candidate); err == nil {
+		return candidate
+	}
+	return ""
+}
+
+// SystemCandidatePath includes a currently absent default system policy.
+// Transactional consumers freeze its absence as well as existing policy bytes.
+func SystemCandidatePath() string {
 	if override := os.Getenv("CURATOR_SYSTEM_CONFIG"); override != "" {
 		return expandHome(override)
 	}
@@ -289,10 +302,7 @@ func SystemPath() string {
 	} else {
 		candidate = "/etc/curator/config.json"
 	}
-	if _, err := os.Stat(candidate); err == nil {
-		return candidate
-	}
-	return ""
+	return candidate
 }
 
 // Load reads the user config, overlays the system config, and parses the

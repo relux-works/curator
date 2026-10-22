@@ -18,14 +18,14 @@ func (c cli) profileUseUsage() {
 }
 
 // cmdProfile dispatches the profile family (cli/curator.md): install,
-// import, list, use, update, remove, sync, compose.
+// import, list, use, update, remove, sync, compose, mcp.
 func (c cli) cmdProfile(args []string) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile needs a subcommand: install | import | list | use | update | remove | sync | compose")
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile needs a subcommand: install | import | list | use | update | remove | sync | compose | mcp")
 		return exitUsage
 	}
 	if wantsHelp(args) {
-		_, _ = fmt.Fprint(c.stdout, "usage: curator profile <install|import|list|use|update|remove|sync|compose> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
+		_, _ = fmt.Fprint(c.stdout, "usage: curator profile <install|import|list|use|update|remove|sync|compose|mcp> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
 		return exitOK
 	}
 	cfg, code := c.loadConfig()
@@ -33,6 +33,8 @@ func (c cli) cmdProfile(args []string) int {
 		return code
 	}
 	switch args[0] {
+	case "mcp":
+		return c.cmdProfileMCP(cfg, args[1:])
 	case "install":
 		return c.cmdProfileInstall(cfg, args[1:])
 	case "import":

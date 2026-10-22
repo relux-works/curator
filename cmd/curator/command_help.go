@@ -50,13 +50,21 @@ var commandRegistry = []commandSpec{
 	{"global adopt", "<command> [--dry-run]", "Adopt an existing global command.", "", nil},
 	{"global update", "", "Fetch global source repositories.", "", nil},
 	{"global upgrade", "[--dry-run] [--audit[=advisory|strict]]", "Fetch the global dependency closure and install it.", "", nil},
-	{"profile", "<install|import|list|use|update|remove|sync|compose> [arguments]", "Manage environment profiles.", "Requires the global config: " + configNotFoundHint + ".\n", cli.cmdProfile},
+	{"profile", "<install|import|list|use|update|remove|sync|compose|mcp> [arguments]", "Manage environment profiles.", "Requires the global config: " + configNotFoundHint + ".\n", cli.cmdProfile},
 	{"profile install", "<source> [--directory <dir>] [--range <range>|--tag <tag>|--revision <ref>] [--as <name>] [--use] [--takeover] [--confirm-system-delta]", "Install an environment profile from a source package.", "", nil},
 	{"profile import", "[--as <name>] [--allow-lossy] [--use]", "Import the managed home as an environment profile.", "", nil},
 	{"profile list", "", "List installed environment profiles.", "", nil},
 	{"profile use", "<name> [--env <env-id>] [--target <target-id>] [--clear] [--takeover]", "Activate or clear an environment profile.", envAliasUsage + "\n", nil},
 	{"profile update", "[<name>] [--all] [--takeover] [--confirm-system-delta]", "Update installed environment profiles.", "", nil},
 	{"profile remove", "<name> [--purge]", "Remove an installed environment profile.", "", nil},
+	{"profile mcp", "<install|status|repair|restore|replace|remove|release> <profile> [flags]", "Inspect or first-install profile package MCP records.", "Ownership actions refuse until the separate authority capability is available.\n", nil},
+	{"profile mcp install", "<profile> [--env <id,id>] [--scope profile] [--dry-run] [--takeover]", "First-install absent records or refuse unavailable ownership actions.", "", nil},
+	{"profile mcp status", "<profile> [--env <id,id>] [--scope profile] [--dry-run] [--takeover]", "Inspect profile MCP records without recovery or writes.", "", nil},
+	{"profile mcp repair", "<profile> [--env <id,id>] [--scope profile] [--dry-run] [--takeover]", "First-install absent records or refuse unavailable ownership actions.", "", nil},
+	{"profile mcp restore", "<profile> [--env <id,id>] [--scope profile] [--dry-run] [--takeover]", "Refuse ownership actions until the authority capability is available.", "", nil},
+	{"profile mcp replace", "<profile> [--env <id,id>] [--scope profile] [--dry-run] [--takeover]", "Refuse ownership actions until the authority capability is available.", "", nil},
+	{"profile mcp remove", "<profile> [--env <id,id>] [--scope profile] [--dry-run] [--takeover]", "Refuse ownership actions until the authority capability is available.", "", nil},
+	{"profile mcp release", "<profile> [--env <id,id>] [--scope profile] [--dry-run] [--takeover]", "Refuse ownership actions until the authority capability is available.", "", nil},
 	{"profile sync", "[--takeover]", "Synchronize active environment profiles.", "", nil},
 	{"profile compose", "<profile> <add|remove|list> [arguments]", "Compose an environment profile from installed profiles.", "", nil},
 	{"profile compose <profile> add", "<source> [--range <range>|--tag <tag>|--revision <ref>] [--directory <dir>] [--weight <n>]", "Add an overlay to a composed profile.", "", nil},
@@ -157,7 +165,7 @@ func rejectsTakeover(args []string) bool {
 	command, _ := registeredCommand(args)
 	if command != nil {
 		switch command.name {
-		case "profile use", "profile sync", "profile update":
+		case "profile mcp", "profile mcp install", "profile mcp status", "profile mcp repair", "profile mcp restore", "profile mcp replace", "profile mcp remove", "profile mcp release", "profile use", "profile sync", "profile update":
 			return false
 		case "env resolve":
 			return !repair || dryRun
