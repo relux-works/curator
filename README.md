@@ -335,8 +335,8 @@ reported without values. They grant no approval or scope override.
 This stage has no native MCP writer. Explicit canonical environment targets
 (`claude_code`, `codex_cli`, `opencode`, `pi`, `muse`) are reported individually
 as `skipped: unsupported`, with an unavailable path. An absent selector selects
-writable targets; none are qualified in this stage. Existing native files are
-preserved. URL shorthand and inline server objects are parsed and validated,
+writable targets; none are qualified in this stage. Refused input retains independently known pairs; malformed declarations
+receive declaration-level diagnostics. Existing native files are preserved. URL shorthand and inline server objects are parsed and validated,
 then refused as `mcp_inline_approval_unsupported`, including purported approvals.
 The stage-A `npx`/`uvx` operands require the closed exact-version pin forms;
 legacy package byte bounds still apply alongside the new scalar bounds.

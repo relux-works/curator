@@ -48,23 +48,43 @@ var uvRE = regexp.MustCompile(`^([a-z0-9](?:[a-z0-9._-]*[a-z0-9])?)(@|==)((?:0|[
 // Environments is the persisted environment vocabulary, not CLI aliases.
 var environments = []string{"claude_code", "codex_cli", "muse", "opencode", "pi"}
 
-// ParseSet recognizes all three declaration arms. Valid inline arms remain
-// identifiable for total refusal reporting; admission always refuses them.
+// SetError retains only independently valid declarations for refusal reporting.
+// Its valid siblings never authorize partial admission after a failed parse.
+type SetError struct {
+	Cause error
+	Valid map[string]Declaration
+}
+
+func (e *SetError) Error() string { return e.Cause.Error() }
+func (e *SetError) Unwrap() error { return e.Cause }
+
+// ParseSet recognizes all three arms. On failure, no declaration set is
+// admitted; valid siblings remain available solely through the typed error.
 func ParseSet(raw any) (map[string]Declaration, error) {
 	object, ok := raw.(map[string]any)
 	if !ok {
 		return nil, invalid("mcp_servers must be an object")
 	}
 	out := map[string]Declaration{}
+	var first error
 	for _, name := range sortedKeys(object) {
+		var decl Declaration
+		var err error
 		if !nameRE.MatchString(name) {
-			return nil, invalid("mcp_servers NAME")
+			err = invalid("mcp_servers NAME")
+		} else {
+			decl, err = ParseDeclaration(object[name])
 		}
-		decl, err := ParseDeclaration(object[name])
 		if err != nil {
-			return nil, err
+			if first == nil {
+				first = err
+			}
+			continue
 		}
 		out[name] = decl
+	}
+	if first != nil {
+		return nil, &SetError{Cause: first, Valid: out}
 	}
 	return out, nil
 }
