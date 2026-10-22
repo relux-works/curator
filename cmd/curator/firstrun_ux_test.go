@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // Second-operator first-run rows (TASK-260930-3b3oyi): every row drives
@@ -238,7 +240,7 @@ func TestPostureWarningOncePerProcessTree(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		binary += ".exe"
 	}
-	build := exec.Command("go", "build", "-p", "1", "-o", binary, ".")
+	build := exec.Command(testtoolchain.Go(t), "build", "-p", "1", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("go build: %v\n%s", err, output)
 	}

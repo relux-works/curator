@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/conformancecoverage"
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/testtoolchain"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
@@ -37,7 +38,7 @@ func main(){if len(os.Args)==2 && os.Args[1]=="--version" {os.Stdout.WriteString
 		name += ".exe"
 	}
 	binary := filepath.Join(dir, name)
-	cmd := exec.Command("go", "build", "-o", binary, src)
+	cmd := exec.Command(testtoolchain.Go(t), "build", "-o", binary, src)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build fake Muse: %v %s", err, output)
 	}
