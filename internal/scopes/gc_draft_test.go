@@ -60,7 +60,7 @@ func TestCollectRetainsDraftSourceV1Runtime(t *testing.T) {
 	}
 
 	cache := &recordingCache{}
-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
+	result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
 	if err != nil {
 		t.Fatal(err)
 	}

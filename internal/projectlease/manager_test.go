@@ -84,6 +84,13 @@ func atHome(t *testing.T, home string) fixture {
 	t.Helper()
 	files := map[string][]byte{"AGENTS.md": []byte("approved\n")}
 	c := Composition{Ref: "composition:first", SHA256: strings.Repeat("a", 64), CheckoutID: "checkout-a", Profile: "default", Environment: "codex_cli", HomeRef: "home:first", ConcurrentState: true, BuildKeys: []string{"sha256:" + strings.Repeat("b", 64)}, RuntimeEntries: []string{"tool/revision"}, Generated: inventory(files)}
+	// These roots stand for artifacts already verified by the fixture authority;
+	// receipt/hash qualification belongs to the composition/cache implementation.
+	for _, path := range []string{filepath.Join(home, "runtime", "tool", "revision"), filepath.Join(home, "cache", "build", "go-v1", strings.Repeat("b", 64))} {
+		if err := privatedir.MakeAll(path); err != nil {
+			t.Fatal(err)
+		}
+	}
 	a := &authorities{home: home, comps: map[string]Composition{c.Ref: c}, sessions: map[string]Evidence{}}
 	m, err := New(home, a, a)
 	if err != nil {
