@@ -1,8 +1,9 @@
-// Package manifest parses project Skillfile.json schema 1 and schema 2
+// Package manifest parses project Skillfile.json schemas 1, 2 and 3
 // declarations and edits legacy schema-1 declarations.
 package manifest
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/projectmcp"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/verr"
 )
@@ -50,6 +52,7 @@ type Manifest struct {
 	Agents        []string
 	Locale        string
 	Skills        []Decl
+	MCPServers    map[string]projectmcp.Declaration
 }
 
 // PathIn returns the manifest path for a project root.
@@ -78,6 +81,10 @@ func Load(projectRoot string) (*Manifest, error) {
 // and parsing a possibly different generation.
 func ParseBytes(payload []byte, filePath string) (*Manifest, error) {
 	if err := protocoljson.Validate(payload); err != nil {
+		if schema3Prefix(payload) {
+			return nil, &projectmcp.Error{Code: projectmcp.Invalid, Field: "Skillfile JSON"}
+		}
+
 		return nil, fmt.Errorf("malformed JSON in %s: %w", filePath, err)
 	}
 	var raw any
@@ -87,6 +94,19 @@ func ParseBytes(payload []byte, filePath string) (*Manifest, error) {
 	obj, ok := raw.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("%s must contain a JSON object", filePath)
+	}
+	if obj["schema_version"] == float64(3) {
+		decoder := json.NewDecoder(bytes.NewReader(payload))
+		decoder.UseNumber()
+		var precise map[string]any
+		if err := decoder.Decode(&precise); err != nil {
+			return nil, &projectmcp.Error{Code: projectmcp.Invalid, Field: "Skillfile JSON"}
+		}
+		if _, err := protocoljson.MarshalCanonical(precise); err != nil {
+			return nil, &projectmcp.Error{Code: projectmcp.Invalid, Field: "Skillfile JSON scalars"}
+		}
+		precise["schema_version"] = float64(3)
+		obj = precise
 	}
 	return Parse(obj, filePath)
 }
@@ -99,21 +119,30 @@ func Parse(obj map[string]any, filePath string) (*Manifest, error) {
 	}
 	number, ok := schema.(float64)
 	if !ok || number != float64(int(number)) {
+		if _, extension := obj["mcp_servers"]; extension {
+			return nil, &projectmcp.Error{Code: projectmcp.Invalid, Field: "Skillfile schema_version"}
+		}
 		return nil, verr.New("schema_version", "must be an integer, got %v", schema)
 	}
-	if number != SchemaVersion && number != 2 {
+	if number != SchemaVersion && number != 2 && number != 3 {
 		return nil, verr.New("schema_version", "unsupported Skillfile schema_version %d; this Skillfile requires a newer tool", int(number))
 	}
 
 	allowed := []string{"schema_version", "project", "agents", "locale", "skills"}
-	if number == 2 {
+	if number >= 2 {
 		allowed = append(allowed, "sources")
 	}
+	if number == 3 {
+		allowed = append(allowed, "mcp_servers")
+	}
 	if unknown := unknownFields(obj, allowed...); len(unknown) > 0 {
+		if number == 3 {
+			return nil, &projectmcp.Error{Code: projectmcp.Invalid, Field: "Skillfile members"}
+		}
 		return nil, verr.New("Skillfile", "unsupported field(s): %s", strings.Join(unknown, ", "))
 	}
 	var sources map[string]Source
-	if number == 2 {
+	if number >= 2 {
 		var err error
 		sources, err = parseSources(obj)
 		if err != nil {
@@ -159,7 +188,7 @@ func Parse(obj map[string]any, filePath string) (*Manifest, error) {
 		if !ok {
 			return nil, verr.New(label, "must be an object")
 		}
-		if _, selected := entry["from"]; selected && number == 2 {
+		if _, selected := entry["from"]; selected && number >= 2 {
 			decl, err := parseSelector(entry, sources, label)
 			if err != nil {
 				return nil, err
@@ -224,7 +253,16 @@ func Parse(obj map[string]any, filePath string) (*Manifest, error) {
 		skills = append(skills, Decl{Name: name, Source: source, Ref: Ref{Kind: refKeys[0], Value: refValue}, Git: git})
 	}
 
-	return &Manifest{Path: filePath, SchemaVersion: int(number), Sources: sources, ProjectAlias: alias, Agents: agents, Locale: locale, Skills: skills}, nil
+	var mcpServers map[string]projectmcp.Declaration
+	if number == 3 {
+		if raw, present := obj["mcp_servers"]; present {
+			mcpServers, err = projectmcp.ParseSet(raw)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return &Manifest{MCPServers: mcpServers, Path: filePath, SchemaVersion: int(number), Sources: sources, ProjectAlias: alias, Agents: agents, Locale: locale, Skills: skills}, nil
 }
 
 func parseProjectAlias(obj map[string]any) (string, error) {
@@ -394,4 +432,35 @@ func writeJSON(filePath string, payload any) error {
 		return err
 	}
 	return os.WriteFile(filePath, append(data, '\n'), 0o644)
+}
+
+// schema3Prefix classifies an already rejected document from a well-formed
+// leading schema member. It never admits input or exposes malformed field data.
+func schema3Prefix(payload []byte) bool {
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.UseNumber()
+	first, err := decoder.Token()
+	if err != nil || first != json.Delim('{') {
+		return false
+	}
+	for decoder.More() {
+		key, err := decoder.Token()
+		if err != nil {
+			return false
+		}
+		var raw json.RawMessage
+		if err := decoder.Decode(&raw); err != nil {
+			return false
+		}
+		if key == "schema_version" {
+			var version json.Number
+			if json.Unmarshal(raw, &version) == nil {
+				number, err := version.Float64()
+				if err == nil && number == 3 {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

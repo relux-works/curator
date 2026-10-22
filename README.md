@@ -298,6 +298,56 @@ setup, and [Skillfile source and transport
 diagnostics](docs/troubleshooting.md#skillfile-source-and-transport-diagnostics)
 for the stable error classes.
 
+## Skillfile schema 3 MCP package declarations
+
+Project schema 3 inherits schema 2 and adds optional `mcp_servers`. Machine-global
+Skillfiles still require schema 1. No command implicitly upgrades a manifest.
+
+```json
+{
+  "schema_version": 3,
+  "skills": [],
+  "mcp_servers": {
+    "tool": {
+      "package": {"git": "https://packages.example/tool", "tag": "v1.2.3"},
+      "install": {"scope": "project"}
+    }
+  }
+}
+```
+
+`curator project resolve .` (or `refresh`) validates exact Git packages through
+machine source/MCP allowlists, signer policy, revocations, strict audit and
+machine environment-name ceilings. It publishes `Skillfile.mcp-lock.json`
+alongside the unchanged source lock and protected local replay authority.
+A repository-supplied lock alone cannot authorize installation. The manifest
+identity hashes the complete CCJ-1 document; whitespace and object key order
+are immaterial. Declaration, normalized server and package content identities
+remain distinct.
+
+`curator install . --dry-run` and status consume only locked local input and
+never fetch, authenticate or start an MCP runtime. Missing input refuses.
+An actual install can reconstruct a missing snapshot at its exact locked
+commit under current machine policy. No selector is re-resolved during replay.
+All supplied `install` options are preserved but ignored, and their names are
+reported without values. They grant no approval or scope override.
+
+This stage has no native MCP writer. Explicit canonical environment targets
+(`claude_code`, `codex_cli`, `opencode`, `pi`, `muse`) are reported individually
+as `skipped: unsupported`, with an unavailable path. An absent selector selects
+writable targets; none are qualified in this stage. Existing native files are
+preserved. URL shorthand and inline server objects are parsed and validated,
+then refused as `mcp_inline_approval_unsupported`, including purported approvals.
+The stage-A `npx`/`uvx` operands require the closed exact-version pin forms;
+legacy package byte bounds still apply alongside the new scalar bounds.
+
+Focused checks:
+
+```bash
+env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectmcp ./internal/projectmcpstate
+env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envprofile ./cmd/curator -run TestProjectMCP
+```
+
 ## An open protocol
 
 Curator conforms to an open specification. Independent implementations include [cocoaskills](https://github.com/ivanopcode/cocoaskills). The registry protocol is implemented by [Curator Skill Registry](https://github.com/relux-works/curator-skill-registry).
