@@ -28,6 +28,7 @@ import (
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/testgitenv"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 const (
@@ -825,7 +826,7 @@ func TestReviewProbeLegacyLaneIdentityInvalid(t *testing.T) {
 
 func TestProductionBinaryDispatchesSSHWrapper(t *testing.T) {
 	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
-	build := exec.Command("go", "build", "-o", binary, ".")
+	build := exec.Command(testtoolchain.Go(t), "build", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build production curator: %v\n%s", err, output)
 	}

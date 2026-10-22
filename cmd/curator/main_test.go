@@ -32,6 +32,7 @@ import (
 	"github.com/relux-works/curator/internal/scriptworker"
 	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/testgitenv"
+	"github.com/relux-works/curator/internal/testtoolchain"
 	"github.com/relux-works/curator/internal/version"
 )
 
@@ -914,7 +915,7 @@ func TestProductionBinaryDispatchesNetNSProbe(t *testing.T) {
 		t.Fatalf("hidden probe mode %q appears in the user-visible command surface", scriptworker.ScriptNetNSProbeMode)
 	}
 	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
-	build := exec.Command("go", "build", "-o", binary, ".")
+	build := exec.Command(testtoolchain.Go(t), "build", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build production curator: %v\n%s", err, output)
 	}
@@ -936,7 +937,7 @@ func TestProductionBinaryDispatchesLandlockProbe(t *testing.T) {
 		t.Fatalf("hidden probe mode %q appears in the user-visible command surface", scriptworker.ScriptLandlockProbeMode)
 	}
 	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
-	build := exec.Command("go", "build", "-o", binary, ".")
+	build := exec.Command(testtoolchain.Go(t), "build", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build production curator: %v\n%s", err, output)
 	}
@@ -967,7 +968,7 @@ func productionBinarySuffix() string {
 func TestProductionBinaryDispatchesRustOracleBeforeAmbientCargoDiscovery(t *testing.T) {
 	t.Parallel()
 	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
-	build := exec.Command("go", "build", "-o", binary, ".")
+	build := exec.Command(testtoolchain.Go(t), "build", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build production curator: %v\n%s", err, output)
 	}
