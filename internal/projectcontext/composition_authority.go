@@ -3,11 +3,14 @@ package projectcontext
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
 )
@@ -15,8 +18,8 @@ import (
 // CompositionAuthority mirrors the I-LEASE contract until its owning package
 // is integrated. These exact shapes will be replaced with that package import.
 type CompositionAuthority interface {
-	Resolve(context.Context, string, string) (Composition, error)
-	Authorize(context.Context, Composition, string) error
+	Resolve(context.Context, managerlock.Held, string, string) (Composition, error)
+	Authorize(context.Context, managerlock.Held, Composition, string) error
 }
 
 // Authority is bound to an operator-controlled store and the invocation CWD.
@@ -29,6 +32,9 @@ type Authority struct {
 }
 
 var _ CompositionAuthority = Authority{}
+
+// Temporary sentinel mirror, replaced by projectlease.ErrRevoked at integration.
+var ErrAuthorityRevoked = errors.New("project authority revoked")
 
 type compositionEnvelope struct {
 	Version        int
@@ -108,6 +114,9 @@ func (a Authority) PublishComposition(ctx context.Context, req ComposeRequest, e
 		if err = ctx.Err(); err != nil {
 			return Composition{}, err
 		}
+		if err = op.lock.Held().Validate(filepath.Dir(op.root)); err != nil {
+			return Composition{}, err
+		}
 		if err = writeAtomic(dir, name, b); err != nil {
 			return Composition{}, err
 		}
@@ -143,14 +152,24 @@ func (a Authority) bound(op *operation, id string) error {
 	}
 	return nil
 }
-func (a Authority) Resolve(ctx context.Context, ref, sha256 string) (Composition, error) {
-	op, err := a.Store.begin(false)
+func (a Authority) Resolve(ctx context.Context, held managerlock.Held, ref, sha256 string) (Composition, error) {
+	if err := ctx.Err(); err != nil {
+		return Composition{}, err
+	}
+	op, err := a.Store.readHeld(held)
 	if err != nil {
 		return Composition{}, err
 	}
-	defer op.close()
-	return a.resolve(ctx, op, ref, sha256)
+	c, err := a.resolve(ctx, op, ref, sha256)
+	if err != nil {
+		return Composition{}, err
+	}
+	if err = held.Validate(filepath.Dir(op.root)); err != nil {
+		return Composition{}, err
+	}
+	return c, nil
 }
+
 func (a Authority) resolve(ctx context.Context, op *operation, ref, hash string) (Composition, error) {
 	if !hexRE.MatchString(hash) || ref != "composition:"+hashID(hash) {
 		return Composition{}, fail("project_context_invalid", "invalid composition reference or digest")
@@ -185,6 +204,12 @@ func (a Authority) resolve(ctx context.Context, op *operation, ref, hash string)
 	if err = a.bound(op, saved.Request.CheckoutID); err != nil {
 		return Composition{}, err
 	}
+	for _, item := range saved.Preview.Generation.Items {
+		approval, ok := op.state.Approvals[saved.Request.CheckoutID+":"+item.ItemID]
+		if ok && (approval.Revoked || approval.Record.ItemSHA256 != item.ItemSHA256) {
+			return Composition{}, fmt.Errorf("project_item_unapproved: %w", ErrAuthorityRevoked)
+		}
+	}
 	plan, err := op.compose(ctx, saved.Request)
 	if err != nil {
 		return Composition{}, err
@@ -195,13 +220,15 @@ func (a Authority) resolve(ctx context.Context, op *operation, ref, hash string)
 	}
 	return compositionOf(plan), nil
 }
-func (a Authority) Authorize(ctx context.Context, c Composition, ownerRef string) error {
-	op, err := a.Store.begin(false)
+func (a Authority) Authorize(ctx context.Context, held managerlock.Held, c Composition, ownerRef string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	op, err := a.Store.readHeld(held)
 	if err != nil {
 		return err
 	}
-	defer op.close()
-	if !strings.HasPrefix(ownerRef, "principal:") || ownerRef != op.state.Principal {
+	if !tagged(ownerRef, "principal") || ownerRef != op.state.Principal {
 		return fail("project_item_unapproved", "owner has no current manager authority")
 	}
 	resolved, err := a.resolve(ctx, op, c.Ref, c.SHA256)
@@ -211,8 +238,12 @@ func (a Authority) Authorize(ctx context.Context, c Composition, ownerRef string
 	if identity(resolved) != identity(c) {
 		return fail("project_context_drift", "resolved composition binding or receipt differs")
 	}
+	if err = held.Validate(filepath.Dir(op.root)); err != nil {
+		return err
+	}
 	return ctx.Err()
 }
+
 func compositionOf(plan compositionPlan) Composition {
 	p := plan.Preview
 	c := Composition{Ref: p.Ref, SHA256: p.SHA256, CheckoutID: strings.TrimPrefix(p.Record.RegistrationRef, "registration:"), Profile: p.Record.Profile.Name, Environment: p.Record.Environment, HomeRef: p.Record.HomeRef, ConcurrentState: plan.ConcurrentState, BuildKeys: append([]string{}, plan.BuildKeys...), RuntimeEntries: append([]string{}, plan.RuntimeEntries...), Generated: map[string]Surface{}}
