@@ -3,6 +3,7 @@ package projectlease
 import (
 	"context"
 	"errors"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/transaction"
 	"os"
 	"os/exec"
@@ -180,4 +181,66 @@ func TestLeaseCrashHelper(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Fatal("crash plant did not execute")
+}
+
+// An empty generated inventory still publishes a private stable home. Once
+// leased, a missing home refuses resume and identical publication without
+// recreating it; idle reuse preserves native state in the existing directory.
+func TestEmptyGeneratedHome(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	f.files = map[string][]byte{}
+	f.c.Generated = inventory(f.files)
+	f.a.comps[f.c.Ref] = f.c
+	acquire(t, f, "one")
+	if err := f.m.PublishPrepared(ctx, "one", f.files, false); err != nil {
+		t.Fatalf("empty generated publication: %v", err)
+	}
+	root := filepath.Join(f.home, homeRelative(f.c))
+	if info, err := os.Stat(root); err != nil || !info.IsDir() {
+		t.Fatalf("empty published home missing: %v", err)
+	}
+	if err := privatedir.Validate(root); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "native-session"), []byte("login"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	f.observe("one", func(e *Evidence) { e.Running = true; e.ProcessGeneration = "reserved-runner" })
+	if err := f.m.Transfer(ctx, "one"); err != nil {
+		t.Fatal(err)
+	}
+	retained := root + ".retained"
+	if err := os.Rename(root, retained); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.Resume(ctx, "one"); err == nil || !strings.Contains(err.Error(), "project home unavailable") {
+		t.Fatalf("missing empty home admitted resume: %v", err)
+	}
+	acquire(t, f, "two")
+	mustRefuse(t, f.m.PublishPrepared(ctx, "two", f.files, false), "project home unavailable")
+	if _, err := os.Lstat(root); !os.IsNotExist(err) {
+		t.Fatalf("leased missing home recreated: %v", err)
+	}
+	if err := os.Rename(retained, root); err != nil {
+		t.Fatal(err)
+	}
+	f.observe("one", func(e *Evidence) {
+		e.Running = false
+		e.Terminated = true
+		e.DescendantsTerminated = true
+		e.OwnershipReconciled = true
+	})
+	f.observe("two", func(e *Evidence) { e.OwnershipReconciled = true })
+	for _, id := range []string{"one", "two"} {
+		if err := f.m.Reconcile(ctx, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := f.m.Update(ctx, f.c.Ref, f.c.SHA256, "principal:operator", f.files, false); err != nil {
+		t.Fatal(err)
+	}
+	if raw, err := os.ReadFile(filepath.Join(root, "native-session")); err != nil || string(raw) != "login" {
+		t.Fatalf("native state lost: %q, %v", raw, err)
+	}
 }
