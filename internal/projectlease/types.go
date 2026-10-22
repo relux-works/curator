@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
@@ -43,9 +44,6 @@ type Binding struct {
 	Generation    int64  `json:"generation"`
 }
 
-// Composition is a verified projection of an immutable protected composition.
-// The resolver must verify its complete CCJ-1 digest and registration binding.
-// BuildKeys and RuntimeEntries name the existing cache GC namespaces.
 // Surface is the protected receipt projection for one generated regular file.
 // Mode is the numeric value of 0600 or 0700; native mutable state is excluded.
 type Surface struct {
@@ -53,6 +51,9 @@ type Surface struct {
 	Size   int64  `json:"size"`
 	Mode   uint32 `json:"mode"`
 }
+
+// Composition is a verified protected projection, including its CCJ-1 digest
+// and registration binding. Cache keys name the existing GC namespaces.
 type Composition struct {
 	Ref             string             `json:"ref"`
 	SHA256          string             `json:"sha256"`
@@ -70,8 +71,8 @@ type Composition struct {
 // current admission/revocation. Implementations must not fetch, repair or
 // accept caller-supplied records. Missing authority always refuses a launch.
 type Authority interface {
-	Resolve(context.Context, string, string) (Composition, error)
-	Authorize(context.Context, Composition, string) error
+	Resolve(context.Context, managerlock.Held, string, string) (Composition, error)
+	Authorize(context.Context, managerlock.Held, Composition, string) error
 }
 
 // Evidence is supplied by the tracked-session authority, not a PID probe.
