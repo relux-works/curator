@@ -1,0 +1,224 @@
+package projectcontext
+
+import (
+	"bytes"
+	"context"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	"github.com/relux-works/curator/internal/pathboundary"
+	"github.com/relux-works/curator/internal/privatedir"
+)
+
+// CompositionAuthority mirrors the I-LEASE contract until its owning package
+// is integrated. These exact shapes will be replaced with that package import.
+type CompositionAuthority interface {
+	Resolve(context.Context, string, string) (Composition, error)
+	Authorize(context.Context, Composition, string) error
+}
+
+// Authority is bound to an operator-controlled store and the invocation CWD.
+// Empty CWD means the process CWD, never the registered project root as fallback.
+// It grants no agent authority: the current I-REG lane admits the local manager
+// principal only. A future grant entry point must enforce its own live ceiling.
+type Authority struct {
+	Store Store
+	CWD   string
+}
+
+var _ CompositionAuthority = Authority{}
+
+type compositionEnvelope struct {
+	Version        int
+	Request        ComposeRequest
+	Preview        CompositionPreview
+	RuntimeEntries []string
+	BuildKeys      []string
+}
+
+// PublishComposition retains a derived record and supporting metadata only.
+// Rendering is previewed first and recomputed under the same manager lock just
+// before publication. Generated files are consumed by the separate lease lane;
+// this method does not mutate the managed home, profile lock or lease state.
+func (a Authority) PublishComposition(ctx context.Context, req ComposeRequest, expected string, ownerRef string) (Composition, error) {
+	op, err := a.Store.begin(false)
+	if err != nil {
+		return Composition{}, err
+	}
+	defer op.close()
+	if ownerRef != op.state.Principal {
+		return Composition{}, fail("project_item_unapproved", "owner has no current manager authority")
+	}
+	if err = a.bound(op, req.CheckoutID); err != nil {
+		return Composition{}, err
+	}
+	plan, err := op.compose(ctx, req)
+	if err != nil {
+		return Composition{}, err
+	}
+	if !hexRE.MatchString(expected) || plan.Preview.SHA256 != expected {
+		return Composition{}, fail("project_context_drift", "composition differs from operator preview")
+	}
+	// A fresh recomputation catches changed protected bytes, approvals, policy or
+	// registration between the first read and the publication boundary.
+	again, err := op.compose(ctx, req)
+	if err != nil {
+		return Composition{}, err
+	}
+	if identity(plan) != identity(again) {
+		return Composition{}, fail("project_context_drift", "composition changed before publication")
+	}
+	if err = a.bound(op, req.CheckoutID); err != nil {
+		return Composition{}, err
+	}
+	envelope := compositionEnvelope{1, req, again.Preview, again.RuntimeEntries, again.BuildKeys}
+	b, err := canonical(envelope)
+	if err != nil {
+		return Composition{}, err
+	}
+	if len(b) > MaxRecord {
+		return Composition{}, fail("project_context_invalid", "composition metadata exceeds record bound")
+	}
+	dir := filepath.Join(op.root, "compositions")
+	if err = privatedir.MakeAll(dir); err != nil {
+		return Composition{}, err
+	}
+	if err = pathboundary.Validate(dir); err != nil {
+		return Composition{}, err
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return Composition{}, err
+	}
+	defer root.Close()
+	name := again.Preview.SHA256 + ".json"
+	if _, e := root.Lstat(name); e == nil {
+		old, _, e := read(root, name, MaxRecord)
+		if e != nil {
+			return Composition{}, e
+		}
+		if !bytes.Equal(old, b) {
+			return Composition{}, fail("project_context_drift", "immutable composition metadata changed")
+		}
+	} else if !os.IsNotExist(e) {
+		return Composition{}, fail("project_context_unreadable", "composition state unknown")
+	} else {
+		if err = ctx.Err(); err != nil {
+			return Composition{}, err
+		}
+		if err = writeAtomic(dir, name, b); err != nil {
+			return Composition{}, err
+		}
+	}
+	return compositionOf(again), nil
+}
+func (a Authority) bound(op *operation, id string) error {
+	r, err := op.registered(id)
+	if err != nil {
+		return err
+	}
+	cwd := a.CWD
+	if cwd == "" {
+		cwd, err = os.Getwd()
+		if err != nil {
+			return fail("project_registration_mismatch", "CWD unavailable")
+		}
+	}
+	cwd, err = filepath.EvalSymlinks(cwd)
+	if err != nil {
+		return fail("project_registration_mismatch", "CWD unavailable")
+	}
+	st, err := os.Stat(cwd)
+	if err != nil || !st.IsDir() {
+		return fail("project_registration_mismatch", "CWD is not a directory")
+	}
+	selected, err := op.locateFor(cwd, r.Record.Profile.Name, r.Record.Environment)
+	if err != nil {
+		return err
+	}
+	if selected.CheckoutID != id {
+		return fail("project_registration_mismatch", "composition belongs to another CWD binding")
+	}
+	return nil
+}
+func (a Authority) Resolve(ctx context.Context, ref, sha256 string) (Composition, error) {
+	op, err := a.Store.begin(false)
+	if err != nil {
+		return Composition{}, err
+	}
+	defer op.close()
+	return a.resolve(ctx, op, ref, sha256)
+}
+func (a Authority) resolve(ctx context.Context, op *operation, ref, hash string) (Composition, error) {
+	if !hexRE.MatchString(hash) || ref != "composition:"+hashID(hash) {
+		return Composition{}, fail("project_context_invalid", "invalid composition reference or digest")
+	}
+	dir := filepath.Join(op.root, "compositions")
+	if err := pathboundary.Validate(dir); err != nil {
+		return Composition{}, fail("project_context_drift", "composition boundary unavailable")
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return Composition{}, fail("project_context_unreadable", "composition record unavailable")
+	}
+	defer root.Close()
+	b, _, err := read(root, hash+".json", MaxRecord)
+	if err != nil {
+		return Composition{}, fail("project_context_unreadable", "composition record unavailable")
+	}
+	var saved compositionEnvelope
+	if err = decode(b, &saved); err != nil {
+		return Composition{}, err
+	}
+	record, err := canonical(saved.Preview.Record)
+	if err != nil {
+		return Composition{}, err
+	}
+	if saved.Version != 1 || digest(record) != hash || saved.Preview.SHA256 != hash || saved.Preview.Ref != ref {
+		return Composition{}, fail("project_context_drift", "composition digest differs")
+	}
+	if _, err = ParseCompositionRecord(record); err != nil {
+		return Composition{}, err
+	}
+	if err = a.bound(op, saved.Request.CheckoutID); err != nil {
+		return Composition{}, err
+	}
+	plan, err := op.compose(ctx, saved.Request)
+	if err != nil {
+		return Composition{}, err
+	}
+	fresh := compositionEnvelope{1, saved.Request, plan.Preview, plan.RuntimeEntries, plan.BuildKeys}
+	if identity(fresh) != identity(saved) {
+		return Composition{}, fail("project_context_drift", "composition supporting records or receipt differ")
+	}
+	return compositionOf(plan), nil
+}
+func (a Authority) Authorize(ctx context.Context, c Composition, ownerRef string) error {
+	op, err := a.Store.begin(false)
+	if err != nil {
+		return err
+	}
+	defer op.close()
+	if !strings.HasPrefix(ownerRef, "principal:") || ownerRef != op.state.Principal {
+		return fail("project_item_unapproved", "owner has no current manager authority")
+	}
+	resolved, err := a.resolve(ctx, op, c.Ref, c.SHA256)
+	if err != nil {
+		return err
+	}
+	if identity(resolved) != identity(c) {
+		return fail("project_context_drift", "resolved composition binding or receipt differs")
+	}
+	return ctx.Err()
+}
+func compositionOf(plan compositionPlan) Composition {
+	p := plan.Preview
+	c := Composition{Ref: p.Ref, SHA256: p.SHA256, CheckoutID: strings.TrimPrefix(p.Record.RegistrationRef, "registration:"), Profile: p.Record.Profile.Name, Environment: p.Record.Environment, HomeRef: p.Record.HomeRef, ConcurrentState: plan.ConcurrentState, BuildKeys: append([]string{}, plan.BuildKeys...), RuntimeEntries: append([]string{}, plan.RuntimeEntries...), Generated: map[string]Surface{}}
+	for _, f := range p.Receipt.Files {
+		mode, _ := strconv.ParseUint(f.Mode, 8, 32)
+		c.Generated[f.Path] = Surface{f.SHA256, f.Size, uint32(mode)}
+	}
+	return c
+}
