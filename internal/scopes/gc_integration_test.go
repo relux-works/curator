@@ -38,7 +38,7 @@ func TestCollectRetainsLiveProcessBuild(t *testing.T) {
 				}
 				return []string{filepath.Join(realEntryPath(home, live), "bin", "runner")}, nil
 			}
-			result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
+			result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -77,7 +77,7 @@ func TestCollectSweepsOnlyUnreferencedProtectedEntries(t *testing.T) {
 	backdateEntry(t, home, referenced, 30*24*time.Hour)
 	backdateEntry(t, home, orphan, 30*24*time.Hour)
 
-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
+	result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestCollectRetainsAJournalOwnedEntry(t *testing.T) {
 	inFlight := publishRealEntry(t, store, "in-flight-tool", "in-flight artifact")
 	backdateEntry(t, home, inFlight, 30*24*time.Hour)
 
-	result, err := Collect(MaintenanceRequest{
+	result, err := collectWithTestHomeLock(t, MaintenanceRequest{
 		Home: home, Lock: testHomeLock{}, Cache: store, JournalKeys: []string{string(inFlight)},
 	})
 	if err != nil {
@@ -148,7 +148,7 @@ func TestCollectRetainsBuildEntriesWhenAMarkerCannotBeRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
+	result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
 	if err != nil {
 		t.Fatal(err)
 	}
