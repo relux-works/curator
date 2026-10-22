@@ -231,7 +231,7 @@ func ParseDeclaration(b []byte) (Declaration, error) {
 	}
 	seen := map[string]bool{}
 	for i, r := range d.Items {
-		if r.Packaging != "" {
+		if _, present := raw.Items[i]["packaging"]; present {
 			return d, fail("project_context_invalid", "packaging is an explicit manager operation")
 		}
 		if !idRE.MatchString(r.ID) || seen[r.ID] || !environment(r.Environment) || (r.Type != "context" && r.Type != "skill" && r.Type != "mcp") {
