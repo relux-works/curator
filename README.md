@@ -175,6 +175,7 @@ curator list       # list configured projects and declared skills
 
 ```bash
 curator project add      # register a project alias and path in the machine configuration
+curator project register # bind a checkout identity for explicit project-context admission
 curator project resolve  # resolve transitive dependencies for a project closure
 ```
 
@@ -340,6 +341,13 @@ uses opt-in Go probes, Python 3, Git and macOS `sandbox-exec`. Run
 exact-digest vendor opt-ins and fresh `.temp/` evidence roots are documented
 in its guide. `collect.py` publishes bounded synthetic observations. Complete
 Codex/Muse permissions and memory-off surfaces remain unqualified.
+
+For explicit project-context packaging and approval, see
+[project admission](docs/project-admission.md). The new `project register`,
+`inspect`, `package`, `preview`, `approve`, `revoke` and `rebind` controls use Go
+and Git; they create protected admission state and perform no native launch.
+Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectcontext -count=1`
+and the documented opt-in Go-overlay mutation lane. Keep logs in `.temp/`.
 
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.

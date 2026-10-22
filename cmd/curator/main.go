@@ -1427,10 +1427,13 @@ func (c cli) cmdList() int {
 
 func (c cli) cmdProject(args []string) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: project requires a subcommand: add, resolve, refresh")
+		_, _ = fmt.Fprintln(c.stderr, "curator: project requires a subcommand: add, resolve, refresh, register, rebind, inspect, package, preview, approve, revoke")
 		return exitUsage
 	}
 	switch args[0] {
+	case "register", "rebind", "inspect", "package", "preview", "approve", "revoke":
+		return c.cmdProjectContext(args[0], args[1:])
+
 	case "add":
 		flags := c.newFlagSet("project add")
 		agentsRaw := flags.String("agents", "", "comma-separated target agents")
