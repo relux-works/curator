@@ -23,6 +23,10 @@ import (
 
 var ErrRevoked = errors.New("project authority revoked")
 
+// ErrArtifactsUnavailable means admission lost a referenced artifact before
+// committing the lease. Callers must not publish or start this reservation.
+var ErrArtifactsUnavailable = errors.New("project_artifacts_unavailable")
+
 const Busy = "project_view_busy"
 const maxRecord = 1 << 20
 

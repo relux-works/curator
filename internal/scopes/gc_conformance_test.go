@@ -122,7 +122,7 @@ func assertReceiptRootRetained(t *testing.T) {
 	backdateEntry(t, home, referenced, 30*24*time.Hour)
 	backdateEntry(t, home, orphan, 30*24*time.Hour)
 
-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
+	result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func assertJournalRootRetained(t *testing.T) {
 	backdateEntry(t, home, inFlight, 30*24*time.Hour)
 	backdateEntry(t, home, orphan, 30*24*time.Hour)
 
-	result, err := Collect(MaintenanceRequest{
+	result, err := collectWithTestHomeLock(t, MaintenanceRequest{
 		Home: home, Lock: testHomeLock{}, Cache: store, JournalKeys: []string{string(inFlight)},
 	})
 	if err != nil {
@@ -187,7 +187,7 @@ func assertMarkerRootRetained(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: openProtectedStore(t, home)})
+	result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: openProtectedStore(t, home)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +226,7 @@ func assertSnapshotRootRetained(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(home, "runtime", "skill-a", strings.Repeat("4", 40)), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: openProtectedStore(t, home)})
+	result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: openProtectedStore(t, home)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,7 +261,7 @@ func assertUncertainRootRetained(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
+	result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: store})
 	if err != nil {
 		t.Fatal(err)
 	}

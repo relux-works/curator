@@ -22,6 +22,10 @@ func TestLeaseNarrowingMutants(t *testing.T) {
 		goTool = "go"
 	}
 	cases := []struct{ name, file, before, after, pkg, run, message string }{
+		{"gc-exact-home-witness", "internal/projectlease/manager.go", "if err := witness.Held().Validate(home); err != nil {", "if err := witness.Held().Validate(home); false && err != nil {", "scopes", "TestCollectProjectLeaseForeignLockInterleaving", "foreign GC interleaving:"},
+		{"acquire-artifact-presence", "internal/projectlease/manager.go", "if err = m.verifyArtifacts(c); err != nil {", "if err = m.verifyArtifacts(c); false && err != nil {", "projectlease", "TestAcquireArtifactsBeforeCommit", "missing artifact admission"},
+		{"idle-repair-allows-drift", "internal/projectlease/manager.go", "err = m.verifyRepairView(old)", "err = m.verifyView(old.Composition, old)", "projectlease", "TestIdleRepairGeneratedDrift", "idle repair refused changed generated state"},
+		{"idle-repair-native-directory", "internal/projectlease/manager.go", "if !observed.Info.Mode().IsRegular() {", "if false && !observed.Info.Mode().IsRegular() {", "projectlease", "TestIdleRepairRefusesDirectoryTakeover", "refusal <nil>, want not a regular file"},
 		{"receipt-alias", "internal/projectlease/types.go", "if aliases[key] {", "if false && aliases[key] {", "projectlease", "TestReceiptPortablePaths", "invalid receipt paths accepted"},
 		{"receipt-file-ancestor", "internal/projectlease/types.go", `if aliases[strings.Join(parts[:i], "/")] {`, `if false && aliases[strings.Join(parts[:i], "/")] {`, "projectlease", "TestReceiptPortablePaths", "invalid receipt paths accepted"},
 		{"pid-only", "internal/projectlease/manager.go", "} else if o.ProcessGeneration != e.ProcessGeneration {", "} else if false && o.ProcessGeneration != e.ProcessGeneration {", "projectlease", "TestDetachDescendantsUnknownAndPIDReuse", "process incarnation mismatch released"},
