@@ -151,11 +151,16 @@ curator env status --check --json
 curator env resolve codex --profile review --format json
 ```
 
-Install фиксирует выбранный профиль. Repair создаёт или восстанавливает
-managed home в пределах lock, затем status и resolve проверяют результат.
-Здесь нет `profile use`: проверка named home сама по себе не должна
-переопределять machine-current profile. Для осознанного переключения
-существует `curator profile use review`. ⟦работает сегодня⟧
+Install фиксирует выбранный профиль. Если current profile ещё не выбран,
+первый успешный install автоматически активирует `review`, даже без
+`--use`. Если current profile уже есть, install без `--use` сохраняет его.
+Для явного переключения существует `curator profile use review`.
+⟦работает сегодня⟧
+
+Repair создаёт или восстанавливает managed home в пределах lock, затем
+status и resolve проверяют результат. Отдельный `env resolve` с
+`--profile review` проверяет named home и сам по себе не переключает
+machine-current profile. ⟦работает сегодня⟧
 
 ## Сценарий: изменить project dependency
 
@@ -200,12 +205,16 @@ curator env resolve claude --profile review --repair \
 curator env resolve claude --profile review --repair --preserve-lock
 ```
 
-Dry run показывает допустимый repair. Он не утверждает, что любой foreign
-file можно присвоить: consent и ownership остаются отдельными. `--takeover`
-разрешён лишь в предусмотренных mutation paths и не является универсальным
-способом убрать любой refusal. Для credential migration существуют
-отдельные `env migrate --inspect`, `--plan` и `--apply`; repair не заменяет
-осознанную migration. ⟦работает сегодня⟧
+При drift generated file этот dry run не пишет файлы и возвращает exit 1
+с `environment_home_stale`. Он проверяет stale state, а не показывает план
+repair. Для восстановления нужен следующий запуск без `--dry-run`.
+⟦работает сегодня⟧
+
+Consent и ownership остаются отдельными условиями. `--takeover` разрешён
+лишь в предусмотренных mutation paths и не является универсальным способом
+убрать любой refusal. Для credential migration существуют отдельные
+`env migrate --inspect`, `--plan` и `--apply`; repair не заменяет осознанную
+migration. ⟦работает сегодня⟧
 
 ## Сценарий: project env file
 
