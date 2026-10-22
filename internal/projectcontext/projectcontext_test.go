@@ -785,3 +785,27 @@ func TestDeclarationFileKinds(t *testing.T) {
 		})
 	}
 }
+
+// Claim: source Git metadata is excluded from a package's content, while
+// injecting that excluded name into a protected snapshot is detected as drift.
+func TestProtectedSnapshotRejectsGitMetadata(t *testing.T) {
+	f := newFixture(t)
+	pkg := filepath.Join(f.root, "package")
+	initRepo(t, pkg)
+	contextDir(t, pkg, "guidance")
+	p, err := f.store.Preview(f.registration.CheckoutID, declaration("guide", "package", false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := p.Review.Items[0]
+	if _, err = f.store.Approve(f.registration.CheckoutID, "guide", c.ItemSHA256, p.PackageSHA256); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = f.store.ReadSnapshot(f.registration.CheckoutID, "guide"); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(f.store.Home, "project-context", "snapshots", c.Item.Payload.SnapshotSHA256, "files", ".git", "config")
+	write(t, target, "Injected metadata.\n")
+	_, _, err = f.store.ReadSnapshot(f.registration.CheckoutID, "guide")
+	required(t, err, "project_context_drift")
+}

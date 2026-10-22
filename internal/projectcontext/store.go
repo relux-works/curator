@@ -363,7 +363,7 @@ func (op *operation) get(ref, hash string) (captured, error) {
 	if identity(manifest) != hash {
 		return empty, fail("project_context_drift", "snapshot manifest changed")
 	}
-	c, err := capture(r, "files")
+	c, err := captureTree(r, "files", false)
 	if err != nil {
 		return empty, err
 	}
