@@ -37,6 +37,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/mcpnative"
 	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
@@ -3422,6 +3423,18 @@ func (p *homePlan) skills(req *ResolveRequest, skills []skillOf, surfaces map[st
 // adapter, managed homes only, with the sorted env_names union carried
 // for the fragment.
 func (p *homePlan) mcp(req *ResolveRequest, servers []contextmaterialize.MCPServer, surfaces map[string]envmarker.Surface) error {
+	// Record ownership must never be bypassed by the legacy whole-file writer,
+	// including an empty declaration set or a removed former package.
+	if mcpnative.Path(p.adapter.ID) != "" {
+		marker, err := mcpRead(req.Home, nativeMCPLedger(req.Home, req.Profile, p.adapter.ID), true)
+		if err != nil {
+			return err
+		}
+		if marker.Kind == stateread.KindPresent {
+			return mcpAuthorityError()
+		}
+	}
+
 	if p.adapter.ID == envregistry.Muse {
 		return nil
 	}

@@ -182,6 +182,7 @@ func (engine *Engine) buildJournal(plan Plan) (*Journal, []string, error) {
 		return bytes.Compare([]byte(targets[i].Identifier), []byte(targets[j].Identifier)) < 0
 	})
 	journal := &Journal{
+		ReadInputs:          cloneReadInputs(plan.ReadInputs),
 		Schema:              journalSchema,
 		TransactionID:       plan.TransactionID,
 		ProjectIdentity:     plan.ProjectIdentity,
@@ -569,6 +570,9 @@ func (engine *Engine) checkBoundary(journal *Journal, index int) error {
 		return err
 	}
 	if err := engine.checkCommit(journal); err != nil {
+		return err
+	}
+	if err := checkReadInputs(journal.ReadInputs); err != nil {
 		return err
 	}
 	delete(engine.nsCache, journal.TransactionID)

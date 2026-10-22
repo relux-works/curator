@@ -368,6 +368,16 @@ env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectmcp ./internal/project
 env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envprofile ./cmd/curator -run TestProjectMCP
 ```
 
+## Profile package MCP first install
+
+`curator profile mcp status <profile>` inspects the separate per-record native
+ownership namespace. `profile mcp install <profile> [--dry-run]` first-installs absent stdio records at the exact qualified native
+pins. Foreign same-NAME entries conflict; drift remains unchanged. Restore,
+replace, cleanup and takeover refuse until the separate authority capability
+exists. Project scope refuses shared profile homes. See the
+[writer contract and validation commands](docs/profile-mcp-native-writer.md)
+for paths, journal recovery, Codex base collisions and qualification limits.
+
 ## An open protocol
 
 Curator conforms to an open specification. Independent implementations include [cocoaskills](https://github.com/ivanopcode/cocoaskills). The registry protocol is implemented by [Curator Skill Registry](https://github.com/relux-works/curator-skill-registry).
@@ -440,6 +450,12 @@ for its behavior, 57 pinned grammar vectors and bounded mutation controls.
 Keep logs and private caches under `.temp/`; preview outputs remain in memory
 and publication retains supporting records under the manager's project-context
 namespace without changing the selected profile lock.
+
+The profile MCP editor uses Go and the existing TOML parser. Run
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/mcpnative ./internal/transaction ./internal/config`
+and the [writer consumer checks](docs/profile-mcp-native-writer.md#validation).
+Keep private homes, Go state, logs and narrowing plants under task-scoped
+`.temp/`; the CLI writes protected records below the configured manager home.
 
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.
