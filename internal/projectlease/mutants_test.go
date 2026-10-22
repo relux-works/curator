@@ -22,6 +22,16 @@ func TestLeaseNarrowingMutants(t *testing.T) {
 		goTool = "go"
 	}
 	cases := []struct{ name, file, before, after, pkg, run, message string }{
+		{"profile-recovery-policy", "internal/envprofile/lock.go", "engine, err := transaction.New(home, append(options, transaction.WithCommitCheck(projectlease.TransactionCheck(home)))...)", "engine, err := transaction.New(home, options...)", "envprofile", "TestDefaultRecoveryChecksLeaseJournal", "default lease recovery policy missing"},
+		{"install-recovery-policy", "internal/install/commit.go", "transaction.WithCommitCheck(projectlease.TransactionCheck(home))", "transaction.WithCommitCheck(func() transaction.CommitCheck { _ = projectlease.TransactionCheck(home); return nil }())", "install", "TestDefaultRecoveryChecksLeaseJournal", "default lease recovery policy missing"},
+		{"pending-gc-preserves-other-owners", "internal/projectlease/manager.go", "engine.PendingRecoveryFor(lock, \"project-leases\")", "engine.PendingRecovery(lock)", "scopes", "TestCollectWithUnrelatedPendingTransaction", "unrelated pending transaction blocked legacy GC"},
+		{"pending-owner-filter", "internal/transaction/pending.go", "journal.ProjectIdentity == projectIdentity", "false && journal.ProjectIdentity == projectIdentity", "transaction", "TestPendingRecoveryForOwner", "owner-filtered pending"},
+		{"gc-cli-recovery-policy", "cmd/curator/main.go", "transaction.WithCommitCheck(projectlease.TransactionCheck(home))", "transaction.WithCommitCheck(func() transaction.CommitCheck { _ = projectlease.TransactionCheck(home); return nil }())", "cmd/curator", "TestGCRecoversProjectLeaseArtifacts", "GC recovery committed missing artifact"},
+		{"prepared-lock-identity", "internal/projectlease/transaction_check.go", "if err := witness.Held().Validate(home); err != nil {", "if err := witness.Held().Validate(home); false && err != nil {", "projectlease", "TestAcquireRevalidatesPreparedLock", "stale Acquire committed or wrong refusal"},
+		{"pending-recovery-gc", "internal/projectlease/manager.go", "if pending {\n\t\treturn Roots{}, ErrPendingRecovery", "if false && pending {\n\t\treturn Roots{}, ErrPendingRecovery", "projectlease", "TestAcquirePreparedRecoveryArtifacts", "pending GC did not refuse safely"},
+		{"recovery-artifact-validation", "internal/projectlease/transaction_check.go", "return m.verifyTransactionArtifacts(journal)", "_ = m; return nil", "projectlease", "TestAcquirePreparedRecoveryArtifacts", "missing recovery artifact committed or wrong refusal"},
+		{"binding-member-case", "internal/projectlease/types.go", "if err != nil || string(exact) != string(raw) {", "if false && (err != nil || string(exact) != string(raw)) {", "projectlease", "TestBindingExactMembers", "case-alias binding accepted"},
+		{"transaction-commit-check", "internal/transaction/engine.go", "return engine.commitCheck(engine.commitLock, *snapshot)", "_ = snapshot; return nil", "transaction", "TestCommitCheck", "commit check refusal"},
 		{"gc-exact-home-witness", "internal/projectlease/manager.go", "if err := witness.Held().Validate(home); err != nil {", "if err := witness.Held().Validate(home); false && err != nil {", "scopes", "TestCollectProjectLeaseForeignLockInterleaving", "foreign GC interleaving:"},
 		{"acquire-artifact-presence", "internal/projectlease/manager.go", "if err = m.verifyArtifacts(c); err != nil {", "if err = m.verifyArtifacts(c); false && err != nil {", "projectlease", "TestAcquireArtifactsBeforeCommit", "missing artifact admission"},
 		{"idle-repair-allows-drift", "internal/projectlease/manager.go", "err = m.verifyRepairView(old)", "err = m.verifyView(old.Composition, old)", "projectlease", "TestIdleRepairGeneratedDrift", "idle repair refused changed generated state"},
@@ -56,7 +66,11 @@ func TestLeaseNarrowingMutants(t *testing.T) {
 				t.Skip("native receipt mode bits are Unix-specific")
 			}
 			run := func(overlay string) ([]byte, error) {
-				args := []string{"test", "-count=1", "-timeout=90s", "-v", "./internal/" + tc.pkg, "-run", "^" + tc.run + "$"}
+				pkgPath := "./internal/" + tc.pkg
+				if tc.pkg == "cmd/curator" {
+					pkgPath = "./cmd/curator"
+				}
+				args := []string{"test", "-count=1", "-timeout=90s", "-v", pkgPath, "-run", "^" + tc.run + "$"}
 				if overlay != "" {
 					args = append([]string{"test", "-overlay", overlay}, args[1:]...)
 				}

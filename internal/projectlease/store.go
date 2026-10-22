@@ -135,18 +135,36 @@ func load(home string) (*ledger, error) {
 	if err != nil {
 		return nil, err
 	}
+	l, err := decodeLedger(raw)
+	if err != nil {
+		return nil, err
+	}
+	for id, e := range l.Leases {
+		immutable, er := read(home, bindingPath(home, id))
+		if er != nil {
+			return nil, er
+		}
+		want, _ := canonical(e.Binding)
+		if string(immutable) != string(want) {
+			return nil, fmt.Errorf("immutable lease binding changed")
+		}
+	}
+	return l, nil
+}
+
+func decodeLedger(raw []byte) (*ledger, error) {
 	if len(raw) > maxRecord {
 		return nil, fmt.Errorf("project lease state exceeds record limit")
 	}
 	var l ledger
-	if err = protocoljson.UnmarshalCanonical(raw, &l); err != nil {
+	if err := protocoljson.UnmarshalCanonical(raw, &l); err != nil {
 		return nil, err
 	}
 	if l.Kind != "project-lease-state/1" || l.Leases == nil || l.Views == nil {
 		return nil, fmt.Errorf("invalid project lease state")
 	}
 	for id, e := range l.Leases {
-		if err = e.Binding.validate(); err != nil {
+		if err := e.Binding.validate(); err != nil {
 			return nil, err
 		}
 		if id != e.Binding.LeaseID || e.Composition.validate() != nil || !matches(e.Binding, e.Composition) {
@@ -160,14 +178,6 @@ func load(home string) (*ledger, error) {
 		}
 		if len(e.ProcessGeneration) > 256 {
 			return nil, fmt.Errorf("invalid process generation")
-		}
-		immutable, er := read(home, bindingPath(home, id))
-		if er != nil {
-			return nil, er
-		}
-		want, _ := canonical(e.Binding)
-		if string(immutable) != string(want) {
-			return nil, fmt.Errorf("immutable lease binding changed")
 		}
 	}
 	for key, v := range l.Views {
@@ -210,7 +220,7 @@ func (m *Manager) locked(ctx context.Context, fn func(*ledger, *managerlock.Home
 	if err = lock.AssertCurrent(); err != nil {
 		return err
 	}
-	engine, err := transaction.New(m.home, transaction.WithHooks(m.hooks))
+	engine, err := transaction.New(m.home, transaction.WithHooks(m.hooks), transaction.WithCommitCheck(TransactionCheck(m.home)))
 	if err != nil {
 		return err
 	}
