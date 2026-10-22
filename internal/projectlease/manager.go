@@ -599,6 +599,17 @@ func ReferencesUnderLock(home string, lock transaction.HomeLock) (Roots, error) 
 	if err := witness.Held().Validate(home); err != nil {
 		return Roots{}, err
 	}
+	engine, err := transaction.New(home)
+	if err != nil {
+		return Roots{}, err
+	}
+	pending, err := engine.PendingRecoveryFor(lock, "project-leases")
+	if err != nil {
+		return Roots{}, err
+	}
+	if pending {
+		return Roots{}, ErrPendingRecovery
+	}
 	if !HasState(home) {
 		return Roots{}, nil
 	}

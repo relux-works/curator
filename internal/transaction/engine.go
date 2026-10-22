@@ -18,6 +18,8 @@ import (
 // every mutating or journal-reading entry point requires the caller's witness.
 type Engine struct {
 	mu               sync.Mutex
+	commitCheck      CommitCheck
+	commitLock       HomeLock // scoped to Commit/Recover while mu is held
 	journalRoot      string
 	hooks            Hooks
 	syncStagedParent func(string) error
@@ -310,6 +312,8 @@ func (engine *Engine) Commit(lock HomeLock, transactionID string) error {
 	}
 	engine.mu.Lock()
 	defer engine.mu.Unlock()
+	engine.commitLock = lock
+	defer func() { engine.commitLock = nil }()
 	journal, err := engine.loadJournal(transactionID)
 	if err != nil {
 		return err
@@ -337,6 +341,8 @@ func (engine *Engine) RecoverWithOutcome(lock HomeLock) (bool, error) {
 	}
 	engine.mu.Lock()
 	defer engine.mu.Unlock()
+	engine.commitLock = lock
+	defer func() { engine.commitLock = nil }()
 	ids, err := engine.journalIDs()
 	if err != nil {
 		return false, err
@@ -369,6 +375,9 @@ func (engine *Engine) resume(journal *Journal) error {
 }
 
 func (engine *Engine) commit(journal *Journal) error {
+	if err := engine.checkCommit(journal); err != nil {
+		return engine.abortPreparation(journal, err)
+	}
 	if journal.Phase == PhasePrepared {
 		journal.Phase = PhaseCommitting
 		if err := engine.saveJournal(journal); err != nil {
@@ -529,6 +538,9 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 // one epoch is therefore still caught here, and the transaction refuses as
 // before.
 func (engine *Engine) checkBoundary(journal *Journal, index int) error {
+	if err := engine.checkCommit(journal); err != nil {
+		return err
+	}
 	delete(engine.nsCache, journal.TransactionID)
 	if guard := engine.guards[journal.TransactionID]; guard != nil {
 		return guard(index, journal.Targets[index].LivePath)
@@ -1092,4 +1104,12 @@ func cloneDurableProof(proof *staging.DurableSnapshot) *staging.DurableSnapshot 
 		clone.Targets[live] = staging.DurableTarget{Canonical: record.Canonical, Ancestors: ancestors}
 	}
 	return clone
+}
+
+func (engine *Engine) checkCommit(journal *Journal) error {
+	if engine.commitCheck == nil {
+		return nil
+	}
+	snapshot := cloneJournal(journal)
+	return engine.commitCheck(engine.commitLock, *snapshot)
 }

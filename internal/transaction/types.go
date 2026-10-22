@@ -275,3 +275,16 @@ func sidecarPath(livePath, transactionID string, index int, suffix string) strin
 	name := fmt.Sprintf(".curator-txn-%s-%03d.%s", shortIdentity(transactionID), index, suffix)
 	return filepath.Join(filepath.Dir(livePath), name)
 }
+
+// CommitCheck revalidates caller-owned dependencies before forward publication,
+// including restart recovery. The journal is an independent snapshot. A refusal
+// rolls back through the usual journal protocol; rollback never calls the check.
+// Callers must configure the same policy on every engine that may recover their
+// transactions. The borrowed lock belongs to the current commit/recovery call.
+type CommitCheck func(HomeLock, Journal) error
+
+// WithCommitCheck installs the caller's commit and recovery admission policy.
+// A nil check preserves the existing transaction behavior.
+func WithCommitCheck(check CommitCheck) Option {
+	return func(engine *Engine) { engine.commitCheck = check }
+}

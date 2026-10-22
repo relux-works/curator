@@ -16,6 +16,7 @@ import (
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/hookapproval"
 	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/projectlease"
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/staging"
 	"github.com/relux-works/curator/internal/transaction"
@@ -125,7 +126,7 @@ func (deps CommitDeps) resolve(home string, inspector CacheInspector) (CommitDep
 		deps.Locks = &managerLocks{manager: manager}
 	}
 	if deps.Journal == nil {
-		engine, err := transaction.New(home, transaction.WithHooks(deps.Hooks))
+		engine, err := transaction.New(home, transaction.WithHooks(deps.Hooks), transaction.WithCommitCheck(projectlease.TransactionCheck(home)))
 		if err != nil {
 			return CommitDeps{}, fmt.Errorf("open the install transaction journal: %w", err)
 		}

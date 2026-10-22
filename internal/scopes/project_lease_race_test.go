@@ -10,6 +10,7 @@ import (
 
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/projectlease"
+	"github.com/relux-works/curator/internal/transaction"
 )
 
 // managerHome is carried separately from the opaque composition projection.
@@ -106,5 +107,45 @@ func TestCollectProjectLeaseForeignLockInterleaving(t *testing.T) {
 		if _, err = os.Stat(filepath.Join(home, "runtime", "tool", entry)); err != nil {
 			t.Fatal("same-home GC removed leased runtime", err)
 		}
+	}
+}
+
+// A valid pending journal owned by another subsystem preserves legacy GC:
+// the orphan runtime is swept while the unrelated target/intent stays intact.
+func TestCollectWithUnrelatedPendingTransaction(t *testing.T) {
+	home := protectedTestHome(t)
+	if err := os.MkdirAll(filepath.Join(home, "runtime", "tool", "orphan"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	lm, err := managerlock.New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock, err := lm.AcquireHomeOnly(t.Context(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	engine, err := transaction.New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stage := filepath.Join(t.TempDir(), "stage")
+	if err = os.WriteFile(stage, []byte("approved other bytes"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(home, "other-owner.txt")
+	if _, err = engine.Prepare(lock, transaction.Plan{TransactionID: "other-owner", ProjectIdentity: "other", Targets: []transaction.Target{{Class: "other", Identifier: "other", LivePath: target, StagedSource: stage, PreimageDigest: transaction.DigestAbsent}}}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := Collect(MaintenanceRequest{Home: home, Lock: lock, Cache: &recordingCache{}})
+	if err != nil || len(result.RemovedRuntime) != 1 || result.RemovedRuntime[0] != "tool/orphan" {
+		t.Fatalf("unrelated pending transaction blocked legacy GC: %+v %v", result, err)
+	}
+	if pending, err := engine.PendingRecovery(lock); err != nil || !pending {
+		t.Fatal("GC consumed unrelated intent", err)
+	}
+	if _, err = os.Lstat(target); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("GC published unrelated intent", err)
 	}
 }
