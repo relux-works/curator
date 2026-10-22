@@ -320,6 +320,14 @@ The command displays project skills and their configured source revisions across
 
 ## Project subcommands
 
+### Project-context admission
+
+`project register`, `inspect`, `package`, `preview`, `approve`, `revoke` and
+`rebind` are the explicit operator controls for protected checkout registration
+and per-item admission. See [project admission](project-admission.md) for exact
+commands, request grammar, preview output, platform bounds and unsupported
+surfaces. These controls perform no composition or provider launch.
+
 ### curator project add
 
 `curator project add` registers a new project alias and path in the machine configuration and initializes `Skillfile.json` and `.gitignore`.
