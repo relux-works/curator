@@ -3,6 +3,7 @@ package projectmcpstate
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -394,4 +395,25 @@ func required(obj map[string]any, names ...string) bool {
 		}
 	}
 	return true
+}
+
+// FailurePlan preserves independently known pairs without authorizing partial
+// admission. Malformed declarations themselves supply no rows or option names.
+func FailurePlan(project string, payload []byte, decls map[string]projectmcp.Declaration, dry bool, cause error) *Plan {
+	var partial *projectmcp.SetError
+	if errors.As(cause, &partial) {
+		decls = partial.Valid
+	}
+	if decls == nil {
+		return nil
+	}
+	hash, err := sourcelock.ManifestDigest(payload)
+	if err != nil {
+		return nil
+	}
+	plan, err := NewPlan(project, hash, decls, nil, nil, dry, Refusals(decls, cause))
+	if err != nil {
+		return nil
+	}
+	return plan
 }
