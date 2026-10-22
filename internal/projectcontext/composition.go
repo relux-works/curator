@@ -34,6 +34,7 @@ type compositionRequirement struct {
 	lockedCommit                                               string
 }
 type compositionPlan struct {
+	Claude          *ClaudeControls `json:",omitempty"`
 	Preview         CompositionPreview
 	RuntimeEntries  []string
 	BuildKeys       []string
@@ -59,6 +60,9 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 	r, err := op.registered(req.CheckoutID)
 	if err != nil {
 		return result, err
+	}
+	if req.Claude != nil && (req.Adapter.Environment != "claude_code" || req.Adapter.ProviderVersion != ClaudeProjectVersion || req.Adapter.Platform != "macos") {
+		return result, claudeRefuse("project_context_unsupported", "Claude native materialization tuple is unqualified")
 	}
 	if err = req.Adapter.validate(r.Record.Environment); err != nil {
 		return result, err
@@ -333,14 +337,28 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 			out.Files[p] = b
 		}
 	}
+	if req.Claude != nil {
+		if r.Record.Environment != "claude_code" {
+			return result, claudeRefuse("project_context_invalid", "Claude controls require Claude environment")
+		}
+		effectiveMCP, e := contextmaterialize.MCPSet(mcpSet, r.Record.Environment)
+		if e != nil {
+			return result, e
+		}
+		out.MCPEnvNames = contextmaterialize.MCPEnvNames(effectiveMCP)
+		if err = claudeOutputs(out.Files, *req.Claude); err != nil {
+			return result, err
+		}
+	}
 	policyObject := struct {
+		Claude          *ClaudeControls `json:",omitempty"`
 		Policy          CompositionPolicy
 		Precedence      contextlock.Precedence
 		Modules         []OrderedModule
 		Skills          []EffectiveSkill
 		Commands        []CommandOwner
 		ConcurrentState bool
-	}{req.Policy, r.Precedence, out.Modules, out.Skills, owners, req.ConcurrentState}
+	}{req.Claude, req.Policy, r.Precedence, out.Modules, out.Skills, owners, req.ConcurrentState}
 	policyBytes, err := canonical(policyObject)
 	if err != nil {
 		return result, err
@@ -380,6 +398,7 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 	if err = ctx.Err(); err != nil {
 		return result, err
 	}
+	result.Claude = req.Claude
 	result.Preview = out
 	result.RuntimeEntries = sortedKeys(runtimeEntries)
 	result.BuildKeys = []string{}

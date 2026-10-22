@@ -326,6 +326,12 @@ Keep logs and private caches under `.temp/`; preview outputs remain in memory
 and publication retains supporting records under the manager's project-context
 namespace without changing the selected profile lock.
 
+The internal [Claude project-home adapter](docs/project-claude-adapter.md)
+adds manager settings, explicit empty MCP, receipts and a version-bound launch
+contribution. Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectcontext -run TestClaude -count=1`
+and the documented `CURATOR_PROJECT_CLAUDE_MUTANTS=1` lane; store logs in `.temp/`.
+The typed certification report keeps unsupported strict tuples refused.
+
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.
 Vendor tests skip unless `CODEX_EXCL_BINARY` selects the exact build and
