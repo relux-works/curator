@@ -1,0 +1,27 @@
+@startuml
+!theme plain
+skinparam defaultFontName PT Sans
+skinparam dpi 160
+skinparam shadowing false
+skinparam ArrowColor #23466e
+title Порядок инструкций в managed home
+start
+:Profile root context\nиз выбранного profile lock;
+:Одобренный project-general context;
+:Одобренный environment-specific context;
+:Уточнения более глубокого\nодобренного scope;
+:Итоговый instruction file\nв managed home;
+note right
+  ⟦решено⟧
+  Все project parts добавляются.
+  Profile root сохраняется.
+  Порядок текста не выдаёт permissions.
+end note
+:Harness читает управляемый результат;
+note right
+  Native discovery неодобренных
+  control files должно быть исключено
+  квалифицированным adapter.
+end note
+stop
+@enduml

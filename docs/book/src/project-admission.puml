@@ -1,0 +1,24 @@
+@startuml
+!theme plain
+skinparam defaultFontName PT Sans
+skinparam dpi 160
+skinparam shadowing false
+title Допуск project context — принятое устройство
+start
+:Registered checkout\nпроверенная identity;
+:Candidate inventory\nтолько недоверенные данные;
+:Protected snapshot + pinned closure\npreview точного item и его эффектов;
+if (Есть действующее per-item approval\nв пределах policy ceiling?) then (да)
+  :Approved generation;
+  :Composition\nprofile lock + generation\n+ environment + policy;
+  :Проверка surfaces и source exclusion\nlease перед launch;
+else (нет)
+  :Candidate остаётся инертным;
+  :Отказ при обязательном item;
+endif
+stop
+legend bottom
+  ⟦решено⟧ — не свидетельство готовой реализации.
+  Edits создают новый candidate; старое approval не переносится.
+endlegend
+@enduml
