@@ -333,6 +333,7 @@ func TestCompositionAuthority(t *testing.T) {
 	if err = authorizeComposition(t, a, c, owner); err != nil {
 		t.Fatal(err)
 	}
+	required(t, authorizeComposition(t, a, c, "principal:other"), "project_item_unapproved")
 	c.Generated["AGENTS.md"] = Surface{strings.Repeat("0", 64), 1, 0600}
 	required(t, authorizeComposition(t, a, c, owner), "project_context_drift")
 	other := a
