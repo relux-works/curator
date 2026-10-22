@@ -17,6 +17,8 @@ import (
 )
 
 type authorities struct {
+	home      string
+	witnesses []managerlock.Held
 	mu        sync.Mutex
 	comps     map[string]Composition
 	sessions  map[string]Evidence
@@ -24,18 +26,26 @@ type authorities struct {
 	uncertain bool
 }
 
-func (a *authorities) Resolve(_ context.Context, ref, sha string) (Composition, error) {
+func (a *authorities) Resolve(_ context.Context, held managerlock.Held, ref, sha string) (Composition, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.witnesses = append(a.witnesses, held)
+	if err := held.Validate(a.home); err != nil {
+		return Composition{}, err
+	}
 	c, ok := a.comps[ref]
 	if !ok || c.SHA256 != sha {
 		return c, errors.New("unknown protected composition")
 	}
 	return c, nil
 }
-func (a *authorities) Authorize(_ context.Context, _ Composition, _ string) error {
+func (a *authorities) Authorize(_ context.Context, held managerlock.Held, _ Composition, _ string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.witnesses = append(a.witnesses, held)
+	if err := held.Validate(a.home); err != nil {
+		return err
+	}
 	if a.uncertain {
 		return errors.New("authority unreadable")
 	}
@@ -74,7 +84,7 @@ func atHome(t *testing.T, home string) fixture {
 	t.Helper()
 	files := map[string][]byte{"AGENTS.md": []byte("approved\n")}
 	c := Composition{Ref: "composition:first", SHA256: strings.Repeat("a", 64), CheckoutID: "checkout-a", Profile: "default", Environment: "codex_cli", HomeRef: "home:first", ConcurrentState: true, BuildKeys: []string{"sha256:" + strings.Repeat("b", 64)}, RuntimeEntries: []string{"tool/revision"}, Generated: inventory(files)}
-	a := &authorities{comps: map[string]Composition{c.Ref: c}, sessions: map[string]Evidence{}}
+	a := &authorities{home: home, comps: map[string]Composition{c.Ref: c}, sessions: map[string]Evidence{}}
 	m, err := New(home, a, a)
 	if err != nil {
 		t.Fatal(err)

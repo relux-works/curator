@@ -18,14 +18,17 @@ import (
 	"github.com/relux-works/curator/internal/transaction"
 )
 
-func (m *Manager) resolve(ctx context.Context, ref, sha, owner string) (Composition, error) {
+func (m *Manager) resolve(ctx context.Context, held managerlock.Held, ref, sha, owner string) (Composition, error) {
 	if !tagged(ref, "composition") || !hexPattern.MatchString(sha) || !tagged(owner, "principal") {
 		return Composition{}, fmt.Errorf("invalid project composition or principal identity")
+	}
+	if err := held.Validate(m.home); err != nil {
+		return Composition{}, err
 	}
 	if m.authority == nil {
 		return Composition{}, fmt.Errorf("project composition authority unavailable")
 	}
-	c, err := m.authority.Resolve(ctx, ref, sha)
+	c, err := m.authority.Resolve(ctx, held, ref, sha)
 	if err != nil {
 		return c, err
 	}
@@ -35,7 +38,13 @@ func (m *Manager) resolve(ctx context.Context, ref, sha, owner string) (Composit
 	if c.Ref != ref || c.SHA256 != sha {
 		return c, fmt.Errorf("project composition authority returned a different identity")
 	}
-	if err = m.authority.Authorize(ctx, c, owner); err != nil {
+	if err = held.Validate(m.home); err != nil {
+		return c, err
+	}
+	if err = m.authority.Authorize(ctx, held, c, owner); err != nil {
+		return c, err
+	}
+	if err = held.Validate(m.home); err != nil {
 		return c, err
 	}
 	return c, nil
@@ -110,7 +119,7 @@ func (m *Manager) acquireUnderLock(ctx context.Context, r Request, l *ledger, lo
 	if _, ok := l.Leases[r.LeaseID]; ok {
 		return fmt.Errorf("lease ID already allocated")
 	}
-	c, err := m.resolve(ctx, r.ContextRef, r.ContextSHA256, r.OwnerRef)
+	c, err := m.resolve(ctx, lock.Held(), r.ContextRef, r.ContextSHA256, r.OwnerRef)
 	if err != nil {
 		return err
 	}
@@ -243,12 +252,12 @@ func (m *Manager) publishView(ctx context.Context, id, ref, sha, owner string, f
 				if !ok || e.State != Prepared {
 					return fmt.Errorf("prepared lease required before publication")
 				}
-				c, err = m.resolve(ctx, e.Binding.ContextRef, e.Binding.ContextSHA256, e.Binding.OwnerRef)
+				c, err = m.resolve(ctx, lock.Held(), e.Binding.ContextRef, e.Binding.ContextSHA256, e.Binding.OwnerRef)
 				if err == nil && !reflect.DeepEqual(c, e.Composition) {
 					err = fmt.Errorf("immutable composition projection changed")
 				}
 			} else {
-				c, err = m.resolve(ctx, ref, sha, owner)
+				c, err = m.resolve(ctx, lock.Held(), ref, sha, owner)
 			}
 			if err != nil {
 				return err
@@ -326,11 +335,11 @@ func (m *Manager) publishView(ctx context.Context, id, ref, sha, owner string, f
 // Transfer persists runner ownership BEFORE provider start. A launching process
 // may exit afterwards; neither detach nor descendants call a release path.
 func (m *Manager) Transfer(ctx context.Context, id string) error {
-	return m.transition(ctx, id, func(l *ledger, e *entry) error {
+	return m.transition(ctx, id, func(l *ledger, e *entry, lock *managerlock.HomeLock) error {
 		if e.State != Prepared {
 			return fmt.Errorf("transfer requires a prepared lease")
 		}
-		c, err := m.resolve(ctx, e.Binding.ContextRef, e.Binding.ContextSHA256, e.Binding.OwnerRef)
+		c, err := m.resolve(ctx, lock.Held(), e.Binding.ContextRef, e.Binding.ContextSHA256, e.Binding.OwnerRef)
 		if err != nil {
 			return err
 		}
@@ -352,13 +361,13 @@ func (m *Manager) Transfer(ctx context.Context, id string) error {
 		return nil
 	})
 }
-func (m *Manager) transition(ctx context.Context, id string, fn func(*ledger, *entry) error) error {
+func (m *Manager) transition(ctx context.Context, id string, fn func(*ledger, *entry, *managerlock.HomeLock) error) error {
 	return m.locked(ctx, func(l *ledger, lock *managerlock.HomeLock, engine *transaction.Engine) error {
 		e, ok := l.Leases[id]
 		if !ok {
 			return fmt.Errorf("unknown project lease")
 		}
-		if err := fn(l, &e); err != nil {
+		if err := fn(l, &e, lock); err != nil {
 			return err
 		}
 		l.Leases[id] = e
@@ -370,7 +379,7 @@ func (m *Manager) transition(ctx context.Context, id string, fn func(*ledger, *e
 // or recovered sessions require the recorded process incarnation plus proof
 // that the complete session and descendants ended and authority reconciled.
 func (m *Manager) Reconcile(ctx context.Context, id string) error {
-	return m.transition(ctx, id, func(_ *ledger, e *entry) error {
+	return m.transition(ctx, id, func(_ *ledger, e *entry, _ *managerlock.HomeLock) error {
 		if e.State == Released {
 			return nil
 		}
@@ -416,12 +425,12 @@ func (m *Manager) Recover(ctx context.Context) error {
 // session/process reconciliation. Failure never acquires a fresh composition.
 func (m *Manager) Resume(ctx context.Context, id string) (Binding, error) {
 	var result Binding
-	err := m.locked(ctx, func(l *ledger, _ *managerlock.HomeLock, _ *transaction.Engine) error {
+	err := m.locked(ctx, func(l *ledger, lock *managerlock.HomeLock, _ *transaction.Engine) error {
 		e, ok := l.Leases[id]
 		if !ok || e.State != Active {
 			return fmt.Errorf("resume requires a reconciled active lease")
 		}
-		c, err := m.resolve(ctx, e.Binding.ContextRef, e.Binding.ContextSHA256, e.Binding.OwnerRef)
+		c, err := m.resolve(ctx, lock.Held(), e.Binding.ContextRef, e.Binding.ContextSHA256, e.Binding.OwnerRef)
 		if err != nil {
 			return err
 		}
@@ -489,7 +498,7 @@ func (m *Manager) Status(ctx context.Context) ([]Status, error) {
 		}
 		if m.authority == nil {
 			s.AuthorityUnknown = true
-		} else if resolved, er := m.resolve(ctx, e.Binding.ContextRef, e.Binding.ContextSHA256, e.Binding.OwnerRef); er != nil {
+		} else if resolved, er := m.resolve(ctx, lock.Held(), e.Binding.ContextRef, e.Binding.ContextSHA256, e.Binding.OwnerRef); er != nil {
 			s.Revoked = errors.Is(er, ErrRevoked)
 			s.AuthorityUnknown = !s.Revoked
 		} else if !reflect.DeepEqual(resolved, e.Composition) {
