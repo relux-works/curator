@@ -157,6 +157,9 @@ func TestCompositionNativeProfileOnly(t *testing.T) {
 			if !reflect.DeepEqual(receipt.Files, p.ProfileDocumentReceipt) {
 				t.Fatal("profile inventory differs")
 			}
+			if !bytes.Equal(p.Files[filepath.ToSlash(filepath.Join(adapter.SkillsDir, "project-skill", "SKILL.md"))], []byte("# project-skill\n")) {
+				t.Fatal("approved whole-skill context bytes lost")
+			}
 			if len(p.Skills) != 1 || p.Skills[0].Layer != "project" {
 				t.Fatal("whole skill delivery lost")
 			}
@@ -187,6 +190,12 @@ func TestCompositionNativeProfileOnly(t *testing.T) {
 			c, err := a.PublishComposition(context.Background(), req, p.SHA256, principal(t, f))
 			if err != nil {
 				t.Fatal(err)
+			}
+			explicit := req
+			explicit.Mode = "native-project"
+			repeated, err := a.PublishComposition(context.Background(), explicit, p.SHA256, principal(t, f))
+			if err != nil || !reflect.DeepEqual(c, repeated) {
+				t.Fatalf("equivalent explicit mode changed publication: %v", err)
 			}
 			resolved, err := resolveComposition(t, a, c.Ref, c.SHA256)
 			if err != nil {
@@ -258,7 +267,7 @@ func TestCompositionNativeContextRefusal(t *testing.T) {
 }
 
 // Claim: registration defaults to strict, native mode needs the explicit
-// operator API, unknown input causes no store write, and missing retained mode
+// operator API, unknown input causes no store write, and missing/null/unknown retained mode
 // fails closed rather than enabling native discovery or upgrading old authority.
 func TestCompositionRegistrationMode(t *testing.T) {
 	f := newFixture(t)
@@ -291,6 +300,18 @@ func TestCompositionRegistrationMode(t *testing.T) {
 	}
 	registrations := value["registrations"].(map[string]any)
 	registration := registrations[f.registration.CheckoutID].(map[string]any)["record"].(map[string]any)
+	for _, mode := range []any{nil, "", "off", "admitted", "future"} {
+		registration["mode"] = mode
+		damaged, _ := canonical(value)
+		if err = os.WriteFile(state, damaged, 0600); err != nil {
+			t.Fatal(err)
+		}
+		_, err = f.store.Locate(f.root)
+		required(t, err, "project_context_drift")
+		if mode != nil {
+			required(t, err, "invalid protected registration")
+		}
+	}
 	delete(registration, "mode")
 	damaged, _ := canonical(value)
 	if err = os.WriteFile(state, damaged, 0600); err != nil {
@@ -298,4 +319,11 @@ func TestCompositionRegistrationMode(t *testing.T) {
 	}
 	_, err = f.store.Locate(f.root)
 	required(t, err, "project_context_drift")
+	if err = os.WriteFile(state, before, 0600); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := f.store.Locate(f.root)
+	if err != nil || restored.Mode != "strict" {
+		t.Fatalf("restored strict registration refused: %v", err)
+	}
 }
