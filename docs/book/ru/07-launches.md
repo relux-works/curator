@@ -81,6 +81,13 @@ Lock digest идентифицирует выбранное содержимое
 Исходный managed home и private session home имеют разные роли.
 ⟦решено⟧
 
+Manifest связывает исходную материализацию Curator. Последующие native
+session state и разрешённые runtime writes не становятся частью нового
+«начального» manifest. При resume проверяются сохранённые receipts
+и protected inputs, а не весь изменившийся home против startup hash.
+Credential exceptions также определяет Curator, а не copy recipe host.
+⟦решено⟧
+
 Сначала host резервирует identity, generation, private locations и нужный
 endpoint. Preparation не запускает harness и не даёт полномочий на запуск.
 Curator материализует home в подготовленном месте; caller получает
