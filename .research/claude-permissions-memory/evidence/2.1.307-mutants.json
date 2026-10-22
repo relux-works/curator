@@ -1,0 +1,148 @@
+[
+  {
+    "control": "deny-Bash-fresh",
+    "exit": 1,
+    "seconds": 2.209,
+    "intended_failure": true,
+    "witness": "observed No such tool available: Bash=false; want true",
+    "forbidden_effect_observed": true
+  },
+  {
+    "control": "deny-Edit-fresh",
+    "exit": 1,
+    "seconds": 1.552,
+    "intended_failure": true,
+    "witness": "observed No such tool available: Edit=false; want true",
+    "forbidden_effect_observed": true
+  },
+  {
+    "control": "deny-Write-fresh",
+    "exit": 1,
+    "seconds": 1.322,
+    "intended_failure": true,
+    "witness": "observed No such tool available: Write=false; want true",
+    "forbidden_effect_observed": true
+  },
+  {
+    "control": "deny-WebFetch-fresh",
+    "exit": 1,
+    "seconds": 1.697,
+    "intended_failure": true,
+    "witness": "observed No such tool available: WebFetch=false; want true"
+  },
+  {
+    "control": "deny-MCP-fresh",
+    "exit": 1,
+    "seconds": 1.844,
+    "intended_failure": true,
+    "witness": "observed No such tool available: mcp__approved-probe__sentinel=false; want true",
+    "forbidden_effect_observed": true
+  },
+  {
+    "control": "deny-Bash-resume",
+    "exit": 1,
+    "seconds": 1.72,
+    "intended_failure": true,
+    "witness": "observed No such tool available: Bash=false; want true",
+    "forbidden_effect_observed": true
+  },
+  {
+    "control": "deny-Edit-resume",
+    "exit": 1,
+    "seconds": 1.873,
+    "intended_failure": true,
+    "witness": "observed No such tool available: Edit=false; want true",
+    "forbidden_effect_observed": true
+  },
+  {
+    "control": "deny-Write-resume",
+    "exit": 1,
+    "seconds": 2.046,
+    "intended_failure": true,
+    "witness": "observed No such tool available: Write=false; want true",
+    "forbidden_effect_observed": true
+  },
+  {
+    "control": "deny-WebFetch-resume",
+    "exit": 1,
+    "seconds": 1.901,
+    "intended_failure": true,
+    "witness": "observed No such tool available: WebFetch=false; want true"
+  },
+  {
+    "control": "deny-MCP-resume",
+    "exit": 1,
+    "seconds": 1.963,
+    "intended_failure": true,
+    "witness": "observed No such tool available: mcp__approved-probe__sentinel=false; want true",
+    "forbidden_effect_observed": true
+  },
+  {
+    "control": "deny-Bash-child",
+    "exit": 1,
+    "seconds": 1.486,
+    "intended_failure": true,
+    "witness": "observed No such tool available: Bash=false; want true",
+    "forbidden_effect_observed": true
+  },
+  {
+    "control": "deny-Edit-child",
+    "exit": 1,
+    "seconds": 1.607,
+    "intended_failure": true,
+    "witness": "observed No such tool available: Edit=false; want true",
+    "forbidden_effect_observed": true
+  },
+  {
+    "control": "deny-Write-child",
+    "exit": 1,
+    "seconds": 1.201,
+    "intended_failure": true,
+    "witness": "observed No such tool available: Write=false; want true",
+    "forbidden_effect_observed": true
+  },
+  {
+    "control": "deny-WebFetch-child",
+    "exit": 1,
+    "seconds": 1.352,
+    "intended_failure": true,
+    "witness": "observed No such tool available: WebFetch=false; want true"
+  },
+  {
+    "control": "deny-MCP-child",
+    "exit": 1,
+    "seconds": 1.918,
+    "intended_failure": true,
+    "witness": "observed No such tool available: mcp__approved-probe__sentinel=false; want true",
+    "forbidden_effect_observed": true
+  },
+  {
+    "control": "ceiling",
+    "exit": 1,
+    "seconds": 2.233,
+    "intended_failure": true,
+    "witness": "builtin catalog ceiling bypassed:",
+    "forbidden_effect_observed": true
+  },
+  {
+    "control": "memory-fresh",
+    "exit": 1,
+    "seconds": 1.323,
+    "intended_failure": true,
+    "witness": "observed QUAL_AUTOMATIC_MEMORY_INPUT_9821=true; want false"
+  },
+  {
+    "control": "boundary-network",
+    "exit": 1,
+    "seconds": 1.022,
+    "intended_failure": true,
+    "witness": "unrelated loopback not denied"
+  },
+  {
+    "control": "boundary-keychains",
+    "exit": 1,
+    "seconds": 1.704,
+    "intended_failure": true,
+    "witness": "synthetic Keychains read not denied"
+  }
+]

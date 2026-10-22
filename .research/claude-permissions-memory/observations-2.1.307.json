@@ -1,0 +1,6320 @@
+{
+  "identity": {
+    "platform": "darwin/arm64",
+    "sha256": "5b113a7752119470f1da419cb0e608af3361cae25b614216b13022093958fb2a",
+    "version": "2.1.307 (Claude Code)"
+  },
+  "records": [
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Read"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "ordinary.txt": "QUAL_CEILING_READ_9821\n"
+      },
+      "native_tools": [
+        "Read"
+      ],
+      "permission_denials": [],
+      "request_count": 6,
+      "request_sha256": "dbe00b904cd97bb4e3280a00df1788d9a0468fa7f8de13825d216fc26145f3df",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Write. Write is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Write. Write is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: Bash. Bash is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Write. Write is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: Bash. Bash is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: Edit. Edit is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Write. Write is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: Bash. Bash is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: Edit. Edit is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: WebFetch. WebFetch is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestBuiltinCeiling_Read",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        ""
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "ordinary.txt": "QUAL_CEILING_READ_9821\n"
+      },
+      "native_tools": [],
+      "permission_denials": [],
+      "request_count": 6,
+      "request_sha256": "e984393596affe69f6891ef29a919f9bfab096fb25e9c71a89fb309e95fda7ab",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Read. Read is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Read. Read is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: Write. Write is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Read. Read is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: Write. Write is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: Bash. Bash is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Read. Read is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: Write. Write is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: Bash. Bash is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: Edit. Edit is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Read. Read is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: Write. Write is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: Bash. Bash is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: Edit. Edit is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>",
+            "<tool_use_error>Error: No such tool available: WebFetch. WebFetch is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestBuiltinCeiling_empty",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Write,Task",
+        "--allowedTools",
+        "Write,Task"
+      ],
+      "child_stats": {
+        "by_type": {
+          "probe-agent": 1
+        },
+        "completed": 1,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 1,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 1
+        },
+        "spawned": 1,
+        "spawned_by_subagents": 0,
+        "started_in_background": 1
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n",
+        "memory/directed.md": "QUAL_MEMORY_WRITE_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 5,
+      "request_sha256": "aa9b2e7a39f872518f5420b687b79647cf7599f99d168355d7ee37bef609ec11",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemoryDirectedWrite_child_off-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Write,Task",
+        "--allowedTools",
+        "Write,Task"
+      ],
+      "child_stats": {
+        "by_type": {
+          "probe-agent": 1
+        },
+        "completed": 1,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 1,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 1
+        },
+        "spawned": 1,
+        "spawned_by_subagents": 0,
+        "started_in_background": 1
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n",
+        "memory/directed.md": "QUAL_MEMORY_WRITE_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 5,
+      "request_sha256": "a99c15e81dab9e30168504168fe63b5d6fed806c27b9796cd234589ef23f034a",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemoryDirectedWrite_child_off-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Write,Task",
+        "--allowedTools",
+        "Write,Task"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n",
+        "memory/directed.md": "QUAL_MEMORY_WRITE_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "276b98df6fbd76161d6ed0882fdb14b16250942ae129f623d8deb1ac6032d2c2",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemoryDirectedWrite_fresh_off-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Write,Task",
+        "--allowedTools",
+        "Write,Task"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n",
+        "memory/directed.md": "QUAL_MEMORY_WRITE_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "115e9cd29dfb73060b9a6bc3946172920ae6d23485687c5d82dad8f270600e6e",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemoryDirectedWrite_fresh_off-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/origin.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Write,Task",
+        "--allowedTools",
+        "Write,Task"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n",
+        "memory/directed.md": "QUAL_MEMORY_WRITE_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "11e4a1ec9e110bd2cc576a76faa489192f3694555c501210b1a7b5e9ae6cfb52",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemoryDirectedWrite_resume_off-false",
+      "turn": "origin"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Write,Task",
+        "--allowedTools",
+        "Write,Task",
+        "--resume",
+        "74a8931a-ccab-4dbb-a9a0-10b042d19d8a"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n",
+        "memory/directed.md": "QUAL_MEMORY_WRITE_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "f69aa12dcf19aba88e40cf447980c98174da495f94f203f9a93e0ab5bdcf4923",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemoryDirectedWrite_resume_off-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/origin.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Write,Task",
+        "--allowedTools",
+        "Write,Task"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n",
+        "memory/directed.md": "QUAL_MEMORY_WRITE_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "df1bb3eb11953923477d014eb70cf6214b4d365177a6375f8e0c9eca4534a771",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemoryDirectedWrite_resume_off-true",
+      "turn": "origin"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Write,Task",
+        "--allowedTools",
+        "Write,Task",
+        "--resume",
+        "5d006cc4-4d43-45e7-b6cc-6b88409c3cef"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n",
+        "memory/directed.md": "QUAL_MEMORY_WRITE_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "a66b248c13aa98d68165e7a97e0f7ca1d51a1dfd730103948e444dfdb87a66de",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemoryDirectedWrite_resume_off-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/origin.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        ""
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n"
+      },
+      "native_tools": [],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "a0c9fc647baf3cc22e2958caedf5f50ae1925c43170d96b76e476c15170fd84c",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemoryResumeHistory",
+      "turn": "origin"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/resume.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "",
+        "--resume",
+        "be8ff604-4360-4dfe-b1d1-35733ef45ea3"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n"
+      },
+      "native_tools": [],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "b58cb94344439abc7d072989eb11ae9f95a24ffe2e8136b4d2473b54cd4e61bb",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemoryResumeHistory",
+      "turn": "resume"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/first.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Read,Task",
+        "--allowedTools",
+        "Read,Task"
+      ],
+      "child_stats": {
+        "by_type": {
+          "probe-agent": 1
+        },
+        "completed": 1,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 1,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 1
+        },
+        "spawned": 1,
+        "spawned_by_subagents": 0,
+        "started_in_background": 1
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Read"
+      ],
+      "permission_denials": [],
+      "request_count": 4,
+      "request_sha256": "44f0bfda5fbff38b095aba1ab14cb79941d9a3bd8918ff0356ce46b9257a423b",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemory_off-false_child",
+      "turn": "first"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/first.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Read,Task",
+        "--allowedTools",
+        "Read,Task"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Read"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "6daaff72e28f8ea05249b74aade5436aae34bad931d918278b645516321abb4a",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemory_off-false_fresh",
+      "turn": "first"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/first.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Read,Task",
+        "--allowedTools",
+        "Read,Task"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Read"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "18ba66e1b7bf97fca29e80da76eee6ad4f682905fb07c980b98405f0ab6aa509",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemory_off-false_resume",
+      "turn": "first"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/resume.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Read,Task",
+        "--allowedTools",
+        "Read,Task",
+        "--resume",
+        "c5914483-3b9c-48b6-a8f9-8fce3814d7ab"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Read"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "77cc0e2bd127d974647a166c024f839ed35691b7c3956da234554ba1cc0af6d0",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": true,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemory_off-false_resume",
+      "turn": "resume"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/first.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Read,Task",
+        "--allowedTools",
+        "Read,Task"
+      ],
+      "child_stats": {
+        "by_type": {
+          "probe-agent": 1
+        },
+        "completed": 1,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 1,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 1
+        },
+        "spawned": 1,
+        "spawned_by_subagents": 0,
+        "started_in_background": 1
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Read"
+      ],
+      "permission_denials": [],
+      "request_count": 4,
+      "request_sha256": "ae1cd4344a1df75e3fbebbd8c15ccff6a9f294e20563469398b9ba52025a05ce",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemory_off-true_child",
+      "turn": "first"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/first.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Read,Task",
+        "--allowedTools",
+        "Read,Task"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Read"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "6a35d10e2377ca1d170e5de3cd2bf75356b94ffca6e9bbaad22e16de4618cba1",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemory_off-true_fresh",
+      "turn": "first"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/first.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Read,Task",
+        "--allowedTools",
+        "Read,Task"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Read"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "291999453cb7fd52ec3e13cd50a3c05287cc4a8f5bd0852b39d90b7cbd418815",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemory_off-true_resume",
+      "turn": "first"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/resume.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--tools",
+        "Read,Task",
+        "--allowedTools",
+        "Read,Task",
+        "--resume",
+        "eb3c1f75-3a0f-4e96-ae20-6cd07f7db98e"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "memory/MEMORY.md": "QUAL_AUTOMATIC_MEMORY_INPUT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Read"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "d63b587cfc399c265067ef6fbeda078852f15d922b2f47a5596465964c79b732",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestMemory_off-true_resume",
+      "turn": "resume"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Bash",
+        "--tools",
+        "Read,Task,Bash,Edit,Write,WebFetch",
+        "--allowedTools",
+        "Read,Task,Bash"
+      ],
+      "child_stats": {
+        "by_type": {
+          "probe-agent": 1
+        },
+        "completed": 1,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 1,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 1
+        },
+        "spawned": 1,
+        "spawned_by_subagents": 0,
+        "started_in_background": 1
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "Edit",
+        "Read",
+        "WebFetch",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 5,
+      "request_sha256": "f0500ad9968bce09df87f2f8642076b2f7ec8bed5fc8077820fa5f4edaa30cd9",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_child_Bash_deny-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Bash",
+        "--tools",
+        "Read,Task,Bash,Edit,Write,WebFetch",
+        "--allowedTools",
+        "Read,Task,Bash"
+      ],
+      "child_stats": {
+        "by_type": {
+          "probe-agent": 1
+        },
+        "completed": 1,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 1,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 1
+        },
+        "spawned": 1,
+        "spawned_by_subagents": 0,
+        "started_in_background": 1
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "Edit",
+        "Read",
+        "WebFetch",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 5,
+      "request_sha256": "ac4d78558e466f8262fb72411eef6b266c83d3dd97cc25e3aec3544abc999f8a",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Bash. Bash is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\nAvailable agent types for the Agent tool:\n- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n- Explore: Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis \u2014 it reads excerpts rather than "
+          ]
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_child_Bash_deny-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Edit",
+        "--tools",
+        "Read,Task,Bash,Edit,Write,WebFetch",
+        "--allowedTools",
+        "Read,Task,Edit"
+      ],
+      "child_stats": {
+        "by_type": {
+          "probe-agent": 1
+        },
+        "completed": 1,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 1,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 1
+        },
+        "spawned": 1,
+        "spawned_by_subagents": 0,
+        "started_in_background": 1
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "Edit",
+        "Read",
+        "WebFetch",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 6,
+      "request_sha256": "fe55b018ce0b8afeefb020add504f136dc0c993e667aecdea352cf952a59228a",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_child_Edit_deny-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Edit",
+        "--tools",
+        "Read,Task,Bash,Edit,Write,WebFetch",
+        "--allowedTools",
+        "Read,Task,Edit"
+      ],
+      "child_stats": {
+        "by_type": {
+          "probe-agent": 1
+        },
+        "completed": 1,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 1,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 1
+        },
+        "spawned": 1,
+        "spawned_by_subagents": 0,
+        "started_in_background": 1
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_BEFORE_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "Read",
+        "WebFetch",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 6,
+      "request_sha256": "f083ec1b972d15704dcfcd1edec5af3a0562b542a3be3c8d4a33674793e26138",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Edit. Edit is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_child_Edit_deny-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "$SYNTHETIC_HOME/.claude/managed-mcp.json",
+        "--tools",
+        "",
+        "--allowedTools",
+        "Read,mcp__approved-probe__sentinel",
+        "--tools",
+        "Read,Task,Bash,Edit,Write,WebFetch",
+        "--allowedTools",
+        "Read,Task,mcp__approved-probe__sentinel"
+      ],
+      "child_stats": {
+        "by_type": {
+          "probe-agent": 1
+        },
+        "completed": 1,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 1,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 1
+        },
+        "spawned": 1,
+        "spawned_by_subagents": 0,
+        "started_in_background": 1
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "approved.witness": "MCP_STARTED\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "Edit",
+        "Read",
+        "WebFetch",
+        "Write",
+        "mcp__approved-probe__sentinel"
+      ],
+      "permission_denials": [],
+      "request_count": 5,
+      "request_sha256": "9ac1ef566fe79e3f1924972b5cbaf1b1c6cecd680ba1ca309962b734216d4851",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": true,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_child_MCP_deny-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "$SYNTHETIC_HOME/.claude/managed-mcp.json",
+        "--tools",
+        "",
+        "--allowedTools",
+        "Read,mcp__approved-probe__sentinel",
+        "--tools",
+        "Read,Task,Bash,Edit,Write,WebFetch",
+        "--allowedTools",
+        "Read,Task,mcp__approved-probe__sentinel"
+      ],
+      "child_stats": {
+        "by_type": {
+          "probe-agent": 1
+        },
+        "completed": 1,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 1,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 1
+        },
+        "spawned": 1,
+        "spawned_by_subagents": 0,
+        "started_in_background": 1
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "approved.witness": "MCP_STARTED\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "Edit",
+        "Read",
+        "WebFetch",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 5,
+      "request_sha256": "562ca91200f07c9daf1911d3f18911bd3ac674ea77f7f528a89b715d008a3e66",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: mcp__approved-probe__sentinel</tool_use_error>\n\n<system-reminder>\nAvailable agent types for the Agent tool:\n- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n- Explore: Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis \u2014 it reads excerpts rather than whole files and will miss content past it"
+          ]
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_child_MCP_deny-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,WebFetch",
+        "--tools",
+        "Read,Task,Bash,Edit,Write,WebFetch",
+        "--allowedTools",
+        "Read,Task,WebFetch"
+      ],
+      "child_stats": {
+        "by_type": {
+          "probe-agent": 1
+        },
+        "completed": 1,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 1,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 1
+        },
+        "spawned": 1,
+        "spawned_by_subagents": 0,
+        "started_in_background": 1
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "Bash",
+        "Edit",
+        "Read",
+        "WebFetch",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 5,
+      "request_sha256": "ad2424bfc97b4e6e1b30c06d1d0c873bc5b490b77c5fa23e98b89a143796ba5c",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "Unable to verify if domain 127.0.0.1 is safe to fetch. This may be due to network restrictions or enterprise security policies blocking claude.ai.\n\n<system-reminder>\nAvailable agent types for the Agent tool:\n- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n- Explore: Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis \u2014 it reads excerpts "
+          ]
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_child_WebFetch_deny-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,WebFetch",
+        "--tools",
+        "Read,Task,Bash,Edit,Write,WebFetch",
+        "--allowedTools",
+        "Read,Task,WebFetch"
+      ],
+      "child_stats": {
+        "by_type": {
+          "probe-agent": 1
+        },
+        "completed": 1,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 1,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 1
+        },
+        "spawned": 1,
+        "spawned_by_subagents": 0,
+        "started_in_background": 1
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "Bash",
+        "Edit",
+        "Read",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 5,
+      "request_sha256": "ce5222709ea0b7762dcf925e81f8d39072214b391b44b78715d85f510224064c",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: WebFetch. WebFetch is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\nAvailable agent types for the Agent tool:\n- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n- Explore: Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis \u2014 it reads excerpts rath"
+          ]
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_child_WebFetch_deny-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Write",
+        "--tools",
+        "Read,Task,Bash,Edit,Write,WebFetch",
+        "--allowedTools",
+        "Read,Task,Write"
+      ],
+      "child_stats": {
+        "by_type": {
+          "probe-agent": 1
+        },
+        "completed": 1,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 1,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 1
+        },
+        "spawned": 1,
+        "spawned_by_subagents": 0,
+        "started_in_background": 1
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "Edit",
+        "Read",
+        "WebFetch",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 5,
+      "request_sha256": "aba1ae3b849c03b047207101547eaa4431e1d6d2f1dd14fd8d89f86565fc21b4",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_child_Write_deny-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Write",
+        "--tools",
+        "Read,Task,Bash,Edit,Write,WebFetch",
+        "--allowedTools",
+        "Read,Task,Write"
+      ],
+      "child_stats": {
+        "by_type": {
+          "probe-agent": 1
+        },
+        "completed": 1,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 1,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 1
+        },
+        "spawned": 1,
+        "spawned_by_subagents": 0,
+        "started_in_background": 1
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "Bash",
+        "Edit",
+        "Read",
+        "WebFetch"
+      ],
+      "permission_denials": [],
+      "request_count": 5,
+      "request_sha256": "dbe518e22bc85e97a1c9d72e0a4988d3f88e97f94bae9b9521ec7f7340728874",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": true,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Write. Write is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\nAvailable agent types for the Agent tool:\n- claude: Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed. (Tools: *)\n- Explore: Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis \u2014 it reads excerpts rather tha"
+          ]
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_child_Write_deny-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Bash"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "688d716db3ade10ef1137b229d445bdcd84b76b87ad8106b1c00e70eb10eec9e",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_fresh_Bash_deny-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Bash"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "Glob",
+        "Grep",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "1e9923682389f275fc7c08ba857a5e64e6b4c515ce4122f956b7df7e81e3293a",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Bash. Bash is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_fresh_Bash_deny-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Edit"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 3,
+      "request_sha256": "3181383e9c864eb76c7b8b0c19729b02d8713e6b7684b954dc76702716dd6502",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_fresh_Edit_deny-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Edit"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_BEFORE_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 3,
+      "request_sha256": "a447ecba5b884b957d42b4d60b066d16133af31dc8e5a3cbda3631d9d2792eb9",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Edit. Edit is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_fresh_Edit_deny-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "$SYNTHETIC_HOME/.claude/managed-mcp.json",
+        "--tools",
+        "",
+        "--allowedTools",
+        "Read,mcp__approved-probe__sentinel"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "approved.witness": "MCP_STARTED\n"
+      },
+      "native_tools": [
+        "mcp__approved-probe__sentinel"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "ca8631ff48bd54d9c666c09306dc61c89ddaf6f17f39f1512ddc264bc9b2a680",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": true,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_fresh_MCP_deny-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "$SYNTHETIC_HOME/.claude/managed-mcp.json",
+        "--tools",
+        "",
+        "--allowedTools",
+        "Read,mcp__approved-probe__sentinel"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "approved.witness": "MCP_STARTED\n"
+      },
+      "native_tools": [],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "6bb8beb2d7f37fdf681d805a978b549e8d208cae35fed461275778aee008f467",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: mcp__approved-probe__sentinel</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_fresh_MCP_deny-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,WebFetch"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "183b7a0332430dcb1dc9cd29fe934271af1450471230efa19b76ed688b58d897",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "Unable to verify if domain 127.0.0.1 is safe to fetch. This may be due to network restrictions or enterprise security policies blocking claude.ai.\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_fresh_WebFetch_deny-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,WebFetch"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "adda293c0f10cddac71b4102cfecf0c761c8636226f51ade4f141e9c3bbf552d",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: WebFetch. WebFetch is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_fresh_WebFetch_deny-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Write"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "a8bfcc519082fb0c3bca524bb5a24778bf1496eb3d079105c37093b913d14eed",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_fresh_Write_deny-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Write"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "5e834721f18eb742a5900afc869b6e0e0cd80f73247ce359a71d733eb921e48a",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Write. Write is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_fresh_Write_deny-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/origin.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Bash"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "794a03fb73033e73d560e9ee5beca98c451989d05bc85de3adaed3d4dd9702f1",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_Bash_deny-false",
+      "turn": "origin"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Bash",
+        "--resume",
+        "9a4583fc-bfa8-426b-ad44-4a9b19ffaf93"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "22655822167446735942d7873653603f91b30c42fe07bb6dbb5c7e1f8dc534f3",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_Bash_deny-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/origin.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Bash"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "Glob",
+        "Grep",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "640d671b3630b6b6a47b4bac0b85be5859a047688a4f7a9723f170fa9b86833f",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_Bash_deny-true",
+      "turn": "origin"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Bash",
+        "--resume",
+        "bd97a1b2-a18d-4f21-b7c0-1d2653cc8cfe"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "Glob",
+        "Grep",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "956c1234120b9c8c8dc842eccc9a83b57ff45ba557cd11aeae0745996755ff41",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Bash. Bash is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_Bash_deny-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/origin.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Edit"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "31b97ddadc02dc9943d35e39b945de7f704c2fbe0fd3c2ea710668a3406ab15e",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_Edit_deny-false",
+      "turn": "origin"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Edit",
+        "--resume",
+        "83853a24-27fd-4036-8854-98f2a38028d0"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 3,
+      "request_sha256": "7f7a205a35137ed3f6077de0ab79dd1cc2b2c814d6a08448ffc51647a1208b88",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_Edit_deny-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/origin.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Edit"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_BEFORE_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "90b21d7e156a07702e4737a4108a313e92c9bbb085b4a5a324958fdde3db3878",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_Edit_deny-true",
+      "turn": "origin"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Edit",
+        "--resume",
+        "60f55f97-c473-42f2-94fc-fba0a2b5a9dc"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_BEFORE_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 3,
+      "request_sha256": "32fb0ff49116cfd08338927cd9e2fcf11e260782c3c5f10f568978d77444a120",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Edit. Edit is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_Edit_deny-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/origin.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "$SYNTHETIC_HOME/.claude/managed-mcp.json",
+        "--tools",
+        "",
+        "--allowedTools",
+        "Read,mcp__approved-probe__sentinel"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "approved.witness": "MCP_STARTED\n"
+      },
+      "native_tools": [
+        "mcp__approved-probe__sentinel"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "e7ead0b3b0ca8b355627210d5cdff9b5e4d820c80e83b14bd9850962f8d58657",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_MCP_deny-false",
+      "turn": "origin"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "$SYNTHETIC_HOME/.claude/managed-mcp.json",
+        "--tools",
+        "",
+        "--allowedTools",
+        "Read,mcp__approved-probe__sentinel",
+        "--resume",
+        "dfa43b98-ca66-4060-804f-a3664a4e3393"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "approved.witness": "MCP_STARTED\n"
+      },
+      "native_tools": [
+        "mcp__approved-probe__sentinel"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "574a4b6780379b207b869cee3aa9f2523c2b80286eaa37e79f32f88b3ef3257a",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": true,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_MCP_deny-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/origin.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "$SYNTHETIC_HOME/.claude/managed-mcp.json",
+        "--tools",
+        "",
+        "--allowedTools",
+        "Read,mcp__approved-probe__sentinel"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "approved.witness": "MCP_STARTED\n"
+      },
+      "native_tools": [],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "175fc909cbc9f23922d87333c92b458bca7963583bd5d599a68a4439605511ae",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_MCP_deny-true",
+      "turn": "origin"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "$SYNTHETIC_HOME/.claude/managed-mcp.json",
+        "--tools",
+        "",
+        "--allowedTools",
+        "Read,mcp__approved-probe__sentinel",
+        "--resume",
+        "401a2214-8d78-4410-a3e9-1e1599864c7e"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "approved.witness": "MCP_STARTED\n"
+      },
+      "native_tools": [],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "2b1957b6ebbe7d70455b8f04dda1a94f36d54aafa1b4af53c38954d91c405995",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: mcp__approved-probe__sentinel</tool_use_error>\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_MCP_deny-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/origin.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,WebFetch"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "75487eae5fb687567e56b4503e29d3d176ca671f3c4e91cbfa84157d9673f072",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_WebFetch_deny-false",
+      "turn": "origin"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,WebFetch",
+        "--resume",
+        "d941d290-41cb-4e92-bcfb-df6dc9496379"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "6279bd20f5de8d5187edad2c7f8002c25f1ca70324c84a81d44209410e916465",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "Unable to verify if domain 127.0.0.1 is safe to fetch. This may be due to network restrictions or enterprise security policies blocking claude.ai.\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_WebFetch_deny-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/origin.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,WebFetch"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "22fcc6560438543ff5f254784a8ff554e6e79c33a05161373866cc6342afe144",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_WebFetch_deny-true",
+      "turn": "origin"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,WebFetch",
+        "--resume",
+        "ed61856a-cc6a-45f6-aa7e-53eb673cc5f7"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "da20c1a44bc8b1d0cf24d415a1ade06dcb9bdf1d92171400c6c79a76a6e12174",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: WebFetch. WebFetch is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_WebFetch_deny-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/origin.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Write"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "7066ec74acf1aeaeeb4d280ba31ce0c3cf458de65c72f99bf0326fcf459744eb",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_Write_deny-false",
+      "turn": "origin"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Write",
+        "--resume",
+        "4e7dd655-7f9b-46ee-9941-df416d2ba360"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "effect.txt": "QUAL_EFFECT_9821\n"
+      },
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "6921c6aabba0d48d9be42e0fd8a3988f6a1f360b27e6be3fb9dafcc1e69aaecf",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_Write_deny-false",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/origin.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Write"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow"
+      ],
+      "permission_denials": [],
+      "request_count": 1,
+      "request_sha256": "891fe58e5974b4f62776fdbd90656a6eddae009dfabd25433278c6bf579b94b1",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_Write_deny-true",
+      "turn": "origin"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read,Write",
+        "--resume",
+        "076ce8c8-559f-45d5-9d0c-0e29b5c6ff98"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {},
+      "native_tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "7dd5a1b3b1511517adc6cfcea4e0ac6d73054235c7ca85960a38994a00614267",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>Error: No such tool available: Write. Write is disabled for this session, in subagents as well as here.</tool_use_error>\n\n<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestPermissions_resume_Write_deny-true",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read",
+        "--tools",
+        "Read"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "ordinary.txt": "QUAL_ORDINARY_READ_9821\n"
+      },
+      "native_tools": [
+        "Read"
+      ],
+      "permission_denials": [
+        {
+          "tool_input": {
+            "file_path": "$RUN/ancestor/work/ordinary.txt"
+          },
+          "tool_name": "Read",
+          "tool_use_id": "tool_probe_0"
+        }
+      ],
+      "request_count": 2,
+      "request_sha256": "526a824d38b72643601b719c14142a5779f2143cb244fdf4870eae5db2569a02",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>File is in a directory that is denied by your permission settings.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestProjectPermissions_local",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read",
+        "--tools",
+        "Read"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "ordinary.txt": "QUAL_ORDINARY_READ_9821\n"
+      },
+      "native_tools": [
+        "Read"
+      ],
+      "permission_denials": [],
+      "request_count": 2,
+      "request_sha256": "39686ed03f2ceb723c4c7325afe29e84f1acc09d0e746e5fc29786b726a250a2",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": true
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestProjectPermissions_none",
+      "turn": "turn"
+    },
+    {
+      "argv": [
+        "-p",
+        "QUALIFICATION_PROBE",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--debug-file",
+        "$RUN/turn.debug.log",
+        "--max-turns",
+        "12",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "Read",
+        "--tools",
+        "Read"
+      ],
+      "child_stats": {
+        "by_type": {},
+        "completed": 0,
+        "failed": 0,
+        "killed": {
+          "parent": 0,
+          "system": 0,
+          "user": 0
+        },
+        "max_depth": 0,
+        "refused": {
+          "budget": 0,
+          "concurrency_limit": 0,
+          "depth_limit": 0
+        },
+        "requested": {
+          "background": 0,
+          "foreground": 0,
+          "unset": 0
+        },
+        "spawned": 0,
+        "spawned_by_subagents": 0,
+        "started_in_background": 0
+      },
+      "exit": 0,
+      "final_fixture_effects": {
+        "ordinary.txt": "QUAL_ORDINARY_READ_9821\n"
+      },
+      "native_tools": [
+        "Read"
+      ],
+      "permission_denials": [
+        {
+          "tool_input": {
+            "file_path": "$RUN/ancestor/work/ordinary.txt"
+          },
+          "tool_name": "Read",
+          "tool_use_id": "tool_probe_0"
+        }
+      ],
+      "request_count": 2,
+      "request_sha256": "ecfedc3765ed53beba2924cf2d9a6e4ecca1959e197ce369e30acddd86300c5d",
+      "requests": [
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": []
+        },
+        {
+          "markers": {
+            "EXCL_APPROVED_ROOT_7352": true,
+            "MCP_TOOL_SENTINEL": false,
+            "QUAL_AUTOMATIC_MEMORY_INPUT_9821": false,
+            "QUAL_CHILD_INPUT_9821": false,
+            "QUAL_NATIVE_PROJECT_INPUT_9821": true,
+            "QUAL_ORDINARY_READ_9821": false
+          },
+          "model": "claude-sonnet-4-6",
+          "tool_errors": [
+            "<tool_use_error>File is in a directory that is denied by your permission settings.</tool_use_error>\n\n<system-reminder>\n<total_tokens>14999899 tokens left</total_tokens>\n</system-reminder>"
+          ]
+        }
+      ],
+      "terminal_reason": "completed",
+      "test": "TestProjectPermissions_project",
+      "turn": "turn"
+    }
+  ]
+}
