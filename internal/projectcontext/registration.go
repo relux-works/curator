@@ -177,6 +177,15 @@ func profile(home, name string) (Profile, *contextlock.Lock, error) {
 	return Profile{name, digest(c)}, l, nil
 }
 func (s Store) Register(name, root, profileName, env string) (Registration, error) {
+	return s.RegisterMode(name, root, profileName, env, "strict")
+}
+
+// RegisterMode is an explicit protected operator operation. Repository data and
+// composition requests cannot enable native discovery or change a registration.
+func (s Store) RegisterMode(name, root, profileName, env, mode string) (Registration, error) {
+	if !validSourceMode(mode) {
+		return Registration{}, fail("project_context_invalid", "unknown source mode")
+	}
 	if name == "" {
 		name = filepath.Base(filepath.Clean(root))
 	}
@@ -208,16 +217,16 @@ func (s Store) Register(name, root, profileName, env string) (Registration, erro
 		return Registration{}, err
 	}
 	defer op.close()
-	return op.register(name, b, p, env)
+	return op.register(name, b, p, env, mode)
 }
-func (op *operation) register(name string, b binding, p Profile, env string) (Registration, error) {
+func (op *operation) register(name string, b binding, p Profile, env, mode string) (Registration, error) {
 	for _, old := range op.state.Registrations {
 		if old.Active && ((old.Name == name && old.Record.ProjectRoot != b.Repository.Root) || (old.Record.ProjectRoot == b.Repository.Root && old.Record.Profile == p && old.Record.Environment == env)) {
 			return Registration{}, fail("project_registration_mismatch", "registration already exists; explicitly rebind")
 		}
 	}
 	id := newID()
-	r := Registration{"project-registration/1", id, b.Repository.Root, identity(b), p, env, "home:" + id, "worktree:" + id}
+	r := Registration{"project-registration/1", id, b.Repository.Root, identity(b), p, env, mode, "home:" + id, "worktree:" + id}
 	for _, part := range []string{"homes", "worktrees"} {
 		p := filepath.Join(op.root, part, id)
 		if err := privatedir.MakeAll(p); err != nil {
@@ -270,7 +279,7 @@ func (s Store) Rebind(id, root string) (Registration, error) {
 	if err != nil {
 		return Registration{}, err
 	}
-	return op.register(old.Name, b, p, old.Record.Environment)
+	return op.register(old.Name, b, p, old.Record.Environment, old.Record.Mode)
 }
 
 // Locate proves the real launch CWD belongs to the most specific registered

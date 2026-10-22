@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// Claim: the actual reader agrees with all 51 published composition grammar
+// Claim: the actual reader agrees with all 57 published composition grammar
 // fixtures at the pinned spec commit, including their complete-record identity.
 // These are syntax vectors, not native adapter or runtime qualification.
 func TestCompositionPublishedVectors(t *testing.T) {
@@ -28,7 +28,7 @@ func TestCompositionPublishedVectors(t *testing.T) {
 	if err = json.Unmarshal(b, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	if len(manifest.Cases) != 51 {
+	if len(manifest.Cases) != 57 {
 		t.Fatal("pinned composition vector count differs")
 	}
 	for _, tc := range manifest.Cases {

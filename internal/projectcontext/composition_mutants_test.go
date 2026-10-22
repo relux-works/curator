@@ -10,8 +10,8 @@ import (
 	"testing"
 )
 
-// Claim: these bounded source plants make the composition narrowing mutants
-// pass a forbidden operation, and the corresponding regression witness fails
+// Claim: these bounded source plants violate composition admission or identity,
+// and the corresponding regression witness fails
 // for its intended assertion. A setup/compile failure is not a caught mutant.
 // Opt in explicitly; the ordinary suite keeps only production behavior tests.
 func TestCompositionNarrowingMutants(t *testing.T) {
@@ -39,6 +39,15 @@ func TestCompositionNarrowingMutants(t *testing.T) {
 		{"ignore-preview-digest", "composition_authority.go", "TestCompositionAuthority", "!hexRE.MatchString(expected) || plan.Preview.SHA256 != expected", "(!hexRE.MatchString(expected) || plan.Preview.SHA256 != expected) && false", "want project_context_drift"},
 		{"allow-adapter-range", "composition_types.go", "TestCompositionAdapterRelease", "invalidProviderVersion(a.ProviderVersion)", "false", "want invalid adapter release contract"},
 		{"allow-memory-on", "composition.go", "TestCompositionClosedPreparation", `req.Policy.Version != 1 || req.Policy.Memory != "off"`, `req.Policy.Version != 1`, "want project_context_invalid"},
+		{"native-includes-project-context", "composition.go", "TestCompositionNativeContextRefusal", `if req.Mode == "native-project" {`, `if req.Mode == "native-project" && false {`, "want native-project cannot select context items"},
+		{"native-requires-exclusion", "composition_types.go", "TestCompositionAdapterModes", `if mode == "strict" {`, `if validSourceMode(mode) {`, "native mode incorrectly requires exclusion"},
+		{"mode-omitted-from-digest", "composition.go", "TestCompositionNativeProfileOnly", `out.SHA256 = digest(b)`, `digestRecord := record; digestRecord.Mode = "strict"; out.SHA256 = identity(digestRecord)`, "mode omitted from digest"},
+		{"ignore-mode-binding", "composition.go", "TestCompositionNativeContextRefusal", `req.Mode != r.Record.Mode`, `false`, "want project_context_invalid"},
+		{"ignore-mode-advertisement", "composition_types.go", "TestCompositionAdapterModes", `if !advertised {`, `if !advertised && false {`, "want project_context_unsupported"},
+		{"allow-unknown-mode", "composition_types.go", "TestCompositionAdapterModes", `if !validSourceMode(mode) {`, `if !validSourceMode(mode) && false {`, "want project_context_invalid"},
+		{"allow-duplicate-modes", "composition_types.go", "TestCompositionAdapterModes", `(i > 0 && m == a.Modes[i-1])`, `(i > 0 && m == a.Modes[i-1] && false)`, "want project_context_invalid"},
+		{"allow-unknown-registration-mode", "registration.go", "TestCompositionRegistrationMode", `if !validSourceMode(mode) {`, `if !validSourceMode(mode) && false {`, "want project_context_invalid"},
+		{"ignore-retained-registration-mode", "store.go", "TestCompositionRegistrationMode", `!validSourceMode(v.Mode)`, `false`, "want project_context_drift"},
 	}
 
 	for _, tc := range cases {
