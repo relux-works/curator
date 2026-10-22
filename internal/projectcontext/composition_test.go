@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +23,9 @@ import (
 
 func compositionFixture(t *testing.T, env string, skillSources map[string]string, system ...bool) fixture {
 	t.Helper()
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+		t.Skip("CIP filesystem binding supports macOS/Linux; pure composition contracts remain portable")
+	}
 	base := t.TempDir()
 	home := filepath.Join(base, "manager")
 	root := filepath.Join(base, "checkout")
