@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"go/build"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +15,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // A probe-shaped caller, including a malformed request, must report absent
@@ -94,7 +95,7 @@ func TestLandlockProbeNarrowingMutants(t *testing.T) {
 			if err := os.WriteFile(overlayPath, overlay, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			command := exec.Command(filepath.Join(build.Default.GOROOT, "bin", "go"), "test", "-count=1", "-timeout=60s", "-run", mutant.run, ".") // #nosec G204 -- local toolchain and fixed behavioral tests
+			command := exec.Command(testtoolchain.Go(t), "test", "-count=1", "-timeout=60s", "-run", mutant.run, ".") // #nosec G204 -- local toolchain and fixed behavioral tests
 			command.Env = append(os.Environ(), "GOFLAGS="+os.Getenv("GOFLAGS")+" "+strconv.Quote("-overlay="+overlayPath))
 			output, err := command.CombinedOutput()
 			var exit *exec.ExitError

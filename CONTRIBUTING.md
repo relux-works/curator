@@ -14,6 +14,26 @@ Curator follows a small set of working agreements. They are binding for every ch
 - Signed: SSH signature, verified on GitHub.
 - Tests accompany the change in the same commit; a phase closes only with green CI on ubuntu, macos, and windows.
 
+## Test environment
+
+CLI tests discard the caller's PATH in `TestMain`. They retain a private fixture
+directory and the system command directories (`/usr/bin` and `/bin` on Unix;
+System32 and the standard Git for Windows command directory on Windows).
+Individual provider tests can still supply an explicit fixture PATH, including
+untrusted providers. Do not append developer tool directories to the default
+test PATH.
+
+Real Go launches in the CLI and script-worker fixtures use
+`internal/testtoolchain.Go`: an absolute `CURATOR_GO`, then `GOROOT/bin/go`, then
+the test binary's build GOROOT. There is no PATH fallback. Rust metadata probes
+use the pinned native installation beside the Cargo selected by the product.
+An absent toolchain skips only its dependent test with a reason; an invalid
+selection fails. Run package tests with `go test ./cmd/curator/...` and the
+affected internal packages. `TestCLIPathIsolation` plants ambient providers;
+`TestCLIPathIsolationNarrowingMutant` proves that restoring ambient PATH breaks
+the real status witness. Provider fixtures use test temp directories;
+`TestMain` removes its private PATH directory when the package run exits.
+
 ## Code
 
 - Go, stdlib first. New third-party dependencies only when the plan names them (section 2); anything else needs a plan update first.

@@ -12,12 +12,14 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 func buildHelpCLI(t *testing.T) string {
 	t.Helper()
 	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
-	command := exec.Command("go", "build", "-o", binary, ".")
+	command := exec.Command(testtoolchain.Go(t), "build", "-o", binary, ".")
 	if out, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("build CLI: %v\n%s", err, out)
 	}
@@ -215,7 +217,7 @@ func main() { _ = json.NewEncoder(os.Stdout).Encode(os.Args[1:]) }
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	build := exec.Command("go", "build", "-o", provider, source)
+	build := exec.Command(testtoolchain.Go(t), "build", "-o", provider, source)
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build provider: %v\n%s", err, out)
 	}

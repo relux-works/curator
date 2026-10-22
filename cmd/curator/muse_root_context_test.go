@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/pathboundary"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 type museRootVector struct {
@@ -466,7 +467,7 @@ func TestMuseRootContextNarrowingMutants(t *testing.T) {
 				t.Fatal(err)
 			}
 			parts := strings.Split(mutant.test, "/")
-			command := exec.Command("go", "test", "-overlay", overlayPath, "-count=1", "-timeout=5m", "-v", "-run", "^"+parts[0]+"$/^"+parts[1]+"$", ".")
+			command := exec.Command(testtoolchain.Go(t), "test", "-overlay", overlayPath, "-count=1", "-timeout=5m", "-v", "-run", "^"+parts[0]+"$/^"+parts[1]+"$", ".")
 			// Reuse the CLI helper protocol: the parent already holds the
 			// package GOROOT lock, and these behavioral tests do not mutate it.
 			// TestMain still isolates git in the child process.
