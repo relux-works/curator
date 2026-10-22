@@ -21,7 +21,7 @@ func TestMuseNarrowingMutants(t *testing.T) {
 	cases := []struct{ name, file, pkg, test, old, new, witness string }{
 		{"project-document-first", "../projectcontext/composition_types.go", "../projectcontext", "TestMuseOfflineComposition", `return bytes.Join(parts, []byte{'\n'})`, `if len(parts)>1 { parts[0],parts[len(parts)-1]=parts[len(parts)-1],parts[0] }; return bytes.Join(parts, []byte{'\n'})`, "profile-first exact separator lost"},
 		{"repository-approval-imported", "muse.go", ".", "TestMuseRepositoryControls/config/muse/approval.json", `func musePath(p string) bool {`, `func musePath(p string) bool { if p == "config/muse/approval.json" { return true }`, "want unapproved_control_path"},
-		{"interactive-allowed", "muse.go", ".", "TestMuseLaunchRefused", `return LaunchContribution{}, &Unsupported{LaunchForm, "interactive_and_resume_unqualified"}`, `return LaunchContribution{}, nil`, "unsafe launch accepted"},
+		{"interactive-allowed", "muse.go", ".", "TestMuseLaunchRefused", `return LaunchContribution{}, &Unsupported{LaunchForm, reason}`, `return LaunchContribution{}, nil`, "unsafe launch accepted"},
 		{"native-project-allowed", "muse.go", ".", "TestMuseLaunchRefused", `return LaunchContribution{}, &Unsupported{Permissions, "manager_permissions_unqualified; project sources not isolated"}`, `return LaunchContribution{}, nil`, "unsafe launch accepted"},
 		{"native-project-notice", "muse.go", ".", "TestMuseLaunchRefused", `report.Notice = "project sources not isolated"`, `report.Notice = ""`, "native source warning missing"},
 		{"file-count", "muse.go", ".", "TestMuseOfflineBounds/count", `len(input.Files) > 10000`, `false`, "want complete receipt required"},
