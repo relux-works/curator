@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 type binding struct {
@@ -113,11 +114,11 @@ func (s Store) begin(create bool) (*operation, error) {
 	if err := pathboundary.ValidateRoot(m.Home()); err != nil {
 		return nil, err
 	}
-	_, rootErr := os.Lstat(op.root)
-	freshRoot := errors.Is(rootErr, os.ErrNotExist)
-	if rootErr != nil && !freshRoot {
+	rootState, rootErr := stateread.Lstat(op.root)
+	if rootErr != nil {
 		return nil, rootErr
 	}
+	freshRoot := rootState.Kind == stateread.KindAbsent
 	if create {
 		if err := privatedir.MakeAll(op.root); err != nil {
 			return nil, err
@@ -254,10 +255,12 @@ func writeAtomic(root, name string, b []byte) error {
 		return err
 	}
 	target := filepath.Join(root, name)
-	if st, e := os.Lstat(target); e == nil && (!st.Mode().IsRegular() || st.Mode()&os.ModeSymlink != 0) {
+	state, err := stateread.Lstat(target)
+	if err != nil {
+		return err
+	}
+	if state.Kind == stateread.KindPresent && (!state.Info.Mode().IsRegular() || state.Info.Mode()&os.ModeSymlink != 0) {
 		return fail("project_context_drift", "invalid protected record target")
-	} else if e != nil && !errors.Is(e, os.ErrNotExist) {
-		return e
 	}
 	if err = os.Rename(tmp, target); err != nil {
 		return err
@@ -289,13 +292,15 @@ func (op *operation) put(c captured) (string, string, error) {
 		return "", "", err
 	}
 	target := filepath.Join(base, h)
-	if _, err := os.Lstat(target); err == nil {
+	state, err := stateread.Lstat(target)
+	if err != nil {
+		return "", "", err
+	}
+	if state.Kind == stateread.KindPresent {
 		if _, err := op.get(ref, h); err != nil {
 			return "", "", err
 		}
 		return ref, h, nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return "", "", err
 	}
 	stage, err := os.MkdirTemp(base, ".snapshot-*")
 	if err != nil {
