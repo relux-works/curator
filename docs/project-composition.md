@@ -59,6 +59,13 @@ I-LEASE package lands, its result types and revocation sentinel are mirrored
 locally with the agreed exact field shapes. Integration replaces those mirrors
 with the owning package import; it must not introduce a reverse dependency.
 
+For native-project delivery, the non-wire preview also returns
+`ProfileDocuments` and `ProfileDocumentReceipt`, derived separately from the
+selected protected profile closure. Adapters use these profile-only root and
+system outputs rather than splitting the strict composition's additive prose.
+They do not change the closed composition record, its receipt or strict adapter
+admission. See [Codex delivery](project-adapter-codex.md) for mode boundaries.
+
 ## Verification
 
 Run the package tests and bounded Go-overlay controls:

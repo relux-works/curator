@@ -100,15 +100,20 @@ type Composition struct {
 	Generated       map[string]Surface `json:"generated"`
 }
 type CompositionPreview struct {
-	Record       CompositionRecord
-	Generation   Generation
-	PolicyRecord json.RawMessage
-	Receipt      MaterializationReceipt
-	Files        map[string][]byte `json:"-"`
-	Modules      []OrderedModule
-	Skills       []EffectiveSkill
-	Ref          string
-	SHA256       string
+	// ProfileDocuments and its receipt are derived, non-wire profile-only
+	// outputs for native-project adapters. They are recomputed from the selected
+	// protected profile closure, never split out of concatenated project prose.
+	ProfileDocuments       map[string][]byte `json:"-"`
+	ProfileDocumentReceipt []File            `json:"-"`
+	Record                 CompositionRecord
+	Generation             Generation
+	PolicyRecord           json.RawMessage
+	Receipt                MaterializationReceipt
+	Files                  map[string][]byte `json:"-"`
+	Modules                []OrderedModule
+	Skills                 []EffectiveSkill
+	Ref                    string
+	SHA256                 string
 }
 type OrderedModule struct {
 	ItemID  string

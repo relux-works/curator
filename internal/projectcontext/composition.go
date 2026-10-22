@@ -73,7 +73,7 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 	if err != nil {
 		return result, err
 	}
-	out := CompositionPreview{Files: map[string][]byte{}, Modules: []OrderedModule{}, Skills: []EffectiveSkill{}}
+	out := CompositionPreview{ProfileDocuments: map[string][]byte{}, Files: map[string][]byte{}, Modules: []OrderedModule{}, Skills: []EffectiveSkill{}}
 	generation := Generation{"project-generation/1", "registration:" + r.Record.CheckoutID, identity(r.Record), []GenerationItem{}}
 	for _, c := range admitted.Items {
 		a := op.state.Approvals[r.Record.CheckoutID+":"+c.Item.ID]
@@ -271,6 +271,12 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 		}
 		return false
 	}
+	if len(profileRoot) > 0 {
+		out.ProfileDocuments[adapter.RootTarget] = profileRoot
+	}
+	if len(profileSystem) > 0 {
+		out.ProfileDocuments[".agent-context/system-prompt.md"] = profileSystem
+	}
 	root := JoinRootDocuments(profileRoot, projectRoots...)
 	if len(root) > 0 {
 		out.Files[adapter.RootTarget] = root
@@ -351,6 +357,12 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 	if err != nil {
 		return result, err
 	}
+
+	profileReceipt, err := compositionReceipt(out.ProfileDocuments, map[string]bool{}, identity(req.Adapter), policyHash, r.Record.WorktreeRef)
+	if err != nil {
+		return result, err
+	}
+	out.ProfileDocumentReceipt = profileReceipt.Files
 
 	omitted := []CompositionOmission{}
 	for _, v := range admitted.Omitted {
