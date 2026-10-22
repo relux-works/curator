@@ -38,9 +38,10 @@ type registered struct {
 	Precedence contextlock.Precedence `json:"precedence"`
 }
 type approved struct {
-	Record       Approval `json:"record"`
-	ReviewSHA256 string   `json:"review_sha256"`
-	Revoked      bool     `json:"revoked"`
+	Record       Approval   `json:"record"`
+	ReviewSHA256 string     `json:"review_sha256"`
+	Revoked      bool       `json:"revoked"`
+	Candidate    *Candidate `json:"candidate,omitempty"`
 }
 type state struct {
 	Version        int                   `json:"version"`
@@ -174,7 +175,7 @@ func (op *operation) validate() error {
 			return fail("project_context_drift", "invalid retained precedence")
 		}
 		v := r.Record
-		if id != v.CheckoutID || !idRE.MatchString(id) || v.Kind != "project-registration/1" || !identifiers.Valid(r.Name) || !environment(v.Environment) || !filepath.IsAbs(v.ProjectRoot) || len(v.ProjectRoot) > 4096 || v.RootIdentity != identity(r.Binding) || !identifiers.Valid(v.Profile.Name) || !hexRE.MatchString(v.Profile.LockSHA256) || v.HomeRef != "home:"+id || v.WorktreeRef != "worktree:"+id {
+		if id != v.CheckoutID || !idRE.MatchString(id) || v.Kind != "project-registration/1" || !identifiers.Valid(r.Name) || !environment(v.Environment) || !validRoot(v.ProjectRoot) || !validRoot(r.Binding.Repository.Root) || v.RootIdentity != identity(r.Binding) || !identifiers.Valid(v.Profile.Name) || !hexRE.MatchString(v.Profile.LockSHA256) || v.HomeRef != "home:"+id || v.WorktreeRef != "worktree:"+id {
 			return fail("project_context_drift", "invalid protected registration")
 		}
 	}
@@ -196,6 +197,9 @@ func (op *operation) validate() error {
 		v := a.Record
 		if !ok || key != v.CheckoutID+":"+v.ItemID || v.Kind != "project-approval/1" || !idRE.MatchString(v.ItemID) || !hexRE.MatchString(v.ItemSHA256) || v.Environment != r.Record.Environment || v.ApproverRef != s.Principal || v.CeilingSHA256 != ceiling(r.Record) || !hexRE.MatchString(a.ReviewSHA256) {
 			return fail("project_context_drift", "invalid protected approval")
+		}
+		if a.Candidate != nil && (validateCandidate(*a.Candidate, r.Record) != nil || a.Candidate.ItemSHA256 != v.ItemSHA256 || a.Candidate.Item.ID != v.ItemID) {
+			return fail("project_context_drift", "approved candidate differs from its immutable identity")
 		}
 	}
 	return nil
