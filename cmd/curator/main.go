@@ -41,6 +41,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/opaquescan"
+	"github.com/relux-works/curator/internal/projectlease"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/rustsource"
 	"github.com/relux-works/curator/internal/scopes"
@@ -2398,7 +2399,7 @@ func collectUnderLock(home string, lock *managerlock.HomeLock, policy envprofile
 	if err := envprofile.PreflightCurrentPathSources(home, policy); err != nil {
 		return scopes.MaintenanceResult{}, err
 	}
-	engine, err := transaction.New(home)
+	engine, err := transaction.New(home, transaction.WithCommitCheck(projectlease.TransactionCheck(home)))
 	if err != nil {
 		return scopes.MaintenanceResult{}, fmt.Errorf("open the install transaction journal: %w", err)
 	}

@@ -27,6 +27,9 @@ var ErrRevoked = errors.New("project authority revoked")
 // committing the lease. Callers must not publish or start this reservation.
 var ErrArtifactsUnavailable = errors.New("project_artifacts_unavailable")
 
+// ErrPendingRecovery refuses collection until durable transaction intent is reconciled.
+var ErrPendingRecovery = errors.New("pending project lease transaction; recover before collection")
+
 const Busy = "project_view_busy"
 const maxRecord = 1 << 20
 
@@ -218,6 +221,12 @@ func ParseBinding(raw []byte) (Binding, error) {
 	}
 	if err := protocoljson.UnmarshalCanonical(raw, &b); err != nil {
 		return b, err
+	}
+	// Re-encoding enforces exact member spelling and completeness; the JSON
+	// struct decoder alone also accepts case-insensitive field aliases.
+	exact, err := canonical(b)
+	if err != nil || string(exact) != string(raw) {
+		return b, fmt.Errorf("project lease binding members must match exactly")
 	}
 	if err := b.validate(); err != nil {
 		return b, err
