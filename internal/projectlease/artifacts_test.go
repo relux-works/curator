@@ -26,7 +26,8 @@ func (s *artifactLossSessions) Observe(ctx context.Context, ref string, generati
 
 // Artifact presence is checked again after authority/session callbacks and
 // before lease publication. Missing, linked or non-directory runtime roots
-// yield the typed refusal and no binding; restoring the root admits a retry.
+// yield the typed refusal without allocating the lease namespace; restoring
+// the root admits a retry. The later commit gate cannot replace this preflight.
 // This checks presence/boundaries, not the authority's receipt/hash proof.
 func TestAcquireArtifactsBeforeCommit(t *testing.T) {
 	for _, kind := range []string{"present", "removed-during-observe", "missing", "file", "link"} {
@@ -64,6 +65,9 @@ func TestAcquireArtifactsBeforeCommit(t *testing.T) {
 			}
 			if !errors.Is(err, ErrArtifactsUnavailable) {
 				t.Fatalf("missing artifact admission = %v, want typed refusal", err)
+			}
+			if HasState(f.home) {
+				t.Fatal("missing artifact admission allocated lease namespace")
 			}
 			for _, path := range []string{bindingPath(f.home, "one"), statePath(f.home), filepath.Join(f.home, homeRelative(f.c))} {
 				if _, err = os.Lstat(path); !errors.Is(err, os.ErrNotExist) {

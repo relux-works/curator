@@ -13,6 +13,7 @@ import (
 
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/privatedir"
+	"github.com/relux-works/curator/internal/projectlease"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -53,7 +54,7 @@ func beginCaptureOperation(home string, options ...transaction.Option) (*operati
 		return nil, fmt.Errorf("%s: acquire capture lock: %w", DiagLockUnavailable, err)
 	}
 	op := &operation{lock: lock}
-	op.engine, err = transaction.New(home, options...)
+	op.engine, err = transaction.New(home, append(options, transaction.WithCommitCheck(projectlease.TransactionCheck(home)))...)
 	if err == nil {
 		var pending bool
 		pending, err = op.engine.PendingRecovery(lock)
@@ -98,7 +99,7 @@ func beginOperationValidated(home string, validate func() error, options ...tran
 			return nil, err
 		}
 	}
-	engine, err := transaction.New(home, options...)
+	engine, err := transaction.New(home, append(options, transaction.WithCommitCheck(projectlease.TransactionCheck(home)))...)
 	if err != nil {
 		_ = lock.Close()
 		return nil, err
