@@ -13,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // CompositionAuthority mirrors the I-LEASE contract until its owning package
@@ -100,7 +101,11 @@ func (a Authority) PublishComposition(ctx context.Context, req ComposeRequest, e
 	}
 	defer root.Close()
 	name := again.Preview.SHA256 + ".json"
-	if _, e := root.Lstat(name); e == nil {
+	metadata, e := stateread.LstatWith(filepath.Join(dir, name), func(string) (os.FileInfo, error) { return root.Lstat(name) })
+	if e != nil {
+		return Composition{}, fail("project_context_unreadable", "composition state unknown")
+	}
+	if metadata.Kind == stateread.KindPresent {
 		old, _, e := read(root, name, MaxRecord)
 		if e != nil {
 			return Composition{}, e
@@ -108,8 +113,6 @@ func (a Authority) PublishComposition(ctx context.Context, req ComposeRequest, e
 		if !bytes.Equal(old, b) {
 			return Composition{}, fail("project_context_drift", "immutable composition metadata changed")
 		}
-	} else if !os.IsNotExist(e) {
-		return Composition{}, fail("project_context_unreadable", "composition state unknown")
 	} else {
 		if err = ctx.Err(); err != nil {
 			return Composition{}, err
