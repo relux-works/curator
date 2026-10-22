@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextpkg"
@@ -16,7 +17,8 @@ import (
 // PackageInstruction is the explicit operator packaging act. Discovery never
 // calls it. It selects exactly one inventoried bare instruction file and
 // preserves its bytes; no normalization or implicit import expansion occurs.
-func (s Store) PackageInstruction(id, itemID, source string, required bool) (Preview, error) {
+func (s Store) PackageInstruction(id, itemID, source string, required bool) (result Preview, resultErr error) {
+	defer func() { resultErr = projectError(resultErr) }()
 	if !idRE.MatchString(itemID) || !relative(source) {
 		return Preview{}, fail("project_context_invalid", "invalid selected instruction")
 	}
@@ -76,7 +78,8 @@ func (s Store) PackageInstruction(id, itemID, source string, required bool) (Pre
 	items = append(items, c)
 	return op.preview(r, items, []Omission{})
 }
-func (s Store) Preview(id string, d Declaration) (Preview, error) {
+func (s Store) Preview(id string, d Declaration) (result Preview, resultErr error) {
+	defer func() { resultErr = projectError(resultErr) }()
 	// Re-parse programmatic requests through the same closed reader.
 	b, err := canonical(d)
 	if err != nil {
@@ -131,6 +134,13 @@ func (s Store) Preview(id string, d Declaration) (Preview, error) {
 			c, err = op.context(r, req, nil)
 		}
 		if err != nil {
+			if !req.Required && isCode(err, "project_context_unsupported") {
+				if !hexRE.MatchString(c.SourceSHA256) {
+					return Preview{}, err
+				}
+				omitted = append(omitted, Omission{ItemID: req.ID, Reason: "unsupported", Source: req.Source, SourceSHA256: c.SourceSHA256})
+				continue
+			}
 			return Preview{}, err
 		}
 		items = append(items, c)
@@ -156,17 +166,36 @@ func (op *operation) preview(r registered, items []Candidate, omitted []Omission
 		if err != nil {
 			return Preview{}, err
 		}
-		changes = append(changes, Change{c.Item.ID, effect, before, c.ItemSHA256, files})
+		change := Change{ItemID: c.Item.ID, Effect: effect, Before: before, After: c.ItemSHA256, Files: files}
+		if c.Item.Type == "skill" {
+			after, err := op.skillSemantics(c)
+			if err != nil {
+				return Preview{}, err
+			}
+			change.Semantics = &SemanticChange{After: after}
+			if prior, err := op.approvedCandidate(r.Record.CheckoutID, c.Item.ID); err != nil {
+				return Preview{}, err
+			} else if prior != nil && prior.Item.Type == "skill" {
+				change.Semantics.Before, err = op.skillSemantics(*prior)
+				if err != nil {
+					return Preview{}, err
+				}
+			}
+		}
+		changes = append(changes, change)
 	}
-	if old, ok := op.state.Reviews[r.Record.CheckoutID]; ok {
-		for _, c := range old.Review.Items {
+	for _, a := range op.state.Approvals {
+		if a.Record.CheckoutID == r.Record.CheckoutID && !a.Revoked {
+			prior, err := op.approvedCandidate(r.Record.CheckoutID, a.Record.ItemID)
+			if err != nil {
+				return Preview{}, err
+			}
+			c := *prior
 			if !next[c.Item.ID] {
 				if c.Item.Required {
-					if a, ok := op.state.Approvals[r.Record.CheckoutID+":"+c.Item.ID]; ok && !a.Revoked {
-						return Preview{}, fail("project_context_unsupported", "revoke the required item before removing its selection")
-					}
+					return Preview{}, fail("project_context_unsupported", "revoke the required item before removing its selection")
 				}
-				changes = append(changes, Change{c.Item.ID, "removed", c.ItemSHA256, "", []FileChange{}})
+				changes = append(changes, Change{ItemID: c.Item.ID, Effect: "removed", Before: c.ItemSHA256, Files: []FileChange{}})
 			}
 		}
 	}
@@ -187,7 +216,8 @@ func (op *operation) preview(r registered, items []Candidate, omitted []Omission
 
 // Review returns retained bytes and metadata for an exact operator preview.
 // It never rereads live files as a replacement baseline.
-func (s Store) Review(id string) (Preview, error) {
+func (s Store) Review(id string) (result Preview, resultErr error) {
+	defer func() { resultErr = projectError(resultErr) }()
 	op, err := s.begin(false)
 	if err != nil {
 		return Preview{}, err
@@ -289,7 +319,8 @@ func (op *operation) fresh(r registered, c Candidate) error {
 	}
 	return nil
 }
-func (s Store) Approve(id, itemID, itemDigest, packageDigest string) (Approval, error) {
+func (s Store) Approve(id, itemID, itemDigest, packageDigest string) (result Approval, resultErr error) {
+	defer func() { resultErr = projectError(resultErr) }()
 	if !idRE.MatchString(itemID) || !hexRE.MatchString(itemDigest) || !hexRE.MatchString(packageDigest) {
 		return Approval{}, fail("project_item_unapproved", "approval requires exact item and review digests")
 	}
@@ -323,7 +354,7 @@ func (s Store) Approve(id, itemID, itemDigest, packageDigest string) (Approval, 
 			return Approval{}, err
 		}
 		a := Approval{"project-approval/1", id, itemID, itemDigest, r.Record.Environment, op.state.Principal, ceiling(r.Record)}
-		op.state.Approvals[id+":"+itemID] = approved{a, packageDigest, false}
+		op.state.Approvals[id+":"+itemID] = approved{Record: a, ReviewSHA256: packageDigest, Candidate: &c}
 		if err := op.save(); err != nil {
 			return Approval{}, err
 		}
@@ -331,7 +362,8 @@ func (s Store) Approve(id, itemID, itemDigest, packageDigest string) (Approval, 
 	}
 	return Approval{}, fail("project_item_unapproved", "item has no supported protected preview")
 }
-func (s Store) Revoke(id, itemID string) error {
+func (s Store) Revoke(id, itemID string) (resultErr error) {
+	defer func() { resultErr = projectError(resultErr) }()
 	if !idRE.MatchString(itemID) {
 		return fail("project_item_unapproved", "invalid item ID")
 	}
@@ -367,7 +399,8 @@ type Admitted struct {
 	Rendering string
 }
 
-func (s Store) Admitted(id string, selections []Selection) (Admitted, error) {
+func (s Store) Admitted(id string, selections []Selection) (result Admitted, resultErr error) {
+	defer func() { resultErr = projectError(resultErr) }()
 	op, err := s.begin(false)
 	if err != nil {
 		return Admitted{}, err
@@ -382,6 +415,28 @@ func (s Store) Admitted(id string, selections []Selection) (Admitted, error) {
 		return Admitted{}, fail("project_item_unapproved", "no protected review")
 	}
 	wanted := map[string]bool{}
+	// A mutable candidate preview cannot erase an actively approved requirement.
+	for _, a := range op.state.Approvals {
+		if a.Record.CheckoutID != id || a.Revoked {
+			continue
+		}
+		prior, err := op.approvedCandidate(id, a.Record.ItemID)
+		if err != nil {
+			return Admitted{}, err
+		}
+		if !prior.Item.Required {
+			continue
+		}
+		found := false
+		for _, c := range p.Review.Items {
+			if c.Item.ID == prior.Item.ID && c.ItemSHA256 == prior.ItemSHA256 {
+				found = true
+			}
+		}
+		if !found {
+			return Admitted{}, fail("project_item_unapproved", "required approved item differs from the candidate preview")
+		}
+	}
 	for _, sel := range selections {
 		if _, ok := wanted[sel.ItemID]; ok {
 			return Admitted{}, fail("project_context_invalid", "duplicate selection")
@@ -422,7 +477,8 @@ func (s Store) Admitted(id string, selections []Selection) (Admitted, error) {
 
 // ReadSnapshot exposes only already-approved immutable context bytes. No path
 // supplied by a repository can select manager state or approval authority.
-func (s Store) ReadSnapshot(id, itemID string) (Snapshot, map[string][]byte, error) {
+func (s Store) ReadSnapshot(id, itemID string) (result Snapshot, files map[string][]byte, resultErr error) {
+	defer func() { resultErr = projectError(resultErr) }()
 	op, err := s.begin(false)
 	if err != nil {
 		return Snapshot{}, nil, err
@@ -460,7 +516,8 @@ type ReviewContent struct {
 	Text        map[string]string   `json:"text"`
 }
 
-func (s Store) ReviewContent(id string) (ReviewContent, error) {
+func (s Store) ReviewContent(id string) (result ReviewContent, resultErr error) {
+	defer func() { resultErr = projectError(resultErr) }()
 	op, err := s.begin(false)
 	if err != nil {
 		return ReviewContent{}, err
@@ -495,6 +552,12 @@ func (s Store) ReviewContent(id string) (ReviewContent, error) {
 					p := path.Join("context", mod.Path)
 					out.Text[key+"/"+p] = string(capt.Bytes[p])
 				}
+			} else if c.Item.Type == "skill" {
+				for p, b := range capt.Bytes {
+					if utf8.Valid(b) {
+						out.Text[key+"/"+p] = string(b)
+					}
+				}
 			}
 		}
 		if c.Item.Type == "context" {
@@ -526,13 +589,11 @@ func (op *operation) fileDiff(id string, next Candidate) ([]FileChange, error) {
 	if err := collect(next, current); err != nil {
 		return nil, err
 	}
-	if old, ok := op.state.Reviews[id]; ok {
-		for _, c := range old.Review.Items {
-			if c.Item.ID == next.Item.ID {
-				if err := collect(c, prior); err != nil {
-					return nil, err
-				}
-			}
+	if c, err := op.approvedCandidate(id, next.Item.ID); err != nil {
+		return nil, err
+	} else if c != nil {
+		if err := collect(*c, prior); err != nil {
+			return nil, err
 		}
 	}
 	names := map[string]bool{}
@@ -563,4 +624,24 @@ func (op *operation) fileDiff(id string, next Candidate) ([]FileChange, error) {
 		changes = append(changes, FileChange{p, effect, before, after})
 	}
 	return changes, nil
+}
+
+// Older protected approvals may recover their candidate only from an exact
+// matching retained review. A newer unapproved preview is never a baseline.
+func (op *operation) approvedCandidate(id, itemID string) (*Candidate, error) {
+	a, ok := op.state.Approvals[id+":"+itemID]
+	if !ok || a.Revoked {
+		return nil, nil
+	}
+	if a.Candidate != nil {
+		return a.Candidate, nil
+	}
+	for _, c := range op.state.Reviews[id].Review.Items {
+		if c.Item.ID == itemID && c.ItemSHA256 == a.Record.ItemSHA256 {
+			a.Candidate = &c
+			op.state.Approvals[id+":"+itemID] = a
+			return &c, nil
+		}
+	}
+	return nil, fail("project_context_drift", "approved candidate evidence is missing; revoke before replacing it")
 }
