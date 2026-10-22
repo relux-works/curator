@@ -22,6 +22,15 @@ writes. Muse, opencode, and managed-home discovery paths retain their existing
 behavior. Muse multi-root ownership, opencode's machine-global surface, and
 adapter-ledger precedence require separate specification clarification.
 
+When `global install` encounters a profile-owned native skill, the profile
+remains its sole native publisher. The legacy mirror verifies the environment
+marker, profile lock, projected content and live entry, then leaves that entry
+out of its adapter ledger. The requested global skill must have the same
+canonical source, commit and selected directory; disagreement refuses with
+`context_range_conflict` (environments §§1.4 and 9.4). A matching name or content
+alone never establishes ownership. Foreign entries still refuse without
+takeover. This does not transfer an existing legacy-only entry to a profile.
+
 Tests run only against temporary homes. Run the behavioral and mutation controls
 with `go test ./internal/envprofile ./cmd/curator -run '^TestNativeSkills' -count=1`.
 Build with `go build -o .temp/curator ./cmd/curator`. Gate commands and evidence
