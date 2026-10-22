@@ -3,12 +3,13 @@ package scriptworker
 import (
 	"context"
 	"errors"
-	"go/build"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // Every current test binary that transitively imports scriptworker must answer
@@ -21,7 +22,7 @@ func TestLandlockProbeModeTerminatesAffectedTestBinaries(t *testing.T) {
 			if runtime.GOOS == "windows" {
 				binary += ".exe"
 			}
-			compile := exec.Command(filepath.Join(build.Default.GOROOT, "bin", goBinaryName()), "test", "-c", "-o", binary, "../../"+pkg) // #nosec G204 -- fixed repository test packages
+			compile := exec.Command(testtoolchain.Go(t), "test", "-c", "-o", binary, "../../"+pkg) // #nosec G204 -- fixed repository test packages
 			if output, err := compile.CombinedOutput(); err != nil {
 				t.Fatalf("build: %v\n%s", err, output)
 			}

@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // Each overlay weakens one help boundary while leaving the guard present.
@@ -47,7 +49,7 @@ func TestCommandHelpNarrowingMutants(t *testing.T) {
 			if err := os.WriteFile(overlay, data, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			command := exec.Command("go", "test", "-count=1", "-timeout=3m", "-v", "-run", mutant.test, ".")
+			command := exec.Command(testtoolchain.Go(t), "test", "-count=1", "-timeout=3m", "-v", "-run", mutant.test, ".")
 			// GOFLAGS carries the overlay into the real CLI binary built by the
 			// behavioral suite too. These child tests do not fingerprint GOROOT;
 			// reuse the repository's helper protocol to avoid taking its lock twice.

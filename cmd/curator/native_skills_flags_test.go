@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // Every unrelated registered command rejects takeover through run(), both with
@@ -224,7 +226,7 @@ func TestNativeSkillsTakeoverRegistryNarrowingMutant(t *testing.T) {
 	if err := os.WriteFile(overlay, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	command := exec.Command("go", "test", "-count=1", "-timeout=3m", "-v", "-run", "^TestNativeSkillsTakeover(EveryRegisteredCommand|ArgumentDiscardRegression)$/^list$", ".")
+	command := exec.Command(testtoolchain.Go(t), "test", "-count=1", "-timeout=3m", "-v", "-run", "^TestNativeSkillsTakeover(EveryRegisteredCommand|ArgumentDiscardRegression)$/^list$", ".")
 	command.Env = append(os.Environ(), cliHelperProcess+"=1", "GOFLAGS="+os.Getenv("GOFLAGS")+" "+strconv.Quote("-overlay="+overlay))
 	output, err := command.CombinedOutput()
 	exit, ok := err.(*exec.ExitError)
@@ -271,7 +273,7 @@ func TestNativeSkillsTakeoverHelpNarrowingMutant(t *testing.T) {
 			if err := os.WriteFile(overlay, data, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			command := exec.Command("go", "test", "-count=1", "-timeout=3m", "-v", "-run", "^TestReviewNativeTakeoverHelpBoundary$", ".")
+			command := exec.Command(testtoolchain.Go(t), "test", "-count=1", "-timeout=3m", "-v", "-run", "^TestReviewNativeTakeoverHelpBoundary$", ".")
 			command.Env = append(os.Environ(), cliHelperProcess+"=1", "GOFLAGS="+os.Getenv("GOFLAGS")+" "+strconv.Quote("-overlay="+overlay))
 			output, err := command.CombinedOutput()
 			exit, ok := err.(*exec.ExitError)
