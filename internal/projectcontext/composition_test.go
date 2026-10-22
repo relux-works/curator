@@ -342,6 +342,26 @@ func TestCompositionAuthority(t *testing.T) {
 	required(t, err, "project_registration_mismatch")
 	file := filepath.Join(f.store.Home, "project-context/compositions", p.SHA256+".json")
 	before, _ := os.ReadFile(file)
+	// Unreadable retained evidence is unknown; neither reader nor publisher
+	// may turn it into absence or replace the immutable baseline.
+	if err := os.Chmod(file, 0000); err != nil {
+		t.Fatal(err)
+	}
+	_, err = resolveComposition(t, a, resolved.Ref, resolved.SHA256)
+	required(t, err, "project_context_unreadable")
+	_, err = a.PublishComposition(context.Background(), req, p.SHA256, owner)
+	required(t, err, "project_context_unreadable")
+	if err := os.Chmod(file, 0600); err != nil {
+		t.Fatal(err)
+	}
+	republished, err := a.PublishComposition(context.Background(), req, p.SHA256, owner)
+	if err != nil || identity(republished) != identity(resolved) {
+		t.Fatalf("idempotent publication: %v", err)
+	}
+	retained, err := os.ReadFile(file)
+	if err != nil || !bytes.Equal(before, retained) {
+		t.Fatal("unreadable evidence rebaselined composition")
+	}
 	var envelope compositionEnvelope
 	_ = json.Unmarshal(before, &envelope)
 	envelope.Preview.Receipt.Files[0].SHA256 = strings.Repeat("0", 64)
