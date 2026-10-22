@@ -17,6 +17,7 @@ import (
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
+	"github.com/relux-works/curator/internal/projectadapter"
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
@@ -35,16 +36,25 @@ type ClaudeControls struct {
 
 // ClaudeDiagnostic is a typed project refusal with no filesystem locators.
 type ClaudeDiagnostic struct {
-	Code   string
-	Detail string
+	Code    string
+	Detail  string
+	Mode    string
+	Notice  string
+	Refused []projectadapter.Refusal
 }
 
-func (d *ClaudeDiagnostic) Error() string    { return d.Code + ": " + d.Detail }
-func claudeRefuse(code, detail string) error { return &ClaudeDiagnostic{code, detail} }
+func (d *ClaudeDiagnostic) Error() string {
+	message := d.Code + ": " + d.Detail
+	if d.Notice != "" {
+		message += "; " + d.Notice
+	}
+	return message
+}
+func claudeRefuse(code, detail string) error { return &ClaudeDiagnostic{Code: code, Detail: detail} }
 
 // ClaudeSurface describes the bounded native evidence, not a capability
 // advertisement. Uncertified reloads keep the complete strict tuple closed.
-type ClaudeSurface string
+type ClaudeSurface = projectadapter.SurfaceName
 
 const (
 	ClaudeStartup      ClaudeSurface = "startup-sources"
@@ -63,22 +73,21 @@ const (
 	ClaudeToolPolicy   ClaudeSurface = "manager-default-deny-tools"
 )
 
-type ClaudeCertification struct {
-	ProviderVersion string
-	Platform        string
-	Architecture    string
-	Certified       []ClaudeSurface
-	Uncertified     []ClaudeSurface
-}
+// ClaudeCertification adds only the provider-specific strict gate to the one
+// candidate shared report shape; all status fields live in Certification.
+type ClaudeCertification struct{ projectadapter.Certification }
 
 func ClaudeCertificationReport(version, platform, architecture string) ClaudeCertification {
-	r := ClaudeCertification{version, platform, architecture, []ClaudeSurface{}, []ClaudeSurface{}}
+	r := ClaudeCertification{projectadapter.Certification{Environment: "claude_code", ProviderVersion: version, Platform: platform + "/" + architecture, Mode: projectadapter.Strict, Form: "managed-home", Certified: []ClaudeSurface{}, Refused: []projectadapter.Refusal{}}}
 	measured := []ClaudeSurface{ClaudeStartup, ClaudeNestedRead, ClaudeSkills, ClaudeMCP, ClaudePermissions, ClaudeSafeResume, ClaudeChild}
-	r.Uncertified = []ClaudeSurface{ClaudeLateHooks, ClaudeLatePlugins, ClaudeLateMCP, ClaudeLateSettings, ClaudeImports, ClaudeMemory, ClaudeToolPolicy}
+	gaps := []ClaudeSurface{ClaudeLateHooks, ClaudeLatePlugins, ClaudeLateMCP, ClaudeLateSettings, ClaudeImports, ClaudeMemory, ClaudeToolPolicy}
 	if version == ClaudeProjectVersion && platform == "macos" && architecture == "arm64" {
 		r.Certified = measured
 	} else {
-		r.Uncertified = append(measured, r.Uncertified...)
+		gaps = append(measured, gaps...)
+	}
+	for _, surface := range gaps {
+		r.Refused = append(r.Refused, projectadapter.Refusal{Surface: surface, Reason: "native surface is not qualified for this exact tuple"})
 	}
 	return r
 }

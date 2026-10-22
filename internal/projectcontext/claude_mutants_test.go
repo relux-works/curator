@@ -44,6 +44,22 @@ func TestClaudeNarrowingMutants(t *testing.T) {
 		{"allow-legacy-opt-in", "claude_adapter.go", "TestClaudeNativeOptIn", `if req.Claude == nil || req.Adapter.Environment != "claude_code" {`, `if req.Claude == nil && false || req.Adapter.Environment != "claude_code" {`, "want project_context_unsupported"},
 		{"allow-root-mode-drift", "claude_adapter.go", "TestClaudeReceiptAndPublicationRefusals", `if err := privatedir.Validate(home); err != nil {`, `if err := privatedir.Validate(home); err != nil && false {`, "want project_context_drift"},
 		{"ignore-mcp-transport", "claude_adapter.go", "TestClaudeManagerControls", `bytes.TrimSuffix(files[contextmaterialize.MCPClaudePath], []byte{'\n'})`, `bytes.TrimSuffix([]byte("{\"mcpServers\":{}}"),nil)`, "want project_context_unsupported"},
+		{"native-project-prose", "claude_native_project.go", "TestClaudeNativeProjectPreparation", `files := cloneClaudeFiles(documents)`, `files := cloneClaudeFiles(preview.Files)`, "native profile-only root differs"},
+		{"native-drop-profile-system", "claude_native_project.go", "TestClaudeNativeProjectPreparation", `files := cloneClaudeFiles(documents)`, `files := cloneClaudeFiles(documents);delete(files,".agent-context/system-prompt.md")`, "native profile-only system differs"},
+		{"native-launch-without-qualification", "claude_native_project.go", "TestClaudeNativeProjectQualification", `return out, &ClaudeDiagnostic{Code: "project_context_unsupported", Detail: "Claude native-project requires qualified manager permissions and memory-off", Mode: mode, Notice: r.Notice, Refused: r.Refused}`, `_ = r; return out, nil`, "native launch qualification bypass"},
+		{"native-omit-notice", "claude_native_project.go", "TestClaudeNativeProjectQualification", `r.Notice = projectadapter.NativeProjectNotice`, `r.Notice = ""`, "native status notice missing"},
+		{"native-policy-rebinding", "claude_native_project.go", "TestClaudeNativeProjectInputs", `if !bytes.Equal(files["settings.json"], preview.Files["settings.json"]) || !bytes.Equal(files[claudeOwnershipPath], preview.Files[claudeOwnershipPath]) {`, `if false && (!bytes.Equal(files["settings.json"], preview.Files["settings.json"]) || !bytes.Equal(files[claudeOwnershipPath], preview.Files[claudeOwnershipPath])) {`, "want project_context_invalid"},
+		{"native-profile-surfaces", "claude_native_project.go", "TestClaudeNativeProjectInputs", `(f.Path != "CLAUDE.md" && f.Path != ".agent-context/system-prompt.md")`, `false`, "want project_context_invalid"},
+		{"native-profile-mode", "claude_native_project.go", "TestClaudeNativeProjectInputs", `f.Mode != "0600"`, `false`, "want project_context_invalid"},
+		{"native-receipt-grammar", "claude_native_project.go", "TestClaudeNativeFileSet", `if err := validateInventory(captured{Manifest: Snapshot{1, receipt}}); err != nil {`, `if err := validateInventory(captured{Manifest: Snapshot{1, receipt}}); err != nil && false {`, "want project_context_invalid"},
+		{"native-receipt-digest", "claude_native_project.go", "TestClaudeNativeFileSet", `digest(b) != f.SHA256`, `false`, "want project_context_invalid"},
+		{"native-receipt-size", "claude_native_project.go", "TestClaudeNativeFileSet", `int64(len(b)) != f.Size`, `false`, "want project_context_invalid"},
+		{"native-receipt-extra", "claude_native_project.go", "TestClaudeNativeFileSet", `if len(files) != len(receipt) {`, `if len(files) != len(receipt) && false {`, "want project_context_invalid"},
+		{"native-implicit-mode", "claude_native_project.go", "TestClaudeNativeProjectInputs", "func requireClaudeNativeMode(mode string) error {\n\tif mode != projectadapter.NativeProject {", "func requireClaudeNativeMode(mode string) error {\n\tif false {", "want project_context_invalid"},
+		{"native-base-ref-binding", "claude_native_project.go", "TestClaudeNativeProjectInputs", `preview.Ref != "composition:"+hashID(preview.SHA256)`, `false`, "want project_context_invalid"},
+		{"native-base-sha-binding", "claude_native_project.go", "TestClaudeNativeProjectInputs", `identity(preview.Record) != preview.SHA256`, `false`, "want project_context_invalid"},
+		{"native-base-receipt-binding", "claude_native_project.go", "TestClaudeNativeProjectInputs", `identity(preview.Receipt) != preview.Record.MaterializationSHA256`, `false`, "want project_context_invalid"},
+		{"native-base-environment-binding", "claude_native_project.go", "TestClaudeNativeProjectInputs", `preview.Record.Environment != "claude_code"`, `false`, "want project_context_invalid"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

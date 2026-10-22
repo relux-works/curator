@@ -388,10 +388,10 @@ func TestClaudeCertificationAndResume(t *testing.T) {
 	for _, tuple := range [][3]string{{ClaudeProjectVersion, "macos", "arm64"}, {"2.1.306", "macos", "arm64"}, {ClaudeProjectVersion, "linux", "arm64"}, {ClaudeProjectVersion, "macos", "amd64"}} {
 		report := ClaudeCertificationReport(tuple[0], tuple[1], tuple[2])
 		if tuple == [3]string{ClaudeProjectVersion, "macos", "arm64"} {
-			if len(report.Certified) != 7 || len(report.Uncertified) != 7 {
+			if len(report.Certified) != 7 || len(report.Refused) != 7 {
 				t.Fatal("exact tuple evidence differs")
 			}
-		} else if len(report.Certified) != 0 || len(report.Uncertified) != 14 {
+		} else if len(report.Certified) != 0 || len(report.Refused) != 14 {
 			t.Fatal("unsupported tuple borrowed certification")
 		}
 		required(t, report.RequireStrict(), "project_context_unsupported")
@@ -463,7 +463,7 @@ func TestClaudeEmptyDocuments(t *testing.T) {
 		}
 		pub := &claudePublisherFixture{t: t, home: home, expected: Composition{Generated: map[string]Surface{}}}
 		for _, f := range receipt.Files {
-			pub.expected.Generated[f.Path] = Surface{f.SHA256, f.Size, 0600}
+			pub.expected.Generated[f.Path] = Surface{SHA256: f.SHA256, Size: f.Size, Mode: 0600}
 		}
 		if err = pub.PublishPrepared(context.Background(), "reserved", files, false); err != nil {
 			t.Fatal(err)
