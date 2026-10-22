@@ -10,8 +10,8 @@ this leaf exposes no external lease CLI and accepts no repository records.
 
 ```go
 type Authority interface {
-    Resolve(context.Context, string, string) (Composition, error)
-    Authorize(context.Context, Composition, string) error
+    Resolve(context.Context, managerlock.Held, string, string) (Composition, error)
+    Authorize(context.Context, managerlock.Held, Composition, string) error
 }
 type Sessions interface {
     Observe(context.Context, string, int64) (Evidence, error)
@@ -34,8 +34,14 @@ Empty inventories are explicit empty maps/slices.
 and principal. Known revocation returns `projectlease.ErrRevoked`; unreadable
 or unavailable authority returns another error. Neither method may fetch,
 repair or accept caller-authored authority. Missing interfaces refuse admission.
-These callbacks run while the manager-home mutation lock is held and must not
-reacquire it. The caller acquires any project lock before entering this API.
+These callbacks receive an explicit borrowed `managerlock.Held` witness while
+its owning manager-home lock remains held. Before every protected read, the
+resolver calls `held.Validate(home)` to verify a live, unreplaced lock for its
+exact canonical manager home. Zero, stale and another-home witnesses refuse.
+Only lock acquisition mints a witness; `(*HomeLock).Held()` borrows it without
+release authority. Retaining a witness does not extend lock lifetime, and a
+later acquisition does not revive an old witness. Callbacks never reacquire
+the lock. The caller acquires any project lock before entering this API.
 
 `Observe` receives the reserved session reference and positive session
 generation. Its evidence must bind those exact values, the owner principal,
@@ -105,7 +111,7 @@ composition construction are separate integration/qualification leaves.
 
 ## Verification
 
-Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectlease ./internal/scopes`.
+Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/managerlock ./internal/projectlease ./internal/scopes`.
 The fixtures cover independent projects, qualified shared sessions, exclusive
 adapters, busy refuse/wait/cancel, login preservation, receipt/mode/path checks,
 rollback/recovery, launcher subprocess exit, descendants, unknown liveness,

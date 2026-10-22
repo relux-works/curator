@@ -227,7 +227,46 @@ func (operation *Operation) ReleaseBuildKey() error {
 // HomeLock is an exclusive manager-home mutation witness. It satisfies the
 // caller-held witness expected by buildcache and future transaction code.
 type HomeLock struct {
-	lock *fileLock
+	lock    *fileLock
+	home    string
+	witness Held
+}
+
+// Held is a borrowed, read-only witness minted only by home-lock acquisition.
+// Its zero value is invalid. Retaining it never extends the owner's lock lifetime.
+type Held struct{ lock *HomeLock }
+
+func newHomeLock(lock *fileLock, home string) *HomeLock {
+	h := &HomeLock{lock: lock, home: home}
+	h.witness = Held{lock: h}
+	return h
+}
+
+// Held returns the acquisition's witness without exposing release authority.
+func (lock *HomeLock) Held() Held {
+	if lock == nil {
+		return Held{}
+	}
+	return lock.witness
+}
+
+// Validate checks a live, unreplaced lock for exactly the canonical home.
+// Callers must keep the owning HomeLock open for the entire borrowed operation.
+func (h Held) Validate(home string) error {
+	if h.lock == nil {
+		return ErrNotHeld
+	}
+	if err := h.lock.AssertCurrent(); err != nil {
+		return err
+	}
+	canonical, err := canonicalAbsolute(home, "manager home")
+	if err != nil {
+		return err
+	}
+	if canonical != h.lock.home {
+		return ErrNotHeld
+	}
+	return nil
 }
 
 // AssertHeld verifies that the operating-system lock has not been released.
@@ -302,7 +341,7 @@ func (operation *Operation) acquireHome(ctx context.Context) (*HomeLock, error) 
 		return nil, err
 	}
 	acquired = true
-	operation.home = &HomeLock{lock: fileLock}
+	operation.home = newHomeLock(fileLock, operation.manager.Home())
 	return operation.home, nil
 }
 
@@ -345,7 +384,7 @@ func (manager *Manager) acquireHomeOnly(ctx context.Context, create bool) (*Home
 		return nil, err
 	}
 	acquired = true
-	return &HomeLock{lock: fileLock}, nil
+	return newHomeLock(fileLock, manager.Home()), nil
 }
 
 // Close releases held locks in reverse class and project order.
