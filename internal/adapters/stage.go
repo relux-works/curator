@@ -55,6 +55,24 @@ func StageGlobal(
 	sources map[string]string,
 	admitted []string,
 ) (Mirror, error) {
+	return StageGlobalWithOwnership(stageRoot, home, userHome, agents, skills, mode, sources, admitted, nil)
+}
+
+// GlobalOwnership verifies an entry owned by another Curator publisher. A true
+// result preserves the entry and excludes it from this publisher's ledger.
+// The caller must verify both ownership and the requested package identity.
+type GlobalOwnership func(adapterRoot, name string) (bool, error)
+
+// StageGlobalWithOwnership leaves verified profile entries with their existing
+// owner; the legacy mirror still handles every other entry normally.
+func StageGlobalWithOwnership(
+	stageRoot, home, userHome string,
+	agents, skills []string,
+	mode string,
+	sources map[string]string,
+	admitted []string,
+	owner GlobalOwnership,
+) (Mirror, error) {
 	canonical := filepath.Join(home, "global", "skills")
 	roots := map[string]string{}
 	for _, agent := range agents {
@@ -65,10 +83,14 @@ func StageGlobal(
 			roots[agent] = filepath.Join(userHome, filepath.FromSlash(NativeDiscoveryHomePath))
 		}
 	}
-	return stage(stageRoot, roots, []Group{{Root: canonical, Skills: skills, Sources: sources, Admitted: admitted}}, mode)
+	return stageWithOwnership(stageRoot, roots, []Group{{Root: canonical, Skills: skills, Sources: sources, Admitted: admitted}}, mode, owner)
 }
 
 func stage(stageRoot string, adapterRoots map[string]string, groups []Group, mode string) (Mirror, error) {
+	return stageWithOwnership(stageRoot, adapterRoots, groups, mode, nil)
+}
+
+func stageWithOwnership(stageRoot string, adapterRoots map[string]string, groups []Group, mode string, owner GlobalOwnership) (Mirror, error) {
 	expected := map[string]bool{}
 	for _, group := range groups {
 		for _, name := range group.Skills {
@@ -90,7 +112,7 @@ func stage(stageRoot string, adapterRoots map[string]string, groups []Group, mod
 			continue
 		}
 		staged[adapterRoot] = true
-		if err := mirror.stageRoot(stageRoot, adapterRoot, groups, expected, mode); err != nil {
+		if err := mirror.stageRoot(stageRoot, adapterRoot, groups, expected, mode, owner); err != nil {
 			return Mirror{}, err
 		}
 	}
@@ -109,16 +131,44 @@ func stage(stageRoot string, adapterRoots map[string]string, groups []Group, mod
 	return mirror, nil
 }
 
-func (mirror *Mirror) stageRoot(stageRoot, adapterRoot string, groups []Group, expected map[string]bool, mode string) error {
+func (mirror *Mirror) stageRoot(stageRoot, adapterRoot string, groups []Group, expected map[string]bool, mode string, owner GlobalOwnership) error {
 	key := rootKey(adapterRoot)
 	managed, err := readLedger(adapterRoot)
 	if err != nil {
 		return fmt.Errorf("read adapter ownership ledger in %s: %w", adapterRoot, err)
 	}
+	// Ownership is per adapter entry. Never add a profile-owned name to the
+	// legacy ledger, or later profile switches would treat it as legacy state.
+	preserved := map[string]bool{}
+	claimed := map[string]bool{}
+	for name := range expected {
+		claimed[name] = true
+	}
+	for name := range managed {
+		claimed[name] = true
+	}
+	localExpected := map[string]bool{}
+	claimNames := make([]string, 0, len(claimed))
+	for name := range claimed {
+		claimNames = append(claimNames, name)
+	}
+	sort.Strings(claimNames)
+	for _, name := range claimNames {
+		if owner != nil {
+			owned, err := owner(adapterRoot, name)
+			if err != nil {
+				return err
+			}
+			preserved[name] = owned && !casingAliasUnmanaged(filepath.Join(adapterRoot, name))
+		}
+		if expected[name] && !preserved[name] {
+			localExpected[name] = true
+		}
+	}
 
 	var stale []string
 	for name := range managed {
-		if !expected[name] {
+		if !expected[name] && !preserved[name] {
 			stale = append(stale, name)
 		}
 	}
@@ -133,6 +183,9 @@ func (mirror *Mirror) stageRoot(stageRoot, adapterRoot string, groups []Group, e
 		names := append([]string(nil), group.Skills...)
 		sort.Strings(names)
 		for _, name := range names {
+			if preserved[name] {
+				continue
+			}
 			// The mirror points at the canonical root the commit publishes,
 			// while its bytes are read from wherever the content lives right
 			// now — the staged replacement for a skill this run installs, the
@@ -156,7 +209,7 @@ func (mirror *Mirror) stageRoot(stageRoot, adapterRoot string, groups []Group, e
 		}
 	}
 
-	ledger, err := ledgerPayload(expected)
+	ledger, err := ledgerPayload(localExpected)
 	if err != nil {
 		return err
 	}

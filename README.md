@@ -308,6 +308,13 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+Native profile/global ownership regression checks run separately with
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./cmd/curator -run '^TestGlobalNativeOwner'`,
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envprofile -run '^TestNativeSkillOwner'`,
+and `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/adapters -run '^TestGlobalProfileOwner'`.
+They use temporary homes; keep validation logs under `.temp/`. See
+[native profile skills](docs/native-profile-skills.md) for the ownership contract.
+
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.
 Vendor tests skip unless `CODEX_EXCL_BINARY` selects the exact build and
