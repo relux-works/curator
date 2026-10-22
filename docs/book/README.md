@@ -26,7 +26,12 @@ pixels: a successful inventory check cannot prove visual correctness or that a
 stale render was regenerated. Inspect changed figures during review.
 
 The build runs the figure checker before rendering. The Lua filter refuses
-unknown complete status markers. The tooling tests pair valid inventories with
+unknown complete status markers, including a second adjacent marker. Real
+pandoc tests cover adjacent valid and multiword labels, later unknown labels,
+and rejection before the PDF renderer can replace prior output. A bounded
+control removes only the adjacent-marker split and requires the planted
+unknown-second-marker build to expose that regression.
+The tooling tests pair valid inventories with
 missing-render, missing-source, missing-row, changed-hash and orphan negatives;
 bounded controls verify selected gates fail for their intended witnesses.
 Pandoc filter tests skip if pandoc is absent, so Go success alone does not replace
