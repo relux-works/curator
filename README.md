@@ -162,6 +162,7 @@ curator list       # list configured projects and declared skills
 
 ```bash
 curator project add      # register a project alias and path in the machine configuration
+curator project register # bind a checkout identity for explicit project-context admission
 curator project resolve  # resolve transitive dependencies for a project closure
 ```
 
@@ -307,6 +308,33 @@ Curator conforms to an open specification. Independent implementations include [
 Curator uses an in-repository task board in `.task-board/`. Automated gates run under `.github/ci/` and mirror `Makefile` targets; see [docs/ci-gates.md](docs/ci-gates.md) for gate definitions, evidence paths, platform carve-out rules, and suite consumption requirements.
 
 ### Tools
+
+For explicit project-context packaging and approval, see
+[project admission](docs/project-admission.md). The new `project register`,
+`inspect`, `package`, `preview`, `approve`, `revoke` and `rebind` controls use Go
+and Git; they create protected admission state and perform no native launch.
+Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectcontext -count=1`
+and the documented opt-in Go-overlay mutation lane. Keep logs in `.temp/`.
+
+The derived composition API and its refusal boundaries are documented in
+[project composition](docs/project-composition.md). It uses Go and Git to render
+profile-first instructions and metadata-only receipts from protected inputs.
+Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectcontext -run TestComposition -count=1`
+and `env -u GIT_DIR -u GIT_WORK_TREE CURATOR_PROJECT_COMPOSITION_MUTANTS=1 go test ./internal/projectcontext -run '^TestCompositionNarrowingMutants$' -count=1 -v`
+for its behavior, 51 pinned grammar vectors and bounded mutation controls.
+Keep logs and private caches under `.temp/`; preview outputs remain in memory
+and publication retains supporting records under the manager's project-context
+namespace without changing the selected profile lock.
+
+The internal [Claude project-home adapter](docs/project-claude-adapter.md)
+adds manager settings, explicit empty MCP, receipts and a version-bound launch
+contribution. Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectcontext -run TestClaude -count=1`
+and the documented `CURATOR_PROJECT_CLAUDE_MUTANTS=1` lane; store logs in `.temp/`.
+The typed certification report keeps unsupported strict tuples refused.
+The explicit `native-project` preparation uses dedicated profile-only document
+inputs and reports "project sources not isolated". Launch also refuses while
+manager permissions and memory-off remain unqualified; the adapter guide links
+the exact evidence gaps and proposed qualification probes.
 
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.
