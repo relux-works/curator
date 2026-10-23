@@ -479,7 +479,12 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 		return result
 	}
 	if opts.WithGlobalProfile != nil {
-		result = opts.WithGlobalProfile(publicationHome, publish)
+		var profileErr error
+		result, profileErr = opts.WithGlobalProfile(publicationHome, publish)
+		if profileErr != nil {
+			restart = nil
+			result.failf("%v", profileErr)
+		}
 	} else {
 		result = publish()
 	}

@@ -320,7 +320,7 @@ func TestGlobalNativeOwnerCommitRollback(t *testing.T) {
 		}
 		return nil
 	}}}}
-	opts.WithGlobalProfile = func(lock install.HomeLock, next func() install.Result) install.Result {
+	opts.WithGlobalProfile = func(lock install.HomeLock, next func() install.Result) (install.Result, error) {
 		var result install.Result
 		_, err := envprofile.GlobalSkillTransaction(fixture.home, envprofile.PolicyFromConfig(fixture.source.cfg), envregistry.MachineConfig{}, nil, nil, lock, func() error {
 			result = next()
@@ -333,7 +333,7 @@ func TestGlobalNativeOwnerCommitRollback(t *testing.T) {
 			result.Status = "failed"
 			result.Errors = append(result.Errors, err.Error())
 		}
-		return result
+		return result, err
 	}
 	result := install.Global(fixture.source.cfg, filepath.Dir(fixture.codex), opts)
 	if !fired || result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "planted legacy commit failure") {

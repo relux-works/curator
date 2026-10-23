@@ -590,7 +590,7 @@ func storeModuleLink(req *ResolveRequest, lock *contextlock.Lock, member, module
 // runs only under the mutation lock: assembly itself is pure so that
 // lock-free verification recomputes expected link targets without
 // writing (environments §10.1, §12).
-func (p *homePlan) publishDocs() error {
+func (p *homePlan) publishDocs(op *operation) error {
 	paths := make([]string, 0, len(p.docs))
 	for path := range p.docs {
 		paths = append(paths, path)
@@ -598,6 +598,9 @@ func (p *homePlan) publishDocs() error {
 	sort.Strings(paths)
 	for _, path := range paths {
 		if err := writeStoreDoc(p.storeRoot, path, p.docs[path]); err != nil {
+			return err
+		}
+		if err := op.recordPostimages(path); err != nil {
 			return err
 		}
 	}
@@ -1314,7 +1317,7 @@ func sameStoreTree(target, storeRoot string) bool {
 // store documents, copies, links (with copy fallback for files), seed
 // files, and the marker. Managed paths the plan no longer wants are
 // removed; files the marker does not record are never touched.
-func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded map[string]bool, prior *envmarker.Marker, provisioned bool) error {
+func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded map[string]bool, prior *envmarker.Marker, provisioned bool) (resultErr error) {
 	root := EnvRoot(req.Home)
 	homeRel, err := managedRelative(root, plan.homeDir)
 	if err != nil {
@@ -1323,6 +1326,7 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	if err := op.captureManaged(plan, seeds, recorded); err != nil {
 		return err
 	}
+	defer func() { resultErr = errors.Join(resultErr, op.recordHomePostimages(plan.homeDir)) }()
 	// Validate Claude state before directory protection, backups, context writes
 	// or link replacement. Staging/rename I/O errors after this boundary are
 	// not an all-or-nothing home transaction (see atomicManagedFile).
@@ -1379,7 +1383,7 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 			return err
 		}
 	}
-	if err := plan.publishDocs(); err != nil {
+	if err := plan.publishDocs(op); err != nil {
 		return err
 	}
 	// Versioned generations preserve replaced regular-file bytes (§8.3,

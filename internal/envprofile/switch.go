@@ -687,7 +687,7 @@ func loadMaterial(home string, manager *gitManager, lock *contextlock.Lock) (map
 // environment_surface_unmanaged_conflict (or
 // environment_foreign_manager_detected for a foreign-manager symlink)
 // rather than overwrite.
-func materializeOne(op *operation, home string, source Source, profile string, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, packages map[string]contextmaterialize.Package, skills []skillOf, adapter Adapter, policy Policy, nativeHomeOf func(string) (string, error)) EntryResult {
+func materializeOne(op *operation, home string, source Source, profile string, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, packages map[string]contextmaterialize.Package, skills []skillOf, adapter Adapter, policy Policy, nativeHomeOf func(string) (string, error)) (out EntryResult) {
 	takeover := policy.Takeover
 	native, err := resolveNativeHome(adapter, nativeHomeOf)
 	if err != nil {
@@ -700,6 +700,12 @@ func materializeOne(op *operation, home string, source Source, profile string, l
 	if err := op.captureNative(native, adapter, skills); err != nil {
 		return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
 	}
+	defer func() {
+		if err := op.recordHomePostimages(native); err != nil {
+			out.OK = false
+			out.Detail = fmt.Sprintf("%s; record native postimage: %v", out.Detail, err)
+		}
+	}()
 	if err := os.MkdirAll(native, 0o755); err != nil {
 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 	}
@@ -870,6 +876,9 @@ func materializeOne(op *operation, home string, source Source, profile string, l
 			storeFile, err := writeStoreDocument(home, profile, adapter, document)
 			if err != nil {
 				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
+			}
+			if err := op.recordPostimages(storeFile); err != nil {
+				return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
 			}
 			if err := replaceLink(native, adapter.Target, storeFile); err != nil {
 				// Copy fallback uses the same atomic replacement
