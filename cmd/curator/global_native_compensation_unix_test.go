@@ -22,6 +22,9 @@ import (
 func TestGlobalNativeOwnerCompensationRestart(t *testing.T) {
 	for _, fault := range []string{"none", "unwritable-parent", "replacement"} {
 		t.Run(fault, func(t *testing.T) {
+			if fault == "unwritable-parent" && os.Geteuid() == 0 {
+				t.Skip("requires unprivileged directory permissions")
+			}
 			fixture := setupNativeConcurrent(t, false)
 			child, release := pauseNativeProfilePublication(t, fixture)
 			fixture.requireProfileOwner(t)

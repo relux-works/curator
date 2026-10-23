@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/relux-works/curator/internal/envmarker"
@@ -250,5 +251,70 @@ func TestGlobalProfileCompensationFailureType(t *testing.T) {
 	}
 	if _, err := os.Stat(sourcePath(home, DefaultProfile)); err != nil {
 		t.Fatalf("compensation lost pending install record: %v", err)
+	}
+}
+
+// A native home nested inside the manager home still rolls back before profile
+// recovery records. An unwritable native parent leaves the published lock;
+// the adjacent writable control restores both targets. Unix permission checks
+// require an unprivileged process.
+func TestGlobalProfileCompensationNestedNativeHome(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("requires unprivileged Unix directory permissions")
+	}
+	for _, writable := range []bool{false, true} {
+		t.Run(fmt.Sprintf("writable=%v", writable), func(t *testing.T) {
+			home := t.TempDir()
+			parent := filepath.Join(home, "native")
+			if err := os.Mkdir(parent, 0700); err != nil {
+				t.Fatal(err)
+			}
+			native := filepath.Join(parent, "entry")
+			record := filepath.Join(ProfileDir(home, "long-profile-name"), "lock.json")
+			if err := os.MkdirAll(filepath.Dir(record), 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(record, []byte("old lock"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			op := &operation{undo: &globalUndo{managerHome: home, entries: map[string]*globalImage{}}}
+			if err := op.capture(native, record); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(native, []byte("published native"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(record, []byte("pending lock"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := op.recordPostimages(native, record); err != nil {
+				t.Fatal(err)
+			}
+			if !writable {
+				if err := os.Chmod(parent, 0500); err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = os.Chmod(parent, 0700) })
+			}
+			err := op.undo.restore()
+			if writable {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if data, err := os.ReadFile(record); err != nil || string(data) != "old lock" {
+					t.Fatalf("writable nested rollback did not restore lock: %q %v", data, err)
+				}
+				if _, err := os.Stat(native); !os.IsNotExist(err) {
+					t.Fatalf("writable nested rollback retained native entry: %v", err)
+				}
+			} else {
+				if !errors.Is(err, os.ErrPermission) {
+					t.Fatalf("nested native permission fault not exercised: %v", err)
+				}
+				if data, err := os.ReadFile(record); err != nil || string(data) != "pending lock" {
+					t.Fatalf("nested native compensation lost pending lock: %q %v", data, err)
+				}
+			}
+		})
 	}
 }

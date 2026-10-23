@@ -19,6 +19,7 @@ func TestGlobalNativeOwnershipNarrowingControls(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, plant := range []struct{ name, file, before, after, pkg, run, failure, message string }{
+		{"revert-pending-lock-before-nested-native", "internal/envprofile/global_operation.go", "return undo.managerHome != \"\" && (path == CurrentFile(undo.managerHome) || strings.HasPrefix(path, ProfilesDir(undo.managerHome)+string(filepath.Separator)))", "return false", "./internal/envprofile", "^TestGlobalProfileCompensationNestedNativeHome$", "TestGlobalProfileCompensationNestedNativeHome/writable=false", "nested native compensation lost pending lock"},
 		{"retry-failed-profile-compensation", "internal/install/global.go", "if profileErr != nil {", "if profileErr != nil && false {", "./internal/install", "^TestGlobalProfileCompensationStopsRestart$/^failed$", "TestGlobalProfileCompensationStopsRestart/failed", "compensation failure was retried or hidden"},
 		{"overwrite-compensation-postimage", "internal/envprofile/global_operation.go", "if !reflect.DeepEqual(current, undo.postimages[path]) {", "if !reflect.DeepEqual(current, undo.postimages[path]) && false {", "./internal/envprofile", "^TestGlobalProfileCompensationPostimages$", "TestGlobalProfileCompensationPostimages/link/replacement=true", "foreign postimage admitted"},
 		{"discard-pending-lock-after-compensation-error", "internal/envprofile/global_operation.go", "if err := restoreGlobalImage(path, undo.entries[path]); err != nil {\n\t\t\t\treturn err", "if err := restoreGlobalImage(path, undo.entries[path]); err != nil {\n\t\t\t\terrs = append(errs, err)", "./cmd/curator", "^TestGlobalNativeOwnerCompensationRestart$/^unwritable-parent$", "TestGlobalNativeOwnerCompensationRestart/unwritable-parent", "compensation failure lost pending lock"},
@@ -55,7 +56,12 @@ func TestGlobalNativeOwnershipNarrowingControls(t *testing.T) {
 		{"ignore-ledgers", "internal/adapters/adapters.go", "func unmanagedConflict(target string, inLedger bool, source string) (bool, error) {", "func unmanagedConflict(target string, inLedger bool, source string) (bool, error) {\nif filepath.Base(target) == \"shared-skill\" { return false, nil }", "./internal/adapters", "^TestGlobalProfileOwnerForeignRefuses$", "TestGlobalProfileOwnerForeignRefuses", "foreign adapter entry admitted"},
 	} {
 		t.Run(plant.name, func(t *testing.T) {
-			if plant.name == "bypass-global-removal-lock" || plant.name == "release-removal-lock-before-read" {
+			if plant.name == "discard-pending-lock-after-compensation-error" || plant.name == "revert-pending-lock-before-nested-native" {
+				if os.Geteuid() == 0 {
+					t.Skip("permission control requires an unprivileged process")
+				}
+			}
+			if plant.name == "bypass-global-removal-lock" || plant.name == "release-removal-lock-before-read" || plant.name == "discard-pending-lock-after-compensation-error" || plant.name == "omit-native-publication-postimage" || plant.name == "revert-pending-lock-before-nested-native" {
 				switch runtime.GOOS {
 				case "aix", "android", "darwin", "dragonfly", "freebsd", "hurd", "illumos", "ios", "linux", "netbsd", "openbsd", "solaris":
 				default:
