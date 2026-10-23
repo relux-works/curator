@@ -215,9 +215,6 @@ func manifest(c captured) (*contextpkg.Manifest, error) {
 	if len(m.Skills) != 0 || len(m.MCP) != 0 {
 		return nil, fail("project_context_unsupported", "context requires explicit modules and context-only dependencies")
 	}
-	if len(c.Bytes["config/muse/auth.json"]) > 0 {
-		return nil, fail("project_context_invalid", "authentication state is not context")
-	}
 	for _, mod := range m.Modules {
 		b, ok := c.Bytes[path.Join("context", mod.Path)]
 		if !ok {
@@ -351,6 +348,9 @@ func validateInventory(c captured) error {
 			return fail("project_context_invalid", "invalid snapshot inventory")
 		}
 		key := portableAlias(e.Path)
+		if nativeAuthenticationPath(key) {
+			return fail("project_context_invalid", "native authentication state is not project content")
+		}
 		if aliases[key] {
 			return fail("project_context_invalid", "case or normalization alias")
 		}
@@ -374,4 +374,17 @@ func validateInventory(c captured) error {
 	}
 
 	return nil
+}
+
+// Native login-state filenames have owning passthrough contracts, never a
+// project snapshot contract. Use the same portable equivalence as inventory
+// alias detection, including on case-sensitive hosts. Reject whole candidates;
+// filtering would change their inventory. This is not general secret detection.
+func nativeAuthenticationPath(key string) bool {
+	for _, reserved := range []string{"config/muse/auth.json", "auth.json", ".credentials.json"} {
+		if key == reserved || strings.HasPrefix(key, reserved+"/") {
+			return true
+		}
+	}
+	return false
 }

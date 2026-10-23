@@ -173,13 +173,16 @@ func (op *operation) preview(r registered, items []Candidate, omitted []Omission
 				return Preview{}, err
 			}
 			change.Semantics = &SemanticChange{After: after}
-			if prior, err := op.approvedCandidate(r.Record.CheckoutID, c.Item.ID); err != nil {
+		}
+		if prior, err := op.approvedCandidate(r.Record.CheckoutID, c.Item.ID); err != nil {
+			return Preview{}, err
+		} else if prior != nil && prior.Item.Type == "skill" {
+			if change.Semantics == nil {
+				change.Semantics = &SemanticChange{}
+			}
+			change.Semantics.Before, err = op.skillSemantics(*prior)
+			if err != nil {
 				return Preview{}, err
-			} else if prior != nil && prior.Item.Type == "skill" {
-				change.Semantics.Before, err = op.skillSemantics(*prior)
-				if err != nil {
-					return Preview{}, err
-				}
 			}
 		}
 		changes = append(changes, change)
@@ -195,7 +198,15 @@ func (op *operation) preview(r registered, items []Candidate, omitted []Omission
 				if c.Item.Required {
 					return Preview{}, fail("project_context_unsupported", "revoke the required item before removing its selection")
 				}
-				changes = append(changes, Change{ItemID: c.Item.ID, Effect: "removed", Before: c.ItemSHA256, Files: []FileChange{}})
+				change := Change{ItemID: c.Item.ID, Effect: "removed", Before: c.ItemSHA256, Files: []FileChange{}}
+				if c.Item.Type == "skill" {
+					before, err := op.skillSemantics(c)
+					if err != nil {
+						return Preview{}, err
+					}
+					change.Semantics = &SemanticChange{Before: before}
+				}
+				changes = append(changes, change)
 			}
 		}
 	}
@@ -204,7 +215,7 @@ func (op *operation) preview(r registered, items []Candidate, omitted []Omission
 	sort.Slice(omitted, func(i, j int) bool { return omitted[i].ItemID < omitted[j].ItemID })
 	p := Preview{Review: Review{1, "registration:" + r.Record.CheckoutID, identity(r.Record), items, changes, omitted}}
 	p.PackageSHA256 = identity(p.Review)
-	if err := verifyBinding(r); err != nil {
+	if err := op.verifyRegistration(r); err != nil {
 		return Preview{}, err
 	}
 	op.state.Reviews[r.Record.CheckoutID] = p
@@ -350,7 +361,7 @@ func (s Store) Approve(id, itemID, itemDigest, packageDigest string) (result App
 		if err := op.fresh(r, c); err != nil {
 			return Approval{}, err
 		}
-		if err := verifyBinding(r); err != nil {
+		if err := op.verifyRegistration(r); err != nil {
 			return Approval{}, err
 		}
 		a := Approval{"project-approval/1", id, itemID, itemDigest, r.Record.Environment, op.state.Principal, ceiling(r.Record)}

@@ -63,6 +63,13 @@ Moved, replaced or unreadable checkouts require an explicit repair:
 curator project rebind CHECKOUT_ID ./demo
 ```
 
+An observed binding failure is retained as a protected authority lapse, even
+when detected by inspect or CWD lookup. Restoring permissions or returning the
+same directory inode does not revive that registration or its approvals. All
+slots for that root lapse together; a lapsed nested root still shadows its
+parent. An unrelated missing child or unavailable profile lock does not lapse
+a still-verifiable root.
+
 Rebind retires the old record and allocates a fresh ID. It carries no approval.
 Revocation remains possible when a source checkout is absent. Filesystem
 binding is supported on macOS and Linux; other platforms refuse registration.
@@ -106,7 +113,9 @@ The conservative first-slice import check rejects whitespace-prefixed `@path`
 tokens in selected modules; ordinary prose links remain inert data.
 
 Whole skill requests use `type: "skill"`. They require an explicit portable
-skill manifest, complete bounded snapshot, content pin and the existing strict
+skill manifest and the owning whole-package document contract: `SKILL.md` with
+valid name/description frontmatter and optional nonempty triggers. They also
+require a complete bounded snapshot, content pin and the existing strict
 read-only audit/canary. This entry point refuses skill requirements, MCP
 requirements and external build repositories until their owning complete pinned
 activation closure is available. It does not replace command activation, build,
@@ -121,7 +130,9 @@ inventory, command owners/declarations, normalized capability requests and
 permission effects. Supported skill candidates have no MCP endpoints; closures
 requiring MCP remain unsupported. Capabilities are inert requests; manager
 policy alone programs permissions. Semantic before/after details are included
-in the review package digest. Closed record and manifest member names match
+in the review package digest. Before-side skill semantics remain visible when
+an approved skill is removed or replaced by context; a non-skill or removed
+after-side has no skill semantics. Closed record and manifest member names match
 exactly, including case; case variants are unknown members.
 
 Inline MCP is inventoried and displayed by identity only. Stage-A admission
@@ -136,7 +147,13 @@ candidates; they have no extra item arms in leaf 1.
 State lives in the private `project-context/` namespace below the configured
 manager home. Its ledger, snapshots and locks use no-follow reads, bounded
 inventories, owner/write-boundary checks, complete byte/entry/mode verification,
-canonical records, the manager-home lock and atomic publication. Missing or
+canonical records, the manager-home lock and atomic publication. Known native
+login-state paths (`config/muse/auth.json`, `auth.json`, `.credentials.json`)
+and their portable case aliases refuse as whole candidates before snapshot
+publication, even for optional unsupported skills and empty files. Retained
+snapshots with those entries also refuse before review output. Files are not
+silently filtered; this filename boundary is not general secret detection.
+Missing or
 malformed authority never becomes an empty successful state. The ledger binds
 its manager allocation; copied records or identical hashes from another
 checkout confer no approval. Snapshot references encode the complete digest.

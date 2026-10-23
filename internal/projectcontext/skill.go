@@ -10,6 +10,7 @@ import (
 	"github.com/relux-works/curator/internal/audit"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/hashing"
+	skillmanifest "github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/skillspec"
 )
 
@@ -47,9 +48,9 @@ func (op *operation) skill(r registered, req Request) (Candidate, error) {
 	return Candidate{item, identity(item), req, identity(capt.Manifest), []Member{{req.ID, ref, h, "state sha256:" + pin}}, AppendAfterProfile}, nil
 }
 func auditSkill(home, snapshot string) (string, error) {
-	spec, err := skillspec.Load(snapshot)
+	_, spec, err := skillmanifest.ReadSkillPackage(snapshot)
 	if err != nil {
-		return "", err
+		return "", fail("project_context_invalid", "whole-skill package document or manifest is invalid")
 	}
 	if err := closedSkill(snapshot); err != nil {
 		return "", err
