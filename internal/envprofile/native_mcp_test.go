@@ -807,9 +807,10 @@ func TestProfileMCPCurrentAdmission(t *testing.T) {
 	}
 }
 
-// A signed version tag can authorize an unsigned exact commit. Moving that tag
-// to a different commit cannot authorize the frozen profile snapshot; both
-// cases replay the current source signer list without fetching.
+// A signed version tag can authorize an unsigned exact commit in the legacy
+// profile cache without project-only origin metadata. Moving that tag to a
+// different commit cannot authorize the frozen snapshot; both cases replay
+// the current source signer list without fetching.
 func TestProfileMCPSignedTagReplay(t *testing.T) {
 	for _, changed := range []bool{false, true} {
 		t.Run(map[bool]string{false: "valid", true: "different-commit"}[changed], func(t *testing.T) {
@@ -817,6 +818,9 @@ func TestProfileMCPSignedTagReplay(t *testing.T) {
 			req.Environments = []string{"codex_cli"}
 			source := "github.com/example/native-mcp"
 			repo := newGitManager(fx.home).repoDir(source)
+			if remotes, err := gitOutput(repo, "remote"); err != nil || strings.TrimSpace(remotes) != "" {
+				t.Fatalf("legacy profile cache must have no remote metadata: %v", err)
+			}
 			key, pub := statusSignerKey(t)
 			gitStatusCommand(t, repo, "-c", "gpg.format=ssh", "-c", "user.signingkey="+key, "tag", "-s", "-m", "fixture", "v1.2.0")
 			req.Policy.SourceSigners = map[string][]contextresolve.Signer{source: {{Type: "ssh", Key: pub}}}
