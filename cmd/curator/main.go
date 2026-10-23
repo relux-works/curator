@@ -1585,6 +1585,22 @@ func (c cli) cmdGlobal(args []string) int {
 		if len(args) < 2 {
 			return exitUsage
 		}
+		// Install holds this operation lock across profile and legacy publication.
+		// Serialize the declaration writer with that whole operation, before
+		// taking any home lock, so the publishers cannot consume different sets.
+		manager, err := managerlock.New(cfg.Home())
+		if err != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+			return exitFail
+		}
+		operation := manager.NewOperation(false)
+		defer func() { _ = operation.Close() }()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if _, err := operation.AcquireProjects(ctx, install.GlobalRoot(cfg.Home())); err != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator: acquire the global operation lock:", err)
+			return exitFail
+		}
 		if err := manifest.RemoveDecl(install.GlobalRoot(cfg.Home()), args[1]); err != nil {
 			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail

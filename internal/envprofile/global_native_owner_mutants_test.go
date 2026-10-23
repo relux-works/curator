@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -18,6 +19,8 @@ func TestGlobalNativeOwnershipNarrowingControls(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, plant := range []struct{ name, file, before, after, pkg, run, failure, message string }{
+		{"bypass-global-removal-lock", "cmd/curator/main.go", "if _, err := operation.AcquireProjects(ctx, install.GlobalRoot(cfg.Home())); err != nil {", "if _, err := func() ([]managerlock.ProjectIdentity, error) { _ = ctx; return nil, nil }(); err != nil {", "./cmd/curator", "^TestGlobalNativeOwnerConcurrentRemove$/^direct-only$", "TestGlobalNativeOwnerConcurrentRemove/direct-only", "remove completed during paused install"},
+		{"release-removal-lock-before-read", "cmd/curator/main.go", "if err := manifest.RemoveDecl(install.GlobalRoot(cfg.Home()), args[1]); err != nil {", "_ = operation.Close()\n\t\tif err := manifest.RemoveDecl(install.GlobalRoot(cfg.Home()), args[1]); err != nil {", "./cmd/curator", "^TestGlobalNativeOwnerRemoveBeforeInstall$", "TestGlobalNativeOwnerRemoveBeforeInstall", "paused remove did not hold the global operation lock"},
 		{"omit-direct-declarations", "internal/envprofile/global.go", "if global != nil {", "if global != nil && len(global.Skills) == 0 {", "./cmd/curator", "^TestGlobalNativeOwnerNewDeclarationAfterProfile$", "TestGlobalNativeOwnerNewDeclarationAfterProfile", "profile native owner lost"},
 		{"retain-old-direct-pin", "internal/envprofile/global.go", "\tif addition != nil {\n\t\tidentity", "\tfor _, member := range oldLock.Members { if member.Kind == contextlock.KindSkill { input.Direct = append(input.Direct, contextresolve.Requirement{Kind: contextlock.KindSkill, Name: member.Name, Source: member.Source, Revision: member.Commit, Directory: member.Directory}) } }\n\tif addition != nil {\n\t\tidentity", "./cmd/curator", "^TestGlobalNativeOwnerNewDeclarationAfterProfile$", "TestGlobalNativeOwnerNewDeclarationAfterProfile", "want 0"},
 		{"resurrect-removed-declaration", "internal/envprofile/global.go", "\tif addition != nil {\n\t\tidentity", "\tfor _, member := range oldLock.Members { if member.Kind == contextlock.KindSkill { input.Direct = append(input.Direct, contextresolve.Requirement{Kind: contextlock.KindSkill, Name: member.Name, Source: member.Source, Revision: member.Commit, Directory: member.Directory}) } }\n\tif addition != nil {\n\t\tidentity", "./cmd/curator", "^TestGlobalNativeOwnerRemoval$/^direct-only$", "TestGlobalNativeOwnerRemoval/direct-only", "native skill appeared before global install"},
@@ -42,6 +45,13 @@ func TestGlobalNativeOwnershipNarrowingControls(t *testing.T) {
 		{"ignore-ledgers", "internal/adapters/adapters.go", "func unmanagedConflict(target string, inLedger bool, source string) (bool, error) {", "func unmanagedConflict(target string, inLedger bool, source string) (bool, error) {\nif filepath.Base(target) == \"shared-skill\" { return false, nil }", "./internal/adapters", "^TestGlobalProfileOwnerForeignRefuses$", "TestGlobalProfileOwnerForeignRefuses", "foreign adapter entry admitted"},
 	} {
 		t.Run(plant.name, func(t *testing.T) {
+			if plant.name == "bypass-global-removal-lock" || plant.name == "release-removal-lock-before-read" {
+				switch runtime.GOOS {
+				case "aix", "android", "darwin", "dragonfly", "freebsd", "hurd", "illumos", "ios", "linux", "netbsd", "openbsd", "solaris":
+				default:
+					t.Skip("concurrency witness requires the Unix Git/FIFO harness")
+				}
+			}
 			original := filepath.Join(root, filepath.FromSlash(plant.file))
 			payload, err := os.ReadFile(original)
 			if err != nil {
