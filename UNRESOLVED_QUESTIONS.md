@@ -23,3 +23,10 @@
   needs proven excluded-origin session state, fresh sessions or refusal.
   Broader late hook/settings/plugin/MCP reloads also remain unqualified.
   [Measured controls and bounds](docs/qualification/project-source-exclusion-claude.md).
+
+- TASK-261022-h1ttey: decide the first Claude strict form (proposed fresh
+  headless only), required tools/child paths, response to unqualifiable late
+  reloads, and whether restricted-form advertisement needs normative carrier
+  negotiation. Installed 2.1.309 has no transferred qualification from 2.1.305;
+  permissions, memory-off and all reachable exclusion paths must qualify.
+  [Contract, negative-first matrix and owner decisions](docs/qualification/strict-mode-claude-plan.md#owner-decisions-to-resolve-before-implementationadmission).
