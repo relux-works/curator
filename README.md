@@ -358,7 +358,9 @@ Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/managerlock ./internal/p
 for lease, transaction, GC and bounded narrowing controls. Store local logs and
 private build caches under `.temp/`; no project launch CLI is exposed yet.
 
-The derived composition API and its refusal boundaries are documented in
+`project inspect` separates source mode from item admission and reports the
+mandatory native-project isolation notice. The derived composition API and its
+refusal boundaries are documented in
 [project composition](docs/project-composition.md), including mode-bound strict
 and explicitly enabled native-project records and separate profile-only outputs.
 It uses Go and Git to render profile-first instructions and metadata-only receipts from protected inputs.

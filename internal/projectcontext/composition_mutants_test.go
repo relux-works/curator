@@ -49,6 +49,11 @@ func TestCompositionNarrowingMutants(t *testing.T) {
 		{"allow-unknown-registration-mode", "registration.go", "TestCompositionRegistrationMode", `if !validSourceMode(mode) {`, `if !validSourceMode(mode) && false {`, "want project_context_invalid"},
 		{"ignore-retained-registration-mode", "store.go", "TestCompositionRegistrationMode", `!validSourceMode(v.Mode)`, `false`, "want project_context_drift"},
 		{"retain-implicit-mode-alias", "composition_authority.go", "TestCompositionNativeProfileOnly", `req.Mode = again.Preview.Record.Mode`, `_ = req.Mode`, "equivalent explicit mode changed publication"},
+		{"entry-only-command-identity", "composition.go", "TestCompositionCommandArtifact", `artifact := s.ArtifactSHA256`, `artifact := s.ArtifactSHA256; if c := s.spec.Commands[command]; c.Type == "script" { artifact = digest(s.files[c.UnixPath]) }`, "changed audited command artifact has unchanged command-owner artifact hash"},
+		{"inspection-source-mode-off", "inspection.go", "TestCompositionInspectionStatus", `Mode:         registration.Mode`, `Mode:         "off"`, "inspection conflates source mode with admission"},
+		{"inspection-without-native-notice", "inspection.go", "TestCompositionInspectionStatus", `out.Notice = "project sources not isolated"`, `out.Notice = ""`, "inspection isolation notice differs"},
+		{"retain-selection-aliases", "composition_authority.go", "TestCompositionPublicationSelections", `req.Selections = canonicalCompositionSelections(req.Selections, op.state.Reviews[req.CheckoutID].Review)`, `_ = req.Selections`, "same composition identity rejected during repeat publication"},
+		{"ignore-immutable-publication-metadata", "composition_authority.go", "TestCompositionPublicationMetadata", `if !bytes.Equal(old, b) {`, `if !bytes.Equal(old, b) && false {`, "want immutable composition metadata changed"},
 	}
 
 	for _, tc := range cases {

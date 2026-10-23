@@ -451,5 +451,5 @@ func (s Store) Inspect(id string) (result Inspection, resultErr error) {
 	if err := op.verifyRegistration(r); err != nil {
 		return Inspection{}, err
 	}
-	return Inspection{r.Record, "off", "off", AppendAfterProfile, items}, nil
+	return inspectionStatus(r.Record, items), nil
 }
