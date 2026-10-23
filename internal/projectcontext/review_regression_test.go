@@ -195,11 +195,16 @@ func TestExecuteOnlyRootRefuses(t *testing.T) {
 	_, err = f.store.Register("another", f.root, "base", "claude_code")
 	required(t, err, "project_registration_mismatch")
 	after, _ := os.ReadFile(filepath.Join(f.store.Home, "project-context/state.json"))
-	if string(after) == string(before) {
-		t.Fatal("observed unreadable root did not retain authority lapse")
+	if string(after) != string(before) {
+		t.Fatal("root lapse unexpectedly rewrote the preview/approval ledger")
 	}
-	var retained state
-	if err := decode(after, &retained); err != nil || !retained.Registrations[id].Lapsed {
+	op, err := f.store.begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retained := op.state.Registrations[id].Lapsed
+	op.close()
+	if !retained {
 		t.Fatal("missing protected root-authority lapse", err)
 	}
 	if err = os.Chmod(f.root, 0700); err != nil {
