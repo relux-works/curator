@@ -12,13 +12,14 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/install"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // Drive main -> cli.install -> install.Project -> gitignore.Ensure with the
 // compiled production binary, including real process exits and published bytes.
 func TestInstallGitignoreEntryPoint(t *testing.T) {
 	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
-	build := exec.Command("go", "build", "-o", binary, ".")
+	build := exec.Command(testtoolchain.Go(t), "build", "-o", binary, ".")
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build curator: %v\n%s", err, out)
 	}

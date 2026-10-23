@@ -1,8 +1,6 @@
 package scriptworker
 
 import (
-	"github.com/relux-works/curator/internal/testgitenv"
-	"go/build"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/godriver"
+	"github.com/relux-works/curator/internal/testgitenv"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // TestMain gives the test binary the same fixed hidden script-worker mode
@@ -53,6 +53,7 @@ var stubOnce struct {
 // executable with a stable identity.
 func stubInterpreterBinary(t *testing.T) string {
 	t.Helper()
+	goTool := testtoolchain.Go(t)
 	stubOnce.Do(func() {
 		directory, err := os.MkdirTemp("", "curator-stubinterp-")
 		if err != nil {
@@ -64,7 +65,7 @@ func stubInterpreterBinary(t *testing.T) string {
 		if runtime.GOOS == "windows" {
 			output += ".exe"
 		}
-		command := exec.Command(filepath.Join(build.Default.GOROOT, "bin", goBinaryName()), "build", "-o", output, "./testdata/stubinterp") // #nosec G204 -- fixed test-only build of the local test double
+		command := exec.Command(goTool, "build", "-o", output, "./testdata/stubinterp") // #nosec G204 -- fixed test-only build of the local test double
 		command.Env = os.Environ()
 		if combined, err := command.CombinedOutput(); err != nil {
 			stubOnce.err = err
@@ -79,13 +80,6 @@ func stubInterpreterBinary(t *testing.T) string {
 	return stubOnce.path
 }
 
-func goBinaryName() string {
-	if runtime.GOOS == "windows" {
-		return "go.exe"
-	}
-	return "go"
-}
-
 var forgeOnce struct {
 	sync.Once
 	directory string
@@ -98,6 +92,7 @@ var forgeOnce struct {
 // proof or result, so tests prove the parent validates before permitting.
 func forgeWorkerBinary(t *testing.T) string {
 	t.Helper()
+	goTool := testtoolchain.Go(t)
 	forgeOnce.Do(func() {
 		directory, err := os.MkdirTemp("", "curator-forgeworker-")
 		if err != nil {
@@ -109,7 +104,7 @@ func forgeWorkerBinary(t *testing.T) string {
 		if runtime.GOOS == "windows" {
 			output += ".exe"
 		}
-		command := exec.Command(filepath.Join(build.Default.GOROOT, "bin", goBinaryName()), "build", "-o", output, "./testdata/forgeworker") // #nosec G204 -- fixed test-only build of the local test double
+		command := exec.Command(goTool, "build", "-o", output, "./testdata/forgeworker") // #nosec G204 -- fixed test-only build of the local test double
 		command.Env = os.Environ()
 		if combined, err := command.CombinedOutput(); err != nil {
 			forgeOnce.err = err
@@ -148,6 +143,7 @@ var curatorOnce struct {
 // binary rather than assumed from shared code.
 func builtCuratorBinary(t *testing.T) string {
 	t.Helper()
+	goTool := testtoolchain.Go(t)
 	curatorOnce.Do(func() {
 		directory, err := os.MkdirTemp("", "curator-scriptworker-prod-")
 		if err != nil {
@@ -159,7 +155,7 @@ func builtCuratorBinary(t *testing.T) string {
 		if runtime.GOOS == "windows" {
 			output += ".exe"
 		}
-		command := exec.Command(filepath.Join(build.Default.GOROOT, "bin", goBinaryName()), "build", "-o", output, "../../cmd/curator") // #nosec G204 -- fixed test-only build of the production binary under test
+		command := exec.Command(goTool, "build", "-o", output, "../../cmd/curator") // #nosec G204 -- fixed test-only build of the production binary under test
 		command.Env = os.Environ()
 		if combined, err := command.CombinedOutput(); err != nil {
 			curatorOnce.err = err

@@ -54,14 +54,31 @@ func TestMain(m *testing.M) {
 		restoreGitEnv()
 		os.Exit(code)
 	}
+	restorePath, err := isolateCLIPath()
+	if err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, "isolate CLI test PATH:", err)
+		restoreGitEnv()
+		os.Exit(1)
+	}
+	// The parent already holds the host-toolchain lock. These children run
+	// only PATH isolation witnesses, including their explicit provider cases.
+	if os.Getenv(cliPathChild) == "1" {
+		code := m.Run()
+		restorePath()
+		restoreGitEnv()
+		os.Exit(code)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	lock, err := testtoolchain.AcquireHostGOROOT(ctx)
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "acquire package host GOROOT test lock:", err)
+		restorePath()
+		restoreGitEnv()
 		os.Exit(1)
 	}
 	code := m.Run()
+	restorePath()
 	restoreGitEnv()
 	if lock != nil {
 		if closeErr := lock.Close(); closeErr != nil {
