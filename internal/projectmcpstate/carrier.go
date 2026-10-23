@@ -155,8 +155,15 @@ func (lock *Lock) Validate() error {
 		if err != nil || !bytes.Equal(modelBytes, declaredBytes) {
 			return invalid("MCP declaration normalization")
 		}
-		if _, err := pkgversion.ParseVersion(entry.Resolved.Version); err != nil {
+		version, err := pkgversion.ParseVersion(entry.Resolved.Version)
+		if err != nil {
 			return invalid("MCP resolved version")
+		}
+		if selector, ok := decl.Package["range"].(string); ok {
+			constraint, err := pkgversion.ParseRange(selector)
+			if err != nil || !constraint.Satisfies(version) {
+				return invalid("MCP resolved range")
+			}
 		}
 		if revision, ok := decl.Package["revision"].(string); ok && revision != entry.Resolved.Commit {
 			return invalid("MCP resolved revision")
@@ -168,7 +175,7 @@ func (lock *Lock) Validate() error {
 		if declarationHash != entry.DeclarationSHA256 {
 			return invalid("MCP declaration digest")
 		}
-		normalized, err := projectmcp.NormalizeServer(entry.Resolved.Server)
+		normalized, err := projectmcp.NormalizePackageServer(entry.Resolved.Server)
 		if err != nil {
 			return err
 		}

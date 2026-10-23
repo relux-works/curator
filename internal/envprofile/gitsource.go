@@ -1,6 +1,7 @@
 package envprofile
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
@@ -41,10 +42,13 @@ import (
 // File:// remotes are rejected at the identity boundary (see canonicalGit)
 // and never reach this cache.
 type gitManager struct {
-	home           string
-	readOnlyAudit  bool
-	fetchRaw       map[string]string
-	allowedSources []string
+	// Nonempty only for source-bound project MCP caches; legacy profile paths
+	// are never promoted into this namespace.
+	sourceCacheRoot string
+	home            string
+	readOnlyAudit   bool
+	fetchRaw        map[string]string
+	allowedSources  []string
 	// Non-nil only during new-profile installation. Each missing exact pin
 	// gets at most one acquisition attempt within that operation.
 	missingPins map[string]bool
@@ -52,6 +56,13 @@ type gitManager struct {
 
 func newGitManager(home string) *gitManager {
 	return &gitManager{home: home, fetchRaw: map[string]string{}}
+}
+
+// newProjectMCPGitManager isolates project MCP caches from legacy lossy keys.
+func newProjectMCPGitManager(home string) *gitManager {
+	manager := newGitManager(home)
+	manager.sourceCacheRoot = filepath.Join(home, "project-mcp-repos")
+	return manager
 }
 
 // withPolicy attaches the machine source allowlist for the operation.
@@ -65,10 +76,18 @@ func (m *gitManager) withPolicy(policy Policy) *gitManager {
 func profileReposDir(home string) string { return filepath.Join(home, "profile-repos") }
 
 // reposDir holds one clone per canonical git identity.
-func (m *gitManager) reposDir() string { return profileReposDir(m.home) }
+func (m *gitManager) reposDir() string {
+	if m.sourceCacheRoot != "" {
+		return m.sourceCacheRoot
+	}
+	return profileReposDir(m.home)
+}
 
 // repoDir maps a canonical identity onto its clone path.
 func (m *gitManager) repoDir(identity string) string {
+	if m.sourceCacheRoot != "" {
+		return filepath.Join(m.reposDir(), fmt.Sprintf("%x", sha256.Sum256([]byte(identity))))
+	}
 	var builder strings.Builder
 	for _, r := range identity {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
@@ -98,7 +117,15 @@ func (m *gitManager) ensureRepo(canonical string) (string, error) {
 		return "", err
 	}
 	dir := m.repoDir(canonical)
-	if info, err := os.Stat(dir); err == nil && info.IsDir() {
+	if m.sourceCacheRoot != "" {
+		metadata, err := stateread.Lstat(dir)
+		if err != nil {
+			return "", err
+		}
+		if metadata.Kind == stateread.KindPresent {
+			return m.checkedRepo(canonical)
+		}
+	} else if info, err := os.Stat(dir); err == nil && info.IsDir() {
 		return dir, nil
 	}
 	if err := os.MkdirAll(m.reposDir(), 0o755); err != nil {
@@ -112,6 +139,31 @@ func (m *gitManager) ensureRepo(canonical string) (string, error) {
 	}
 	if err := gitops.Clone(cloneURL, dir); err != nil {
 		return "", fmt.Errorf("%s: clone %s: %v", DiagSourceInvalid, canonical, err)
+	}
+	if m.sourceCacheRoot != "" {
+		return m.checkedRepo(canonical)
+	}
+	return dir, nil
+}
+
+// checkedRepo is local-only: stored origin, not a rewritten transport URL,
+// binds the object database to the declared identity before acquisition/replay.
+func (m *gitManager) checkedRepo(canonical string) (string, error) {
+	dir := m.repoDir(canonical)
+	metadata, err := stateread.Lstat(dir)
+	if err != nil {
+		return "", err
+	}
+	if metadata.Kind != stateread.KindPresent || !metadata.Info.IsDir() || metadata.Info.Mode()&os.ModeSymlink != 0 {
+		return "", fmt.Errorf("%s: MCP source cache is unavailable", DiagSourceInvalid)
+	}
+	output, err := exec.Command("git", "-C", dir, "config", "--local", "--get-all", "remote.origin.url").Output()
+	if err != nil {
+		return "", fmt.Errorf("%s: MCP source cache origin is unavailable", DiagSourceInvalid)
+	}
+	origin, err := identity.Parse(strings.TrimSpace(string(output)))
+	if err != nil || origin != canonical {
+		return "", fmt.Errorf("%s: MCP source cache origin differs from declaration", DiagSourceInvalid)
 	}
 	return dir, nil
 }
