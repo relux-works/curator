@@ -697,6 +697,9 @@ func materializeOne(op *operation, home string, source Source, profile string, l
 	if err != nil {
 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 	}
+	if err := op.captureNative(native, adapter, skills); err != nil {
+		return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
+	}
 	if err := os.MkdirAll(native, 0o755); err != nil {
 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 	}
