@@ -70,6 +70,17 @@ slots for that root lapse together; a lapsed nested root still shadows its
 parent. An unrelated missing child or unavailable profile lock does not lapse
 a still-verifiable root.
 
+Root-lapse IDs are also retained in a separate, manager-owned `lapses.json`
+record under the same home lock. Its 32 KiB bound covers all 256 registration
+IDs independently of the 1 MiB preview/approval ledger, including existing
+ledgers with no spare bytes. Every store operation reads this record before
+using registration authority; missing, malformed or unreadable records refuse.
+Legacy version-1 ledgers migrate by establishing the companion before a
+same-size version-2 envelope update. Their existing inline lapses remain valid;
+public registration and approval record versions do not change. Releasing a
+large preview does not clear a lapse, and explicit rebind never transfers the
+old ID's lapse to the new ID.
+
 Rebind retires the old record and allocates a fresh ID. It carries no approval.
 Revocation remains possible when a source checkout is absent. Filesystem
 binding is supported on macOS and Linux; other platforms refuse registration.

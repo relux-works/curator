@@ -140,7 +140,10 @@ func (s Store) begin(create bool) (*operation, error) {
 		if err != nil {
 			return nil, err
 		}
-		op.state = state{Version: 1, ManagerID: newID(), Principal: "principal:" + newID(), ManagerBinding: homeBinding, Registrations: map[string]registered{}, Reviews: map[string]Preview{}, Approvals: map[string]approved{}}
+		op.state = state{Version: 2, ManagerID: newID(), Principal: "principal:" + newID(), ManagerBinding: homeBinding, Registrations: map[string]registered{}, Reviews: map[string]Preview{}, Approvals: map[string]approved{}}
+		if err := op.retainLapses(); err != nil {
+			return nil, err
+		}
 		if err := op.save(); err != nil {
 			return nil, err
 		}
@@ -158,6 +161,20 @@ func (s Store) begin(create bool) (*operation, error) {
 			return nil, err
 		}
 	}
+	if err := op.loadLapses(r); err != nil {
+		return nil, err
+	}
+	if op.state.Version == 1 {
+		// Establish the companion before requiring it. Changing the envelope
+		// version uses the same number of bytes, even in a full old ledger.
+		if err := op.retainLapses(); err != nil {
+			return nil, err
+		}
+		op.state.Version = 2
+		if err := op.save(); err != nil {
+			return nil, err
+		}
+	}
 	ok = true
 	return op, nil
 }
@@ -168,7 +185,7 @@ func (op *operation) validate() error {
 	if err != nil || s.ManagerBinding != binding {
 		return fail("project_context_drift", "admission records belong to another manager allocation")
 	}
-	if s.Version != 1 || !idRE.MatchString(s.ManagerID) || !strings.HasPrefix(s.Principal, "principal:") || !idRE.MatchString(strings.TrimPrefix(s.Principal, "principal:")) || s.Registrations == nil || s.Reviews == nil || s.Approvals == nil || len(s.Registrations) > 256 || len(s.Reviews) > 256 || len(s.Approvals) > 256 {
+	if (s.Version != 1 && s.Version != 2) || !idRE.MatchString(s.ManagerID) || !strings.HasPrefix(s.Principal, "principal:") || !idRE.MatchString(strings.TrimPrefix(s.Principal, "principal:")) || s.Registrations == nil || s.Reviews == nil || s.Approvals == nil || len(s.Registrations) > 256 || len(s.Reviews) > 256 || len(s.Approvals) > 256 {
 		return fail("project_context_drift", "invalid protected state envelope")
 	}
 	for id, r := range s.Registrations {
