@@ -334,6 +334,13 @@ and `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/adapters -run '^TestGlob
 They use temporary homes; keep validation logs under `.temp/`. See
 [native profile skills](docs/native-profile-skills.md) for the ownership contract.
 
+The [native permissions and memory research](.research/permissions-memory/README.md)
+uses opt-in Go probes, Python 3, Git and macOS `sandbox-exec`. Run
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/permissions-memory -count=1 -v`;
+exact-digest vendor opt-ins and fresh `.temp/` evidence roots are documented
+in its guide. `collect.py` publishes bounded synthetic observations. Complete
+Codex/Muse permissions and memory-off surfaces remain unqualified.
+
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.
 Vendor tests skip unless `CODEX_EXCL_BINARY` selects the exact build and
