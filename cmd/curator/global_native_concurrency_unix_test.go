@@ -25,7 +25,7 @@ import (
 
 // The wrapper forwards every real Git argument, output and status. It pauses
 // once after native publication, without changing a Git result or product state.
-func TestNativeGitBarrierProcess(t *testing.T) {
+func TestNativeGitBarrierProcess(_ *testing.T) {
 	if os.Getenv("CURATOR_NATIVE_GIT_HELPER") != "1" {
 		return
 	}
@@ -71,7 +71,7 @@ func TestNativeGitBarrierProcess(t *testing.T) {
 
 // Child entry restores only the parent's fixture Git mapping after TestMain's
 // ambient-config isolation, then invokes the production CLI without fake I/O.
-func TestNativeCommandProcess(t *testing.T) {
+func TestNativeCommandProcess(_ *testing.T) {
 	if os.Getenv("CURATOR_NATIVE_COMMAND_HELPER") != "1" {
 		return
 	}

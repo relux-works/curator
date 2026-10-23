@@ -42,7 +42,7 @@ func TestGlobalProfilePrivateStaging(t *testing.T) {
 				}
 				_ = lock.Close()
 				project := manager.NewOperation(false)
-				defer project.Close()
+				defer func() { _ = project.Close() }()
 				if _, err := project.AcquireProjects(probe, GlobalRoot(e.home)); !errors.Is(err, context.DeadlineExceeded) {
 					t.Fatalf("private staging did not preserve project contention: %v", err)
 				}

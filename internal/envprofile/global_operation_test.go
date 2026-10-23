@@ -243,7 +243,7 @@ func TestGlobalProfileCompensationFailureType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	planted := errors.New("planted continuation failure")
 	path := filepath.Join(homes[envregistry.CodexCLI], envmarker.Name)
 	called := false
