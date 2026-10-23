@@ -356,10 +356,11 @@ for both cache orders, v1/v2 framing, and behavioral narrowing mutants. Run
 `go test ./internal/skillspec -run TestCapabilitiesNullRejectedFromV3`
 for schema-3-through-9 capability-object and purpose-statement validation.
 Run `go test ./internal/envprofile -run '^TestGlobalProfileCompensation' -count=1`
-for exact postimage, byte, mode, absence and no-follow compensation witnesses.
+for exact postimage, byte, mode, owner-identity, absence and no-follow compensation
+witnesses, including parent chmod and empty-directory preservation.
 Run `go test ./cmd/curator -run '^TestGlobalNativeOwnerCompensation' -count=1`
-for production restart, failed compensation, operator replacement and pending
-profile-lock recovery controls. Temporary logs belong under `.temp/`.
+for production restart, failed compensation, operator replacement, parent chmod
+and pending profile-lock recovery controls. Temporary logs belong under `.temp/`.
 Run `go test ./internal/envprofile -run 'Test(StrictAuditMemberCapabilityCacheIsolation|MigratedGlobalSkillNetworkCapabilities)'`
 for migration admission and cache isolation between skill, context and MCP
 members. Cache ruleset 4 separates these verdicts from rulesets 2 and 3 without

@@ -47,8 +47,13 @@ and parent directory modes. An in-place `environment_surface_unmanaged_conflict`
 retains the extended lock and its install record under environments §9.4
 so first-use `profile sync --takeover` can recover, while restoring the other
 mutable profile state. Compensation checks recorded postimages before changing
-any target and again before each restoration. An operator replacement is
-preserved and reported as a conflict. Failed compensation stops automatic
+any target and again before each restoration. Parent directory modes and owner
+identities are checkpointed at publication too: a later operator chmod or owner
+change is preserved and reported as a conflict, including an empty directory
+created by the operation. File modes, owner identities and symlink targets also
+participate in postimage comparisons. Parent rollback finishes before profile
+recovery records revert. An operator replacement is preserved and reported as a
+conflict. Failed compensation stops automatic
 generation restarts and retains the extended profile lock and install record;
 resolve the conflicting or unwritable path, then explicitly actualize the
 pending lock with `profile sync --takeover` and retry the global operation.

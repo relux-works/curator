@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/relux-works/curator/internal/envmarker"
@@ -17,9 +18,15 @@ import (
 )
 
 // Compensation restores bytes, modes, link text, removed backup trees and
-// absence. It never follows a captured symlink into its unrelated target.
+// absence without tightening an unchanged ancestor. It never follows a captured
+// symlink into its unrelated target.
 func TestGlobalProfileCompensationImages(t *testing.T) {
 	root := t.TempDir()
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(root, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
 	foreign := filepath.Join(t.TempDir(), "sentinel")
 	if err := os.WriteFile(foreign, []byte("foreign bytes"), 0600); err != nil {
 		t.Fatal(err)
@@ -63,6 +70,11 @@ func TestGlobalProfileCompensationImages(t *testing.T) {
 	}
 	if !reflect.DeepEqual(before, after) {
 		t.Fatal("compensation did not restore exact surface image")
+	}
+	if runtime.GOOS != "windows" {
+		if info, err := os.Lstat(root); err != nil || info.Mode().Perm() != 0755 {
+			t.Fatalf("tree restoration tightened its ancestor: %v", err)
+		}
 	}
 	if _, err := os.Lstat(filepath.Join(root, "new")); !os.IsNotExist(err) {
 		t.Fatalf("compensation retained new parent: %v", err)
@@ -287,15 +299,16 @@ func TestGlobalProfileCompensationNestedNativeHome(t *testing.T) {
 			if err := os.WriteFile(record, []byte("pending lock"), 0600); err != nil {
 				t.Fatal(err)
 			}
-			if err := op.recordPostimages(native, record); err != nil {
-				t.Fatal(err)
-			}
 			if !writable {
 				if err := os.Chmod(parent, 0500); err != nil {
 					t.Fatal(err)
 				}
 				t.Cleanup(func() { _ = os.Chmod(parent, 0700) })
 			}
+			if err := op.recordPostimages(native, record); err != nil {
+				t.Fatal(err)
+			}
+
 			err := op.undo.restore()
 			if writable {
 				if err != nil {
@@ -316,5 +329,344 @@ func TestGlobalProfileCompensationNestedNativeHome(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Existing parent modes restore only from the published mode; operator modes
+// refuse before a captured leaf changes. Created parents use the same guard before
+// removal; an unchanged created parent disappears on successful compensation.
+func TestGlobalProfileCompensationParentModes(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix permission bits are the tested metadata")
+	}
+	for _, created := range []bool{false, true} {
+		for _, changed := range []bool{false, true} {
+			t.Run(fmt.Sprintf("created=%v/changed=%v", created, changed), func(t *testing.T) {
+				root := t.TempDir()
+				parent := filepath.Join(root, "parent")
+				leaf := filepath.Join(parent, "entry")
+				if !created {
+					if err := os.Mkdir(parent, 0755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.Chmod(parent, 0755); err != nil {
+						t.Fatal(err)
+					}
+				}
+				op := &operation{undo: &globalUndo{entries: map[string]*globalImage{}}}
+				if err := op.capture(leaf); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.MkdirAll(parent, 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Chmod(parent, 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(leaf, []byte("publication"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				if err := op.recordPostimages(leaf); err != nil {
+					t.Fatal(err)
+				}
+				if changed {
+					if err := os.Chmod(parent, 0750); err != nil {
+						t.Fatal(err)
+					}
+				}
+				err := op.undo.restore()
+				if changed {
+					if !errors.Is(err, transaction.ErrImplementationCorruption) {
+						t.Fatalf("operator parent mode admitted: %v", err)
+					}
+					if info, err := os.Lstat(parent); err != nil || info.Mode().Perm() != 0750 {
+						t.Fatalf("operator parent mode changed: %v %v", info, err)
+					}
+					if data, err := os.ReadFile(leaf); err != nil || string(data) != "publication" {
+						t.Fatalf("parent conflict partially restored leaf: %q %v", data, err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := os.Lstat(leaf); !os.IsNotExist(err) {
+					t.Fatalf("exact rollback retained leaf: %v", err)
+				}
+				if created {
+					if _, err := os.Lstat(parent); !os.IsNotExist(err) {
+						t.Fatalf("exact rollback retained created parent: %v", err)
+					}
+				} else if info, err := os.Lstat(parent); err != nil || info.Mode().Perm() != 0755 {
+					t.Fatalf("exact rollback lost original parent mode: %v %v", info, err)
+				}
+			})
+		}
+	}
+}
+
+// Mode-only and symlink-target-only changes are foreign postimages even when
+// file bytes are unchanged. Owner mismatch cases exercise the recorded identity
+// comparison with synthetic prior owners; they do not require a privileged
+// chown. The capture control checks the real UID on Unix and nonempty SID on
+// Windows. Unchanged neighbors restore the original bytes/mode or absence.
+func TestGlobalProfileCompensationMetadata(t *testing.T) {
+	for _, kind := range []string{"existing-file-mode", "created-file-mode", "symlink-target", "owner", "parent-owner", "owner-capture"} {
+		for _, changed := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/changed=%v", kind, changed), func(t *testing.T) {
+				if runtime.GOOS == "windows" && strings.Contains(kind, "file-mode") {
+					t.Skip("Unix permission bits are the tested metadata")
+				}
+				root := t.TempDir()
+				path := filepath.Join(root, "entry")
+				op := &operation{undo: &globalUndo{entries: map[string]*globalImage{}}}
+				if kind == "existing-file-mode" {
+					if err := os.WriteFile(path, []byte("original"), 0644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if err := op.capture(path); err != nil {
+					t.Fatal(err)
+				}
+				if kind == "symlink-target" {
+					if err := os.Symlink("published-target", path); err != nil {
+						t.Fatal(err)
+					}
+				} else if err := os.WriteFile(path, []byte("published"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				if err := op.recordPostimages(path); err != nil {
+					t.Fatal(err)
+				}
+				if kind == "owner-capture" {
+					image := op.undo.postimages[path]
+					if image.owner == "" || (runtime.GOOS != "windows" && string(image.owner) != fmt.Sprintf("uid:%d", os.Geteuid())) {
+						t.Fatal("image owner not captured")
+					}
+				}
+				if changed {
+					switch kind {
+					case "existing-file-mode", "created-file-mode":
+						if err := os.Chmod(path, 0640); err != nil {
+							t.Fatal(err)
+						}
+					case "symlink-target":
+						if err := os.Remove(path); err != nil {
+							t.Fatal(err)
+						}
+						if err := os.Symlink("operator-target", path); err != nil {
+							t.Fatal(err)
+						}
+					case "owner":
+						op.undo.postimages[path].owner += "-different-recorded-owner"
+					case "parent-owner":
+						op.undo.parentPostimages[root].owner += "-different-recorded-owner"
+					}
+				}
+				before, err := readGlobalImage(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				err = op.undo.restore()
+				if changed && kind != "owner-capture" {
+					if !errors.Is(err, transaction.ErrImplementationCorruption) {
+						t.Fatalf("foreign metadata admitted: %v", err)
+					}
+					after, err := readGlobalImage(path)
+					if err != nil || !reflect.DeepEqual(before, after) {
+						t.Fatalf("foreign metadata changed: %v", err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if kind == "existing-file-mode" {
+					data, err := os.ReadFile(path)
+					if err != nil || string(data) != "original" {
+						t.Fatalf("original bytes lost: %q %v", data, err)
+					}
+					if info, err := os.Lstat(path); err != nil || info.Mode().Perm() != 0644 {
+						t.Fatalf("original mode lost: %v", err)
+					}
+				} else if _, err := os.Lstat(path); !os.IsNotExist(err) {
+					t.Fatalf("unchanged metadata blocked removal: %v", err)
+				}
+			})
+		}
+	}
+}
+
+// An empty created parent is removed only at its published mode. A mode-only
+// operator change is retained even when every captured leaf is already absent.
+func TestGlobalProfileCompensationCreatedEmptyParentMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix permission bits are the tested metadata")
+	}
+	for _, changed := range []bool{false, true} {
+		t.Run(fmt.Sprintf("changed=%v", changed), func(t *testing.T) {
+			parent := filepath.Join(t.TempDir(), "created")
+			leaf := filepath.Join(parent, "absent")
+			op := &operation{undo: &globalUndo{entries: map[string]*globalImage{}}}
+			if err := op.capture(leaf); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Mkdir(parent, 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := op.recordPostimages(leaf); err != nil {
+				t.Fatal(err)
+			}
+			if changed {
+				if err := os.Chmod(parent, 0750); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err := op.undo.restore()
+			if changed {
+				if !errors.Is(err, transaction.ErrImplementationCorruption) {
+					t.Fatalf("changed empty parent admitted: %v", err)
+				}
+				if info, err := os.Lstat(parent); err != nil || info.Mode().Perm() != 0750 {
+					t.Fatalf("changed empty parent removed or chmodded: %v", err)
+				}
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := os.Lstat(parent); !os.IsNotExist(err) {
+					t.Fatalf("unchanged empty parent retained: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// Checking immediately before parent chmod rejects a change after preflight,
+// including an operator's return to the preimage. An unchanged publication
+// restores sticky and ordinary bits exactly.
+func TestGlobalProfileCompensationLateParentMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix special permission bits are the tested metadata")
+	}
+	for _, changed := range []bool{false, true} {
+		t.Run(fmt.Sprintf("changed=%v", changed), func(t *testing.T) {
+			root := t.TempDir()
+			parent := filepath.Join(root, "parent")
+			original := os.FileMode(0755) | os.ModeSticky
+			if err := os.Mkdir(parent, 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(parent, original); err != nil {
+				t.Fatal(err)
+			}
+			op := &operation{undo: &globalUndo{entries: map[string]*globalImage{}}}
+			leaf := filepath.Join(parent, "absent")
+			if err := op.capture(leaf); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(parent, 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := op.recordPostimages(leaf); err != nil {
+				t.Fatal(err)
+			}
+			if err := op.undo.checkParentPostimage(parent); err != nil {
+				t.Fatal(err)
+			}
+			if changed {
+				if err := os.Chmod(parent, original); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err := op.undo.restoreParents()
+			if changed {
+				if !errors.Is(err, transaction.ErrImplementationCorruption) {
+					t.Fatalf("late parent mode admitted: %v", err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if info, err := os.Lstat(parent); err != nil || (info.Mode().Perm() != 0755 || info.Mode()&os.ModeSticky == 0) {
+				t.Fatalf("parent special mode lost: %v", err)
+			}
+		})
+	}
+}
+
+// Directory-only metadata, as recorded for empty Muse runtime directories,
+// checkpoints at home publication even without a captured child. Unchanged
+// existing/created parents restore mode/absence; operator chmod preserves both
+// the parent and the published marker and returns the specific conflict.
+func TestGlobalProfileCompensationDirectoryOnlyParents(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix permission bits are the tested metadata")
+	}
+	for _, created := range []bool{false, true} {
+		for _, changed := range []bool{false, true} {
+			t.Run(fmt.Sprintf("created=%v/changed=%v", created, changed), func(t *testing.T) {
+				root := t.TempDir()
+				parent := filepath.Join(root, "cache")
+				marker := filepath.Join(root, envmarker.Name)
+				if !created {
+					if err := os.Mkdir(parent, 0755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.Chmod(parent, 0755); err != nil {
+						t.Fatal(err)
+					}
+				}
+				op := &operation{undo: &globalUndo{entries: map[string]*globalImage{}}}
+				if err := op.capture(marker); err != nil {
+					t.Fatal(err)
+				}
+				if err := op.noteParents(filepath.Join(parent, ".directory-mode")); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.MkdirAll(parent, 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Chmod(parent, 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(marker, []byte("published marker"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				if err := op.recordHomePostimages(root); err != nil {
+					t.Fatal(err)
+				}
+				if changed {
+					if err := os.Chmod(parent, 0750); err != nil {
+						t.Fatal(err)
+					}
+				}
+				err := op.undo.restore()
+				if changed {
+					if !errors.Is(err, transaction.ErrImplementationCorruption) {
+						t.Fatalf("directory-only operator mode admitted: %v", err)
+					}
+					if info, err := os.Lstat(parent); err != nil || info.Mode().Perm() != 0750 {
+						t.Fatalf("directory-only operator mode changed: %v", err)
+					}
+					if data, err := os.ReadFile(marker); err != nil || string(data) != "published marker" {
+						t.Fatalf("directory-only conflict changed marker: %q %v", data, err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("directory-only rollback failed: %v", err)
+				}
+				if _, err := os.Lstat(marker); !os.IsNotExist(err) {
+					t.Fatalf("directory-only rollback retained marker: %v", err)
+				}
+				if created {
+					if _, err := os.Lstat(parent); !os.IsNotExist(err) {
+						t.Fatalf("directory-only rollback retained parent: %v", err)
+					}
+				} else if info, err := os.Lstat(parent); err != nil || info.Mode().Perm() != 0755 {
+					t.Fatalf("directory-only original mode lost: %v", err)
+				}
+			})
+		}
 	}
 }

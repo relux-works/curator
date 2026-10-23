@@ -188,3 +188,60 @@ func nativeCommandOutcome(t *testing.T, child *nativeCommand) (int, string) {
 		return -1, ""
 	}
 }
+
+// A real post-publication Git pause leaves room for an operator chmod. An
+// unchanged parent permits rollback and restart; a narrower operator mode must
+// survive, report a compensation conflict and retain the pending profile lock.
+// The unrelated file remains byte-exact in both cases.
+func TestGlobalNativeOwnerCompensationParentMode(t *testing.T) {
+	for _, changed := range []bool{false, true} {
+		t.Run(map[bool]string{false: "unchanged", true: "operator-chmod"}[changed], func(t *testing.T) {
+			fixture := setupNativeConcurrent(t, false)
+			parent := filepath.Join(fixture.home, ".codex", "skills")
+			if err := os.MkdirAll(parent, 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(parent, 0755); err != nil {
+				t.Fatal(err)
+			}
+			unrelated := filepath.Join(parent, "operator-note.txt")
+			writeFile(t, unrelated, "operator bytes\n")
+			child, release := pauseNativeProfilePublication(t, fixture)
+			info, err := os.Lstat(parent)
+			if err != nil || info.Mode().Perm() != 0755 {
+				t.Fatalf("parent publication did not retain the fixture mode: %v %v", info, err)
+			}
+			want := os.FileMode(0755)
+			if changed {
+				want = 0700
+				if err := os.Chmod(parent, want); err != nil {
+					t.Fatal(err)
+				}
+			}
+			writeFile(t, filepath.Join(fixture.home, ".curator", "global", "Skillfile.json"), `{"schema_version":1,"agents":["codex_cli","claude_code"],"skills":[]}`)
+			release()
+			code, output := nativeCommandOutcome(t, child)
+			info, err = os.Lstat(parent)
+			if err != nil || info.Mode().Perm() != want {
+				t.Fatalf("operator parent mode overwritten: want %o, got %v %v", want, info, err)
+			}
+			if data, err := os.ReadFile(unrelated); err != nil || string(data) != "operator bytes\n" {
+				t.Fatalf("unrelated operator file changed: %q %v", data, err)
+			}
+			if !changed {
+				if code != exitOK {
+					t.Fatalf("unchanged parent blocked compensation: %d %s", code, output)
+				}
+				requireNativeClosure(t, fixture, false)
+				requireNativeCanonical(t, fixture, false)
+				return
+			}
+			if code != exitFail || !strings.Contains(output, "global profile compensation failed") || !strings.Contains(output, "compensation parent postimage changed") {
+				t.Fatalf("operator parent change was not a reported conflict: %d %s", code, output)
+			}
+			requirePendingNativeSkill(t, fixture)
+			fixture.requireProfileOwner(t)
+			requireNativeCanonical(t, fixture, false)
+		})
+	}
+}
