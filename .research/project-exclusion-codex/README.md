@@ -117,3 +117,37 @@ app-server still loads at the next thread; its `disabled_tools` affects the
 actual catalog, and removing that restriction permits a synthetic call.
 Malformed/unknown candidate inputs refuse. This bounded stdio parser is an
 experimental fixture, not a complete native-config parser or launch authority.
+
+
+## Config-change fence candidate (r3)
+
+`config_fence_test.go` adds a bounded research preflight, not product admission
+or complete native config discovery. `TestConfigFenceAdmission` pairs unchanged
+thread/turn dispatch with late-server, disabled-tools, removed-server/file,
+added/changed other config, linked file/parent and invalid/unknown-key refusals.
+Each refusal is typed `project_config_changed`, requires relaunch and preserves
+the baseline and input bytes without dispatch. `TestConfigFenceIntake` pairs
+valid digests/dotted ceilings with invalid initial-input refusal.
+
+`TestAdapterConfigFenceReadGap` proves why this cannot certify Permissions.
+The unchanged native control calls the admitted MCP tool, and a quiescent late
+server refuses before dispatch. Relaunch enumerates the late server, disables
+it and still calls the admitted tool. On the original app-server, a deterministic
+edit after a successful check but before `thread/start` loads an unenumerated
+server. Its disabled-tools pair changes the actual catalog. Restoring original
+bytes makes the next preflight pass while the unrestricted loaded tool still
+returns its synthetic call marker. Every native thread start and the retained-state call pass the fence;
+no model turn, network or credentials are used. Status listing re-reads config,
+so the catalog is captured before restoration and the actual call follows it.
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE "$CURATOR_GO" test ./.research/project-exclusion-codex -count=1 -v -run '^TestConfigFence(Admission|Intake)$'
+# Set CODEX_EXCL_BINARY to the qualified frozen executable as above.
+CODEX_EXCL_RUN_ROOT="$PWD/.temp/project-exclusion-codex/fence-01" \
+  env -u GIT_DIR -u GIT_WORK_TREE "$CURATOR_GO" test ./.research/project-exclusion-codex -count=1 -v -run '^TestAdapterConfigFenceReadGap$'
+```
+
+Run through the authorized suite-slot wrapper. The adapter mutation lane adds
+skipped-fence, filenames-only, linked-parent and refusal-path plants. The
+production typed Permissions refusal remains; a preflight cannot atomically
+freeze an independent native reader or erase already loaded runtime state.
