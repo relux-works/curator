@@ -18,19 +18,31 @@ import (
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
+// Capability identifies the profile first-install ownership contract.
 const Capability = "profile-mcp-native-writer-v1"
+
+// AuthorityUnavailable reports an action requiring unavailable ownership authority.
 const AuthorityUnavailable = "mcp_native_writer_authority_unavailable"
+
+// Conflict reports a same-name foreign native entry.
 const Conflict = "mcp_native_entry_conflict"
+
+// Unreadable reports an untrusted or unreadable native surface.
 const Unreadable = "environment_surface_unreadable"
 
+// Digest returns the prefixed SHA-256 identity of the exact bytes.
 func Digest(data []byte) string {
 	sum := sha256.Sum256(data)
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
+
+// Key identifies one profile, environment and native path ownership ledger.
 func Key(profile, environment, path string) string {
 	data, _ := protocoljson.MarshalCanonical([]string{profile, environment, path})
 	return strings.TrimPrefix(Digest(data), "sha256:")
 }
+
+// Path returns the managed-home relative path for a supported native adapter.
 func Path(environment string) string {
 	switch environment {
 	case "claude_code":
@@ -41,6 +53,7 @@ func Path(environment string) string {
 	return ""
 }
 
+// Record binds one owned native entry to its approved and installed identities.
 type Record struct {
 	Name            string  `json:"name"`
 	Owner           string  `json:"owner"`
@@ -49,6 +62,8 @@ type Record struct {
 	PreimageSHA256  *string `json:"preimage_sha256"`
 	InstalledSHA256 string  `json:"installed_sha256"`
 }
+
+// Ownership is the canonical per-profile and per-environment ownership ledger.
 type Ownership struct {
 	SchemaVersion int      `json:"schema_version"`
 	Capability    string   `json:"capability"`
@@ -59,9 +74,12 @@ type Ownership struct {
 	Records       []Record `json:"records"`
 }
 
+// NewOwnership creates an empty ledger for a profile and native environment.
 func NewOwnership(profile, environment string) *Ownership {
 	return &Ownership{1, Capability, "profile", profile, environment, Path(environment), []Record{}}
 }
+
+// Bytes encodes the ledger using canonical protocol JSON.
 func (o *Ownership) Bytes() ([]byte, error) { return projectmcpCanonical(o) }
 func projectmcpCanonical(value any) ([]byte, error) {
 	b, e := json.Marshal(value)
@@ -81,7 +99,7 @@ func validDigest(value string) bool {
 		return false
 	}
 	for _, c := range value[7:] {
-		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 			return false
 		}
 	}
@@ -99,6 +117,8 @@ func closed(data []byte, names ...string) bool {
 	}
 	return true
 }
+
+// DecodeOwnership validates canonical bytes and their exact ownership binding.
 func DecodeOwnership(data []byte, profile, environment string) (*Ownership, error) {
 	bad := func() (*Ownership, error) { return nil, fmt.Errorf("%s: invalid protected MCP ownership", Unreadable) }
 	if protocoljson.RequireCanonical(data) != nil || !closed(data, "schema_version", "capability", "scope", "profile_id", "environment", "path", "records") {
@@ -382,16 +402,16 @@ func Add(environment string, data []byte, server contextmaterialize.MCPServer) (
 		for _, m := range root {
 			if m.name == "mcpServers" {
 				found = true
-				old, close, e := object(data, m.value)
+				old, closing, e := object(data, m.value)
 				if e != nil {
 					return nil, nil, e
 				}
 				if len(old) > 0 {
 					key = append([]byte(","), key...)
 				}
-				result = append(result, data[:close]...)
+				result = append(result, data[:closing]...)
 				result = append(result, key...)
-				result = append(result, data[close:]...)
+				result = append(result, data[closing:]...)
 				break
 			}
 		}
@@ -416,6 +436,8 @@ func Add(environment string, data []byte, server contextmaterialize.MCPServer) (
 	}
 	return result, span, nil
 }
+
+// Sort orders ownership records by server name.
 func Sort(o *Ownership) {
 	sort.Slice(o.Records, func(i, j int) bool { return o.Records[i].Name < o.Records[j].Name })
 }

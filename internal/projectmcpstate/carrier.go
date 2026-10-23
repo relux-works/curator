@@ -1,3 +1,4 @@
+// Package projectmcpstate validates passive stage-A MCP locks, plans and approvals.
 package projectmcpstate
 
 import (

@@ -14,7 +14,7 @@ import (
 func (c cli) cmdProfileMCP(cfg *config.Config, args []string) int {
 	usage := "curator: profile mcp <install|status|repair|restore|replace|remove|release> <profile> [--env <id,id>] [--scope profile] [--dry-run] [--takeover]"
 	if len(args) == 0 {
-		fmt.Fprintln(c.stderr, usage)
+		_, _ = fmt.Fprintln(c.stderr, usage)
 		return exitUsage
 	}
 	mode, operation := args[0], ""
@@ -24,7 +24,7 @@ func (c cli) cmdProfileMCP(cfg *config.Config, args []string) int {
 		operation = mode
 		mode = "repair"
 	default:
-		fmt.Fprintln(c.stderr, usage)
+		_, _ = fmt.Fprintln(c.stderr, usage)
 		return exitUsage
 	}
 	flags := c.newFlagSet("profile mcp")
@@ -34,7 +34,7 @@ func (c cli) cmdProfileMCP(cfg *config.Config, args []string) int {
 	takeover := flags.Bool("takeover", false, "request takeover (ownership-action authority is unavailable)")
 	positional, err := parseInterspersed(flags, args[1:])
 	if err != nil || len(positional) != 1 {
-		fmt.Fprintln(c.stderr, usage)
+		_, _ = fmt.Fprintln(c.stderr, usage)
 		return exitUsage
 	}
 	if *takeover {
@@ -47,12 +47,12 @@ func (c cli) cmdProfileMCP(cfg *config.Config, args []string) int {
 	result, err := envprofile.ProfileMCP(envprofile.ProfileMCPRequest{Home: cfg.Home(), Profile: positional[0], Scope: *scope, Mode: mode, Operation: operation, Environments: envs, DryRun: *dry, Config: cfg})
 	if result != nil {
 		if encodeErr := json.NewEncoder(c.stdout).Encode(result); encodeErr != nil {
-			fmt.Fprintln(c.stderr, "curator:", encodeErr)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", encodeErr)
 			return exitFail
 		}
 	}
 	if err != nil {
-		fmt.Fprintln(c.stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
 	return exitOK
