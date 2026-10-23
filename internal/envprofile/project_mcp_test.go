@@ -65,33 +65,33 @@ func TestProjectMCPCandidateGates(t *testing.T) {
 		code   string
 	}{
 		{"valid", nil, ""},
-		{"unpinned", func(m map[string]any, p *Policy, f map[string]string) {
+		{"unpinned", func(m map[string]any, _ *Policy, _ map[string]string) {
 			m["server"].(map[string]any)["args"] = []string{"tool"}
 		}, "mcp_declaration_invalid"},
-		{"secret", func(m map[string]any, p *Policy, f map[string]string) {
+		{"secret", func(m map[string]any, _ *Policy, _ map[string]string) {
 			m["server"].(map[string]any)["args"] = []string{"tool@1.0.0", "AKIA1234567890ABCDEF"}
 		}, "context-secret-material"},
-		{"unknown environment", func(m map[string]any, p *Policy, f map[string]string) {
+		{"unknown environment", func(m map[string]any, _ *Policy, _ map[string]string) {
 			m["server"].(map[string]any)["environments"] = []string{"codex"}
 		}, "mcp_declaration_invalid"},
-		{"wrong name", func(m map[string]any, p *Policy, f map[string]string) { m["name"] = "other" }, "mcp_declaration_invalid"},
-		{"version mismatch", func(m map[string]any, p *Policy, f map[string]string) { m["version"] = "2.0.0" }, "context_version_mismatch"},
-		{"missing signer", func(m map[string]any, p *Policy, f map[string]string) { p.RequireSourceSigners = true }, "context_source_signers_missing"},
-		{"unsigned", func(m map[string]any, p *Policy, f map[string]string) {
+		{"wrong name", func(m map[string]any, _ *Policy, _ map[string]string) { m["name"] = "other" }, "mcp_declaration_invalid"},
+		{"version mismatch", func(m map[string]any, _ *Policy, _ map[string]string) { m["version"] = "2.0.0" }, "context_version_mismatch"},
+		{"missing signer", func(_ map[string]any, p *Policy, _ map[string]string) { p.RequireSourceSigners = true }, "context_source_signers_missing"},
+		{"unsigned", func(_ map[string]any, p *Policy, _ map[string]string) {
 			p.SourceSigners = map[string][]contextresolve.Signer{"packages.example/tool": {}}
 		}, "context_source_unsigned"},
-		{"revoked", func(m map[string]any, p *Policy, f map[string]string) {
+		{"revoked", func(_ map[string]any, p *Policy, _ map[string]string) {
 			p.Revocations = []string{"source:packages.example/tool"}
 		}, "revoked"},
-		{"ceiling", func(m map[string]any, p *Policy, f map[string]string) {
+		{"ceiling", func(m map[string]any, _ *Policy, _ map[string]string) {
 			m["server"].(map[string]any)["env_names"] = []string{"SERVICE_TOKEN"}
 		}, "mcp_contribution_policy_refused"},
-		{"ceiling admitted", func(m map[string]any, p *Policy, f map[string]string) {
+		{"ceiling admitted", func(m map[string]any, p *Policy, _ map[string]string) {
 			m["server"].(map[string]any)["env_names"] = []string{"SERVICE_TOKEN"}
 			p.PassableEnvNames = []string{"SERVICE_TOKEN"}
 			p.PassableEnvNamesSet = true
 		}, ""},
-		{"strict audit", func(m map[string]any, p *Policy, f map[string]string) {
+		{"strict audit", func(_ map[string]any, _ *Policy, f map[string]string) {
 			f["README.md"] = "POST https://api.example.net/ingest\n"
 		}, "audit blocked"},
 	} {

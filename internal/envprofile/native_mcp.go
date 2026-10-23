@@ -47,6 +47,8 @@ type ProfileMCPRequest struct {
 	transactionOptions []transaction.Option
 	beforePublish      func()
 }
+
+// ProfileMCPRow reports one profile server and environment pair.
 type ProfileMCPRow struct {
 	Name        string  `json:"name"`
 	Environment string  `json:"environment"`
@@ -54,6 +56,8 @@ type ProfileMCPRow struct {
 	State       string  `json:"state"`
 	Code        string  `json:"code,omitempty"`
 }
+
+// ProfileMCPResult records first-install outcomes and read-only observations.
 type ProfileMCPResult struct {
 	Code             string          `json:"code,omitempty"`
 	Capability       string          `json:"capability"`
@@ -104,7 +108,7 @@ func nativeMCPExecutableMatches(path, want string) bool {
 	if err != nil {
 		return false
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	info, err := f.Stat()
 	if err != nil || !info.Mode().IsRegular() {
 		return false
@@ -346,7 +350,7 @@ func ProfileMCP(req ProfileMCPRequest) (result *ProfileMCPResult, resultErr erro
 		if e != nil {
 			return result, e
 		}
-		raw, e := os.ReadFile(filepath.Join(root, contextpkg.MCPManifestName))
+		raw, e := os.ReadFile(filepath.Join(root, contextpkg.MCPManifestName)) // #nosec G304 -- root is the verified package snapshot already checked by LoadNamedPackage.
 		if e != nil {
 			return result, e
 		}
@@ -671,7 +675,7 @@ func envfragmentMCPNames(names []string, policy Policy) bool {
 func stageMCPContextFiles(destination string, skill skillOf, writes map[string][]byte) error {
 	files := map[string][]byte{}
 	err := whitelist.WalkContext(skill.source, skill.includeScripts, skill.excludeRoots, func(path, posix string) error {
-		body, e := os.ReadFile(path)
+		body, e := os.ReadFile(path) // #nosec G304 -- path is selected by the validated context whitelist walk.
 		if e == nil {
 			files[posix] = body
 		}
@@ -767,7 +771,7 @@ func publishNativeMCP(op *operation, req ProfileMCPRequest, writes map[string][]
 		return nil
 	}
 	plan := transaction.Plan{TransactionID: newTransactionID(), ProjectIdentity: "profile-mcp-first-install", ReadInputs: frozen, BoundaryProof: &durable}
-	plan.BoundaryCheck = func(index int, path string) error {
+	plan.BoundaryCheck = func(_ int, path string) error {
 		if err := staging.RecheckOne(staging.Target{LivePath: path, Kind: staging.KindBytes}, snapshot, admitted); err != nil {
 			return err
 		}
@@ -783,7 +787,7 @@ func publishNativeMCP(op *operation, req ProfileMCPRequest, writes map[string][]
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(stage)
+	defer func() { _ = os.RemoveAll(stage) }()
 	paths := make([]string, 0, len(writes))
 	for path := range writes {
 		paths = append(paths, path)
@@ -885,7 +889,7 @@ func verifyNativeMCPSigner(manager *gitManager, member contextlock.Member, polic
 	}
 	for _, tag := range []string{"v" + member.Version, member.Version} {
 		for _, ref := range []string{"refs/tags/" + tag, "packed-refs"} {
-			output, err := exec.Command("git", "-C", manager.repoDir(member.Source), "rev-parse", "--path-format=absolute", "--git-path", ref).Output()
+			output, err := exec.Command("git", "-C", manager.repoDir(member.Source), "rev-parse", "--path-format=absolute", "--git-path", ref).Output() // #nosec G204 -- fixed Git argv inspects a validated member ref without a shell.
 			if err != nil {
 				return original
 			}

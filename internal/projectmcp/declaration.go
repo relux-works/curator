@@ -20,8 +20,11 @@ import (
 )
 
 const (
-	Capability        = "skillfile-mcp-stage-a-v1"
-	Invalid           = "mcp_declaration_invalid"
+	// Capability identifies the stage-A project MCP declaration contract.
+	Capability = "skillfile-mcp-stage-a-v1"
+	// Invalid reports an invalid MCP declaration.
+	Invalid = "mcp_declaration_invalid"
+	// InlineUnsupported reports an inline declaration without package approval authority.
 	InlineUnsupported = "mcp_inline_approval_unsupported"
 )
 

@@ -11,11 +11,11 @@ func cloneReadInputs(inputs map[string]string) map[string]string {
 	if inputs == nil {
 		return nil
 	}
-	copy := make(map[string]string, len(inputs))
+	cloned := make(map[string]string, len(inputs))
 	for path, digest := range inputs {
-		copy[path] = digest
+		cloned[path] = digest
 	}
-	return copy
+	return cloned
 }
 
 // Input bytes are checked even when the in-memory guard was lost at restart.
