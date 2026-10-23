@@ -737,7 +737,7 @@ func TestRegistrationCaseAlias(t *testing.T) {
 	alias := filepath.Join(filepath.Dir(f.root), strings.ToUpper(filepath.Base(f.root)))
 	a, err := os.Stat(alias)
 	if os.IsNotExist(err) {
-		t.Skip("case-sensitive filesystem")
+		t.Skip("test filesystem is case-sensitive")
 	}
 	if err != nil {
 		t.Fatal(err)

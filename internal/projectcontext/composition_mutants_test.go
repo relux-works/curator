@@ -20,7 +20,7 @@ func TestCompositionNarrowingMutants(t *testing.T) {
 		t.Skip("CIP filesystem binding supports macOS/Linux")
 	}
 	if os.Getenv("CURATOR_PROJECT_COMPOSITION_MUTANTS") != "1" {
-		t.Skip("explicit bounded mutation lane")
+		t.Skip("set CURATOR_PROJECT_COMPOSITION_MUTANTS=1 for the explicit bounded mutation lane")
 	}
 	cwd, err := os.Getwd()
 	if err != nil {

@@ -15,7 +15,7 @@ import (
 // Opt in explicitly; the ordinary suite keeps only production behavior tests.
 func TestAdmissionNarrowingMutants(t *testing.T) {
 	if os.Getenv("CURATOR_PROJECT_ADMISSION_MUTANTS") != "1" {
-		t.Skip("explicit bounded mutation lane")
+		t.Skip("set CURATOR_PROJECT_ADMISSION_MUTANTS=1 for the explicit bounded mutation lane")
 	}
 	cwd, err := os.Getwd()
 	if err != nil {

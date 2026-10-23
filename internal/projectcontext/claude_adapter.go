@@ -56,6 +56,7 @@ func claudeRefuse(code, detail string) error { return &ClaudeDiagnostic{Code: co
 // advertisement. Uncertified reloads keep the complete strict tuple closed.
 type ClaudeSurface = projectadapter.SurfaceName
 
+// Claude surface names distinguish startup controls from uncertified reloads.
 const (
 	ClaudeStartup      ClaudeSurface = "startup-sources"
 	ClaudeNestedRead   ClaudeSurface = "nested-read-instructions"
@@ -77,6 +78,7 @@ const (
 // candidate shared report shape; all status fields live in Certification.
 type ClaudeCertification struct{ projectadapter.Certification }
 
+// ClaudeCertificationReport reports the evidence gaps for an exact provider tuple.
 func ClaudeCertificationReport(version, platform, architecture string) ClaudeCertification {
 	r := ClaudeCertification{projectadapter.Certification{Environment: "claude_code", ProviderVersion: version, Platform: platform + "/" + architecture, Mode: projectadapter.Strict, Form: "managed-home", Certified: []ClaudeSurface{}, Refused: []projectadapter.Refusal{}}}
 	measured := []ClaudeSurface{ClaudeStartup, ClaudeNestedRead, ClaudeSkills, ClaudeMCP, ClaudePermissions, ClaudeSafeResume, ClaudeChild}
@@ -91,6 +93,8 @@ func ClaudeCertificationReport(version, platform, architecture string) ClaudeCer
 	}
 	return r
 }
+
+// RequireStrict refuses a tuple with any unqualified mandatory surface.
 func (r ClaudeCertification) RequireStrict() error {
 	// No complete tuple has native qualification in this release.
 	return claudeRefuse("project_context_unsupported", "Claude complete source-exclusion tuple is not certified")
@@ -194,7 +198,7 @@ func (a Authority) claudePlan(ctx context.Context, op *operation, ref, sha, owne
 	if err != nil {
 		return empty, claudeRefuse("project_context_unreadable", "composition unavailable")
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	b, _, err := read(root, sha+".json", MaxRecord)
 	if err != nil {
 		return empty, err
@@ -213,8 +217,10 @@ func (a Authority) claudePlan(ctx context.Context, op *operation, ref, sha, owne
 	return op.compose(ctx, req)
 }
 
+// ClaudeEntry identifies whether a launch starts a fresh or inherited session.
 type ClaudeEntry string
 
+// Claude entry forms distinguish fresh sessions from contaminated resume and fork history.
 const (
 	ClaudeFresh  ClaudeEntry = "fresh"
 	ClaudeResume ClaudeEntry = "resume"
@@ -304,7 +310,7 @@ func verifyClaudeReceipt(home string, receipt MaterializationReceipt) error {
 	if err != nil {
 		return claudeRefuse("project_context_unreadable", "Claude home unavailable")
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	for _, f := range receipt.Files {
 		b, _, e := read(root, f.Path, MaxFileBytes)
 		if e != nil {

@@ -18,7 +18,7 @@ import (
 // The flow never creates a launch fragment or claims native qualification.
 func TestProjectAdmissionCLIFlow(t *testing.T) {
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
-		t.Skip("CIP root identities support macOS/Linux")
+		t.Skip("CIP filesystem binding supports macOS/Linux")
 	}
 	root := t.TempDir()
 	home := filepath.Join(root, "manager")

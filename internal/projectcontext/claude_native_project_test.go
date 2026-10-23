@@ -273,9 +273,9 @@ func TestClaudeNativeFileSet(t *testing.T) {
 				receipt[0].Path = "../CLAUDE.md"
 			case "alias":
 				files["claude.md"] = files["CLAUDE.md"]
-				copy := receipt[0]
-				copy.Path = "claude.md"
-				receipt = append(receipt, copy)
+				changedReceipt := receipt[0]
+				changedReceipt.Path = "claude.md"
+				receipt = append(receipt, changedReceipt)
 			case "bound":
 				receipt[0].Size = MaxFileBytes + 1
 			}

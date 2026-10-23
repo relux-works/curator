@@ -24,7 +24,7 @@ import (
 func claudeFixture(t *testing.T, empty bool, withMCP bool) (fixture, ComposeRequest, CompositionPreview, string) {
 	t.Helper()
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
-		t.Skip("filesystem registration requires macOS/Linux")
+		t.Skip("CIP filesystem binding supports macOS/Linux")
 	}
 	base := t.TempDir()
 	home := filepath.Join(base, "manager")
@@ -175,7 +175,7 @@ func TestClaudeCompositionMaterialization(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			expected := projectDoc
+			var expected []byte
 			{
 				b, err := os.ReadFile(filepath.Join(f.store.Home, "profiles/base/lock.json"))
 				if err != nil {
@@ -233,7 +233,7 @@ func TestClaudeCompositionMaterialization(t *testing.T) {
 			}
 			if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
 				lock := compositionLock(t, f.store.Home)
-				defer lock.Close()
+				defer func() { _ = lock.Close() }()
 				contribution, err := a.ClaudeLaunch(context.Background(), lock.Held(), p.Ref, p.SHA256, owner, ClaudeFresh)
 				if err != nil {
 					t.Fatal(err)
@@ -276,7 +276,7 @@ func TestClaudeManagerControls(t *testing.T) {
 		a, pub := publishClaudeFixture(t, f, req, granted, owner)
 		lock := compositionLock(t, f.store.Home)
 		contribution, e := a.ClaudeLaunch(context.Background(), lock.Held(), granted.Ref, granted.SHA256, owner, ClaudeFresh)
-		lock.Close()
+		_ = lock.Close()
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -344,7 +344,7 @@ func TestClaudeReceiptAndPublicationRefusals(t *testing.T) {
 			required(t, verifyClaudeReceipt(pub.home, p.Receipt), "project_context_drift")
 			if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
 				lock := compositionLock(t, f.store.Home)
-				defer lock.Close()
+				defer func() { _ = lock.Close() }()
 				launch, err := a.ClaudeLaunch(context.Background(), lock.Held(), p.Ref, p.SHA256, owner, ClaudeFresh)
 				required(t, err, "project_context_drift")
 				if launch.Args != nil {
@@ -504,7 +504,7 @@ func TestClaudeAdditiveSystemChannel(t *testing.T) {
 	a, pub := publishClaudeFixture(t, f, req, p, owner)
 	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
 		lock := compositionLock(t, f.store.Home)
-		defer lock.Close()
+		defer func() { _ = lock.Close() }()
 		c, err := a.ClaudeLaunch(context.Background(), lock.Held(), p.Ref, p.SHA256, owner, ClaudeFresh)
 		if err != nil {
 			t.Fatal(err)

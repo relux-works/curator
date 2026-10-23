@@ -2,8 +2,8 @@
 // compositions. Offline output does not certify a provider or authorize launch.
 package projectadapter
 
-// Integration candidate: reconcile this file with the Claude/Codex adapter
-// owners before integrating. Surface mirrors the I-LEASE receipt exactly;
+// Surface mirrors the I-LEASE receipt exactly. Integration must reconcile
+// this contract with the Claude/Codex adapter owners;
 // this package does not own lease state or acquire a second manager lock.
 type Surface struct {
 	SHA256 string `json:"sha256"`
@@ -11,8 +11,10 @@ type Surface struct {
 	Mode   uint32 `json:"mode"`
 }
 
+// SurfaceName identifies a provider surface in a certification report.
 type SurfaceName string
 
+// Surface names cover the manager-controlled outputs and launch constraints.
 const (
 	Context               SurfaceName = "context"
 	Skills                SurfaceName = "skills"
@@ -24,11 +26,13 @@ const (
 	LaunchForm            SurfaceName = "launch-form"
 )
 
+// Refusal records an unqualified surface and its reason.
 type Refusal struct {
 	Surface SurfaceName
 	Reason  string
 }
 
+// Certification reports qualified and refused surfaces for an exact provider tuple.
 type Certification struct {
 	Environment, ProviderVersion, Platform, Mode string
 	Form, Notice                                 string
@@ -43,11 +47,13 @@ type LaunchContribution struct {
 	Args []string
 }
 
+// Unsupported is a typed refusal for an unsupported project contribution.
 type Unsupported struct {
 	Surface SurfaceName
 	Reason  string
 }
 
+// Code returns the diagnostic family for the refused surface.
 func (e *Unsupported) Code() string {
 	if e.Surface == MCP {
 		return "mcp_contribution_policy_refused"

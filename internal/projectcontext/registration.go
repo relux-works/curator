@@ -366,7 +366,7 @@ func (s Store) Rebind(id, root string) (result Registration, resultErr error) {
 	return op.register(old.Name, b, p, old.Record.Environment, old.Record.Mode)
 }
 
-// Locate proves the real launch CWD belongs to the most specific registered
+// Locate proves the resolved launch CWD belongs to the most specific registered
 // root. A stale nested binding refuses instead of falling back to its parent.
 func (s Store) Locate(cwd string) (result Registration, resultErr error) {
 	defer func() { resultErr = projectError(resultErr) }()

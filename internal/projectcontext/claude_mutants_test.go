@@ -14,7 +14,7 @@ import (
 // setup or compilation. Production witnesses run separately without mutations.
 func TestClaudeNarrowingMutants(t *testing.T) {
 	if os.Getenv("CURATOR_PROJECT_CLAUDE_MUTANTS") != "1" {
-		t.Skip("explicit bounded mutation lane")
+		t.Skip("set CURATOR_PROJECT_CLAUDE_MUTANTS=1 for the explicit bounded mutation lane")
 	}
 	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
 		t.Skip("native contribution witnesses require measured host tuple")
