@@ -145,14 +145,18 @@ func TestGCSweepBoundariesRetainOwnership(t *testing.T) {
 				if err = os.WriteFile(filepath.Join(path, "witness"), []byte("keep until acquisition verified"), 0600); err != nil {
 					t.Fatal(err)
 				}
-				checks := 0
+				injected := false
 				check := func() error {
-					checks++
-					// First check admits inventory; the second is the destructive boundary.
-					if replace && checks == 2 {
-						replaceGCLock(t, home)
+					err := witness.Validate(home)
+					// Lose ownership immediately after the first successful
+					// observation, independently of any later deletion gate.
+					if !injected {
+						injected = true
+						if replace {
+							replaceGCLock(t, home)
+						}
 					}
-					return witness.Validate(home)
+					return err
 				}
 				var removed []string
 				if boundary == "runtime" {
@@ -240,13 +244,17 @@ func TestGCPruningRetainsOwnership(t *testing.T) {
 			}
 			defer lock.Close()
 			witness := lock.Held()
-			calls := 0
+			injected := false
 			check := func() error {
-				calls++
-				if replace && calls == 2 {
-					replaceGCLock(t, home)
+				err := witness.Validate(home)
+				// The loss occurs even if the later write gate is removed.
+				if !injected {
+					injected = true
+					if replace {
+						replaceGCLock(t, home)
+					}
 				}
-				return witness.Validate(home)
+				return err
 			}
 			err = pruneConsumersChecked(home, marks{}, check)
 			after, readErr := os.ReadFile(path)
