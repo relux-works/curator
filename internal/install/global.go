@@ -1,6 +1,7 @@
 package install
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -55,6 +56,20 @@ func Global(cfg *config.Config, userHome string, opts Options) Result {
 	defer func() { _ = locks.Close() }()
 	if err := recoverJournals(ctx, commit); err != nil {
 		return failedResult("global", GlobalRoot(cfg.Home()), err)
+	}
+	if opts.WithGlobalProfile != nil {
+		lock, err := commit.Locks.AcquireHome(ctx)
+		if err != nil {
+			return failedResult("global", GlobalRoot(cfg.Home()), err)
+		}
+		defer func() { _ = lock.Close() }()
+		if err := commit.Journal.Recover(lock); err != nil {
+			return failedResult("global", GlobalRoot(cfg.Home()), err)
+		}
+		commit.Locks = globalHeldLocks{LockBroker: commit.Locks, home: lock}
+		return opts.WithGlobalProfile(lock, func() Result {
+			return runWithRestarts("global", commit, func() (Result, *restartError) { return globalAttempt(cfg, userHome, opts, commit) })
+		})
 	}
 	return runWithRestarts("global", commit, func() (Result, *restartError) {
 		return globalAttempt(cfg, userHome, opts, commit)
@@ -588,4 +603,27 @@ func GlobalInit(home string) (string, error) {
 		return "", err
 	}
 	return manifest.EnsureEmpty(root)
+}
+
+// globalHeldLocks borrows a lock owned by the enclosing paired publication.
+// Project locks were already acquired before that home lock; inner recovery
+// and commit may assert it but cannot release it between the two publishers.
+type globalHeldLocks struct {
+	LockBroker
+	home HomeLock
+}
+
+func (locks globalHeldLocks) AcquireHome(_ context.Context) (HomeLock, error) {
+	return globalBorrowedHome{locks.home}, locks.home.AssertHeld()
+}
+
+type globalBorrowedHome struct{ HomeLock }
+
+func (globalBorrowedHome) Close() error { return nil }
+
+func (lock globalBorrowedHome) AssertCurrent() error {
+	if current, ok := lock.HomeLock.(interface{ AssertCurrent() error }); ok {
+		return current.AssertCurrent()
+	}
+	return fmt.Errorf("global operation requires current manager lock")
 }
