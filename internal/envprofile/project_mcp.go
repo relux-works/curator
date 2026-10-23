@@ -90,7 +90,7 @@ func ResolveProjectMCP(home string, decls map[string]projectmcp.Declaration, pol
 	if len(decls) == 0 {
 		return entries, nil, nil
 	}
-	manager := newGitManager(home).withPolicy(policy)
+	manager := newProjectMCPGitManager(home).withPolicy(policy)
 	manager.readOnlyAudit = true
 	requirements := []contextresolve.Requirement{}
 	for _, name := range projectmcp.Names(decls) {
@@ -142,7 +142,7 @@ func ResolveProjectMCP(home string, decls map[string]projectmcp.Declaration, pol
 		if err := pathboundary.ValidateWithin(contextstore.Root(home), store); err != nil {
 			return nil, nil, err
 		}
-		actual, expected, err := storeEntryPinHashes(home, contextlock.Member{Kind: member.Kind, Name: member.Name, Source: member.Source, Commit: member.Commit}, store, member.HashVersion)
+		actual, expected, err := projectMCPStorePinHashes(manager, contextlock.Member{Kind: member.Kind, Name: member.Name, Source: member.Source, Commit: member.Commit}, store, member.HashVersion)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -370,7 +370,7 @@ func replayProjectMCP(home, root, project, manifestHash string, decls map[string
 	if len(lock.Entries) != len(decls) {
 		return nil, nil, fmt.Errorf("source_lock_stale: MCP declaration membership differs")
 	}
-	manager := newGitManager(home).withPolicy(policy)
+	manager := newProjectMCPGitManager(home).withPolicy(policy)
 	manager.readOnlyAudit = true
 	warnings := []string{}
 	for _, entry := range lock.Entries {
@@ -404,7 +404,7 @@ func replayProjectMCP(home, root, project, manifestHash string, decls map[string
 		if err := pathboundary.ValidateWithin(contextstore.Root(home), store); err != nil {
 			return nil, nil, fmt.Errorf("source_snapshot_unavailable: MCP snapshot is unavailable: %w", err)
 		}
-		actual, expected, err := storeEntryPinHashes(home, contextlock.Member{Kind: member.Kind, Name: member.Name, Source: member.Source, Commit: member.Commit}, store, member.HashVersion)
+		actual, expected, err := projectMCPStorePinHashes(manager, contextlock.Member{Kind: member.Kind, Name: member.Name, Source: member.Source, Commit: member.Commit}, store, member.HashVersion)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -465,6 +465,9 @@ func replayMCPTag(decl projectmcp.Declaration, version string) string {
 type localMCPSource struct{ *gitManager }
 
 func (source localMCPSource) VerifyCandidate(kind, name, identity, tag, commit string, allowed []contextresolve.Signer) (contextresolve.CandidateSignatures, error) {
+	if _, err := source.checkedRepo(identity); err != nil {
+		return contextresolve.CandidateSignatures{}, err
+	}
 	if tag != "" {
 		out, err := exec.Command("git", "-C", source.repoDir(identity), "rev-parse", "--verify", "refs/tags/"+tag+"^{commit}").Output()
 		if err != nil || strings.TrimSpace(string(out)) != commit {
@@ -488,12 +491,12 @@ func validateMCPRoute(root, target string) error {
 	current := root
 	for _, part := range strings.Split(relative, string(os.PathSeparator)) {
 		next := filepath.Join(current, part)
-		_, err := os.Lstat(next)
-		if os.IsNotExist(err) {
-			break
-		}
+		metadata, err := stateread.Lstat(next)
 		if err != nil {
 			return err
+		}
+		if metadata.Kind == stateread.KindAbsent {
+			break
 		}
 		current = next
 	}
@@ -529,4 +532,18 @@ func restoreProjectMCPSnapshot(home string, manager *gitManager, member contextr
 	}
 	_, err = manager.ensureEntry(home, member)
 	return err
+}
+
+// Project MCP pins come from their source-bound object database, never the
+// legacy profile cache. The shared snapshot algorithm remains unchanged.
+func projectMCPStorePinHashes(manager *gitManager, member contextlock.Member, entry string, version hashing.Version) (string, string, error) {
+	repo, err := manager.checkedRepo(member.Source)
+	if err != nil {
+		return "", "", err
+	}
+	expected, format, err := gitops.PinnedCommitTree(repo, member.Commit)
+	if err != nil {
+		return "", "", fmt.Errorf("pinned commit object unavailable: %w", err)
+	}
+	return storeEntryHashesFromPin(member, entry, version, expected, format)
 }

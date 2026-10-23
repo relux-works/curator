@@ -63,6 +63,9 @@ func ParseHybridDecls(payload []byte, path string) ([]HybridDecl, error) {
 	if !ok {
 		return nil, fmt.Errorf("%s must contain a JSON object", path)
 	}
+	if obj["schema_version"] != float64(manifest.SchemaVersion) {
+		return nil, verr.New("schema_version", "unsupported hybrid Skillfile schema; this Skillfile requires a newer tool")
+	}
 	parsed, err := manifest.Parse(withoutHybridTargets(obj), path)
 	if err != nil {
 		return nil, err

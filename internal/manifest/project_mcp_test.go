@@ -27,6 +27,7 @@ func TestProjectMCPSchemaDispatch(t *testing.T) {
 func TestProjectMCPStrictJSON(t *testing.T) {
 	for _, text := range []string{
 		`{"schema_version":3.0,"skills":[]}`,
+		`{"schema_version":"3","skills":[],"mcp_servers":{}}`,
 		`{"schema_version":3,"skills":[],"mcp_servers":{"x":"https://safe.example/mcp","x":"https://other.example/mcp"}}`,
 		`{"schema_version":3,"skills":[],"mcp_servers":{"x":{"server":{"transport":"stdio","command":"tool","args":["\ud800"]}}}}`,
 		`{"schema_version":3,"skills":[],"mcp_servers":{"x":{"server":{"transport":"http","url":"https://safe.example/mcp"},"install":{"value":1.5}}}}`,

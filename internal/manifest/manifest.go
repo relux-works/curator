@@ -87,6 +87,24 @@ func ParseBytes(payload []byte, filePath string) (*Manifest, error) {
 
 		return nil, fmt.Errorf("malformed JSON in %s: %w", filePath, err)
 	}
+	// Dispatch with lexical numbers before legacy float conversion. In particular,
+	// an oversized ignored option must not leak through encoding/json's error.
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.UseNumber()
+	var precise map[string]any
+	decodeErr := decoder.Decode(&precise)
+	_, numericSchema := precise["schema_version"].(json.Number)
+	if decodeErr == nil && numericSchema && schema3Prefix(payload) {
+		if !boundedMCPNumbers(precise) {
+			return nil, &projectmcp.Error{Code: projectmcp.Invalid, Field: "Skillfile JSON scalars"}
+		}
+		if _, err := protocoljson.MarshalCanonical(precise); err != nil {
+			return nil, &projectmcp.Error{Code: projectmcp.Invalid, Field: "Skillfile JSON scalars"}
+		}
+		precise["schema_version"] = float64(3)
+		return Parse(precise, filePath)
+	}
+	// Retain the released schema-1/2 decoding and error behavior.
 	var raw any
 	if err := json.Unmarshal(payload, &raw); err != nil {
 		return nil, fmt.Errorf("malformed JSON in %s: %w", filePath, err)
@@ -94,19 +112,6 @@ func ParseBytes(payload []byte, filePath string) (*Manifest, error) {
 	obj, ok := raw.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("%s must contain a JSON object", filePath)
-	}
-	if obj["schema_version"] == float64(3) {
-		decoder := json.NewDecoder(bytes.NewReader(payload))
-		decoder.UseNumber()
-		var precise map[string]any
-		if err := decoder.Decode(&precise); err != nil {
-			return nil, &projectmcp.Error{Code: projectmcp.Invalid, Field: "Skillfile JSON"}
-		}
-		if _, err := protocoljson.MarshalCanonical(precise); err != nil {
-			return nil, &projectmcp.Error{Code: projectmcp.Invalid, Field: "Skillfile JSON scalars"}
-		}
-		precise["schema_version"] = float64(3)
-		obj = precise
 	}
 	return Parse(obj, filePath)
 }
@@ -488,4 +493,26 @@ func schema3Prefix(payload []byte) bool {
 		}
 	}
 	return false
+}
+
+// Reject oversized integer tokens before any numeric conversion. CCJ-1 then
+// checks shortest-form integer spelling and the narrower safe-integer range.
+func boundedMCPNumbers(value any) bool {
+	switch typed := value.(type) {
+	case json.Number:
+		return len(strings.TrimPrefix(string(typed), "-")) <= 16
+	case map[string]any:
+		for _, child := range typed {
+			if !boundedMCPNumbers(child) {
+				return false
+			}
+		}
+	case []any:
+		for _, child := range typed {
+			if !boundedMCPNumbers(child) {
+				return false
+			}
+		}
+	}
+	return true
 }
