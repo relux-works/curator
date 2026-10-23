@@ -361,5 +361,5 @@ func (s Store) Inspect(id string) (Inspection, error) {
 	if err := verifyBinding(r); err != nil {
 		return Inspection{}, err
 	}
-	return Inspection{r.Record, "off", "off", AppendAfterProfile, items}, nil
+	return inspectionStatus(r.Record, items), nil
 }

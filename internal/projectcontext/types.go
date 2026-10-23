@@ -157,6 +157,8 @@ type Discovery struct {
 type Inspection struct {
 	Registration Registration `json:"registration"`
 	Mode         string       `json:"mode"`
+	Admission    string       `json:"admission"`
+	Notice       string       `json:"notice,omitempty"`
 	Memory       string       `json:"memory"`
 	Rendering    string       `json:"rendering"`
 	Candidates   []Discovery  `json:"candidates"`

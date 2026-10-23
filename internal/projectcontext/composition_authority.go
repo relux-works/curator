@@ -80,9 +80,10 @@ func (a Authority) PublishComposition(ctx context.Context, req ComposeRequest, e
 	if err = a.bound(op, req.CheckoutID); err != nil {
 		return Composition{}, err
 	}
-	// Normalize the inherited mode before retaining request metadata: explicit
-	// and inherited requests for the same record must publish identical bytes.
+	// Retain only canonical request representations after admission: aliases for
+	// the same record must publish identical immutable metadata.
 	req.Mode = again.Preview.Record.Mode
+	req.Selections = canonicalCompositionSelections(req.Selections, op.state.Reviews[req.CheckoutID].Review)
 	envelope := compositionEnvelope{1, req, again.Preview, again.RuntimeEntries, again.BuildKeys}
 	b, err := canonical(envelope)
 	if err != nil {
@@ -258,4 +259,21 @@ func compositionOf(plan compositionPlan) Composition {
 		c.Generated[f.Path] = Surface{f.SHA256, f.Size, uint32(mode)}
 	}
 	return c
+}
+
+// canonicalCompositionSelections runs after admission has rejected duplicates,
+// unknown items and implicit omissions. Retain the approved review order and an
+// explicit empty list, without changing any enabled/disabled choice.
+func canonicalCompositionSelections(selections []Selection, review Review) []Selection {
+	selected := make(map[string]Selection, len(selections))
+	for _, selection := range selections {
+		selected[selection.ItemID] = selection
+	}
+	out := []Selection{}
+	for _, candidate := range review.Items {
+		if selection, ok := selected[candidate.Item.ID]; ok {
+			out = append(out, selection)
+		}
+	}
+	return out
 }

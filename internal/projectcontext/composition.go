@@ -552,11 +552,10 @@ func compositionCommands(skills map[string]compositionSkill) ([]CommandOwner, er
 				if c.UnixPath == "" {
 					return nil, fail("project_context_unsupported", "command has no applicable Unix artifact")
 				}
-				b, ok := s.files[c.UnixPath]
+				_, ok := s.files[c.UnixPath]
 				if !ok {
 					return nil, fail("project_context_drift", "command artifact missing")
 				}
-				artifact = digest(b)
 			}
 			owners[command] = CommandOwner{command, name, artifact}
 		}

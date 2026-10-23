@@ -58,7 +58,7 @@ func TestProjectAdmissionCLIFlow(t *testing.T) {
 		t.Fatal(err)
 	}
 	inspect := invoke("project", "inspect", r.CheckoutID)
-	if !strings.Contains(inspect, `"mode": "off"`) || !strings.Contains(inspect, `"memory": "off"`) {
+	if !strings.Contains(inspect, `"mode": "strict"`) || !strings.Contains(inspect, `"admission": "off"`) || !strings.Contains(inspect, `"memory": "off"`) {
 		t.Fatal(inspect)
 	}
 	var preview projectcontext.Preview
@@ -82,5 +82,73 @@ func TestProjectAdmissionCLIFlow(t *testing.T) {
 		if code := run(args, source, &out, &stderr); code == 0 {
 			t.Fatalf("forbidden syntax succeeded: %v", args)
 		}
+	}
+}
+
+// Claim: the public inspect dispatch reports the real strict/native source mode,
+// keeps admission off, and prints the exact native notice without claiming
+// strict isolation or mutating the selected profile lock.
+func TestProjectInspectionModes(t *testing.T) {
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+		t.Skip("CIP root identities support macOS/Linux")
+	}
+	for _, mode := range []string{"strict", "native-project"} {
+		t.Run(mode, func(t *testing.T) {
+			root := t.TempDir()
+			home := filepath.Join(root, "manager")
+			checkout := filepath.Join(root, "checkout")
+			if err := os.MkdirAll(checkout, 0700); err != nil {
+				t.Fatal(err)
+			}
+			runGit(t, checkout, "init")
+			runGit(t, checkout, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "Fixture")
+			lock := &contextlock.Lock{SchemaVersion: 4, HashVersion: 2, Precedence: contextlock.Precedence{Winner: "higher-weight", Placement: "winner-last"}, Root: "base", Members: []contextlock.Member{{Kind: "context", Name: "base", Version: "1.0.0", StateHash: strings.Repeat("1", 64), RequiredBy: []string{}}}}
+			b, err := lock.Canonical()
+			if err != nil {
+				t.Fatal(err)
+			}
+			p := filepath.Join(home, "profiles", "base")
+			if err = os.MkdirAll(p, 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err = os.WriteFile(filepath.Join(p, "lock.json"), b, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err = os.WriteFile(filepath.Join(checkout, "AGENTS.md"), []byte("Explicit project context.\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			source := stubConfigSource{path: filepath.Join(home, "config.json"), cfg: &config.Config{Path: filepath.Join(home, "config.json")}}
+			invoke := func(args ...string) string {
+				t.Helper()
+				var out, stderr strings.Builder
+				code := run(args, source, &out, &stderr)
+				if code != 0 {
+					t.Fatalf("%v = %d\n%s", args, code, stderr.String())
+				}
+				return out.String()
+			}
+
+			store := projectcontext.Store{Home: home}
+			r, err := store.RegisterMode("fixture", checkout, "base", "codex_cli", mode)
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw := invoke("project", "inspect", r.CheckoutID)
+			var fields map[string]any
+			if err := json.Unmarshal([]byte(raw), &fields); err != nil {
+				t.Fatal(err)
+			}
+			if fields["mode"] != mode || fields["admission"] != "off" || fields["memory"] != "off" {
+				t.Errorf("incorrect source/admission status: %s", raw)
+			}
+			notice := strings.Contains(raw, "project sources not isolated")
+			if notice != (mode == "native-project") || (mode == "native-project" && fields["notice"] != "project sources not isolated") {
+				t.Errorf("incorrect native isolation notice: %s", raw)
+			}
+			after, err := os.ReadFile(filepath.Join(p, "lock.json"))
+			if err != nil || string(after) != string(b) {
+				t.Fatal("inspection changed selected profile")
+			}
+		})
 	}
 }

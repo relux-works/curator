@@ -116,7 +116,7 @@ func TestExplicitPackageApprovalRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if report.Mode != "off" || report.Memory != "off" || len(report.Candidates) != 1 {
+	if report.Mode != "strict" || report.Admission != "off" || report.Memory != "off" || len(report.Candidates) != 1 {
 		t.Fatalf("inspect=%+v", report)
 	}
 	p, err := f.store.PackageInstruction(f.registration.CheckoutID, "guide", "AGENTS.md", true)
@@ -313,7 +313,7 @@ func TestDiscoveryIsInertAndMCPUnsupported(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(report.Candidates) != 4 || report.Mode != "off" || report.Memory != "off" {
+	if len(report.Candidates) != 4 || report.Mode != "strict" || report.Admission != "off" || report.Memory != "off" {
 		t.Fatalf("discovery=%+v", report)
 	}
 	for _, c := range report.Candidates {
