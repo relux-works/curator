@@ -96,7 +96,7 @@ func TestExactCaseManifests(t *testing.T) {
 			if kind == "skill" {
 				file = filepath.Join(source, "agent-skill.json")
 				write(t, file, skillManifest(`{}`, `{}`))
-				write(t, filepath.Join(source, "SKILL.md"), "# Skill\n")
+				write(t, filepath.Join(source, "SKILL.md"), validSkillDocument)
 			}
 			b, err := os.ReadFile(file)
 			if err != nil {
@@ -131,7 +131,7 @@ func TestSkillSemanticReview(t *testing.T) {
 	id := f.registration.CheckoutID
 	dir := filepath.Join(f.root, "skill")
 	write(t, filepath.Join(dir, "agent-skill.json"), skillManifest(`{"inspect-data":{"type":"system","command":"true"}}`, `{}`))
-	write(t, filepath.Join(dir, "SKILL.md"), "# Inspect retained instructions\n")
+	write(t, filepath.Join(dir, "SKILL.md"), validSkillDocument+"Inspect retained instructions\n")
 	d := declaration("review", "skill", false)
 	d.Items[0].Type = "skill"
 	p, err := f.store.Preview(id, d)
@@ -177,7 +177,8 @@ func TestSkillSemanticReview(t *testing.T) {
 }
 
 // Claim R4: execute-only roots cannot register or retain lookup authority;
-// readable/searchable roots register, and failed registration writes nothing.
+// readable/searchable roots register. Observed loss retains a protected lapse;
+// failed new registration cannot grant authority.
 func TestExecuteOnlyRootRefuses(t *testing.T) {
 	f := newFixture(t)
 	id := f.registration.CheckoutID
@@ -194,8 +195,12 @@ func TestExecuteOnlyRootRefuses(t *testing.T) {
 	_, err = f.store.Register("another", f.root, "base", "claude_code")
 	required(t, err, "project_registration_mismatch")
 	after, _ := os.ReadFile(filepath.Join(f.store.Home, "project-context/state.json"))
-	if string(after) != string(before) {
-		t.Fatal("unreadable registration changed authority")
+	if string(after) == string(before) {
+		t.Fatal("observed unreadable root did not retain authority lapse")
+	}
+	var retained state
+	if err := decode(after, &retained); err != nil || !retained.Registrations[id].Lapsed {
+		t.Fatal("missing protected root-authority lapse", err)
 	}
 	if err = os.Chmod(f.root, 0700); err != nil {
 		t.Fatal(err)
@@ -229,7 +234,7 @@ func TestOptionalUnsupportedSkillClosures(t *testing.T) {
 				body = `{"schema_version":7,"commands":{"tool":{"type":"build","driver":"go-repository-v1","repository":"helper","target":"sample-tool"}},"capabilities":{"filesystem":"none"},"build_repositories":{"helper":{"git":"https://example.invalid/helper.git","locked_commit":{"object_format":"sha1","hex":"` + strings.Repeat("1", 40) + `"}}}}`
 			}
 			write(t, file, body)
-			write(t, filepath.Join(dir, "SKILL.md"), "# Skill\n")
+			write(t, filepath.Join(dir, "SKILL.md"), validSkillDocument)
 			d := declaration("review", "skill", false)
 			d.Items[0].Type = "skill"
 			_, err := f.store.Preview(id, d)
@@ -242,7 +247,7 @@ func TestOptionalUnsupportedSkillClosures(t *testing.T) {
 			if len(p.Review.Items) != 0 || len(p.Review.Omitted) != 1 || p.Review.Omitted[0].ItemID != "review" || p.Review.Omitted[0].Reason != "unsupported" || !hexRE.MatchString(p.Review.Omitted[0].SourceSHA256) {
 				t.Fatal("missing named unsupported omission", p)
 			}
-			write(t, filepath.Join(dir, "SKILL.md"), "# Changed\n")
+			write(t, filepath.Join(dir, "SKILL.md"), "---\nname: guide\ndescription: Changed fixture\n---\n# Changed\n")
 			changed, err := f.store.Preview(id, d)
 			if err != nil || changed.PackageSHA256 == p.PackageSHA256 {
 				t.Fatal("omission identity ignored content", err)

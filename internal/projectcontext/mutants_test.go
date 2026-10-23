@@ -24,7 +24,7 @@ func TestAdmissionNarrowingMutants(t *testing.T) {
 	cases := []struct{ name, file, test, old, new, witness string }{
 		{"root-only", "admission.go", "TestClosureSnapshotsRejectTamper", "for _, m := range lock.Members {", "for _, m := range lock.Members {\n if m.Name != lock.Root { continue }", "want project_context_drift"},
 		{"cross-checkout-hash", "admission.go", "TestSameHashOtherCheckoutRefuses", "a, ok := op.state.Approvals[id+\":\"+c.Item.ID]", "a, ok := op.state.Approvals[id+\":\"+c.Item.ID]\n if !ok { for _, other := range op.state.Approvals { if other.Record.ItemSHA256 == c.ItemSHA256 { a,ok=other,true; break } } }", "want project_item_unapproved"},
-		{"root-path-only", "registration.go", "TestRegistrationBindingAndNestedCWD", "identity(b) != r.Record.RootIdentity", "b.Repository.Root != r.Record.ProjectRoot", "want project_registration_mismatch"},
+		{"root-path-only", "registration.go", "TestRootReplacementBindingStillRequired", "identity(b) != r.Record.RootIdentity", "b.Repository.Root != r.Record.ProjectRoot", "replacement reused native root identity"},
 		{"reserved-packaging", "types.go", "TestClosedDeclarationReader", "if _, present := raw.Items[i][\"packaging\"]; present {", "if false {", "invalid request accepted"},
 		{"skill-activation-closure", "skill.go", "TestWholeSkillUnsupportedClosureRefuses", "if len(spec.Requirements) != 0 || len(spec.McpServers) != 0 || len(spec.BuildRepositories) != 0 {", "if false {", "unsupported closure was admitted"},
 		{"unknown-fields", "types.go", "TestClosedDeclarationReader", "if err := exactMembers(b, reflect.TypeOf(v)); err != nil {", "if err := exactMembers(b, reflect.TypeOf(v)); false && err != nil {", "invalid request accepted"},
@@ -39,6 +39,14 @@ func TestAdmissionNarrowingMutants(t *testing.T) {
 		{"root-controls", "registration.go", "TestRootPathGrammar", "if r < 0x20 || r == 0x7f {", "if false && (r < 0x20 || r == 0x7f) {", "want project_registration_mismatch"},
 		{"preview-baseline", "admission.go", "TestPreviewUsesApprovedBaseline", "if c, err := op.approvedCandidate(id, next.Item.ID); err != nil {", "candidate := func() (*Candidate,error) { for _, c := range op.state.Reviews[id].Review.Items { if c.Item.ID == next.Item.ID { return &c,nil } }; return nil,nil }; if c, err := candidate(); err != nil {", "preview lost approved file delta"},
 		{"canonical-diagnostics", "diagnostic.go", "TestCanonicalProjectDiagnostics", "if err == nil {", "if err != nil { return err }; if err == nil {", "want project_context_unreadable"},
+		{"root-lapse", "registration.go", "TestRootAuthorityRequiresExplicitRecovery", "slot.Lapsed = true", "slot.Lapsed = false", "restored root revived old authority"},
+		{"root-lapse-slots", "registration.go", "TestRootLapseSlotsAndShadow", "slot.Active && slot.Record.ProjectRoot == r.Record.ProjectRoot", "slot.Active && id == r.Record.CheckoutID", "sibling slot revived root authority"},
+		{"native-authentication", "context.go", "TestNativeAuthenticationNeverPublished", "if nativeAuthenticationPath(key) {", "if false && nativeAuthenticationPath(key) {", "native authentication candidate was published"},
+		{"native-authentication-alias", "context.go", "TestNativeAuthenticationNeverPublished", "nativeAuthenticationPath(key)", "nativeAuthenticationPath(e.Path)", "native authentication candidate was published"},
+		{"retained-native-authentication", "store.go", "TestRetainedNativeAuthenticationRefuses", "if err := validateInventory(c); err != nil {", "if err := validateInventory(c); false && err != nil {", "retained native authentication snapshot was read"},
+		{"skill-before-transition", "admission.go", "TestSkillTransitionSemantics", "prior != nil && prior.Item.Type == \"skill\"", "prior != nil && prior.Item.Type == \"skill\" && c.Item.Type == \"skill\"", "skill transition omitted semantic delta"},
+		{"skill-before-removal", "admission.go", "TestSkillTransitionSemantics", "change.Semantics = &SemanticChange{Before: before}", "change.Semantics = &SemanticChange{}; _ = before", "skill transition lost approved semantics"},
+		{"whole-skill-document", "skill.go", "TestWholeSkillDocumentShape", "_, spec, err := skillmanifest.ReadSkillPackage(snapshot)", "_, spec, err := skillmanifest.ReadSkillPackage(snapshot); if err != nil { spec, err = skillspec.Load(snapshot) }", "invalid whole-skill document was admitted"},
 		{"hardlink-read", "files.go", "TestHardlinkCandidateRefuses", " || !singleLink(before)", "", "want project_context_invalid"},
 	}
 	for _, tc := range cases {
@@ -80,7 +88,7 @@ func TestAdmissionNarrowingMutants(t *testing.T) {
 			if err := os.WriteFile(overlay, b, 0600); err != nil {
 				t.Fatal(err)
 			}
-			cmd := exec.Command("go", "test", "-overlay", overlay, "-count=1", "-run", "^"+tc.test+"$", ".")
+			cmd := exec.Command("env", "-u", "GIT_DIR", "-u", "GIT_WORK_TREE", "go", "test", "-overlay", overlay, "-count=1", "-run", "^"+tc.test+"$", ".")
 			cmd.Dir = cwd
 			for _, e := range os.Environ() {
 				if !strings.HasPrefix(e, "GIT_DIR=") && !strings.HasPrefix(e, "GIT_WORK_TREE=") {
