@@ -51,3 +51,11 @@ Tests run only against temporary homes. Run the behavioral and mutation controls
 with `go test ./internal/envprofile ./cmd/curator -run '^TestNativeSkills' -count=1`.
 Build with `go build -o .temp/curator ./cmd/curator`. Gate commands and evidence
 locations are documented in [ci-gates.md](ci-gates.md).
+
+`global remove` holds the same canonical global operation lock as install and
+add while it reads and writes the declaration. Removal waits for an in-flight
+paired installation to hand off; an installation waits for in-flight removal
+before resolving its profile. Removal still edits declarations only: the next
+install reconciles the installed surfaces, preserving skills required by a
+live profile. This prevents a successful paired install from combining a
+pre-removal profile closure with a post-removal legacy closure.

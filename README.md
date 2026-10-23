@@ -190,6 +190,9 @@ curator global update   # update global source repositories
 curator global upgrade  # upgrade global skill packages
 ```
 
+Global removal serializes with install/add across profile and legacy publication.
+It edits the declaration; the next install reconciles installed surfaces.
+
 </details>
 
 <details>
