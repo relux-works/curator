@@ -2380,7 +2380,7 @@ func collectUnderLock(home string, lock *managerlock.HomeLock, policy envprofile
 	if err != nil {
 		return scopes.MaintenanceResult{}, fmt.Errorf("open the install transaction journal: %w", err)
 	}
-	if err := engine.Recover(lock); err != nil {
+	if _, err := projectlease.RecoverUnderLock(home, lock, engine); err != nil {
 		return scopes.MaintenanceResult{}, fmt.Errorf("recover incomplete install transactions: %w", err)
 	}
 	journalKeys, err := engine.ReferencedBuildKeys(lock)

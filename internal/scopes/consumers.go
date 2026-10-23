@@ -52,19 +52,30 @@ func RecordConsumer(home, projectRoot string) error {
 
 // ReplaceConsumers rewrites the registry (used by GC pruning).
 func ReplaceConsumers(home string, consumers []string) error {
+	return replaceConsumersChecked(home, consumers, func() error { return nil })
+}
+
+func replaceConsumersChecked(home string, consumers []string, check func() error) error {
 	set := map[string]bool{}
 	for _, entry := range consumers {
 		set[entry] = true
 	}
-	return writeConsumers(home, set)
+	return writeConsumersChecked(home, set, check)
 }
 
 func writeConsumers(home string, set map[string]bool) error {
+	return writeConsumersChecked(home, set, func() error { return nil })
+}
+
+func writeConsumersChecked(home string, set map[string]bool, check func() error) error {
 	payload, err := ConsumersPayload(set)
 	if err != nil {
 		return err
 	}
 	if err := os.MkdirAll(home, 0o755); err != nil {
+		return err
+	}
+	if err := check(); err != nil {
 		return err
 	}
 	return os.WriteFile(filepath.Join(home, ConsumersName), payload, 0o644)

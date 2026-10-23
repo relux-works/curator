@@ -17,7 +17,7 @@ import (
 )
 
 // The actual GC recovery entry point applies the project-lease commit policy:
-// intact prepared intent commits and pins runtime; missing runtime rolls back
+// intact prepared intent becomes unknown and pins runtime; missing runtime rolls back
 // the admission before GC and creates neither its ledger nor its binding.
 // These are isolated synthetic protected journal records, not input admission.
 func TestGCRecoversProjectLeaseArtifacts(t *testing.T) {
@@ -87,6 +87,17 @@ func TestGCRecoversProjectLeaseArtifacts(t *testing.T) {
 			if present {
 				if err != nil {
 					t.Fatal("GC refused intact prepared lease", err)
+				}
+				if err := lock.Close(); err != nil {
+					t.Fatal(err)
+				}
+				m, err := projectlease.New(home, nil, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				statuses, err := m.Status(t.Context())
+				if err != nil || len(statuses) != 1 || statuses[0].State != projectlease.Unknown {
+					t.Fatalf("GC recovered lifecycle remained prepared: %v %v", statuses, err)
 				}
 				for _, path := range []string{ledger, binding, filepath.Join(home, "runtime", "tool", "next")} {
 					if _, err = os.Stat(path); err != nil {
