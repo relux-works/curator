@@ -284,6 +284,57 @@ assert 'a skip with an unrecognised reason fails'   1 run_gate "$S" env CI_GATE_
   ev skip internal/registry TestSomethingElse; } >"$S"
 assert 'a host-capability skip is recorded and allowed' 0 run_gate "$S" env CI_GATE_GOOS=windows
 
+# Claim: exact book tool-absence and Unix-only skips keep their declared
+# classes on each platform. Nearby undeclared reasons and removal of the one
+# accepting declaration fail for that skip; no broad unavailable-tool waiver.
+for book_goos in linux darwin windows; do
+  for book_kind in pandoc pandoc-pdf figure unix; do
+    case "$book_kind" in
+      pandoc|pandoc-pdf)
+        book_reason='pandoc unavailable'
+        [ "$book_kind" != pandoc-pdf ] || book_reason='pandoc unavailable; PDF toolchain check required separately'
+        book_pattern='^pandoc unavailable(; PDF toolchain check required separately)?$'
+        book_class='host-capability'
+        ;;
+      figure)
+        book_reason='book checker prerequisite unavailable: shasum'
+        book_pattern='^book checker prerequisite unavailable: (bash|grep|sed|sort|basename|awk|shasum|cut)$'
+        book_class='host-capability'
+        ;;
+      unix)
+        book_reason='book shell toolchain requires Unix paths'
+        book_pattern='^book shell toolchain requires Unix paths$'
+        book_class='platform-control'
+        ;;
+    esac
+    { ev pass internal/buildcache TestWindowsProtectedStateMatrix
+      ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
+      ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+      evout docs/book TestStatusMarkers "$book_reason"
+      ev skip docs/book TestStatusMarkers; } >"$S"
+    assert "declared book $book_kind skip passes on $book_goos" 0 \
+      run_gate "$S" env CI_GATE_GOOS="$book_goos"
+    assert_contains 'book skip records its class and allowed verdict' \
+      "$(printf '%s\tallowed-' "$book_class")" "$WORK/gate-ev/skips-observed.tsv"
+
+    awk -F'\t' -v pattern="$book_pattern" '$2 != pattern' "$CLASSES" >"$WORK/book-classes-minus.tsv"
+    assert "missing book $book_kind declaration refuses on $book_goos" 1 \
+      run_gate "$S" env CI_GATE_GOOS="$book_goos" CI_SKIP_CLASSES="$WORK/book-classes-minus.tsv"
+    assert_contains 'missing book declaration fails for the intended skip' \
+      'UNCLASSIFIED' "$WORK/gate-ev/skips-observed.tsv"
+
+    { ev pass internal/buildcache TestWindowsProtectedStateMatrix
+      ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
+      ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+      evout docs/book TestStatusMarkers "$book_reason unexpectedly"
+      ev skip docs/book TestStatusMarkers; } >"$S"
+    assert "nearby undeclared book $book_kind skip refuses on $book_goos" 1 \
+      run_gate "$S" env CI_GATE_GOOS="$book_goos"
+    assert_contains 'nearby book reason stays unclassified' \
+      'UNCLASSIFIED' "$WORK/gate-ev/skips-observed.tsv"
+  done
+done
+
 { ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
   evout internal/marker TestAuthoritativeThing 'CURATOR_CONFORMANCE_ROOT is not set'
   ev skip internal/marker TestAuthoritativeThing
