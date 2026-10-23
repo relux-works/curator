@@ -172,6 +172,63 @@ func verifyBinding(r registered) error {
 	}
 	return nil
 }
+
+// verifyRegistration retains observed loss of root authority independently of
+// the immutable registration record. Restoring the old inode or permissions
+// cannot revive approvals; only Rebind allocates new authority. Lapsed slots
+// remain active shadows so a parent registration cannot inherit their CWDs.
+func (op *operation) verifyRegistration(r registered) error {
+	if r.Lapsed {
+		return fail("project_registration_mismatch", "registration authority lapsed; explicitly rebind")
+	}
+	if err := verifyBinding(r); err != nil {
+		for id, slot := range op.state.Registrations {
+			if slot.Active && slot.Record.ProjectRoot == r.Record.ProjectRoot {
+				slot.Lapsed = true
+				op.state.Registrations[id] = slot
+			}
+		}
+		if saveErr := op.save(); saveErr != nil {
+			return fail("project_context_drift", "cannot retain root-authority lapse")
+		}
+		return err
+	}
+	return nil
+}
+
+// A missing CWD must not hide an observed missing registered root. Errors in
+// an unrelated child directory leave a still-verifiable root's authority alone.
+func (op *operation) observeUnavailableCWD(cwd string) error {
+	abs, err := filepath.Abs(cwd)
+	if err != nil {
+		return fail("project_registration_mismatch", "CWD cannot be resolved")
+	}
+	// Canonicalize the surviving ancestor even when the registered leaf has
+	// disappeared. A symlinked ancestor must not hide an observed root loss.
+	suffix := []string{}
+	for {
+		if real, err := filepath.EvalSymlinks(abs); err == nil {
+			abs = filepath.Join(append([]string{real}, suffix...)...)
+			break
+		}
+		parent := filepath.Dir(abs)
+		if parent == abs {
+			return fail("project_registration_mismatch", "CWD cannot be resolved")
+		}
+		suffix = append([]string{filepath.Base(abs)}, suffix...)
+		abs = parent
+	}
+	for _, id := range sortedRegistrationIDs(op.state) {
+		r := op.state.Registrations[id]
+		if r.Active && within(r.Record.ProjectRoot, abs) {
+			if err := op.verifyRegistration(r); err != nil {
+				return err
+			}
+		}
+	}
+	return fail("project_registration_mismatch", "CWD is unreadable or not a directory")
+}
+
 func profile(home, name string) (Profile, *contextlock.Lock, error) {
 	if !identifiers.Valid(name) {
 		return Profile{}, nil, fail("project_registration_mismatch", "invalid selected profile")
@@ -255,7 +312,7 @@ func (op *operation) register(name string, b binding, p Profile, env string) (Re
 	if current != p || !validPrecedence(op.precedence) || (l.Precedence.Winner != "" && l.Precedence != op.precedence) {
 		return Registration{}, fail("project_context_drift", "profile or manager precedence changed")
 	}
-	op.state.Registrations[id] = registered{r, name, b, true, op.precedence}
+	op.state.Registrations[id] = registered{Record: r, Name: name, Binding: b, Active: true, Precedence: op.precedence}
 	if err := verifyBinding(op.state.Registrations[id]); err != nil {
 		return Registration{}, err
 	}
@@ -310,19 +367,19 @@ func (s Store) Locate(cwd string) (result Registration, resultErr error) {
 // parent even when that deeper root has no slot for the requested environment.
 func (s Store) LocateFor(cwd, profileName, env string) (result Registration, resultErr error) {
 	defer func() { resultErr = projectError(resultErr) }()
-	canonical, err := filepath.EvalSymlinks(cwd)
-	if err != nil {
-		return Registration{}, fail("project_registration_mismatch", "CWD is unreadable")
-	}
-	st, err := os.Stat(canonical)
-	if err != nil || !st.IsDir() {
-		return Registration{}, fail("project_registration_mismatch", "CWD is not a directory")
-	}
 	op, err := s.begin(false)
 	if err != nil {
 		return Registration{}, err
 	}
 	defer op.close()
+	canonical, err := filepath.EvalSymlinks(cwd)
+	if err != nil {
+		return Registration{}, op.observeUnavailableCWD(cwd)
+	}
+	st, err := os.Stat(canonical)
+	if err != nil || !st.IsDir() {
+		return Registration{}, op.observeUnavailableCWD(cwd)
+	}
 	best := ""
 	matches := []registered{}
 	for _, id := range sortedRegistrationIDs(op.state) {
@@ -376,7 +433,7 @@ func (s Store) Inspect(id string) (result Inspection, resultErr error) {
 	if err != nil {
 		return Inspection{}, err
 	}
-	if err := verifyBinding(r); err != nil {
+	if err := op.verifyRegistration(r); err != nil {
 		return Inspection{}, err
 	}
 	return Inspection{r.Record, "off", "off", AppendAfterProfile, items}, nil
