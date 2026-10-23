@@ -24,11 +24,16 @@ var lockTimeout = 30 * time.Second
 // operation binds one profile mutation to the held manager-home mutation
 // lock and the profile transaction journal.
 type operation struct {
-	lock   *managerlock.HomeLock
+	lock interface {
+		AssertHeld() error
+		AssertCurrent() error
+		Close() error
+	}
 	engine *transaction.Engine
 	// Prepared under this lock before recovery or repair publication.
 	claudePrepared *claudeSeedPlan
 	recovered      bool
+	undo           *globalUndo
 }
 
 // beginCaptureOperation never provisions a home or invokes recovery. The
@@ -128,6 +133,14 @@ func (op *operation) close() error {
 // mid-publication resumes from the journal on the next operation instead of
 // stranding a half-written record set.
 func (op *operation) publish(files map[string][]byte, removals ...string) error {
+	for path := range files {
+		if err := op.capture(path); err != nil {
+			return err
+		}
+	}
+	if err := op.capture(removals...); err != nil {
+		return err
+	}
 	if len(files) == 0 && len(removals) == 0 {
 		return nil
 	}

@@ -42,6 +42,9 @@ import (
 
 // Options control one installation run.
 type Options struct {
+	// WithGlobalProfile runs the profile and legacy publishers under one held
+	// manager-home lock. The wrapper compensates profile state on refusal.
+	WithGlobalProfile func(HomeLock, func() Result) Result
 	// Operation identifies the user-visible manager operation. The zero value
 	// is an install for existing programmatic callers.
 	Operation    Operation

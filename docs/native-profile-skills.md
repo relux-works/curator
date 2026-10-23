@@ -31,6 +31,22 @@ canonical source, commit and selected directory; disagreement refuses with
 alone never establishes ownership. Foreign entries still refuse without
 takeover. This does not transfer an existing legacy-only entry to a profile.
 
+Direct constraints come from the current global Skillfile and the live profile
+closure. A previous lock member is a resolved result, so removing a declaration
+retires that member and its native links on the next install unless a live
+profile requirement still needs it.
+
+No-flag global install and global add serialize profile and legacy publication
+under the same manager-home lock. A returned legacy refusal restores the prior
+profile lock, rendered documents, native and managed surfaces, backup inventory,
+and parent directory modes. An in-place `environment_surface_unmanaged_conflict`
+retains the extended lock and its install record under environments §9.4
+so first-use `profile sync --takeover` can recover, while restoring the other
+mutable profile state. Other failures do not inherit that exception. Admitted
+immutable store entries may remain. The compensation covers returned errors;
+it does not add a cross-phase process-crash journal to the existing individual
+profile and legacy transaction recovery mechanisms.
+
 Tests run only against temporary homes. Run the behavioral and mutation controls
 with `go test ./internal/envprofile ./cmd/curator -run '^TestNativeSkills' -count=1`.
 Build with `go build -o .temp/curator ./cmd/curator`. Gate commands and evidence

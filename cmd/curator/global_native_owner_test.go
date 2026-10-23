@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -9,7 +11,12 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/adapters"
+	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/envprofile"
+	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/install"
+	"github.com/relux-works/curator/internal/transaction"
 )
 
 type nativeGlobalFixture struct {
@@ -151,14 +158,14 @@ func TestGlobalNativeOwnerDifferentPinRefuses(t *testing.T) {
 	fixture.declare(t, "v2.0.0")
 	snapshots := map[string]map[string]helpTreeEntry{}
 	for _, path := range []string{filepath.Join(fixture.home, ".claude"), filepath.Join(fixture.home, ".codex"), filepath.Join(fixture.home, ".curator", "profiles", "selected-profile")} {
-		snapshots[path] = snapshotHelpTree(t, path)
+		snapshots[path] = nativeOwnerSnapshot(t, path)
 	}
 	_, stderr := fixture.command(t, exitFail, "global", "install")
 	if !strings.Contains(stderr, "context_range_conflict") || !strings.Contains(stderr, "shared-skill") || !strings.Contains(stderr, "machine") || !strings.Contains(stderr, "selected-profile") {
 		t.Fatalf("different-pin rejection lost its identity diagnostic: %s", stderr)
 	}
 	for path, before := range snapshots {
-		if after := snapshotHelpTree(t, path); !reflect.DeepEqual(after, before) {
+		if after := nativeOwnerSnapshot(t, path); !reflect.DeepEqual(after, before) {
 			t.Fatalf("different-pin rejection changed mutable state: %s", path)
 		}
 	}
@@ -216,4 +223,202 @@ func TestGlobalNativeOwnerForeignRefuses(t *testing.T) {
 			t.Fatalf("foreign refusal wrote %s: %v", path, err)
 		}
 	}
+}
+
+// Removing a machine declaration retires its native entries and lock member;
+// an independently required profile member remains active after the same flow.
+func TestGlobalNativeOwnerRemoval(t *testing.T) {
+	for _, required := range []bool{false, true} {
+		t.Run(map[bool]string{false: "direct-only", true: "profile-required"}[required], func(t *testing.T) {
+			fixture := newNativeGlobalFixture(t)
+			profile := t.TempDir()
+			writeContextPackage(t, profile, "selected-profile", "1.0.0", "profile context\n")
+			if required {
+				writeFile(t, filepath.Join(profile, "agent-context.json"), `{"schema_version":1,"name":"selected-profile","version":"1.0.0","context":{"modules":[{"path":"a.md"}]},"requires":{"skills":{"shared-skill":{"git":"https://example.com/shared-skill","tag":"v1.0.0"}}}}`)
+			}
+			fixture.command(t, exitOK, "profile", "install", profile, "--use")
+			fixture.declare(t, "v1.0.0")
+			fixture.command(t, exitOK, "global", "install")
+			fixture.requireProfileOwner(t)
+			fixture.command(t, exitOK, "global", "remove", "shared-skill")
+			fixture.command(t, exitOK, "global", "install")
+			if required {
+				fixture.requireProfileOwner(t)
+			} else {
+				fixture.requireAbsent(t)
+			}
+			lock, err := os.ReadFile(filepath.Join(fixture.home, ".curator", "profiles", "selected-profile", "lock.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(lock), `"name":"shared-skill"`) != required {
+				t.Fatalf("removed declaration persisted in profile lock: %s", lock)
+			}
+		})
+	}
+}
+
+// A canonical global-store ownership refusal cannot activate a new profile
+// member or change existing profile/native surfaces; a clean retry can.
+func TestGlobalNativeOwnerCanonicalRefusal(t *testing.T) {
+	for _, command := range []string{"install", "add"} {
+		t.Run(command, func(t *testing.T) {
+			fixture := newNativeGlobalFixture(t)
+			profile := t.TempDir()
+			writeContextPackage(t, profile, "empty-profile", "1.0.0", "profile context\n")
+			fixture.command(t, exitOK, "profile", "install", profile, "--use")
+			args := []string{"global", "install"}
+			if command == "install" {
+				fixture.declare(t, "v1.0.0")
+			} else {
+				args = []string{"global", "add", "shared-skill", "--git", "https://example.com/shared-skill", "--tag", "v1.0.0"}
+			}
+			foreign := filepath.Join(fixture.home, ".curator", "global", "skills", "shared-skill", "SKILL.md")
+			writeFile(t, foreign, "foreign preimage\n")
+			snapshots := map[string]map[string]helpTreeEntry{}
+			for _, path := range []string{filepath.Join(fixture.home, ".claude"), filepath.Join(fixture.home, ".codex"), filepath.Join(fixture.home, ".curator", "profiles", "empty-profile"), filepath.Join(fixture.home, ".curator", "global", "Skillfile.json")} {
+				snapshots[path] = nativeOwnerSnapshot(t, path)
+			}
+			_, stderr := fixture.command(t, exitFail, args...)
+			if !strings.Contains(stderr, "source_ownership_unproven") {
+				t.Fatalf("canonical refusal lost intended diagnostic: %s", stderr)
+			}
+			for path, before := range snapshots {
+				if after := nativeOwnerSnapshot(t, path); !reflect.DeepEqual(before, after) {
+					t.Errorf("canonical refusal changed profile/native state: %s: %s", path, nativeOwnerDiff(before, after))
+				}
+			}
+			fixture.requireAbsent(t)
+			if data, err := os.ReadFile(foreign); err != nil || string(data) != "foreign preimage\n" {
+				t.Fatalf("foreign canonical entry changed: %q %v", data, err)
+			}
+			if err := os.RemoveAll(filepath.Dir(foreign)); err != nil {
+				t.Fatal(err)
+			}
+			fixture.command(t, exitOK, args...)
+			fixture.requireProfileOwner(t)
+		})
+	}
+}
+
+// An actual legacy journal fault after a committed target restores the prior
+// profile lock, native/managed surfaces and backup inventory. A fault-free retry
+// publishes both phases. Synthetic credentials remain inside the fixture.
+func TestGlobalNativeOwnerCommitRollback(t *testing.T) {
+	fixture := newGlobalLockCLIFixture(t)
+	requireGlobalCommand(t, fixture, exitOK, "profile", "sync")
+	fixture.writeLegacyGlobalDeclaration(t)
+	snapshots := map[string]map[string]helpTreeEntry{}
+	for _, path := range []string{filepath.Join(fixture.home, "profiles"), envprofile.EnvRoot(fixture.home), filepath.Dir(fixture.codex)} {
+		snapshots[path] = nativeOwnerSnapshot(t, path)
+	}
+	fired := false
+	opts := install.Options{Commit: install.CommitDeps{Hooks: transaction.Hooks{Fault: func(event transaction.Event) error {
+		if event.Point == transaction.PointTargetCommitted && !fired {
+			fired = true
+			return fmt.Errorf("planted legacy commit failure")
+		}
+		return nil
+	}}}}
+	opts.WithGlobalProfile = func(lock install.HomeLock, next func() install.Result) install.Result {
+		var result install.Result
+		_, err := envprofile.GlobalSkillTransaction(fixture.home, envprofile.PolicyFromConfig(fixture.source.cfg), envregistry.MachineConfig{}, nil, nil, lock, func() error {
+			result = next()
+			if result.Status == "failed" {
+				return fmt.Errorf("%s", strings.Join(result.Errors, "; "))
+			}
+			return nil
+		})
+		if err != nil {
+			result.Status = "failed"
+			result.Errors = append(result.Errors, err.Error())
+		}
+		return result
+	}
+	result := install.Global(fixture.source.cfg, filepath.Dir(fixture.codex), opts)
+	if !fired || result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "planted legacy commit failure") {
+		t.Fatalf("intended commit fault not exercised: fired=%v %+v", fired, result)
+	}
+	for path, before := range snapshots {
+		if after := nativeOwnerSnapshot(t, path); !reflect.DeepEqual(before, after) {
+			t.Errorf("commit refusal changed profile/native state: %s: %s", path, nativeOwnerDiff(before, after))
+		}
+	}
+	if _, err := os.Lstat(filepath.Join(fixture.home, "global", "skills", "new-skill")); !os.IsNotExist(err) {
+		t.Fatalf("failed commit left canonical skill: %v", err)
+	}
+	opts.Commit.Hooks = transaction.Hooks{}
+	result = install.Global(fixture.source.cfg, filepath.Dir(fixture.codex), opts)
+	if result.Status != "ok" {
+		t.Fatalf("fault-free retry refused: %+v", result)
+	}
+	fixture.requireNativeSkill(t)
+}
+
+func nativeOwnerSnapshot(t *testing.T, root string) map[string]helpTreeEntry {
+	t.Helper()
+	if _, err := os.Lstat(root); os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := snapshotHelpTree(t, root)
+	for rel, entry := range snapshot {
+		if entry.Mode&os.ModeSymlink != 0 {
+			target, err := os.Readlink(filepath.Join(root, rel))
+			if err != nil {
+				t.Fatal(err)
+			}
+			entry.Hash = sha256.Sum256([]byte(target))
+			snapshot[rel] = entry
+		}
+	}
+	return snapshot
+}
+
+func nativeOwnerDiff(before, after map[string]helpTreeEntry) string {
+	var diffs []string
+	for path, entry := range before {
+		if got, ok := after[path]; !ok || got != entry {
+			diffs = append(diffs, fmt.Sprintf("%s: %+v -> %+v", path, entry, got))
+		}
+	}
+	for path := range after {
+		if _, ok := before[path]; !ok {
+			diffs = append(diffs, "added "+path)
+		}
+	}
+	return strings.Join(diffs, "; ")
+}
+
+// A first-use global add conflict retains a usable pending profile even when
+// its Skillfile declaration was never published; explicit takeover can recover
+// the native skill from that lock, and retry then commits the declaration.
+func TestGlobalNativeOwnerFreshAddConflict(t *testing.T) {
+	fixture := newNativeGlobalFixture(t)
+	foreign := filepath.Join(fixture.home, ".codex", "skills", "shared-skill", "SKILL.md")
+	writeFile(t, foreign, "foreign preimage\n")
+	args := []string{"global", "add", "shared-skill", "--git", "https://example.com/shared-skill", "--tag", "v1.0.0"}
+	_, stderr := fixture.command(t, exitFail, args...)
+	if !strings.Contains(stderr, "environment_surface_unmanaged_conflict") {
+		t.Fatalf("fresh add conflict diagnostic: %s", stderr)
+	}
+	lock, hash, err := contextlock.Read(filepath.Join(fixture.home, ".curator", "profiles", "default", "lock.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := lock.Find(contextlock.KindSkill, "shared-skill"); !ok {
+		t.Fatal("fresh add lost its pending skill lock")
+	}
+	code, stdout, stderr := runFile(t, fixture.config, "profile", "sync", "--takeover")
+	if code != exitOK {
+		t.Fatalf("explicit takeover refused: %d %s%s", code, stdout, stderr)
+	}
+	fixture.requireProfileOwner(t)
+	_, after, err := contextlock.Read(filepath.Join(fixture.home, ".curator", "profiles", "default", "lock.json"))
+	if err != nil || after != hash {
+		t.Fatalf("takeover replaced the pending global lock: %s -> %s (%v)", hash, after, err)
+	}
+	fixture.command(t, exitOK, args...)
+	fixture.requireProfileOwner(t)
 }

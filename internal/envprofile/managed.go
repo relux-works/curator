@@ -128,6 +128,8 @@ type ResolveRequest struct {
 	// transactionOptions is a fault-injection seam for recovery tests. CLI
 	// requests leave it nil and use the production transaction engine.
 	transactionOptions []transaction.Option
+	// borrowedOperation keeps paired global publication under its outer lock.
+	borrowedOperation *operation
 	// passthroughLstat and passthroughReadlink inject entry inspection errors
 	// in tests. Production requests leave them nil and use the shared reader.
 	passthroughLstat     func(string) (os.FileInfo, error)
@@ -1318,6 +1320,9 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	if err != nil {
 		return err
 	}
+	if err := op.captureManaged(plan, seeds, recorded); err != nil {
+		return err
+	}
 	// Validate Claude state before directory protection, backups, context writes
 	// or link replacement. Staging/rename I/O errors after this boundary are
 	// not an all-or-nothing home transaction (see atomicManagedFile).
@@ -1465,7 +1470,7 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	if provisioned {
 		provenance = "provisioned"
 	}
-	marker, err := finalizeMarker(req, plan, seeds, prior, provenance)
+	marker, err := finalizeMarker(op, req, plan, seeds, prior, provenance)
 	if err != nil {
 		return op.recoveryRefusal(err)
 	}
@@ -1500,7 +1505,7 @@ func isSeedPath(plan *homePlan, path string) bool {
 // entries are seeded and recorded, recorded seeds whose target is gone are
 // removed, and unrecorded entries shadowing allowlisted operator entries
 // warn environment_seed_shadowed and are never touched (§7.1, §7.4).
-func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prior *envmarker.Marker, provenance string) (*envmarker.Marker, error) {
+func finalizeMarker(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBundle, prior *envmarker.Marker, provenance string) (*envmarker.Marker, error) {
 	root := EnvRoot(req.Home)
 	homeRel, err := managedRelative(root, plan.homeDir)
 	if err != nil {
@@ -1538,6 +1543,26 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 			if entry.Path != "" {
 				recordedLinks[entry.Path] = true
 			}
+		}
+	}
+	if op.undo != nil {
+		paths := []string{}
+		for path := range links {
+			paths = append(paths, filepath.Join(plan.homeDir, filepath.FromSlash(path)))
+		}
+		for path := range recordedLinks {
+			paths = append(paths, filepath.Join(plan.homeDir, filepath.FromSlash(path)))
+		}
+		for name := range seeds.xdg {
+			paths = append(paths, filepath.Join(plan.parent, name))
+		}
+		if prior != nil {
+			for _, name := range prior.SeedLinks {
+				paths = append(paths, filepath.Join(plan.parent, name))
+			}
+		}
+		if err := op.capture(paths...); err != nil {
+			return nil, err
 		}
 	}
 	migrateCmd := fmt.Sprintf("curator env migrate --plan --profile %s --env %s, then curator env migrate --apply --expect <plan-hash> --profile %s --env %s", req.Profile, plan.adapter.ID, req.Profile, plan.adapter.ID)
@@ -2850,7 +2875,12 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 		prepared, err = prepareClaudeSeed(root, homeRel, req.LaunchDir, form)
 		return err
 	}
-	op, err := beginOperationValidated(req.Home, validate, req.transactionOptions...)
+	op, err := req.borrowedOperation, error(nil)
+	if op == nil {
+		op, err = beginOperationValidated(req.Home, validate, req.transactionOptions...)
+	} else {
+		err = validate()
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -2891,7 +2921,9 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = op.close() }()
+	if req.borrowedOperation == nil {
+		defer func() { _ = op.close() }()
+	}
 	if err := validateProfilePathSources(req.Profile, source, req.Policy); err != nil {
 		return nil, err
 	}
