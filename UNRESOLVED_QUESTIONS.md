@@ -23,3 +23,15 @@
   needs proven excluded-origin session state, fresh sessions or refusal.
   Broader late hook/settings/plugin/MCP reloads also remain unqualified.
   [Measured controls and bounds](docs/qualification/project-source-exclusion-claude.md).
+
+- TASK-261022-j2er9x R1: Codex 0.162.1 merges repository MCP permission keys
+  through manager `mcp_servers={}` argv. Paired native fixtures prove
+  `mcp_servers.project_tool.disabled_tools` still removes an actual tool.
+  Launch-time enumeration fixes known server names, but a late server on the
+  same app-server bypasses it at the next thread entry;
+  `mcp_servers.late_tool.disabled_tools` still changes the actual catalog.
+  Native-project uses trusted entry and preserves native prose/config, as the
+  owner ruled, but Permissions, launch and prepared publication remain refused.
+  A vendor control or separately qualified manager policy boundary must remove
+  this effect before the leaf can advertise native-project launch support.
+  [Controls, receipt lifecycle and executable regressions](docs/project-adapter-codex.md).

@@ -88,14 +88,18 @@ func (p *Plan) RequireStrict() error {
 	return &Unsupported{NativeSourceExclusion, codexExclusionReason}
 }
 
-// RequireLaunch checks the mode capability only; authority and lease checks
-// remain mandatory at the delegated runner boundary. Strict never downgrades.
+// RequireLaunch refuses native-project permission policy at this pin because
+// repository MCP permission keys survive manager argv. Rendered plans remain
+// inspection data; neither this gate nor strict mode may be bypassed by a
+// delegated runner.
 func (p *Plan) RequireLaunch() error {
 	if p.report.Mode != NativeProject {
 		return p.RequireStrict()
 	}
-	return nil
+	return &Unsupported{Permissions, codexNativeProjectReason}
 }
+
+const codexNativeProjectReason = "Codex 0.162.1 repository mcp_servers.*.disabled_tools survives manager argv and changes exposed MCP tools; launch-time dotted overrides do not cover late servers at native thread entry, so native-project permissions are unsupported"
 
 const codexExclusionReason = "Codex 0.162.1 retains repository skills, including late-created paths; lazy, resume and child exclusion remain unqualified"
 
@@ -133,7 +137,11 @@ func RenderCodex(req CodexRequest) (*Plan, error) {
 		return nil, fmt.Errorf("profile documents: %w", err)
 	}
 	adapter, _ := envregistry.ByID(envregistry.CodexCLI)
-	p := &Plan{files: map[string][]byte{}, generated: map[string]Surface{}, home: req.Home, worktree: req.Worktree}
+	bundle, err := codexSystemSkills(codexSystemBundle)
+	if err != nil {
+		return nil, err
+	}
+	p := &Plan{files: bundle, generated: map[string]Surface{}, home: req.Home, worktree: req.Worktree}
 
 	for name, b := range req.ProfileDocuments {
 		if name != adapter.RootTarget && name != ".agent-context/system-prompt.md" {
@@ -143,6 +151,10 @@ func RenderCodex(req CodexRequest) (*Plan, error) {
 	}
 	var mcpBytes []byte
 	for name, b := range req.Files {
+		folded := cases.Fold().String(norm.NFC.String(name))
+		if folded == "skills/.system" || strings.HasPrefix(folded, "skills/.system/") {
+			return nil, &Unsupported{Skills, "reserved native skill namespace"}
+		}
 		switch {
 		case name == adapter.RootTarget || name == ".agent-context/system-prompt.md":
 			// Native-project never installs concatenated project instructions.
@@ -230,10 +242,10 @@ func RenderCodex(req CodexRequest) (*Plan, error) {
 	replace("approvals_reviewer", "user")
 	replace("sandbox_mode", req.Sandbox)
 	replace("sandbox_workspace_write", map[string]any{"network_access": false, "writable_roots": []string{}, "exclude_tmpdir_env_var": true, "exclude_slash_tmp": true})
-	// A source worktree is trusted as task data, not as a native configuration
-	// authority. Explicit distrust excludes the measured project config surface.
-	// Native project instructions and skills remain discoverable in this mode.
-	replace("projects", map[string]any{req.Worktree: map[string]any{"trust_level": "untrusted"}})
+	// Native-project reads repository prose and config under native rules.
+	// Trust is not Curator admission. Manager argv owns policy/memory settings,
+	// but surviving repository MCP permission effects still make launch refuse.
+	replace("projects", map[string]any{req.Worktree: map[string]any{"trust_level": "trusted"}})
 	replace("project_doc_max_bytes", int64(32768))
 	replace("project_doc_fallback_filenames", []string{})
 	drop("skills")
@@ -288,7 +300,7 @@ func RenderCodex(req CodexRequest) (*Plan, error) {
 		args = append(args, "-c", key+"="+literal)
 	}
 	p.launch = LaunchContribution{Mode: NativeProject, Notice: NativeProjectNotice, Env: map[string]string{adapter.EnvVar: req.Home}, Args: args}
-	p.report = Certification{Environment: adapter.ID, ProviderVersion: req.ProviderVersion, Platform: req.Platform, Mode: req.Mode, Notice: NativeProjectNotice, Certified: []SurfaceName{Context, Skills, MCP, Permissions, MemoryOff}, Refused: []Refusal{{NativeSourceExclusion, codexExclusionReason}}}
+	p.report = Certification{Environment: adapter.ID, ProviderVersion: req.ProviderVersion, Platform: req.Platform, Mode: req.Mode, Notice: NativeProjectNotice, Certified: []SurfaceName{Context, Skills, MCP, MemoryOff}, Refused: []Refusal{{NativeSourceExclusion, codexExclusionReason}, {Permissions, codexNativeProjectReason}}}
 
 	sort.Slice(p.notes, func(i, j int) bool { return p.notes[i].Key < p.notes[j].Key })
 	return p, nil

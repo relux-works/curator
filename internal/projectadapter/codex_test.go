@@ -107,9 +107,9 @@ func TestCodexCompositionAndSeed(t *testing.T) {
 }
 
 // Claim: emitted -c arguments are independently parseable TOML and bind the
-// same manager-owned policy, memory, model and worktree distrust as config.toml.
-// Typed strict refusal is preserved; native-project needs explicit opt-in and
-// reports the same non-isolation notice in status and launch.
+// same manager-owned policy, memory, model and native-project trust as config.toml.
+// Both strict and unsafe native-project launches refuse; preview data
+// needs explicit opt-in and reports the non-isolation notice consistently.
 func TestCodexLaunchAndCertification(t *testing.T) {
 	r := request(t)
 	r.Model = "fixture \"quoted\" model"
@@ -132,18 +132,18 @@ func TestCodexLaunchAndCertification(t *testing.T) {
 	if overrides["model"] != r.Model || overrides["approval_policy"] != r.Approval || overrides["sandbox_mode"] != r.Sandbox {
 		t.Fatal("manager overrides differ")
 	}
-	if overrides["projects"].(map[string]any)[r.Worktree].(map[string]any)["trust_level"] != "untrusted" || overrides["project_doc_max_bytes"] != int64(32768) {
+	if overrides["projects"].(map[string]any)[r.Worktree].(map[string]any)["trust_level"] != "trusted" || overrides["project_doc_max_bytes"] != int64(32768) {
 		t.Fatal("project controls not applied")
 	}
 	if overrides["memories"].(map[string]any)["generate_memories"] != false || overrides["features"].(map[string]any)["memories"] != false {
 		t.Fatal("memory overrides missing")
 	}
 	report := p.Report()
-	if report.Notice != NativeProjectNotice || report.Environment != "codex_cli" || report.Mode != NativeProject || len(report.Certified) != 5 || len(report.Refused) != 1 || report.Refused[0].Surface != NativeSourceExclusion || !strings.Contains(report.Refused[0].Reason, "late-created") {
+	if report.Notice != NativeProjectNotice || report.Environment != "codex_cli" || report.Mode != NativeProject || len(report.Certified) != 4 || len(report.Refused) != 2 || report.Refused[0].Surface != NativeSourceExclusion || !strings.Contains(report.Refused[0].Reason, "late-created") {
 		t.Fatal("certification overclaims")
 	}
-	if err := p.RequireLaunch(); err != nil {
-		t.Fatal(err)
+	if err := p.RequireLaunch(); err == nil {
+		t.Fatal("incompatible native-project launch accepted")
 	}
 	var unsupported *Unsupported
 	if !errors.As(p.RequireStrict(), &unsupported) || unsupported.Surface != NativeSourceExclusion {

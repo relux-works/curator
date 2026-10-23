@@ -1,26 +1,42 @@
 # Codex composition delivery
 
-`internal/projectadapter.RenderCodex` prepares a Codex 0.162.1 Werkstatt home
-for the explicitly enabled `native-project` mode. The managed instruction
-file contains the selected **profile root only**. Codex reads project
-instructions and repository skills natively; Curator delivers only the
-approved project skills and MCP from the admitted composition. Both the
-certification report and launch contribution say **project sources not
-isolated**. This mode does not claim a source-exclusion boundary.
+`internal/projectadapter.RenderCodex` prepares an inspectable Codex 0.162.1
+native-project plan. It renders trusted project entry, so the pinned harness
+loads repository prose and config natively while retaining the selected
+**profile root only** in the managed instruction document. Native config,
+hooks and plugins are permitted by
+[specification §5.1](https://github.com/relux-works/curator-spec/blob/2510171c/protocol/project-context.md#51-explicit-native-project-mode).
+Native trust is not Curator item approval.
 
-The manager must set both `Mode: native-project` and `NativeProjectEnabled`.
-A missing enablement, another mode, another release or another platform
-refuses. `strict` always receives a typed `Unsupported` refusal for
-`native-source-exclusion`. It never falls back to native-project. The existing
+The native-project launch capability is **refused for Permissions**.
+`-c mcp_servers={}` merges with repository servers rather than erasing their
+permission settings. In a paired native fixture,
+`mcp_servers.project_tool.disabled_tools=["project_tool"]` removes the actual
+tool from the MCP catalog despite the complete manager argv. Removing only
+that restriction restores the same server's tool and synthetic call result.
+Per-tool approval settings also survive in effective config; approval-dialog
+behavior is not claimed. `Plan.Report()` refuses Permissions,
+`Plan.RequireLaunch()` returns typed `project_context_unsupported`, and
+`Plan.PublishPrepared()` cannot reach the lease publisher.
+
+This resolves review R1 using the owner's native-project ruling: repository
+config is allowed, but surviving project permission effects require refusal.
+The requested launch-time enumeration alternative was also tested using a
+read-only TOML parse, rejected unknown/malformed inputs, manager tool grants
+and explicit dotted overrides. It restores an admitted tool and prevents a
+known denied server's process from starting. On the same app-server, a newly
+added repository server loads on the next thread; toggling only
+`mcp_servers.late_tool.disabled_tools` changes its actual catalog and restores
+a successful call in the unrestricted positive. One-time launch enumeration
+does not cover that reload/entry. The candidate stays in the research replay;
+no product parser or supported-launch claim is introduced.
+
+The manager must still set both `Mode: native-project` and
+`NativeProjectEnabled` to inspect a plan. Another mode, release or platform
+refuses rendering. `strict` always receives a typed `Unsupported` refusal for
+`native-source-exclusion`; it never falls back to native-project. The existing
 strict I-COMP admission and released fragment grammar remain unchanged.
-These mode names implement the explicit wave-1 owner decision; the separate
-specification/runner integration owns their eventual wire dispatch.
-
-The API starts no provider, acquires no lease and grants no project authority.
-`Plan.RequireLaunch()` accepts only the explicitly enabled native-project
-capability. The delegated consumer must additionally enforce current admission,
-manager permission ceilings, immutable composition binding and an active lease.
-`Plan.RequireStrict()` always refuses at this vendor pin.
+The API starts no provider and grants no admission or lease authority.
 
 ## Protected inputs and output ownership
 
@@ -40,8 +56,10 @@ outputs refuse. The profile system document retains the adapter registry's
 separate `model_instructions_file` channel.
 
 The registry supplies `CODEX_HOME`, the native root and skill paths. A new
-managed `config.toml` owns the complete `mcp_servers` namespace, including an
-explicit empty set, and contains the composition's MCP union. Only the
+managed `config.toml` replaces the seed's `mcp_servers` namespace, including
+an explicit empty set, with the composition's MCP union. This manager-side
+replacement does not erase repository MCP policy in the native merged config,
+which is the launch refusal above. Only the
 measured stdio entry encoding is supported; HTTP entries refuse pending native
 qualification. The intermediate `curator-mcp.config.toml` is consumed as data,
 not published as a second active MCP configuration or selected with `-p`.
@@ -55,17 +73,22 @@ overrides are dropped with named notes. Seeds selecting alternate instruction,
 permission, hook, plugin or agent control sources refuse with the key's name
 rather than silently pruning unowned controls.
 
-No repository config or approval file is read by this API. Explicit native
-project distrust suppresses the measured `.codex/config.toml` settings surface;
-it does not suppress native project instructions or repository skills. The
-project instruction budget is the native default 32768 bytes, not the strict
-zero-cap control. The manager owns model, effort, approval/sandbox policy,
-user approval review, write restrictions and memory settings. Supported
-policies are `never` or `on-request` with `read-only` or `workspace-write`.
-Workspace writes add no writable roots, network access or temporary-directory
-grants. Other policy encodings refuse; project restrictions never become
-manager grants. Memory generation, memory use, dedicated memory tools and both
-memory feature switches are off.
+No repository config or approval file is read by the renderer. Native-project
+uses explicit trusted entry to retain native project instructions and config;
+the project instruction budget is the native default 32768 bytes. The profile
+root and separate system channel remain manager-owned. The manager programs
+model, effort, approval/sandbox policy, user approval review, write restrictions
+and memory flags through native `-c` pairs. Supported request encodings are
+`never` or `on-request` with `read-only` or `workspace-write`.
+
+Paired native startup/config/thread probes cover all four policy combinations.
+The no-manager-argv control exposes hostile repository approval, sandbox and
+memory settings. Complete manager argv retains the requested approval/sandbox,
+no extra writable roots, network off, both temporary-directory exclusions,
+and five false memory settings. Repository plugin config and prose remain
+visible. MCP permission settings survive those same argv values, so this is
+not a certified Permissions capability. The probes do not qualify model-turn,
+reload, resume or child behavior.
 
 `Plan.Launch()` returns the mode, required non-isolation notice, `CODEX_HOME`
 and native `-c` argument pairs. They are argv values, never shell text. A
@@ -86,28 +109,44 @@ bind this final receipt into immutable mode-specific composition and policy
 before publication, never swap a receipt under an already published record
 or lease. This adapter does not advertise a strict `project-adapter/1` record.
 
-`Plan.PublishPrepared` delegates a defensive copy of final bytes through
-I-LEASE's published `PublishPrepared(context, leaseID, files, dryRun)` interface.
-The owner must check current authority and the bound final receipt; owner
-refusals propagate unchanged. No lease implementation is imported or copied.
-The interface test proves delegation, not actual lease transaction/liveness.
+`Plan.PublishPrepared` retains I-LEASE's published
+`PublishPrepared(context, leaseID, files, dryRun)` interface, but this pin
+refuses before calling the owner. The regression proves zero publisher calls
+for refused permissions, invalid inputs and cancellation. It does not claim an
+actual lease transaction/liveness or a supported native-project publication.
+No lease implementation is imported or copied.
 
 `Plan.Materialize` requires a live manager-home lock witness and a stable
 `environments/project-views/<checkout>/<profile>/codex_cli` allocation. The
 caller first enforces I-LEASE's idle-home rule. A new home is staged privately
 and published by rename. An existing home is only verified, never silently
 repaired. `Plan.Verify` checks generated bytes, sizes, modes, linked paths,
-extra generated skill files and home instruction overrides. Native mutable
+extra generated skill files and the complete owned instruction inventory.
+`AGENTS.md` must be absent when no profile root was receipted, including empty
+and system-only profiles; `AGENTS.override.md` must always be absent. Missing
+owned surfaces are classified through the shared `stateread` seam, retaining
+unreadable-ancestor failures instead of treating them as absence. Native mutable
 state and credentials are outside the receipt and are not read. Cancellation
 before publication leaves no partial native home.
 
+The final file map includes the complete pinned native `skills/.system` bundle
+before publication: 48 unchanged upstream assets plus the native fingerprint
+marker. Every byte, size and private mode belongs to the ordinary immutable
+receipt. The bundled archive has a fixed SHA-256 and is never read from a live
+native home. Native startup recognizes the complete matching bundle and leaves
+it unchanged, so normal first start and restart preserve verification. Missing,
+modified, extra or linked bundle files still refuse without repair. Composition
+inputs cannot replace the reserved `.system` namespace, including case aliases.
+See [bundle provenance and licenses](../internal/projectadapter/codex-system-skills.NOTICE.md).
+
 ## Certification boundary
 
-The typed report names profile context, admitted skills, MCP, manager policy
-and memory-off delivery for the pinned macOS release. Exclusion remains
-refused: repository skills, including late-created paths, survive the measured
-controls. Lazy, resume and child exclusion remain unqualified. Native-project
-acceptance does not change those facts or certify hostile-code containment.
+The typed report names native context, admitted skill/MCP delivery and the
+programmed memory-off configuration for the pinned macOS release. Permissions
+is refused because repository MCP tool restrictions remain effective.
+Exclusion remains refused: repository skills, including late-created paths, survive the measured
+controls. Lazy, resume and child exclusion remain unqualified. Neither the
+preview nor the startup observations certify hostile-code containment.
 
 The [profile native writer adaptation](https://github.com/relux-works/curator-spec/blob/f02b5aef/protocol/mcp-native-writer.md)
 limits its ownership protocol to shared profile homes and explicitly leaves
@@ -124,9 +163,10 @@ refused strict runtime boundary.
 ## Tools and verification
 
 Go and Git exercise composition, synthetic approval and temporary native home
-delivery. Tests use no credentials, model turns, provider processes or network
-MCP. Keep logs and private caches under task-local `.temp/` and remove scratch
-after handover.
+delivery. Default tests use no provider processes. Opt-in tests start the exact
+pinned native binary in isolated offline fixtures; they use no credentials,
+model turns or network MCP. Keep logs and private caches under task-local
+`.temp/` and remove scratch after handover.
 
 ```sh
 env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectadapter ./internal/projectcontext -count=1
@@ -137,9 +177,37 @@ env -u GIT_DIR -u GIT_WORK_TREE go vet ./internal/projectadapter ./internal/proj
 The real-composition test independently assembles the strict preview's profile
 and project root documents with a literal LF separator, then requires that the
 native-project file equal only the complete profile document. It includes
-admitted skill assets and profile MCP alongside forbidden repository config,
-approvals and unapproved instructions. Nearby controls exercise empty/nonempty
+admitted skill assets and profile MCP while ensuring repository config,
+approvals and native instructions are not imported into manager-rendered bytes. Nearby controls exercise empty/nonempty
 MCP, seed revisions A/B, both supported policies, profile-only system context,
 explicit native-project enablement, strict refusal, the required notice,
 receipt drift and publication boundaries. Narrowing plants must fail their
 named assertion; a skip, setup failure or compiler error is not evidence.
+
+Rework regressions cover empty/root/system-only instruction inventories,
+required absence, native-bundle receipt provenance/reservation/drift, typed
+unreadable ancestors, permission refusal and zero lease-publisher calls. The
+repository-wide manager-read scanner retains its known-violation control:
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE "$CURATOR_GO" test ./internal/envprofile -count=1 -run '^(TestManagerOwnedAbsenceReadsAreGuarded|TestManagerReadScannerFindsAliasedNotExistCollapse)$'
+```
+
+Set `CODEX_EXCL_BINARY` privately to the frozen qualified executable; each run
+requires a fresh directory. The opt-in regressions call production Render/Materialize/Verify APIs
+with the complete emitted argv. The trust-only control restores repository
+instructions and also admits repository plugin config. Paired config/thread
+probes verify the measured manager overrides; an actual MCP catalog/call pair
+proves the surviving repository `disabled_tools` effect and typed refusal. The lifecycle matrix covers empty/root/system-only profiles,
+read-only/workspace-write policy, debug startup and app-server/thread startup,
+followed by unchanged restart/reuse without receipt recapture:
+
+```sh
+CODEX_EXCL_RUN_ROOT="$PWD/.temp/project-adapter-codex/native-01" \
+  env -u GIT_DIR -u GIT_WORK_TREE "$CURATOR_GO" test ./.research/project-exclusion-codex -count=1 -v -run '^TestAdapter(TrustCapability|TrustedPolicyPrecedence|RepositoryMCPPermissionEffect|EnumeratedMCPReload|NativeBundleLifecycle)$'
+```
+
+Follow the [offline harness guide](../.research/project-exclusion-codex/README.md)
+for boundary controls and fixture requirements. Native process IDs and sanitized
+observations go below the explicit run root. These tests establish startup and
+receipt behavior; they do not qualify model turns, resume or child sessions.

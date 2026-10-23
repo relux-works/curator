@@ -335,10 +335,10 @@ type api struct {
 	trace  strings.Builder
 }
 
-func (f *fixture) api(name string) *api {
+func (f *fixture) api(name string, args ...string) *api {
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	a := &api{f: f, cancel: cancel, lines: make(chan []byte, 100)}
-	a.cmd = f.command(ctx, f.binary, "app-server")
+	a.cmd = f.command(ctx, f.binary, append(args, "app-server")...)
 	var err error
 	a.in, err = a.cmd.StdinPipe()
 	if err != nil {

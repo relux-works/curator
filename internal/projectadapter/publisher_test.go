@@ -3,7 +3,7 @@ package projectadapter
 import (
 	"context"
 	"errors"
-	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -23,29 +23,21 @@ func (p *recordingPublisher) PublishPrepared(_ context.Context, lease string, fi
 	return p.err
 }
 
-// Claim: prepared publication delegates the complete immutable final file map
-// to the lease owner, propagates that owner's refusal and never mutates its
-// baseline. Missing publisher/id and cancellation make zero publisher calls.
-// This proves the interface seam, not actual lease transaction or liveness.
+// Claim: a valid preview cannot reach the lease publisher while native-project
+// permission policy is refused. Invalid publisher/id and cancellation retain their exact
+// earlier errors and make zero calls. Materialize tests provide the nearby
+// successful preview-publication control; no supported native launch is claimed.
 func TestCodexPreparedPublisher(t *testing.T) {
 	plan := render(t, request(t))
 	publisher := &recordingPublisher{}
-	if err := plan.PublishPrepared(context.Background(), "lease-fixture", publisher); err != nil {
-		t.Fatal(err)
+	var refusal *Unsupported
+	if err := plan.PublishPrepared(context.Background(), "lease-fixture", publisher); !errors.As(err, &refusal) || refusal.Surface != Permissions {
+		t.Fatalf("incompatible publication accepted: %v", err)
 	}
-	if publisher.calls != 1 || publisher.lease != "lease-fixture" || publisher.dryRun || !reflect.DeepEqual(publisher.files, plan.Files()) {
-		t.Fatal("lease publication contribution differs")
+	if publisher.calls != 0 {
+		t.Fatal("refused permissions reached lease owner")
 	}
-	publisher.files["AGENTS.md"][0] = 'x'
-	if plan.Files()["AGENTS.md"][0] == 'x' {
-		t.Fatal("publisher changed immutable baseline")
-	}
-	expected := errors.New("fixture owner rejects receipt")
-	publisher.err = expected
-	if err := plan.PublishPrepared(context.Background(), "lease-fixture", publisher); !errors.Is(err, expected) {
-		t.Fatal("lease owner refusal was hidden")
-	}
-	publisher.err = nil
+
 	for _, kind := range []string{"publisher", "identifier", "cancelled"} {
 		publisher.calls = 0
 		ctx := context.Background()
@@ -61,8 +53,13 @@ func TestCodexPreparedPublisher(t *testing.T) {
 			ctx, cancel = context.WithCancel(ctx)
 			cancel()
 		}
-		if err := plan.PublishPrepared(ctx, id, target); err == nil {
-			t.Fatal("invalid publication accepted")
+		err := plan.PublishPrepared(ctx, id, target)
+		if kind == "cancelled" {
+			if !errors.Is(err, context.Canceled) {
+				t.Fatalf("invalid publication accepted: want cancellation, got %v", err)
+			}
+		} else if err == nil || !strings.Contains(err.Error(), "project_lease_mismatch") {
+			t.Fatalf("invalid publication accepted: want lease mismatch, got %v", err)
 		}
 		if publisher.calls != 0 {
 			t.Fatal("refused publication reached lease owner")
