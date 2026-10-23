@@ -202,7 +202,7 @@ func (op *operation) publishProtected(files map[string][]byte, boundaries *stagi
 	}
 	if boundaries != nil {
 		plan.BoundaryProof = &boundaries.Durable
-		plan.BoundaryCheck = func(index int, path string) error {
+		plan.BoundaryCheck = func(_ int, path string) error {
 			if err := staging.RecheckOne(staging.Target{LivePath: path, Kind: staging.KindBytes}, boundaries.Snapshot, boundaries.Admitted); err != nil {
 				return err
 			}

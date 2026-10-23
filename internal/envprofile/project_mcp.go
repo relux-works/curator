@@ -168,7 +168,7 @@ func projectMCPEntry(home string, manager *gitManager, entry string, member cont
 	if manifest.Version != member.Version {
 		return projectmcpstate.Entry{}, nil, fmt.Errorf("context_version_mismatch: MCP package version differs")
 	}
-	payload, err := os.ReadFile(filepath.Join(root, contextpkg.MCPManifestName))
+	payload, err := os.ReadFile(filepath.Join(root, contextpkg.MCPManifestName)) // #nosec G304 -- root is a checked store snapshot whose package has already been validated.
 	if err != nil {
 		return projectmcpstate.Entry{}, nil, err
 	}
@@ -430,12 +430,12 @@ func replayProjectMCP(home, root, project, manifestHash string, decls map[string
 // shared source selection, version and signer machinery.
 type projectMCPSource struct{ *gitManager }
 
-func (source projectMCPSource) Manifest(kind, name, identity, directory, commit string) (*contextresolve.Package, error) {
+func (source projectMCPSource) Manifest(_ string, name, identity, directory, commit string) (*contextresolve.Package, error) {
 	stage, err := os.MkdirTemp("", "curator-project-mcp-manifest-*")
 	if err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(stage)
+	defer func() { _ = os.RemoveAll(stage) }()
 	if err := gitops.Extract(source.repoDir(identity), commit, stage); err != nil {
 		return nil, err
 	}
@@ -464,12 +464,12 @@ func replayMCPTag(decl projectmcp.Declaration, version string) string {
 
 type localMCPSource struct{ *gitManager }
 
-func (source localMCPSource) VerifyCandidate(kind, name, identity, tag, commit string, allowed []contextresolve.Signer) (contextresolve.CandidateSignatures, error) {
+func (source localMCPSource) VerifyCandidate(_, _ string, identity, tag, commit string, allowed []contextresolve.Signer) (contextresolve.CandidateSignatures, error) {
 	if _, err := source.checkedRepo(identity); err != nil {
 		return contextresolve.CandidateSignatures{}, err
 	}
 	if tag != "" {
-		out, err := exec.Command("git", "-C", source.repoDir(identity), "rev-parse", "--verify", "refs/tags/"+tag+"^{commit}").Output()
+		out, err := exec.Command("git", "-C", source.repoDir(identity), "rev-parse", "--verify", "refs/tags/"+tag+"^{commit}").Output() // #nosec G204 -- fixed Git argv checks a validated tag in the source-bound cache without a shell.
 		if err != nil || strings.TrimSpace(string(out)) != commit {
 			tag = ""
 		}
