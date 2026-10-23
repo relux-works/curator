@@ -35,6 +35,7 @@ type registered struct {
 	Name       string                 `json:"name"`
 	Binding    binding                `json:"binding"`
 	Active     bool                   `json:"active"`
+	Lapsed     bool                   `json:"lapsed,omitempty"`
 	Precedence contextlock.Precedence `json:"precedence"`
 }
 type approved struct {
@@ -376,6 +377,9 @@ func (op *operation) get(ref, hash string) (captured, error) {
 	if err != nil {
 		return empty, err
 	}
+	if err := validateInventory(c); err != nil {
+		return empty, fail("project_context_drift", "protected snapshot inventory is invalid")
+	}
 	for _, entry := range c.Manifest.Files {
 		st, e := r.Lstat("files/" + entry.Path)
 		if e != nil || (st.Mode().Perm() != 0600 && st.Mode().Perm() != 0700) {
@@ -435,7 +439,7 @@ func (op *operation) registered(id string) (registered, error) {
 	if !ok || !r.Active {
 		return r, fail("project_registration_mismatch", "unknown or retired registration")
 	}
-	if err := verifyBinding(r); err != nil {
+	if err := op.verifyRegistration(r); err != nil {
 		return r, err
 	}
 	if err := op.policyFresh(r); err != nil {

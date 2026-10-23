@@ -501,7 +501,7 @@ func TestWholeSkillAdmissionUsesOwningReaders(t *testing.T) {
 	f := newFixture(t)
 	dir := filepath.Join(f.root, "skill")
 	write(t, filepath.Join(dir, "agent-skill.json"), `{"schema_version":3,"commands":{},"capabilities":{"network":"none","filesystem":"none","exec":"none","secrets":"none","env_read":"none","prompt_scope":"none"}}`)
-	write(t, filepath.Join(dir, "SKILL.md"), "# Review\n\nReview ordinary source data.\n")
+	write(t, filepath.Join(dir, "SKILL.md"), validSkillDocument)
 	d := declaration("review", "skill", false)
 	d.Items[0].Type = "skill"
 	p, err := f.store.Preview(f.registration.CheckoutID, d)
@@ -518,7 +518,7 @@ func TestWholeSkillAdmissionUsesOwningReaders(t *testing.T) {
 	if _, err = f.store.Admitted(f.registration.CheckoutID, []Selection{{"review", false}}); err != nil {
 		t.Fatal(err)
 	}
-	write(t, filepath.Join(dir, "SKILL.md"), "# Changed\n")
+	write(t, filepath.Join(dir, "SKILL.md"), "---\nname: guide\ndescription: Changed fixture\n---\n# Changed\n")
 	p, err = f.store.Preview(f.registration.CheckoutID, d)
 	if err != nil {
 		t.Fatal(err)
@@ -817,7 +817,7 @@ func TestProtectedSnapshotRejectsGitMetadata(t *testing.T) {
 func TestWholeSkillUnsupportedClosureRefuses(t *testing.T) {
 	f := newFixture(t)
 	dir := filepath.Join(f.root, "skill")
-	write(t, filepath.Join(dir, "SKILL.md"), "# Review\n\nReview ordinary source data.\n")
+	write(t, filepath.Join(dir, "SKILL.md"), validSkillDocument)
 	caps := `"capabilities":{"network":"none","filesystem":"none","exec":"none","secrets":"none","env_read":"none","prompt_scope":"none"}`
 	control := `{"schema_version":3,"commands":{},` + caps + `}`
 	file := filepath.Join(dir, "agent-skill.json")
