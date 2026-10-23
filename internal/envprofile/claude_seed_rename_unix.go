@@ -27,7 +27,7 @@ func prepareClaudeSeedRename(source, target string) (func() error, func(), error
 		var errno syscall.Errno
 		for {
 			_, _, errno = syscall.Syscall6(claudeSeedRenameTrap,
-				uintptr(dirfd), uintptr(unsafe.Pointer(from)), uintptr(dirfd), uintptr(unsafe.Pointer(to)), 0, 0)
+				uintptr(dirfd), uintptr(unsafe.Pointer(from)), uintptr(dirfd), uintptr(unsafe.Pointer(to)), 0, 0) // #nosec G103 -- synchronous syscall with prepared NUL-terminated paths kept live below.
 			// Preserve os.Rename's interrupted-call retry, without another stat.
 			if errno != syscall.EINTR {
 				break
