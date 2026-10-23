@@ -315,7 +315,7 @@ func (m *Marker) Validate() error {
 			}
 		}
 		if m.CodexSeedRecord != nil {
-			if m.CodexSeedRecord.Revision != "A" && m.CodexSeedRecord.Revision != "B" && !(m.Version == VersionV7 && m.CodexSeedRecord.Revision == "C") {
+			if m.CodexSeedRecord.Revision != "A" && m.CodexSeedRecord.Revision != "B" && (m.Version != VersionV7 || m.CodexSeedRecord.Revision != "C") {
 				return fmt.Errorf("codex_seed_record revision is unsupported by this marker version")
 			}
 			if m.CodexSeedRecord.NativeMCPServers == nil || !sort.StringsAreSorted(m.CodexSeedRecord.NativeMCPServers) {
