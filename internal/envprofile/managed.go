@@ -1338,7 +1338,11 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	if err := op.captureManaged(plan, seeds, recorded); err != nil {
 		return err
 	}
-	defer func() { resultErr = errors.Join(resultErr, op.recordHomePostimages(plan.homeDir)) }()
+	defer func() {
+		if err := op.recordHomePostimages(plan.homeDir); err != nil {
+			resultErr = errors.Join(resultErr, err)
+		}
+	}()
 	// Validate Claude state before directory protection, backups, context writes
 	// or link replacement. Staging/rename I/O errors after this boundary are
 	// not an all-or-nothing home transaction (see atomicManagedFile).

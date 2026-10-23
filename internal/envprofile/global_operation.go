@@ -323,12 +323,12 @@ func (undo *globalUndo) restore() error {
 	// Native surfaces must finish compensating before manager records (notably
 	// the extended lock) can revert. A failed surface rollback retains recovery
 	// evidence instead of leaving an active skill outside an empty lock.
-	managerPath := func(path string) bool {
-		return undo.managerHome != "" && strings.HasPrefix(path, undo.managerHome+string(filepath.Separator))
+	recoveryRecord := func(path string) bool {
+		return undo.managerHome != "" && (path == CurrentFile(undo.managerHome) || strings.HasPrefix(path, ProfilesDir(undo.managerHome)+string(filepath.Separator)))
 	}
 	sort.Slice(paths, func(i, j int) bool {
-		if managerPath(paths[i]) != managerPath(paths[j]) {
-			return !managerPath(paths[i])
+		if recoveryRecord(paths[i]) != recoveryRecord(paths[j]) {
+			return !recoveryRecord(paths[i])
 		}
 		if len(paths[i]) != len(paths[j]) {
 			return len(paths[i]) > len(paths[j])
