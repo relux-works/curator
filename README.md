@@ -192,6 +192,9 @@ curator global upgrade  # upgrade global skill packages
 
 Global removal serializes with install/add across profile and legacy publication.
 It edits the declaration; the next install reconciles installed surfaces.
+Private compilation retains the global operation lock while leaving the manager-home
+lock available to profile sync. Both publishers revalidate and commit under the
+home lock after staged builds succeed.
 
 </details>
 

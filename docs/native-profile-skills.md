@@ -37,7 +37,11 @@ retires that member and its native links on the next install unless a live
 profile requirement still needs it.
 
 No-flag global install and global add serialize profile and legacy publication
-under the same manager-home lock. A returned legacy refusal restores the prior
+under the same manager-home lock after private builds succeed and their
+declaration generation is revalidated. Planning, compilation and verification
+retain only the global project operation lock, so a slow compiler leaves profile
+sync available. Global add stages its prospective declaration without writing
+the Skillfile until the paired transaction. A returned legacy refusal restores the prior
 profile lock, rendered documents, native and managed surfaces, backup inventory,
 and parent directory modes. An in-place `environment_surface_unmanaged_conflict`
 retains the extended lock and its install record under environments §9.4

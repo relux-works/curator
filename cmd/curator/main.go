@@ -1874,6 +1874,7 @@ func (c cli) runGlobalInstallModeWithProfile(cfg *config.Config, args []string, 
 		return exitFail
 	}
 	if len(args) == 0 && !opts.DryRun && !fetch {
+		opts.GlobalAddition = addition
 		opts.WithGlobalProfile = func(lock install.HomeLock, next func() install.Result) install.Result {
 			result := install.Result{Alias: "global", Path: install.GlobalRoot(cfg.Home())}
 			var legacyErr error
