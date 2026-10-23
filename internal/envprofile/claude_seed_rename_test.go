@@ -117,7 +117,7 @@ func TestClaudeSeedNativeRenameBoundary(t *testing.T) {
 // The after-comparison hook must be unreachable on the unmodified native path.
 func TestClaudeSeedNativeRenameBoundaryChild(t *testing.T) {
 	if os.Getenv("CURATOR_TEST_CLAUDE_GAP_CHILD") != "1" {
-		t.Skip("run through TestClaudeSeedNativeRenameBoundary's instrumented subprocess")
+		t.Skip("helper process: run through TestClaudeSeedNativeRenameBoundary's instrumented subprocess")
 	}
 	for _, form := range []string{envregistry.FormReferenced, envregistry.FormMonolithic} {
 		for _, variant := range []string{"native-gap", "before-comparison", "invalid-before-comparison"} {
