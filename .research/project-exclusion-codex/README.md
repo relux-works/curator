@@ -81,3 +81,39 @@ The resume source list fails its project-source positive baseline and cannot
 prove project exclusion. Lazy reads, actual child agents, tainted persisted
 model history, automatic in-turn reload, project execution-policy rules,
 other plugin discovery mechanisms and TUI parity remain unqualified.
+
+
+## Adapter rework regressions
+
+`adapter_rework_test.go` calls production Render/Materialize/Verify APIs with a
+manager lock and complete emitted argv. `TestAdapterTrustCapability` confirms
+trusted native project prose/config plus the profile root; the untrusted-only
+control suppresses project prose. Native config loading is permitted by the
+owner's native-project ruling, not a permission-violation witness.
+
+`TestAdapterTrustedPolicyPrecedence` pairs hostile repository config against
+manager argv for four approval/sandbox combinations. Measured approval,
+sandbox/write and memory settings hold, but repository MCP permission keys
+survive. `TestAdapterRepositoryMCPPermissionEffect` proves the actual effect:
+the same native MCP server initializes, but its tool disappears when only
+repository `disabled_tools` changes; the unrestricted positive calls the tool.
+The production permission gate must refuse, naming the surviving key.
+These are startup/config/thread/catalog observations, not model approval-dialog,
+model-turn, reload, resume or child-session qualification.
+
+`TestAdapterNativeBundleLifecycle` covers empty/root/system-only profiles,
+read-only/workspace-write policy, debug and app-server/thread startup, and
+unchanged restart/reuse. The complete pinned native system bundle is published
+under the ordinary receipt, so no live baseline is recaptured. The original
+discovery probes above do not drive Curator admission; adapter regressions
+exercise exported delivery APIs without granting launch authority.
+
+
+`TestMCPCeilingParser` and `TestAdapterEnumeratedMCPReload` replay the owner's
+read-only enumeration candidate without adding a product parser. Explicit
+bare dotted overrides restore an admitted tool and prevent a known denied
+server's process from starting. A late repository server added on the same
+app-server still loads at the next thread; its `disabled_tools` affects the
+actual catalog, and removing that restriction permits a synthetic call.
+Malformed/unknown candidate inputs refuse. This bounded stdio parser is an
+experimental fixture, not a complete native-config parser or launch authority.
