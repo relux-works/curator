@@ -84,6 +84,7 @@ host-capability	creating Windows symlink requires host support	allow	the Windows
 host-capability	no ln on this platform	allow	the `ln` tool is absent from this runner's PATH
 host-capability	no bash	allow	no POSIX shell on this runner
 host-capability	(bash|zsh|PowerShell) is unavailable	allow	that interpreter is absent from this runner
+host-capability	^ssh-keygen is unavailable$	allow	the synthetic SSH signer fixture requires ssh-keygen in the test PATH; signing cases still run where it is available
 host-capability	filesystem rejects invalid UTF-8 names	allow	the runner filesystem enforces UTF-8 names
 host-capability	this host folds the alias	allow	the runner filesystem folds the alias into one member
 host-capability	hard links across the staging filesystem are unavailable	allow	no hard links across the staging filesystem
@@ -97,6 +98,7 @@ host-capability	(per-directory )?case sensitivity	allow	the runner filesystem ca
 host-capability	test filesystem (is case-sensitive|distinguishes canonical Unicode spellings)	allow	the runner filesystem case/normalisation semantics differ
 host-capability	temporary directory uses case-sensitive Windows path semantics	allow	the runner temporary directory case semantics differ
 host-capability	no trusted Go toolchain is resolvable here	allow	no trusted toolchain is resolvable on this runner
+host-capability	^real Go toolchain unavailable: 	allow	the explicitly selected Go executable or GOROOT is absent, including deliberate absent-toolchain fixture controls; invalid selections still fail
 host-capability	(no GOROOT available|GOROOT .* unreadable)	allow	the host GOROOT is absent or unreadable
 host-capability	no home directory	allow	the runner exposes no home directory to expand a `~/` credential path against
 host-capability	no operator-approved Cargo descriptor for native target 	allow	the closed Cargo registry has no approved descriptor for this native host target; no toolchain identity is inferred or invented

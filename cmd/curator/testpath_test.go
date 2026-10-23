@@ -63,7 +63,7 @@ func TestCLIPathIsolation(t *testing.T) {
 func TestCLIPathIsolationChild(t *testing.T) {
 	planted := os.Getenv(cliPathPlant)
 	if os.Getenv(cliPathChild) != "1" || planted == "" {
-		t.Skip("only runs in the planted PATH subprocess")
+		t.Skip("helper process: only runs in the planted PATH subprocess")
 	}
 	for _, name := range []string{"curator-engines", "curator-run"} {
 		if path, err := exec.LookPath(name); err == nil || !errors.Is(err, exec.ErrNotFound) {

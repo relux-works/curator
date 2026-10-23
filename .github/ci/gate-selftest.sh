@@ -284,6 +284,7 @@ assert 'a skip with an unrecognised reason fails'   1 run_gate "$S" env CI_GATE_
   ev skip internal/registry TestSomethingElse; } >"$S"
 assert 'a host-capability skip is recorded and allowed' 0 run_gate "$S" env CI_GATE_GOOS=windows
 
+# Claim: the PATH helper uses registered re-exec wording; explicit Go absence
 # Claim: each exact imported fixture skip retains its declared class on all
 # hosts; removing its row or extending its reason is rejected as unclassified.
 for train_goos in linux darwin windows; do
