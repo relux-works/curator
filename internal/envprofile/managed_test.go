@@ -149,13 +149,19 @@ func seedLiveNativeCredentials(t *testing.T, fx *managedFixture) {
 }
 
 func (fx *managedFixture) request(envID string) ResolveRequest {
+	revision := ""
+	// A hash-v1 writer fixture models the historical release before seed C.
+	if envID == envregistry.CodexCLI && hashing.WriteVersion() == hashing.VersionV1 {
+		revision = envregistry.CodexSeedRevisionB
+	}
 	return ResolveRequest{
-		Home:      fx.home,
-		Profile:   fx.profile,
-		EnvID:     envID,
-		LaunchDir: fx.launch,
-		Machine:   envregistry.DefaultMachineConfig(),
-		Detect:    func(envregistry.Adapter) string { return "unknown" },
+		codexSeedRevisionForTest: revision,
+		Home:                     fx.home,
+		Profile:                  fx.profile,
+		EnvID:                    envID,
+		LaunchDir:                fx.launch,
+		Machine:                  envregistry.DefaultMachineConfig(),
+		Detect:                   func(envregistry.Adapter) string { return "unknown" },
 		NativeHomeOf: func(id string) (string, error) {
 			if id == "opencode" {
 				return fx.native["opencode-native"], nil

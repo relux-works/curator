@@ -419,6 +419,10 @@ func inventoryHome(req *MigrateRequest, profile string, adapter envregistry.Adap
 			"back the marker up, remove it, and re-run `curator env resolve --repair` to re-provision")
 		return home
 	}
+	if err := requirePerHomeCredentialSource(marker); err != nil {
+		home.addConflict("", err.Error(), "use a manager supporting the recorded node credential source")
+		return home
+	}
 	home.provisioned = true
 	home.marker = marker
 	home.markerRaw = payload
@@ -1327,7 +1331,9 @@ func changedMarkers(report *MigrateReport) (map[string][]byte, map[string][]byte
 		}
 		updated := *home.marker
 		if markerHashVersion(home.marker) == hashing.VersionV2 {
-			updated.Version = envmarker.VersionV3
+			if updated.Version != envmarker.VersionV7 {
+				updated.Version = envmarker.VersionV3
+			}
 			updated.HashVersion = int(hashing.VersionV2)
 		} else {
 			updated.Version = envmarker.VersionV2

@@ -308,6 +308,17 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+New Codex managed homes use provisioning seed revision C: top-level `projects`
+and `mcp_servers` are excluded, while unrelated decoded TOML values survive.
+Existing A/B/C and pre-rule seeds keep their bytes and recorded revision.
+The complete marker-7 carrier is validated offline against pinned schemas;
+node credential activation remains unsupported by this manager.
+Run the seed and carrier checks with
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envprofile ./internal/envmarker -run 'TestCodexSeedC|TestMarker7' -count=1`.
+Go writes test artifacts to its configured cache and disposable test directories;
+validation logs belong under `.temp/`.
+
+
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.
 Vendor tests skip unless `CODEX_EXCL_BINARY` selects the exact build and

@@ -92,7 +92,7 @@ func (m *identityMigration) publish(op *operation) error {
 }
 
 func markerHashVersion(marker *envmarker.Marker) hashing.Version {
-	if marker.Version == envmarker.VersionV3 {
+	if marker.Version == envmarker.VersionV3 || marker.Version == envmarker.VersionV7 {
 		return hashing.Version(marker.HashVersion) // #nosec G115 -- nonnegative int versions fit uint64; negative versions cannot alias v1 or v2
 	}
 	return hashing.VersionV1

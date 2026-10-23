@@ -791,15 +791,15 @@ func codexSeedStatusWarnings(marker *envmarker.Marker, state *HomeState, shipped
 	case envregistry.CodexSeedRevisionA:
 		state.NativeMCPServersDisposition = "ungoverned"
 		warnings := []string{fmt.Sprintf("%s: native Codex MCP servers %s remain in this managed home outside the profile lock and MCP allowlist", envregistry.DiagMCPNativeServersUngoverned, strings.Join(record.NativeMCPServers, ", "))}
-		if record.Revision == envregistry.CodexSeedRevisionA && shippedRevision == envregistry.CodexSeedRevisionB {
+		if record.Revision == envregistry.CodexSeedRevisionA && (shippedRevision == envregistry.CodexSeedRevisionB || shippedRevision == envregistry.CodexSeedRevisionC) {
 			warnings = append(warnings, fmt.Sprintf("%s: this home retains revision-A native MCP servers; re-provision it to apply seed revision %s", envregistry.DiagMCPSeedUnstripped, shippedRevision))
 		}
 		return warnings
-	case envregistry.CodexSeedRevisionB:
+	case envregistry.CodexSeedRevisionB, envregistry.CodexSeedRevisionC:
 		state.NativeMCPServersDisposition = "not-inherited"
 		return []string{fmt.Sprintf("%s: native Codex MCP servers %s were stripped from config.toml and are not inherited", envregistry.DiagMCPNativeServersNotInherited, strings.Join(record.NativeMCPServers, ", "))}
 	default:
-		// Marker validation closes the revision set to A and B.
+		// Marker validation closes the revision set to A, B and C.
 		state.NativeMCPServersDisposition = "unknown"
 		return []string{fmt.Sprintf("%s: this managed Codex home records unsupported seed revision %q", envregistry.DiagMCPSeedUnstripped, record.Revision)}
 	}

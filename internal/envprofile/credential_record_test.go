@@ -185,8 +185,8 @@ func TestResolvePublishesCredentialMarkerThroughLockedJournalV2WriterMode(t *tes
 		t.Fatalf("marker publication evidence: install=%t sibling_stage=%t second_lock_refused=%t", reachedMarkerInstall, stagedBesideMarker, secondLockRefused)
 	}
 	marker := readManagedMarker(t, fx, "codex_cli")
-	if marker.Version != envmarker.VersionV3 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
-		t.Fatalf("provision writes one schema-3 hash-v2 record: %+v", marker)
+	if marker.Version != envmarker.VersionV7 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
+		t.Fatalf("provision writes one schema-7 hash-v2 record: %+v", marker)
 	}
 	entry := (*marker.Passthrough)[0]
 	if entry.Path != "auth.json" || entry.Isolation != "shared" || entry.Strategy != "keyring-preferred" ||
@@ -238,7 +238,7 @@ func TestResolveRecoversCredentialMarkerAfterRenameCrashV2WriterMode(t *testing.
 		t.Fatalf("the next resolve recovers and verifies the marker: %v", err)
 	}
 	marker := readManagedMarker(t, fx, "codex_cli")
-	if marker.Version != envmarker.VersionV3 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 || (*marker.Passthrough)[0].Provenance != "provisioned" {
+	if marker.Version != envmarker.VersionV7 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 || (*marker.Passthrough)[0].Provenance != "provisioned" {
 		t.Fatalf("recovery installs the complete intended marker: %+v", marker)
 	}
 	journals, err = os.ReadDir(filepath.Join(fx.home, "state", "transactions", "v1"))
