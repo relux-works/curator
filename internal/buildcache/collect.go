@@ -100,6 +100,9 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 		enumerate = liveExecutablePaths
 	}
 	executables, err := enumerate()
+	if lockErr := requireHomeLock(lock); lockErr != nil {
+		return result, lockErr
+	}
 	if err == nil {
 		executables, err = normalizeExecutablePaths(executables)
 	}
@@ -127,7 +130,11 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 		if err != nil {
 			return result, err
 		}
-		if !store.sweepNamespace(base, referenced, executables, now, grace, &result) {
+		proceed, err := store.sweepNamespace(base, referenced, executables, now, grace, &result, lock)
+		if err != nil {
+			return result, err
+		}
+		if !proceed {
 			// The boundary below the manager home could not be proven; the
 			// same refusal applies to every namespace, so it is reported once.
 			return result, nil
@@ -139,15 +146,15 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 // sweepNamespace sweeps one protected cache root. It reports false only when
 // the root's boundary was refused (an absent root is simply empty); every
 // refusal is recorded as a warning on the result.
-func (store *Store) sweepNamespace(base string, referenced map[string]bool, executables []string, now time.Time, grace time.Duration, result *SweepResult) bool {
+func (store *Store) sweepNamespace(base string, referenced map[string]bool, executables []string, now time.Time, grace time.Duration, result *SweepResult, lock HomeLock) (bool, error) {
 	root, err := openSweepRoot(store.home, base)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return true
+			return true, nil
 		}
 		result.Warnings = append(result.Warnings, fmt.Sprintf(
 			"build cache sweep skipped: %v; no entry was traversed or removed", err))
-		return false
+		return false, nil
 	}
 	// The proven root stays open, and every mutation below goes through the
 	// handle-relative mutator bound to it, so no removal can follow a pathname
@@ -156,14 +163,14 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, exec
 	canonicalBase, err := filepath.EvalSymlinks(base)
 	if err != nil {
 		result.Warnings = append(result.Warnings, fmt.Sprintf("build cache sweep skipped: resolve live executable boundary: %v", err))
-		return false
+		return false, nil
 	}
 
 	names, err := directoryNames(root.validated.dir)
 	if err != nil {
 		result.Warnings = append(result.Warnings, fmt.Sprintf(
 			"build cache sweep skipped: list protected cache root: %v", err))
-		return false
+		return false, nil
 	}
 	for _, name := range names {
 		switch {
@@ -171,13 +178,18 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, exec
 			if referenced[name] || buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), executables) {
 				continue
 			}
-			store.sweepUnreferenced(root, name, now, grace, result)
+			if err := store.sweepUnreferenced(root, name, now, grace, result, lock); err != nil {
+				return false, err
+			}
 		case strings.HasPrefix(name, sweepPrefix):
 			if buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), executables) {
 				continue
 			}
 			// Manager-private wreckage of an interrupted removal: the entry is
 			// already unreachable by key, so finishing the deletion is safe.
+			if err := requireHomeLock(lock); err != nil {
+				return false, err
+			}
 			if err := root.mutator.RemoveAll(name); err != nil {
 				result.Warnings = append(result.Warnings, fmt.Sprintf(
 					"build cache sweep: could not finish removing retired entry %q: %v", name, err))
@@ -187,42 +199,49 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, exec
 				"build cache sweep: retained unrecognized cache root member %q; inspect it and remove it manually", name))
 		}
 	}
-	return true
+	return true, nil
 }
 
 // sweepUnreferenced classifies one unreferenced candidate and removes it only
 // when every safety property holds.
-func (store *Store) sweepUnreferenced(root *sweepRoot, name string, now time.Time, grace time.Duration, result *SweepResult) {
+func (store *Store) sweepUnreferenced(root *sweepRoot, name string, now time.Time, grace time.Duration, result *SweepResult, lock HomeLock) error {
 	key := buildmeta.CacheKey("sha256:" + name)
 	published, inspected, err := store.inspectUnexpected(root, name, key)
 	if err != nil {
 		result.Warnings = append(result.Warnings, fmt.Sprintf(
 			"build cache sweep: retained %s: %v", key, err))
-		return
+		return nil
 	}
 	if inspected.Status != Hit {
 		result.Warnings = append(result.Warnings, fmt.Sprintf(
 			"build cache sweep: retained %s (%s): %s", key, inspected.Status, inspected.Reason))
-		return
+		return nil
 	}
 	if published.After(now) {
 		result.Warnings = append(result.Warnings, fmt.Sprintf(
 			"build cache sweep: retained %s: its publication time %s is in the future; check the system clock",
 			key, published.UTC().Format(time.RFC3339)))
-		return
+		return nil
 	}
 	if now.Sub(published) <= grace {
-		return
+		return nil
 	}
 	if hook := beforeRetireForTests; hook != nil {
 		hook()
 	}
-	if err := retireEntry(root, name); err != nil {
+	if err := requireHomeLock(lock); err != nil {
+		return err
+	}
+	if err := retireEntryChecked(root, name, func() error { return requireHomeLock(lock) }); err != nil {
+		if lockErr := requireHomeLock(lock); lockErr != nil {
+			return lockErr
+		}
 		result.Warnings = append(result.Warnings, fmt.Sprintf(
 			"build cache sweep: could not remove %s: %v", key, err))
-		return
+		return nil
 	}
 	result.Removed = append(result.Removed, string(key))
+	return nil
 }
 
 // inspectUnexpected validates an entry whose logical input maintenance does not
@@ -301,6 +320,10 @@ func readProtectedChild(dir *os.File, name string) ([]byte, error) {
 // rename nor the deletion behind it can act on a directory that replaced the
 // cache root after it was validated.
 func retireEntry(root *sweepRoot, name string) error {
+	return retireEntryChecked(root, name, func() error { return nil })
+}
+
+func retireEntryChecked(root *sweepRoot, name string, check func() error) error {
 	if root == nil || root.mutator == nil {
 		return fmt.Errorf("the protected cache root is not open for mutation")
 	}
@@ -311,11 +334,17 @@ func retireEntry(root *sweepRoot, name string) error {
 	if err != nil {
 		return err
 	}
+	if err := check(); err != nil {
+		return err
+	}
 	if err := root.mutator.Rename(name, retired); err != nil {
 		return fmt.Errorf("retire cache entry: %w", err)
 	}
 	if err := syncDirHandle(root.validated.dir); err != nil {
 		return fmt.Errorf("sync cache root: %w", err)
+	}
+	if err := check(); err != nil {
+		return err
 	}
 	if err := root.mutator.RemoveAll(retired); err != nil {
 		// The entry is already unreachable by key. The leftover is named for

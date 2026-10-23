@@ -224,24 +224,13 @@ func (m *Manager) locked(ctx context.Context, fn func(*ledger, *managerlock.Home
 	if err != nil {
 		return err
 	}
-	recovered, err := engine.RecoverWithOutcome(lock)
+	_, err = RecoverUnderLock(m.home, lock, engine)
 	if err != nil {
 		return err
 	}
 	l, err := load(m.home)
 	if err != nil {
 		return fmt.Errorf("project lease evidence unreadable; retain all roots: %w", err)
-	}
-	if recovered {
-		for id, e := range l.Leases {
-			if e.State != Released {
-				e.State = Unknown
-				l.Leases[id] = e
-			}
-		}
-		if err = m.publish(l, lock, engine, map[string][]byte{}, nil); err != nil {
-			return err
-		}
 	}
 	return fn(l, lock, engine)
 }
