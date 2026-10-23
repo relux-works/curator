@@ -435,7 +435,8 @@ func TestClaudeNativeOptIn(t *testing.T) {
 }
 
 // Claim: empty documents and empty middle documents follow I-COMP's byte rule
-// through native output/receipt construction; the adapter adds no root bytes.
+// through native output construction on every platform; the adapter adds no root
+// bytes. Receipt verification exercises the qualified macOS/Linux binding only.
 func TestClaudeEmptyDocuments(t *testing.T) {
 	for _, tc := range []struct {
 		profile  string
@@ -453,24 +454,29 @@ func TestClaudeEmptyDocuments(t *testing.T) {
 		if string(files["CLAUDE.md"]) != tc.want {
 			t.Fatal("empty-document bytes differ")
 		}
-		receipt, err := compositionReceipt(files, nil, strings.Repeat("1", 64), strings.Repeat("2", 64), "worktree:fixture")
-		if err != nil {
-			t.Fatal(err)
-		}
-		home := t.TempDir()
-		if err := os.Chmod(home, 0700); err != nil {
-			t.Fatal(err)
-		}
-		pub := &claudePublisherFixture{t: t, home: home, expected: Composition{Generated: map[string]Surface{}}}
-		for _, f := range receipt.Files {
-			pub.expected.Generated[f.Path] = Surface{SHA256: f.SHA256, Size: f.Size, Mode: 0600}
-		}
-		if err = pub.PublishPrepared(context.Background(), "reserved", files, false); err != nil {
-			t.Fatal(err)
-		}
-		if err = verifyClaudeReceipt(home, receipt); err != nil {
-			t.Fatal(err)
-		}
+		t.Run("receipt", func(t *testing.T) {
+			if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+				t.Skip("CIP filesystem binding supports macOS/Linux")
+			}
+			receipt, err := compositionReceipt(files, nil, strings.Repeat("1", 64), strings.Repeat("2", 64), "worktree:fixture")
+			if err != nil {
+				t.Fatal(err)
+			}
+			home := t.TempDir()
+			if err := os.Chmod(home, 0700); err != nil {
+				t.Fatal(err)
+			}
+			pub := &claudePublisherFixture{t: t, home: home, expected: Composition{Generated: map[string]Surface{}}}
+			for _, f := range receipt.Files {
+				pub.expected.Generated[f.Path] = Surface{SHA256: f.SHA256, Size: f.Size, Mode: 0600}
+			}
+			if err = pub.PublishPrepared(context.Background(), "reserved", files, false); err != nil {
+				t.Fatal(err)
+			}
+			if err = verifyClaudeReceipt(home, receipt); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 
