@@ -39,7 +39,7 @@ func (engine *Engine) commitExchange(journal *Journal, index int) error {
 			if err := engine.checkBoundary(journal, index); err != nil {
 				return err
 			}
-			if err := durableRenameNoReplace(target.StagedPath, target.BackupPath); err != nil {
+			if err := engine.renameNoReplace(target.StagedPath, target.BackupPath); err != nil {
 				return err
 			}
 			if err := engine.emit(journal, index, PointAfterBackup); err != nil {
@@ -77,7 +77,7 @@ func (engine *Engine) commitExchange(journal *Journal, index int) error {
 		if err := engine.checkBoundary(journal, index); err != nil {
 			return err
 		}
-		if err := durableExchange(target.BackupPath, target.LivePath); err != nil {
+		if err := engine.exchange(target.BackupPath, target.LivePath); err != nil {
 			return err
 		}
 		if err := engine.emit(journal, index, PointAfterInstall); err != nil {
@@ -128,7 +128,7 @@ func (engine *Engine) rollbackExchange(journal *Journal, index int) error {
 		if _, _, err := exchangeLayout(target); err != nil {
 			return err
 		}
-		if err := durableExchange(target.BackupPath, target.LivePath); err != nil {
+		if err := engine.exchange(target.BackupPath, target.LivePath); err != nil {
 			return err
 		}
 		if err := engine.emit(journal, index, PointAfterRestore); err != nil {
@@ -146,7 +146,7 @@ func (engine *Engine) rollbackExchange(journal *Journal, index int) error {
 		if _, _, err := exchangeLayout(target); err != nil {
 			return err
 		}
-		if err := durableRenameNoReplace(target.BackupPath, target.RollbackPath); err != nil {
+		if err := engine.renameNoReplace(target.BackupPath, target.RollbackPath); err != nil {
 			return err
 		}
 	} else if backup != DigestAbsent {
@@ -158,4 +158,14 @@ func (engine *Engine) rollbackExchange(journal *Journal, index int) error {
 		return err
 	}
 	return engine.emit(journal, index, PointTargetRolledBack)
+}
+
+// Exchange mutations use the same acquisition check as ordinary renames, after
+// boundary callbacks and layout reads. Rollback checks ownership independently
+// of forward admission so the current owner can restore rejected transactions.
+func (engine *Engine) exchange(first, second string) error {
+	if err := engine.checkOwnership(); err != nil {
+		return err
+	}
+	return durableExchange(first, second)
 }
