@@ -30,6 +30,9 @@
   Launch-time enumeration fixes known server names, but a late server on the
   same app-server bypasses it at the next thread entry;
   `mcp_servers.late_tool.disabled_tools` still changes the actual catalog.
+  The r3 digest preflight rejects quiescent changes but cannot bind the later
+  native read: a post-check server loads through `thread/start`; restoring the
+  initial bytes passes another check while its tool remains callable.
   Native-project uses trusted entry and preserves native prose/config, as the
   owner ruled, but Permissions, launch and prepared publication remain refused.
   A vendor control or separately qualified manager policy boundary must remove

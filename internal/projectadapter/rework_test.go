@@ -242,7 +242,8 @@ func TestCodexManagerMetadata(t *testing.T) {
 
 // Claim (R1): valid inputs still produce an inspectable immutable plan, while
 // native-project permission certification, launch and prepared lease publication
-// all refuse at this pin. Strict keeps its separate exclusion refusal.
+// all refuse at this pin with the measured post-preflight native read gap named.
+// Strict keeps its separate exclusion refusal.
 func TestCodexNativeProjectRefusal(t *testing.T) {
 	p := render(t, request(t))
 	if len(p.Files()) == 0 || len(p.Launch().Args) == 0 {
@@ -251,6 +252,11 @@ func TestCodexNativeProjectRefusal(t *testing.T) {
 	var refusal *Unsupported
 	if err := p.RequireLaunch(); !errors.As(err, &refusal) || refusal.Surface != Permissions || refusal.Code() != "project_context_unsupported" {
 		t.Fatalf("incompatible native-project launch accepted: %v", err)
+	}
+	for _, detail := range []string{"disabled_tools", "project_config_changed", "thread/start", "restoring config bytes", "tool remains callable"} {
+		if !strings.Contains(refusal.Reason, detail) {
+			t.Fatalf("config-fence refusal omits measured path %q: %s", detail, refusal.Reason)
+		}
 	}
 	report := p.Report()
 	for _, surface := range report.Certified {

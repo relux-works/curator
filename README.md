@@ -331,7 +331,9 @@ and Git to render inspectable native-project plans with profile-only roots,
 admitted skills/MCP and a receipt-bound pinned native system-skill bundle.
 Native-project launch and prepared publication currently refuse because the
 repository MCP permission keys survive manager argv and change the actual
-exposed tools. Trusted previews retain native project prose/config. Run
+exposed tools. A digest preflight still permits a post-check native read;
+restored config bytes pass while the loaded tool remains callable. Trusted
+previews retain native project prose/config. Run
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectadapter ./internal/projectcontext -count=1`.
 The guide documents native opt-in regressions, bundle provenance, narrowing
 controls and task-local `.temp/` evidence.

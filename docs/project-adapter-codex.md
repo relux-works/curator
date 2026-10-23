@@ -31,6 +31,35 @@ a successful call in the unrestricted positive. One-time launch enumeration
 does not cover that reload/entry. The candidate stays in the research replay;
 no product parser or supported-launch claim is introduced.
 
+The r3 digest fence candidate records every fixture-enumerated config input,
+including absent inputs, full file bytes and the sorted MCP server/key/value
+set. Before dispatch it re-reads these inputs. Unchanged input admits;
+a late server, edited `disabled_tools`, removed server/file, added config,
+file/directory link, malformed TOML or unknown key returns a typed
+`project_config_changed` requiring relaunch. Rejection neither dispatches nor
+repairs or recaptures the baseline. Relaunch re-enumerates the new set and
+re-applies manager dotted ceilings; the known unadmitted server stays stopped.
+
+That preflight does not bind Codex's independent later read. The bounded
+`TestAdapterConfigFenceReadGap` deterministically changes config **after a
+successful check and before `thread/start`**, on the same app-server. The new
+server loads and its `disabled_tools` changes the observed catalog. Restoring
+the exact initial bytes passes another check; a real synthetic tool call on
+the already loaded thread still succeeds. No fence check was skipped. Native
+status enumeration itself re-reads config, so the test captures the catalog
+before restoration and uses an actual call afterward to prove retained state.
+This is a native read gap, not an inference from a config view.
+
+Per the r3 fallback, Permissions remains refused; the launch/report diagnostic
+names this exact path. The candidate stays in research and is not installed
+as admission authority. The fixture supplies the input list and supports only
+the existing bounded stdio TOML subset; it claims neither complete native
+config discovery nor model-turn/approval-dialog qualification. A vendor input
+snapshot consumed by the native reader, or an independently enforced policy
+boundary over that reader, needs separate qualification before support can
+be advertised. An advisory filesystem lock or another preflight cannot bind
+a native process that does not participate in that lock.
+
 The manager must still set both `Mode: native-project` and
 `NativeProjectEnabled` to inspect a plan. Another mode, release or platform
 refuses rendering. `strict` always receives a typed `Unsupported` refusal for
@@ -211,3 +240,16 @@ Follow the [offline harness guide](../.research/project-exclusion-codex/README.m
 for boundary controls and fixture requirements. Native process IDs and sanitized
 observations go below the explicit run root. These tests establish startup and
 receipt behavior; they do not qualify model turns, resume or child sessions.
+
+The r3 fence unit pairs and real native call controls are replayed explicitly:
+
+```sh
+env -u GIT_DIR -u GIT_WORK_TREE "$CURATOR_GO" test ./.research/project-exclusion-codex -count=1 -v -run '^TestConfigFence(Admission|Intake)$'
+CODEX_EXCL_RUN_ROOT="$PWD/.temp/project-adapter-codex/fence-01" \
+  env -u GIT_DIR -u GIT_WORK_TREE "$CURATOR_GO" test ./.research/project-exclusion-codex -count=1 -v -run '^TestAdapterConfigFenceReadGap$'
+```
+
+Run the affected packages and controls through the authorized suite-slot
+wrapper. Narrowing plants cover skipping the fence, comparing filenames only,
+ignoring a linked parent and omitting the measured refusal path. Each must
+reach its named assertion; no skipped native entry counts as evidence.

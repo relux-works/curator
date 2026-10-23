@@ -89,7 +89,8 @@ func (p *Plan) RequireStrict() error {
 }
 
 // RequireLaunch refuses native-project permission policy at this pin because
-// repository MCP permission keys survive manager argv. Rendered plans remain
+// repository MCP permission keys survive manager argv and preflight digests do
+// not bind the independent native config read. Rendered plans remain
 // inspection data; neither this gate nor strict mode may be bypassed by a
 // delegated runner.
 func (p *Plan) RequireLaunch() error {
@@ -99,7 +100,7 @@ func (p *Plan) RequireLaunch() error {
 	return &Unsupported{Permissions, codexNativeProjectReason}
 }
 
-const codexNativeProjectReason = "Codex 0.162.1 repository mcp_servers.*.disabled_tools survives manager argv and changes exposed MCP tools; launch-time dotted overrides do not cover late servers at native thread entry, so native-project permissions are unsupported"
+const codexNativeProjectReason = "Codex 0.162.1 repository mcp_servers.*.disabled_tools survives manager argv and changes exposed MCP tools; a late server added after a successful project_config_changed digest preflight loads at native thread/start, and restoring config bytes passes the next check while its tool remains callable; native-project permissions require a bound native config read and remain unsupported"
 
 const codexExclusionReason = "Codex 0.162.1 retains repository skills, including late-created paths; lazy, resume and child exclusion remain unqualified"
 
