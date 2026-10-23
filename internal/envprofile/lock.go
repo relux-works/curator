@@ -224,7 +224,11 @@ func (op *operation) publish(files map[string][]byte, removals ...string) error 
 			return fmt.Errorf("protect published profile record %s: %w", item.path, err)
 		}
 	}
-	return nil
+	var publishedPaths []string
+	for _, item := range changes {
+		publishedPaths = append(publishedPaths, item.path)
+	}
+	return op.recordPostimages(publishedPaths...)
 }
 
 // newTransactionID names one profile journal.

@@ -59,12 +59,12 @@ func TestGlobalProfilePrivateStaging(t *testing.T) {
 			if mode == "cancel" {
 				builder.failOn["alpha"] = context.Canceled
 			}
-			result := Global(e.cfg, t.TempDir(), Options{Context: ctx, Build: deps, WithGlobalProfile: func(lock HomeLock, next func() Result) Result {
+			result := Global(e.cfg, t.TempDir(), Options{Context: ctx, Build: deps, WithGlobalProfile: func(lock HomeLock, next func() Result) (Result, error) {
 				if err := lock.AssertHeld(); err != nil {
 					t.Fatal(err)
 				}
 				published = true
-				return next()
+				return next(), nil
 			}})
 			if mode == "success" {
 				if result.Status != "ok" || !published {
@@ -111,7 +111,7 @@ func TestGlobalProfileStagingAddition(t *testing.T) {
 			deps, _, cache, builder := newFakeDeps(t)
 			addition := &envprofile.DirectSkill{Name: "build-skill", Tag: "v1"}
 			result := Global(e.cfg, t.TempDir(), Options{Build: deps, GlobalAddition: addition,
-				WithGlobalProfile: func(_ HomeLock, next func() Result) Result {
+				WithGlobalProfile: func(_ HomeLock, next func() Result) (Result, error) {
 					if len(builder.calls) != 1 {
 						t.Fatal("prospective addition was not staged")
 					}
@@ -125,7 +125,7 @@ func TestGlobalProfileStagingAddition(t *testing.T) {
 					if diverged {
 						e.write(GlobalRoot(e.home), "Skillfile.json", `{"schema_version":1,"skills":[]}`)
 					}
-					return next()
+					return next(), nil
 				},
 			})
 			if diverged {
@@ -155,12 +155,12 @@ func TestGlobalProfileStagingRevalidatesDeclaration(t *testing.T) {
 			}
 			return nil
 		},
-		WithGlobalProfile: func(_ HomeLock, next func() Result) Result {
+		WithGlobalProfile: func(_ HomeLock, next func() Result) (Result, error) {
 			publications++
 			if stages != 2 {
 				t.Fatal("stale declaration reached profile publication before restart")
 			}
-			return next()
+			return next(), nil
 		},
 	})
 	if result.Status != "ok" || stages != 2 || publications != 1 {
@@ -168,5 +168,43 @@ func TestGlobalProfileStagingRevalidatesDeclaration(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Join(GlobalRoot(e.home), "skills", "build-skill")); !os.IsNotExist(err) {
 		t.Fatalf("stale staged canonical skill published: %v", err)
+	}
+}
+
+// A continuation's generation restart retries only after successful profile
+// compensation. A typed compensation failure terminates the first attempt and
+// remains visible in the result instead of being discarded by the retry loop.
+func TestGlobalProfileCompensationStopsRestart(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		t.Run(map[bool]string{false: "restored", true: "failed"}[fail], func(t *testing.T) {
+			e := newEnv(t)
+			e.buildSkill("build-skill", "alpha")
+			e.globalDeclare("build-skill")
+			deps, _, _, _ := newFakeDeps(t)
+			attempts := 0
+			result := Global(e.cfg, t.TempDir(), Options{Build: deps,
+				WithGlobalProfile: func(_ HomeLock, next func() Result) (Result, error) {
+					attempts++
+					if attempts == 1 {
+						e.write(GlobalRoot(e.home), "Skillfile.json", `{"schema_version":1,"skills":[]}`)
+					}
+					result := next()
+					if attempts == 1 && result.Status != "failed" {
+						t.Fatalf("generation restart was not exercised: %+v", result)
+					}
+					if fail {
+						return result, &envprofile.GlobalCompensationError{Cause: errors.New("planted surface conflict")}
+					}
+					return result, nil
+				},
+			})
+			if fail {
+				if attempts != 1 || result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "global profile compensation failed") {
+					t.Fatalf("compensation failure was retried or hidden: attempts=%d result=%+v", attempts, result)
+				}
+			} else if attempts != 2 || result.Status != "ok" {
+				t.Fatalf("successful compensation did not retry: attempts=%d result=%+v", attempts, result)
+			}
+		})
 	}
 }

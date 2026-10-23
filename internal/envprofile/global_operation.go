@@ -18,7 +18,9 @@ import (
 
 // GlobalSkillTransaction joins profile publication and the legacy continuation
 // under the caller's manager-home lock. Ordinary returned errors restore the
-// profile's mutable records and surfaces. The §9.4 unmanaged-conflict exception
+// profile's mutable records and surfaces after verifying their postimages.
+// Failed native compensation retains published profile recovery records and
+// returns GlobalCompensationError. The §9.4 unmanaged-conflict exception
 // retains the extended lock and its install record. Immutable admitted store
 // entries may remain.
 // The continuation owns its own install journal and rolls its targets back
@@ -44,7 +46,7 @@ func GlobalSkillTransaction(home string, policy Policy, machine envregistry.Mach
 		// Only a profile-phase in-place unmanaged conflict qualifies for retaining
 		// the extended lock. A later legacy refusal never inherits this exception.
 		if err := op.undo.restore(); err != nil {
-			resultErr = errors.Join(resultErr, fmt.Errorf("restore global profile publication: %w", err))
+			resultErr = errors.Join(resultErr, &GlobalCompensationError{Cause: err})
 			return
 		}
 		if retainedRecords != nil {
@@ -89,6 +91,9 @@ func GlobalSkillTransaction(home string, policy Policy, machine envregistry.Mach
 		if err := manifest.AddDecl(root, addition.Name, kind, value, addition.Git, ""); err != nil {
 			return info, err
 		}
+		if err := op.recordPostimages(manifest.PathIn(root)); err != nil {
+			return info, err
+		}
 	}
 	return info, next()
 }
@@ -112,7 +117,19 @@ type globalUndo struct {
 	entries       map[string]*globalImage
 	absentParents map[string]bool
 	parentModes   map[string]os.FileMode
+	postimages    map[string]*globalImage
 }
+
+// GlobalCompensationError forbids retrying a failed paired publication. The
+// published profile lock and install record remain available for explicit sync
+// after the conflicting or unwritable surface has been resolved.
+type GlobalCompensationError struct{ Cause error }
+
+func (err *GlobalCompensationError) Error() string {
+	return fmt.Sprintf("global profile compensation failed; pending profile lock retained: %v", err.Cause)
+}
+func (err *GlobalCompensationError) Unwrap() error { return err.Cause }
+
 type globalImage struct {
 	mode     os.FileMode
 	data     []byte
@@ -201,12 +218,65 @@ func (op *operation) capture(paths ...string) error {
 			return err
 		}
 		op.undo.entries[path] = image
+		if op.undo.postimages == nil {
+			op.undo.postimages = map[string]*globalImage{}
+		}
+		op.undo.postimages[path] = image
 		if op.undo.absentParents == nil {
 			op.undo.absentParents = map[string]bool{}
 		}
 		if err := op.noteParents(path); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// Record immediately at the publisher boundary, before another phase can run
+// external processes or the continuation. Never learn a postimage at rollback.
+func (op *operation) recordPostimages(paths ...string) error {
+	if op == nil || op.undo == nil {
+		return nil
+	}
+	for captured := range op.undo.entries {
+		for _, path := range paths {
+			if captured == path || strings.HasPrefix(path, captured+string(filepath.Separator)) {
+				image, err := readGlobalImage(captured)
+				if err != nil {
+					return err
+				}
+				op.undo.postimages[captured] = image
+				break
+			}
+		}
+	}
+	return nil
+}
+
+func (op *operation) recordHomePostimages(root string) error {
+	if op == nil || op.undo == nil {
+		return nil
+	}
+	var paths []string
+	for path := range op.undo.entries {
+		if strings.HasPrefix(path, root+string(filepath.Separator)) {
+			paths = append(paths, path)
+		}
+	}
+	return op.recordPostimages(paths...)
+}
+
+func (undo *globalUndo) checkPostimage(path string) error {
+	current, err := readGlobalImage(path)
+	if err != nil {
+		return err
+	}
+	// An unchanged or already restored preimage needs no mutation.
+	if reflect.DeepEqual(current, undo.entries[path]) {
+		return nil
+	}
+	if !reflect.DeepEqual(current, undo.postimages[path]) {
+		return fmt.Errorf("%w: global profile compensation postimage changed: %s", transaction.ErrImplementationCorruption, path)
 	}
 	return nil
 }
@@ -250,7 +320,46 @@ func (undo *globalUndo) restore() error {
 	for path := range undo.entries {
 		paths = append(paths, path)
 	}
-	sort.Slice(paths, func(i, j int) bool { return len(paths[i]) > len(paths[j]) })
+	// Native surfaces must finish compensating before manager records (notably
+	// the extended lock) can revert. A failed surface rollback retains recovery
+	// evidence instead of leaving an active skill outside an empty lock.
+	managerPath := func(path string) bool {
+		return undo.managerHome != "" && strings.HasPrefix(path, undo.managerHome+string(filepath.Separator))
+	}
+	sort.Slice(paths, func(i, j int) bool {
+		if managerPath(paths[i]) != managerPath(paths[j]) {
+			return !managerPath(paths[i])
+		}
+		if len(paths[i]) != len(paths[j]) {
+			return len(paths[i]) > len(paths[j])
+		}
+		return paths[i] < paths[j]
+	})
+	// Refuse unknown state before changing any target, including its marker or
+	// lock. Inspect recorded parents without following a replacement symlink.
+	for parent := range undo.parentModes {
+		state, err := stateread.Lstat(parent)
+		if err != nil {
+			return err
+		}
+		if state.Kind != stateread.KindPresent || state.Info == nil || !state.Info.IsDir() {
+			return fmt.Errorf("%w: compensation parent changed kind: %s", transaction.ErrImplementationCorruption, parent)
+		}
+	}
+	for parent := range undo.absentParents {
+		state, err := stateread.Lstat(parent)
+		if err != nil {
+			return err
+		}
+		if state.Kind != stateread.KindAbsent && (state.Kind != stateread.KindPresent || state.Info == nil || !state.Info.IsDir()) {
+			return fmt.Errorf("%w: compensation parent changed kind: %s", transaction.ErrImplementationCorruption, parent)
+		}
+	}
+	for _, path := range paths {
+		if err := undo.checkPostimage(path); err != nil {
+			return err
+		}
+	}
 	var errs []error
 	for _, path := range paths {
 		// A parent image supersedes any leaves captured before the parent.
@@ -262,8 +371,11 @@ func (undo *globalUndo) restore() error {
 			}
 		}
 		if !nested {
+			if err := undo.checkPostimage(path); err != nil {
+				return err
+			}
 			if err := restoreGlobalImage(path, undo.entries[path]); err != nil {
-				errs = append(errs, err)
+				return err
 			}
 		}
 	}

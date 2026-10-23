@@ -46,7 +46,13 @@ profile lock, rendered documents, native and managed surfaces, backup inventory,
 and parent directory modes. An in-place `environment_surface_unmanaged_conflict`
 retains the extended lock and its install record under environments §9.4
 so first-use `profile sync --takeover` can recover, while restoring the other
-mutable profile state. Other failures do not inherit that exception. Admitted
+mutable profile state. Compensation checks recorded postimages before changing
+any target and again before each restoration. An operator replacement is
+preserved and reported as a conflict. Failed compensation stops automatic
+generation restarts and retains the extended profile lock and install record;
+resolve the conflicting or unwritable path, then explicitly actualize the
+pending lock with `profile sync --takeover` and retry the global operation.
+Other failures do not inherit the handled-conflict exception. Admitted
 immutable store entries may remain. The compensation covers returned errors;
 it does not add a cross-phase process-crash journal to the existing individual
 profile and legacy transaction recovery mechanisms.

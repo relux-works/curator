@@ -1875,7 +1875,7 @@ func (c cli) runGlobalInstallModeWithProfile(cfg *config.Config, args []string, 
 	}
 	if len(args) == 0 && !opts.DryRun && !fetch {
 		opts.GlobalAddition = addition
-		opts.WithGlobalProfile = func(lock install.HomeLock, next func() install.Result) install.Result {
+		opts.WithGlobalProfile = func(lock install.HomeLock, next func() install.Result) (install.Result, error) {
 			result := install.Result{Alias: "global", Path: install.GlobalRoot(cfg.Home())}
 			var legacyErr error
 			info, err := envprofile.GlobalSkillTransaction(cfg.Home(), envprofile.PolicyFromConfig(cfg), machineFromConfig(cfg), addition, c.profileNativeHomeResolver(), lock, func() error {
@@ -1889,12 +1889,12 @@ func (c cli) runGlobalInstallModeWithProfile(cfg *config.Config, args []string, 
 			if err != nil {
 				result.Status = "failed"
 				if err != legacyErr {
-					result.Errors = append(result.Errors, err.Error())
+					return result, err
 				}
 			} else {
 				result.Messages = append(result.Messages, fmt.Sprintf("installed global skills from profile %s (lock %s)", info.Name, info.LockHash))
 			}
-			return result
+			return result, nil
 		}
 	}
 	result := install.Global(cfg, userHome, opts)
