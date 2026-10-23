@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,50 +22,26 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 )
 
-// The wrapper forwards every real Git argument, output and status. It pauses
-// once after native publication, without changing a Git result or product state.
-func TestNativeGitBarrierProcess(_ *testing.T) {
-	if os.Getenv("CURATOR_NATIVE_GIT_HELPER") != "1" {
-		return
+// This fixture-only shell barrier forwards real Git's arguments, streams and
+// status without reexecuting a race-instrumented Go binary for each Git call.
+// Noclobber claims the ready file once; only that invocation waits for release.
+func installNativeGitBarrier(t *testing.T, published, ready, release string) {
+	t.Helper()
+	git, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
 	}
-	_ = os.Setenv("GIT_CONFIG_GLOBAL", os.Getenv("CURATOR_NATIVE_GIT_CONFIG"))
-	if _, err := os.Lstat(os.Getenv("CURATOR_NATIVE_PUBLISHED")); err == nil {
-		ready := os.Getenv("CURATOR_NATIVE_READY")
-		if f, err := os.OpenFile(ready, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600); err == nil {
-			_ = f.Close()
-			deadline := time.Now().Add(30 * time.Second)
-			for {
-				if _, err := os.Stat(os.Getenv("CURATOR_NATIVE_RELEASE")); err == nil {
-					break
-				}
-				if time.Now().After(deadline) {
-					fmt.Fprintln(os.Stderr, "native Git barrier timed out")
-					os.Exit(91)
-				}
-				time.Sleep(10 * time.Millisecond)
-			}
-		}
+	dir := t.TempDir()
+	quote := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'" }
+	script := "#!/bin/sh\npublished=" + quote(published) + "\nready=" + quote(ready) + "\nrelease=" + quote(release) + "\n"
+	script += "if [ -e \"$published\" ] && (set -C; : > \"$ready\") 2>/dev/null; then\n  while [ ! -e \"$release\" ]; do sleep 0.01; done\nfi\n"
+	script += "exec " + quote(git) + " \"$@\"\n"
+	path := filepath.Join(dir, "git")
+	writeFile(t, path, script)
+	if err := os.Chmod(path, 0700); err != nil {
+		t.Fatal(err)
 	}
-	separator := 0
-	for i, arg := range os.Args {
-		if arg == "--" {
-			separator = i + 1
-			break
-		}
-	}
-	if separator == 0 {
-		os.Exit(92)
-	}
-	cmd := exec.Command(os.Getenv("CURATOR_NATIVE_REAL_GIT"), os.Args[separator:]...)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
-			os.Exit(exit.ExitCode())
-		}
-		os.Exit(93)
-	}
-	os.Exit(0)
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
 // Child entry restores only the parent's fixture Git mapping after TestMain's
@@ -207,21 +182,7 @@ func TestGlobalNativeOwnerConcurrentRemove(t *testing.T) {
 			}
 			dir := t.TempDir()
 			ready, release := filepath.Join(dir, "ready"), filepath.Join(dir, "release")
-			git, err := exec.LookPath("git")
-			if err != nil {
-				t.Fatal(err)
-			}
-			quote := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'" }
-			script := "#!/bin/sh\n"
-			for key, value := range map[string]string{cliHelperProcess: "1", "CURATOR_NATIVE_GIT_HELPER": "1", "CURATOR_NATIVE_REAL_GIT": git, "CURATOR_NATIVE_GIT_CONFIG": os.Getenv("GIT_CONFIG_GLOBAL"), "CURATOR_NATIVE_PUBLISHED": published, "CURATOR_NATIVE_READY": ready, "CURATOR_NATIVE_RELEASE": release} {
-				script += key + "=" + quote(value) + "\nexport " + key + "\n"
-			}
-			script += "exec " + quote(os.Args[0]) + " -test.run=^TestNativeGitBarrierProcess$ -- \"$@\"\n"
-			writeFile(t, filepath.Join(dir, "git"), script)
-			if err := os.Chmod(filepath.Join(dir, "git"), 0700); err != nil {
-				t.Fatal(err)
-			}
-			t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+			installNativeGitBarrier(t, published, ready, release)
 			installing := startNativeCommand(t, fixture, "global", "install")
 			// Release before child cleanup even on assertion failure.
 			defer func() { _ = os.WriteFile(release, []byte("release"), 0600) }()

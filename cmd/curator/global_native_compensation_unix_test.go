@@ -128,21 +128,7 @@ func pauseNativeProfilePublication(t *testing.T, fixture nativeGlobalFixture) (*
 	published := filepath.Join(envprofile.ManagedHomeDir(filepath.Join(fixture.home, ".curator"), "selected-profile", envregistry.CodexCLI), envmarker.Name)
 	dir := t.TempDir()
 	ready, release := filepath.Join(dir, "ready"), filepath.Join(dir, "release")
-	git, err := exec.LookPath("git")
-	if err != nil {
-		t.Fatal(err)
-	}
-	quote := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'" }
-	script := "#!/bin/sh\n"
-	for key, value := range map[string]string{cliHelperProcess: "1", "CURATOR_NATIVE_GIT_HELPER": "1", "CURATOR_NATIVE_REAL_GIT": git, "CURATOR_NATIVE_GIT_CONFIG": os.Getenv("GIT_CONFIG_GLOBAL"), "CURATOR_NATIVE_PUBLISHED": published, "CURATOR_NATIVE_READY": ready, "CURATOR_NATIVE_RELEASE": release} {
-		script += key + "=" + quote(value) + "\nexport " + key + "\n"
-	}
-	script += "exec " + quote(os.Args[0]) + " -test.run=^TestNativeGitBarrierProcess$ -- \"$@\"\n"
-	writeFile(t, filepath.Join(dir, "git"), script)
-	if err := os.Chmod(filepath.Join(dir, "git"), 0700); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	installNativeGitBarrier(t, published, ready, release)
 	child := startNativeCommand(t, fixture, "global", "install")
 	unblock := func() {
 		if err := os.WriteFile(release, []byte("release"), 0600); err != nil {

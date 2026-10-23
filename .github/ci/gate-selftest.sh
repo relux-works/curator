@@ -487,6 +487,43 @@ for goos in linux darwin windows; do
 done
 
 echo ''
+# The native-owner carve-outs apply only to their named Unix fixtures on
+# Windows. The same skip is refused on Unix, and another recognised class
+# cannot excuse the Windows skip. These are gate controls, not product runs.
+for fixture in \
+ 'TestGlobalNativeOwnershipNarrowingControls/omit-build-permit-barrier|concurrency witness requires the Unix Git/FIFO harness' \
+ 'TestGlobalProfileCompensationParentModes|Unix permission bits are the tested metadata' \
+ 'TestGlobalProfileCompensationLateParentMode|Unix special permission bits are the tested metadata' \
+ 'TestGlobalProfileCompensationNestedNativeHome|requires unprivileged Unix directory permissions'; do
+ native_case="${fixture%%|*}"; native_reason="${fixture#*|}"
+ for goos in linux darwin windows; do
+  stream="$WORK/native-owner-$goos.json"
+  grep -v -F "\"Test\":\"$native_case\"" "$WORK/shipped-$goos.json" >"$stream"
+  evout internal/envprofile "$native_case" "$native_reason" >>"$stream"
+  ev skip internal/envprofile "$native_case" >>"$stream"
+  want=1; [ "$goos" = windows ] && want=0
+  excluded=''; [ "$goos" = linux ] && excluded='internal/godriver'
+  assert "native ownership $native_case skip has the declared policy on $goos" "$want" \
+   env CI_GATE_GOOS="$goos" CI_EXCLUDED_PKGS="$excluded" CI_PLATFORM_CASES="$SHIPPED" \
+   CI_SKIP_CLASSES="$CLASSES" CI_GATE_MODULE="$MODULE_PATH" \
+   bash "$GATE" "$stream" "$WORK/native-owner-ev-$goos"
+  if [ "$goos" = windows ]; then
+   assert_contains "Windows records $native_case as the declared platform control" \
+    "$(printf '%s\tplatform-control\ttolerated-by-ledger' "$native_case")" \
+    "$WORK/native-owner-ev-$goos/skips-observed.tsv"
+   sed "s|$native_reason|helper process|" "$stream" >"$WORK/native-owner-wrong.json" || {
+    bad "prepare wrong-class control for $native_case" "cannot rewrite skip reason"; continue
+   }
+   assert "native ownership $native_case rejects a different recognised skip class" 1 \
+    env CI_GATE_GOOS=windows CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
+    CI_GATE_MODULE="$MODULE_PATH" bash "$GATE" "$WORK/native-owner-wrong.json" "$WORK/native-owner-wrong-ev"
+   assert_contains "wrong-class control for $native_case fails for its intended reason" \
+    'FATAL-wrong-class' "$WORK/native-owner-wrong-ev/skips-observed.tsv"
+  fi
+ done
+done
+
+echo ''
 echo '=== suite-plan.sh: the plan comes from the root, not from the lane ==='
 PLAN="$HERE/suite-plan.sh"
 assert 'suite-plan rejects a nonexistent root'      2 bash "$PLAN" "$WORK/absent" "$WORK/planev"

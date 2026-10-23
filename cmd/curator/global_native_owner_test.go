@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/transaction"
 )
@@ -364,14 +366,18 @@ func nativeOwnerSnapshot(t *testing.T, root string) map[string]helpTreeEntry {
 	}
 	snapshot := snapshotHelpTree(t, root)
 	for rel, entry := range snapshot {
+		// Directory allocation size is not a content or permission invariant.
+		if entry.Mode.IsDir() {
+			entry.Size = 0
+		}
 		if entry.Mode&os.ModeSymlink != 0 {
 			target, err := os.Readlink(filepath.Join(root, rel))
 			if err != nil {
 				t.Fatal(err)
 			}
 			entry.Hash = sha256.Sum256([]byte(target))
-			snapshot[rel] = entry
 		}
+		snapshot[rel] = entry
 	}
 	return snapshot
 }
@@ -421,4 +427,104 @@ func TestGlobalNativeOwnerFreshAddConflict(t *testing.T) {
 	}
 	fixture.command(t, exitOK, args...)
 	fixture.requireProfileOwner(t)
+}
+
+func configureNativeCompiledSkill(t *testing.T, fixture nativeGlobalFixture, compiled string) {
+	t.Helper()
+	f, err := os.OpenFile(os.Getenv("GIT_CONFIG_GLOBAL"), os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.WriteString("\n[url \"" + filepath.ToSlash(compiled) + "\"]\n\tinsteadOf = https://example.com/build-skill\n")
+	if closeErr := f.Close(); err != nil || closeErr != nil {
+		t.Fatalf("write fixture mapping: %v %v", err, closeErr)
+	}
+	writeFile(t, filepath.Join(fixture.home, ".curator", "global", "Skillfile.json"), `{"schema_version":1,"agents":["codex_cli","claude_code"],"skills":[{"name":"build-skill","git":"https://example.com/build-skill","tag":"v1"}]}`)
+}
+
+func requireCompiledNativeOwner(t *testing.T, fixture nativeGlobalFixture) {
+	t.Helper()
+	for _, path := range []string{".curator/global/skills/build-skill", ".codex/skills/build-skill", ".claude/skills/build-skill"} {
+		if _, err := os.Stat(filepath.Join(fixture.home, filepath.FromSlash(path))); err != nil {
+			t.Fatalf("real build did not publish %s: %v", path, err)
+		}
+	}
+}
+
+// Covered inventory hosts perform a real global compiled install. Uncovered
+// hosts return the specified control diagnostic and preserve native/profile
+// state without publishing a canonical entry. No host is silently skipped.
+func TestGlobalNativeOwnerBuildInventory(t *testing.T) {
+	fixture := newNativeGlobalFixture(t)
+	profile := t.TempDir()
+	writeContextPackage(t, profile, "empty-profile", "1.0.0", "profile context\n")
+	fixture.command(t, exitOK, "profile", "install", profile, "--use")
+	compiled := t.TempDir()
+	writeCompiledSkillRepo(t, compiled)
+	configureNativeCompiledSkill(t, fixture, compiled)
+	snapshots := map[string]map[string]helpTreeEntry{}
+	for _, path := range []string{filepath.Join(fixture.home, ".claude"), filepath.Join(fixture.home, ".codex"), filepath.Join(fixture.home, ".curator", "profiles", "empty-profile")} {
+		snapshots[path] = nativeOwnerSnapshot(t, path)
+	}
+	code, stdout, stderr := runFile(t, fixture.config, "global", "install")
+	if godriver.InventoryPlatform(runtime.GOOS) != "" {
+		if code != exitOK {
+			t.Fatalf("covered global compiled install failed: %d %s%s", code, stdout, stderr)
+		}
+		requireCompiledNativeOwner(t, fixture)
+		return
+	}
+	if code != exitFail || !strings.Contains(stderr, godriver.CodeControlUnavailable) || !strings.Contains(stderr, "no record for host "+runtime.GOOS) {
+		t.Fatalf("uncovered global build lost its specific refusal: %d %s%s", code, stdout, stderr)
+	}
+	for path, before := range snapshots {
+		if after := nativeOwnerSnapshot(t, path); !reflect.DeepEqual(before, after) {
+			t.Fatalf("uncovered global build published profile/native state: %s", nativeOwnerDiff(before, after))
+		}
+	}
+	if _, err := os.Lstat(filepath.Join(fixture.home, ".curator", "global", "skills", "build-skill")); !os.IsNotExist(err) {
+		t.Fatalf("uncovered global build published canonical entry: %v", err)
+	}
+}
+
+// Directory allocation length is opaque filesystem metadata. Snapshots omit
+// it but preserve file length, bytes and entry kind; identical trees compare
+// equal, while same-length edits, length changes and file-to-directory changes
+// are detected. Existing ownership tests retain mode and link-target checks.
+func TestNativeOwnerSnapshotContract(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "entry")
+	writeFile(t, path, "before")
+	before := nativeOwnerSnapshot(t, root)
+	if before["."].Size != 0 {
+		t.Fatal("directory allocation leaked into snapshot")
+	}
+	if before["entry"].Size != 6 {
+		t.Fatal("regular file size lost")
+	}
+	if !reflect.DeepEqual(before, nativeOwnerSnapshot(t, root)) {
+		t.Fatal("unchanged snapshot differs")
+	}
+	writeFile(t, path, "mutant")
+	if reflect.DeepEqual(before, nativeOwnerSnapshot(t, root)) {
+		t.Fatal("same-length file edit ignored")
+	}
+	writeFile(t, path, "longer content")
+	after := nativeOwnerSnapshot(t, root)
+	if after["entry"].Size != 14 || reflect.DeepEqual(before, after) {
+		t.Fatal("file length change ignored")
+	}
+	writeFile(t, path, "before")
+	if !reflect.DeepEqual(before, nativeOwnerSnapshot(t, root)) {
+		t.Fatal("restored content differs after directory allocation changes")
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(path, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if reflect.DeepEqual(before, nativeOwnerSnapshot(t, root)) {
+		t.Fatal("file replacement by directory ignored")
+	}
 }

@@ -119,3 +119,8 @@ opt-in	hashes the whole host GOROOT	allow	a whole-GOROOT probe, not part of the 
 helper-process	helper process	allow	the go test helper-process re-exec pattern
 helper-process	is not reachable from this test binary	allow	the go test helper-process re-exec pattern
 platform-control	install\.sh supports macOS and Linux	allow	install.sh is a POSIX shell installer; Windows installs use the release archive directly
+
+# Global native ownership test fixtures use Unix process and permission primitives.
+platform-control	^concurrency witness requires the Unix Git/FIFO harness$	allow	the test-only process barrier and named metadata controls run on Unix; portable ownership and canonical refusal witnesses remain required on Windows
+platform-control	^Unix (special )?permission bits are the tested metadata$	allow	these compensation witnesses mutate Unix mode bits; Windows SID capture and foreign-postimage refusal still execute
+platform-control	^requires unprivileged Unix directory permissions$	allow	the nested-native compensation fixture needs Unix mode-bit denial; its portable ownership controls run on all hosts

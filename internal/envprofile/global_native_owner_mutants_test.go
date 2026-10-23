@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/godriver"
 )
 
 // Each overlay removes one ownership condition for a bounded witness. A kill
@@ -35,6 +37,9 @@ func TestGlobalNativeOwnershipNarrowingControls(t *testing.T) {
 		{"omit-native-publication-postimage", "internal/envprofile/switch.go", "if err := op.recordHomePostimages(native); err != nil {", "if err := error(nil); err != nil {", "./cmd/curator", "^TestGlobalNativeOwnerCompensationRestart$/^none$", "TestGlobalNativeOwnerCompensationRestart/none", "clean restart failed"},
 		{"omit-preview-carrier-validation", "internal/manifest/manifest.go", "func WithDecl(payload []byte, filePath, name, refKind, refValue, git, source string) ([]byte, error) {\n\tif err := protocoljson.Validate(payload); err != nil {", "func WithDecl(payload []byte, filePath, name, refKind, refValue, git, source string) ([]byte, error) {\n\tif err := protocoljson.Validate(payload); false && err != nil {", "./internal/manifest", "^TestWithDeclRejectsInvalidInput$", "TestWithDeclRejectsInvalidInput", "invalid preview admitted"},
 		{"lock-before-private-build", "internal/install/global.go", "\treturn runWithRestarts(\"global\", commit, func() (Result, *restartError) {", "\tif opts.WithGlobalProfile != nil { lock, err := commit.Locks.AcquireHome(ctx); if err != nil { return failedResult(\"global\", GlobalRoot(cfg.Home()), err) }; defer lock.Close(); commit.Locks = globalHeldLocks{LockBroker: commit.Locks, home: lock} }\n\treturn runWithRestarts(\"global\", commit, func() (Result, *restartError) {", "./internal/install", "^TestGlobalProfilePrivateStaging$/^success$", "TestGlobalProfilePrivateStaging/success", "private staging held the home lock"},
+		{"lock-before-real-private-build", "internal/install/global.go", "\treturn runWithRestarts(\"global\", commit, func() (Result, *restartError) {", "\tif opts.WithGlobalProfile != nil { lock, err := commit.Locks.AcquireHome(ctx); if err != nil { return failedResult(\"global\", GlobalRoot(cfg.Home()), err) }; defer lock.Close(); commit.Locks = globalHeldLocks{LockBroker: commit.Locks, home: lock} }\n\treturn runWithRestarts(\"global\", commit, func() (Result, *restartError) {", "./cmd/curator", "^TestGlobalNativeOwnerPausedBuild$", "TestGlobalNativeOwnerPausedBuild", "profile sync blocked by private build"},
+		{"omit-build-permit-barrier", "cmd/curator/global_native_build_unix_test.go", "if pauseOnPermit && frame.Kind == \"permit\" {", "if false && pauseOnPermit && frame.Kind == \"permit\" {", "./cmd/curator", "^TestNativeBuildPermitBarrier$", "TestNativeBuildPermitBarrier", "build permit pause count"},
+		{"ignore-regular-file-snapshot-size", "cmd/curator/global_native_owner_test.go", "if entry.Mode.IsDir() {\n\t\t\tentry.Size = 0", "if entry.Mode.IsDir() || entry.Mode.IsRegular() {\n\t\t\tentry.Size = 0", "./cmd/curator", "^TestNativeOwnerSnapshotContract$", "TestNativeOwnerSnapshotContract", "regular file size lost"},
 		{"omit-profile-generation-recheck", "internal/install/global.go", "if restart := observed.recheck(plan, deps.Cache); restart != nil {", "if restart := observed.recheck(plan, deps.Cache); false && restart != nil {", "./internal/install", "^TestGlobalProfileStagingRevalidatesDeclaration$", "TestGlobalProfileStagingRevalidatesDeclaration", "stale declaration reached profile publication before restart"},
 		{"omit-prospective-addition", "internal/install/global.go", "if addition := opts.GlobalAddition; addition != nil {", "if addition := opts.GlobalAddition; addition != nil && addition.Name == \"never-staged\" {", "./internal/install", "^TestGlobalProfileStagingAddition$/^exact$", "TestGlobalProfileStagingAddition/exact", "prospective addition was not staged"},
 		{"admit-divergent-addition", "internal/install/global.go", "err != nil || !bytes.Equal(document.payload, globalManifestPayload)", "err != nil || (!bytes.Equal(document.payload, globalManifestPayload) && len(document.payload) == 0)", "./internal/install", "^TestGlobalProfileStagingAddition$/^diverged$", "TestGlobalProfileStagingAddition/diverged", "divergent addition reached publication"},
@@ -69,12 +74,15 @@ func TestGlobalNativeOwnershipNarrowingControls(t *testing.T) {
 					t.Skip("permission control requires an unprivileged process")
 				}
 			}
-			if plant.name == "kind-only-parent-compensation" || plant.name == "ignore-created-parent-mode" || plant.name == "drop-special-compensation-bits" || plant.name == "omit-parent-metadata-checkpoint" || plant.name == "omit-directory-only-parent-checkpoint" || plant.name == "bypass-global-removal-lock" || plant.name == "release-removal-lock-before-read" || plant.name == "discard-pending-lock-after-compensation-error" || plant.name == "omit-native-publication-postimage" || plant.name == "revert-pending-lock-before-nested-native" {
+			if plant.name == "omit-build-permit-barrier" || plant.name == "lock-before-real-private-build" || plant.name == "kind-only-parent-compensation" || plant.name == "ignore-created-parent-mode" || plant.name == "drop-special-compensation-bits" || plant.name == "omit-parent-metadata-checkpoint" || plant.name == "omit-directory-only-parent-checkpoint" || plant.name == "bypass-global-removal-lock" || plant.name == "release-removal-lock-before-read" || plant.name == "discard-pending-lock-after-compensation-error" || plant.name == "omit-native-publication-postimage" || plant.name == "revert-pending-lock-before-nested-native" {
 				switch runtime.GOOS {
 				case "aix", "android", "darwin", "dragonfly", "freebsd", "hurd", "illumos", "ios", "linux", "netbsd", "openbsd", "solaris":
 				default:
 					t.Skip("concurrency witness requires the Unix Git/FIFO harness")
 				}
+			}
+			if plant.name == "lock-before-real-private-build" && godriver.InventoryPlatform(runtime.GOOS) == "" {
+				t.Skipf("rc5-native-control-inventory-v1 defines no record for host %s", runtime.GOOS)
 			}
 			original := filepath.Join(root, filepath.FromSlash(plant.file))
 			payload, err := os.ReadFile(original)
