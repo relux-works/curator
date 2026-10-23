@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -146,5 +147,37 @@ func TestProjectMCPLegacyCacheIsNotAuthority(t *testing.T) {
 	after, err := gitOutput(repo, "rev-parse", "HEAD")
 	if err != nil || after != before {
 		t.Fatalf("legacy cache changed: %v", err)
+	}
+}
+
+// Local project signer replay requires its source-bound cache origin even when
+// the exact signed tag and commit are present. A correctly bound cache returns
+// valid tag evidence; missing/wrong origins return none and preserve all state.
+func TestProjectMCPLocalSignerCacheOrigin(t *testing.T) {
+	for _, mode := range []string{"valid", "missing", "wrong"} {
+		t.Run(mode, func(t *testing.T) {
+			home, _, lock, decls, policy := lockedProjectMCP(t, Policy{}, true)
+			member := lock.Entries[0].Resolved
+			manager := newProjectMCPGitManager(home)
+			cache := manager.repoDir(member.Source)
+			switch mode {
+			case "missing":
+				gitStatusCommand(t, cache, "remote", "remove", "origin")
+			case "wrong":
+				gitStatusCommand(t, cache, "remote", "set-url", "origin", "https://packages.example/other")
+			}
+			before := preserveSnapshot(t, home)
+			evidence, err := (localMCPSource{manager}).VerifyCandidate("mcp", "tool", member.Source, replayMCPTag(decls["tool"], member.Version), member.Commit, policy.SourceSigners[member.Source])
+			if mode == "valid" {
+				if err != nil || !evidence.Tag.Present || !evidence.Tag.Valid {
+					t.Fatalf("bound signed cache refused: %+v %v", evidence, err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || evidence.Tag.Present || evidence.Commit.Present {
+				t.Fatalf("unbound cache admitted signature evidence: %+v %v", evidence, err)
+			}
+			if !reflect.DeepEqual(before, preserveSnapshot(t, home)) {
+				t.Fatal("local signer replay changed cache or consumer state")
+			}
+		})
 	}
 }
