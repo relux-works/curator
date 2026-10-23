@@ -298,6 +298,8 @@ func statusSignerRepo(t *testing.T, privateKey string) string {
 func gitStatusCommand(t *testing.T, repo string, args ...string) {
 	t.Helper()
 	command := exec.Command("git", append([]string{"-C", repo}, args...)...)
+	command.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Curator Test", "GIT_AUTHOR_EMAIL=curator@example.test",
+		"GIT_COMMITTER_NAME=Curator Test", "GIT_COMMITTER_EMAIL=curator@example.test")
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, output)
 	}
