@@ -465,8 +465,12 @@ func replayMCPTag(decl projectmcp.Declaration, version string) string {
 type localMCPSource struct{ *gitManager }
 
 func (source localMCPSource) VerifyCandidate(_, _ string, identity, tag, commit string, allowed []contextresolve.Signer) (contextresolve.CandidateSignatures, error) {
-	if _, err := source.checkedRepo(identity); err != nil {
-		return contextresolve.CandidateSignatures{}, err
+	// Project caches bind origin metadata; legacy profile caches replay their
+	// existing exact signed pins without adopting the project cache contract.
+	if source.sourceCacheRoot != "" {
+		if _, err := source.checkedRepo(identity); err != nil {
+			return contextresolve.CandidateSignatures{}, err
+		}
 	}
 	if tag != "" {
 		out, err := exec.Command("git", "-C", source.repoDir(identity), "rev-parse", "--verify", "refs/tags/"+tag+"^{commit}").Output() // #nosec G204 -- fixed Git argv checks a validated tag in the source-bound cache without a shell.
