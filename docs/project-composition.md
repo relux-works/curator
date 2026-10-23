@@ -26,7 +26,10 @@ protected operator operation `RegisterMode` may select `native-project` when
 allocating a new registration. Existing registrations cannot silently change
 mode through `ComposeRequest`; a mismatched or unknown mode refuses. Missing
 mode in retained state refuses rather than upgrading old authority. This lane
-adds no in-place mode switch or lease/busy-update bypass.
+adds no in-place mode switch or lease/busy-update bypass. `project inspect`
+reports this source `mode` separately from item `admission: "off"`; a
+`native-project` registration always includes the exact notice
+`project sources not isolated`, including before any items are approved.
 
 In `native-project`, the managed root and system documents contain only the
 selected profile. Selected project context items refuse
@@ -105,3 +108,11 @@ repositories and operator homes. These tests provide no native qualification,
 tracked-session execution, lease-liveness or broader admission evidence. Store
 logs and private caches under `.temp/` and validate the full default suite in a
 clean normal checkout at the delivery commit.
+
+Command owners bind the complete audited skill snapshot, including its manifest
+and declared runtime companions. The command entry's individual byte digest
+remains in the generated-file receipt. Immutable composition publication retains
+selection choices in approved review order with an explicit empty list, so nil,
+empty and permuted equivalent requests republish the same record. A different
+choice still requires its own matching preview digest; stored metadata is never
+overwritten to reconcile a mismatch.
