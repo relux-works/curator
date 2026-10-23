@@ -18,6 +18,11 @@ func TestNativeSkillsTakeoverEveryRegisteredCommand(t *testing.T) {
 	allowed := map[string]bool{
 		"profile install": true, "profile use": true, "profile sync": true,
 		"profile update": true, "env resolve": true,
+		// MCP help admits syntax; its separate dispatcher refuses ownership
+		// actions until the authority capability exists.
+		"profile mcp": true, "profile mcp install": true, "profile mcp status": true,
+		"profile mcp repair": true, "profile mcp restore": true, "profile mcp replace": true,
+		"profile mcp remove": true, "profile mcp release": true,
 	}
 	for _, command := range commandRegistry {
 		if allowed[command.name] {
@@ -133,7 +138,10 @@ func TestNativeSkillsTakeoverHelpCrossProduct(t *testing.T) {
 		variants := []struct {
 			flags []string
 			admit bool
-		}{{nil, command.name == "profile use" || command.name == "profile sync" || command.name == "profile update"}}
+		}{{nil, command.name == "profile use" || command.name == "profile sync" || command.name == "profile update" ||
+			command.name == "profile mcp" || command.name == "profile mcp install" || command.name == "profile mcp status" ||
+			command.name == "profile mcp repair" || command.name == "profile mcp restore" || command.name == "profile mcp replace" ||
+			command.name == "profile mcp remove" || command.name == "profile mcp release"}}
 		activation := ""
 		switch command.name {
 		case "profile install":

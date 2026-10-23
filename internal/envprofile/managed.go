@@ -3327,12 +3327,8 @@ func (p *homePlan) mcp(req *ResolveRequest, servers []contextmaterialize.MCPServ
 	// Record ownership must never be bypassed by the legacy whole-file writer,
 	// including an empty declaration set or a removed former package.
 	if mcpnative.Path(p.adapter.ID) != "" {
-		marker, err := mcpRead(req.Home, nativeMCPLedger(req.Home, req.Profile, p.adapter.ID), true)
-		if err != nil {
+		if err := refuseNativeMCPEnrollment(req.Home, req.Profile, p.adapter.ID); err != nil {
 			return err
-		}
-		if marker.Kind == stateread.KindPresent {
-			return mcpAuthorityError()
 		}
 	}
 

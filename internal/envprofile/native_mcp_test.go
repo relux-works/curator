@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -992,5 +993,300 @@ func TestProfileMCPEnvironmentNamesCeiling(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Both TOML string kinds and legal closing lengths install with nonempty
+// ownership digests and immediately report unchanged without rewriting bytes.
+func TestProfileMCPTOMLMultilineClosingRuns(t *testing.T) {
+	for _, quote := range []string{"\"", "'"} {
+		for count := 3; count <= 5; count++ {
+			t.Run(fmt.Sprintf("%s/%d", quote, count), func(t *testing.T) {
+				fx, req := nativeWriterFixture(t)
+				req.Environments = []string{"codex_cli"}
+				input := []byte("[mcp_servers.foreign]\ncommand='external'\nnote=" + strings.Repeat(quote, 3) + "hello" + strings.Repeat(quote, count) + "\n")
+				path := nativeWriterPath(fx, "codex_cli")
+				nativeWrite(t, path, input)
+				result, err := ProfileMCP(req)
+				if err != nil || !result.Published {
+					t.Fatalf("install: %+v %v", result, err)
+				}
+				body := nativeRead(t, path)
+				if !bytes.HasPrefix(body, input) {
+					t.Fatal("foreign bytes changed")
+				}
+				entries, err := mcpnative.Entries("codex_cli", body)
+				if err != nil || len(entries["figma-devmode"]) == 0 {
+					t.Fatalf("INSERTED_SPAN_ABSENT: %v", err)
+				}
+				ledger, err := mcpnative.DecodeOwnership(nativeRead(t, nativeMCPLedger(fx.home, fx.profile, "codex_cli")), fx.profile, "codex_cli")
+				if err != nil || len(ledger.Records) != 1 || ledger.Records[0].InstalledSHA256 != mcpnative.Digest(entries["figma-devmode"]) {
+					t.Fatalf("ownership: %+v %v", ledger, err)
+				}
+				before := snapshotMCPRecovery(t, fx.home)
+				req.Mode = "status"
+				result, err = ProfileMCP(req)
+				if err != nil || len(result.Rows) != 1 || result.Rows[0].State != "unchanged" || !reflect.DeepEqual(before, snapshotMCPRecovery(t, fx.home)) {
+					t.Fatalf("status: %+v %v", result, err)
+				}
+			})
+		}
+	}
+}
+
+// An absent ledger is not permission to publish beneath a pre-existing shared
+// ownership parent. Refusals preserve its mode and all payload bytes; 0700
+// installs and immediately reports unchanged. Unix modes do not qualify ACLs.
+func TestProfileMCPLedgerParentBeforeFirstInstall(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix permission-bit witnesses")
+	}
+	for _, mode := range []os.FileMode{0o700, 0o755, 0o777} {
+		t.Run(fmt.Sprintf("%o", mode), func(t *testing.T) {
+			fx, req := nativeWriterFixture(t)
+			req.Environments = []string{"claude_code"}
+			ledger := nativeMCPLedger(fx.home, fx.profile, "claude_code")
+			parent := filepath.Dir(ledger)
+			if err := privatedir.MakeAll(parent); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(parent, mode); err != nil {
+				t.Fatal(err)
+			}
+			before := snapshotMCPRecovery(t, fx.home)
+			result, err := ProfileMCP(req)
+			info, statErr := os.Lstat(parent)
+			if statErr != nil || info.Mode().Perm() != mode {
+				t.Fatalf("parent mode changed: %v", statErr)
+			}
+			if mode == 0o700 {
+				if err != nil || !result.Published {
+					t.Fatalf("private install: %+v %v", result, err)
+				}
+				req.Mode = "status"
+				result, err = ProfileMCP(req)
+				if err != nil || len(result.Rows) != 1 || result.Rows[0].State != "unchanged" {
+					t.Fatalf("private status: %+v %v", result, err)
+				}
+			} else {
+				requireMCPError(t, err, mcpnative.Unreadable)
+				if result.Published {
+					t.Fatal("UNTRUSTED_PARENT_PUBLISHED")
+				}
+				for path, body := range before {
+					if string(nativeRead(t, path)) != body {
+						t.Fatal("refusal changed existing payload")
+					}
+				}
+				adapter, _ := envregistry.ByID("claude_code")
+				nativeAbsent(t, filepath.Join(ManagedHomeDir(fx.home, fx.profile, "claude_code"), adapter.SkillsDir, "myskill"))
+				nativeAbsent(t, ledger)
+				nativeAbsent(t, nativeWriterPath(fx, "claude_code"))
+			}
+		})
+	}
+}
+
+// Preview and mutation agree on deterministic skill conflicts (changed bytes,
+// extra file and wrong mode). Preview of absent/identical context stays useful
+// and neither creates a path nor recovers or acquires the mutation lock.
+func TestProfileMCPPreviewSkillPreimages(t *testing.T) {
+	for _, variant := range []string{"absent", "identical", "changed", "extra", "wrong-mode"} {
+		t.Run(variant, func(t *testing.T) {
+			if variant == "wrong-mode" && runtime.GOOS == "windows" {
+				t.Skip("Unix mode preimage")
+			}
+			fx, req := nativeWriterFixture(t)
+			req.Environments = []string{"claude_code"}
+			adapter, _ := envregistry.ByID("claude_code")
+			path := filepath.Join(ManagedHomeDir(fx.home, fx.profile, "claude_code"), adapter.SkillsDir, "myskill", "SKILL.md")
+			if variant != "absent" {
+				nativeWrite(t, path, []byte("# myskill\n"))
+			}
+			switch variant {
+			case "changed":
+				nativeWrite(t, path, []byte("changed\n"))
+			case "extra":
+				nativeWrite(t, filepath.Join(filepath.Dir(path), "extra.txt"), []byte("extra\n"))
+			case "wrong-mode":
+				if err := os.Chmod(path, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			before := snapshotMCPReviewTree(t, fx.home)
+			recoveries := 0
+			req.transactionOptions = []transaction.Option{transaction.WithHooks(transaction.Hooks{ObserveRecovery: func() { recoveries++ }})}
+			req.DryRun = true
+			result, err := ProfileMCP(req)
+			conflict := variant != "absent" && variant != "identical"
+			if conflict {
+				requireMCPError(t, err, mcpnative.AuthorityUnavailable)
+				if len(result.Rows) != 1 || result.Rows[0].State != "would:refused" || result.Rows[0].Code != mcpnative.AuthorityUnavailable {
+					t.Fatalf("preview conflict row: %+v", result)
+				}
+			} else if err != nil || len(result.Rows) != 1 || result.Rows[0].State != "would:added" {
+				t.Fatalf("preview: %+v %v", result, err)
+			}
+			if result.Published || recoveries != 0 || !reflect.DeepEqual(before, snapshotMCPReviewTree(t, fx.home)) {
+				t.Fatal("PREVIEW_MUTATED_STATE")
+			}
+			req.DryRun = false
+			result, err = ProfileMCP(req)
+			if conflict {
+				requireMCPError(t, err, mcpnative.AuthorityUnavailable)
+				nativeAbsent(t, nativeWriterPath(fx, "claude_code"))
+				nativeAbsent(t, nativeMCPLedger(fx.home, fx.profile, "claude_code"))
+				if string(nativeRead(t, path)) != before[path].body {
+					t.Fatal("conflicting skill changed")
+				}
+			} else if err != nil || !result.Published {
+				t.Fatalf("install: %+v %v", result, err)
+			}
+		})
+	}
+}
+
+type mcpReviewNode struct {
+	mode os.FileMode
+	body string
+}
+
+func snapshotMCPReviewTree(t *testing.T, root string) map[string]mcpReviewNode {
+	t.Helper()
+	nodes := map[string]mcpReviewNode{}
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		node := mcpReviewNode{mode: info.Mode()}
+		if info.Mode().IsRegular() {
+			body, e := os.ReadFile(path)
+			if e != nil {
+				return e
+			}
+			node.body = string(body)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			body, e := os.Readlink(path)
+			if e != nil {
+				return e
+			}
+			node.body = body
+		}
+		nodes[path] = node
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return nodes
+}
+
+// Legacy planning accepts shared operator-home permissions only with absent
+// enrollment; present/malformed markers and linked ownership routes still
+// refuse without touching the plan or foreign target. Protected roots remain
+// covered through production Resolve by the checked-root conformance control.
+func TestProfileMCPLegacyEnrollmentRoute(t *testing.T) {
+	for _, variant := range []string{"absent", "empty-parent", "marker", "malformed", "root-link", "parent-link", "leaf-link"} {
+		t.Run(variant, func(t *testing.T) {
+			fx, _ := nativeWriterFixture(t)
+			ledger := nativeMCPLedger(fx.home, fx.profile, "codex_cli")
+			switch variant {
+			case "empty-parent":
+				if err := privatedir.MakeAll(filepath.Dir(ledger)); err != nil {
+					t.Fatal(err)
+				}
+			case "marker":
+				body, _ := mcpnative.NewOwnership(fx.profile, "codex_cli").Bytes()
+				nativeWrite(t, ledger, body)
+			case "malformed":
+				nativeWrite(t, ledger, []byte("invalid\n"))
+			case "root-link", "parent-link", "leaf-link":
+				target := t.TempDir()
+				link := filepath.Join(fx.home, "mcp-native-v1")
+				if variant == "parent-link" {
+					link = filepath.Dir(ledger)
+				}
+				if variant == "leaf-link" {
+					link = ledger
+					target = filepath.Join(target, "marker")
+					nativeWrite(t, target, []byte("external\n"))
+				}
+				if err := privatedir.MakeAll(filepath.Dir(link)); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(target, link); err != nil {
+					t.Skipf("fixture symlink unavailable: %v", err)
+				}
+			}
+			if runtime.GOOS != "windows" {
+				restore, err := makeWorldWritableSingleDirectoryForTest(fx.home)
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() {
+					if err := restore(); err != nil {
+						t.Error(err)
+					}
+				})
+			}
+			before := snapshotMCPReviewTree(t, fx.home)
+			adapter, _ := envregistry.ByID("codex_cli")
+			plan := &homePlan{adapter: adapter, docs: map[string][]byte{}, links: map[string]string{}, fileHashes: map[string][]byte{}}
+			legacy := fx.request("codex_cli")
+			err := plan.mcp(&legacy, nil, map[string]envmarker.Surface{})
+			if variant == "absent" || variant == "empty-parent" {
+				if err != nil {
+					t.Fatalf("LEGACY_OPERATOR_HOME_REFUSED: %v", err)
+				}
+			} else {
+				code := mcpnative.Unreadable
+				if variant == "marker" || variant == "malformed" {
+					code = mcpnative.AuthorityUnavailable
+				}
+				requireMCPError(t, err, code)
+				if len(plan.docs) != 0 || len(plan.links) != 0 || len(plan.fileHashes) != 0 {
+					t.Fatal("legacy refusal altered plan")
+				}
+			}
+			if !reflect.DeepEqual(before, snapshotMCPReviewTree(t, fx.home)) {
+				t.Fatal("legacy guard mutated state")
+			}
+		})
+	}
+}
+
+// Tight planning-time permissions cannot authorize publication after the same
+// directory's mode changes. The unchanged mode is a successful control above.
+func TestProfileMCPLedgerParentPermissionRace(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix permission-bit witness")
+	}
+	fx, req := nativeWriterFixture(t)
+	req.Environments = []string{"claude_code"}
+	ledger := nativeMCPLedger(fx.home, fx.profile, "claude_code")
+	parent := filepath.Dir(ledger)
+	if err := privatedir.MakeAll(parent); err != nil {
+		t.Fatal(err)
+	}
+	req.beforePublish = func() {
+		if err := os.Chmod(parent, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result, err := ProfileMCP(req)
+	requireMCPError(t, err, mcpnative.Unreadable)
+	if result.Published {
+		t.Fatal("UNTRUSTED_PARENT_PUBLISHED")
+	}
+	nativeAbsent(t, ledger)
+	nativeAbsent(t, nativeWriterPath(fx, "claude_code"))
+	info, err := os.Lstat(parent)
+	if err != nil || info.Mode().Perm() != 0o755 {
+		t.Fatalf("refusal repaired external mode: %v", err)
 	}
 }
