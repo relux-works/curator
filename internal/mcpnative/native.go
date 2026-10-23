@@ -260,9 +260,14 @@ func tomlEntries(data []byte) (map[string][]byte, error) {
 			if c == quote {
 				if triple {
 					if i+2 < len(data) && data[i+1] == quote && data[i+2] == quote {
+						// TOML permits one or two quote characters immediately
+						// before the closing delimiter. Consume the entire run;
+						// otherwise a fourth quote starts a phantom string.
+						for i+1 < len(data) && data[i+1] == quote {
+							i++
+						}
 						quote = 0
 						triple = false
-						i += 2
 					}
 				} else {
 					quote = 0
@@ -405,7 +410,11 @@ func Add(environment string, data []byte, server contextmaterialize.MCPServer) (
 	if e != nil {
 		return nil, nil, e
 	}
-	return result, final[server.Name], nil
+	span := final[server.Name]
+	if len(span) == 0 {
+		return nil, nil, fmt.Errorf("%s: inserted native entry has no certified span", Unreadable)
+	}
+	return result, span, nil
 }
 func Sort(o *Ownership) {
 	sort.Slice(o.Records, func(i, j int) bool { return o.Records[i].Name < o.Records[j].Name })
