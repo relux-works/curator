@@ -28,16 +28,17 @@ func TestHeldWitnessScopeAndLifetime(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			var lock *HomeLock
 			var err error
-			if mode == "ordered" {
+			switch mode {
+			case "ordered":
 				op := manager.NewOperation(false)
 				defer func() { _ = op.Close() }()
 				if _, err = op.AcquireProjects(context.Background(), t.TempDir()); err != nil {
 					t.Fatal(err)
 				}
 				lock, err = op.AcquireHome(context.Background())
-			} else if mode == "observer" {
+			case "observer":
 				lock, err = manager.AcquireExistingHomeOnly(context.Background())
-			} else {
+			default:
 				lock, err = manager.AcquireHomeOnly(context.Background(), false)
 			}
 			if err != nil {

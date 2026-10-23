@@ -32,26 +32,36 @@ type CompositionRecord struct {
 	CommandOwners         []CommandOwner        `json:"command_owners"`
 	Omitted               []CompositionOmission `json:"omitted"`
 }
+
+// CommandOwner binds an effective command to its item and artifact digest.
 type CommandOwner struct {
 	Name           string `json:"name"`
 	ItemID         string `json:"item_id"`
 	ArtifactSHA256 string `json:"artifact_sha256"`
 }
+
+// CompositionOmission names an item excluded from a derived composition.
 type CompositionOmission struct {
 	ItemID string `json:"item_id"`
 	Reason string `json:"reason"`
 }
+
+// GenerationItem binds a selected item digest to its approval reference.
 type GenerationItem struct {
 	ItemID      string `json:"item_id"`
 	ItemSHA256  string `json:"item_sha256"`
 	ApprovalRef string `json:"approval_ref"`
 }
+
+// Generation records the selected approved items for a registered checkout.
 type Generation struct {
 	Kind               string           `json:"kind"`
 	RegistrationRef    string           `json:"registration_ref"`
 	RegistrationSHA256 string           `json:"registration_sha256"`
 	Items              []GenerationItem `json:"items"`
 }
+
+// AdapterContract names the exact provider tuple and required surfaces.
 type AdapterContract struct {
 	Kind            string   `json:"kind"`
 	Environment     string   `json:"environment"`
@@ -59,6 +69,8 @@ type AdapterContract struct {
 	Platform        string   `json:"platform"`
 	Surfaces        []string `json:"surfaces"`
 }
+
+// MaterializationReceipt binds generated files to the adapter, policy and worktree.
 type MaterializationReceipt struct {
 	Version       int    `json:"version"`
 	Files         []File `json:"files"`
@@ -74,6 +86,8 @@ type CompositionPolicy struct {
 	Memory  string                       `json:"memory"`
 	System  contextmaterialize.Admission `json:"system"`
 }
+
+// ComposeRequest selects approved inputs and manager-controlled composition policy.
 type ComposeRequest struct {
 	// Claude enables manager-controlled native outputs before receipt hashing.
 	Claude          *ClaudeControls `json:",omitempty"`
@@ -86,6 +100,8 @@ type ComposeRequest struct {
 
 // Surface and Composition are the resolver contract shared with I-LEASE.
 type Surface = projectadapter.Surface
+
+// Composition is the protected resolver result shared with the lease consumer.
 type Composition struct {
 	Ref             string             `json:"ref"`
 	SHA256          string             `json:"sha256"`
@@ -98,6 +114,8 @@ type Composition struct {
 	RuntimeEntries  []string           `json:"runtime_entries"`
 	Generated       map[string]Surface `json:"generated"`
 }
+
+// CompositionPreview contains derived output bytes and their supporting records.
 type CompositionPreview struct {
 	MCPEnvNames  []string `json:",omitempty"`
 	Record       CompositionRecord
@@ -110,6 +128,8 @@ type CompositionPreview struct {
 	Ref          string
 	SHA256       string
 }
+
+// OrderedModule identifies a context module in effective rendering order.
 type OrderedModule struct {
 	ItemID  string
 	Package string
@@ -117,6 +137,8 @@ type OrderedModule struct {
 	Class   string
 	SHA256  string
 }
+
+// EffectiveSkill records the winning whole skill and its immutable owner.
 type EffectiveSkill struct {
 	Layer          string
 	Name           string

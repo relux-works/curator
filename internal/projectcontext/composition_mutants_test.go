@@ -16,10 +16,10 @@ import (
 // Opt in explicitly; the ordinary suite keeps only production behavior tests.
 func TestCompositionNarrowingMutants(t *testing.T) {
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
-		t.Skip("manager-backed witnesses require supported CIP filesystem binding")
+		t.Skip("CIP filesystem binding supports macOS/Linux")
 	}
 	if os.Getenv("CURATOR_PROJECT_COMPOSITION_MUTANTS") != "1" {
-		t.Skip("explicit bounded mutation lane")
+		t.Skip("set CURATOR_PROJECT_COMPOSITION_MUTANTS=1 for the explicit bounded mutation lane")
 	}
 	cwd, err := os.Getwd()
 	if err != nil {

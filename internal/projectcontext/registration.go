@@ -36,11 +36,11 @@ type localGitError struct{ code int }
 func (e *localGitError) Error() string {
 	return "project_registration_mismatch: local Git identity or object is unavailable, ambiguous or exceeds its bound"
 }
-func gitBytes(dir string, max int, args ...string) ([]byte, error) {
+func gitBytes(dir string, limit int, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	prefix := []string{"--no-optional-locks", "--no-replace-objects", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.DevNull, "-c", "core.untrackedCache=false", "-C", dir}
-	cmd := exec.CommandContext(ctx, "git", append(prefix, args...)...)
+	cmd := exec.CommandContext(ctx, "git", append(prefix, args...)...) // #nosec G204 -- fixed Git executable and manager-built argument vectors; no shell or source-supplied command.
 	for _, e := range os.Environ() {
 		k, _, _ := strings.Cut(e, "=")
 		if strings.HasPrefix(k, "GIT_") || k == "SSH_AUTH_SOCK" {
@@ -49,7 +49,7 @@ func gitBytes(dir string, max int, args ...string) ([]byte, error) {
 		cmd.Env = append(cmd.Env, e)
 	}
 	cmd.Env = append(cmd.Env, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_TERMINAL_PROMPT=0", "GIT_NO_LAZY_FETCH=1")
-	out := &boundedOutput{max: max}
+	out := &boundedOutput{max: limit}
 	cmd.Stdout = out
 	cmd.Stderr = &boundedOutput{max: 4096}
 	if err := cmd.Run(); err != nil {
@@ -94,8 +94,8 @@ func bind(p string) (binding, error) {
 	if err != nil {
 		return b, err
 	}
-	real, err := filepath.EvalSymlinks(root)
-	if err != nil || real != canonical {
+	resolved, err := filepath.EvalSymlinks(root)
+	if err != nil || resolved != canonical {
 		return b, fail("project_registration_mismatch", "registration requires the exact checkout root")
 	}
 	commit, err := gitLocal(canonical, "rev-list", "--max-parents=0", "HEAD")
@@ -132,15 +132,15 @@ func contextCommit(s string) bool {
 		return false
 	}
 	for _, c := range s {
-		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 			return false
 		}
 	}
 	return true
 }
 func verifyBinding(r registered) error {
-	real, err := filepath.EvalSymlinks(r.Record.ProjectRoot)
-	if err != nil || real != r.Record.ProjectRoot {
+	resolved, err := filepath.EvalSymlinks(r.Record.ProjectRoot)
+	if err != nil || resolved != r.Record.ProjectRoot {
 		return fail("project_registration_mismatch", "checkout moved or is unreadable; explicitly rebind")
 	}
 	b, err := bind(r.Record.ProjectRoot)
@@ -161,7 +161,7 @@ func profile(home, name string) (Profile, *contextlock.Lock, error) {
 	if err != nil {
 		return Profile{}, nil, err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 	b, _, err := read(r, "lock.json", MaxRecord)
 	if err != nil {
 		return Profile{}, nil, err
@@ -176,6 +176,8 @@ func profile(home, name string) (Profile, *contextlock.Lock, error) {
 	}
 	return Profile{name, digest(c)}, l, nil
 }
+
+// Register binds an explicit checkout, profile and environment in protected state.
 func (s Store) Register(name, root, profileName, env string) (Registration, error) {
 	if name == "" {
 		name = filepath.Base(filepath.Clean(root))
@@ -193,8 +195,8 @@ func (s Store) Register(name, root, profileName, env string) (Registration, erro
 	if err != nil {
 		return Registration{}, err
 	}
-	if real, e := filepath.EvalSymlinks(home); e == nil {
-		home = real
+	if resolved, e := filepath.EvalSymlinks(home); e == nil {
+		home = resolved
 	}
 	if within(b.Repository.Root, home) {
 		return Registration{}, fail("project_registration_mismatch", "manager home must be outside the source tree")
@@ -273,7 +275,7 @@ func (s Store) Rebind(id, root string) (Registration, error) {
 	return op.register(old.Name, b, p, old.Record.Environment)
 }
 
-// Locate proves the real launch CWD belongs to the most specific registered
+// Locate proves the resolved launch CWD belongs to the most specific registered
 // root. A stale nested binding refuses instead of falling back to its parent.
 func (s Store) Locate(cwd string) (Registration, error) { return s.LocateFor(cwd, "", "") }
 
@@ -330,6 +332,7 @@ func (op *operation) locateFor(canonical, profileName, env string) (Registration
 	return r.Record, nil
 }
 
+// Inspect reports the registration and inert native discovery candidates.
 func (s Store) Inspect(id string) (Inspection, error) {
 	op, err := s.begin(false)
 	if err != nil {
@@ -344,7 +347,7 @@ func (s Store) Inspect(id string) (Inspection, error) {
 	if err != nil {
 		return Inspection{}, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	items, err := discovery(root)
 	if err != nil {
 		return Inspection{}, err

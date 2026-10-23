@@ -284,6 +284,41 @@ assert 'a skip with an unrecognised reason fails'   1 run_gate "$S" env CI_GATE_
   ev skip internal/registry TestSomethingElse; } >"$S"
 assert 'a host-capability skip is recorded and allowed' 0 run_gate "$S" env CI_GATE_GOOS=windows
 
+# Claim: declared project fixture limits pass, while altered reasons stay
+# unclassified. Removing each new declaration must fail on that exact skip.
+for project_reason in \
+  'CIP filesystem binding supports macOS/Linux' \
+  'CIP filesystem binding supports macOS/Linux; pure composition contracts remain portable' \
+  'native contribution witnesses require measured host tuple' \
+  'host refuses unlink of an open lock: sharing violation'; do
+  { ev pass internal/buildcache TestWindowsProtectedStateMatrix
+    ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
+    ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+    evout internal/projectcontext TestFixtureLimit "$project_reason"
+    ev skip internal/projectcontext TestFixtureLimit; } >"$S"
+  assert "declared project fixture skip passes: $project_reason" 0 run_gate "$S" env CI_GATE_GOOS=windows
+  assert_contains 'the declared project fixture skip has an allowed verdict' 'allowed-' "$WORK/gate-ev/skips-observed.tsv"
+
+  # A narrowing control removes only the declaration that accepted this reason.
+  case "$project_reason" in
+    CIP*) project_pattern='^CIP filesystem binding' ;;
+    native*) project_pattern='^native contribution witnesses' ;;
+    host*) project_pattern='^host refuses unlink' ;;
+  esac
+  awk -F'\t' -v pattern="$project_pattern" 'index($2, pattern) != 1' "$CLASSES" >"$WORK/project-classes-minus.tsv"
+  assert "missing project skip declaration refuses: $project_reason" 1 run_gate "$S" \
+    env CI_GATE_GOOS=windows CI_SKIP_CLASSES="$WORK/project-classes-minus.tsv"
+  assert_contains 'the missing declaration fails for the intended skip' 'UNCLASSIFIED' "$WORK/gate-ev/skips-observed.tsv"
+
+  { ev pass internal/buildcache TestWindowsProtectedStateMatrix
+    ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
+    ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+    evout internal/projectcontext TestFixtureLimit "unexpected: $project_reason"
+    ev skip internal/projectcontext TestFixtureLimit; } >"$S"
+  assert "nearby undeclared project skip refuses: $project_reason" 1 run_gate "$S" env CI_GATE_GOOS=windows
+  assert_contains 'the nearby reason remains unclassified' 'UNCLASSIFIED' "$WORK/gate-ev/skips-observed.tsv"
+done
+
 { ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
   evout internal/marker TestAuthoritativeThing 'CURATOR_CONFORMANCE_ROOT is not set'
   ev skip internal/marker TestAuthoritativeThing

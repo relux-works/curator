@@ -73,6 +73,9 @@ platform-control	Windows-only control in script-worker-v1-native-control-invento
 platform-control	unix-only script-inventory fixture in script-worker-v1-native-control-inventory-v1	allow	the script-inventory fixture needs unix process primitives; the behaviour is asserted on the unix runners
 platform-control	Claude's per-home Keychain strategy is supported on macOS	allow	the isolated Claude Keychain backend is supported only on macOS; its schema-2 credential record is exercised there
 
+platform-control	^CIP filesystem binding supports macOS/Linux(; pure composition contracts remain portable)?$	allow	CIP checkout identity fixtures require the supported Unix filesystem binding; pure contracts remain portable
+platform-control	^native contribution witnesses require measured host tuple$	allow	the opt-in Claude mutation witnesses require the measured darwin/arm64 tuple; portable refusal tests still run
+
 # --- host capability --------------------------------------------------------
 host-capability	(symlink|symlinks|hard links|named pipes|symlink canonical-prefix test) unavailable	allow	the runner filesystem provides no such link
 host-capability	filesystem does not support (hard|symbolic) links	allow	the runner filesystem provides no such link
@@ -103,6 +106,8 @@ host-capability	(Yarn Classic is not installed|exact Yarn .* is unavailable)	all
 host-capability	exact Yarn .* is installed without a supported pinned tool root	allow	the exact Yarn release is present but its installation layout cannot be staged by the pinned integration harness
 host-capability	OS-level network-denial harness is unavailable	allow	the runner does not provide the sandbox control required by the real Yarn Classic zero-network vector
 host-capability	SwiftPM manifest linker unavailable: clang posix_spawn failed while linking a manifest	allow	the Swift executable is present but its manifest compiler cannot spawn the host linker
+
+host-capability	^host refuses unlink of an open lock: sharing violation$	allow	Windows denies unlink of the open lock; the same test first verifies its live witness and the unlink regression runs on Unix
 
 # --- opt-in probes ----------------------------------------------------------
 opt-in	set CURATOR_[A-Z_]+=1	allow	enabled by an explicit developer environment variable

@@ -17,7 +17,7 @@ import (
 // All candidate reads are anchored in os.Root. Component lstat rejects links;
 // identity and metadata checks detect substitutions around the bounded read.
 // os.Root also prevents a concurrent symlink swap escaping the open root.
-func read(root *os.Root, name string, max int64) ([]byte, os.FileMode, error) {
+func read(root *os.Root, name string, limit int64) ([]byte, os.FileMode, error) {
 	if !relative(name) {
 		return nil, 0, fail("project_context_invalid", "unsafe relative path")
 	}
@@ -42,19 +42,19 @@ func read(root *os.Root, name string, max int64) ([]byte, os.FileMode, error) {
 	if before.Mode().Perm()&0444 == 0 {
 		return nil, 0, fail("project_context_unreadable", "candidate file is unreadable")
 	}
-	if !before.Mode().IsRegular() || !singleLink(before) || before.Size() > max {
+	if !before.Mode().IsRegular() || !singleLink(before) || before.Size() > limit {
 		return nil, 0, fail("project_context_invalid", "unreadable, special or oversized file")
 	}
 	f, err := openCandidate(root, name)
 	if err != nil {
 		return nil, 0, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	opened, err := f.Stat()
 	if err != nil || !same(before, opened) {
 		return nil, 0, fail("project_context_drift", "candidate changed before read")
 	}
-	b, err := io.ReadAll(io.LimitReader(f, max+1))
+	b, err := io.ReadAll(io.LimitReader(f, limit+1))
 	if err != nil {
 		return nil, 0, err
 	}

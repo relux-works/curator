@@ -102,7 +102,7 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 		if err != nil {
 			return err
 		}
-		defer dir.Close()
+		defer func() { _ = dir.Close() }()
 		capt, err := captureTree(dir, "", false)
 		if err != nil {
 			return err

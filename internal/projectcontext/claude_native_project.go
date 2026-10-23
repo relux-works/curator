@@ -19,8 +19,10 @@ type ClaudeProfileDocumentSource interface {
 	ProfileDocuments(context.Context, string, string) (map[string][]byte, []File, error)
 }
 
+// ClaudeProfileDocumentsUnavailable refuses native preparation until the profile-only producer is integrated.
 type ClaudeProfileDocumentsUnavailable struct{}
 
+// ProfileDocuments refuses without inventing a profile-only document from composed prose.
 func (ClaudeProfileDocumentsUnavailable) ProfileDocuments(context.Context, string, string) (map[string][]byte, []File, error) {
 	return nil, nil, claudeRefuse("project_context_unsupported", "dedicated I-COMP profile documents are not available")
 }
@@ -143,7 +145,7 @@ func ClaudeModeCertificationReport(version, platform, architecture, mode string)
 // ClaudeLaunchMode refuses before authority lookup while mandatory native
 // permissions/memory qualifications are missing. It cannot start a provider or
 // publish a home. The legacy strict construction seam remains internal only.
-func (a Authority) ClaudeLaunchMode(ctx context.Context, held managerlock.Held, ref, sha, owner string, entry ClaudeEntry, mode string) (projectadapter.LaunchContribution, error) {
+func (a Authority) ClaudeLaunchMode(_ context.Context, _ managerlock.Held, _, _, _ string, _ ClaudeEntry, mode string) (projectadapter.LaunchContribution, error) {
 	var out projectadapter.LaunchContribution
 	if mode == projectadapter.Strict {
 		return out, ClaudeCertificationReport(ClaudeProjectVersion, "macos", "arm64").RequireStrict()

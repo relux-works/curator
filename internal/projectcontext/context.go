@@ -34,7 +34,7 @@ func (s *offlineSource) repo(name, source string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 	cur := ""
 	for _, c := range strings.Split(p, "/") {
 		cur = path.Join(cur, c)
@@ -71,7 +71,7 @@ func (s *offlineSource) Identity(kind, name, declared string) (string, error) {
 	_, err := s.repo(name, v)
 	return v, err
 }
-func (s *offlineSource) ResolveTag(kind, name, source, tag string) (string, error) {
+func (s *offlineSource) ResolveTag(_, name, source, tag string) (string, error) {
 	dir, err := s.repo(name, source)
 	if err != nil {
 		return "", err
@@ -172,7 +172,7 @@ func captureCommit(dir, commit, directory string) (captured, error) {
 	}
 	return c, nil
 }
-func (s *offlineSource) Manifest(kind, name, source, directory, commit string) (*contextresolve.Package, error) {
+func (s *offlineSource) Manifest(_, name, source, directory, commit string) (*contextresolve.Package, error) {
 	dir, err := s.repo(name, source)
 	if err != nil {
 		return nil, err
@@ -237,7 +237,7 @@ func (op *operation) context(r registered, req Request, synthetic map[string][]b
 	if err != nil {
 		return Candidate{}, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	c, err := capture(root, req.Source)
 	if synthetic != nil {
 		c = fromFiles(synthetic)

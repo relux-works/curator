@@ -31,7 +31,7 @@ func (s Store) readHeld(held managerlock.Held) (*operation, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	b, _, err := read(root, "state.json", MaxRecord)
 	if err != nil {
 		return nil, fail("project_context_unreadable", "protected admission state unavailable")

@@ -33,7 +33,7 @@ func (s Store) PackageInstruction(id, itemID, source string, required bool) (Pre
 	if err != nil {
 		return Preview{}, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	inventory, err := discovery(root)
 	if err != nil {
 		return Preview{}, err
@@ -76,6 +76,8 @@ func (s Store) PackageInstruction(id, itemID, source string, required bool) (Pre
 	items = append(items, c)
 	return op.preview(r, items, []Omission{})
 }
+
+// Preview captures a protected review of an explicit declaration.
 func (s Store) Preview(id string, d Declaration) (Preview, error) {
 	// Re-parse programmatic requests through the same closed reader.
 	b, err := canonical(d)
@@ -272,7 +274,7 @@ func (op *operation) fresh(r registered, c Candidate) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	if c.Request.Packaging == "instruction" {
 		b, _, err := read(root, c.Request.Source, MaxFileBytes)
 		if err != nil || digest(b) != c.SourceSHA256 {
@@ -289,6 +291,8 @@ func (op *operation) fresh(r registered, c Candidate) error {
 	}
 	return nil
 }
+
+// Approve binds an item approval to its exact protected preview and package.
 func (s Store) Approve(id, itemID, itemDigest, packageDigest string) (Approval, error) {
 	if !idRE.MatchString(itemID) || !hexRE.MatchString(itemDigest) || !hexRE.MatchString(packageDigest) {
 		return Approval{}, fail("project_item_unapproved", "approval requires exact item and review digests")
@@ -331,6 +335,8 @@ func (s Store) Approve(id, itemID, itemDigest, packageDigest string) (Approval, 
 	}
 	return Approval{}, fail("project_item_unapproved", "item has no supported protected preview")
 }
+
+// Revoke withdraws a protected item approval for the registered checkout.
 func (s Store) Revoke(id, itemID string) error {
 	if !idRE.MatchString(itemID) {
 		return fail("project_item_unapproved", "invalid item ID")
@@ -361,12 +367,15 @@ type Selection struct {
 	ItemID   string
 	Disabled bool
 }
+
+// Admitted contains the verified selected items and named optional omissions.
 type Admitted struct {
 	Items     []Candidate
 	Omitted   []Omission
 	Rendering string
 }
 
+// Admitted verifies approvals and immutable bytes for the explicit selection.
 func (s Store) Admitted(id string, selections []Selection) (Admitted, error) {
 	op, err := s.begin(false)
 	if err != nil {
@@ -463,6 +472,7 @@ type ReviewContent struct {
 	Text        map[string]string   `json:"text"`
 }
 
+// ReviewContent returns verified inventories and context text for the protected preview.
 func (s Store) ReviewContent(id string) (ReviewContent, error) {
 	op, err := s.begin(false)
 	if err != nil {

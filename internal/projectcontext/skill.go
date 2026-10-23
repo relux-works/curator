@@ -16,7 +16,7 @@ func (op *operation) skill(r registered, req Request) (Candidate, error) {
 	if err != nil {
 		return Candidate{}, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	capt, err := capture(root, req.Source)
 	if err != nil {
 		return Candidate{}, err

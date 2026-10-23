@@ -131,7 +131,7 @@ func (s Store) begin(create bool) (*operation, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 	b, _, err := read(r, "state.json", MaxRecord)
 	if errors.Is(err, os.ErrNotExist) && create && freshRoot {
 		homeBinding, err := managerBinding(m.Home())
@@ -240,7 +240,7 @@ func writeAtomic(root, name string, b []byte) error {
 		return err
 	}
 	tmp := f.Name()
-	defer os.Remove(tmp)
+	defer func() { _ = os.Remove(tmp) }()
 	if err = f.Chmod(0600); err == nil {
 		_, err = f.Write(b)
 	}
@@ -268,11 +268,11 @@ func writeAtomic(root, name string, b []byte) error {
 	return syncDir(root)
 }
 func syncDir(p string) error {
-	f, err := os.Open(p)
+	f, err := os.Open(p) // #nosec G304 -- directory sync and tree sync use manager-owned paths under the validated protected root.
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return f.Sync()
 }
 func hashID(hash string) string {
@@ -306,7 +306,7 @@ func (op *operation) put(c captured) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	defer os.RemoveAll(stage)
+	defer func() { _ = os.RemoveAll(stage) }()
 	for _, e := range c.Manifest.Files {
 		if !relative(e.Path) {
 			return "", "", fail("project_context_invalid", "unsafe snapshot path")
@@ -356,7 +356,7 @@ func (op *operation) get(ref, hash string) (captured, error) {
 	if err != nil {
 		return empty, err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 	b, _, err := read(r, "manifest.json", MaxRecord)
 	if err != nil {
 		return empty, err
@@ -395,7 +395,7 @@ func (op *operation) putLock(b []byte) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	defer rr.Close()
+	defer func() { _ = rr.Close() }()
 	_ = p
 	if old, _, err := read(rr, name, MaxRecord); err == nil {
 		if string(old) != string(b) {
@@ -416,7 +416,7 @@ func (op *operation) lockBytes(ref, hash string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 	b, _, err := read(r, hash+".json", MaxRecord)
 	if err != nil || digest(b) != hash {
 		return nil, fail("project_context_drift", "retained lock changed or missing")
@@ -461,7 +461,7 @@ func syncTree(root string) error {
 			dirs = append(dirs, p)
 			return nil
 		}
-		f, err := os.Open(p)
+		f, err := os.Open(p) // #nosec G304 -- directory sync and tree sync use manager-owned paths under the validated protected root.
 		if err != nil {
 			return err
 		}

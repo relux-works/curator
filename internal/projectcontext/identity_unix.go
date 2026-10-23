@@ -15,7 +15,7 @@ func filesystemIdentity(st os.FileInfo) (map[string]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("filesystem identity unavailable")
 	}
-	return map[string]string{"device": strconv.FormatUint(uint64(s.Dev), 10), "inode": strconv.FormatUint(uint64(s.Ino), 10)}, nil
+	return map[string]string{"device": strconv.FormatUint(uint64(s.Dev), 10), "inode": strconv.FormatUint(uint64(s.Ino), 10)}, nil // #nosec G115 -- stable serialization of the native device/inode bit pattern; no size or allocation arithmetic.
 }
 
 func openCandidate(root *os.Root, name string) (*os.File, error) {

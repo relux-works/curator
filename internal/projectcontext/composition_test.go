@@ -165,7 +165,7 @@ func TestCompositionPreviewAndReceipt(t *testing.T) {
 				target = "config/muse/AGENTS.md"
 			}
 			doc := string(p.Files[target])
-			if strings.Index(doc, "Package context.\n") < 0 || strings.Index(doc, "Selected project context.\n") < strings.Index(doc, "Package context.\n") {
+			if !strings.Contains(doc, "Package context.\n") || strings.Index(doc, "Selected project context.\n") < strings.Index(doc, "Package context.\n") {
 				t.Fatal("profile-first rendering lost")
 			}
 			for _, file := range p.Receipt.Files {
@@ -625,13 +625,13 @@ func compositionLock(t *testing.T, home string) *managerlock.HomeLock {
 func resolveComposition(t *testing.T, a Authority, ref, hash string) (Composition, error) {
 	t.Helper()
 	lock := compositionLock(t, a.Store.Home)
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	return a.Resolve(context.Background(), lock.Held(), ref, hash)
 }
 func authorizeComposition(t *testing.T, a Authority, c Composition, owner string) error {
 	t.Helper()
 	lock := compositionLock(t, a.Store.Home)
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	return a.Authorize(context.Background(), lock.Held(), c, owner)
 }
 
@@ -681,7 +681,7 @@ func TestCompositionHeldAuthority(t *testing.T) {
 	}
 	other := compositionFixture(t, "codex_cli", nil)
 	otherLock := compositionLock(t, other.store.Home)
-	defer otherLock.Close()
+	defer func() { _ = otherLock.Close() }()
 	_, err = a.Resolve(context.Background(), otherLock.Held(), c.Ref, c.SHA256)
 	if !errors.Is(err, managerlock.ErrNotHeld) {
 		t.Fatalf("other-home witness accepted: %v", err)
