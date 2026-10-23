@@ -87,6 +87,10 @@ const (
 	DiagReservedCommand              = "environment_reserved_command_name"
 )
 
+// Incapable source consumers refuse before output or mutation
+// (local-setup-token-source, inherited-source compatibility).
+const DiagCredentialInjectionUnavailable = "credential_injection_unavailable"
+
 // Forms (environments §7.2).
 const (
 	FormMonolithic = "monolithic"

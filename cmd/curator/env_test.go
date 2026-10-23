@@ -779,10 +779,10 @@ func TestEnvResolvePreserveLockRepairBindsUnchangedLock(t *testing.T) {
 	}
 }
 
+// A historical hash-v1/seed-B home stays current during read-only status and
+// preserve-lock refusal; plain repair then migrates its profile lock.
 func TestEnvResolvePreserveLockRefusesCurrentV1AndPlainRepairMigrates(t *testing.T) {
-	prior := hashing.EnableV2Writers
-	hashing.EnableV2Writers = false
-	t.Cleanup(func() { hashing.EnableV2Writers = prior })
+	pinV1MarkerWriters(t)
 	source, _ := profileHome(t)
 	// Keep optional provider discovery and version probes inside this fixture.
 	bin := statusProviderPath(t, "")

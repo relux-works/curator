@@ -3390,7 +3390,7 @@ func (p *homePlan) mcp(req *ResolveRequest, servers []contextmaterialize.MCPServ
 // node-bound home as the older per-home credential policy.
 func requirePerHomeCredentialSource(marker *envmarker.Marker) error {
 	if marker != nil && marker.CredentialSource != nil && marker.CredentialSource.Source != nil {
-		return fmt.Errorf("%s: node credential source activation is not supported", envregistry.DiagCredentialUnsupported)
+		return fmt.Errorf("%s: node credential source activation is not supported", envregistry.DiagCredentialInjectionUnavailable)
 	}
 	return nil
 }

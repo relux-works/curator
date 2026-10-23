@@ -364,9 +364,10 @@ func TestCodexSeedCLegacyBRepair(t *testing.T) {
 	}
 }
 
-// Full node-carrier parsing is a positive control; activation and credential
-// migration must refuse its unsupported authority without per-home repair or
-// changes to the seed, marker, or credential link.
+// Full node-carrier parsing and per-home activation are positive controls.
+// Node activation with either repair value refuses with the inherited source
+// diagnostic, emits no fragment, and preserves home, lock, and native bytes.
+// Migration planning also reports that authority refusal without writes.
 func TestCodexSeedCNodeAuthorityIsNotPerHome(t *testing.T) {
 	fx := writeManagedFixture(t, "example")
 	seedLiveNativeCredentials(t, fx)
@@ -374,6 +375,13 @@ func TestCodexSeedCNodeAuthorityIsNotPerHome(t *testing.T) {
 	req.Repair = true
 	if _, err := Resolve(req); err != nil {
 		t.Fatal(err)
+	}
+	for _, repair := range []bool{false, true} {
+		req.Repair = repair
+		result, err := Resolve(req)
+		if err != nil || result == nil || len(result.Document) == 0 {
+			t.Fatalf("per-home activation repair=%v: result=%+v err=%v", repair, result, err)
+		}
 	}
 	marker := readManagedMarker(t, fx, envregistry.CodexCLI)
 	emptyPass := []envmarker.Passthrough{}
@@ -394,9 +402,23 @@ func TestCodexSeedCNodeAuthorityIsNotPerHome(t *testing.T) {
 	if err := os.WriteFile(path, raw, 0600); err != nil {
 		t.Fatal(err)
 	}
-	before := nativeSnapshot(t, home)
-	if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialUnsupported) {
-		t.Fatalf("node activation did not refuse authority: %v", err)
+	before := nativeSnapshot(t, fx.home)
+	nativeBefore := nativeSnapshot(t, fx.native[envregistry.CodexCLI])
+	for _, repair := range []bool{false, true} {
+		t.Run(fmt.Sprintf("repair=%v", repair), func(t *testing.T) {
+			req.Repair = repair
+			result, err := Resolve(req)
+			// Pin the normative diagnostic independently of the implementation constant.
+			if err == nil || !strings.HasPrefix(err.Error(), "credential_injection_unavailable:") {
+				t.Fatalf("node activation did not refuse authority: %v", err)
+			}
+			if result != nil && len(result.Document) != 0 {
+				t.Fatalf("node activation emitted a fragment: %+v", result)
+			}
+			if nativeSnapshot(t, fx.home) != before || nativeSnapshot(t, fx.native[envregistry.CodexCLI]) != nativeBefore {
+				t.Fatal("node authority refusal changed home, lock, or native bytes")
+			}
+		})
 	}
 	migration, err := PlanMigration(fx.migrateRequest())
 	if err != nil {
@@ -405,7 +427,7 @@ func TestCodexSeedCNodeAuthorityIsNotPerHome(t *testing.T) {
 	conflict := false
 	for _, entry := range migration.Homes {
 		for _, c := range entry.Conflicts {
-			if strings.Contains(fmt.Sprint(c), envregistry.DiagCredentialUnsupported) {
+			if strings.HasPrefix(c.Detail, "credential_injection_unavailable:") {
 				conflict = true
 			}
 		}
@@ -413,8 +435,8 @@ func TestCodexSeedCNodeAuthorityIsNotPerHome(t *testing.T) {
 	if !conflict {
 		t.Fatal("node migration did not refuse authority")
 	}
-	if after := nativeSnapshot(t, home); after != before {
-		t.Fatal("node authority refusal changed home")
+	if nativeSnapshot(t, fx.home) != before || nativeSnapshot(t, fx.native[envregistry.CodexCLI]) != nativeBefore {
+		t.Fatal("node migration planning changed home, lock, or native bytes")
 	}
 }
 
