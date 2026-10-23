@@ -3,6 +3,7 @@ package mcpnative
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -149,6 +150,47 @@ func TestSealedInlineContainerRefusesLossyConversion(t *testing.T) {
 		_, _, err = Add("codex_cli", input, contextmaterialize.MCPServer{Name: "fresh", Transport: "stdio", Command: "fixture-mcp"})
 		if err == nil || !strings.Contains(err.Error(), Unreadable) {
 			t.Fatalf("uncertified native table converted: %v", err)
+		}
+	}
+}
+
+// Legal three-, four- and five-quote TOML endings retain their semantic value
+// and foreign span across append; installed spans must be nonempty and stable.
+func TestTOMLMultilineClosingRuns(t *testing.T) {
+	for _, quote := range []string{"\"", "'"} {
+		for count := 3; count <= 5; count++ {
+			t.Run(fmt.Sprintf("%s/%d", quote, count), func(t *testing.T) {
+				input := []byte("[mcp_servers.foreign]\ncommand='external'\nnote=" + strings.Repeat(quote, 3) + "hello" + strings.Repeat(quote, count) + "\n")
+				var before map[string]any
+				if _, err := toml.Decode(string(input), &before); err != nil {
+					t.Fatal(err)
+				}
+				entries, err := Entries("codex_cli", input)
+				if err != nil {
+					t.Fatal(err)
+				}
+				output, span, err := Add("codex_cli", input, contextmaterialize.MCPServer{Name: "fresh", Transport: "stdio", Command: "fixture-mcp"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(span) == 0 {
+					t.Fatal("INSERTED_SPAN_ABSENT")
+				}
+				after, err := Entries("codex_cli", output)
+				if err != nil || !bytes.Equal(after["fresh"], span) || !bytes.Equal(entries["foreign"], after["foreign"]) || !bytes.HasPrefix(output, input) {
+					t.Fatalf("foreign/span changed: %v", err)
+				}
+				var decoded map[string]any
+				if _, err = toml.Decode(string(output), &decoded); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(before["mcp_servers"].(map[string]any)["foreign"], decoded["mcp_servers"].(map[string]any)["foreign"]) {
+					t.Fatal("foreign semantics changed")
+				}
+				if _, _, err = Add("codex_cli", output, contextmaterialize.MCPServer{Name: "fresh", Transport: "stdio", Command: "other"}); err == nil || !strings.Contains(err.Error(), Conflict) {
+					t.Fatalf("conflict: %v", err)
+				}
+			})
 		}
 	}
 }
