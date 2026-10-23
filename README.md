@@ -313,7 +313,8 @@ For explicit project-context packaging and approval, see
 [project admission](docs/project-admission.md). The new `project register`,
 `inspect`, `package`, `preview`, `approve`, `revoke` and `rebind` controls use Go
 and Git; they create protected admission state and perform no native launch.
-Observed root loss requires explicit rebind. Previews retain approved skill
+Observed root loss requires explicit rebind, even with a full approval ledger.
+Previews retain approved skill
 semantics and refuse known native login-state files before snapshot publication.
 Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectcontext -count=1`
 and the documented opt-in Go-overlay mutation lane. Keep logs in `.temp/`.

@@ -188,7 +188,7 @@ func (op *operation) verifyRegistration(r registered) error {
 				op.state.Registrations[id] = slot
 			}
 		}
-		if saveErr := op.save(); saveErr != nil {
+		if saveErr := op.retainLapses(); saveErr != nil {
 			return fail("project_context_drift", "cannot retain root-authority lapse")
 		}
 		return err
