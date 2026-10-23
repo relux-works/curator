@@ -24,6 +24,7 @@ import (
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/mcpnative"
+	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/projectmcp"
 	"github.com/relux-works/curator/internal/staging"
@@ -125,12 +126,16 @@ func mcpRead(home, path string, private bool) (stateread.File, error) {
 	if err != nil {
 		return f, fmt.Errorf("%s: native MCP preimage is unreadable: %w", mcpnative.Unreadable, err)
 	}
-	if private && f.Kind == stateread.KindPresent {
-		if err = privatedir.Validate(filepath.Dir(path)); err == nil {
-			err = privatedir.ValidateFile(path)
+	if private {
+		parent, e := stateread.Lstat(filepath.Dir(path))
+		if e == nil && parent.Kind == stateread.KindPresent {
+			e = privatedir.Validate(filepath.Dir(path))
 		}
-		if err != nil {
-			return f, fmt.Errorf("%s: protected MCP ownership is untrusted: %w", mcpnative.Unreadable, err)
+		if e == nil && f.Kind == stateread.KindPresent {
+			e = privatedir.ValidateFile(path)
+		}
+		if e != nil {
+			return f, fmt.Errorf("%s: protected MCP ownership is untrusted: %w", mcpnative.Unreadable, e)
 		}
 	}
 	return f, nil
@@ -554,7 +559,7 @@ func ProfileMCP(req ProfileMCPRequest) (result *ProfileMCPResult, resultErr erro
 		}
 		return result, first
 	}
-	if len(writes) == 0 || req.Mode == "status" || req.DryRun {
+	if len(writes) == 0 || req.Mode == "status" {
 		return result, nil
 	}
 	// Applicable skill payloads and the unchanged exact lock share this journal.
@@ -612,6 +617,10 @@ func ProfileMCP(req ProfileMCPRequest) (result *ProfileMCPResult, resultErr erro
 				writes[path] = body
 			}
 		}
+	}
+
+	if req.DryRun {
+		return result, nil
 	}
 
 	lockBytes, err := os.ReadFile(lockPath(req.Home, req.Profile))
@@ -699,6 +708,11 @@ func publishNativeMCP(op *operation, req ProfileMCPRequest, writes map[string][]
 		if err := validateMCPRoute(req.Home, path); err != nil {
 			return err
 		}
+		if filepath.Dir(path) == filepath.Join(req.Home, "mcp-native-v1", "ownership") {
+			if err := privatedir.Validate(filepath.Dir(path)); err != nil {
+				return fmt.Errorf("%s: protected MCP ownership parent is untrusted: %w", mcpnative.Unreadable, err)
+			}
+		}
 		targets.Targets = append(targets.Targets, staging.Target{LivePath: path, Kind: staging.KindBytes})
 	}
 	admitted := []string{}
@@ -759,6 +773,9 @@ func publishNativeMCP(op *operation, req ProfileMCPRequest, writes map[string][]
 		}
 		if err := validateMCPRoute(req.Home, path); err != nil {
 			return err
+		}
+		if err := privatedir.Validate(filepath.Join(req.Home, "mcp-native-v1", "ownership")); err != nil {
+			return fmt.Errorf("%s: protected MCP ownership parent changed: %w", mcpnative.Unreadable, err)
 		}
 		return recheck()
 	}
@@ -883,4 +900,27 @@ func verifyNativeMCPSigner(manager *gitManager, member contextlock.Member, polic
 		}
 	}
 	return original
+}
+
+// The legacy writer only asks whether enrollment exists. Check each protected
+// route node before descending, while retaining the existing operator-directory
+// boundary scope. No ledger bytes, including malformed bytes, are adopted.
+func refuseNativeMCPEnrollment(home, profile, environment string) error {
+	ledger := nativeMCPLedger(home, profile, environment)
+	for _, path := range []string{filepath.Join(home, "mcp-native-v1"), filepath.Dir(ledger), ledger} {
+		state, err := stateread.Lstat(path)
+		if err != nil {
+			return fmt.Errorf("%s: ownership route unreadable: %w", mcpnative.Unreadable, err)
+		}
+		if state.Kind == stateread.KindAbsent {
+			return nil
+		}
+		if err = pathboundary.ValidateLeafWithOwner(home, path, pathboundary.DefaultOwnerLookup()); err != nil {
+			return fmt.Errorf("%s: unsafe ownership route: %w", mcpnative.Unreadable, err)
+		}
+		if path != ledger && !state.Info.IsDir() {
+			return fmt.Errorf("%s: ownership ancestor is not a directory", mcpnative.Unreadable)
+		}
+	}
+	return mcpAuthorityError()
 }
