@@ -212,6 +212,14 @@ func storeEntryPinHashes(home string, member contextlock.Member, entry string, v
 	if err != nil {
 		return "", "", err
 	}
+	return storeEntryHashesFromPin(member, entry, version, expected, format)
+}
+
+// storeEntryHashesFromPin compares snapshot bytes with a caller-verified pin;
+// callers select and verify the appropriate source cache before this boundary.
+func storeEntryHashesFromPin(member contextlock.Member, entry string, version hashing.Version, expected, format string) (string, string, error) {
+	var actual string
+	var err error
 	// Spec §8 interim rule for v1 readers: refuse before the recorded
 	// v1 state below is recomputed or trusted over NUL bytes. Commit
 	// pins verify through Git tree object IDs — a separate algorithm

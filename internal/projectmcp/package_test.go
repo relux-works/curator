@@ -36,3 +36,28 @@ func TestPackageRetainsLegacyByteBounds(t *testing.T) {
 		})
 	}
 }
+
+// An absent package has a declaration error; an unreadable/non-file package
+// has a typed state-read error. A valid package remains admitted.
+func TestPackageReadBoundary(t *testing.T) {
+	root := t.TempDir()
+	if _, err := LoadPackage(root); err == nil || !strings.Contains(err.Error(), Invalid) {
+		t.Fatalf("missing: %v", err)
+	}
+	path := filepath.Join(root, "agent-mcp.json")
+	if err := os.Mkdir(path, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadPackage(root); err == nil || !strings.Contains(err.Error(), "manager_state_unreadable") {
+		t.Fatalf("unreadable: %v", err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"schema_version":1,"name":"tool","version":"1.0.0","server":{"transport":"stdio","command":"runtime","args":[]}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadPackage(root); err != nil {
+		t.Fatal(err)
+	}
+}
