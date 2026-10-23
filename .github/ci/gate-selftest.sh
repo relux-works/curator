@@ -492,6 +492,7 @@ echo ''
 # cannot excuse the Windows skip. These are gate controls, not product runs.
 for fixture in \
  'TestGlobalNativeOwnershipNarrowingControls/omit-build-permit-barrier|concurrency witness requires the Unix Git/FIFO harness' \
+ 'TestGlobalNativeOwnershipNarrowingControls/omit-parent-mode-compensation|concurrency witness requires the Unix Git/FIFO harness' \
  'TestGlobalProfileCompensationParentModes|Unix permission bits are the tested metadata' \
  'TestGlobalProfileCompensationLateParentMode|Unix special permission bits are the tested metadata' \
  'TestGlobalProfileCompensationNestedNativeHome|requires unprivileged Unix directory permissions'; do

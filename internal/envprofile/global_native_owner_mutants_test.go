@@ -74,7 +74,7 @@ func TestGlobalNativeOwnershipNarrowingControls(t *testing.T) {
 					t.Skip("permission control requires an unprivileged process")
 				}
 			}
-			if plant.name == "omit-build-permit-barrier" || plant.name == "lock-before-real-private-build" || plant.name == "kind-only-parent-compensation" || plant.name == "ignore-created-parent-mode" || plant.name == "drop-special-compensation-bits" || plant.name == "omit-parent-metadata-checkpoint" || plant.name == "omit-directory-only-parent-checkpoint" || plant.name == "bypass-global-removal-lock" || plant.name == "release-removal-lock-before-read" || plant.name == "discard-pending-lock-after-compensation-error" || plant.name == "omit-native-publication-postimage" || plant.name == "revert-pending-lock-before-nested-native" {
+			if plant.name == "omit-parent-mode-compensation" || plant.name == "omit-build-permit-barrier" || plant.name == "lock-before-real-private-build" || plant.name == "kind-only-parent-compensation" || plant.name == "ignore-created-parent-mode" || plant.name == "drop-special-compensation-bits" || plant.name == "omit-parent-metadata-checkpoint" || plant.name == "omit-directory-only-parent-checkpoint" || plant.name == "bypass-global-removal-lock" || plant.name == "release-removal-lock-before-read" || plant.name == "discard-pending-lock-after-compensation-error" || plant.name == "omit-native-publication-postimage" || plant.name == "revert-pending-lock-before-nested-native" {
 				switch runtime.GOOS {
 				case "aix", "android", "darwin", "dragonfly", "freebsd", "hurd", "illumos", "ios", "linux", "netbsd", "openbsd", "solaris":
 				default:
