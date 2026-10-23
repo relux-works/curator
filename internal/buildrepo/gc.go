@@ -16,7 +16,19 @@ import (
 // retains exactly the snapshot roots reachable from retained receipts. It is
 // called only while the manager-home mutation lock is held by the lifecycle
 // layer; this package independently revalidates the protected boundary.
-func Collect(root string, referenced []string, now time.Time, grace time.Duration) (removed []string, err error) {
+func Collect(root string, referenced []string, now time.Time, grace time.Duration) ([]string, error) {
+	return CollectChecked(root, referenced, now, grace, func() error { return nil })
+}
+
+// CollectChecked revalidates the acquisition that produced referenced after
+// potentially blocking reads and immediately before each artifact/snapshot removal.
+func CollectChecked(root string, referenced []string, now time.Time, grace time.Duration, check func() error) (removed []string, err error) {
+	if check == nil {
+		return nil, fmt.Errorf("external sweep ownership check is required")
+	}
+	if err := check(); err != nil {
+		return nil, err
+	}
 	store := &DiskProtectedStore{Root: root}
 	if _, statErr := os.Lstat(root); os.IsNotExist(statErr) {
 		return nil, nil
@@ -30,7 +42,7 @@ func Collect(root string, referenced []string, now time.Time, grace time.Duratio
 	}
 	reachableSnapshots := map[string]bool{}
 	for _, version := range []int{LegacyReceiptSchemaVersion, SourceAwareReceiptSchemaVersion} {
-		removed, err = collectArtifacts(store, filepath.Join(root, ArtifactsDir(version)), keep, reachableSnapshots, now, grace, removed)
+		removed, err = collectArtifacts(store, filepath.Join(root, ArtifactsDir(version)), keep, reachableSnapshots, now, grace, removed, check)
 		if err != nil {
 			return removed, err
 		}
@@ -42,6 +54,9 @@ func Collect(root string, referenced []string, now time.Time, grace time.Duratio
 	}
 	for _, entry := range snapshots {
 		if entry.IsDir() && !reachableSnapshots[entry.Name()] {
+			if err := check(); err != nil {
+				return removed, err
+			}
 			if err := os.RemoveAll(filepath.Join(snapshotsRoot, entry.Name())); err != nil {
 				return removed, err
 			}
@@ -54,7 +69,7 @@ func Collect(root string, referenced []string, now time.Time, grace time.Duratio
 
 // collectArtifacts sweeps one artifact namespace and records the snapshot
 // roots its retained receipts still reach.
-func collectArtifacts(store *DiskProtectedStore, artifactsRoot string, keep, reachableSnapshots map[string]bool, now time.Time, grace time.Duration, removed []string) ([]string, error) {
+func collectArtifacts(store *DiskProtectedStore, artifactsRoot string, keep, reachableSnapshots map[string]bool, now time.Time, grace time.Duration, removed []string, check func() error) ([]string, error) {
 	entries, readErr := os.ReadDir(artifactsRoot)
 	if readErr != nil && !os.IsNotExist(readErr) {
 		return removed, readErr
@@ -69,6 +84,9 @@ func collectArtifacts(store *DiskProtectedStore, artifactsRoot string, keep, rea
 			return removed, infoErr
 		}
 		if !keep[entry.Name()] && (grace <= 0 || !info.ModTime().Add(grace).After(now)) {
+			if err := check(); err != nil {
+				return removed, err
+			}
 			if err := os.RemoveAll(path); err != nil {
 				return removed, err
 			}

@@ -99,7 +99,7 @@ func beginOperationValidated(home string, validate func() error, options ...tran
 		_ = lock.Close()
 		return nil, err
 	}
-	recovered, err := engine.RecoverWithOutcome(lock)
+	recovered, err := projectlease.RecoverUnderLock(home, lock, engine)
 	if err != nil {
 		_ = lock.Close()
 		return nil, fmt.Errorf("recover incomplete profile transactions: %w", err)

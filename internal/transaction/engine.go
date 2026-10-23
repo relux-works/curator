@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/staging"
 )
 
@@ -19,7 +20,7 @@ import (
 type Engine struct {
 	mu               sync.Mutex
 	commitCheck      CommitCheck
-	commitLock       HomeLock // scoped to Commit/Recover while mu is held
+	commitLock       HomeLock // scoped to Prepare/Commit/Recover while mu is held
 	journalRoot      string
 	hooks            Hooks
 	syncStagedParent func(string) error
@@ -83,6 +84,11 @@ func (engine *Engine) Prepare(lock HomeLock, plan Plan) (*Journal, error) {
 	}
 	engine.mu.Lock()
 	defer engine.mu.Unlock()
+	engine.commitLock = lock
+	defer func() { engine.commitLock = nil }()
+	if err := engine.checkOwnership(); err != nil {
+		return nil, err
+	}
 
 	journal, _, err := engine.buildJournal(plan)
 	if err != nil {
@@ -436,7 +442,7 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 				if err := engine.checkBoundary(journal, index); err != nil {
 					return err
 				}
-				if err := durableRenameNoReplace(target.LivePath, target.BackupPath); err != nil {
+				if err := engine.renameNoReplace(target.LivePath, target.BackupPath); err != nil {
 					return err
 				}
 				if err := syncTree(target.BackupPath); err != nil {
@@ -447,7 +453,7 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 					return err
 				}
 				if captured != digest {
-					if restoreErr := durableRenameNoReplace(target.BackupPath, target.LivePath); restoreErr != nil {
+					if restoreErr := engine.renameNoReplace(target.BackupPath, target.LivePath); restoreErr != nil {
 						return errors.Join(corruptionf("target %s/%s changed while backing up", target.Class, target.Identifier), restoreErr)
 					}
 					return corruptionf("target %s/%s changed while backing up", target.Class, target.Identifier)
@@ -493,7 +499,7 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 			if err := engine.checkBoundary(journal, index); err != nil {
 				return err
 			}
-			if err := durableRenameNoReplace(target.StagedPath, target.LivePath); err != nil {
+			if err := engine.renameNoReplace(target.StagedPath, target.LivePath); err != nil {
 				return err
 			}
 			if err := syncTree(target.LivePath); err != nil {
@@ -538,6 +544,9 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 // one epoch is therefore still caught here, and the transaction refuses as
 // before.
 func (engine *Engine) checkBoundary(journal *Journal, index int) error {
+	if err := engine.checkOwnership(); err != nil {
+		return err
+	}
 	if err := engine.checkCommit(journal); err != nil {
 		return err
 	}
@@ -790,7 +799,7 @@ func (engine *Engine) rollbackTarget(journal *Journal, index int) error {
 			} else if existing != DigestAbsent {
 				return corruptionf("rollback refused to overwrite current bytes for %s/%s", target.Class, target.Identifier)
 			}
-			if err := durableRenameNoReplace(target.RollbackPath, target.LivePath); err != nil {
+			if err := engine.renameNoReplace(target.RollbackPath, target.LivePath); err != nil {
 				return errors.Join(corruptionf("rollback target %s/%s has unknown bytes", target.Class, target.Identifier), err)
 			}
 			return corruptionf("rollback target %s/%s desired digest mismatch", target.Class, target.Identifier)
@@ -799,7 +808,7 @@ func (engine *Engine) rollbackTarget(journal *Journal, index int) error {
 		if current != target.DesiredDigest {
 			return corruptionf("rollback refused unknown current bytes for %s/%s", target.Class, target.Identifier)
 		}
-		if err := durableRenameNoReplace(target.LivePath, target.RollbackPath); err != nil {
+		if err := engine.renameNoReplace(target.LivePath, target.RollbackPath); err != nil {
 			return err
 		}
 		rollbackDigest, err = target.digest(target.RollbackPath)
@@ -812,7 +821,7 @@ func (engine *Engine) rollbackTarget(journal *Journal, index int) error {
 			} else if existing != DigestAbsent {
 				return corruptionf("rollback captured unknown bytes for %s/%s and current bytes appeared", target.Class, target.Identifier)
 			}
-			if restoreErr := durableRenameNoReplace(target.RollbackPath, target.LivePath); restoreErr != nil {
+			if restoreErr := engine.renameNoReplace(target.RollbackPath, target.LivePath); restoreErr != nil {
 				return errors.Join(corruptionf("rollback captured unknown bytes for %s/%s", target.Class, target.Identifier), restoreErr)
 			}
 			return corruptionf("rollback captured unknown bytes for %s/%s", target.Class, target.Identifier)
@@ -833,7 +842,7 @@ func (engine *Engine) rollbackTarget(journal *Journal, index int) error {
 		} else if existing != DigestAbsent {
 			return corruptionf("rollback refused to overwrite current bytes for %s/%s", target.Class, target.Identifier)
 		}
-		if err := durableRenameNoReplace(target.BackupPath, target.LivePath); err != nil {
+		if err := engine.renameNoReplace(target.BackupPath, target.LivePath); err != nil {
 			return err
 		}
 		if err := syncTree(target.LivePath); err != nil {
@@ -968,6 +977,9 @@ func (engine *Engine) removeRecordedSidecar(journal *Journal, removal removalCan
 }
 
 func (engine *Engine) finishRecordedRemoval(journal *Journal, removal removalCandidate) error {
+	if err := engine.checkOwnership(); err != nil {
+		return err
+	}
 	if journal.RemovalPath != removal.path {
 		return corruptionf("transaction %s removal ownership does not match %s", journal.TransactionID, removal.path)
 	}
@@ -978,6 +990,7 @@ func (engine *Engine) finishRecordedRemoval(journal *Journal, removal removalCan
 		journal.RemovalEntries,
 		func() error { return engine.emit(journal, removal.targetIndex, PointAfterCleanupRename) },
 		func() error { return engine.emit(journal, removal.targetIndex, PointDuringCleanupRemoval) },
+		engine.checkOwnership,
 	); err != nil {
 		return err
 	}
@@ -1028,6 +1041,9 @@ func (engine *Engine) finishRecordedRemoval(journal *Journal, removal removalCan
 }
 
 func (engine *Engine) emit(journal *Journal, targetIndex int, point Point) error {
+	if err := engine.checkOwnership(); err != nil {
+		return err
+	}
 	event := Event{Point: point, TransactionID: journal.TransactionID, TargetIndex: targetIndex}
 	if targetIndex >= 0 {
 		event.Class = journal.Targets[targetIndex].Class
@@ -1038,9 +1054,9 @@ func (engine *Engine) emit(journal *Journal, targetIndex int, point Point) error
 		engine.hooks.Observe(event)
 	}
 	if engine.hooks.Fault != nil {
-		return engine.hooks.Fault(event)
+		return errors.Join(engine.hooks.Fault(event), engine.checkOwnership())
 	}
-	return nil
+	return engine.checkOwnership()
 }
 
 // ReferencedBuildKeys returns the sorted union from every live journal. GC can
@@ -1112,4 +1128,24 @@ func (engine *Engine) checkCommit(journal *Journal) error {
 	}
 	snapshot := cloneJournal(journal)
 	return engine.commitCheck(engine.commitLock, *snapshot)
+}
+
+// Ownership is independent of forward policy: a current owner may restore a
+// rejected artifact transaction, whereas a stale owner must not mutate even a
+// rollback journal or cleanup sidecar. Legacy test witnesses retain AssertHeld.
+func (engine *Engine) checkOwnership() error {
+	if engine.commitLock == nil {
+		return nil
+	}
+	if witness, ok := engine.commitLock.(interface{ Held() managerlock.Held }); ok {
+		return witness.Held().Validate(filepath.Dir(filepath.Dir(filepath.Dir(engine.journalRoot))))
+	}
+	return requireHomeLock(engine.commitLock)
+}
+
+func (engine *Engine) renameNoReplace(source, destination string) error {
+	if err := engine.checkOwnership(); err != nil {
+		return err
+	}
+	return durableRenameNoReplace(source, destination)
 }
