@@ -124,7 +124,7 @@ func TestNativeCommandTimeoutDiagnostics(t *testing.T) {
 	}
 }
 
-func TestNativeCommandDiagnosticProcess(t *testing.T) {
+func TestNativeCommandDiagnosticProcess(_ *testing.T) {
 	if os.Getenv("CURATOR_NATIVE_DIAGNOSTIC_HELPER") != "1" {
 		return
 	}
