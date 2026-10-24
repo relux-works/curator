@@ -49,7 +49,7 @@ func TestLeaseCollectorProcessHelper(t *testing.T) {
 		p.Error = err.Error()
 		return
 	}
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	p.Acquired = true
 	engine, err := transaction.New(home)
 	if err != nil {

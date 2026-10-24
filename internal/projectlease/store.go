@@ -45,6 +45,7 @@ type Manager struct {
 	hooks     transaction.Hooks
 }
 
+// New constructs a lease manager with explicit authority and session observers.
 func New(home string, authority Authority, sessions Sessions) (*Manager, error) {
 	locks, err := managerlock.New(home)
 	if err != nil {

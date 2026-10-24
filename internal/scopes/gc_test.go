@@ -36,7 +36,7 @@ func collectWithTestHomeLock(t *testing.T, request MaintenanceRequest) (Maintena
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	request.Lock = lock
 	return Collect(request)
 }

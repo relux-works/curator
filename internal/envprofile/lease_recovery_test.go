@@ -59,7 +59,7 @@ func TestDefaultRecoveryChecksLeaseJournal(t *testing.T) {
 			}
 			op, err := beginOperation(home)
 			if op != nil {
-				defer op.close()
+				defer func() { _ = op.close() }()
 			}
 			raw, readErr := os.ReadFile(target)
 			if readErr != nil {

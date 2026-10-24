@@ -38,7 +38,7 @@ func TestSweepRetainsOwnershipAfterClassification(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer lock.Close()
+				defer func() { _ = lock.Close() }()
 				reached := false
 				hook := func() {
 					reached = true

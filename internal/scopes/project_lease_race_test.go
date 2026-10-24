@@ -98,7 +98,7 @@ func TestCollectProjectLeaseForeignLockInterleaving(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	result, err = Collect(MaintenanceRequest{Home: home, Lock: lock, Cache: &recordingCache{}})
 	if err != nil || len(result.RemovedRuntime) != 1 || result.RemovedRuntime[0] != "tool/orphan" {
 		t.Fatalf("same-home GC control: %+v %v", result, err)
@@ -125,7 +125,7 @@ func TestCollectWithUnrelatedPendingTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	engine, err := transaction.New(home)
 	if err != nil {
 		t.Fatal(err)

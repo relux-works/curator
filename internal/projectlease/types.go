@@ -21,6 +21,7 @@ import (
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
+// ErrRevoked reports that the manager no longer authorizes a project lease.
 var ErrRevoked = errors.New("project authority revoked")
 
 // ErrArtifactsUnavailable means admission lost a referenced artifact before
@@ -30,6 +31,7 @@ var ErrArtifactsUnavailable = errors.New("project_artifacts_unavailable")
 // ErrPendingRecovery refuses collection until durable transaction intent is reconciled.
 var ErrPendingRecovery = errors.New("pending project lease transaction; recover before collection")
 
+// Busy identifies a project view retained by a live or uncertain lease.
 const Busy = "project_view_busy"
 const maxRecord = 1 << 20
 
@@ -98,10 +100,12 @@ type Evidence struct {
 	NoChildStarted        bool
 }
 
+// Sessions observes tracked session generations through the owning authority.
 type Sessions interface {
 	Observe(context.Context, string, int64) (Evidence, error)
 }
 
+// Request names the immutable composition and tracked owner for a lease.
 type Request struct {
 	LeaseID       string
 	ContextRef    string
@@ -111,8 +115,10 @@ type Request struct {
 	Generation    int64
 }
 
+// Phase describes the protected lifecycle state of a project lease.
 type Phase string
 
+// Prepared, Active, Unknown and Released name the durable project lease phases.
 const (
 	Prepared Phase = "prepared"
 	Active   Phase = "active"

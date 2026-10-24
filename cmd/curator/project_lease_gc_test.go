@@ -33,7 +33,7 @@ func TestGCRecoversProjectLeaseArtifacts(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer lock.Close()
+			defer func() { _ = lock.Close() }()
 			if present {
 				if err = os.MkdirAll(filepath.Join(home, "runtime", "tool", "next"), 0700); err != nil {
 					t.Fatal(err)

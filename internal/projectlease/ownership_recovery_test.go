@@ -77,7 +77,7 @@ func TestAcquireCannotUndoRecoveredOwner(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer lock.Close()
+				defer func() { _ = lock.Close() }()
 				engine, _ := transaction.New(f.home)
 				if pending, err := engine.PendingRecovery(lock); err != nil || pending {
 					t.Fatalf("stale owner recreated settled intent: %v %v", pending, err)

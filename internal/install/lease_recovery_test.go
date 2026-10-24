@@ -65,7 +65,7 @@ func TestDefaultRecoveryChecksLeaseJournal(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer recoveryLock.Close()
+			defer func() { _ = recoveryLock.Close() }()
 			err = deps.Journal.Recover(recoveryLock)
 			raw, readErr := os.ReadFile(target)
 			if readErr != nil {

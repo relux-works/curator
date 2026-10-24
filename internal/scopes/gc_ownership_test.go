@@ -36,7 +36,7 @@ func TestCollectCannotSweepNewOwnerLease(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer lock.Close()
+			defer func() { _ = lock.Close() }()
 			store.ExecutablePaths = func() ([]string, error) {
 				if replace {
 					replaceGCLock(t, home)
@@ -130,7 +130,7 @@ func TestGCSweepBoundariesRetainOwnership(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer lock.Close()
+				defer func() { _ = lock.Close() }()
 				witness := lock.Held()
 				path := filepath.Join(home, "runtime", "tool", "orphan")
 				if boundary == "external-artifact" {
@@ -202,7 +202,7 @@ func TestCollectRechecksBeforeExternalSweep(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer lock.Close()
+			defer func() { _ = lock.Close() }()
 			result, err := Collect(MaintenanceRequest{Home: home, Lock: lock, Now: time.Now().Add(time.Hour), Grace: time.Second, Cache: afterInternalSweep{after: func() {
 				if replace {
 					replaceGCLock(t, home)
@@ -242,7 +242,7 @@ func TestGCPruningRetainsOwnership(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer lock.Close()
+			defer func() { _ = lock.Close() }()
 			witness := lock.Held()
 			injected := false
 			check := func() error {

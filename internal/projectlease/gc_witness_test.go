@@ -30,7 +30,7 @@ func TestGCReferenceWitness(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	if roots, err := ReferencesUnderLock(f.home, lock); err != nil || len(roots.Homes) != 1 {
 		t.Fatal("valid witness refused roots", err)
 	}
@@ -54,7 +54,7 @@ func TestGCReferenceWitness(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer reacquired.Close()
+	defer func() { _ = reacquired.Close() }()
 	if _, err = ReferencesUnderLock(f.home, lock); !errors.Is(err, managerlock.ErrNotHeld) {
 		t.Fatalf("released GC witness = %v", err)
 	}

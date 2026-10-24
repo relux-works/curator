@@ -39,7 +39,7 @@ func TestExchangeOwnershipAtBoundary(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					defer lock.Close()
+					defer func() { _ = lock.Close() }()
 					target := fileTarget(t, "projection", "fixture", filepath.Join(root, "live"), filepath.Join(root, "source"), "old", "new")
 					target.Kind = kind
 					installing := false
@@ -114,7 +114,7 @@ func TestExchangeNewOwnerHelper(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	if os.Getenv("CURATOR_EXCHANGE_OWNER_RECOVER") == "true" {
 		if err := mustEngine(t, home).Recover(lock); err != nil {
 			t.Fatal(err)
@@ -129,7 +129,7 @@ func TestExchangeNewOwnerHelper(t *testing.T) {
 
 // replaceExchangeOwner acquires a real replacement lock in a bounded subprocess.
 // Its stdin lifetime keeps that acquisition held throughout the stale attempt.
-func replaceExchangeOwner(t *testing.T, home string, old *managerlock.HomeLock, recover bool) {
+func replaceExchangeOwner(t *testing.T, home string, old *managerlock.HomeLock, recoverPending bool) {
 	t.Helper()
 	paths, err := filepath.Glob(filepath.Join(home, "state", "locks", "v1", "*.lock"))
 	if err != nil || len(paths) != 1 {
@@ -143,7 +143,7 @@ func replaceExchangeOwner(t *testing.T, home string, old *managerlock.HomeLock, 
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	child := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestExchangeNewOwnerHelper$")
-	child.Env = append(os.Environ(), "CURATOR_EXCHANGE_OWNER_HOME="+home, fmt.Sprintf("CURATOR_EXCHANGE_OWNER_RECOVER=%t", recover))
+	child.Env = append(os.Environ(), "CURATOR_EXCHANGE_OWNER_HOME="+home, fmt.Sprintf("CURATOR_EXCHANGE_OWNER_RECOVER=%t", recoverPending))
 	child.Stderr = os.Stderr
 	input, err := child.StdinPipe()
 	if err != nil {
@@ -197,7 +197,7 @@ func TestExchangeRollbackOwnership(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer lock.Close()
+				defer func() { _ = lock.Close() }()
 				target := fileTarget(t, "projection", "fixture", filepath.Join(root, "live"), filepath.Join(root, "source"), "old", "new")
 				target.Kind = KindExchange
 				engine := mustEngine(t, home)
@@ -283,7 +283,7 @@ func TestExchangeRecoveredOwnerPreserved(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer lock.Close()
+				defer func() { _ = lock.Close() }()
 				target := fileTarget(t, "projection", "fixture", filepath.Join(root, "live"), filepath.Join(root, "source"), "old", "new")
 				target.Kind = KindExchange
 				reached := false

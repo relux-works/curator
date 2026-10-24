@@ -25,7 +25,7 @@ func TestLeaseTransactionPolicyCurrentLock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	path := statePath(lm.Home())
 	digest, err := transaction.DigestTarget(transaction.KindBytes, path)
 	if err != nil {
