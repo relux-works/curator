@@ -291,8 +291,8 @@ jobs:
           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
         run: >-
           env -u GIT_DIR -u GIT_WORK_TREE go test -count=1 -timeout=10m
-          ./internal/envprofile ./cmd/curator
-          -run '^(TestWindowsMCPMetadataRootRefusal|TestMCPWindowsNarrowingControls|TestProfileMCP.*|TestProjectMCP.*|TestProjectRefreshGitBranchMembershipChangeThroughCLI)$'
+          ./internal/envprofile ./cmd/curator ./internal/install
+          -run '^(TestWindowsMCPMetadataRootRefusal|TestWindowsSourceReplayMetadataBoundary|TestWindowsDraftAcquisitionMetadataBoundary|TestMCPWindowsNarrowingControls|TestProfileMCP.*|TestProjectMCP.*|TestProjectRefreshGitBranchMembershipChangeThroughCLI)$'
 
       # Check the formerly cross-volume fixture paths and the slow Windows
       # lease control before the long suite. These are additional positives;
