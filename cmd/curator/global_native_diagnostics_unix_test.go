@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -100,6 +101,13 @@ func TestNativeCommandTimeoutDiagnostics(t *testing.T) {
 			if blocked {
 				child.cmd.Env = append(child.cmd.Env, "CURATOR_NATIVE_DIAGNOSTIC_BLOCK=1")
 			}
+			ready, writer, err := os.Pipe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer ready.Close()
+			defer writer.Close()
+			child.cmd.ExtraFiles = []*os.File{writer}
 			child.cmd.Stdout = &child.output
 			child.cmd.Stderr = &child.output
 			if err := child.cmd.Start(); err != nil {
@@ -117,8 +125,11 @@ func TestNativeCommandTimeoutDiagnostics(t *testing.T) {
 				child.wait(t)
 				return
 			}
-			// Allow the helper to enter its test before collecting a real Go stack.
-			time.Sleep(time.Second)
+			_ = writer.Close()
+			var started [1]byte
+			if _, err := io.ReadFull(ready, started[:]); err != nil || started[0] != 1 {
+				t.Fatalf("diagnostic helper did not reach readiness: %v", err)
+			}
 			if os.Getenv("CURATOR_NATIVE_DIAGNOSTIC_WATCHDOG") == "1" {
 				child.waitWithin(t, time.Millisecond)
 				t.Fatal("watchdog returned success")
@@ -127,7 +138,7 @@ func TestNativeCommandTimeoutDiagnostics(t *testing.T) {
 			if !child.finished || !strings.Contains(diagnostic, "production CLI did not finish after release") || !strings.Contains(diagnostic, "TestNativeCommandDiagnosticProcess") || !strings.Contains(diagnostic, "SIGQUIT") {
 				t.Fatalf("timeout lost failure or blocked child stack: %s", diagnostic)
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			watchdog := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestNativeCommandTimeoutDiagnostics$/^true$")
 			watchdog.Env = append(os.Environ(), cliHelperProcess+"=1", "CURATOR_NATIVE_DIAGNOSTIC_WATCHDOG=1")
@@ -147,6 +158,14 @@ func TestNativeCommandDiagnosticProcess(_ *testing.T) {
 	if os.Getenv("CURATOR_NATIVE_DIAGNOSTIC_HELPER") != "1" {
 		return
 	}
+	ready := os.NewFile(3, "diagnostic-ready")
+	if ready == nil {
+		os.Exit(94)
+	}
+	if _, err := ready.Write([]byte{1}); err != nil {
+		os.Exit(94)
+	}
+	_ = ready.Close()
 	if os.Getenv("CURATOR_NATIVE_DIAGNOSTIC_BLOCK") == "1" {
 		time.Sleep(time.Minute)
 	}

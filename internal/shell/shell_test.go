@@ -504,7 +504,7 @@ func writeHook(t *testing.T, shellName string, includeGlobal bool) string {
 
 func runPosix(t *testing.T, executable, script string, environment map[string]string) string {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	args := []string{"--noprofile", "--norc", "-c", script}
 	if filepath.Base(executable) == "zsh" {

@@ -136,7 +136,7 @@ func TestMaterializeCaptureCurrentAndRelease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	lock, err := manager.AcquireExistingHomeOnly(ctx)
 	if err != nil {
@@ -692,7 +692,7 @@ func TestMaterializeCaptureConcurrentRepair(t *testing.T) {
 		go func() { _, err := Resolve(repair); completed <- err }()
 		select {
 		case <-waiting:
-		case <-time.After(2 * time.Second):
+		case <-t.Context().Done():
 			return nil, errors.New("repair did not reach mutation lock")
 		}
 		select {

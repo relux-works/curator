@@ -252,8 +252,7 @@ func TestRunSessionTerminatesDescendants(t *testing.T) {
 		t.Fatal("the interpreter descendant published no identity")
 	}
 	pid := report.SpawnPid
-	deadline := time.Now().Add(15 * time.Second)
-	for processAlive(pid) && time.Now().Before(deadline) {
+	for processAlive(pid) && t.Context().Err() == nil {
 		time.Sleep(50 * time.Millisecond)
 	}
 	if processAlive(pid) {

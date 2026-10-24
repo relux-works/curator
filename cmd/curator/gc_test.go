@@ -172,7 +172,7 @@ func TestGCRetainsLiveProcessBuild(t *testing.T) {
 		if !ok {
 			t.Fatal("cache executable did not signal readiness")
 		}
-	case <-time.After(30 * time.Second):
+	case <-t.Context().Done():
 		t.Fatal("cache executable readiness timed out")
 	}
 	if err := os.Remove(filepath.Join(project, ".agents", "skills", "build-skill", marker.Name)); err != nil {
@@ -342,7 +342,7 @@ func TestGCWaitsForTheHomeLock(t *testing.T) {
 		if code != exitOK {
 			t.Fatalf("gc after the lock was released = %d", code)
 		}
-	case <-time.After(30 * time.Second):
+	case <-t.Context().Done():
 		t.Fatal("gc did not resume after the home lock was released")
 	}
 	if consumers := mustLoadConsumers(t, home); len(consumers) != 0 {

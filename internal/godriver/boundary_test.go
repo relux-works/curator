@@ -67,7 +67,7 @@ func TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes(t *testing.T) {
 			before := len(fixture.calls())
 
 			fired := injectControlSeamFault(t, seam)
-			result, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
+			result, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout}))
 
 			if *fired == 0 {
 				t.Fatalf("the %s seam was never crossed", seam)
@@ -107,7 +107,7 @@ func TestControlSeamFailureNeverDriftsIntoAHardenedClaim(t *testing.T) {
 	fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
 
 	fired := injectControlSeamFault(t, seamPrepare)
-	if _, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second})); DiagnosticCode(err) != CodeControlUnavailable {
+	if _, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout})); DiagnosticCode(err) != CodeControlUnavailable {
 		t.Fatalf("error = %v, want %s", err, CodeControlUnavailable)
 	}
 	if *fired == 0 {
@@ -115,7 +115,7 @@ func TestControlSeamFailureNeverDriftsIntoAHardenedClaim(t *testing.T) {
 	}
 	controlSeamFault = nil
 
-	result, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
+	result, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout}))
 	if err != nil {
 		t.Fatalf("an unavailable inventory control or a deferred guarantee rejected the build: %v", err)
 	}
@@ -271,7 +271,7 @@ func TestBuildFailsClosedWhenTheGoChildCannotStart(t *testing.T) {
 	fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
 	before := len(fixture.calls())
 
-	_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second, Processes: 1}))
+	_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout, Processes: 1}))
 	if DiagnosticCode(err) != "go_list_failed" {
 		t.Fatalf("error = %v, want the fixed go list command to fail closed", err)
 	}
@@ -293,8 +293,7 @@ func TestWorkerDomainTeardownSurvivesARefusedChild(t *testing.T) {
 	}
 	pid := worker.command.Process.Pid
 	worker.close()
-	deadline := time.Now().Add(15 * time.Second)
-	for processAlive(pid) && time.Now().Before(deadline) {
+	for processAlive(pid) && t.Context().Err() == nil {
 		time.Sleep(50 * time.Millisecond)
 	}
 	if processAlive(pid) {

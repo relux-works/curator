@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 // rawWorker drives a real hidden-mode worker process over the session channel
@@ -144,7 +143,7 @@ func newWorkerScenario(t *testing.T) *workerScenario {
 	if err != nil {
 		t.Fatal(err)
 	}
-	limits, err := normalizeBuildLimits(ResourceLimits{Timeout: 30 * time.Second})
+	limits, err := normalizeBuildLimits(ResourceLimits{Timeout: defaultBuildTimeout})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -470,7 +469,7 @@ func TestWorkerModeIsNotReachableThroughPackageData(t *testing.T) {
 	// worker executable is this manager, never a package path.
 	fixture := newSnapshotFixture(t)
 	fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
-	request := fixture.request(ResourceLimits{Timeout: 30 * time.Second})
+	request := fixture.request(ResourceLimits{Timeout: defaultBuildTimeout})
 	request.CommandObject["worker_mode"] = WorkerMode
 	if _, err := Build(context.Background(), request); DiagnosticCode(err) != CodePackageInfluenceForbidden {
 		t.Fatalf("error = %v, want %s", err, CodePackageInfluenceForbidden)

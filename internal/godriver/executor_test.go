@@ -18,7 +18,7 @@ func TestOSExecutorClosesStdinAndCapturesBoundedOutput(t *testing.T) {
 	environment["GO_WANT_GODRIVER_HELPER"] = "stdin"
 	output, err := (OSExecutor{}).Run(context.Background(), Process{
 		Executable: os.Args[0], Arguments: []string{"-test.run=TestGodriverHelperProcess"},
-		Directory: t.TempDir(), Environment: environmentSlice(environment), Timeout: 5 * time.Second, OutputLimit: 64,
+		Directory: t.TempDir(), Environment: environmentSlice(environment), Timeout: defaultBuildTimeout, OutputLimit: 64,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -35,8 +35,8 @@ func TestOSExecutorEnforcesOutputAndTimeBounds(t *testing.T) {
 		limit      int64
 		want       error
 	}{
-		{name: "output", mode: "output", timeout: 5 * time.Second, limit: 32, want: errOutputLimit},
-		{name: "combined output", mode: "combined-output", timeout: 5 * time.Second, limit: 32, want: errOutputLimit},
+		{name: "output", mode: "output", timeout: defaultBuildTimeout, limit: 32, want: errOutputLimit},
+		{name: "combined output", mode: "combined-output", timeout: defaultBuildTimeout, limit: 32, want: errOutputLimit},
 		{name: "timeout", mode: "timeout", timeout: 20 * time.Millisecond, limit: 32, want: errProcessTimeout},
 	} {
 		t.Run(test.name, func(t *testing.T) {

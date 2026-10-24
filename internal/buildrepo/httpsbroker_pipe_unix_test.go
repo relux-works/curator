@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"syscall"
 	"testing"
-	"time"
 )
 
 // Drive the real askpass dispatch, but wait for its exit before starting the
@@ -60,7 +59,7 @@ func TestHTTPSBrokerSecretTransportChildExitsBeforeServe(t *testing.T) {
 			if cmd.ProcessState.ExitCode() != tc.code || stdout.String() != tc.output || stderr.Len() != 0 {
 				t.Fatalf("unexpected child result: code=%d; output redacted", cmd.ProcessState.ExitCode())
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			if err := transport.Serve(ctx); err != nil {
 				t.Fatalf("HTTPS broker secret transport after non-reading child exit: %v", err)
@@ -87,7 +86,7 @@ func TestHTTPSBrokerSecretTransportReportsWriteFailureAfterRequest(t *testing.T)
 	if err := syscall.Shutdown(int(unix.writer.Fd()), syscall.SHUT_WR); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	if err := transport.Serve(ctx); !errors.Is(err, syscall.EPIPE) {
 		t.Fatalf("requested secret write error = %v, want EPIPE", err)
@@ -104,7 +103,7 @@ func TestHTTPSBrokerSecretTransportRejectsInvalidRequest(t *testing.T) {
 	if _, err := unix.reader.WriteString("X"); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	if err := transport.Serve(ctx); err == nil || err.Error() != "invalid HTTPS broker secret request" {
 		t.Fatalf("invalid request error = %v", err)
@@ -125,7 +124,7 @@ func TestHTTPSCredentialBrokerRejectsClosedSecretSocket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	cmd := exec.CommandContext(ctx, wrapper, "Password for 'https://oauth2@fixture.test': ")
 	transport, err := NewHTTPSBrokerSecretTransport(cmd, "transport-secret")

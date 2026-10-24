@@ -79,7 +79,7 @@ func (fixture *workerFixture) replacedPackage() packageJSON {
 
 func moduleRootLimits() ResourceLimits {
 	return ResourceLimits{
-		Timeout: 30 * time.Second, OutputBytes: 64 * 1024, ArtifactBytes: 1024,
+		Timeout: defaultBuildTimeout, OutputBytes: 64 * 1024, ArtifactBytes: 1024,
 		DiskBytes: 8 * 1024 * 1024, MemoryBytes: 64 * 1024 * 1024, Processes: 8,
 	}
 }

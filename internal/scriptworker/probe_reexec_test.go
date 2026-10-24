@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 )
 
 // Every current test binary that transitively imports scriptworker must answer
@@ -37,7 +36,7 @@ func TestLandlockProbeModeTerminatesAffectedTestBinaries(t *testing.T) {
 				{"extra-argument", []string{ScriptLandlockProbeMode, owned, "extra"}, 1},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
-					ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+					ctx, cancel := context.WithCancel(t.Context())
 					defer cancel()
 					command := exec.CommandContext(ctx, binary, tc.args...) // #nosec G204 -- test-owned binary and fixed hidden arguments
 					command.Env = scriptWorkerEnvironment()
