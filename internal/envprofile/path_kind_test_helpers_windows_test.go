@@ -71,6 +71,14 @@ func makeWorldWritableDirectoryForTest(path string) (func() error, error) {
 // for directories that hold manager-created links: restore puts back the
 // original DACL of that one path instead of protecting the tree.
 func makeWorldWritableSingleDirectoryForTest(path string) (func() error, error) {
+	return makeForeignAccessSinglePathForTest(path, windows.GENERIC_WRITE)
+}
+
+func makeWorldReadableFileForTest(path string) (func() error, error) {
+	return makeForeignAccessSinglePathForTest(path, windows.GENERIC_READ)
+}
+
+func makeForeignAccessSinglePathForTest(path string, rights windows.ACCESS_MASK) (func() error, error) {
 	path16, err := windows.UTF16PtrFromString(path)
 	if err != nil {
 		return nil, err
@@ -105,7 +113,7 @@ func makeWorldWritableSingleDirectoryForTest(path string) (func() error, error) 
 		return nil, err
 	}
 	worldWrite, err := windows.ACLFromEntries([]windows.EXPLICIT_ACCESS{{
-		AccessPermissions: windows.GENERIC_WRITE,
+		AccessPermissions: rights,
 		AccessMode:        windows.GRANT_ACCESS,
 		Inheritance:       windows.NO_INHERITANCE,
 		Trustee: windows.TRUSTEE{

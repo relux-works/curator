@@ -411,10 +411,10 @@ func TestProfileMCPUnreadableAndNoFollow(t *testing.T) {
 					p := nativeMCPLedger(fx.home, fx.profile, id)
 					nativeWrite(t, p, body)
 					if kind == "unprotected-marker" {
-						// The shared permission plant operates on an existing handle;
-						// for this regular file it broadens the DACL on Windows
-						// as well as the permission bits on Unix.
-						restore, err := makeWorldWritableSingleDirectoryForTest(p)
+						// Read-only foreign access passes the mutation route check
+						// but must still fail the ownership ledger's stricter
+						// privacy boundary: chmod on Unix, a real ACE on Windows.
+						restore, err := makeWorldReadableFileForTest(p)
 						if err != nil {
 							t.Fatal(err)
 						}
