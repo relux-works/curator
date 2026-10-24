@@ -17,7 +17,7 @@ func securityPostureRevisions() config.SecurityPostureRevisions {
 		EnvPassthrough:     string(envfragment.ActiveS4Profile),
 		ProviderTrustRoots: providerTrustRoots,
 		UpdateConfirmation: "A-warning",
-		CodexSeed:          envregistry.CodexSeedRevisionB,
+		CodexSeed:          envregistry.CodexSeedRevision,
 	}
 }
 

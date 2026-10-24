@@ -17,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/sourcelock"
@@ -31,6 +32,15 @@ func pinV1MarkerWriters(t *testing.T) {
 	t.Helper()
 	prior := hashing.EnableV2Writers
 	hashing.EnableV2Writers = false
+	// The frozen writer fixture predates seed C as well as hash framing v2.
+	for i := range envregistry.Registry {
+		if envregistry.Registry[i].ID == envregistry.CodexCLI {
+			index := i
+			revision := envregistry.Registry[i].CodexSeedRevision
+			envregistry.Registry[i].CodexSeedRevision = envregistry.CodexSeedRevisionB
+			t.Cleanup(func() { envregistry.Registry[index].CodexSeedRevision = revision })
+		}
+	}
 	t.Cleanup(func() { hashing.EnableV2Writers = prior })
 }
 

@@ -28,6 +28,7 @@ import (
 	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/devsub"
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/gitcred"
 	"github.com/relux-works/curator/internal/gitignore"
@@ -1535,6 +1536,14 @@ func (c cli) cmdGlobal(args []string) int {
 	if code != exitOK {
 		return code
 	}
+	switch args[0] {
+	case "init", "add", "remove", "install", "adopt", "update", "upgrade":
+		if err := envauthority.Validate(cfg.Home()); err != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+			return exitFail
+		}
+	}
+
 	if args[0] != "init" {
 		globalManifest, err := manifest.Load(install.GlobalRoot(cfg.Home()))
 		if err == nil && globalManifest != nil && globalManifest.SchemaVersion != manifest.SchemaVersion {
@@ -1605,6 +1614,17 @@ func (c cli) cmdGlobal(args []string) int {
 			_, _ = fmt.Fprintln(c.stderr, "curator: acquire the global operation lock:", err)
 			return exitFail
 		}
+		lock, err := manager.AcquireHomeOnly(ctx, false)
+		if err != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+			return exitFail
+		}
+		defer func() { _ = lock.Close() }()
+		if err := envauthority.Validate(cfg.Home()); err != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+			return exitFail
+		}
+
 		if err := manifest.RemoveDecl(install.GlobalRoot(cfg.Home()), args[1]); err != nil {
 			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
@@ -2362,6 +2382,10 @@ func (c cli) cmdGC() int {
 		return code
 	}
 	home := cfg.Home()
+	if err := envauthority.Validate(home); err != nil {
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+		return exitFail
+	}
 	manager, err := managerlock.New(home)
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)

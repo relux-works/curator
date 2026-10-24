@@ -38,6 +38,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
@@ -269,6 +270,25 @@ func (r *MigrateReport) Conflicts() []MigrateConflict {
 	return out
 }
 
+// conflictError renders the same operator choice for locked apply and early
+// read-only authority refusal; neither path applies a conflicted plan.
+func (r *MigrateReport) conflictError() error {
+	if conflicts := r.Conflicts(); len(conflicts) > 0 {
+		first := conflicts[0]
+		where := fmt.Sprintf("profile %s, environment %s", first.Profile, first.EnvID)
+		if first.Path != "" {
+			where += ", " + first.Path
+		}
+		extra := ""
+		if len(conflicts) > 1 {
+			extra = fmt.Sprintf(" (+%d more; see plan)", len(conflicts)-1)
+		}
+		return fmt.Errorf("%s: migration blocked by %d conflicts: %s: %s. Operator choice: %s%s",
+			envregistry.DiagCredentialConflict, len(conflicts), where, first.Detail, first.Choice, extra)
+	}
+	return nil
+}
+
 // PlanMigration inventories the scope and derives the exact operations,
 // conflicts, and plan hash. Read-only: it takes no lock and never reads
 // credential bytes (lstat/readlink/stat only). It serves both the
@@ -417,6 +437,10 @@ func inventoryHome(req *MigrateRequest, profile string, adapter envregistry.Adap
 	if err != nil {
 		home.addConflict("", fmt.Sprintf("marker is invalid: %v", err),
 			"back the marker up, remove it, and re-run `curator env resolve --repair` to re-provision")
+		return home
+	}
+	if err := requirePerHomeCredentialSource(marker); err != nil {
+		home.addConflict("", err.Error(), "use a manager supporting the recorded node credential source")
 		return home
 	}
 	home.provisioned = true
@@ -928,8 +952,9 @@ func (c MigrateConflict) writePlan(out *strings.Builder) {
 }
 
 // MigrateApplyResult carries the recomputed plan apply printed before
-// executing, plus the operations it applied and any interrupted apply
-// it recovered first (nil when no journal was present).
+// executing, or a read-only refusal plan when authority admission fails. It
+// records operations applied and any interrupted apply recovered first (nil
+// when no journal was present).
 type MigrateApplyResult struct {
 	Report    *MigrateReport
 	Applied   []MigrateOp
@@ -955,6 +980,17 @@ type MigrateApplyResult struct {
 func ApplyMigration(req MigrateRequest) (*MigrateApplyResult, error) {
 	op, err := beginOperation(req.Home, req.transactionOptions...)
 	if err != nil {
+		// Admission must not recover an unreadable authority marker, but the
+		// read-only inventory still explains the existing migration conflict.
+		if strings.HasPrefix(err.Error(), envmarker.DiagMarkerUnreadable+":") || strings.HasPrefix(err.Error(), envmarker.DiagMarkerInvalid+":") {
+			if report, planErr := PlanMigration(req); planErr == nil && len(report.Conflicts()) != 0 {
+				result := &MigrateApplyResult{Report: report}
+				if printErr := printMigrationPlan(req.Print, report); printErr != nil {
+					return result, fmt.Errorf("migration authority refusal plan cannot be printed: %w; %w", printErr, err)
+				}
+				return result, fmt.Errorf("%w; %w", report.conflictError(), err)
+			}
+		}
 		return nil, err
 	}
 	defer func() { _ = op.close() }()
@@ -990,18 +1026,8 @@ func ApplyMigration(req MigrateRequest) (*MigrateApplyResult, error) {
 		return result, fmt.Errorf("%s: migration plan drift: expected plan %s, the inventory now hashes %s; re-run `curator env migrate --plan%s` and apply with the new hash",
 			envregistry.DiagCredentialConflict, strings.TrimSpace(req.Expect), report.Hash, report.scopeFlags())
 	}
-	if conflicts := report.Conflicts(); len(conflicts) > 0 {
-		first := conflicts[0]
-		where := fmt.Sprintf("profile %s, environment %s", first.Profile, first.EnvID)
-		if first.Path != "" {
-			where += ", " + first.Path
-		}
-		extra := ""
-		if len(conflicts) > 1 {
-			extra = fmt.Sprintf(" (+%d more; see plan)", len(conflicts)-1)
-		}
-		return result, fmt.Errorf("%s: migration blocked by %d conflicts: %s: %s. Operator choice: %s%s",
-			envregistry.DiagCredentialConflict, len(conflicts), where, first.Detail, first.Choice, extra)
+	if err := report.conflictError(); err != nil {
+		return result, err
 	}
 	ops := report.Ops()
 	if len(report.identityInputs) > 0 {
@@ -1327,7 +1353,9 @@ func changedMarkers(report *MigrateReport) (map[string][]byte, map[string][]byte
 		}
 		updated := *home.marker
 		if markerHashVersion(home.marker) == hashing.VersionV2 {
-			updated.Version = envmarker.VersionV3
+			if updated.Version != envmarker.VersionV7 {
+				updated.Version = envmarker.VersionV3
+			}
 			updated.HashVersion = int(hashing.VersionV2)
 		} else {
 			updated.Version = envmarker.VersionV2
@@ -1808,6 +1836,12 @@ func removeMigrationJournal(home string) error {
 // failure fails before anything changes. It returns the pre-recovery
 // summary for reporting, or nil when no journal was present.
 func recoverMigrationJournal(home string, op *operation, announce io.Writer, symlink func(string, string) error, rename func(string, string) error) (*MigrateRecovery, error) {
+	if err := op.lock.AssertHeld(); err != nil {
+		return nil, err
+	}
+	if err := envauthority.Validate(home); err != nil {
+		return nil, err
+	}
 	journal, err := readMigrationJournal(home)
 	if err != nil {
 		return nil, fmt.Errorf("migration journal %s is unusable (%v): back it up out of band, verify every managed link by hand, and only then remove it and re-run `curator env migrate --plan`",

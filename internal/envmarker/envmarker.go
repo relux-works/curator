@@ -1,5 +1,5 @@
 // Package envmarker reads and writes the environment marker of environments
-// §8.2, agent-environment-marker-v1, v2, and v3: the
+// §8.2, agent-environment-marker-v1, v2, v3 and v7: the
 // per-home ledger of record for environment surfaces
 // (.agent-environment.json). Readers reject an unsupported version and
 // unknown fields; failed reads and malformed content fail closed as
@@ -24,13 +24,13 @@ import (
 // Name is the marker file name beside the managed surfaces.
 const Name = ".agent-environment.json"
 
-// Marker schema versions supported by the reader. Version 3 is the current
-// writer shape and records content framing version 2. Versions 1 and 2 keep
-// their frozen v1 meaning.
+// Marker schema versions adopted by the reader. New Codex C homes use v7;
+// other hash-v2 writers use v3. Versions 1 and 2 keep frozen hash-v1 meaning.
 const (
 	VersionV1 = 1
 	VersionV2 = 2
 	VersionV3 = 3
+	VersionV7 = 7
 	// Version is the legacy writer version for marker paths outside managed
 	// homes. Keep those call sites explicit until their own schema-2 work.
 	Version = VersionV1
@@ -122,25 +122,43 @@ type Surface struct {
 	Copies *[]Copy `json:"copies,omitempty"`
 }
 
-// Marker is one agent-environment-marker-v1 or v2 object. The managed-home
+// Marker is one adopted environment carrier. The managed-home
 // members (passthrough, seeds, seeded_projects, seed_links) are declared so a
 // reader accepts a managed-home marker; callers decide which schema to write.
 type Marker struct {
-	Version         int                `json:"version"`
-	HashVersion     int                `json:"hash_version,omitempty"`
-	Profile         Profile            `json:"profile"`
-	Members         []Member           `json:"members"`
-	Precedence      Precedence         `json:"precedence"`
-	Mode            string             `json:"mode"`
-	Surfaces        map[string]Surface `json:"surfaces"`
-	Passthrough     *[]Passthrough     `json:"passthrough,omitempty"`
-	Seeds           *[]string          `json:"seeds,omitempty"`
-	SeededProjects  []string           `json:"seeded_projects,omitempty"`
-	SeedLinks       []string           `json:"seed_links,omitempty"`
-	CodexSeedRecord *CodexSeedRecord   `json:"codex_seed_record,omitempty"`
+	Version          int                `json:"version"`
+	HashVersion      int                `json:"hash_version,omitempty"`
+	Profile          Profile            `json:"profile"`
+	Members          []Member           `json:"members"`
+	Precedence       Precedence         `json:"precedence"`
+	Mode             string             `json:"mode"`
+	Surfaces         map[string]Surface `json:"surfaces"`
+	Passthrough      *[]Passthrough     `json:"passthrough,omitempty"`
+	Seeds            *[]string          `json:"seeds,omitempty"`
+	SeededProjects   []string           `json:"seeded_projects,omitempty"`
+	SeedLinks        []string           `json:"seed_links,omitempty"`
+	CodexSeedRecord  *CodexSeedRecord   `json:"codex_seed_record,omitempty"`
+	CodexSettings    json.RawMessage    `json:"codex_settings,omitempty"`
+	CredentialSource *CredentialSource  `json:"credential_source,omitempty"`
 	// surfaceOrder is the source order of the surfaces keys, captured at
 	// parse: surface keys are sorted (§8.2).
 	surfaceOrder []string
+}
+
+// CredentialSource retains the complete marker-7 authority identity. A node
+// carrier does not imply the per-home credential policy used by old managers.
+type CredentialSource struct {
+	Mode             string      `json:"mode,omitempty"`
+	Source           *NodeSource `json:"source,omitempty"`
+	SourceGeneration uint64      `json:"source_generation,omitempty"`
+	PolicyGeneration uint64      `json:"policy_generation,omitempty"`
+}
+
+// NodeSource is the closed local node authority reference, never a credential.
+type NodeSource struct {
+	Mode           string `json:"mode"`
+	SourceRef      string `json:"source_ref"`
+	HarnessChannel string `json:"harness_channel"`
 }
 
 // Passthrough is one recorded credential passthrough entry of a managed home.
@@ -171,15 +189,27 @@ var (
 
 // Validate applies the schema rules.
 func (m *Marker) Validate() error {
-	if m.Version != VersionV1 && m.Version != VersionV2 && m.Version != VersionV3 {
+	if m.Version != VersionV1 && m.Version != VersionV2 && m.Version != VersionV3 && m.Version != VersionV7 {
 		return &unsupportedMarkerVersionError{version: m.Version}
 	}
-	if m.Version == VersionV3 {
+	if m.Version == VersionV3 || m.Version == VersionV7 {
 		if m.HashVersion != 2 {
-			return fmt.Errorf("version 3 requires hash_version 2")
+			return fmt.Errorf("versions 3 and 7 require hash_version 2")
 		}
 	} else if m.HashVersion != 0 {
 		return fmt.Errorf("versions 1 and 2 do not carry hash_version")
+	}
+	if m.Version != VersionV7 && (m.CodexSettings != nil || m.CredentialSource != nil) {
+		return fmt.Errorf("legacy markers carry no marker-7 members")
+	}
+	if m.Version == VersionV7 {
+		payload, err := json.Marshal(m)
+		if err != nil {
+			return err
+		}
+		if err := validateMarker7(payload); err != nil {
+			return err
+		}
 	}
 	if !identifiers.Valid(m.Profile.Name) || !identifiers.Valid(m.Profile.Root) {
 		return fmt.Errorf("profile name or root is not a portable identifier")
@@ -285,8 +315,8 @@ func (m *Marker) Validate() error {
 			}
 		}
 		if m.CodexSeedRecord != nil {
-			if m.CodexSeedRecord.Revision != "A" && m.CodexSeedRecord.Revision != "B" {
-				return fmt.Errorf("codex_seed_record revision is not A or B")
+			if m.CodexSeedRecord.Revision != "A" && m.CodexSeedRecord.Revision != "B" && (m.Version != VersionV7 || m.CodexSeedRecord.Revision != "C") {
+				return fmt.Errorf("codex_seed_record revision is unsupported by this marker version")
 			}
 			if m.CodexSeedRecord.NativeMCPServers == nil || !sort.StringsAreSorted(m.CodexSeedRecord.NativeMCPServers) {
 				return fmt.Errorf("codex_seed_record native_mcp_servers is not a sorted array")
@@ -423,6 +453,28 @@ func (m *Marker) Marshal() ([]byte, error) {
 func Parse(payload []byte) (*Marker, error) {
 	if err := protocoljson.Validate(payload); err != nil {
 		return nil, fmt.Errorf("%s: %w", DiagMarkerInvalid, err)
+	}
+	var header struct {
+		Version int `json:"version"`
+	}
+	if err := json.Unmarshal(payload, &header); err != nil {
+		return nil, fmt.Errorf("%s: %w", DiagMarkerInvalid, err)
+	}
+	if header.Version != VersionV7 {
+		var members map[string]json.RawMessage
+		if err := json.Unmarshal(payload, &members); err != nil {
+			return nil, err
+		}
+		for _, name := range []string{"codex_settings", "credential_source"} {
+			if _, present := members[name]; present {
+				return nil, fmt.Errorf("%s: legacy marker carries %s", DiagMarkerInvalid, name)
+			}
+		}
+	}
+	if header.Version == VersionV7 {
+		if err := validateMarker7(payload); err != nil {
+			return nil, fmt.Errorf("%s: %w", DiagMarkerInvalid, err)
+		}
 	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()

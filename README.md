@@ -328,6 +328,26 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+The marker/snapshot schema regexp engine is pinned to regexp2 v1.11.5, which
+fixes stale timeout deadlines after idle. Run
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envmarker -run TestMarker7AfterRegexpClockIdle -count=1`
+for full-carrier name controls around an idle restart, and
+`env -u GIT_DIR -u GIT_WORK_TREE go test github.com/dlclark/regexp2 -run TestIncorrectDeadline -count=1`
+for the upstream deterministic deadline regression. Keep output under `.temp/`.
+
+New Codex managed homes use provisioning seed revision C: top-level `projects`
+and `mcp_servers` are excluded, while unrelated decoded TOML values survive.
+Existing A/B/C and pre-rule seeds keep their bytes and recorded revision.
+The complete marker-7 carrier is validated offline against pinned schemas;
+node credential activation remains unsupported by this manager.
+Run the seed and carrier checks with
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envprofile ./internal/envmarker -run 'TestCodexSeedC|TestMarker7' -count=1`.
+Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envauthority ./internal/envprofile ./internal/install ./cmd/curator -run 'Test(ManagedAuthority|CredentialAuthorityEntryPoints|MigrationNodeAuthorityBeforeRecovery|Operation.*Authority|TransactionRecoveredAuthority|AuthorityChange|CaptureCredentialAuthority|GlobalCredentialAuthorityEntries|InstallCredentialAuthority)' -count=1`
+for manager-wide authority admission before mutation and recovery, with synthetic
+node refusals and per-home controls. The seed checks include 19 isolated narrowing
+plants, including a gate moved after recovery. Go writes test artifacts to its
+configured cache and disposable test directories; validation logs belong under `.temp/`.
+
 Native profile/global ownership regression checks run separately with
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./cmd/curator -run '^TestGlobalNativeOwner'`,
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envprofile -run '^TestNativeSkillOwner'`,

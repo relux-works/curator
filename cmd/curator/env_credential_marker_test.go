@@ -38,10 +38,10 @@ func cliEnvMarker(t *testing.T, source stubConfigSource, env string) (string, []
 
 func requireCLICodexRecord(t *testing.T, marker *envmarker.Marker, provenance, backend string) {
 	t.Helper()
-	// Current writers publish schema 3 with hash_version 2 (Spec
+	// Current writers publish schema 7 with hash_version 2 (Spec
 	// environments §8.2); the record fields below are unchanged.
-	if marker.Version != envmarker.VersionV3 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
-		t.Fatalf("expected one schema-3 credential record, got %+v", marker)
+	if marker.Version != envmarker.VersionV7 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
+		t.Fatalf("expected one schema-7 credential record, got %+v", marker)
 	}
 	record := (*marker.Passthrough)[0]
 	if record.Path != "auth.json" || record.Isolation != "shared" || record.Strategy != "keyring-preferred" ||
@@ -87,8 +87,8 @@ func TestEnvResolveCredentialRecordPathlessKeyring(t *testing.T) {
 		t.Fatalf("resolve --repair = %d\nstderr:\n%s", code, stderr)
 	}
 	_, payload, marker := cliEnvMarker(t, source, "codex_cli")
-	if marker.Version != envmarker.VersionV3 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
-		t.Fatalf("expected a schema-3 pathless record: %+v", marker)
+	if marker.Version != envmarker.VersionV7 || marker.HashVersion != 2 || marker.Passthrough == nil || len(*marker.Passthrough) != 1 {
+		t.Fatalf("expected a schema-7 pathless record: %+v", marker)
 	}
 	record := (*marker.Passthrough)[0]
 	if record.Path != "" || record.Isolation != "shared" || record.Strategy != "keyring-preferred" || record.SourceRole != "native" || record.Backend != "ambient" || record.BackendVersion != "0.162.1" || record.Provenance != "provisioned" {
@@ -284,7 +284,7 @@ func TestEnvResolvePreservesPreRuleCodexSeedAndReportsUnstrippedHome(t *testing.
 	if code != exitOK {
 		t.Fatalf("env status = %d\nstderr:\n%s", code, stderr)
 	}
-	if !strings.Contains(stdout, "mcp_seed_unstripped: this managed Codex home predates the seed record; re-provision it to apply seed revision B") {
+	if !strings.Contains(stdout, "mcp_seed_unstripped: this managed Codex home predates the seed record; re-provision it to apply seed revision C") {
 		t.Fatalf("env status did not report the pre-rule Codex home:\n%s", stdout)
 	}
 }

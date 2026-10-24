@@ -71,6 +71,12 @@ internal/buildcache	TestUnixProtectionHelperFailuresFailClosed	linux,darwin	-	-	
 internal/config	TestBootstrapAndAddProject	linux,darwin,windows	-	-	asserts the manager config is written with private (0o600) ownership bits on unix
 
 # ===========================================================================
+# Managed authority: native boundaries run everywhere; mode bits are POSIX-only
+# ===========================================================================
+internal/envauthority	TestManagedAuthorityBoundary	linux,darwin,windows	-	-	unsafe and malformed authority cannot authorize managed-home mutation
+internal/envauthority	TestManagedAuthorityBoundary/writable	linux,darwin	windows	platform-control	the writable-marker witness uses POSIX mode bits; Windows records the exact declared skip while the parent boundary cases still execute
+
+# ===========================================================================
 # Profile source paths: absence and read failures stay distinct
 # ===========================================================================
 cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/missing_operand	linux,darwin,windows	-	-	a missing profile source operand reports profile_source_path_missing only

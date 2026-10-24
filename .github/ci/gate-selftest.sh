@@ -458,6 +458,63 @@ for goos in linux darwin windows; do
 done
 
 echo ''
+echo '=== authority boundary ledger: the POSIX mode witness stays platform-specific ==='
+# The exact Windows reason is allowed; Unix still has to execute the mode-bit
+# witness. Removing its classification must fail as unclassified, not disappear.
+authority_mode_gate() {
+	authority_mode_excluded=''; [ "$2" = linux ] && authority_mode_excluded='internal/godriver'
+	CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$1" CI_GATE_MODULE="$MODULE_PATH" \
+		CI_EXCLUDED_PKGS="$authority_mode_excluded" CI_GATE_GOOS="$2" \
+		bash "$GATE" "$3" "$WORK/authority-mode-ev"
+}
+authority_mode_case='TestManagedAuthorityBoundary/writable'
+cp "$WORK/shipped-windows.json" "$WORK/authority-mode-windows.json"
+evout internal/envauthority "$authority_mode_case" 'POSIX mode-bit contract' >>"$WORK/authority-mode-windows.json"
+ev skip internal/envauthority "$authority_mode_case" >>"$WORK/authority-mode-windows.json"
+assert 'Windows records the exact authority POSIX mode skip' 0 \
+	authority_mode_gate "$CLASSES" windows "$WORK/authority-mode-windows.json"
+assert_contains 'the authority POSIX skip is recorded with its class' \
+	'platform-control' "$WORK/authority-mode-ev/skips-observed.tsv"
+
+sed 's/POSIX mode-bit contract/POSIX mode-bit contract extended/' \
+	"$WORK/authority-mode-windows.json" >"$WORK/authority-mode-extended.json"
+assert 'an extended authority POSIX skip reason remains unclassified' 1 \
+	authority_mode_gate "$CLASSES" windows "$WORK/authority-mode-extended.json"
+assert_contains 'the extended reason reaches the unclassified refusal' \
+	'ledger case skipped for the wrong reason on windows: internal/envauthority :: TestManagedAuthorityBoundary/writable' "$WORK/out.txt"
+assert_contains 'the extended authority reason is unclassified' \
+	'classified as UNCLASSIFIED' "$WORK/out.txt"
+
+sed 's/POSIX mode-bit contract/helper process/' "$WORK/authority-mode-windows.json" >"$WORK/authority-mode-wrong-class.json"
+assert 'Windows authority mode skip rejects another recognised class' 1 \
+	authority_mode_gate "$CLASSES" windows "$WORK/authority-mode-wrong-class.json"
+assert_contains 'authority mode wrong-class control reaches the intended refusal' \
+	'ledger case skipped for the wrong reason' "$WORK/out.txt"
+
+awk -F '\t' '$1 != "platform-control" || $2 != "^POSIX mode-bit contract$"' \
+	"$CLASSES" >"$WORK/authority-mode-class-removed.tsv"
+if cmp -s "$CLASSES" "$WORK/authority-mode-class-removed.tsv"; then
+	bad 'authority mode class row-removal control is applied' 'the exact classification row is missing'
+else
+	assert 'removing the authority mode class row fails the Windows gate' 1 \
+		authority_mode_gate "$WORK/authority-mode-class-removed.tsv" windows "$WORK/authority-mode-windows.json"
+	assert_contains 'authority mode row-removal control reaches the intended refusal' \
+		'ledger case skipped for the wrong reason on windows: internal/envauthority :: TestManagedAuthorityBoundary/writable' "$WORK/out.txt"
+	assert_contains 'the removed authority mode row leaves the reason unclassified' \
+		'classified as UNCLASSIFIED' "$WORK/out.txt"
+fi
+
+for goos in linux darwin; do
+	# Removing the named Unix pass must fail even though the parent still passes.
+	sed '\|"Test":"TestManagedAuthorityBoundary/writable"|d' \
+		"$WORK/shipped-$goos.json" >"$WORK/authority-mode-missing-$goos.json"
+	assert "the authority mode witness cannot disappear on $goos" 1 \
+		authority_mode_gate "$CLASSES" "$goos" "$WORK/authority-mode-missing-$goos.json"
+	assert_contains "the missing $goos authority mode witness is named" \
+		"required case never ran on $goos: internal/envauthority :: TestManagedAuthorityBoundary/writable" "$WORK/out.txt"
+done
+
+echo ''
 echo '=== non-git install ledger: only the two Unix PATH-shim rows may skip ==='
 hygiene_reason='PATH git shell shim requires Unix; corrupt .git row runs on all platforms'
 hygiene_gate() {

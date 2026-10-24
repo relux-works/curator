@@ -17,6 +17,7 @@ import (
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/gitops"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // The reviewer regression keeps its original name. Both origin substitution
@@ -149,6 +150,11 @@ func newPinTransportFixture(t *testing.T) *pinTransportFixture {
 	var err error
 	f.current, err = Current(f.home)
 	if err != nil {
+		t.Fatal(err)
+	}
+	// The manager-owned environment boundary must be private on Windows too;
+	// native homes and unrelated caches below retain their original fixtures.
+	if err := privatedir.MakeAll(EnvRoot(f.home)); err != nil {
 		t.Fatal(err)
 	}
 	paths := []string{ProfileDir(f.home, "existing"), ProfileDir(f.home, DefaultProfile), EnvRoot(f.home)}

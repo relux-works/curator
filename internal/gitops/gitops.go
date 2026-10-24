@@ -221,6 +221,23 @@ func isolatedGitEnv() (env []string, cleanup func(), err error) {
 	return env, cleanup, nil
 }
 
+// processError preserves the execution cause without adding process status to
+// nonempty Git output: draft transport classification consumes that output as
+// a closed diagnostic grammar. Empty output instead reports the process cause.
+type processError struct {
+	cause  error
+	detail string
+}
+
+func (e *processError) Error() string {
+	if e.detail != "" {
+		return e.detail
+	}
+	return e.cause.Error()
+}
+
+func (e *processError) Unwrap() error { return e.cause }
+
 // runWithEnv runs one git invocation with an explicit environment.
 func runWithEnv(dir string, env []string, args ...string) (string, error) {
 	cmd := exec.Command("git", args...) // #nosec G204 -- fixed binary, arguments are built by this package
@@ -236,7 +253,7 @@ func runWithEnv(dir string, env []string, args ...string) (string, error) {
 		if detail == "" {
 			detail = strings.TrimSpace(stdout.String())
 		}
-		return "", fmt.Errorf("git %s failed: %s", strings.Join(args, " "), detail)
+		return "", fmt.Errorf("git %s failed: %w", strings.Join(args, " "), &processError{cause: err, detail: detail})
 	}
 	return strings.TrimSpace(stdout.String()), nil
 }

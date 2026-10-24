@@ -31,6 +31,7 @@ import (
 	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/contextpkg"
 	"github.com/relux-works/curator/internal/contextstore"
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
@@ -337,6 +338,9 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
 
 // assembleHomeObserved derives the home from supplied release evidence without a probe.
 func assembleHomeObserved(req *ResolveRequest, source Source, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, adapter envregistry.Adapter, prior *envmarker.Marker, release string) (*homePlan, error) {
+	if prior == nil && adapter.CodexSeedRevision == envregistry.CodexSeedRevisionC && lock.ContentHashVersion() != hashing.VersionV2 {
+		return nil, fmt.Errorf("%s: Codex seed C requires hash_version 2", envregistry.DiagSeedUnreadable)
+	}
 	previous := req.credentialRelease
 	req.credentialRelease = &release
 	defer func() { req.credentialRelease = previous }()
@@ -727,6 +731,26 @@ func stripCodexSeedMCPServers(payload []byte) ([]byte, []string, error) {
 	return stripped.Bytes(), names, nil
 }
 
+// stripCodexSeedTrust applies revision C only at first provisioning. Filtering
+// uses decoded TOML, never filesystem observations of project labels.
+func stripCodexSeedTrust(payload []byte) ([]byte, []string, error) {
+	document, names, hasMCP, err := parseCodexSeedConfig(payload)
+	if err != nil {
+		return nil, nil, err
+	}
+	_, hasProjects := document["projects"]
+	if !hasMCP && !hasProjects {
+		return payload, names, nil
+	}
+	delete(document, "mcp_servers")
+	delete(document, "projects")
+	var output bytes.Buffer
+	if err := toml.NewEncoder(&output).Encode(document); err != nil {
+		return nil, nil, err
+	}
+	return output.Bytes(), names, nil
+}
+
 // gatherSeeds reads every seed upfront so that an unreadable seed stops
 // provisioning before the first write. A seed absent in the native home
 // is simply not seeded; absence and unreadability stay different facts
@@ -741,7 +765,7 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 	}
 	if provision {
 		if adapter.ID == envregistry.CodexCLI {
-			if adapter.CodexSeedRevision != envregistry.CodexSeedRevisionA && adapter.CodexSeedRevision != envregistry.CodexSeedRevisionB {
+			if adapter.CodexSeedRevision != envregistry.CodexSeedRevisionA && adapter.CodexSeedRevision != envregistry.CodexSeedRevisionB && adapter.CodexSeedRevision != envregistry.CodexSeedRevisionC {
 				return nil, fmt.Errorf("%s: unsupported codex_cli seed revision %q", envregistry.DiagSeedUnreadable, adapter.CodexSeedRevision)
 			}
 			bundle.codexSeedRecord = &envmarker.CodexSeedRecord{
@@ -791,6 +815,8 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 					_, names, _, err = parseCodexSeedConfig(payload)
 				case envregistry.CodexSeedRevisionB:
 					payload, names, err = stripCodexSeedMCPServers(payload)
+				case envregistry.CodexSeedRevisionC:
+					payload, names, err = stripCodexSeedTrust(payload)
 				}
 				if err != nil {
 					return nil, fmt.Errorf("%s: seed %s: %v", envregistry.DiagSeedUnreadable, seed, err)
@@ -800,7 +826,7 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 					switch adapter.CodexSeedRevision {
 					case envregistry.CodexSeedRevisionA:
 						bundle.warnings = append(bundle.warnings, fmt.Sprintf("%s: native Codex MCP servers %s were inherited into this managed home outside the profile lock and MCP allowlist; the next seed revision stops inheriting them. Declare each server in the profile's MCP set, or accept the loss.", envregistry.DiagMCPNativeServersUngoverned, strings.Join(names, ", ")))
-					case envregistry.CodexSeedRevisionB:
+					case envregistry.CodexSeedRevisionB, envregistry.CodexSeedRevisionC:
 						bundle.warnings = append(bundle.warnings, fmt.Sprintf("%s: native Codex MCP servers %s were stripped from config.toml and are not inherited", envregistry.DiagMCPNativeServersNotInherited, strings.Join(names, ", ")))
 					}
 				}
@@ -1549,6 +1575,19 @@ func finalizeMarker(op *operation, req *ResolveRequest, plan *homePlan, seeds *s
 		record.NativeMCPServers = append([]string{}, seeds.codexSeedRecord.NativeMCPServers...)
 		marker.CodexSeedRecord = &record
 	}
+	// A new C seed requires the complete successor carrier. Existing carriers
+	// stay at their adopted version unless an independent operation publishes it.
+	if (prior != nil && prior.Version == envmarker.VersionV7) ||
+		(seeds.codexSeedRecord != nil && seeds.codexSeedRecord.Revision == envregistry.CodexSeedRevisionC) {
+		marker.Version = envmarker.VersionV7
+		marker.HashVersion = 2
+		marker.CodexSettings = json.RawMessage(`{}`)
+		marker.CredentialSource = &envmarker.CredentialSource{Mode: "per-home"}
+		if prior != nil && prior.Version == envmarker.VersionV7 {
+			marker.CodexSettings = prior.CodexSettings
+			marker.CredentialSource = prior.CredentialSource
+		}
+	}
 	links, _, err := req.effectivePassthrough(plan.adapter)
 	if err != nil {
 		return nil, err
@@ -1687,6 +1726,8 @@ func legacyMarkerProjectionMatches(prior, candidate *envmarker.Marker) bool {
 	projected := *candidate
 	projected.Version = envmarker.VersionV1
 	projected.HashVersion = 0
+	projected.CodexSettings = nil
+	projected.CredentialSource = nil
 	projected.Passthrough = &legacyEntries
 	// codex_seed_record is valid in schema 1 as well as schema 2. Preserve it
 	// in the legacy projection so metadata-only repair does not rewrite a
@@ -1926,6 +1967,7 @@ type verification struct {
 	warnings              []string
 	passthroughReadFailed bool
 	markerReadFailed      bool
+	credentialSourceError error
 	markerState           stateread.Kind
 	// surfaceState carries the per-surface outcome for status rows: ""
 	// (current), environment_surface_drift, environment_surface_missing,
@@ -1997,6 +2039,11 @@ func verifyHomeObserved(req *ResolveRequest, adapter envregistry.Adapter, source
 	}
 	verdict.markerState = stateread.KindPresent
 	verdict.marker = marker
+	if err := requirePerHomeCredentialSource(marker); err != nil {
+		verdict.credentialSourceError = err
+		verdict.reasons = append(verdict.reasons, err.Error())
+		return verdict
+	}
 	// Directory drift is stale even if all managed bytes are current. This
 	// admits repair through the normal mutation lock and keeps verify/dry-run
 	// read-only. OpenCode's XDG parent is part of the private route too.
@@ -2720,6 +2767,11 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	if err != nil {
 		return nil, err
 	}
+	// Admit the marker authority before store repair, identity migration or
+	// native-state inspection can enter a mutation/recovery path.
+	if err := req.validateActivationCredentialSource(); err != nil {
+		return nil, err
+	}
 	selection, err := req.Machine.CredentialStoreFor(req.Profile, adapter.ID)
 	if err != nil {
 		return nil, err
@@ -2815,6 +2867,9 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 		}
 	}
 	verdict := verify(&req, adapter, source, lock, hash)
+	if verdict.credentialSourceError != nil {
+		return nil, verdict.credentialSourceError
+	}
 	if verdict.markerReadFailed {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
 	}
@@ -2867,8 +2922,40 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 	}
 	var prepared *claudeSeedPlan
 	validate := func() error {
+		// Recheck authority under the mutation lock before journal recovery.
+		if err := req.validateActivationCredentialSource(); err != nil {
+			return err
+		}
 		if err := req.validatePreservedLock(); err != nil {
 			return err
+		}
+		if req.EnvID == envregistry.CodexCLI {
+			adapter, err := envregistry.ByID(req.EnvID)
+			if err != nil {
+				return err
+			}
+			adapter, err = applyCodexSeedRevisionTestOverride(adapter, req.codexSeedRevisionForTest)
+			if err != nil {
+				return err
+			}
+			if adapter.CodexSeedRevision == envregistry.CodexSeedRevisionC {
+				read := req.readStateFile
+				if read == nil {
+					read = stateread.ReadFile
+				}
+				prior, err := envmarker.ReadWith(ManagedHomeDir(req.Home, req.Profile, req.EnvID), read)
+				if err != nil {
+					return err
+				}
+				if prior == nil {
+					// Refuse malformed native input before recovery or identity migration
+					// can publish any provisioning-dependent state. Existing seeds are never
+					// re-read from native configuration.
+					if _, err := req.gatherSeeds(adapter, true); err != nil {
+						return err
+					}
+				}
+			}
 		}
 		if req.EnvID != envregistry.ClaudeCode {
 			return nil
@@ -2903,6 +2990,14 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+	// Recovery may replace the marker as well as the lock. Refuse before
+	// callers publish any further repair using the recovered authority.
+	if err := req.validateActivationCredentialSource(); err != nil {
+		if req.borrowedOperation == nil {
+			_ = op.close()
+		}
+		return nil, op.recoveryRefusal(err)
 	}
 	op.claudePrepared = prepared
 	// Recovery can take time while the tool changes its input. Refresh before
@@ -2975,6 +3070,9 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		}
 	}
 	verdict := verifyHome(req, adapter, source, lock, hash)
+	if verdict.credentialSourceError != nil {
+		return nil, verdict.credentialSourceError
+	}
 	if verdict.markerReadFailed {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
 	}
@@ -3145,12 +3243,13 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	return result, nil
 }
 
-// isCredentialRefusal reports whether a repair error is already a §7.7
-// credential refusal, which surfaces as itself rather than wrapped in
+// isCredentialRefusal reports whether a repair error is already a credential
+// or inherited-source refusal, which surfaces as itself rather than wrapped in
 // environment_repair_failed.
 func isCredentialRefusal(err error) bool {
 	return err != nil && (strings.Contains(err.Error(), envregistry.DiagCredentialConflict) ||
-		strings.Contains(err.Error(), envregistry.DiagCredentialUnsupported))
+		strings.Contains(err.Error(), envregistry.DiagCredentialUnsupported) ||
+		strings.Contains(err.Error(), envregistry.DiagCredentialInjectionUnavailable))
 }
 
 // checkProfileCollision fails provisioning with environment_path_collision
@@ -3344,4 +3443,39 @@ func (p *homePlan) mcp(req *ResolveRequest, servers []contextmaterialize.MCPServ
 		Copies:        &copies,
 	}
 	return nil
+}
+
+// validateActivationCredentialSource reads only a boundary-validated marker.
+// It also runs under the repair lock before recovery; an absent marker remains
+// eligible for ordinary per-home provisioning.
+func (req *ResolveRequest) validateActivationCredentialSource() error {
+	if _, err := validateResolveRoots(req.Home, req.boundaryOwnerLookup); err != nil {
+		return err
+	}
+	if err := validateMarkerBoundary(req.Home, req.Profile, req.EnvID, req.boundaryOwnerLookup); err != nil {
+		return err
+	}
+	root := EnvRoot(req.Home)
+	homeRel, err := managedRelative(root, ManagedHomeDir(req.Home, req.Profile, req.EnvID))
+	if err != nil {
+		return err
+	}
+	if err := checkManagedPrivateTarget(root, managedJoin(homeRel, envmarker.Name)); err != nil {
+		return err
+	}
+	read := req.readStateFile
+	if read == nil {
+		read = stateread.ReadFile
+	}
+	marker, err := envmarker.ReadWith(ManagedHomeDir(req.Home, req.Profile, req.EnvID), read)
+	if err != nil {
+		return err
+	}
+	return requirePerHomeCredentialSource(marker)
+}
+
+// Schema acceptance preserves node identity; it does not authorize treating a
+// node-bound home as the older per-home credential policy.
+func requirePerHomeCredentialSource(marker *envmarker.Marker) error {
+	return envauthority.RequirePerHome(marker)
 }

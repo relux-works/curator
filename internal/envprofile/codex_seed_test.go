@@ -56,7 +56,7 @@ type codexSeedVectorSet struct {
 
 // TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression retains the
 // historical warning-release behavior through the revision-A test seam, then
-// checks that shipped revision B preserves the existing home through repair.
+// checks that shipped revision C preserves the existing home through repair.
 func TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
@@ -142,12 +142,12 @@ func TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.CodexSeedRule.Revision != envregistry.CodexSeedRevisionB || status.CodexSeedRule.Provenance != "shipped" {
+	if status.CodexSeedRule.Revision != envregistry.CodexSeedRevisionC || status.CodexSeedRule.Provenance != "shipped" {
 		t.Fatalf("shipped codex-seed status row = %+v", status.CodexSeedRule)
 	}
 	home = findHome(status, fx.profile, envregistry.CodexCLI)
 	if home == nil || !home.Current || home.NativeMCPServersDisposition != "ungoverned" {
-		t.Fatalf("revision-A home under shipped B = %+v", home)
+		t.Fatalf("revision-A home under shipped C = %+v", home)
 	}
 	if got := countWarnings(home.Warnings, envregistry.DiagMCPSeedUnstripped); got != 1 || !strings.Contains(warningWithPrefix(home.Warnings, envregistry.DiagMCPSeedUnstripped), "re-provision") {
 		t.Fatalf("revision-A home lacks the B re-provision warning: %v", home.Warnings)
@@ -158,7 +158,7 @@ func TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression(t *testing.T) {
 	req.codexSeedRevisionForTest = ""
 	result, err = Resolve(req)
 	if err != nil {
-		t.Fatalf("repair revision-A home under shipped B: %v", err)
+		t.Fatalf("repair revision-A home under shipped C: %v", err)
 	}
 	if result.Provisioned || countWarnings(result.Warnings, envregistry.DiagMCPNativeServersNotInherited) != 0 {
 		t.Fatalf("repair must not provision a B seed: %+v", result)
@@ -168,10 +168,11 @@ func TestCodexSeedRevisionAWholeCopyWarningAndPostureRegression(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(after, []byte(native)) || !reflect.DeepEqual(readManagedMarker(t, fx, envregistry.CodexCLI).CodexSeedRecord, wantRecord) {
-		t.Fatal("repair under shipped B changed the revision-A seed bytes or record")
+		t.Fatal("repair under shipped C changed the revision-A seed bytes or record")
 	}
 }
 
+// This retained B control strips MCP while preserving its historical record.
 func TestCodexSeedStripsInlineMCPTable(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
@@ -181,6 +182,7 @@ func TestCodexSeedStripsInlineMCPTable(t *testing.T) {
 	}
 	req := fx.request(envregistry.CodexCLI)
 	req.Repair = true
+	req.codexSeedRevisionForTest = envregistry.CodexSeedRevisionB
 	result, err := Resolve(req)
 	if err != nil {
 		t.Fatalf("Resolve provisioning: %v", err)
@@ -267,11 +269,11 @@ func TestCodexSeedSnapshotAndBytesDoNotRefreshOnRepair(t *testing.T) {
 }
 
 // TestEnvironmentsCodexSeedVectors drives every published case through Resolve
-// and StatusOf. B uses the shipped registry without an override; A remains a
-// historical regression through the retained revision seam.
+// and StatusOf. A/B retain their frozen historical behavior through explicit
+// revision overrides; the shipped C cases execute in TestCodexSeedCSpecCases.
 func TestEnvironmentsCodexSeedVectors(t *testing.T) {
-	if envregistry.CodexSeedRevision != envregistry.CodexSeedRevisionB {
-		t.Fatalf("registry must ship Codex seed revision B, got %q", envregistry.CodexSeedRevision)
+	if envregistry.CodexSeedRevision != envregistry.CodexSeedRevisionC {
+		t.Fatalf("registry must ship Codex seed revision C, got %q", envregistry.CodexSeedRevision)
 	}
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
 	if root == "" {
@@ -302,7 +304,7 @@ func codexSeedHistoricalOverride(t *testing.T, revision string) string {
 	case envregistry.CodexSeedRevisionA:
 		return envregistry.CodexSeedRevisionA
 	case envregistry.CodexSeedRevisionB:
-		return ""
+		return envregistry.CodexSeedRevisionB
 	default:
 		t.Fatalf("unknown Codex seed vector revision %q", revision)
 		return ""

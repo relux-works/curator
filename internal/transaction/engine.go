@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/staging"
 )
@@ -19,6 +20,7 @@ import (
 // every mutating or journal-reading entry point requires the caller's witness.
 type Engine struct {
 	mu               sync.Mutex
+	home             string
 	commitCheck      CommitCheck
 	commitLock       HomeLock // scoped to Prepare/Commit/Recover while mu is held
 	journalRoot      string
@@ -62,6 +64,7 @@ func New(home string, options ...Option) (*Engine, error) {
 		return nil, err
 	}
 	engine := &Engine{
+		home:             filepath.Clean(absolute),
 		journalRoot:      filepath.Join(filepath.Clean(absolute), "state", "transactions", "v1"),
 		syncStagedParent: syncDirectory,
 		guards:           map[string]BoundaryCheck{},
@@ -80,6 +83,9 @@ func New(home string, options ...Option) (*Engine, error) {
 // home lock so one transaction id cannot race another process.
 func (engine *Engine) Prepare(lock HomeLock, plan Plan) (*Journal, error) {
 	if err := requireHomeLock(lock); err != nil {
+		return nil, err
+	}
+	if err := envauthority.Validate(engine.home); err != nil {
 		return nil, err
 	}
 	engine.mu.Lock()
@@ -316,6 +322,9 @@ func (engine *Engine) Commit(lock HomeLock, transactionID string) error {
 	if err := requireHomeLock(lock); err != nil {
 		return err
 	}
+	if err := envauthority.Validate(engine.home); err != nil {
+		return err
+	}
 	engine.mu.Lock()
 	defer engine.mu.Unlock()
 	engine.commitLock = lock
@@ -335,11 +344,15 @@ func (engine *Engine) Recover(lock HomeLock) error {
 }
 
 // RecoverWithOutcome runs the same recovery loop and reports whether a nonempty
-// inventory was fully recovered. False with an error does not mean zero writes:
-// earlier journals may already have completed. No preflight or policy changes
-// are introduced; existing callers can continue using Recover.
+// inventory was recovered. True with an authority refusal reports completed
+// intent before further recovery was stopped. False with an error does not mean
+// zero writes: earlier journals may already have completed. Unsupported authority
+// refuses before the recovery observer or any journal write.
 func (engine *Engine) RecoverWithOutcome(lock HomeLock) (bool, error) {
 	if err := requireHomeLock(lock); err != nil {
+		return false, err
+	}
+	if err := envauthority.Validate(engine.home); err != nil {
 		return false, err
 	}
 	if engine.hooks.ObserveRecovery != nil {
@@ -360,6 +373,11 @@ func (engine *Engine) RecoverWithOutcome(lock HomeLock) (bool, error) {
 		}
 		if err := engine.resume(journal); err != nil {
 			return false, fmt.Errorf("recover transaction %s: %w", id, err)
+		}
+		// Completed durable intent can change authority. Stop before another
+		// journal or the caller publishes anything under the recovered marker.
+		if err := envauthority.Validate(engine.home); err != nil {
+			return true, fmt.Errorf("%w; previously pending transaction recovery completed", err)
 		}
 	}
 	return len(ids) != 0, nil

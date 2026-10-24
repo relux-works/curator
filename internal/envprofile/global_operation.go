@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/manifest"
@@ -29,6 +30,9 @@ import (
 // of individual profile and install transactions.
 func GlobalSkillTransaction(home string, policy Policy, machine envregistry.MachineConfig, addition *DirectSkill, nativeHomeOf func(string) (string, error), lock transaction.HomeLock, next func() error) (info Info, resultErr error) {
 	if err := lock.AssertHeld(); err != nil {
+		return Info{}, err
+	}
+	if err := envauthority.Validate(home); err != nil {
 		return Info{}, err
 	}
 	if addition != nil && (addition.Name == "" || addition.Git == "" || (addition.Tag == "") == (addition.Revision == "")) {

@@ -27,14 +27,15 @@ const (
 
 // Codex seed behavior recorded in codex_seed_record (environments §7.4,
 // §8.2). Revision A copies config.toml whole and warns about inherited MCP
-// servers. Revision B removes them before the managed home is published.
+// servers. Revision B removes MCP servers; C also excludes project trust.
 const (
 	CodexSeedRevisionA = "A"
 	CodexSeedRevisionB = "B"
+	CodexSeedRevisionC = "C"
 
 	// CodexSeedRevision selects the manager behavior shipped on trunk.
-	// Revision A shipped in v0.15.0-rc.3 before this revision-B switch.
-	CodexSeedRevision = CodexSeedRevisionB
+	// A/B remain historical rules; C is the current provisioning rule.
+	CodexSeedRevision = CodexSeedRevisionC
 )
 
 // EnvAliases maps the CLI-only short spellings to their canonical
@@ -85,6 +86,10 @@ const (
 	DiagSizeExceeded                 = "environment_context_size_exceeded"
 	DiagReservedCommand              = "environment_reserved_command_name"
 )
+
+// DiagCredentialInjectionUnavailable identifies an incapable source consumer
+// refusing before output or mutation (local-setup-token-source compatibility).
+const DiagCredentialInjectionUnavailable = "credential_injection_unavailable" // #nosec G101 -- diagnostic identifier, not credential material.
 
 // Forms (environments §7.2).
 const (

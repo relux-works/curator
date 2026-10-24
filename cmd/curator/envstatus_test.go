@@ -61,7 +61,7 @@ func TestEnvStatusReportsNotInheritedNativeCodexServers(t *testing.T) {
 	}
 	assertCLISeedStripped(t, seeded)
 	_, _, marker := cliEnvMarker(t, source, envregistry.CodexCLI)
-	if record := marker.CodexSeedRecord; record == nil || record.Revision != envregistry.CodexSeedRevisionB || len(record.NativeMCPServers) != 1 || record.NativeMCPServers[0] != "figma" {
+	if record := marker.CodexSeedRecord; record == nil || record.Revision != envregistry.CodexSeedRevisionC || len(record.NativeMCPServers) != 1 || record.NativeMCPServers[0] != "figma" {
 		t.Fatalf("CLI provisioning seed record = %+v, want B with figma", record)
 	}
 	code, stdout, stderr := runProfile(t, source, "env", "status")
@@ -69,8 +69,8 @@ func TestEnvStatusReportsNotInheritedNativeCodexServers(t *testing.T) {
 		t.Fatalf("env status = %d\nstderr:\n%s", code, stderr)
 	}
 	for _, want := range []string{
-		"codex-seed: revision B (shipped)",
-		"codex-seed-record: revision B; native MCP servers figma (not-inherited)",
+		"codex-seed: revision C (shipped)",
+		"codex-seed-record: revision C; native MCP servers figma (not-inherited)",
 		"warning: mcp_native_servers_not_inherited: native Codex MCP servers figma were stripped from config.toml and are not inherited",
 	} {
 		if !strings.Contains(stdout, want) {
