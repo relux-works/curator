@@ -50,6 +50,7 @@ root-content	is a pre-revision root	allow	the supplied root predates this artefa
 root-content	publishes a release other than the pinned 	allow	CI's SPEC_PIN and the module's immutable release pin are promoted by separate owners; the module pin is asserted against its own release and declares any other one
 
 # --- protocol / platform-defined controls -----------------------------------
+platform-control	^POSIX mode-bit contract$	allow	the authority writable-marker fixture checks POSIX mode bits on Unix; Windows keeps the native boundary and valid-carrier controls
 platform-control	the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account	allow	the unreadable fixture uses POSIX mode-bit semantics unavailable to the hosted Windows runner account
 platform-control	available only on (Windows|macOS) in rc5-native-control-inventory-v1	allow	the inventory defines this control for one platform only
 platform-control	launch-env-fragment-v2 schema gap	allow	the v2 absolutePath schema has no Windows path form; production-entry permissions assertions still run on Windows
