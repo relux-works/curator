@@ -35,7 +35,7 @@ func (s Store) PackageInstruction(id, itemID, source string, required bool) (res
 	if err != nil {
 		return Preview{}, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	inventory, err := discovery(root)
 	if err != nil {
 		return Preview{}, err
@@ -78,6 +78,8 @@ func (s Store) PackageInstruction(id, itemID, source string, required bool) (res
 	items = append(items, c)
 	return op.preview(r, items, []Omission{})
 }
+
+// Preview retains a content-bound candidate review without approving its items.
 func (s Store) Preview(id string, d Declaration) (result Preview, resultErr error) {
 	defer func() { resultErr = projectError(resultErr) }()
 	// Re-parse programmatic requests through the same closed reader.
@@ -313,7 +315,7 @@ func (op *operation) fresh(r registered, c Candidate) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	if c.Request.Packaging == "instruction" {
 		b, _, err := read(root, c.Request.Source, MaxFileBytes)
 		if err != nil || digest(b) != c.SourceSHA256 {
@@ -330,6 +332,8 @@ func (op *operation) fresh(r registered, c Candidate) error {
 	}
 	return nil
 }
+
+// Approve binds a retained item and package digest to explicit approval.
 func (s Store) Approve(id, itemID, itemDigest, packageDigest string) (result Approval, resultErr error) {
 	defer func() { resultErr = projectError(resultErr) }()
 	if !idRE.MatchString(itemID) || !hexRE.MatchString(itemDigest) || !hexRE.MatchString(packageDigest) {
@@ -373,6 +377,8 @@ func (s Store) Approve(id, itemID, itemDigest, packageDigest string) (result App
 	}
 	return Approval{}, fail("project_item_unapproved", "item has no supported protected preview")
 }
+
+// Revoke revokes retained item approval without requiring the live source checkout.
 func (s Store) Revoke(id, itemID string) (resultErr error) {
 	defer func() { resultErr = projectError(resultErr) }()
 	if !idRE.MatchString(itemID) {
@@ -404,12 +410,15 @@ type Selection struct {
 	ItemID   string
 	Disabled bool
 }
+
+// Admitted contains retained source packages selected by an admission request.
 type Admitted struct {
 	Items     []Candidate
 	Omitted   []Omission
 	Rendering string
 }
 
+// Admitted reads approved retained packages after checking registration and policy.
 func (s Store) Admitted(id string, selections []Selection) (result Admitted, resultErr error) {
 	defer func() { resultErr = projectError(resultErr) }()
 	op, err := s.begin(false)
@@ -527,6 +536,7 @@ type ReviewContent struct {
 	Text        map[string]string   `json:"text"`
 }
 
+// ReviewContent returns retained instructions and inventories for explicit review.
 func (s Store) ReviewContent(id string) (result ReviewContent, resultErr error) {
 	defer func() { resultErr = projectError(resultErr) }()
 	op, err := s.begin(false)
@@ -553,7 +563,8 @@ func (s Store) ReviewContent(id string) (result ReviewContent, resultErr error) 
 			}
 			key := c.Item.ID + "/" + m.Name
 			out.Inventories[key] = capt.Manifest
-			if c.Item.Type == "context" {
+			switch c.Item.Type {
+			case "context":
 				man, err := manifest(capt)
 				if err != nil {
 					return ReviewContent{}, err
@@ -563,7 +574,7 @@ func (s Store) ReviewContent(id string) (result ReviewContent, resultErr error) 
 					p := path.Join("context", mod.Path)
 					out.Text[key+"/"+p] = string(capt.Bytes[p])
 				}
-			} else if c.Item.Type == "skill" {
+			case "skill":
 				for p, b := range capt.Bytes {
 					if utf8.Valid(b) {
 						out.Text[key+"/"+p] = string(b)

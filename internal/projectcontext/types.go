@@ -20,6 +20,7 @@ import (
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
+// MaxRecord bounds protected records; the remaining constants bound source inventories and rendering.
 const (
 	MaxRecord          = 1 << 20
 	MaxFiles           = 10000
@@ -39,6 +40,8 @@ type Profile struct {
 	Name       string `json:"name"`
 	LockSHA256 string `json:"lock_sha256"`
 }
+
+// Registration binds a checkout identity to a selected profile and environment.
 type Registration struct {
 	Kind         string  `json:"kind"`
 	CheckoutID   string  `json:"checkout_id"`
@@ -49,6 +52,8 @@ type Registration struct {
 	HomeRef      string  `json:"home_ref"`
 	WorktreeRef  string  `json:"worktree_ref"`
 }
+
+// Item identifies one required or optional source item in an environment.
 type Item struct {
 	Kind        string  `json:"kind"`
 	ID          string  `json:"id"`
@@ -66,6 +71,8 @@ type Payload struct {
 	LockRef        string `json:"lock_ref,omitempty"`
 	LockSHA256     string `json:"lock_sha256,omitempty"`
 }
+
+// Approval binds explicit authority to a checkout, item digest and policy ceiling.
 type Approval struct {
 	Kind          string `json:"kind"`
 	CheckoutID    string `json:"checkout_id"`
@@ -75,12 +82,16 @@ type Approval struct {
 	ApproverRef   string `json:"approver_ref"`
 	CeilingSHA256 string `json:"ceiling_sha256"`
 }
+
+// File records the relative path, digest, size and mode of one retained file.
 type File struct {
 	Path   string `json:"path"`
 	Size   int64  `json:"size"`
 	SHA256 string `json:"sha256"`
 	Mode   string `json:"mode"`
 }
+
+// Snapshot is the versioned inventory of retained source files.
 type Snapshot struct {
 	Version int    `json:"version"`
 	Files   []File `json:"files"`
@@ -93,6 +104,8 @@ type Declaration struct {
 	Version int       `json:"version"`
 	Items   []Request `json:"items"`
 }
+
+// Request describes an explicitly selected source and its offline dependencies.
 type Request struct {
 	ID           string            `json:"id"`
 	Type         string            `json:"type"`
@@ -102,6 +115,8 @@ type Request struct {
 	Dependencies map[string]string `json:"dependencies"`
 	Packaging    string            `json:"packaging,omitempty"`
 }
+
+// Candidate retains an item, its source closure and content-bound review identity.
 type Candidate struct {
 	Item         Item     `json:"item"`
 	ItemSHA256   string   `json:"item_sha256"`
@@ -110,18 +125,24 @@ type Candidate struct {
 	Members      []Member `json:"members"`
 	Rendering    string   `json:"rendering"`
 }
+
+// Member names one retained package in a candidate source closure.
 type Member struct {
 	Name           string `json:"name"`
 	SnapshotRef    string `json:"snapshot_ref"`
 	SnapshotSHA256 string `json:"snapshot_sha256"`
 	Pin            string `json:"pin"`
 }
+
+// FileChange records before and after identities for a reviewed file change.
 type FileChange struct {
 	Path   string `json:"path"`
 	Effect string `json:"effect"`
 	Before string `json:"before"`
 	After  string `json:"after"`
 }
+
+// Change describes a reviewed item transition and its file and skill semantics.
 type Change struct {
 	ItemID    string          `json:"item_id"`
 	Effect    string          `json:"effect"`
@@ -130,21 +151,29 @@ type Change struct {
 	Files     []FileChange    `json:"files"`
 	Semantics *SemanticChange `json:"semantics,omitempty"`
 }
+
+// SemanticChange records the skill semantics before and after a transition.
 type SemanticChange struct {
 	Before *SkillSemantics `json:"before,omitempty"`
 	After  *SkillSemantics `json:"after"`
 }
+
+// SkillSemantics describes retained command, capability and permission declarations.
 type SkillSemantics struct {
 	CommandOwners         []CommandOwner `json:"command_owners"`
 	RequestedCapabilities map[string]any `json:"requested_capabilities"`
 	MCPEndpoints          []string       `json:"mcp_endpoints"`
 	PermissionEffects     string         `json:"permission_effects"`
 }
+
+// CommandOwner binds an inert command declaration to its owning item.
 type CommandOwner struct {
 	Name        string         `json:"name"`
 	ItemID      string         `json:"item_id"`
 	Declaration map[string]any `json:"declaration"`
 }
+
+// Review binds candidate items and their changes to a protected registration.
 type Review struct {
 	Version            int         `json:"version"`
 	RegistrationRef    string      `json:"registration_ref"`
@@ -153,22 +182,30 @@ type Review struct {
 	Changes            []Change    `json:"changes"`
 	Omitted            []Omission  `json:"omitted"`
 }
+
+// Omission records an explicitly unsupported optional source with its identity.
 type Omission struct {
 	ItemID       string `json:"item_id"`
 	Reason       string `json:"reason"`
 	Source       string `json:"source,omitempty"`
 	SourceSHA256 string `json:"source_sha256,omitempty"`
 }
+
+// Preview pairs a retained review with its package digest.
 type Preview struct {
 	Review        Review `json:"review"`
 	PackageSHA256 string `json:"package_sha256"`
 }
+
+// Discovery records an inert project path, kind, digest and discovery status.
 type Discovery struct {
 	Path   string `json:"path"`
 	Kind   string `json:"kind"`
 	SHA256 string `json:"sha256"`
 	Status string `json:"status"`
 }
+
+// Inspection reports registration, manager selection and inert discovered candidates.
 type Inspection struct {
 	Registration Registration `json:"registration"`
 	Mode         string       `json:"mode"`
@@ -309,6 +346,8 @@ func exactMembers(b []byte, typ reflect.Type) error {
 	}
 	return nil
 }
+
+// ParseDeclaration reads a bounded closed manager-operation request.
 func ParseDeclaration(b []byte) (result Declaration, resultErr error) {
 	defer func() { resultErr = projectError(resultErr) }()
 	var d Declaration
@@ -375,7 +414,7 @@ func ReadDeclaration(path string) (result Declaration, resultErr error) {
 	if err != nil {
 		return Declaration{}, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	b, _, err := read(root, filepath.Base(abs), MaxRecord)
 	if err != nil {
 		return Declaration{}, err

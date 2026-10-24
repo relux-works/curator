@@ -384,7 +384,7 @@ func TestRootLapseSlotsAndShadow(t *testing.T) {
 	if err = os.Chmod(f.root, 0100); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(f.root, 0700)
+	defer func() { _ = os.Chmod(f.root, 0700) }()
 	_, err = f.store.Inspect(f.registration.CheckoutID)
 	required(t, err, "project_registration_mismatch")
 	if err = os.Chmod(f.root, 0700); err != nil {

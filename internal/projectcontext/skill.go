@@ -19,7 +19,7 @@ func (op *operation) skill(r registered, req Request) (Candidate, error) {
 	if err != nil {
 		return Candidate{}, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	capt, err := capture(root, req.Source)
 	if err != nil {
 		return Candidate{}, err
@@ -79,7 +79,7 @@ func auditSkill(home, snapshot string) (string, error) {
 // The owning parser checks modern closed manifests. Apply exact member
 // closure to the legacy schema as well at this project-admission boundary.
 func closedSkill(snapshot string) error {
-	b, err := os.ReadFile(filepath.Join(snapshot, skillspec.CanonicalManifestName))
+	b, err := os.ReadFile(filepath.Join(snapshot, skillspec.CanonicalManifestName)) // #nosec G304 -- The retained snapshot is verified by the caller and the manifest leaf is fixed.
 	if err != nil {
 		return err
 	}

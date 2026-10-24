@@ -15,7 +15,7 @@ func filesystemIdentity(st os.FileInfo) (map[string]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("filesystem identity unavailable")
 	}
-	return map[string]string{"device": strconv.FormatUint(uint64(s.Dev), 10), "inode": strconv.FormatUint(uint64(s.Ino), 10)}, nil
+	return map[string]string{"device": strconv.FormatUint(uint64(s.Dev), 10), "inode": strconv.FormatUint(uint64(s.Ino), 10)}, nil // #nosec G115 -- Equality-only device identity preserves the existing injective int32-to-uint64 mapping.
 }
 
 func openCandidate(root *os.Root, name string) (*os.File, error) {

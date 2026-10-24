@@ -603,7 +603,7 @@ func TestRegistrationEnvironmentAmbiguity(t *testing.T) {
 	required(t, err, "project_registration_mismatch")
 }
 
-// Claim: hardlinked candidate bytes cannot cross the registration boundary;
+// Claim: hard-linked candidate bytes cannot cross the registration boundary;
 // an ordinary independent file with the same contents packages successfully.
 func TestHardlinkCandidateRefuses(t *testing.T) {
 	f := newFixture(t)

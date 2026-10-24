@@ -86,7 +86,7 @@ func TestRootLapseAtCapacity(t *testing.T) {
 			if err := os.Chmod(f.root, 0100); err != nil {
 				t.Fatal(err)
 			}
-			defer os.Chmod(f.root, 0700)
+			defer func() { _ = os.Chmod(f.root, 0700) }()
 			_, loss := f.store.Inspect(id)
 			// Continue through a failed retention attempt as well: the actual
 			// regression witness is forbidden authority after restoration.

@@ -189,7 +189,7 @@ func TestExecuteOnlyRootRefuses(t *testing.T) {
 	if err := os.Chmod(f.root, 0100); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(f.root, 0700)
+	defer func() { _ = os.Chmod(f.root, 0700) }()
 	_, err := f.store.LocateFor(f.root, "base", "codex_cli")
 	required(t, err, "project_registration_mismatch")
 	_, err = f.store.Register("another", f.root, "base", "claude_code")
