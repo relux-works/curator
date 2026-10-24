@@ -321,6 +321,8 @@ platform-control	internal/projectcontext	TestRegistrationBindingAndNestedCWD	CIP
 platform-control	internal/projectlease	TestLeaseNarrowingMutants/ignore-mode-drift	native receipt mode bits are Unix-specific
 host-capability	internal/projectlease	TestLeaseTransactionPolicyCurrentLock	host refuses open-lock replacement
 host-capability	internal/projectlease	TestGCReferenceWitness	host refuses replacement of an open lock: sharing violation
+platform-control	cmd/curator	TestProjectAdmissionCLIFlow	CIP root identities support macOS/Linux
+host-capability	internal/managerlock	TestHeldWitnessRejectsRemovedLock	host refuses unlink of an open lock: sharing violation
 TRAIN_SKIPS
 done
 
