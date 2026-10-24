@@ -1751,7 +1751,10 @@ func TestProjectRefreshFetchFailurePreservesStateThroughCLI(t *testing.T) {
 func installFailingRemoteGit(t *testing.T, realGit string) {
 	t.Helper()
 	fakeDir := t.TempDir()
-	script := "#!/bin/sh\nif [ \"$1\" = \"remote\" ] && [ \"$#\" = \"1\" ]; then\n" +
+	// Inspect in a subshell so delegation retains the original process setting.
+	script := "#!/bin/sh\nif (\n" +
+		"if [ \"$1\" = \"-c\" ] && [ \"$2\" = \"core.longpaths=true\" ]; then shift 2; fi\n" +
+		"[ \"$1\" = \"remote\" ] && [ \"$#\" = \"1\" ]\n); then\n" +
 		"echo \"fake remote enumeration failure\" >&2\nexit 73\nfi\nexec '" + realGit + "' \"$@\"\n"
 	if err := os.WriteFile(filepath.Join(fakeDir, "git"), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
@@ -1799,6 +1802,18 @@ func TestProjectRefreshRemoteEnumerationFailurePreservesStateThroughCLI(t *testi
 		t.Fatal(err)
 	}
 	installFailingRemoteGit(t, realGit)
+	// The fault plant must fire for both argv shapes, while a neighboring valid
+	// command still reaches real Git with its process configuration intact.
+	for _, args := range [][]string{{"remote"}, {"-c", "core.longpaths=true", "remote"}} {
+		output, err := exec.Command("git", args...).CombinedOutput()
+		exit, ok := err.(*exec.ExitError)
+		if !ok || exit.ExitCode() != 73 || strings.TrimSpace(string(output)) != "fake remote enumeration failure" {
+			t.Fatalf("remote enumeration plant %q = %v, %q, want exit 73 and the intended diagnostic", args, err, output)
+		}
+	}
+	if output, err := exec.Command("git", "-c", "core.longpaths=true", "config", "--get", "core.longpaths").CombinedOutput(); err != nil || strings.TrimSpace(string(output)) != "true" {
+		t.Fatalf("remote wrapper delegation = %v, %q, want real Git process configuration", err, output)
+	}
 	t.Setenv("GIT_TERMINAL_PROMPT", "0")
 	if code, _, stderr := capture(t, configPath, "project", "refresh", "app"); code != exitFail || !strings.Contains(stderr, "failed to fetch") {
 		t.Fatalf("broken remote enumeration refresh = %d, stderr %q, want a failed fetch", code, stderr)
