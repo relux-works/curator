@@ -129,3 +129,11 @@ platform-control	install\.sh supports macOS and Linux	allow	install.sh is a POSI
 platform-control	^concurrency witness requires the Unix Git/FIFO harness$	allow	the test-only process barrier and named metadata controls run on Unix; portable ownership and canonical refusal witnesses remain required on Windows
 platform-control	^Unix (special )?permission bits are the tested metadata$	allow	these compensation witnesses mutate Unix mode bits; Windows SID capture and foreign-postimage refusal still execute
 platform-control	^requires unprivileged Unix directory permissions$	allow	the nested-native compensation fixture needs Unix mode-bit denial; its portable ownership controls run on all hosts
+
+# Exact imported fixture reasons, tied to their existing condition guards.
+opt-in	^explicit bounded mutation lane$	allow	registration admission source plants run only with CURATOR_PROJECT_ADMISSION_MUTANTS=1; ordinary admission controls remain required
+host-capability	^case-sensitive filesystem$	allow	registration alias fixture requires two spellings of the same existing root; distinct paths exercise ordinary checkout isolation instead
+platform-control	^CIP filesystem binding supports macOS/Linux$	allow	the imported fixture skips only when GOOS is neither darwin nor linux; registration fails closed as unsupported on those hosts
+platform-control	^native receipt mode bits are Unix-specific$	allow	only ignore-mode-drift skips when os.PathSeparator is the Windows separator; other receipt plants execute
+host-capability	^host refuses open-lock replacement$	allow	only Windows Rename failure matching syscall.Errno(32) skips this open-lock replacement fixture; other errors remain fatal
+host-capability	^host refuses replacement of an open lock: sharing violation$	allow	only Windows Rename failure matching syscall.Errno(32) skips the replacement stage after valid, zero, foreign and released GC witness checks

@@ -284,6 +284,46 @@ assert 'a skip with an unrecognised reason fails'   1 run_gate "$S" env CI_GATE_
   ev skip internal/registry TestSomethingElse; } >"$S"
 assert 'a host-capability skip is recorded and allowed' 0 run_gate "$S" env CI_GATE_GOOS=windows
 
+# Claim: each exact imported fixture skip retains its declared class on all
+# hosts; removing its row or extending its reason is rejected as unclassified.
+for train_goos in linux darwin windows; do
+  while IFS="$(printf '\t')" read -r train_class train_package train_case train_reason; do
+    [ -n "$train_class" ] || continue
+    { ev pass internal/buildcache TestWindowsProtectedStateMatrix
+      ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
+      ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+      evout "$train_package" "$train_case" "$train_reason"
+      ev skip "$train_package" "$train_case"; } >"$S"
+    assert "declared train $train_case skip passes on $train_goos" 0 \
+      run_gate "$S" env CI_GATE_GOOS="$train_goos"
+    assert_contains 'train skip records its class and allowed verdict' \
+      "$(printf '%s\tallowed-' "$train_class")" "$WORK/gate-ev/skips-observed.tsv"
+
+    awk -F'\t' -v pattern="^$train_reason"'$' '$2 != pattern' "$CLASSES" >"$WORK/train-classes-minus.tsv"
+    assert "missing train $train_case declaration refuses on $train_goos" 1 \
+      run_gate "$S" env CI_GATE_GOOS="$train_goos" CI_SKIP_CLASSES="$WORK/train-classes-minus.tsv"
+    assert_contains 'missing train declaration fails for the intended skip' \
+      'UNCLASSIFIED' "$WORK/gate-ev/skips-observed.tsv"
+
+    { ev pass internal/buildcache TestWindowsProtectedStateMatrix
+      ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
+      ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+      evout "$train_package" "$train_case" "$train_reason unexpectedly"
+      ev skip "$train_package" "$train_case"; } >"$S"
+    assert "nearby undeclared train $train_case skip refuses on $train_goos" 1 \
+      run_gate "$S" env CI_GATE_GOOS="$train_goos"
+    assert_contains 'nearby train reason stays unclassified' \
+      'UNCLASSIFIED' "$WORK/gate-ev/skips-observed.tsv"
+  done <<'TRAIN_SKIPS'
+opt-in	internal/projectcontext	TestAdmissionNarrowingMutants	explicit bounded mutation lane
+host-capability	internal/projectcontext	TestRegistrationCaseAlias	case-sensitive filesystem
+platform-control	internal/projectcontext	TestRegistrationBindingAndNestedCWD	CIP filesystem binding supports macOS/Linux
+platform-control	internal/projectlease	TestLeaseNarrowingMutants/ignore-mode-drift	native receipt mode bits are Unix-specific
+host-capability	internal/projectlease	TestLeaseTransactionPolicyCurrentLock	host refuses open-lock replacement
+host-capability	internal/projectlease	TestGCReferenceWitness	host refuses replacement of an open lock: sharing violation
+TRAIN_SKIPS
+done
+
 # Claim: exact book tool-absence and Unix-only skips keep their declared
 # classes on each platform. Nearby undeclared reasons and removal of the one
 # accepting declaration fail for that skip; no broad unavailable-tool waiver.
