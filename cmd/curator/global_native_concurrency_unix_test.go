@@ -214,6 +214,18 @@ func TestGlobalNativeOwnerConcurrentRemove(t *testing.T) {
 	}
 }
 
+// managerlock selects on Done only after an OS-lock attempt reports contention.
+// Cancel at that event so the probe tests lock ownership without a clock budget.
+type nativeLockContentionContext struct {
+	context.Context
+	cancel context.CancelFunc
+}
+
+func (ctx nativeLockContentionContext) Done() <-chan struct{} {
+	ctx.cancel()
+	return ctx.Context.Done()
+}
+
 // A FIFO pauses the real removal read after it holds the operation lock. The
 // path is then restored to an ordinary file, so the competing install can read
 // normally and must wait on that lock. Remove-before-install leaves both native
@@ -275,8 +287,10 @@ func TestGlobalNativeOwnerRemoveBeforeInstall(t *testing.T) {
 		}
 	}
 	defer release()
-	installing := startNativeCommand(t, fixture, "global", "install")
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	// Probe before starting the competing install: only the paused removal
+	// may own this lock. Otherwise an install can acquire a prematurely
+	// released lock and make the removal-lock assertion pass accidentally.
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	manager, err := managerlock.New(filepath.Join(fixture.home, ".curator"))
 	if err != nil {
@@ -284,10 +298,11 @@ func TestGlobalNativeOwnerRemoveBeforeInstall(t *testing.T) {
 	}
 	operation := manager.NewOperation(false)
 	defer func() { _ = operation.Close() }()
-	_, err = operation.AcquireProjects(ctx, filepath.Join(fixture.home, ".curator", "global"))
-	if !errors.Is(err, context.DeadlineExceeded) {
+	_, err = operation.AcquireProjects(nativeLockContentionContext{ctx, cancel}, filepath.Join(fixture.home, ".curator", "global"))
+	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("paused remove did not hold the global operation lock: %v", err)
 	}
+	installing := startNativeCommand(t, fixture, "global", "install")
 	installing.pending(t)
 	requireNativeClosure(t, fixture, false)
 	release()
