@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/transaction"
@@ -245,7 +244,7 @@ func TestPublicationSerializesLeaseAcquisition(t *testing.T) {
 	var unblock sync.Once
 	var firstPublication sync.Once
 	defer func() { unblock.Do(func() { close(release) }) }()
-	ctx, cancel := context.WithTimeout(context.Background(), leaseTestCompletionBudget())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	f.m.hooks = transaction.Hooks{Observe: func(e transaction.Event) {
 		if e.Point == transaction.PointPrepared {
@@ -269,11 +268,20 @@ func TestPublicationSerializesLeaseAcquisition(t *testing.T) {
 	}
 	acquired := make(chan error, 1)
 	r := f.reserve("two")
-	go func() { _, err := f.m.Acquire(ctx, r); acquired <- err }()
+	waiting := &waitObservedContext{Context: ctx, waiting: make(chan struct{})}
+	go func() { _, err := f.m.Acquire(waiting, r); acquired <- err }()
 	select {
 	case err := <-acquired:
 		t.Fatalf("acquisition passed an in-flight update: %v", err)
-	case <-time.After(20 * time.Millisecond):
+	case <-waiting.waiting:
+	}
+	// Done is requested only after the real OS lock refuses acquisition.
+	// Publication is still held at PointPrepared, so no scheduling delay is
+	// needed to establish contention before the test releases the barrier.
+	select {
+	case err := <-acquired:
+		t.Fatalf("acquisition passed an in-flight update: %v", err)
+	default:
 	}
 	unblock.Do(func() { close(release) })
 	if err := <-update; err != nil {
