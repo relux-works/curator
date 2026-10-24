@@ -236,7 +236,7 @@ func runWithEnv(dir string, env []string, args ...string) (string, error) {
 		if detail == "" {
 			detail = strings.TrimSpace(stdout.String())
 		}
-		return "", fmt.Errorf("git %s failed: %s", strings.Join(args, " "), detail)
+		return "", fmt.Errorf("git %s failed: %w: %s", strings.Join(args, " "), err, detail)
 	}
 	return strings.TrimSpace(stdout.String()), nil
 }
