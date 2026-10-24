@@ -59,6 +59,13 @@ func CreateTemp(dir, pattern string) (*os.File, error) {
 	return createPrivateTempFile(dir, pattern)
 }
 
+// Create exclusively creates a named private file. An existing name is never
+// opened or replaced. Unix retains mode; Windows attaches its protected,
+// owner-only DACL at creation and uses mode for the read-only attribute.
+func Create(path string, mode os.FileMode) (*os.File, error) {
+	return createPrivateNamedFile(path, mode)
+}
+
 // ValidateFile proves that path is a regular, non-link owner-only file.
 func ValidateFile(path string) error { return validatePrivateFile(path) }
 

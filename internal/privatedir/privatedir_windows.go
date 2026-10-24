@@ -308,6 +308,19 @@ func createPrivateFile(path string) (*os.File, error) {
 	return file, nil
 }
 
+func createPrivateNamedFile(path string, mode os.FileMode) (*os.File, error) {
+	file, err := createPrivateFile(path)
+	if err != nil {
+		return nil, err
+	}
+	if err := file.Chmod(mode); err != nil {
+		_ = file.Close()
+		_ = os.Remove(path)
+		return nil, err
+	}
+	return file, nil
+}
+
 func validatePrivateFile(path string) error {
 	handle, err := openPrivateFile(path, windows.READ_CONTROL)
 	if err != nil {

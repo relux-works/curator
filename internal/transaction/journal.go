@@ -15,6 +15,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -62,7 +63,7 @@ func makeDurableDirectories(path string) error {
 	if err := makeDurableDirectories(parent); err != nil {
 		return err
 	}
-	if err := os.Mkdir(path, 0o700); err != nil && !os.IsExist(err) {
+	if err := privatedir.Make(path); err != nil && !os.IsExist(err) {
 		return err
 	}
 	if err := syncDirectory(path); err != nil {
@@ -93,7 +94,7 @@ func (engine *Engine) saveJournal(journal *Journal) error {
 	if tombState.Kind == stateread.KindPresent {
 		return corruptionf("journal cleanup tomb exists while saving transaction %s", journal.TransactionID)
 	}
-	temporary, err := os.CreateTemp(engine.journalRoot, ".journal-*.tmp")
+	temporary, err := privatedir.CreateTemp(engine.journalRoot, ".journal-*.tmp")
 	if err != nil {
 		return err
 	}

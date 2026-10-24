@@ -8,6 +8,32 @@ import (
 	"testing"
 )
 
+// Claim: deterministic private creation preserves existing bytes on collision
+// and makes a new file private before its caller can write any payload.
+func TestCreateIsPrivateAndExclusive(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "owned")
+	file, err := Create(path, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = file.Close() }()
+	if err := ValidateFile(path); err != nil {
+		t.Fatalf("new named private file: %v", err)
+	}
+	if _, err := file.WriteString("preserved"); err != nil {
+		t.Fatal(err)
+	}
+	if second, err := Create(path, 0o600); !errors.Is(err, os.ErrExist) {
+		if second != nil {
+			_ = second.Close()
+		}
+		t.Fatalf("exclusive creation = %v, want already exists", err)
+	}
+	if raw, err := os.ReadFile(path); err != nil || string(raw) != "preserved" {
+		t.Fatalf("collision changed original bytes: %q, %v", raw, err)
+	}
+}
+
 func TestMakeCreatesADirectoryValidateAccepts(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "private")
 	if err := Make(path); err != nil {

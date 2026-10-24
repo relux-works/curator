@@ -35,6 +35,10 @@ func createPrivateTempFile(dir, pattern string) (*os.File, error) {
 	return os.CreateTemp(dir, pattern)
 }
 
+func createPrivateNamedFile(path string, mode os.FileMode) (*os.File, error) {
+	return os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, mode) // #nosec G304 -- caller-selected exclusive private publication.
+}
+
 func validatePrivateFile(path string) error {
 	info, err := os.Lstat(path)
 	if err != nil {

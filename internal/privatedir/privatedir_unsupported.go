@@ -30,6 +30,10 @@ func createPrivateTempFile(string, string) (*os.File, error) {
 	return nil, fmt.Errorf("private files are unsupported on this platform")
 }
 
+func createPrivateNamedFile(string, os.FileMode) (*os.File, error) {
+	return nil, fmt.Errorf("private files are unsupported on this platform")
+}
+
 func validatePrivateFile(string) error {
 	return fmt.Errorf("private files are unsupported on this platform")
 }

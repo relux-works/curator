@@ -77,7 +77,7 @@ func (engine *Engine) createStagingEntry(journal *Journal, targetIndex int, entr
 			return err
 		}
 	case "directory":
-		if err := os.Mkdir(destination, 0); err != nil {
+		if err := makePublicationDirectory(destination, 0); err != nil {
 			return err
 		}
 		if err := os.Chmod(destination, os.FileMode(entry.Mode)); err != nil {
@@ -94,7 +94,7 @@ func (engine *Engine) createStagingEntry(journal *Journal, targetIndex int, entr
 		if err := verifyRemovalEntry(source, info, entry); err != nil {
 			return corruptionf("staging source entry changed before copy: %s", source)
 		}
-		file, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0) // #nosec G304 -- deterministic transaction sidecar
+		file, err := createPublicationFile(destination, 0)
 		if err != nil {
 			return err
 		}
