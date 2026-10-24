@@ -35,7 +35,7 @@ func TestLeaseNarrowingMutants(t *testing.T) {
 		{"profile-recovered-lifecycle", "internal/envprofile/lock.go", "projectlease.RecoverUnderLock(home, lock, engine)", "engine.RecoverWithOutcome(lock)", "envprofile", "TestRecoveredLeaseLifecycle", "recovered lifecycle remained prepared/active or released"},
 		{"install-recovered-lifecycle", "internal/install/commit.go", "projectlease.RecoverUnderLock(journal.home, lock, journal.Engine)", "journal.Engine.RecoverWithOutcome(lock)", "install", "TestRecoveredLeaseLifecycle", "recovered lifecycle remained prepared/active or released"},
 
-		{"profile-recovery-policy", "internal/envprofile/lock.go", "engine, err := transaction.New(home, append(options, transaction.WithCommitCheck(projectlease.TransactionCheck(home)))...)", "engine, err := transaction.New(home, options...)", "envprofile", "TestDefaultRecoveryChecksLeaseJournal", "default lease recovery policy missing"},
+		{"profile-recovery-policy", "internal/envprofile/lock.go", "transaction.WithCommitCheck(projectlease.TransactionCheck(home))", "transaction.WithCommitCheck(func() transaction.CommitCheck { _ = projectlease.TransactionCheck(home); return nil }())", "envprofile", "TestDefaultRecoveryChecksLeaseJournal", "default lease recovery policy missing"},
 		{"install-recovery-policy", "internal/install/commit.go", "transaction.WithCommitCheck(projectlease.TransactionCheck(home))", "transaction.WithCommitCheck(func() transaction.CommitCheck { _ = projectlease.TransactionCheck(home); return nil }())", "install", "TestDefaultRecoveryChecksLeaseJournal", "default lease recovery policy missing"},
 		{"pending-gc-preserves-other-owners", "internal/projectlease/manager.go", "engine.PendingRecoveryFor(lock, \"project-leases\")", "engine.PendingRecovery(lock)", "scopes", "TestCollectWithUnrelatedPendingTransaction", "unrelated pending transaction blocked legacy GC"},
 		{"pending-owner-filter", "internal/transaction/pending.go", "journal.ProjectIdentity == projectIdentity", "false && journal.ProjectIdentity == projectIdentity", "transaction", "TestPendingRecoveryForOwner", "owner-filtered pending"},
@@ -93,6 +93,13 @@ func TestLeaseNarrowingMutants(t *testing.T) {
 					if !strings.HasPrefix(kv, "GIT_DIR=") && !strings.HasPrefix(kv, "GIT_WORK_TREE=") {
 						cmd.Env = append(cmd.Env, kv)
 					}
+				}
+				if tc.pkg == "cmd/curator" {
+					// These GC witnesses recover synthetic journals and never
+					// fingerprint or mutate the host toolchain. Reuse the CLI
+					// helper mode so a parallel package's host lock cannot
+					// prevent the positive control or plant from reaching them.
+					cmd.Env = append(cmd.Env, "CURATOR_TEST_CLI_HELPER=1")
 				}
 				return cmd.CombinedOutput()
 			}
