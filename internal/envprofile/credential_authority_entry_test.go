@@ -380,11 +380,16 @@ func TestOperationRecoveredNodeAuthority(t *testing.T) {
 
 // Node authority refuses before waiting for a busy mutation lock. The per-home
 // neighbor reaches the real contention refusal and succeeds after release.
+// Full snapshots, including lock bytes, bracket acquisition/release because
+// Windows forbids reading the file while its exclusive byte-range lock is held.
 func TestOperationAuthorityBeforeLock(t *testing.T) {
 	for _, node := range []bool{true, false} {
 		t.Run(fmt.Sprintf("node=%v", node), func(t *testing.T) {
 			fx, _, _ := claudeRepairFixture(t, envregistry.FormReferenced)
 			lock := authorityTestLock(t, fx.home)
+			if err := lock.Close(); err != nil {
+				t.Fatal(err)
+			}
 			defer func() { _ = lock.Close() }()
 			priorTimeout := lockTimeout
 			lockTimeout = 25 * time.Millisecond
@@ -393,6 +398,7 @@ func TestOperationAuthorityBeforeLock(t *testing.T) {
 				writeNodeAuthorityMarker(t, fx)
 			}
 			before := nativeSnapshot(t, fx.home)
+			lock = authorityTestLock(t, fx.home)
 			n := 0
 			op, err := beginOperation(fx.home, recoveryCounter(&n)...)
 			if op != nil {
@@ -406,11 +412,11 @@ func TestOperationAuthorityBeforeLock(t *testing.T) {
 			if err == nil || !strings.HasPrefix(err.Error(), want) {
 				t.Fatalf("node operation diagnostic: %v; want %s", err, want)
 			}
-			if n != 0 || nativeSnapshot(t, fx.home) != before {
-				t.Fatal("busy authority refusal mutated or entered recovery")
-			}
 			if err := lock.Close(); err != nil {
 				t.Fatal(err)
+			}
+			if n != 0 || nativeSnapshot(t, fx.home) != before {
+				t.Fatal("busy authority refusal mutated or entered recovery")
 			}
 			if !node {
 				op, err = beginOperation(fx.home)
@@ -476,23 +482,36 @@ func TestTransactionRecoveredAuthorityStopsNextJournal(t *testing.T) {
 
 // A marker changed by locked validation is checked again by the transaction
 // consumer before its recovery callback or real prepared intent can run.
+// The expected snapshot includes that intentional marker change and is captured
+// before acquisition; the actual snapshot follows release and omits no files.
 func TestAuthorityChangeBeforeTransactionRecovery(t *testing.T) {
 	for _, node := range []bool{true, false} {
 		t.Run(fmt.Sprintf("node=%v", node), func(t *testing.T) {
 			fx, _, _ := claudeRepairFixture(t, envregistry.FormReferenced)
 			target := filepath.Join(fx.home, "state", "authority-witness")
 			prepareAuthorityIntent(t, fx.home, "authority-pending", target, []byte("recovered intent\n"))
-			before := ""
+			markerPath := filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.ClaudeCode), envmarker.Name)
+			prior := readClaudeState(t, markerPath)
+			if node {
+				writeNodeAuthorityMarker(t, fx)
+			}
+			before := nativeSnapshot(t, fx.home)
+			if node {
+				if err := os.WriteFile(markerPath, prior, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
 			n := 0
 			op, err := beginOperationValidated(fx.home, func() error {
 				if node {
 					writeNodeAuthorityMarker(t, fx)
 				}
-				before = nativeSnapshot(t, fx.home)
 				return nil
 			}, recoveryCounter(&n)...)
 			if op != nil {
-				defer func() { _ = op.close() }()
+				if closeErr := op.close(); closeErr != nil {
+					t.Fatal(closeErr)
+				}
 			}
 			if node {
 				if err == nil || !strings.Contains(err.Error(), "credential_injection_unavailable:") || op != nil {
