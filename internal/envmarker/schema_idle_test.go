@@ -46,9 +46,12 @@ func TestMarker7AfterRegexpClockIdle(t *testing.T) {
 	time.Sleep(1300 * time.Millisecond)
 	defer regexp2.StopTimeoutClock()
 	until := time.Now().Add(400 * time.Millisecond)
-	for time.Now().Before(until) {
+	for {
 		if _, err := Parse(valid); err != nil {
 			t.Fatalf("valid marker rejected after regexp clock idle: %v", err)
+		}
+		if !time.Now().Before(until) {
+			break
 		}
 	}
 }
