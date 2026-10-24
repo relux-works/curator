@@ -682,8 +682,17 @@ func TestProfileMCPPrivateFixtureBoundary(t *testing.T) {
 					}
 					return
 				}
-				if err == nil || !strings.Contains(err.Error(), "permissions:") || result.Published {
+				// Main's Windows manager-home lock refuses the foreign grant
+				// before the native writer's later route-permission check.
+				refusal := "permissions:"
+				if runtime.GOOS == "windows" && mode == "home" {
+					refusal = "environment_lock_unavailable:"
+				}
+				if err == nil || !strings.Contains(err.Error(), refusal) || result.Published {
 					t.Fatalf("broadened mutation rights accepted: %+v %v", result, err)
+				}
+				if runtime.GOOS == "windows" && mode == "home" && !strings.Contains(err.Error(), "DACL grants access to another principal") {
+					t.Fatalf("manager-home refusal did not identify the foreign grant: %v", err)
 				}
 				if privatedir.Validate(widened) == nil {
 					t.Fatal("refusal repaired broadened permissions")

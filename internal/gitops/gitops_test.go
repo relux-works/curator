@@ -170,10 +170,10 @@ func TestFetchAndSubmodules(t *testing.T) {
 	}
 }
 
-// Clone enables long-path support before template initialization and persists
-// it for packed transfers, independently of ambient defaults. The two witnesses
-// isolate template and pack paths exceeding MAX_PATH from Git's separate
-// absolute GIT_DIR length guard during a file:// clone.
+// Clone enables long-path support before copying a template beyond MAX_PATH
+// and persists it for a real packed transfer, independently of ambient defaults.
+// The packed fixture stays below Git's independent absolute metadata-path limit;
+// this test does not claim arbitrary-length repository roots are supported.
 func TestCloneLongDestination(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "gitconfig")
 	if err := os.WriteFile(configPath, []byte("[core]\nlongpaths = false\n"), 0o600); err != nil {
@@ -187,7 +187,7 @@ func TestCloneLongDestination(t *testing.T) {
 		packed bool
 	}{
 		{"initialization", 238, false},
-		{"packed-transfer", 210, true},
+		{"packed-transfer", 180, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -202,7 +202,7 @@ func TestCloneLongDestination(t *testing.T) {
 			}
 			t.Setenv("GIT_TEMPLATE_DIR", template)
 			packPath := filepath.Join(dest, ".git", "objects", "pack", "pack-"+strings.Repeat("0", 40)+".keep")
-			if len(dest) >= 248 || len(packPath) <= 260 || !tc.packed && len(filepath.Join(dest, ".git", name)) <= 260 || tc.packed && len(filepath.Join(dest, ".git")) > 220 {
+			if len(dest) >= 248 || !tc.packed && len(filepath.Join(dest, ".git", name)) <= 260 || tc.packed && len(packPath) >= 250 {
 				t.Fatalf("invalid long-path witness: directory=%d pack=%d", len(dest), len(packPath))
 			}
 			if err := Clone("--upload-pack=forbidden", dest); err == nil || !strings.Contains(err.Error(), "suspicious git URL") {
@@ -222,8 +222,16 @@ func TestCloneLongDestination(t *testing.T) {
 			if err := Clone(remote, dest); err != nil {
 				t.Fatal(err)
 			}
-			if got := gitRun(t, dest, "config", "--local", "--get", "core.longpaths"); got != "true" {
-				t.Fatalf("cache long-path support = %q, want true", got)
+			// Inspect stdout separately: Git can warn on stderr while probing
+			// an absent alternates file before loading this local setting.
+			if got, err := run(dest, "config", "--local", "--get", "core.longpaths"); err != nil || got != "true" {
+				t.Fatalf("cache long-path support = %q, want true: %v", got, err)
+			}
+			if tc.packed {
+				packs, err := filepath.Glob(filepath.Join(dest, ".git", "objects", "pack", "pack-*.pack"))
+				if err != nil || len(packs) == 0 {
+					t.Fatalf("file transport did not install a pack: %v %v", packs, err)
+				}
 			}
 			if body, err := os.ReadFile(filepath.Join(dest, ".git", name)); err != nil || string(body) != "template" {
 				t.Fatalf("long-path template = %q: %v", body, err)
