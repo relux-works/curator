@@ -4,9 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 const stagingCopyChunkSize = 32 * 1024
@@ -94,7 +97,12 @@ func (engine *Engine) createStagingEntry(journal *Journal, targetIndex int, entr
 		if err := verifyRemovalEntry(source, info, entry); err != nil {
 			return corruptionf("staging source entry changed before copy: %s", source)
 		}
-		file, err := createPublicationFile(destination, 0)
+		if target.PrivateFile {
+			if err := privatedir.ValidateFile(source); err != nil {
+				return fmt.Errorf("private transaction source: %w", err)
+			}
+		}
+		file, err := createStagingFile(destination, target.PrivateFile)
 		if err != nil {
 			return err
 		}
@@ -113,6 +121,22 @@ func (engine *Engine) createStagingEntry(journal *Journal, targetIndex int, entr
 		return journalf("unknown staging entry kind %q", entry.Kind)
 	}
 	return syncDirectory(filepath.Dir(destination))
+}
+
+func createStagingFile(path string, private bool) (*os.File, error) {
+	if private {
+		return privatedir.Create(path, 0o600)
+	}
+	return createPublicationFile(path, 0)
+}
+
+func validatePrivateReplacement(target *TargetRecord, path string) error {
+	if target.PrivateFile {
+		if err := privatedir.ValidateFile(path); err != nil {
+			return fmt.Errorf("private transaction replacement: %w", err)
+		}
+	}
+	return nil
 }
 
 func (engine *Engine) copyStagingFile(journal *Journal, targetIndex int, entry RemovalEntry) (result error) {
