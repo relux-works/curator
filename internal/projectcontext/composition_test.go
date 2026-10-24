@@ -28,7 +28,7 @@ func compositionFixture(t *testing.T, env string, skillSources map[string]string
 func compositionModeFixture(t *testing.T, env string, skillSources map[string]string, mode string, system ...bool) fixture {
 	t.Helper()
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
-		t.Skip("CIP filesystem binding supports macOS/Linux; pure composition contracts remain portable")
+		t.Skip("CIP filesystem binding supports macOS/Linux")
 	}
 	base := t.TempDir()
 	home := filepath.Join(base, "manager")
@@ -103,7 +103,7 @@ func compositionSkillSource(t *testing.T, name, command string) string {
 	}
 	b, _ := json.Marshal(map[string]any{"schema_version": 3, "runtime_roots": roots, "commands": commands, "capabilities": map[string]any{"network": "none", "filesystem": "none", "exec": "none", "secrets": "none", "env_read": "none", "prompt_scope": "none"}})
 	write(t, filepath.Join(root, "agent-skill.json"), string(b))
-	write(t, filepath.Join(root, "SKILL.md"), "# "+name+"\n")
+	write(t, filepath.Join(root, "SKILL.md"), compositionSkillDocument(name, "# "+name+"\n"))
 	return root
 }
 func approveCompositionDeclaration(t *testing.T, f fixture, d Declaration) Preview {
@@ -169,7 +169,7 @@ func TestCompositionPreviewAndReceipt(t *testing.T) {
 				target = "config/muse/AGENTS.md"
 			}
 			doc := string(p.Files[target])
-			if strings.Index(doc, "Package context.\n") < 0 || strings.Index(doc, "Selected project context.\n") < strings.Index(doc, "Package context.\n") {
+			if !strings.Contains(doc, "Package context.\n") || strings.Index(doc, "Selected project context.\n") < strings.Index(doc, "Package context.\n") {
 				t.Fatal("profile-first rendering lost")
 			}
 			for _, file := range p.Receipt.Files {
@@ -216,7 +216,7 @@ func TestCompositionWholeSkillReplacement(t *testing.T) {
 				}
 			} else {
 				write(t, filepath.Join(project, "agent-skill.json"), `{"schema_version":3,"commands":{},"capabilities":{"network":"none","filesystem":"none","exec":"none","secrets":"none","env_read":"none","prompt_scope":"none"}}`)
-				write(t, filepath.Join(project, "SKILL.md"), "# Replacement\n")
+				write(t, filepath.Join(project, "SKILL.md"), compositionSkillDocument("review", "# Replacement\n"))
 			}
 			d := declaration("review", "review", false)
 			d.Items[0].Type = "skill"
@@ -239,7 +239,7 @@ func TestCompositionWholeSkillReplacement(t *testing.T) {
 					t.Fatal("same pin lost command")
 				}
 			} else {
-				if string(p.Files["skills/review/SKILL.md"]) != "# Replacement\n" || len(p.Record.CommandOwners) != 0 {
+				if string(p.Files["skills/review/SKILL.md"]) != compositionSkillDocument("review", "# Replacement\n") || len(p.Record.CommandOwners) != 0 {
 					t.Fatal("whole-skill replacement retained old context or command")
 				}
 				if _, ok := p.Files[".agent-context/commands/old-command"]; ok {
@@ -608,7 +608,7 @@ func TestCompositionReplacementRechecksConsumer(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, filepath.Join(f.root, "provider/agent-skill.json"), string(b))
-	write(t, filepath.Join(f.root, "provider/SKILL.md"), "# Replacement\n")
+	write(t, filepath.Join(f.root, "provider/SKILL.md"), compositionSkillDocument("provider", "# Replacement\n"))
 	approveCompositionDeclaration(t, f, d)
 	_, err = f.store.PreviewComposition(context.Background(), req)
 	required(t, err, "required provider command missing")
@@ -629,13 +629,13 @@ func compositionLock(t *testing.T, home string) *managerlock.HomeLock {
 func resolveComposition(t *testing.T, a Authority, ref, hash string) (Composition, error) {
 	t.Helper()
 	lock := compositionLock(t, a.Store.Home)
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	return a.Resolve(context.Background(), lock.Held(), ref, hash)
 }
 func authorizeComposition(t *testing.T, a Authority, c Composition, owner string) error {
 	t.Helper()
 	lock := compositionLock(t, a.Store.Home)
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	return a.Authorize(context.Background(), lock.Held(), c, owner)
 }
 
@@ -685,7 +685,7 @@ func TestCompositionHeldAuthority(t *testing.T) {
 	}
 	other := compositionFixture(t, "codex_cli", nil)
 	otherLock := compositionLock(t, other.store.Home)
-	defer otherLock.Close()
+	defer func() { _ = otherLock.Close() }()
 	_, err = a.Resolve(context.Background(), otherLock.Held(), c.Ref, c.SHA256)
 	if !errors.Is(err, managerlock.ErrNotHeld) {
 		t.Fatalf("other-home witness accepted: %v", err)
@@ -708,4 +708,8 @@ func TestCompositionAdapterRelease(t *testing.T) {
 		bad.ProviderVersion = version
 		required(t, bad.validate("codex_cli", "strict"), "invalid adapter release contract")
 	}
+}
+
+func compositionSkillDocument(name, body string) string {
+	return "---\nname: " + name + "\ndescription: Inert composition fixture\n---\n" + body
 }

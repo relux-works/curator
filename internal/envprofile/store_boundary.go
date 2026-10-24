@@ -257,7 +257,7 @@ func extractPinnedSnapshot(home string, member contextlock.Member) (string, func
 	if member.Commit == "" || member.Source == "" {
 		return "", nil, "", fmt.Errorf("member %s/%s has no recomputable pin", member.Kind, member.Name)
 	}
-	snapshot, err := os.MkdirTemp("", "curator-store-pin-*")
+	snapshot, err := privatedir.TempStaging("", "curator-store-pin-*")
 	if err != nil {
 		return "", nil, "", err
 	}
@@ -266,6 +266,10 @@ func extractPinnedSnapshot(home string, member contextlock.Member) (string, func
 	if err := gitops.Extract(repo, member.Commit, snapshot); err != nil {
 		cleanup()
 		return "", nil, "", fmt.Errorf("extract pinned snapshot %s: %w", member.Commit, err)
+	}
+	if err := privatedir.ProtectTree(snapshot); err != nil {
+		cleanup()
+		return "", nil, "", err
 	}
 	hash, err := contextstore.ContentHash(snapshot)
 	if err != nil {

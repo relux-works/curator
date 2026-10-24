@@ -34,7 +34,7 @@ type Authority struct {
 
 var _ CompositionAuthority = Authority{}
 
-// Temporary sentinel mirror, replaced by projectlease.ErrRevoked at integration.
+// ErrAuthorityRevoked mirrors projectlease.ErrRevoked until lease wiring.
 var ErrAuthorityRevoked = errors.New("project authority revoked")
 
 type compositionEnvelope struct {
@@ -50,6 +50,7 @@ type compositionEnvelope struct {
 // before publication. Generated files are consumed by the separate lease lane;
 // this method does not mutate the managed home, profile lock or lease state.
 func (a Authority) PublishComposition(ctx context.Context, req ComposeRequest, expected string, ownerRef string) (Composition, error) {
+	req.Policy = canonicalCompositionPolicy(req.Policy)
 	op, err := a.Store.begin(false)
 	if err != nil {
 		return Composition{}, err
@@ -103,7 +104,7 @@ func (a Authority) PublishComposition(ctx context.Context, req ComposeRequest, e
 	if err != nil {
 		return Composition{}, err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	name := again.Preview.SHA256 + ".json"
 	metadata, e := stateread.LstatWith(filepath.Join(dir, name), func(string) (os.FileInfo, error) { return root.Lstat(name) })
 	if e != nil {
@@ -142,14 +143,6 @@ func (a Authority) bound(op *operation, id string) error {
 			return fail("project_registration_mismatch", "CWD unavailable")
 		}
 	}
-	cwd, err = filepath.EvalSymlinks(cwd)
-	if err != nil {
-		return fail("project_registration_mismatch", "CWD unavailable")
-	}
-	st, err := os.Stat(cwd)
-	if err != nil || !st.IsDir() {
-		return fail("project_registration_mismatch", "CWD is not a directory")
-	}
 	selected, err := op.locateFor(cwd, r.Record.Profile.Name, r.Record.Environment)
 	if err != nil {
 		return err
@@ -159,6 +152,8 @@ func (a Authority) bound(op *operation, id string) error {
 	}
 	return nil
 }
+
+// Resolve rechecks a retained composition under the caller's held home lock.
 func (a Authority) Resolve(ctx context.Context, held managerlock.Held, ref, sha256 string) (Composition, error) {
 	if err := ctx.Err(); err != nil {
 		return Composition{}, err
@@ -189,7 +184,7 @@ func (a Authority) resolve(ctx context.Context, op *operation, ref, hash string)
 	if err != nil {
 		return Composition{}, fail("project_context_unreadable", "composition record unavailable")
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	b, _, err := read(root, hash+".json", MaxRecord)
 	if err != nil {
 		return Composition{}, fail("project_context_unreadable", "composition record unavailable")
@@ -227,6 +222,8 @@ func (a Authority) resolve(ctx context.Context, op *operation, ref, hash string)
 	}
 	return compositionOf(plan), nil
 }
+
+// Authorize rechecks current principal authority and the complete composition.
 func (a Authority) Authorize(ctx context.Context, held managerlock.Held, c Composition, ownerRef string) error {
 	if err := ctx.Err(); err != nil {
 		return err

@@ -14,44 +14,54 @@ import (
 // CompositionRecord is the closed project-composition/1 wire record. The
 // selected profile lock remains immutable; derived details are supporting data.
 type CompositionRecord struct {
-	Kind                  string                `json:"kind"`
-	RegistrationRef       string                `json:"registration_ref"`
-	RegistrationSHA256    string                `json:"registration_sha256"`
-	GenerationSHA256      string                `json:"generation_sha256"`
-	Profile               Profile               `json:"profile"`
-	Environment           string                `json:"environment"`
-	Mode                  string                `json:"mode"`
-	AdapterRef            string                `json:"adapter_ref"`
-	AdapterSHA256         string                `json:"adapter_sha256"`
-	PolicyRef             string                `json:"policy_ref"`
-	PolicySHA256          string                `json:"policy_sha256"`
-	Memory                string                `json:"memory"`
-	HomeRef               string                `json:"home_ref"`
-	WorktreeRef           string                `json:"worktree_ref"`
-	MaterializationSHA256 string                `json:"materialization_sha256"`
-	CommandOwners         []CommandOwner        `json:"command_owners"`
-	Omitted               []CompositionOmission `json:"omitted"`
+	Kind                  string                    `json:"kind"`
+	RegistrationRef       string                    `json:"registration_ref"`
+	RegistrationSHA256    string                    `json:"registration_sha256"`
+	GenerationSHA256      string                    `json:"generation_sha256"`
+	Profile               Profile                   `json:"profile"`
+	Environment           string                    `json:"environment"`
+	Mode                  string                    `json:"mode"`
+	AdapterRef            string                    `json:"adapter_ref"`
+	AdapterSHA256         string                    `json:"adapter_sha256"`
+	PolicyRef             string                    `json:"policy_ref"`
+	PolicySHA256          string                    `json:"policy_sha256"`
+	Memory                string                    `json:"memory"`
+	HomeRef               string                    `json:"home_ref"`
+	WorktreeRef           string                    `json:"worktree_ref"`
+	MaterializationSHA256 string                    `json:"materialization_sha256"`
+	CommandOwners         []CompositionCommandOwner `json:"command_owners"`
+	Omitted               []CompositionOmission     `json:"omitted"`
 }
-type CommandOwner struct {
+
+// CompositionCommandOwner binds a command to its complete audited artifact.
+type CompositionCommandOwner struct {
 	Name           string `json:"name"`
 	ItemID         string `json:"item_id"`
 	ArtifactSHA256 string `json:"artifact_sha256"`
 }
+
+// CompositionOmission records a disabled or unsupported selected item.
 type CompositionOmission struct {
 	ItemID string `json:"item_id"`
 	Reason string `json:"reason"`
 }
+
+// GenerationItem binds an admitted item to its approval and content.
 type GenerationItem struct {
 	ItemID      string `json:"item_id"`
 	ItemSHA256  string `json:"item_sha256"`
 	ApprovalRef string `json:"approval_ref"`
 }
+
+// Generation identifies the exact admitted project item sequence.
 type Generation struct {
 	Kind               string           `json:"kind"`
 	RegistrationRef    string           `json:"registration_ref"`
 	RegistrationSHA256 string           `json:"registration_sha256"`
 	Items              []GenerationItem `json:"items"`
 }
+
+// AdapterContract describes the explicit provider release and supported surfaces.
 type AdapterContract struct {
 	Kind            string   `json:"kind"`
 	Environment     string   `json:"environment"`
@@ -60,6 +70,8 @@ type AdapterContract struct {
 	Surfaces        []string `json:"surfaces"`
 	Modes           []string `json:"modes"`
 }
+
+// MaterializationReceipt binds generated file identities to adapter and policy inputs.
 type MaterializationReceipt struct {
 	Version       int    `json:"version"`
 	Files         []File `json:"files"`
@@ -75,6 +87,8 @@ type CompositionPolicy struct {
 	Memory  string                       `json:"memory"`
 	System  contextmaterialize.Admission `json:"system"`
 }
+
+// ComposeRequest selects protected inputs for one derived composition.
 type ComposeRequest struct {
 	CheckoutID      string
 	Mode            string
@@ -90,6 +104,8 @@ type Surface struct {
 	Size   int64  `json:"size"`
 	Mode   uint32 `json:"mode"`
 }
+
+// Composition is the protected projection consumed by the lease authority.
 type Composition struct {
 	Ref             string             `json:"ref"`
 	SHA256          string             `json:"sha256"`
@@ -102,6 +118,8 @@ type Composition struct {
 	RuntimeEntries  []string           `json:"runtime_entries"`
 	Generated       map[string]Surface `json:"generated"`
 }
+
+// CompositionPreview retains the derived records and in-memory output bytes.
 type CompositionPreview struct {
 	Record       CompositionRecord
 	Generation   Generation
@@ -116,6 +134,8 @@ type CompositionPreview struct {
 	Ref                    string
 	SHA256                 string
 }
+
+// OrderedModule records one module in effective rendering order.
 type OrderedModule struct {
 	ItemID  string
 	Package string
@@ -123,6 +143,8 @@ type OrderedModule struct {
 	Class   string
 	SHA256  string
 }
+
+// EffectiveSkill identifies the audited skill selected from either layer.
 type EffectiveSkill struct {
 	Layer          string
 	Name           string
