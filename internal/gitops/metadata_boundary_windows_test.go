@@ -13,16 +13,20 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Regular and isolated clones admit the adjacent supported roots and refuse
+// Regular/isolated clones and fresh exact-commit fetches admit the adjacent supported roots and refuse
 // the next UTF-16 unit before invoking Git or creating even a cache parent.
 // Unicode and relative spellings must obey the same expanded absolute bound.
 func TestWindowsCloneMetadataBoundary(t *testing.T) {
 	src := makeRepo(t)
+	commit := gitRun(t, src, "rev-parse", "v1^{commit}")
 	for _, lane := range []struct {
 		name  string
 		clone func(string, string) error
 	}{
 		{"regular", Clone}, {"isolated", CloneIsolated},
+		{"exact-commit", func(source, destination string) error {
+			return FetchCommitFromURLIsolated(destination, fileURL(t, source), commit)
+		}},
 	} {
 		t.Run(lane.name, func(t *testing.T) {
 			for _, tc := range []struct {
@@ -66,6 +70,20 @@ func TestWindowsCloneMetadataBoundary(t *testing.T) {
 					}
 					if err != nil {
 						t.Fatal(err)
+					}
+					if lane.name == "exact-commit" {
+						// Reuse the freshly initialized cache through every existing-
+						// repository fetch entry; none may reselect the locked object.
+						gitRun(t, dest, "remote", "add", "origin", fileURL(t, src))
+						if err := FetchCommitIsolated(dest, commit); err != nil {
+							t.Fatal(err)
+						}
+						if err := FetchURLIsolated(dest, fileURL(t, src)); err != nil {
+							t.Fatal(err)
+						}
+						if err := FetchIsolated(dest); err != nil {
+							t.Fatal(err)
+						}
 					}
 					if err := Fetch(dest); err != nil {
 						t.Fatal(err)
@@ -180,6 +198,37 @@ func TestWindowsCloneMetadataJunctions(t *testing.T) {
 			}
 			if entries, err := os.ReadDir(target); err != nil || len(entries) != 1 {
 				t.Fatalf("junction check wrote paths: %v %v", entries, err)
+			}
+		})
+	}
+}
+
+// The admission applies to new caches only. Every existing-repository fetch
+// entry still works at root 134 when its actual metadata fits Git's limit;
+// Curator neither relocates nor rejects that pre-existing checkout.
+func TestWindowsExistingCacheMetadataExemption(t *testing.T) {
+	src := makeRepo(t)
+	commit := gitRun(t, src, "rev-parse", "v1^{commit}")
+	base := cloneTestRoot(t)
+	repo := filepath.Join(base, strings.Repeat("e", 134-utf16PathLength(base)-1))
+	gitRun(t, base, "-c", "core.longpaths=true", "clone", "--", src, repo)
+	for _, lane := range []struct {
+		name  string
+		fetch func() error
+	}{
+		{"regular", func() error { return Fetch(repo) }},
+		{"isolated", func() error { return FetchIsolated(repo) }},
+		{"url", func() error { return FetchURLIsolated(repo, fileURL(t, src)) }},
+		{"commit", func() error { return FetchCommitIsolated(repo, commit) }},
+		{"commit-url", func() error { return FetchCommitFromURLIsolated(repo, fileURL(t, src), commit) }},
+	} {
+		t.Run(lane.name, func(t *testing.T) {
+			if err := lane.fetch(); err != nil {
+				t.Fatalf("existing cache unexpectedly subject to new-root admission: %v", err)
+			}
+			ref, err := Resolve(repo, "tag", "v1")
+			if err != nil || ref.Commit != commit {
+				t.Fatalf("existing locked object changed: %+v %v", ref, err)
 			}
 		})
 	}

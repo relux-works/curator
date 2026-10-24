@@ -720,9 +720,15 @@ func fetchLockedCommitFromDeclaredSource(cfg *config.Config, projectRoot string,
 		if !ok {
 			return "", fmt.Errorf("source_selection_invalid: replay endpoint %d is malformed", index+1)
 		}
-		if err := gitops.FetchCommitFromURLIsolated(repo, target, member.Package.Commit.Hex); err == nil {
+		err := gitops.FetchCommitFromURLIsolated(repo, target, member.Package.Commit.Hex)
+		if err == nil {
 			return repo, nil
-		} else if index+1 < len(resolution.Attempts) && buildrepo.AllowSecondAttempt(resolution.Fallback, buildrepo.ClassifyFetchOutput(err.Error())) {
+		}
+		var refusal *gitops.MetadataPathError
+		if errors.As(err, &refusal) {
+			return "", err
+		}
+		if index+1 < len(resolution.Attempts) && buildrepo.AllowSecondAttempt(resolution.Fallback, buildrepo.ClassifyFetchOutput(err.Error())) {
 			continue
 		}
 		break

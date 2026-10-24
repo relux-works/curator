@@ -17,6 +17,7 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -271,6 +272,10 @@ func fetchDraftRepoAllowingFallback(repoDir string, resolution config.Resolution
 		cloneErr := gitops.CloneIsolated(targets[index], repoDir)
 		if cloneErr == nil {
 			return nil
+		}
+		var refusal *gitops.MetadataPathError
+		if errors.As(cloneErr, &refusal) {
+			return cloneErr
 		}
 		class := buildrepo.ClassifyFetchOutput(stripCloneFraming(gitFailureDetail(cloneErr)))
 		classes = append(classes, class)

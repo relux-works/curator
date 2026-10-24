@@ -1,6 +1,6 @@
 # Windows Git metadata paths
 
-New Git clones on Windows require a projected metadata path of at most **259
+New Git clones and fresh exact-commit replay caches on Windows require a projected metadata path of at most **259
 UTF-16 code units**, excluding the terminating NUL. Curator computes this before
 creating the destination or its cache parents. It expands existing short-name
 ancestors and resolves the absolute path, so a relative operand, an 8.3 alias or
@@ -23,9 +23,12 @@ and receive the same check. Use a short manager home rather than relying on
 The typed `git_metadata_path_too_long` refusal reports the projected metadata
 length, the measured metadata bound, the expanded root length and its root
 bound. It creates no destination, parent directory or half-cloned cache. The
-manager preserves this refusal through `profile_source_invalid`; unrelated
-existing home files remain unchanged. Existing caches are not relocated or
-removed by this check. Other Git errors still use the existing clone cleanup.
+manager preserves this refusal through `profile_source_invalid`. Draft source
+resolve/refresh and fresh locked-source replay preserve the typed refusal
+before endpoint fallback, temporary Git configuration or cache initialization; unrelated
+existing home files remain unchanged. Existing caches are not relocated, refused by this new-root check or
+removed. Ordinary, isolated, explicit-URL and locked-commit fetches that require
+an existing repository keep their existing behavior. Other Git errors still use the existing clone cleanup.
 
 The measurement uses real Git clone, fetch and exact object reads with a
 disabled ambient long-path setting and enabled process/local settings. On Git
@@ -50,6 +53,7 @@ invariant. Run:
 ```sh
 env -u GIT_DIR -u GIT_WORK_TREE go test -count=1 -v ./internal/gitops ./internal/testgitenv
 env -u GIT_DIR -u GIT_WORK_TREE go test -count=1 -v ./internal/envprofile -run 'Test(WindowsMCPMetadataRootRefusal|MCPWindowsNarrowingControls)$'
+env -u GIT_DIR -u GIT_WORK_TREE go test -count=1 -v ./internal/install ./cmd/curator -run '^TestWindows(SourceReplay|DraftAcquisition)MetadataBoundary$'
 ```
 
 Keep logs and bounded overlay controls in task-scoped `.temp/`; hosted Test

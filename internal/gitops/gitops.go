@@ -463,6 +463,11 @@ func FetchCommitFromURLIsolated(repo, remoteURL, commit string) error {
 		if !os.IsNotExist(err) {
 			return err
 		}
+		// A missing exact-commit cache has the same metadata layout as a
+		// clone. Admit it before parents or isolated configuration are written.
+		if err := CheckCloneDestination(repo); err != nil {
+			return err
+		}
 		if err := os.MkdirAll(filepath.Dir(repo), 0o755); err != nil {
 			return err
 		}
