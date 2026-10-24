@@ -13,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/projectmcpstate"
 )
 
@@ -47,6 +48,11 @@ func mcpCLISetup(t *testing.T, server map[string]any) (string, string, string) {
 	t.Helper()
 	root := t.TempDir()
 	cfg, project := setupCLIProject(t, root)
+	for _, dir := range []string{filepath.Dir(cfg), project} {
+		if err := privatedir.ProtectTree(dir); err != nil {
+			t.Fatal(err)
+		}
+	}
 	repo := filepath.Join(root, "package")
 	if err := os.MkdirAll(repo, 0700); err != nil {
 		t.Fatal(err)
@@ -262,7 +268,7 @@ func TestProjectMCPMalformedSiblingReporting(t *testing.T) {
 	// manager bytes and every project entry must retain the post-plant state.
 	after := snapshotHelpTree(t, filepath.Dir(cfg))
 	for name, value := range after {
-		if name == "." || name == "state" || name == "state/locks" || strings.HasPrefix(name, "state/locks/") {
+		if name == "." || name == "state" || name == filepath.Join("state", "locks") || strings.HasPrefix(name, filepath.Join("state", "locks")+string(filepath.Separator)) {
 			continue
 		}
 		if before[name] != value {

@@ -11,6 +11,7 @@ import (
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/contextstore"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/projectmcp"
 	"github.com/relux-works/curator/internal/projectmcpstate"
 	"github.com/relux-works/curator/internal/sourcelock"
@@ -139,6 +140,11 @@ func lockedProjectMCP(t *testing.T, policy Policy, signedTag bool) (string, stri
 	t.Helper()
 	ids := newGitIdentities(t)
 	home, root := t.TempDir(), t.TempDir()
+	for _, dir := range []string{home, root} {
+		if err := privatedir.Protect(dir); err != nil {
+			t.Fatal(err)
+		}
+	}
 	repo := gitRepo(t, map[string]string{"agent-mcp.json": `{"schema_version":1,"name":"tool","version":"1.0.0","server":{"transport":"stdio","command":"npx","args":["tool@1.0.0"],"environments":["codex_cli","muse"]}}`}, "v1.0.0")
 	if signedTag {
 		key, pub := statusSignerKey(t)

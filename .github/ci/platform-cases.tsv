@@ -41,38 +41,38 @@
 #
 # package	test	must_run_on	skip_allowed_on	class	behaviour
 
-# ===========================================================================
+# ====================================================================
 # Windows DACL / security descriptor
-# ===========================================================================
+# ====================================================================
 internal/buildcache	TestWindowsProtectedStateMatrix	windows	-	-	Windows DACL protected-state matrix for the build cache
 internal/buildcache	TestWindowsProtectedStateMatrix/*	-	windows	host-capability	a subtest needing a Windows symlink may skip where the host forbids it; the matrix itself must still pass
 internal/buildcache	TestValidateWindowsSecurityPolicy	windows	-	-	validates the Windows security-descriptor policy on cache state
 
-# ===========================================================================
+# ====================================================================
 # Windows reparse points
-# ===========================================================================
+# ====================================================================
 internal/buildcache	TestSweepDoesNotFollowAReparsedEntry	windows	windows	host-capability	cache sweep refuses to traverse a reparse point inside an entry
 internal/buildcache	TestSweepDoesNotFollowAReparsedCacheRoot	windows	windows	host-capability	cache sweep refuses to traverse a reparsed cache root
 internal/scopes	TestCollectStaysFailSafeOnRedirectedWindowsScopes	windows	windows	host-capability	GC stays fail-safe when a Windows scope is redirected by a reparse point
 
-# ===========================================================================
+# ====================================================================
 # Windows `.cmd` launchers
-# ===========================================================================
+# ====================================================================
 internal/runtimestore	TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode	windows	-	-	the installed `.cmd` wrapper forwards arguments, PATH and exit code through cmd.exe
 internal/runtimestore	TestInstallSingleCommandAndShims	linux,darwin,windows	-	-	writes the `run.cmd` Windows launcher and asserts its `@echo off` payload
 internal/runtimestore	TestRuntimeCommandPath	linux,darwin,windows	-	-	maps a `tool.cmd` Windows launcher back to its command name
 internal/runtimestore	TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly	linux,darwin	windows	platform-control	compiled shims stage without launching, then forward exactly (POSIX post-install fixture)
 
-# ===========================================================================
+# ====================================================================
 # Unix ownership and permission
-# ===========================================================================
+# ====================================================================
 internal/buildcache	TestUnixProtectedStateMatrix	linux,darwin	-	-	unix ownership and mode matrix for protected cache state
 internal/buildcache	TestUnixProtectionHelperFailuresFailClosed	linux,darwin	-	-	unix protection helpers fail closed rather than degrading the boundary
 internal/config	TestBootstrapAndAddProject	linux,darwin,windows	-	-	asserts the manager config is written with private (0o600) ownership bits on unix
 
-# ===========================================================================
+# ====================================================================
 # Profile source paths: absence and read failures stay distinct
-# ===========================================================================
+# ====================================================================
 cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/missing_operand	linux,darwin,windows	-	-	a missing profile source operand reports profile_source_path_missing only
 cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/unreadable_root	linux,darwin	windows	platform-control	the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account
 cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/unreadable_module_directory	linux,darwin	windows	platform-control	the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account
@@ -84,9 +84,9 @@ internal/snapshot	TestFrozenSnapshotReadersRefuseBlockedParents	linux,darwin,win
 internal/install	TestDraftReplayRefusesUnreadableGitSnapshotCache	linux,darwin,windows	-	-	production install refuses an unreadable Git snapshot cache parent before declared-source replay
 internal/install	TestDraftInstallRefusesUnreadableLocalSnapshotCache	linux,darwin,windows	-	-	production install refuses an unreadable local snapshot store parent before path replay
 
-# ===========================================================================
+# ====================================================================
 # No-follow: link traversal is refused, never followed
-# ===========================================================================
+# ====================================================================
 internal/buildcache	TestSweepDoesNotFollowSymlinkedEntries	linux,darwin	-	-	cache sweep refuses to traverse symlinked entries
 internal/buildcache	TestSweepDoesNotFollowASymlinkedCacheRoot	linux,darwin	-	-	cache sweep refuses to traverse a symlinked cache root
 internal/buildcache	TestRetireEntryRemovesLinksWithoutFollowingThem	linux,darwin	-	-	entry retirement removes links without following them
@@ -113,9 +113,9 @@ internal/gitops	TestExtractAdmitsDirectoryComponentFoldWhenCaseSensitive	linux	d
 internal/gitops	TestExtractRefusesFileDirectoryFold	darwin,windows	linux	host-capability	a regular file folding onto a planned directory (a/x.txt + A, Dir/x.txt + dir) is refused with the duplicate-platform-path diagnostic on a case-folding filesystem, with nothing written; a case-sensitive host has no collision to refuse
 internal/gitops	TestExtractRefusesNestedDirectoryComponentFold	darwin,windows	linux	host-capability	A/B/x + a/b/y is refused with the duplicate-platform-path diagnostic before cat-file starts on a case-folding filesystem, with nothing written; a case-sensitive host has no collision to refuse
 
-# ===========================================================================
+# ====================================================================
 # Read-only build source
-# ===========================================================================
+# ====================================================================
 internal/buildsource	TestFrozenTokenRejectsMutation	linux,darwin,windows	-	-	a frozen build source rejects mutation of the source tree
 internal/buildsource	TestFrozenTokenRejectsMutation/*	-	linux,darwin,windows	host-capability	a link-dependent subtest may skip where the host forbids symlinks
 internal/buildsource	TestFrozenTokenRejectsRootReplacement	linux,darwin,windows	-	-	a frozen build source rejects replacement of its root
@@ -124,9 +124,9 @@ internal/buildsource	TestWithValidatedOrdersCallbackAndRejectsMutation/*	-	linux
 internal/install	TestDryRunTouchesNothing	linux,darwin,windows	-	-	proves a dry run leaves the source and target trees unwritten
 internal/whitelist	TestRuntimeRootsExcludedFromContext	linux,darwin,windows	-	-	proves runtime roots stay outside the copied agent context
 
-# ===========================================================================
+# ====================================================================
 # Resource policy -- rc5-native-control-inventory-v1
-# ===========================================================================
+# ====================================================================
 internal/godriver	TestResourceLimitsStayInsideManagerBounds	darwin,windows	-	-	worker resource limits stay inside the manager's declared bounds
 internal/godriver	TestProbeSetGuardMatchesTheInventoryExactly	darwin,windows	-	-	the probed native control set matches rc5-native-control-inventory-v1 exactly
 internal/godriver	TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes	darwin,windows	-	-	every native control seam failure rejects before the worker executes
@@ -135,9 +135,9 @@ internal/godriver	TestBuildFailsClosedWhenTheGoChildCannotStart	windows	darwin	p
 internal/godriver	TestWorkerRejectsMissingPrivateJobHandle	windows	-	-	the Windows worker refuses an unbound current-job query before compiler execution
 internal/godriver	TestWorkerRejectsForeignPrivateJobHandle	windows	-	-	the Windows worker refuses a matching-limits Job Object that does not contain it
 
-# ===========================================================================
+# ====================================================================
 # Executable identity and executable behaviour
-# ===========================================================================
+# ====================================================================
 internal/godriver	TestExecutableIdentityRejectsSubstitutionAndMutation	darwin,windows	-	-	the toolchain executable identity rejects substitution and mutation
 
 # The manager resolves its own executable to the canonical installed file
@@ -180,9 +180,9 @@ internal/envfiles	TestWriteProjectShapesAndSourcing	linux,darwin,windows	-	-	sou
 internal/install	TestEndToEndInstall	linux,darwin,windows	-	-	materialises the executable shim and env files of a full install
 internal/adapters	TestSymlinkModeStagesRelativeLinkTargets	linux,darwin,windows	-	-	creates a link (Windows: a reparse point) and asserts its target stays relative
 
-# ===========================================================================
+# ====================================================================
 # Audit registry snapshot clock bound
-# ===========================================================================
+# ====================================================================
 #
 # The future-timestamp gate is wall-clock sensitive and its only observed
 # failure was on the slowest runner in the matrix (BUG-260906-1bdotx: the
@@ -208,9 +208,9 @@ internal/pathboundary	TestOpenReadNoFollowRejectsFinalSymlink	linux,darwin,windo
 internal/registry	TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew	linux,darwin,windows	-	-	the future-timestamp bound is exactly the configured skew at three sampled skews — the literal zero the e2e path uses, an arbitrary middle, and the shipped default; the gate is linear in clockSkew, so those three fix the line, and the row claims the sample rather than the unbounded set a config can express
 internal/registry	TestSnapshotZeroClockSkewIsLiteral	linux,darwin,windows	-	-	a zero clock skew is literal: no tolerance, not a fallback to the default
 
-# ===========================================================================
+# ====================================================================
 # Transaction journal and install atomicity
-# ===========================================================================
+# ====================================================================
 internal/transaction	TestValidateIndependentTargetNamespacesRejectsOverlappingPaths	linux,darwin,windows	linux,darwin,windows	host-capability	independent target namespaces reject overlapping paths (link-capability guarded)
 internal/transaction	TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves	linux,darwin,windows	linux,darwin,windows	host-capability	a namespace alias introduced between saves is rejected (link-capability guarded)
 internal/transaction	TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped	linux,darwin,windows	linux,darwin,windows	host-capability	recovery rejects target namespaces aliased while stopped (link-capability guarded)
@@ -232,9 +232,9 @@ internal/transaction	TestEntryTargetsDoNotAliasTheirDestination	linux,darwin,win
 internal/transaction	TestNamespaceIdentityIsReadOnceWithinOneValidationPass	linux,darwin,windows	-	-	one validation pass reads each declared path's identity once and answers every later pair from that snapshot
 internal/transaction	TestWindowsNamespaceIdentityIsCompletedWhenItIsTaken	windows	-	-	the pass snapshot completes the file identity Windows leaves deferred, so no comparison reads the filesystem and an unreadable one fails closed
 
-# ===========================================================================
+# ====================================================================
 # Interop / conformance consumer
-# ===========================================================================
+# ====================================================================
 internal/interop	TestGoldenContextCopy	linux,darwin,windows	-	-	the agent context copied for a skill matches the authoritative golden file list
 
 # ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ internal/interop/environments	TestConformanceEveryPathTheVectorsNameIsDeclared	l
 internal/godriver	TestCandidateGoV1SourceAwareContract	darwin,windows	darwin,windows	root-content	the go-v1 driver honours the source-aware contract published by the supplied root
 internal/godriver	TestFingerprintReportsUnreadableDirectoryIdentically	darwin,windows	-	-	a directory the host refuses to list is reported identically by both traversals (unix mode bits, Windows DACL)
 
-# ===========================================================================
+# ====================================================================
 # Compiled-build surface -- rc5-native-control-inventory-v1 carve-out
 #
 # A completed compiled command needs the go-v1 driver, which refuses before any
@@ -295,7 +295,7 @@ internal/godriver	TestFingerprintReportsUnreadableDirectoryIdentically	darwin,wi
 # Linux is the open qualification item (rc.5 qualification vector, until_task
 # TASK-260728-1skseh).  When the inventory gains a linux record, the guard stops
 # skipping there on its own and only `must_run_on` below needs widening.
-# ===========================================================================
+# ====================================================================
 cmd/curator	TestCompiledInstallFollowsTheNativeControlInventoryExactly	linux,darwin,windows	-	-	a compiled install succeeds on exactly the platforms rc5-native-control-inventory-v1 covers, and fails closed on the others
 cmd/curator	TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt	darwin,windows	linux	platform-control	the CLI build-dispatch path completes the portable go-v1 seed build before verified-provider dispatch; Linux skips because rc5-native-control-inventory-v1 defines no record for that host
 cmd/curator	TestCompiledProjectStatusAndUntrustedRecovery	darwin,windows	linux	platform-control	compiled currentness and untrusted-state repair over one real installation
@@ -308,7 +308,7 @@ cmd/curator	TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck	darwin,windo
 cmd/curator	TestGlobalStatusReportsATransitivelyResolvedCompiledCommand	darwin,windows	linux	platform-control	machine-wide status resolves a compiled command no declaration names
 cmd/curator	TestNativeBlackboxExternalBuildLifecycle	darwin,windows	linux	platform-control	the built binary installs a schema-7 external build repository command from a local substitution, runs its shim, reinstalls as a cache hit, and removes the shim and build root
 
-# ===========================================================================
+# ====================================================================
 # Protocol platform exclusion -- asserted, never merely omitted.
 #
 # The rc.5 qualification vector marks linux `excluded` (until_task
@@ -316,10 +316,10 @@ cmd/curator	TestNativeBlackboxExternalBuildLifecycle	darwin,windows	linux	platfo
 # case proves the exclusion is real fail-closed behaviour: an uncovered
 # platform is refused BEFORE the worker starts.  It is required on every
 # runner, including the one where the package is otherwise excluded.
-# ===========================================================================
+# ====================================================================
 internal/godriver	TestProbeRejectsAnUncoveredPlatformBeforeTheWorker	linux,darwin,windows	-	-	an uncovered inventory platform (including linux) is rejected before the worker starts
 
-# ===========================================================================
+# ====================================================================
 # Schema-8 suite consumption.
 #
 # Schema 8 is one shared bump carrying script-worker-v1 and first-party module
@@ -348,7 +348,7 @@ internal/godriver	TestProbeRejectsAnUncoveredPlatformBeforeTheWorker	linux,darwi
 # that serves the package refuses the skip on policy whatever the row says;
 # `internal/godriver` carries `root-content` because that case guards its own
 # read, and `root-content` is policy `allow` in every lane.
-# ===========================================================================
+# ====================================================================
 internal/skillspec	TestReleasedSchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published agent-skill-v8 and csk-skill-v8 families are loaded, and every case in them is consumed
 internal/marker	TestReadAuthoritativeMarkerV4SchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published install-marker-v4 family is read back through the marker reader
 cmd/curator	TestContextExposureDistinguishesAbsentAndUnreadableBuildRoots	linux,darwin	windows	platform-control	POSIX mode-bit unreadability proves a failed build-root metadata read
@@ -474,7 +474,7 @@ internal/config	TestSystemConfigV2SchemaCases	linux,darwin,windows	-	-	the publi
 internal/config	TestManagerConfigV2Vectors	linux,darwin,windows	-	-	the published manager-config-v2 vectors render the expected effective configuration
 internal/config	TestSystemV2LockableSubsetIsClassWide	linux,darwin,windows	-	-	the system file carries exactly the transcribed section 12.2 set class-wide: every lockable key is carriable and every non-lockable key is refused
 
-# ===========================================================================
+# ====================================================================
 # Stage (b): managed homes, fragment, and umbrella rows.
 # Every row is required on all three runners except the POSIX launcher
 # fixtures, which tolerate the registered host-capability skip on Windows.
@@ -518,10 +518,10 @@ cmd/curator	TestUmbrellaProviderResolutionVectors	linux,darwin,windows	linux,dar
 cmd/curator	TestCuratorStatusProviderPostureAndCheck	linux,darwin,windows	-	-	curator status reports provider paths and trust verdicts, and --check fails for missing provider rows
 
 # Opt-in developer probe -- never required, always tolerated.
-# ===========================================================================
+# ====================================================================
 internal/hashing	TestCrossCheckTree	-	linux,darwin,windows	opt-in	cross-implementation tree digest probe, enabled by an explicit developer env var
 
-# ===========================================================================
+# ====================================================================
 # Stage (c): composition, the path kind, onboarding takeover, and import rows.
 # Hermetic fixtures only: every row is required on all three runners.
 internal/config	TestPathOverlayDeclarationParses	linux,darwin,windows	-	-	a path overlay parses with no requirement form at all, in every path spelling the landed discriminator admits (absolute, relative, colon-in-a-later-segment, and all four Windows drive spellings)
@@ -625,7 +625,7 @@ cmd/curator	TestEnvStatusReportsLockedRequire	linux,darwin,windows	-	-	env statu
 cmd/curator	TestProductionBinaryDispatchesNetNSProbe	linux	darwin,windows	platform-control	the hidden network-isolation probe mode dispatches before launcher dispatch and exits 0 on the Linux lane
 cmd/curator	TestProductionBinaryDispatchesLandlockProbe	linux,darwin,windows	-	-	the hidden Landlock probe mode dispatches before launcher dispatch and answers the probe silently
 
-# ===========================================================================
+# ====================================================================
 # Real-pnpm integration (BUG-260916-2f3xbf landed)
 #
 # The pnpm pin (TASK-260916-5aqozl) installs pnpm 10.33.0 in every suite lane
@@ -637,11 +637,11 @@ cmd/curator	TestProductionBinaryDispatchesLandlockProbe	linux,darwin,windows	-	-
 # Any skip of either case, on any runner, is fatal. The third case
 # (TestRealPinnedPNPMTargetPrunedUnreachableRejectsBeforeInstall) passes on all
 # three runners and carries no row.
-# ===========================================================================
+# ====================================================================
 internal/pnpmsource	TestRealPinnedPNPMLockSupersetSnapshotDependencies	linux,darwin,windows	-	-	pinned-pnpm lock-superset case executes against the pinned pnpm on every runner, including the Windows junction spelling of the store registry
 internal/pnpmsource	TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization	linux,darwin,windows	-	-	pinned-pnpm private-store and offline-materialization case executes against the pinned pnpm on every runner, including the Windows junction spelling of the store registry
 
-# ===========================================================================
+# ====================================================================
 # Pinned-Rust production cases (TASK-260916-vygif0)
 #
 # The rust pin (rust-toolchain.toml plus .github/ci/install-rust-toolchain.sh)
@@ -655,11 +655,11 @@ internal/pnpmsource	TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization	linu
 # class. A skip of either case on darwin, or for any other reason on any
 # runner, is fatal. If the registry ever approves a linux or windows
 # descriptor, widen must_run_on to cover it.
-# ===========================================================================
+# ====================================================================
 internal/rustsource	TestProductionManagerCapturesRegistryFromRawPaths	darwin	linux,windows	host-capability	pinned-Rust registry capture executes on darwin; linux/windows have no operator-approved Cargo descriptor, so the host-capability absence skip is tolerated there
 internal/rustsource	TestProductionManagerCapturesGitWithoutCallerProjection	darwin	linux,windows	host-capability	pinned-Rust Git capture executes on darwin; linux/windows have no operator-approved Cargo descriptor, so the host-capability absence skip is tolerated there
 
-# ===========================================================================
+# ====================================================================
 # Script-worker-v1 runtime conformance qualification (TASK-260916-2ok97n)
 #
 # These rows bind the R5 section/case-to-production map to tests that really
@@ -668,7 +668,7 @@ internal/rustsource	TestProductionManagerCapturesGitWithoutCallerProjection	darw
 # require their native runner; no platform-specific control gets a new skip
 # class. The real Windows interpreter row requires both python.exe and
 # node.exe from windows-latest and a manager-resolved cmd.exe exec.
-# ===========================================================================
+# ====================================================================
 internal/scriptpolicy	TestScriptHostExecutionPolicyProductionConsumersCoverAllCases	linux,darwin,windows	linux,darwin,windows	root-unset	the pinned script-worker vector has exactly 33 named cases mapped to registered production-entry rows and all 11 mandatory controls have ledger consumers
 internal/scriptworker	TestScriptWorkerRechecksInterpreterBeforeExec	linux,darwin,windows	-	-	a worker refuses an interpreter replaced after acceptance and before permit, before the interpreter runs
 internal/scriptworker	TestScriptWorkerBindsStandardInput	linux,darwin,windows	-	-	the worker binds a payload explicitly and maps an absent payload to the null device
@@ -709,7 +709,7 @@ cmd/curator	TestEnvUnmanageTakeoverPreservesFileMode	linux,darwin	-	-	CLI instal
 internal/envprofile	TestUnmanageRestorePlanRetainsMetadata	linux,darwin	-	-	restore plan retains each supported backup entry's type, mode and bytes
 internal/envprofile	TestUnmanageRestoreRefusesLinkedParent	linux,darwin	-	-	production Unmanage refuses a linked restore parent before changing external context
 
-# ===========================================================================
+# ====================================================================
 # Decision 0017 credential-link repairs and explicit migration (F-C1/F-C2/F-C3).
 #
 # Production-entry rows on temporary stores: the two 0017 hazards, the
@@ -723,7 +723,7 @@ internal/envprofile	TestUnmanageRestoreRefusesLinkedParent	linux,darwin	-	-	prod
 # are the arbiter and every row is required on all of them. The four
 # ENOTDIR inspection rows are unix-only: Windows maps a stat through a
 # file to path-not-found, so the artefact is unproducible there.
-# ===========================================================================
+# ====================================================================
 internal/envprofile	TestSharedToIsolatedRemovesStaleLink	linux,darwin,windows	windows	host-capability	repair refuses the stale shared link pointing at migration, which unlinks it with native bytes intact
 internal/envprofile	TestCredentialLinkRegularFileRefuses	linux,darwin,windows	windows	host-capability	a regular file at a link path refuses with environment_credential_conflict naming the path, bytes intact
 internal/envprofile	TestStaleCredentialLinkRefusals	linux,darwin,windows	windows	host-capability	a file, foreign link, or directory at a stale link path refuses with environment_credential_conflict, removing nothing
@@ -772,16 +772,16 @@ cmd/curator	TestEnvMigratePrintBeforeWrite	linux,darwin,windows	windows	host-cap
 cmd/curator	TestEnvResolveCredentialRecordIsolatedKeychain	darwin	linux,windows	platform-control	isolated Claude credential records omit path on the supported macOS Keychain backend
 cmd/curator	TestEnvResolveRepairFailedOnUninspectable	linux,darwin	windows	host-capability	env resolve --repair surfaces environment_repair_failed for an uninspectable target through the CLI
 
-# ===========================================================================
+# ====================================================================
 
 
-# ===========================================================================
+# ====================================================================
 # State-reader seam on trunk refresh readers (TASK-260922-cww1ov)
 #
 # These rows drive the R5 sidecar and shim inventory readers plus schema-9
 # locked checkout replay. The blocked-parent shape is portable across all
 # hosted lanes; missing leaves still take only their documented absence path.
-# ===========================================================================
+# ====================================================================
 internal/stateread	TestReadsDistinguishAbsentFromBlockedParent	linux,darwin,windows	-	-	a missing leaf is absent, while file/directory/metadata reads below a regular-file ancestor are typed unreadable
 internal/scriptworker	TestLoadShimSidecarRefusesUnreadablePath	linux,darwin,windows	-	-	loading an enforced sidecar below a regular-file ancestor refuses with manager_state_unreadable
 cmd/curator	TestEnforcedShimDispatchRefusesUnreadableSidecar	linux,darwin,windows	-	-	main executable dispatch refuses unreadable sidecar state instead of falling through to ordinary CLI dispatch
@@ -881,3 +881,9 @@ internal/envprofile	TestGlobalNativeOwnershipNarrowingControls/omit-parent-mode-
 internal/envprofile	TestGlobalNativeOwnershipNarrowingControls/omit-timeout-child-stacks	linux,darwin	windows	platform-control	removing SIGQUIT loses the owned child stack and fails the timeout diagnostic control; signal diagnostics use the Unix fixture
 internal/envprofile	TestGlobalNativeOwnershipNarrowingControls/ignore-timeout-process-identity	linux,darwin	windows	platform-control	removing the recorded start identity check fails the stale PID cleanup witness; the diagnostic fixture uses Unix signals
 internal/envprofile	TestGlobalNativeOwnershipNarrowingControls/omit-timeout-failure-verdict	linux,darwin	windows	platform-control	removing the watchdog failure verdict fails the real blocked-child subprocess control; signal diagnostics use the Unix fixture
+
+# MCP fixture privacy and Windows cache-path regressions.
+internal/envprofile	TestProfileMCPPrivateFixtureBoundary	linux,darwin,windows	-	-	private fixtures install on both native adapters; broadened home and managed-home mutation rights refuse without payload changes or permission repair
+internal/envprofile	TestProfileMCPExecutableQualificationInert	linux,darwin,windows	-	-	executable byte qualification never executes its input; an explicitly invoked portable tripwire proves the observation instrument
+internal/envprofile	TestMCPSignedTagFixturesWithoutAmbientIdentity	linux,darwin,windows	-	-	empty ambient Git identity cannot hide missing fixture author or committer settings; all three signed-tag fixtures reach their strict assertions
+internal/gitops	TestCloneLongDestination	linux,darwin,windows	-	-	clone enables persistent cache long-path support before index-pack; fetch, exact ref resolution and payload extraction work beyond MAX_PATH while suspicious URLs leave no destination

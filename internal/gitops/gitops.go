@@ -276,7 +276,9 @@ func cloneWith(remoteURL, destination string, runFn func(dir string, args ...str
 	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
 		return err
 	}
-	if _, err := runFn("", "clone", "--", trimmed, destination); err != nil {
+	// Git for Windows otherwise fails on pack paths below deep cache roots.
+	// Clone --config applies before checkout and persists for later fetches.
+	if _, err := runFn("", "clone", "--config", "core.longpaths=true", "--", trimmed, destination); err != nil {
 		_ = os.RemoveAll(destination)
 		return fmt.Errorf("git clone failed for %s -> %s: %w", remoteURL, destination, err)
 	}
