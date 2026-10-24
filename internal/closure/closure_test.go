@@ -13,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/devsub"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/skillspec"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 // harness builds skill repositories under a skills root and a machine home.
@@ -24,7 +25,7 @@ type harness struct {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	return &harness{t: t, skillsRoot: t.TempDir(), home: t.TempDir()}
+	return &harness{t: t, skillsRoot: testgitenv.ShortTempDir(t), home: testgitenv.ShortTempDir(t)}
 }
 
 func (h *harness) git(dir string, args ...string) string {
@@ -552,7 +553,7 @@ func TestScratchResolutionLeavesPersistentRootsAbsent(t *testing.T) {
 	root := t.TempDir()
 	skillsRoot := filepath.Join(root, "missing-skills")
 	home := filepath.Join(root, "missing-home")
-	scratch := t.TempDir()
+	scratch := testgitenv.ShortTempDir(t)
 
 	nodes, err := Build(Options{
 		SkillsRoot:  skillsRoot,
@@ -636,7 +637,7 @@ func TestScratchSnapshotRefusalLeavesNoReusablePartialTree(t *testing.T) {
 	goodTree := h.gitStdin(repo, "100644 blob "+blob+"\tSKILL.md\x00", "mktree", "-z")
 	good := h.git(repo, "commit-tree", goodTree, "-m", "good")
 
-	scratch := t.TempDir()
+	scratch := testgitenv.ShortTempDir(t)
 	opts := Options{ScratchRoot: scratch}
 	if _, err := snapshotFor(opts, "src", repo, bad); err == nil || !strings.Contains(err.Error(), "links in git snapshots are unsupported") {
 		t.Fatalf("err = %v, want link refusal", err)

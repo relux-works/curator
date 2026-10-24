@@ -292,7 +292,7 @@ jobs:
         run: >-
           env -u GIT_DIR -u GIT_WORK_TREE go test -count=1 -timeout=10m
           ./internal/envprofile ./cmd/curator
-          -run '^(TestWindowsMCPMetadataRootRefusal|TestMCPWindowsNarrowingControls|TestProfileMCP.*|TestProjectMCP.*)$'
+          -run '^(TestWindowsMCPMetadataRootRefusal|TestMCPWindowsNarrowingControls|TestProfileMCP.*|TestProjectMCP.*|TestProjectRefreshGitBranchMembershipChangeThroughCLI)$'
 
       # Runs the planned package set and enforces .github/ci/platform-cases.tsv:
       # the Windows runner must execute the DACL, reparse-point and `.cmd`

@@ -27,6 +27,7 @@ import (
 	"github.com/relux-works/curator/internal/gitcred"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 const (
@@ -67,7 +68,7 @@ func setupDraftCLI(t *testing.T) *draftCLIFixture {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not available")
 	}
-	fixture := &draftCLIFixture{t: t, root: t.TempDir(), origPath: os.Getenv("PATH")}
+	fixture := &draftCLIFixture{t: t, root: testgitenv.ShortTempDir(t), origPath: os.Getenv("PATH")}
 	skillsRoot := filepath.Join(fixture.root, "skills")
 	project := filepath.Join(fixture.root, "project")
 	fixture.configPath = filepath.Join(fixture.root, "home", "config.json")

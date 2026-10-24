@@ -16,6 +16,7 @@ import (
 	manifestpkg "github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/runtimestore"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 type env struct {
@@ -28,7 +29,7 @@ type env struct {
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
-	e := &env{t: t, skillsRoot: t.TempDir(), home: t.TempDir(), project: t.TempDir()}
+	e := &env{t: t, skillsRoot: testgitenv.ShortTempDir(t), home: testgitenv.ShortTempDir(t), project: t.TempDir()}
 	e.git(e.project, "init", "-q")
 	e.cfg = &config.Config{
 		Path:          filepath.Join(e.home, "config.json"),

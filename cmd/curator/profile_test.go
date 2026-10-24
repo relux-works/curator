@@ -11,13 +11,14 @@ import (
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/pathboundary"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 // These tests drive the production run() entry point for the profile rows.
 
 func profileHome(t *testing.T) (stubConfigSource, string) {
 	t.Helper()
-	home := t.TempDir()
+	home := testgitenv.ShortTempDir(t)
 	source := stubConfigSource{
 		path: filepath.Join(home, "config.json"),
 		cfg:  &config.Config{Path: filepath.Join(home, "config.json")},
