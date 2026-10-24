@@ -90,13 +90,18 @@ func startNativeCommand(t *testing.T, fixture nativeGlobalFixture, args ...strin
 }
 func (child *nativeCommand) wait(t *testing.T) {
 	t.Helper()
+	child.waitWithin(t, 40*time.Second)
+}
+
+func (child *nativeCommand) waitWithin(t *testing.T, timeout time.Duration) {
+	t.Helper()
 	select {
 	case err := <-child.done:
 		child.finished = true
 		if err != nil {
 			t.Fatalf("production CLI failed: %v\n%s", err, child.output.String())
 		}
-	case <-time.After(40 * time.Second):
+	case <-time.After(timeout):
 		t.Fatal(child.timeoutDiagnostic())
 	}
 }
