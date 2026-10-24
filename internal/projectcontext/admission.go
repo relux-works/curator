@@ -426,6 +426,9 @@ func (s Store) Admitted(id string, selections []Selection) (result Admitted, res
 		return Admitted{}, err
 	}
 	defer op.close()
+	return op.admitted(id, selections)
+}
+func (op *operation) admitted(id string, selections []Selection) (Admitted, error) {
 	r, err := op.registered(id)
 	if err != nil {
 		return Admitted{}, err

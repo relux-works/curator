@@ -1,5 +1,6 @@
 // Package projectcontext owns CIP-0002 project registrations and inert item
-// admission. It does not compose profiles, create leases, or launch providers.
+// admission, plus derived compositions over immutable selected profile locks.
+// It creates no leases and launches no providers.
 // Admitted root context is additive: the composition consumer must append it
 // after the selected profile document, never replace that document.
 package projectcontext
@@ -49,6 +50,7 @@ type Registration struct {
 	RootIdentity string  `json:"root_identity"`
 	Profile      Profile `json:"profile"`
 	Environment  string  `json:"environment"`
+	Mode         string  `json:"mode"`
 	HomeRef      string  `json:"home_ref"`
 	WorktreeRef  string  `json:"worktree_ref"`
 }
@@ -209,6 +211,8 @@ type Discovery struct {
 type Inspection struct {
 	Registration Registration `json:"registration"`
 	Mode         string       `json:"mode"`
+	Admission    string       `json:"admission"`
+	Notice       string       `json:"notice,omitempty"`
 	Memory       string       `json:"memory"`
 	Rendering    string       `json:"rendering"`
 	Candidates   []Discovery  `json:"candidates"`
