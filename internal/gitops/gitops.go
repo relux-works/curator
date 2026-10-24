@@ -279,12 +279,12 @@ func Clone(remoteURL, destination string) error {
 // no proxy environment, and the curator-owned ssh command with an empty ssh
 // config), independent of HOME.
 func CloneIsolated(remoteURL, destination string) error {
-	env, cleanup, err := isolatedGitEnv()
-	if err != nil {
-		return err
-	}
-	defer cleanup()
 	return cloneWith(remoteURL, destination, func(dir string, args ...string) (string, error) {
+		env, cleanup, err := isolatedGitEnv()
+		if err != nil {
+			return "", err
+		}
+		defer cleanup()
 		return runWithEnv(dir, env, withIsolatedConfigArgs(args)...)
 	})
 }
@@ -296,6 +296,9 @@ func cloneWith(remoteURL, destination string, runFn func(dir string, args ...str
 	}
 	if _, err := os.Stat(destination); err == nil {
 		return fmt.Errorf("clone destination already exists: %s", destination)
+	}
+	if err := CheckCloneDestination(destination); err != nil {
+		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
 		return err

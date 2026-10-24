@@ -49,7 +49,7 @@ func TestCanonicalIdentityUnifiesSpellings(t *testing.T) {
 	const want = "example.com/acme"
 	var hashes []string
 	for index, operand := range operands {
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		pinHomes(t)
 		info, _, _, err := Install(home, InstallOptions{Operand: operand})
 		if err != nil {
@@ -101,7 +101,7 @@ func TestCanonicalIdentityUnifiesSpellings(t *testing.T) {
 // malformed network source (explicit port) is rejected with
 // profile_source_invalid before any clone.
 func TestCanonicalIdentityRejectsMalformedSource(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	_, _, _, err := Install(home, InstallOptions{Operand: "https://example.com:8443/acme"})
 	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
 		t.Fatalf("malformed source err = %v, want %s", err, DiagSourceInvalid)
@@ -121,7 +121,7 @@ func TestCanonicalIdentityRejectsMalformedSource(t *testing.T) {
 // member outside allowed_sources is refused with profile_source_invalid
 // before any clone (the profile-repos cache stays empty).
 func TestSourceAllowlistRefusesBeforeClone(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	policy := Policy{AllowedSources: []string{"github.com/relux-works"}}
 	_, _, _, err := Install(home, InstallOptions{
 		Operand: "https://evil.example.com/pkg/root",
@@ -149,7 +149,7 @@ func TestRevokedSourceIsRefused(t *testing.T) {
 	}, "v1.0.0")
 	ids := newGitIdentities(t)
 	operand := ids.serve(repo, "https://example.com/evil/pkg")
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	policy := Policy{Revocations: []string{"source:example.com/evil/pkg"}}
 	_, _, _, err := Install(home, InstallOptions{Operand: operand, Policy: policy})
 	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
@@ -174,7 +174,7 @@ func TestMCPAllowlistRefusesOutsidePackage(t *testing.T) {
 		"agent-context.json": `{"schema_version": 1, "name": "withmcp", "version": "1.0.0",` +
 			`"requires": {"mcp": {"tool": {"git": "` + mcpOperand + `", "range": "*"}}}}` + "\n",
 	}, "v1.0.0")
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	policy := Policy{MCPAllowlist: []string{"example.com/allowed"}}
 	_, _, _, err := Install(home, InstallOptions{Operand: ids.serve(root, "https://example.com/withmcp"), Policy: policy})
 	if err == nil || !strings.Contains(err.Error(), "mcp_package_not_allowed") {
@@ -202,7 +202,7 @@ func TestMigratedSkillSourceIsCanonical(t *testing.T) {
 	skill := gitRepo(t, map[string]string{"README.md": "skill\n"}, "v1.0.0")
 	ids := newGitIdentities(t)
 	operand := ids.serve(skill, "https://EXAMPLE.com/skills/hello.git")
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	if err := os.MkdirAll(filepath.Join(home, "global"), 0o755); err != nil {
 		t.Fatal(err)

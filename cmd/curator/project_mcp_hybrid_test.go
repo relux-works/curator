@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/relux-works/curator/internal/testgitenv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,7 +18,7 @@ import (
 func TestProjectMCPHybridDispatch(t *testing.T) {
 	for _, version := range []int{1, 2, 3} {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
-			cfg, project := setupCLIProject(t, t.TempDir())
+			cfg, project := setupCLIProject(t, testgitenv.ShortTempDir(t))
 			writeProjectMCP(t, filepath.Join(project, "Skillfile.json"), map[string]any{"schema_version": 1, "skills": []any{}})
 			hybrid := scopes.HybridManifestPath(filepath.Dir(cfg))
 			if err := os.MkdirAll(filepath.Dir(hybrid), 0700); err != nil {

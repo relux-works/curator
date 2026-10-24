@@ -99,7 +99,7 @@ func TestProjectMCPCandidateGates(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ids := newGitIdentities(t)
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			native := filepath.Join(home, "native.json")
 			if err := os.WriteFile(native, []byte("foreign"), 0600); err != nil {
 				t.Fatal(err)
@@ -140,7 +140,7 @@ func TestProjectMCPCandidateGates(t *testing.T) {
 func lockedProjectMCP(t *testing.T, policy Policy, signedTag bool) (string, string, *projectmcpstate.Lock, map[string]projectmcp.Declaration, Policy) {
 	t.Helper()
 	ids := newGitIdentities(t)
-	home, root := t.TempDir(), t.TempDir()
+	home, root := gitFixtureHome(t), gitFixtureHome(t)
 	for _, dir := range []string{home, root} {
 		if err := privatedir.Protect(dir); err != nil {
 			t.Fatal(err)
@@ -290,7 +290,7 @@ func TestProjectMCPPublicationGates(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				other := filepath.Join(t.TempDir(), "foreign.json")
+				other := filepath.Join(gitFixtureHome(t), "foreign.json")
 				if err := os.WriteFile(other, bytes, 0600); err != nil {
 					t.Fatal(err)
 				}

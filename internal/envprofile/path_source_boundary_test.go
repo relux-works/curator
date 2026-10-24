@@ -35,7 +35,7 @@ func assertPathMCPRefusal(t *testing.T, err error) {
 func TestPathRootAndImportedMCPDeclarationsRefused(t *testing.T) {
 	for _, imported := range []bool{false, true} {
 		t.Run(map[bool]string{false: "root", true: "onboarding-import"}[imported], func(t *testing.T) {
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			pinHomes(t)
 			source := filepath.Join(t.TempDir(), "path-mcp")
 			pathMCPPackage(t, source)
@@ -52,7 +52,7 @@ func TestPathRootAndImportedMCPDeclarationsRefused(t *testing.T) {
 // ordinary install pipeline and refuses its MCP declaration before the
 // overlay can join the profile closure.
 func TestPathOverlayMCPDeclarationRefused(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root := filepath.Join(t.TempDir(), "root")
 	writeManifestPackage(t, root,
@@ -101,7 +101,7 @@ func TestPathOverlayBoundaryRejectsEscapingAndInternalLinks(t *testing.T) {
 		{name: "within-tree", target: func(_ string, overlay string) string { return filepath.Join(overlay, "context", "personal.md") }, check: "link_safety"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			pinHomes(t)
 			root, overlay, policy := pathOverlayFixture(t, "")
 			link := filepath.Join(overlay, "context", "alias.md")
@@ -120,7 +120,7 @@ func TestPathOverlayBoundaryRejectsEscapingAndInternalLinks(t *testing.T) {
 // the pinned path-overlay-system-module-admitted vector: direct trusted
 // path overlays share the existing system-module admission rule.
 func TestPathOverlayTrustedSystemModuleRemainsAdmitted(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root, _, policy := pathOverlayFixture(t, "system")
 	info, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy})
@@ -142,7 +142,7 @@ func TestPathOverlayTrustedSystemModuleRemainsAdmitted(t *testing.T) {
 // path directory contract after install. The path is inspected again by
 // Resolve and Status, no fragment is emitted, and no rebuild is planned.
 func TestPathOverlayFailureBlocksResolveAndMakesStatusNonCurrent(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root, overlay, policy := pathOverlayFixture(t, "")
 	if _, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy}); err != nil {
@@ -161,7 +161,7 @@ func TestPathOverlayFailureBlocksResolveAndMakesStatusNonCurrent(t *testing.T) {
 		t.Fatalf("world-writable path source validation = %v, want permissions refusal", err)
 	}
 	req := ResolveRequest{
-		Home: home, Profile: "team-context", EnvID: "claude_code", LaunchDir: t.TempDir(),
+		Home: home, Profile: "team-context", EnvID: "claude_code", LaunchDir: gitFixtureHome(t),
 		Machine: envregistry.DefaultMachineConfig(), Policy: policy,
 		Detect: func(envregistry.Adapter) string { return "unknown" },
 	}
@@ -191,7 +191,7 @@ func TestPathOverlayFailureBlocksResolveAndMakesStatusNonCurrent(t *testing.T) {
 func TestPathSourceMutationsRejectUntrustedOverlayBeforeDefaultWrites(t *testing.T) {
 	for _, operation := range []string{"update", "use", "sync"} {
 		t.Run(operation, func(t *testing.T) {
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			pinHomes(t)
 			root, overlay, policy := pathOverlayFixture(t, "")
 			if _, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy}); err != nil {

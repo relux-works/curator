@@ -899,7 +899,7 @@ internal/projectcontext	TestCompositionCredentialVisitorReentry	linux,darwin	win
 internal/envprofile	TestProfileMCPPrivateFixtureBoundary	linux,darwin,windows	-	-	private fixtures install on both native adapters; broadened home and managed-home mutation rights refuse without payload changes or permission repair
 internal/envprofile	TestProfileMCPExecutableQualificationInert	linux,darwin,windows	-	-	executable byte qualification never executes its input; an explicitly invoked portable tripwire proves the observation instrument
 internal/envprofile	TestMCPSignedTagFixturesWithoutAmbientIdentity	linux,darwin,windows	-	-	empty ambient Git identity cannot hide missing fixture author or committer settings; all three signed-tag fixtures reach their strict assertions
-internal/gitops	TestCloneLongDestination	linux,darwin,windows	-	-	process-level long-path support admits a template beyond MAX_PATH and reopens deep loose objects for fetch, exact ref resolution and extraction; bounded real packed transport persists the setting, and suspicious URLs leave no destination
+internal/gitops	TestCloneLongDestination	linux,darwin,windows	-	-	Windows deep template roots receive a typed no-write metadata refusal and an admitted boundary root completes packed clone and exact reopen; Unix retains the deep template success; suspicious URLs leave no destination
 
 # MCP native writer Windows publication and exact platform controls.
 internal/privatedir	TestCreateFileIsPrivateAndExclusive	linux,darwin,windows	-	-	private named creation is exclusive and immediately validates as owner-only
@@ -920,3 +920,9 @@ internal/transaction	TestMCPPrivateCommitAndInputGates	linux,darwin,windows	-	-	
 internal/envprofile	TestProfileMCPPrivateStagingBoundary	linux,darwin,windows	-	-	private ownership staging admits unchanged bytes and refuses a later foreign-read grant before publication while retaining prior lock bytes
 internal/gitops	TestGitLongPathProcessSetting	linux,darwin,windows	-	-	regular and isolated real Git commands override a disabled local long-path setting for that process without rewriting it; direct Git controls confirm the disabled setting remains
 internal/gitops	TestWindowsGitMetadataLimit	windows	-	-	real Git measures adjacent usable and path-length-refused repository roots for loose-object reopening and real file-transport pack creation; exact payload and intended diagnostic controls exclude setup failures
+internal/gitops	TestGitMetadataPathBudget	linux,darwin,windows	-	-	fixed metadata budget includes SHA-256 loose objects and incremental MIDX bitmaps, counts UTF-16 surrogate pairs, and distinguishes adjacent admitted and typed-refused lengths
+internal/gitops	TestWindowsCloneMetadataBoundary	windows	-	-	regular and isolated clones admit adjacent supported ASCII and Unicode roots, refuse over-bound and relative roots without creating cache parents, and preserve exact reopened bytes
+internal/gitops	TestWindowsCloneMetadataAliases	windows	-	-	8.3 and extended-prefix spellings cannot lower the expanded metadata-root charge or change existing ancestor bytes
+internal/gitops	TestWindowsCloneMetadataJunctions	windows	-	-	junctions charge the longer lexical or resolved clone root in both directions and refusal preserves linked target bytes
+internal/envprofile	TestWindowsMCPMetadataRootRefusal	windows	-	-	manager propagates the typed metadata refusal before creating repository parents while an admitted source-bound cache acquires correctly and existing home bytes survive
+internal/testgitenv	TestShortTempDirIsPrivateAndCleaned	linux,darwin,windows	-	-	Git fixture remains writable and cleanup removes a read-only object; Windows verifies its private DACL and Unix keeps the standard testing temporary directory

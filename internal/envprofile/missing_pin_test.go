@@ -24,7 +24,7 @@ func TestInstallMissingDependencyPin(t *testing.T) {
 			native := pinHomes(t)
 			pinOperatorHome(t, t.TempDir())
 			ids := newGitIdentities(t)
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			existing := t.TempDir()
 			writePackage(t, existing, "existing", "1.0.0", "existing bytes\n")
 			if _, _, _, err := Install(home, InstallOptions{Operand: existing}); err != nil {

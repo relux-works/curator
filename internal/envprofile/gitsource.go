@@ -129,6 +129,9 @@ func (m *gitManager) ensureRepo(canonical string) (string, error) {
 	} else if info, err := os.Stat(dir); err == nil && info.IsDir() {
 		return dir, nil
 	}
+	if err := gitops.CheckCloneDestination(dir); err != nil {
+		return "", fmt.Errorf("%s: clone %s: %w", DiagSourceInvalid, canonical, err)
+	}
 	if err := os.MkdirAll(m.reposDir(), 0o755); err != nil {
 		return "", err
 	}
@@ -139,7 +142,7 @@ func (m *gitManager) ensureRepo(canonical string) (string, error) {
 		cloneURL = "https://" + canonical
 	}
 	if err := gitops.Clone(cloneURL, dir); err != nil {
-		return "", fmt.Errorf("%s: clone %s: %v", DiagSourceInvalid, canonical, err)
+		return "", fmt.Errorf("%s: clone %s: %w", DiagSourceInvalid, canonical, err)
 	}
 	if m.sourceCacheRoot != "" {
 		return m.checkedRepo(canonical)

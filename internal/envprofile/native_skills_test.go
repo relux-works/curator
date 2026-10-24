@@ -372,7 +372,7 @@ func TestNativeSkillsConvergenceAndSwitch(t *testing.T) {
 func TestNativeSkillsInstallAndUpdate(t *testing.T) {
 	pinOperatorHome(t, t.TempDir())
 	homes := pinHomes(t)
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	ids := newGitIdentities(t)
 	repo := gitRepo(t, map[string]string{"SKILL.md": "# myskill\n"}, "v1.0.0")
 	operand := ids.serve(repo, "https://example.com/native-skill")

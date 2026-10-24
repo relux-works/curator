@@ -88,7 +88,7 @@ func TestInstallDependencyUsesDeclaredEndpoint(t *testing.T) {
 			}
 			ids.serve(correct, tc.declaration)
 			ids.serve(decoy, "https://example.com/team/dep")
-			root, home := t.TempDir(), t.TempDir()
+			root, home := gitFixtureHome(t), gitFixtureHome(t)
 			writeManifestPackage(t, root, fmt.Sprintf(`{"schema_version":1,"name":"root","version":"1.0.0","requires":{%q:{"dep":{"git":%q,"tag":"v1.0.0"}}}}`, tc.collection, tc.declaration), nil)
 			info, _, _, err := Install(home, InstallOptions{Operand: root})
 			if err != nil {

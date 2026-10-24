@@ -52,7 +52,7 @@ func TestInstallHTTPUserinfoSinks(t *testing.T) {
 				if sink == "range-conflict" {
 					constraint = `"range":"^2.0.0"`
 				}
-				root, home := t.TempDir(), t.TempDir()
+				root, home := gitFixtureHome(t), gitFixtureHome(t)
 				writeManifestPackage(t, root, fmt.Sprintf(`{"schema_version":1,"name":"root","version":"1.0.0","requires":{"contexts":{"dep":{"git":%q,%s}}}}`, declared, constraint), nil)
 				info, _, _, err := Install(home, InstallOptions{Operand: root})
 				var observed string

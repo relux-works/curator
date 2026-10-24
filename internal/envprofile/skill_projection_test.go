@@ -57,7 +57,7 @@ func projectionFiles(t *testing.T, root string) map[string][]byte {
 func TestSkillProjectionCoreSelection(t *testing.T) {
 	for _, version := range []hashing.Version{hashing.VersionV1, hashing.VersionV2} {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
-			source, home := t.TempDir(), t.TempDir()
+			source, home := gitFixtureHome(t), gitFixtureHome(t)
 			writeGitFile(t, source, "SKILL.md", "# Guide\n")
 			writeGitFile(t, source, "references/guide.md", "visible\n")
 			for _, pattern := range whitelist.AlwaysExcluded {
@@ -115,7 +115,7 @@ func TestSkillProjectionCoreSelection(t *testing.T) {
 func TestProfileSkillProjectionPublication(t *testing.T) {
 	for _, commands := range []bool{false, true} {
 		t.Run(fmt.Sprintf("commands-%t", commands), func(t *testing.T) {
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			pinOperatorHome(t, home)
 			native := pinHomes(t)
 			ids := newGitIdentities(t)
@@ -163,7 +163,7 @@ func TestProfileSkillProjectionPublication(t *testing.T) {
 			var shared string
 			for _, id := range []string{"claude_code", "codex_cli"} {
 				t.Run(id, func(t *testing.T) {
-					req := ResolveRequest{Home: home, Profile: info.Name, EnvID: id, Repair: true, LaunchDir: t.TempDir(), Machine: envregistry.DefaultMachineConfig(), Detect: func(envregistry.Adapter) string { return "unknown" }, NativeHomeOf: func(id string) (string, error) { return native[id], nil }}
+					req := ResolveRequest{Home: home, Profile: info.Name, EnvID: id, Repair: true, LaunchDir: gitFixtureHome(t), Machine: envregistry.DefaultMachineConfig(), Detect: func(envregistry.Adapter) string { return "unknown" }, NativeHomeOf: func(id string) (string, error) { return native[id], nil }}
 					if _, err := Resolve(req); err != nil {
 						t.Fatal(err)
 					}
@@ -367,7 +367,7 @@ func TestProfileSkillProjectionRepair(t *testing.T) {
 func TestSkillProjectionStoreReuse(t *testing.T) {
 	for _, kind := range []string{"bytes", "link", "destination", "source-changed"} {
 		t.Run(kind, func(t *testing.T) {
-			home, source := t.TempDir(), t.TempDir()
+			home, source := gitFixtureHome(t), gitFixtureHome(t)
 			writeGitFile(t, source, "SKILL.md", "# Guide\n")
 			skill, err := projectSkill(home, source, hashing.VersionV2)
 			if err != nil {
@@ -479,7 +479,7 @@ func TestProfileSkillProjectionMissingStore(t *testing.T) {
 // the entire old tree, including old excluded files; retry publishes exactly
 // the projected tree. The fault must fire on the real entry transaction.
 func TestSkillProjectionFallbackRollback(t *testing.T) {
-	home, source := t.TempDir(), t.TempDir()
+	home, source := gitFixtureHome(t), gitFixtureHome(t)
 	root := EnvRoot(home)
 	rel := "sample/codex_cli/skills/guide"
 	old := t.TempDir()
@@ -534,7 +534,7 @@ func TestSkillProjectionFallbackRollback(t *testing.T) {
 func TestSkillProjectionLegacyFraming(t *testing.T) {
 	for _, phase := range []string{"plan", "stage", "verify"} {
 		t.Run(phase, func(t *testing.T) {
-			source, home := t.TempDir(), t.TempDir()
+			source, home := gitFixtureHome(t), gitFixtureHome(t)
 			writeGitFile(t, source, "SKILL.md", "# Guide\n")
 			skill, err := projectSkill(home, source, hashing.VersionV1)
 			if err != nil {
@@ -570,7 +570,7 @@ func TestSkillProjectionLegacyFraming(t *testing.T) {
 			}
 		})
 	}
-	source, home := t.TempDir(), t.TempDir()
+	source, home := gitFixtureHome(t), gitFixtureHome(t)
 	writeGitFile(t, source, "SKILL.md", "# Guide\x00\n")
 	skill, err := projectSkill(home, source, hashing.VersionV2)
 	if err != nil {

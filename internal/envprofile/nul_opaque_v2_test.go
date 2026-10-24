@@ -47,7 +47,7 @@ func TestInstallAdmitsV1CollidingSkillTreesUnderV2(t *testing.T) {
 		t.Fatalf("v1 framing did not collide: %s != %s", leftHash, rightHash)
 	}
 
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	skillARepo := gitRepo(t, single, "v1.0.0")
 	skillAOperand := ids.serve(skillARepo, "https://example.com/v2-single-skill")
 	skillBRepo := gitRepo(t, split, "v1.0.0")
@@ -75,7 +75,7 @@ func TestInstallAdmitsV1CollidingSkillTreesUnderV2(t *testing.T) {
 // installs and publishes its profile source.
 func TestInstallAdmitsDeepNULFileInContextPathSnapshotUnderV2(t *testing.T) {
 	enableV2WritersForTest(t)
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := t.TempDir()
 	writeGitFile(t, source, "agent-context.json", `{"schema_version": 1, "name": "nul-context", "version": "1.0.0",`+

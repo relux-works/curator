@@ -73,7 +73,7 @@ func TestSystemDeltaVectors(t *testing.T) {
 	}
 	for _, tc := range vectors.DeltaCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			oldLock := &contextlock.Lock{Root: "root", Members: vectorLockMembers(tc.OldMembers)}
 			newLock := &contextlock.Lock{Root: "root", Members: vectorLockMembers(tc.NewMembers)}
 			for _, member := range append(append([]contextlock.Member{}, oldLock.Members...), newLock.Members...) {

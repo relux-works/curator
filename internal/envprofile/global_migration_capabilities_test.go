@@ -240,7 +240,7 @@ func TestInstalledMemberCapabilitiesStayKindScoped(t *testing.T) {
 				files["agent-skill.json"] = `{"schema_version":3,"capabilities":{"network":7}}`
 			}
 			root := gitRepo(t, files, "v1.0.0")
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			pinHomes(t)
 			info, _, _, err := Install(home, InstallOptions{Operand: ids.serve(root, "https://example.com/profiles/clean")})
 			if tc.admitted {

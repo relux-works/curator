@@ -279,7 +279,7 @@ func runAllowlistVectorCase(t *testing.T, tc allowlistVectorCase) {
 	}
 	switch tc.Operation {
 	case "profile-install":
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		pinHomes(t)
 		root := filepath.Join(t.TempDir(), "root")
 		writePackage(t, root, "acme", "1.0.0", "hello\n")
@@ -292,7 +292,7 @@ func runAllowlistVectorCase(t *testing.T, tc allowlistVectorCase) {
 		}
 		assertWarningPresent(t, info.Warnings, DiagAllowlistEmpty)
 	case "profile-update":
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		pinHomes(t)
 		root := filepath.Join(t.TempDir(), "root")
 		writePackage(t, root, "acme", "1.0.0", "hello\n")
@@ -607,7 +607,7 @@ func runSurfacingOrderCase(t *testing.T, tc surfacingOrderCase) {
 	}
 	switch tc.Operation {
 	case "profile-install":
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		pinHomes(t)
 		root := filepath.Join(t.TempDir(), "root")
 		writeManifestPackage(t, root,

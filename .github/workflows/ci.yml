@@ -279,7 +279,7 @@ jobs:
       - name: Windows Git long-path preflight
         if: runner.os == 'Windows'
         shell: bash
-        run: env -u GIT_DIR -u GIT_WORK_TREE go test -count=1 -timeout=5m ./internal/gitops -run '^Test(CloneLongDestination|GitLongPathProcessSetting)$'
+        run: env -u GIT_DIR -u GIT_WORK_TREE go test -count=1 -timeout=5m ./internal/gitops ./internal/testgitenv
 
       # Runs the planned package set and enforces .github/ci/platform-cases.tsv:
       # the Windows runner must execute the DACL, reparse-point and `.cmd`

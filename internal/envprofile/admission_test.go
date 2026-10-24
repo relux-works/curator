@@ -67,7 +67,7 @@ func admissionPolicy() Policy {
 // context_system_module_transitive naming the transitive package and
 // module, and no lock is written.
 func TestInstallErrorRefusesTransitiveSystemModule(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	operand := admissionRepos(t, ids, true, true)
@@ -93,7 +93,7 @@ func TestInstallErrorRefusesTransitiveSystemModule(t *testing.T) {
 // error policy with a waiver for the transitive package: the waiver
 // admits the module and the install succeeds.
 func TestInstallErrorWaiverAdmits(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	operand := admissionRepos(t, ids, true, true)
@@ -113,7 +113,7 @@ func TestInstallErrorWaiverAdmits(t *testing.T) {
 // under error: the update fails with the refusal and the old lock bytes
 // are untouched.
 func TestUpdateErrorLeavesLockUnchanged(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	operand := admissionRepos(t, ids, true, true)
@@ -189,7 +189,7 @@ func admissionResolve(t *testing.T, home, profile, envID string, policy Policy, 
 // system-prompt file holds exactly the admitted modules' bytes, and the
 // fragment carries the system_prompt section for the admitted set.
 func TestDropRepairWarnsAndFragmentFollowsAdmitted(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	operand := admissionRepos(t, ids, true, true)
@@ -241,7 +241,7 @@ func TestDropRepairWarnsAndFragmentFollowsAdmitted(t *testing.T) {
 // system module is transitive: nothing is written and the fragment
 // carries no system_prompt section.
 func TestDropAllDroppedOmitsFragmentSection(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	operand := admissionRepos(t, ids, false, false)
@@ -268,7 +268,7 @@ func TestDropAllDroppedOmitsFragmentSection(t *testing.T) {
 // package and path, and the drop warning never makes a home row
 // non-current.
 func TestStatusReportsPolicyAndDropped(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	operand := admissionRepos(t, ids, true, true)
@@ -328,7 +328,7 @@ func TestStatusReportsPolicyAndDropped(t *testing.T) {
 // profile row reports error with an empty dropped list, since nothing is
 // skipped under error.
 func TestStatusErrorReportsPolicyWithoutDropped(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	operand := admissionRepos(t, ids, true, true)
@@ -366,7 +366,7 @@ func TestStatusErrorReportsPolicyWithoutDropped(t *testing.T) {
 // TestStatusUnreadableTransitiveManifestDoesNotBecomeNoDrops ensures a
 // manifest read failure cannot masquerade as an empty dropped-module set.
 func TestStatusUnreadableTransitiveManifestDoesNotBecomeNoDrops(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	operand := admissionRepos(t, ids, true, true)

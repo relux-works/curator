@@ -105,6 +105,12 @@ No launch fragment is exposed by this entrypoint.
 
 ## Validation
 
+On Windows, Git-backed profile and project MCP caches obey the
+[measured metadata-root bound](windows-git-paths.md). An over-budget acquisition
+returns `git_metadata_path_too_long` through `profile_source_invalid` before
+creating cache parents; it does not leave a partial clone or change existing
+home bytes. A short private metadata layout remains a separate follow-up.
+
 The tests exercise production planning, actual journal publication and fresh
 engine recovery in disposable homes. They replace only vendor identity
 observation with a private test seam; they make no claim of new vendor runtime

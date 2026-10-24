@@ -43,7 +43,7 @@ func makeStateDirectoryUnreadable(t *testing.T, path string) {
 }
 
 func TestCurrentPointerAbsenceAndUnreadabilityDiffer(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	if current, err := Current(home); err != nil || current != "" {
 		t.Fatalf("absent current pointer = (%q, %v), want empty, nil", current, err)
 	}
@@ -61,7 +61,7 @@ func TestCurrentPointerAbsenceAndUnreadabilityDiffer(t *testing.T) {
 }
 
 func TestScopedCurrentAbsenceAndUnreadabilityDiffer(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	if current, err := ScopedCurrents(home); err != nil || len(current) != 0 {
 		t.Fatalf("absent scoped-current directory = (%v, %v), want empty, nil", current, err)
 	}
@@ -79,7 +79,7 @@ func TestScopedCurrentAbsenceAndUnreadabilityDiffer(t *testing.T) {
 }
 
 func TestScopedCurrentReadFailureDoesNotFallBackToMachineCurrent(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	if err := SetCurrent(home, "default"); err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestScopedCurrentReadFailureDoesNotFallBackToMachineCurrent(t *testing.T) {
 }
 
 func TestProfileSourceAbsenceAndUnreadabilityDiffer(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	path := sourcePath(home, "profile-a")
 	if _, err := readSource(home, "profile-a"); err == nil || !strings.Contains(err.Error(), stateread.DiagAbsent) {
 		t.Fatalf("absent profile source error = %v, want typed absence", err)
@@ -116,7 +116,7 @@ func TestProfileSourceAbsenceAndUnreadabilityDiffer(t *testing.T) {
 }
 
 func TestUnreadableDefaultProfileSourceDoesNotRecreateDefault(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	path := sourcePath(home, DefaultProfile)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
@@ -157,7 +157,7 @@ func TestOverlayOwnerLockAbsenceAndUnreadabilityDiffer(t *testing.T) {
 
 func TestImportAbsentAndUnreadableRootSurfaceDiffer(t *testing.T) {
 	t.Run("absent is not a loss", func(t *testing.T) {
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		pinHomes(t)
 		seams := pinImportSeams(t)
 		seedCurrentDefault(t, home)
@@ -168,7 +168,7 @@ func TestImportAbsentAndUnreadableRootSurfaceDiffer(t *testing.T) {
 	})
 
 	t.Run("unreadable is a typed loss", func(t *testing.T) {
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		pinHomes(t)
 		seams := pinImportSeams(t)
 		path := filepath.Join(seams.native["claude_code"], "CLAUDE.md")
@@ -185,7 +185,7 @@ func TestImportAbsentAndUnreadableRootSurfaceDiffer(t *testing.T) {
 func TestImportAbsentAndUnreadableSkillsLedgerDiffer(t *testing.T) {
 	makeFixture := func(t *testing.T) (string, importSeams, string) {
 		t.Helper()
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		pinHomes(t)
 		seams := pinImportSeams(t)
 		writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
@@ -228,7 +228,7 @@ func TestImportAbsentAndUnreadableSkillsLedgerDiffer(t *testing.T) {
 
 func TestImportAbsentAndUnreadableSkillsSurfaceDiffer(t *testing.T) {
 	t.Run("absent skills directory is empty", func(t *testing.T) {
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		pinHomes(t)
 		seams := pinImportSeams(t)
 		writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
@@ -240,7 +240,7 @@ func TestImportAbsentAndUnreadableSkillsSurfaceDiffer(t *testing.T) {
 	})
 
 	t.Run("unreadable skills directory is a typed loss", func(t *testing.T) {
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		pinHomes(t)
 		seams := pinImportSeams(t)
 		writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
@@ -258,7 +258,7 @@ func TestImportAbsentAndUnreadableSkillsSurfaceDiffer(t *testing.T) {
 }
 
 func TestUpdatePathSnapshotUnreadableIsNotAbsent(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := filepath.Join(t.TempDir(), "source")
 	writeManifestPackage(t, source,
@@ -424,7 +424,7 @@ func TestStatusBackupInventoryAbsenceAndUnreadabilityDiffer(t *testing.T) {
 func TestRemovePurgeMarkerAbsenceAndUnreadabilityDiffer(t *testing.T) {
 	makeFixture := func(t *testing.T) (string, map[string]string, string) {
 		t.Helper()
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		homes := pinHomes(t)
 		source := t.TempDir()
 		writePackage(t, source, "acme", "1.0.0", "hello\n")

@@ -18,7 +18,7 @@ func TestUpdateSystemDeltaRefusesBeforePublication(t *testing.T) {
 	if _, err := gitLookPath(); err != nil {
 		t.Skip("no git on PATH")
 	}
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	manifest := `{"schema_version":1,"name":"delta","version":"1.0.0"}` + "\n"

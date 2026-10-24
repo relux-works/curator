@@ -148,3 +148,9 @@ func (g *gitIdentities) serve(repo, operand string) string {
 	}
 	return operand
 }
+
+// gitFixtureHome keeps cache-root fixtures within the Windows metadata budget.
+func gitFixtureHome(t *testing.T) string {
+	t.Helper()
+	return testgitenv.ShortTempDir(t)
+}

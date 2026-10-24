@@ -1,9 +1,11 @@
 package gitops
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -33,7 +35,7 @@ func gitRun(t *testing.T, dir string, args ...string) string {
 // commit on main.
 func makeRepo(t *testing.T) string {
 	t.Helper()
-	dir := t.TempDir()
+	dir := cloneTestRoot(t)
 	gitRun(t, dir, "init", "-q", "-b", "main")
 	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("v1"), 0o644); err != nil {
 		t.Fatal(err)
@@ -49,7 +51,7 @@ func makeRepo(t *testing.T) string {
 }
 
 func TestCloneRefusesSuspiciousURLs(t *testing.T) {
-	dest := filepath.Join(t.TempDir(), "out")
+	dest := filepath.Join(cloneTestRoot(t), "out")
 	if err := Clone("", dest); err == nil {
 		t.Fatal("empty URL must be refused")
 	}
@@ -59,7 +61,7 @@ func TestCloneRefusesSuspiciousURLs(t *testing.T) {
 }
 
 func TestCloneRefusesExistingDestination(t *testing.T) {
-	dest := t.TempDir()
+	dest := cloneTestRoot(t)
 	if err := Clone("https://example.invalid/repo.git", dest); err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("err = %v", err)
 	}
@@ -67,7 +69,7 @@ func TestCloneRefusesExistingDestination(t *testing.T) {
 
 func TestCloneAndResolve(t *testing.T) {
 	src := makeRepo(t)
-	dest := filepath.Join(t.TempDir(), "clone")
+	dest := filepath.Join(cloneTestRoot(t), "clone")
 	if err := Clone(src, dest); err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +104,7 @@ func TestCloneAndResolve(t *testing.T) {
 	if _, err := Resolve(dest, "semver", "1"); err == nil {
 		t.Fatal("unknown kind must fail")
 	}
-	if _, err := Resolve(t.TempDir(), "tag", "v1"); err == nil {
+	if _, err := Resolve(cloneTestRoot(t), "tag", "v1"); err == nil {
 		t.Fatal("non-repo must fail")
 	}
 }
@@ -113,7 +115,7 @@ func TestExtractProducesExactTree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dest := filepath.Join(t.TempDir(), "snap")
+	dest := filepath.Join(cloneTestRoot(t), "snap")
 	if err := Extract(src, v1.Commit, dest); err != nil {
 		t.Fatal(err)
 	}
@@ -133,14 +135,14 @@ func TestExtractProducesExactTree(t *testing.T) {
 // symlink entry (mode 120000). The entry is written through mktree, so the
 // case needs neither `ln` nor host symlink support and runs on every GOOS.
 func TestArchiveRejectsLinks(t *testing.T) {
-	repo := t.TempDir()
+	repo := cloneTestRoot(t)
 	gitRun(t, repo, "init", "-q", "-b", "main")
 	oid := blobOID(t, repo, "x")
 	commit := commitRawTree(t, repo, []string{
 		"100644 blob " + oid + "\tSKILL.md",
 		"120000 blob " + oid + "\tlink.md",
 	})
-	dest := filepath.Join(t.TempDir(), "snap")
+	dest := filepath.Join(cloneTestRoot(t), "snap")
 	err := Extract(repo, commit, dest)
 	if err == nil || !strings.Contains(err.Error(), "links") {
 		t.Fatalf("err = %v, want link rejection", err)
@@ -152,7 +154,7 @@ func TestArchiveRejectsLinks(t *testing.T) {
 
 func TestFetchAndSubmodules(t *testing.T) {
 	src := makeRepo(t)
-	dest := filepath.Join(t.TempDir(), "clone")
+	dest := filepath.Join(cloneTestRoot(t), "clone")
 	if err := Clone(src, dest); err != nil {
 		t.Fatal(err)
 	}
@@ -170,13 +172,12 @@ func TestFetchAndSubmodules(t *testing.T) {
 	}
 }
 
-// Clone enables long-path support before copying a template beyond MAX_PATH
-// and can reopen its loose objects for fetch, resolution and exact extraction.
-// It also persists the setting for a real packed transfer despite ambient defaults.
-// The packed fixture stays below Git's independent absolute metadata-path limit;
-// this test does not claim arbitrary-length repository roots are supported.
+// Windows refuses the deep-template root with a typed, no-write diagnostic;
+// its adjacent supported root completes a real packed clone and exact reopen.
+// Unix retains the deep-template clone/fetch/extract control. Both persist the
+// local setting despite a disabled ambient value and refuse suspicious URLs.
 func TestCloneLongDestination(t *testing.T) {
-	configPath := filepath.Join(t.TempDir(), "gitconfig")
+	configPath := filepath.Join(cloneTestRoot(t), "gitconfig")
 	if err := os.WriteFile(configPath, []byte("[core]\nlongpaths = false\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -191,12 +192,17 @@ func TestCloneLongDestination(t *testing.T) {
 		{"packed-transfer", 180, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			root := t.TempDir()
+			root := cloneTestRoot(t)
+			if tc.packed && runtime.GOOS == "windows" {
+				// The independently documented metadata-root bound, including
+				// the reserved SHA-256 incremental MIDX bitmap, is 133 units.
+				tc.length = 133
+			}
 			if len(root)+1 >= tc.length {
 				t.Fatalf("temporary root leaves no room for long-path witness: %d", len(root))
 			}
 			dest := filepath.Join(root, strings.Repeat("c", tc.length-len(root)-1))
-			template := t.TempDir()
+			template := cloneTestRoot(t)
 			name := strings.Repeat("template", 5)
 			if err := os.WriteFile(filepath.Join(template, name), []byte("template"), 0o600); err != nil {
 				t.Fatal(err)
@@ -220,7 +226,19 @@ func TestCloneLongDestination(t *testing.T) {
 					remote = "file:///" + filepath.ToSlash(src)
 				}
 			}
-			if err := Clone(remote, dest); err != nil {
+			err := Clone(remote, dest)
+			if runtime.GOOS == "windows" && tc.name == "initialization" {
+				var refusal *MetadataPathError
+				if !errors.As(err, &refusal) || refusal.Actual != 364 || refusal.Limit != 259 || refusal.RootLimit != 133 {
+					t.Fatalf("want typed metadata refusal with actual length and bound: %v", err)
+				}
+				entries, err := os.ReadDir(root)
+				if err != nil || len(entries) != 0 {
+					t.Fatalf("refused deep clone created paths: %v %v", entries, err)
+				}
+				return
+			}
+			if err != nil {
 				t.Fatal(err)
 			}
 			// Inspect stdout separately: Git can warn on stderr while probing
@@ -244,7 +262,7 @@ func TestCloneLongDestination(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			snapshot := filepath.Join(t.TempDir(), "snapshot")
+			snapshot := filepath.Join(cloneTestRoot(t), "snapshot")
 			if err := Extract(dest, ref.Commit, snapshot); err != nil {
 				t.Fatal(err)
 			}

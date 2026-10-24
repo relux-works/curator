@@ -24,7 +24,7 @@ func fileURL(t *testing.T, dir string) string {
 // fetch of declared to evil, and returns its path.
 func hostileGitConfig(t *testing.T, declared, evil string) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "hostile.gitconfig")
+	path := filepath.Join(cloneTestRoot(t), "hostile.gitconfig")
 	body := "[url \"" + evil + "\"]\n" +
 		"\tinsteadOf = " + declared + "\n" +
 		"\tpushInsteadOf = " + declared + "\n" +
@@ -41,7 +41,7 @@ func hostileGitConfig(t *testing.T, declared, evil string) string {
 // selection the HEAD must be evil's, proving the payload is live.
 func cloneHead(t *testing.T, env []string, url string) string {
 	t.Helper()
-	dest := filepath.Join(t.TempDir(), "control")
+	dest := filepath.Join(cloneTestRoot(t), "control")
 	cmd := exec.Command("git", "clone", "--quiet", "--", url, dest)
 	cmd.Env = env
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -77,7 +77,7 @@ func TestCloneIsolatedIgnoresUserConfig(t *testing.T) {
 		if got := cloneHead(t, gitEnvHostile(t), declaredURL); got != evilHead {
 			t.Fatalf("control HEAD = %s, want evil %s (payload not live)", got, evilHead)
 		}
-		dest := filepath.Join(t.TempDir(), "clone")
+		dest := filepath.Join(cloneTestRoot(t), "clone")
 		if err := CloneIsolated(declaredURL, dest); err != nil {
 			t.Fatal(err)
 		}
@@ -93,7 +93,7 @@ func TestCloneIsolatedIgnoresUserConfig(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		home := t.TempDir()
+		home := cloneTestRoot(t)
 		payload, err := os.ReadFile(hostile)
 		if err != nil {
 			t.Fatal(err)
@@ -102,11 +102,11 @@ func TestCloneIsolatedIgnoresUserConfig(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Setenv("HOME", home)
-		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		t.Setenv("XDG_CONFIG_HOME", cloneTestRoot(t))
 		if got := cloneHead(t, gitEnvHome(t, home), declaredURL); got != evilHead {
 			t.Fatalf("control HEAD = %s, want evil %s (payload not live)", got, evilHead)
 		}
-		dest := filepath.Join(t.TempDir(), "clone")
+		dest := filepath.Join(cloneTestRoot(t), "clone")
 		if err := CloneIsolated(declaredURL, dest); err != nil {
 			t.Fatal(err)
 		}
@@ -116,8 +116,8 @@ func TestCloneIsolatedIgnoresUserConfig(t *testing.T) {
 	})
 
 	t.Run("environment injected config", func(t *testing.T) {
-		t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "empty"))
-		t.Setenv("GIT_CONFIG_SYSTEM", filepath.Join(t.TempDir(), "empty"))
+		t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(cloneTestRoot(t), "empty"))
+		t.Setenv("GIT_CONFIG_SYSTEM", filepath.Join(cloneTestRoot(t), "empty"))
 		t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 		t.Setenv("GIT_CONFIG_COUNT", "1")
 		t.Setenv("GIT_CONFIG_KEY_0", "url."+evilURL+".insteadOf")
@@ -125,7 +125,7 @@ func TestCloneIsolatedIgnoresUserConfig(t *testing.T) {
 		if got := cloneHead(t, gitEnvParams(t), declaredURL); got != evilHead {
 			t.Fatalf("control HEAD = %s, want evil %s (payload not live)", got, evilHead)
 		}
-		dest := filepath.Join(t.TempDir(), "clone")
+		dest := filepath.Join(cloneTestRoot(t), "clone")
 		if err := CloneIsolated(declaredURL, dest); err != nil {
 			t.Fatal(err)
 		}
@@ -197,7 +197,7 @@ func TestFetchIsolatedIgnoresUserConfig(t *testing.T) {
 	t.Setenv("GIT_CONFIG_SYSTEM", hostile)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "0")
 
-	dest := filepath.Join(t.TempDir(), "clone")
+	dest := filepath.Join(cloneTestRoot(t), "clone")
 	if err := CloneIsolated(declaredURL, dest); err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func TestFetchIsolatedIgnoresUserConfig(t *testing.T) {
 func TestFetchCommitFromURLIsolatedRequestsLockedObjectWithoutTags(t *testing.T) {
 	source := makeRepo(t)
 	locked := gitRun(t, source, "rev-parse", "refs/tags/v1^{commit}")
-	destination := filepath.Join(t.TempDir(), "replay")
+	destination := filepath.Join(cloneTestRoot(t), "replay")
 	if err := FetchCommitFromURLIsolated(destination, fileURL(t, source), locked); err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +234,7 @@ func TestFetchCommitFromURLIsolatedRequestsLockedObjectWithoutTags(t *testing.T)
 }
 
 func TestIsolatedGitEnvPinsEmptyConfig(t *testing.T) {
-	hostile := filepath.Join(t.TempDir(), "hostile.gitconfig")
+	hostile := filepath.Join(cloneTestRoot(t), "hostile.gitconfig")
 	if err := os.WriteFile(hostile, []byte("[url \"https://evil.test/\"]\n\tinsteadOf = https://example.org/\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -366,12 +366,12 @@ func TestIsolatedGitEnvAllowList(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "/tmp/evil-xdg")
 	t.Setenv("LANG", "evil.UTF-8")
 	t.Setenv("LC_ALL", "evil.UTF-8")
-	home := t.TempDir()
+	home := cloneTestRoot(t)
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	t.Setenv("TMPDIR", t.TempDir())
-	t.Setenv("TMP", t.TempDir())
-	t.Setenv("TEMP", t.TempDir())
+	t.Setenv("TMPDIR", cloneTestRoot(t))
+	t.Setenv("TMP", cloneTestRoot(t))
+	t.Setenv("TEMP", cloneTestRoot(t))
 	t.Setenv("TZ", "UTC")
 	t.Setenv("SYSTEMROOT", `C:\Windows`)
 	t.Setenv("WINDIR", `C:\Windows`)
@@ -570,7 +570,7 @@ func TestCloneIsolatedIgnoresGitProxyCommand(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("test transport wrapper is POSIX-only")
 	}
-	evilDir := t.TempDir()
+	evilDir := cloneTestRoot(t)
 	invokedLog := filepath.Join(evilDir, "proxy-invoked.log")
 	evilProxy := filepath.Join(evilDir, "evil-proxy")
 	if err := os.WriteFile(evilProxy, []byte("#!/bin/sh\necho \"invoked $@\" >>'"+invokedLog+"'\nexit 1\n"), 0o700); err != nil {
@@ -579,7 +579,7 @@ func TestCloneIsolatedIgnoresGitProxyCommand(t *testing.T) {
 	// Positive control: raw git with the ambient proxy honoured invokes
 	// it, proving the payload is live.
 	controlEnv := append(gitEnv(), "GIT_PROXY_COMMAND="+evilProxy)
-	controlDest := filepath.Join(t.TempDir(), "control")
+	controlDest := filepath.Join(cloneTestRoot(t), "control")
 	cmd := exec.Command("git", "clone", "--quiet", "--", "git://fixture.test/kit.git", controlDest)
 	cmd.Env = controlEnv
 	if err := cmd.Run(); err == nil {
@@ -591,7 +591,7 @@ func TestCloneIsolatedIgnoresGitProxyCommand(t *testing.T) {
 	_ = os.Remove(invokedLog)
 
 	t.Setenv("GIT_PROXY_COMMAND", evilProxy)
-	dest := filepath.Join(t.TempDir(), "clone")
+	dest := filepath.Join(cloneTestRoot(t), "clone")
 	if err := CloneIsolated("git://fixture.test/kit.git", dest); err == nil {
 		t.Fatal("CloneIsolated with a hostile GIT_PROXY_COMMAND succeeded, want the fail-closed error")
 	}
