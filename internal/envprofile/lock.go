@@ -39,7 +39,9 @@ type operation struct {
 }
 
 // newOperationEngine keeps recovery observation available to entry-point tests.
-var newOperationEngine = transaction.New
+var newOperationEngine = func(home string, options ...transaction.Option) (*transaction.Engine, error) {
+	return transaction.New(home, append(options, transaction.WithCommitCheck(projectlease.TransactionCheck(home)))...)
+}
 
 // beginCaptureOperation never provisions a home or invokes recovery. The
 // observer validates every journal before reporting pending recovery.
@@ -65,7 +67,7 @@ func beginCaptureOperation(home string, options ...transaction.Option) (*operati
 		return nil, err
 	}
 	op := &operation{lock: lock}
-	op.engine, err = newOperationEngine(home, append(options, transaction.WithCommitCheck(projectlease.TransactionCheck(home)))...)
+	op.engine, err = newOperationEngine(home, options...)
 	if err == nil {
 		var pending bool
 		pending, err = op.engine.PendingRecovery(lock)
@@ -119,7 +121,7 @@ func beginOperationValidated(home string, validate func() error, options ...tran
 			return nil, err
 		}
 	}
-	engine, err := newOperationEngine(home, append(options, transaction.WithCommitCheck(projectlease.TransactionCheck(home)))...)
+	engine, err := newOperationEngine(home, options...)
 	if err != nil {
 		_ = lock.Close()
 		return nil, err
