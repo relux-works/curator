@@ -84,6 +84,9 @@ func reviewedManagerReadExceptions() map[string]string {
 	allow("Initializes a private object database for one locked Git commit; absence means the isolated replay checkout does not exist yet, while every other Lstat failure stops before fetching.",
 		"internal/gitops/gitops.go:FetchCommitFromURLIsolated",
 	)
+	allow("Measures clone-destination topology without reading manager state: missing or overlong ancestors are walked upward only to compute the Windows metadata budget; other inspection failures abort, and this grants no creation, adoption or privacy authority.",
+		"internal/gitops/metadata_path_windows.go:expandedWindowsClonePath",
+	)
 	allow("Inspects a caller-selected source snapshot for declared content; absence means the snapshot lacks that input and other read failures do not count as absence.",
 		"internal/audit/audit.go:detectWithOpaquePaths",
 		"internal/contextaudit/contextaudit.go:Detect",
