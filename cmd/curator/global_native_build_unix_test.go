@@ -191,7 +191,12 @@ func TestGlobalNativeOwnerPausedBuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	resumed = true
-	child.wait(t)
+	// Completion is not a latency assertion: the production worker permits a
+	// two-minute real build, followed by toolchain verification/publication.
+	// Keep the shorter watchdog for the separate lock-order controls.
+	released := time.Now()
+	child.waitWithin(t, 3*time.Minute)
+	t.Logf("released real build completed in %s", time.Since(released))
 	requireCompiledNativeOwner(t, fixture)
 	fixture.command(t, exitOK, "global", "remove", "build-skill")
 	fixture.command(t, exitOK, "global", "install")
