@@ -49,7 +49,7 @@ func expandedWindowsClonePath(destination string) (string, error) {
 	}
 	// Charge both spellings: a long junction name cannot borrow its short
 	// target's budget, and a short junction cannot hide a long target.
-	resolved, err := filepath.EvalSymlinks(ancestor)
+	resolved, err := resolvedWindowsAncestor(ancestor)
 	if err != nil {
 		return "", err
 	}
@@ -68,6 +68,31 @@ func expandedWindowsClonePath(destination string) (string, error) {
 		root = filepath.Join(root, missing[i])
 	}
 	return root, nil
+}
+
+// Go's EvalSymlinks does not classify directory junctions as symbolic links
+// under the current Windows mode policy. Resolve the final opened ancestor
+// through a zero-access directory handle instead. This only measures a name;
+// the existing privacy and no-follow checks still decide product authority.
+func resolvedWindowsAncestor(ancestor string) (string, error) {
+	p, err := windows.UTF16PtrFromString(ancestor)
+	if err != nil {
+		return "", err
+	}
+	handle, err := windows.CreateFile(p, 0, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING, windows.FILE_FLAG_BACKUP_SEMANTICS, 0)
+	if err != nil {
+		return "", err
+	}
+	defer windows.CloseHandle(handle)
+	buf := make([]uint16, 32768)
+	n, err := windows.GetFinalPathNameByHandle(handle, &buf[0], uint32(len(buf)), 0)
+	if err != nil {
+		return "", err
+	}
+	if n == 0 || int(n) >= len(buf) {
+		return "", fmt.Errorf("resolved clone ancestor exceeds path buffer")
+	}
+	return windows.UTF16ToString(buf[:n]), nil
 }
 
 func expandedWindowsAncestor(ancestor string) (string, error) {

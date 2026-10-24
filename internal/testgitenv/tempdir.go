@@ -32,7 +32,7 @@ func ShortTempDir(t testing.TB) string {
 		// Read-only Git objects may need their write attribute restored.
 		// WalkDir does not follow symlinks, including fixture link targets.
 		_ = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil || entry.Type()&os.ModeSymlink != 0 {
+			if err != nil || entry.Type()&(os.ModeSymlink|os.ModeIrregular) != 0 {
 				return nil
 			}
 			info, err := entry.Info()
