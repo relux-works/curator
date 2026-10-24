@@ -169,3 +169,51 @@ func TestFetchAndSubmodules(t *testing.T) {
 		t.Fatal("submodule marker not detected")
 	}
 }
+
+// Clone opts its own cache into long-path support before Git writes pack
+// files, independently of ambient defaults. Fetch/ref lookup and exact
+// payload extraction remain usable beyond the Windows MAX_PATH boundary.
+func TestCloneLongDestination(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "gitconfig")
+	if err := os.WriteFile(configPath, []byte("[core]\nlongpaths = false\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", configPath)
+	src := makeRepo(t)
+	dest := t.TempDir()
+	for len(dest) < 300 {
+		dest = filepath.Join(dest, strings.Repeat("cache", 8))
+	}
+	if err := Clone("--upload-pack=forbidden", dest); err == nil || !strings.Contains(err.Error(), "suspicious git URL") {
+		t.Fatalf("invalid source accepted: %v", err)
+	}
+	if _, err := os.Lstat(dest); !os.IsNotExist(err) {
+		t.Fatalf("refused clone created destination: %v", err)
+	}
+	remote := "file://" + filepath.ToSlash(src)
+	if filepath.VolumeName(src) != "" {
+		remote = "file:///" + filepath.ToSlash(src)
+	}
+	// file:// exercises index-pack, rather than the local hard-link fast path.
+	if err := Clone(remote, dest); err != nil {
+		t.Fatal(err)
+	}
+	if got := gitRun(t, dest, "config", "--local", "--get", "core.longpaths"); got != "true" {
+		t.Fatalf("cache long-path support = %q, want true", got)
+	}
+	if err := Fetch(dest); err != nil {
+		t.Fatal(err)
+	}
+	ref, err := Resolve(dest, "tag", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := filepath.Join(t.TempDir(), "snapshot")
+	if err := Extract(dest, ref.Commit, snapshot); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(snapshot, "SKILL.md"))
+	if err != nil || string(body) != "v1" {
+		t.Fatalf("long-path payload = %q: %v", body, err)
+	}
+}

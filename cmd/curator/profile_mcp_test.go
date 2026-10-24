@@ -10,12 +10,16 @@ import (
 
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/mcpnative"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // The real dispatcher exposes a separate profile carrier and read-only status.
 // No project scope or explicit CLI action confers ownership-action authority.
 func TestProfileMCPCLI(t *testing.T) {
 	source, home := profileHome(t)
+	if err := privatedir.Protect(home); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
 	configBody, _ := json.Marshal(map[string]any{"schema_version": 1, "projects": map[string]any{}, "skills_root": filepath.Join(home, "unused-skills")})
 	if err := os.WriteFile(source.path, configBody, 0o600); err != nil {
@@ -67,6 +71,9 @@ func TestProfileMCPCLI(t *testing.T) {
 // false spellings preserve normal read-only status/preview controls.
 func TestProfileMCPTakeoverFlagContract(t *testing.T) {
 	source, home := profileHome(t)
+	if err := privatedir.Protect(home); err != nil {
+		t.Fatal(err)
+	}
 	pinOperatorHome(t)
 	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
 	configBody, _ := json.Marshal(map[string]any{"schema_version": 1, "projects": map[string]any{}, "skills_root": filepath.Join(home, "unused-skills")})
