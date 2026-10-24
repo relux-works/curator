@@ -12,7 +12,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 )
 
 func buildHelpCLI(t *testing.T) string {
@@ -109,7 +108,7 @@ func snapshotHelpTree(t *testing.T, root string) map[string]helpTreeEntry {
 
 func (sandbox helpSandbox) invoke(t *testing.T, binary string, args ...string) (int, string, string) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	command := exec.CommandContext(ctx, binary, args...)
 	command.Dir, command.Env = sandbox.cwd, sandbox.env

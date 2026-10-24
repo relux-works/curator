@@ -27,7 +27,7 @@ func TestBuildRunsExactlyOneFixedListAndBuildInsideTheWorker(t *testing.T) {
 	fixture := newSnapshotFixture(t)
 	fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "verified executable"})
 
-	limits := ResourceLimits{Timeout: 30 * time.Second, OutputBytes: 64 * 1024, ArtifactBytes: 1024, DiskBytes: 8 * 1024 * 1024, MemoryBytes: 64 * 1024 * 1024, Processes: 8}
+	limits := ResourceLimits{Timeout: defaultBuildTimeout, OutputBytes: 64 * 1024, ArtifactBytes: 1024, DiskBytes: 8 * 1024 * 1024, MemoryBytes: 64 * 1024 * 1024, Processes: 8}
 	result, err := Build(context.Background(), fixture.request(limits))
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +76,7 @@ func TestBuildRunsExactlyOneFixedListAndBuildInsideTheWorker(t *testing.T) {
 func TestBuildEmitsExactlyOneClosedCapabilityEvidenceRecord(t *testing.T) {
 	fixture := newSnapshotFixture(t)
 	fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
-	result, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
+	result, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestBuildStopsBeforeBuildForEveryPreflightRejectionClass(t *testing.T) {
 			item := fixture.rootPackage()
 			testCase.edit(&item)
 			fixture.start(stubScript{ListStdout: string(encodePackages(t, item)), Artifact: "artifact"})
-			_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
+			_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout}))
 			if DiagnosticCode(err) != testCase.code {
 				t.Fatalf("error = %v, want %s", err, testCase.code)
 			}
@@ -171,7 +171,7 @@ func TestBuildRejectsDirectivesPGOAndMultipleRootsBeforeBuild(t *testing.T) {
 				items = append(items, second)
 			}
 			fixture.start(stubScript{ListStdout: string(encodePackages(t, items...)), Artifact: "artifact"})
-			_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
+			_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout}))
 			if DiagnosticCode(err) != testCase.code {
 				t.Fatalf("error = %v, want %s", err, testCase.code)
 			}
@@ -208,7 +208,7 @@ func TestBuildRejectsArtifactLinksOversizeAndUnexpectedOutputs(t *testing.T) {
 			fixture := newSnapshotFixture(t)
 			script := stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"}
 			fixture.start(testCase.script(fixture, script))
-			limits := ResourceLimits{Timeout: 30 * time.Second, ArtifactBytes: 64, DiskBytes: 8 * 1024 * 1024}
+			limits := ResourceLimits{Timeout: defaultBuildTimeout, ArtifactBytes: 64, DiskBytes: 8 * 1024 * 1024}
 			_, err := Build(context.Background(), fixture.request(limits))
 			if DiagnosticCode(err) != testCase.code {
 				t.Fatalf("error = %v, want %s", err, testCase.code)
@@ -230,7 +230,7 @@ func TestBuildRejectsHardLinkedArtifact(t *testing.T) {
 		// only when the temporary directories do; skip otherwise.
 		ArtifactMode: "hardlink", HardlinkSource: outside,
 	})
-	_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
+	_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout}))
 	switch DiagnosticCode(err) {
 	case "artifact_link":
 	case "go_build_failed":
@@ -249,7 +249,7 @@ func TestBuildEnforcesOutputDeadlineDiskAndNonzeroExit(t *testing.T) {
 		{name: "combined output", code: "process_output_limit", script: func(script stubScript) stubScript {
 			script.ListPadBytes = 8192
 			return script
-		}, limits: ResourceLimits{Timeout: 30 * time.Second, OutputBytes: 1024}},
+		}, limits: ResourceLimits{Timeout: defaultBuildTimeout, OutputBytes: 1024}},
 		{name: "deadline", code: "process_timeout", script: func(script stubScript) stubScript {
 			script.ListSleepMS = 20000
 			return script
@@ -258,7 +258,7 @@ func TestBuildEnforcesOutputDeadlineDiskAndNonzeroExit(t *testing.T) {
 			script.ListExit = 1
 			script.ListStderr = "compiler failed"
 			return script
-		}, limits: ResourceLimits{Timeout: 30 * time.Second}},
+		}, limits: ResourceLimits{Timeout: defaultBuildTimeout}},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			fixture := newSnapshotFixture(t)
@@ -288,7 +288,7 @@ func TestBuildRejectsOversizedPrivateState(t *testing.T) {
 		ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact",
 		PrivateFileName: "oversized", PrivateFileBytes: 4 * 1024 * 1024,
 	})
-	limits := ResourceLimits{Timeout: 30 * time.Second, ArtifactBytes: 1024, FileBytes: 8 * 1024 * 1024, DiskBytes: 2 * 1024 * 1024}
+	limits := ResourceLimits{Timeout: defaultBuildTimeout, ArtifactBytes: 1024, FileBytes: 8 * 1024 * 1024, DiskBytes: 2 * 1024 * 1024}
 	_, err := Build(context.Background(), fixture.request(limits))
 	if DiagnosticCode(err) != "process_disk_limit" {
 		t.Fatalf("error = %v, want process_disk_limit", err)
@@ -304,7 +304,7 @@ func TestBuildClassifiesOfflineVendorAndToolchainFailures(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			fixture := newSnapshotFixture(t)
 			fixture.start(stubScript{ListExit: 1, ListStderr: testCase.stderr})
-			_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
+			_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout}))
 			if DiagnosticCode(err) != testCase.code {
 				t.Fatalf("error = %v, want %s", err, testCase.code)
 			}
@@ -331,7 +331,7 @@ func TestBuildRejectsWorkspaceAndPackageSelectedToolchainBeforeGo(t *testing.T) 
 			fixture := newSnapshotFixture(t)
 			testCase.write(fixture)
 			fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
-			_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
+			_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout}))
 			if DiagnosticCode(err) != testCase.code {
 				t.Fatalf("error = %v, want %s", err, testCase.code)
 			}
@@ -350,7 +350,7 @@ func TestBuildDetectsSourceMutationThroughTheLastChild(t *testing.T) {
 		MutateSourcePath:    filepath.Join(fixture.sourceDir, "main.go"),
 		MutateSourceContent: "package main\nfunc main() { panic(\"mutated\") }\n",
 	})
-	_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
+	_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout}))
 	if DiagnosticCode(err) != "source_mutated" {
 		t.Fatalf("error = %v, want source_mutated", err)
 	}
@@ -366,7 +366,7 @@ func TestBuildRejectsEveryPackageInfluenceSurface(t *testing.T) {
 		t.Run(surface, func(t *testing.T) {
 			fixture := newSnapshotFixture(t)
 			fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
-			request := fixture.request(ResourceLimits{Timeout: 30 * time.Second})
+			request := fixture.request(ResourceLimits{Timeout: defaultBuildTimeout})
 			request.CommandObject[surface] = "package-selected"
 			_, err := Build(context.Background(), request)
 			if DiagnosticCode(err) != CodePackageInfluenceForbidden {
@@ -382,12 +382,12 @@ func TestBuildRejectsEveryPackageInfluenceSurface(t *testing.T) {
 func TestBuildRequiresThePackageCommandSurface(t *testing.T) {
 	fixture := newSnapshotFixture(t)
 	fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
-	request := fixture.request(ResourceLimits{Timeout: 30 * time.Second})
+	request := fixture.request(ResourceLimits{Timeout: defaultBuildTimeout})
 	request.CommandObject = nil
 	if _, err := Build(context.Background(), request); DiagnosticCode(err) != CodePackageInfluenceForbidden {
 		t.Fatalf("error = %v, want %s", err, CodePackageInfluenceForbidden)
 	}
-	request = fixture.request(ResourceLimits{Timeout: 30 * time.Second})
+	request = fixture.request(ResourceLimits{Timeout: defaultBuildTimeout})
 	request.CommandObject["driver"] = "go-repository-v1"
 	if _, err := Build(context.Background(), request); DiagnosticCode(err) != CodePackageInfluenceForbidden {
 		t.Fatalf("error = %v, want %s", err, CodePackageInfluenceForbidden)
@@ -412,13 +412,12 @@ func TestBuildTerminatesTheCompleteWorkerDomain(t *testing.T) {
 	if len(pids) != 2 {
 		t.Fatalf("descendant pids = %v, want two", pids)
 	}
-	deadline := time.Now().Add(15 * time.Second)
 	for _, raw := range pids {
 		pid, convErr := strconv.Atoi(raw)
 		if convErr != nil {
 			t.Fatal(convErr)
 		}
-		for processAlive(pid) && time.Now().Before(deadline) {
+		for processAlive(pid) && t.Context().Err() == nil {
 			time.Sleep(50 * time.Millisecond)
 		}
 		if processAlive(pid) {
@@ -439,7 +438,7 @@ func TestPerFileSizeLimitIsReallyApplied(t *testing.T) {
 		ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact",
 		PrivateFileName: "oversized", PrivateFileBytes: 4 * 1024 * 1024,
 	})
-	limits := ResourceLimits{Timeout: 30 * time.Second, ArtifactBytes: 1024, FileBytes: 1024 * 1024, DiskBytes: defaultDiskLimit}
+	limits := ResourceLimits{Timeout: defaultBuildTimeout, ArtifactBytes: 1024, FileBytes: 1024 * 1024, DiskBytes: defaultDiskLimit}
 	_, err := Build(context.Background(), fixture.request(limits))
 	if DiagnosticCode(err) != "go_build_failed" {
 		t.Fatalf("error = %v, want the compiler to fail under RLIMIT_FSIZE", err)

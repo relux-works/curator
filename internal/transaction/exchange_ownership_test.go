@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/relux-works/curator/internal/managerlock"
 )
@@ -141,7 +140,9 @@ func replaceExchangeOwner(t *testing.T, home string, old *managerlock.HomeLock, 
 	if err := os.WriteFile(paths[0], nil, 0600); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Cleanup owns this child: t.Context is cancelled before Cleanup and would
+	// kill the valid new owner before stdin is closed and its exit is joined.
+	ctx, cancel := context.WithCancel(context.Background())
 	child := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestExchangeNewOwnerHelper$")
 	child.Env = append(os.Environ(), "CURATOR_EXCHANGE_OWNER_HOME="+home, fmt.Sprintf("CURATOR_EXCHANGE_OWNER_RECOVER=%t", recoverPending))
 	child.Stderr = os.Stderr

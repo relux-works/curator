@@ -106,6 +106,13 @@ func TestLandlockProbeNarrowingMutants(t *testing.T) {
 	}
 }
 
+// deadlineCauseContext preserves the actual cancellation cause supplied by the
+// timeout created after readiness, including DeadlineExceeded versus Canceled.
+// exec.CommandContext observes a stable Done channel throughout process startup.
+type deadlineCauseContext struct{ context.Context }
+
+func (ctx deadlineCauseContext) Err() error { return context.Cause(ctx.Context) }
+
 // Both deadline expiry and explicit cancellation kill a real grandchild in
 // the production probe command's process group. An isolated subreaper lets the
 // test reap it and assert SIGKILL, rather than mistaking a zombie for a survivor.
@@ -126,19 +133,31 @@ func TestLandlockProbeCancellationKillsProcessGroup(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			directory := t.TempDir()
 			manager := filepath.Join(directory, "manager")
-			// Absolute sleep avoids depending on the sanitized worker PATH.
-			if err := os.WriteFile(manager, []byte("#!/bin/sh\n/bin/sleep 60 &\necho $! > \"$2/descendant\"\nwait\n"), 0o700); err != nil {
+			// A private inherited pipe holds the real descendant until the
+			// test closes it. A missed group kill then exits normally, giving
+			// Wait4 a deterministic wrong status instead of a timed poll.
+			release, hold, err := os.Pipe()
+			if err != nil {
 				t.Fatal(err)
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer func() { _ = release.Close() }()
+			defer func() { _ = hold.Close() }()
+			if err := os.WriteFile(manager, []byte("#!/bin/sh\n/bin/sh -c 'read release <&3' &\necho $! > \"$2/descendant\"\nwait\n"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			base, stop := context.WithCancelCause(t.Context())
+			ctx := deadlineCauseContext{base}
+			cancel := func() { stop(context.Canceled) }
 			defer cancel()
 			command := landlockProbeCommand(ctx, manager, directory)
+			command.ExtraFiles = []*os.File{release}
 			if err := command.Start(); err != nil {
 				t.Fatal(err)
 			}
+			_ = release.Close()
 			defer func() { _ = unix.Kill(-command.Process.Pid, unix.SIGKILL) }()
 			var pid int
-			for deadline := time.Now().Add(time.Second); time.Now().Before(deadline); {
+			for t.Context().Err() == nil {
 				payload, err := os.ReadFile(filepath.Join(directory, "descendant"))
 				if err == nil {
 					pid, err = strconv.Atoi(strings.TrimSpace(string(payload)))
@@ -153,30 +172,34 @@ func TestLandlockProbeCancellationKillsProcessGroup(t *testing.T) {
 				_ = command.Wait()
 				t.Fatal("probe fixture did not start its descendant")
 			}
+			// Start the deadline only after the fixture's real descendant
+			// reports readiness; CI startup is not part of this assertion.
+			var expired context.Context
 			if mode == "cancel" {
 				cancel()
+			} else {
+				var expireCancel context.CancelFunc
+				expired, expireCancel = context.WithTimeout(t.Context(), 2*time.Second)
+				defer expireCancel()
+				stopForwarding := context.AfterFunc(expired, func() { stop(context.Cause(expired)) })
+				defer stopForwarding()
 			}
 			if err := command.Wait(); err == nil || ctx.Err() == nil {
 				t.Fatalf("probe did not fail on %s: wait=%v context=%v", mode, err, ctx.Err())
 			}
+			if mode == "timeout" && !errors.Is(expired.Err(), context.DeadlineExceeded) {
+				t.Fatalf("probe ended without deadline expiry: %v", expired.Err())
+			}
+			// The direct command has joined after cancellation. Close the
+			// descendant barrier: a pending SIGKILL must win over normal exit.
+			_ = hold.Close()
 			var status unix.WaitStatus
-			for deadline := time.Now().Add(time.Second); ; {
-				reaped, err := unix.Wait4(pid, &status, unix.WNOHANG, nil)
-				if err != nil {
-					t.Fatalf("reap probe descendant: %v", err)
-				}
-				if reaped == pid {
-					break
-				}
-				if time.Now().After(deadline) {
-					_ = unix.Kill(pid, unix.SIGKILL)
-					_, _ = unix.Wait4(pid, &status, 0, nil)
-					t.Fatal("probe descendant survived cancellation")
-				}
-				time.Sleep(10 * time.Millisecond)
+			reaped, err := unix.Wait4(pid, &status, 0, nil)
+			if err != nil || reaped != pid {
+				t.Fatalf("reap probe descendant: pid=%d err=%v", reaped, err)
 			}
 			if !status.Signaled() || status.Signal() != unix.SIGKILL {
-				t.Fatalf("descendant status=%v, want SIGKILL", status)
+				t.Fatalf("probe descendant survived cancellation: status=%v, want SIGKILL", status)
 			}
 			if err := unix.Kill(pid, 0); !errors.Is(err, unix.ESRCH) {
 				t.Fatalf("descendant still exists after reap: %v", err)

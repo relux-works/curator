@@ -26,7 +26,7 @@ const (
 
 const (
 	blockedHelperDeadline  = 200 * time.Millisecond
-	acquiredHelperDeadline = 30 * time.Second
+	acquiredHelperDeadline = 0 // Positive helpers use their enclosing subprocess test watchdog.
 )
 
 func TestCanonicalProjectIdentitiesAndOrder(t *testing.T) {
@@ -331,14 +331,10 @@ func TestProjectOrderInversionFailsBeforeWaiting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	started := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
 	if _, err := high.AcquireProjects(ctx, string(ordered[0])); !errors.Is(err, ErrLockOrder) {
 		t.Fatalf("inversion error = %v, want ErrLockOrder", err)
-	}
-	if elapsed := time.Since(started); elapsed > 100*time.Millisecond {
-		t.Fatalf("inversion waited on the contended lower lock for %v", elapsed)
 	}
 }
 
@@ -523,8 +519,8 @@ func TestSubprocessBuildKeyDeduplicationAcrossProjects(t *testing.T) {
 }
 
 func TestSubprocessExpectedAcquiredWithTinyDeadlineReportsBlocked(t *testing.T) {
-	if acquiredHelperDeadline <= blockedHelperDeadline {
-		t.Fatalf("acquired helper deadline %v must exceed blocked helper deadline %v", acquiredHelperDeadline, blockedHelperDeadline)
+	if acquiredHelperDeadline != 0 {
+		t.Fatal("positive lock helper has an independent acquisition deadline")
 	}
 	home := t.TempDir()
 	project := t.TempDir()
@@ -547,6 +543,10 @@ func TestSubprocessExpectedAcquiredWithTinyDeadlineReportsBlocked(t *testing.T) 
 	}
 	if _, err := os.Stat(lockPath); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expired helper created or acquired project lock %q: stat = %v, want not exist", lockPath, err)
+	}
+	// The same helper acquires this exact lock without an artificial deadline.
+	if got := runHelper(t, "try-project", home, project, "acquired"); got != "acquired" {
+		t.Fatalf("unbounded helper = %q, want acquired", got)
 	}
 }
 
@@ -588,7 +588,7 @@ func TestAbnormalChildExitReleasesOSLock(t *testing.T) {
 	}
 	operation := manager.NewOperation(false)
 	cleanupOperation(t, operation)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	if _, err := operation.AcquireProjects(ctx, project); err != nil {
 		t.Fatalf("OS lock survived abnormal child exit: %v", err)
@@ -634,7 +634,7 @@ func runHelperWithDeadline(t *testing.T, mode, home, project, key string, deadli
 }
 
 func helperCommand(mode, home, project string) *exec.Cmd {
-	command := exec.Command(os.Args[0], "-test.run=^TestManagerLockHelper$")
+	command := exec.Command(os.Args[0], "-test.run=^TestManagerLockHelper$", "-test.timeout=3m")
 	command.Env = append(os.Environ(),
 		helperModeEnv+"="+mode,
 		helperHomeEnv+"="+home,
@@ -667,8 +667,12 @@ func TestManagerLockHelper(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invalid helper deadline %q: %v", os.Getenv(helperDeadlineEnv), err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), deadline)
-	defer cancel()
+	ctx := t.Context()
+	if deadline != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, deadline)
+		defer cancel()
+	}
 	var release func() error
 	switch mode {
 	case "try-project":

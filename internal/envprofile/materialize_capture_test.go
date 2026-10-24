@@ -136,7 +136,7 @@ func TestMaterializeCaptureCurrentAndRelease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	lock, err := manager.AcquireExistingHomeOnly(ctx)
 	if err != nil {
@@ -333,7 +333,9 @@ func TestMaterializeCaptureWaitReselectsAndTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lockTimeout = time.Second
+	// The released positive control uses the production lock budget; only
+	// the refusal above needs a deliberately short deadline.
+	lockTimeout = old
 	result := make(chan error, 1)
 	req.Capture = func(c *MaterializeCapture) ([]byte, error) {
 		if c.Request.Profile != "capture" || c.Request.Machine.Permissions["capture"] != "native" {
@@ -692,7 +694,7 @@ func TestMaterializeCaptureConcurrentRepair(t *testing.T) {
 		go func() { _, err := Resolve(repair); completed <- err }()
 		select {
 		case <-waiting:
-		case <-time.After(2 * time.Second):
+		case <-t.Context().Done():
 			return nil, errors.New("repair did not reach mutation lock")
 		}
 		select {

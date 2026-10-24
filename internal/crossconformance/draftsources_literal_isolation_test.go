@@ -465,9 +465,6 @@ func proxyListener(t *testing.T) (addr string, count *atomic.Int64, closeFn func
 	count = &atomic.Int64{}
 	go func() {
 		for {
-			if err := listener.(*net.TCPListener).SetDeadline(time.Now().Add(10 * time.Second)); err != nil {
-				return
-			}
 			conn, err := listener.Accept()
 			if err != nil {
 				return
@@ -503,10 +500,9 @@ func TestDraftLiteralIgnoresProxyEnvironment(t *testing.T) {
 		closeControl()
 		t.Fatalf("control ls-remote succeeded, want failure:\n%s", controlStderr)
 	}
-	deadline := time.Now().Add(5 * time.Second)
-	for controlCount.Load() == 0 && time.Now().Before(deadline) {
-		time.Sleep(50 * time.Millisecond)
-	}
+	// The fixture increments before closing the accepted socket. Git cannot
+	// finish this connected exchange before that event; no polling budget is
+	// needed to distinguish a live proxy control from a setup failure.
 	closeControl()
 	if controlCount.Load() == 0 {
 		t.Fatalf("control left zero proxy connections (payload not live):\n%s", controlStderr)
@@ -559,7 +555,7 @@ func TestDraftLiteralIgnoresProxyEnvironment(t *testing.T) {
 		}
 	}
 	// Give a leaked proxy dial time to arrive; the lane must stay silent.
-	deadline = time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
 		if count.Load() != 0 {
 			break

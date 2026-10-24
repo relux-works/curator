@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/relux-works/curator/internal/hashing"
@@ -572,48 +573,50 @@ func TestSnapshotVerification(t *testing.T) {
 }
 
 func TestSnapshotRequiresCompleteShapeAndRejectsEquivocation(t *testing.T) {
-	s := newSigner(t)
-	now := time.Now().UTC().Truncate(time.Second)
-	cacheDir := t.TempDir()
-	reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
+	synctest.Test(t, func(t *testing.T) {
+		s := newSigner(t)
+		now := time.Now().UTC().Truncate(time.Second)
+		cacheDir := t.TempDir()
+		reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
 
-	valid := snapshotBody(5, now)
-	fetch := func(string) (map[string]any, error) { return s.sign(valid), nil }
-	tampered, _ := CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
-	if len(tampered) != 0 {
-		t.Fatal("valid snapshot rejected")
-	}
+		valid := snapshotBody(5, now)
+		fetch := func(string) (map[string]any, error) { return s.sign(valid), nil }
+		tampered, _ := CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
+		if len(tampered) != 0 {
+			t.Fatal("valid snapshot rejected")
+		}
 
-	equivocated := snapshotBody(5, now)
-	equivocated["head"] = strings.Repeat("c", 64)
-	fetch = func(string) (map[string]any, error) { return s.sign(equivocated), nil }
-	tampered, warnings := CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
-	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "equivocation") {
-		t.Fatalf("equivocation not detected: %v %v", tampered, warnings)
-	}
+		equivocated := snapshotBody(5, now)
+		equivocated["head"] = strings.Repeat("c", 64)
+		fetch = func(string) (map[string]any, error) { return s.sign(equivocated), nil }
+		tampered, warnings := CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
+		if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "equivocation") {
+			t.Fatalf("equivocation not detected: %v %v", tampered, warnings)
+		}
 
-	incomplete := snapshotBody(6, now)
-	delete(incomplete, "merkle_root")
-	fetch = func(string) (map[string]any, error) { return s.sign(incomplete), nil }
-	tampered, warnings = CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
-	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "malformed") {
-		t.Fatalf("incomplete snapshot not rejected: %v %v", tampered, warnings)
-	}
+		incomplete := snapshotBody(6, now)
+		delete(incomplete, "merkle_root")
+		fetch = func(string) (map[string]any, error) { return s.sign(incomplete), nil }
+		tampered, warnings = CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
+		if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "malformed") {
+			t.Fatalf("incomplete snapshot not rejected: %v %v", tampered, warnings)
+		}
 
-	unknown := snapshotBody(6, now)
-	unknown["extension"] = true
-	fetch = func(string) (map[string]any, error) { return s.sign(unknown), nil }
-	tampered, warnings = CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
-	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "malformed") {
-		t.Fatalf("snapshot unknown field not rejected: %v %v", tampered, warnings)
-	}
+		unknown := snapshotBody(6, now)
+		unknown["extension"] = true
+		fetch = func(string) (map[string]any, error) { return s.sign(unknown), nil }
+		tampered, warnings = CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
+		if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "malformed") {
+			t.Fatalf("snapshot unknown field not rejected: %v %v", tampered, warnings)
+		}
 
-	future := snapshotBody(7, now.Add(DefaultSnapshotClockSkew+time.Second))
-	fetch = func(string) (map[string]any, error) { return s.sign(future), nil }
-	tampered, warnings = CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
-	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "future") {
-		t.Fatalf("future snapshot not rejected: %v %v", tampered, warnings)
-	}
+		future := snapshotBody(7, now.Add(DefaultSnapshotClockSkew+time.Second))
+		fetch = func(string) (map[string]any, error) { return s.sign(future), nil }
+		tampered, warnings = CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
+		if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "future") {
+			t.Fatalf("future snapshot not rejected: %v %v", tampered, warnings)
+		}
+	})
 }
 
 func TestSnapshotRollbackStateCorruptionFailsClosedAndMigrates(t *testing.T) {
@@ -927,17 +930,13 @@ func TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew(t *testing.T) {
 	for _, skew := range []time.Duration{0, 30 * time.Second, DefaultSnapshotClockSkew} {
 		for _, tc := range cases {
 			name := skew.String() + "/" + tc.name
-			t.Run(name, func(t *testing.T) {
+			runSnapshotClockTest(t, name, func(t *testing.T) {
 				body := snapshotBody(5, now.Add(skew).Add(tc.offset))
 				fetch := func(string) (map[string]any, error) { return s.sign(body), nil }
 				reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
 				cacheDir := t.TempDir()
-				// A new persistent cache writes and syncs its empty catalog before
-				// checking the timestamp. The checker includes that setup time in
-				// its latency allowance; on Windows, the sync can exceed this test's
-				// one-second exact edge. Keep each row isolated, but seed the empty
-				// catalog before entering the checker so cache initialization does
-				// not widen the bound this row is meant to pin.
+				// Each row has private persistent state. In the fake-clock
+				// bubble, catalog I/O cannot widen the exact one-second edge.
 				if err := writeSnapshotStateCatalog(cacheDir, map[string]bool{}); err != nil {
 					t.Fatal(err)
 				}
@@ -968,30 +967,40 @@ func TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew(t *testing.T) {
 // within that latency is legitimate even here; the install fixtures that stamp
 // before the run are unaffected (BUG-260906-1bdotx).
 func TestSnapshotZeroClockSkewIsLiteral(t *testing.T) {
-	s := newSigner(t)
-	strictCache, defaultCache := t.TempDir(), t.TempDir()
-	// Prepare persistent-cache state before sampling `now`: its creation and
-	// sync are checker work and must not widen this injected-now boundary.
-	for _, cache := range []string{strictCache, defaultCache} {
-		if err := writeSnapshotStateCatalog(cache, map[string]bool{}); err != nil {
-			t.Fatal(err)
+	synctest.Test(t, func(t *testing.T) {
+		s := newSigner(t)
+		strictCache, defaultCache := t.TempDir(), t.TempDir()
+		// Prepare persistent-cache state before sampling `now`: its creation and
+		// sync are checker work and must not widen this injected-now boundary.
+		for _, cache := range []string{strictCache, defaultCache} {
+			if err := writeSnapshotStateCatalog(cache, map[string]bool{}); err != nil {
+				t.Fatal(err)
+			}
 		}
-	}
-	now := time.Now().UTC().Truncate(time.Second).Add(500 * time.Millisecond)
-	// The next whole second is 500ms ahead of `now` — the shape a snapshot
-	// minted during the fetch takes after RFC3339 truncation.
-	body := snapshotBody(5, now.Truncate(time.Second).Add(time.Second))
-	fetch := func(string) (map[string]any, error) { return s.sign(body), nil }
-	reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
+		now := time.Now().UTC().Truncate(time.Second).Add(500 * time.Millisecond)
+		// The next whole second is 500ms ahead of `now` — the shape a snapshot
+		// minted during the fetch takes after RFC3339 truncation.
+		body := snapshotBody(5, now.Truncate(time.Second).Add(time.Second))
+		fetch := func(string) (map[string]any, error) { return s.sign(body), nil }
+		reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
 
-	tampered, warnings := CheckSnapshotsWithPolicy([]Registry{reg}, strictCache, fetch, now, 0, 0)
-	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "too far in the future") {
-		t.Fatalf("a zero skew must refuse a sub-second future timestamp: %v %v", tampered, warnings)
-	}
-	tampered, warnings = CheckSnapshotsWithPolicy([]Registry{reg}, defaultCache, fetch, now, 0, DefaultSnapshotClockSkew)
-	if tampered[reg.URL] || len(withoutTOFUWarnings(warnings)) != 0 {
-		t.Fatalf("the shipped default must absorb sub-second drift: %v %v", tampered, warnings)
-	}
+		tampered, warnings := CheckSnapshotsWithPolicy([]Registry{reg}, strictCache, fetch, now, 0, 0)
+		if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "too far in the future") {
+			t.Fatalf("a zero skew must refuse a sub-second future timestamp: %v %v", tampered, warnings)
+		}
+		tampered, warnings = CheckSnapshotsWithPolicy([]Registry{reg}, defaultCache, fetch, now, 0, DefaultSnapshotClockSkew)
+		if tampered[reg.URL] || len(withoutTOFUWarnings(warnings)) != 0 {
+			t.Fatalf("the shipped default must absorb sub-second drift: %v %v", tampered, warnings)
+		}
+	})
+}
+
+// runSnapshotClockTest preserves named subtests outside the clock bubble.
+// Filesystem/signing latency consumes no fake time; the existing sleeps advance
+// only the intended checker latency and all original verdicts remain asserted.
+func runSnapshotClockTest(t *testing.T, name string, f func(*testing.T)) {
+	t.Helper()
+	t.Run(name, func(t *testing.T) { synctest.Test(t, f) })
 }
 
 // TestSnapshotFutureBoundToleratesCheckerLatency pins the elapsed-time term
@@ -1008,9 +1017,8 @@ func TestSnapshotFutureBoundToleratesCheckerLatency(t *testing.T) {
 	// created_at round-trips as whole seconds, so each row anchors its
 	// injected `now` on a whole second just before the check: every future
 	// offset below is an exact whole number of seconds, and the 500 ms
-	// margins against the 1.5 s sleeps hold on any scheduler the suite
-	// runs on.
-	t.Run("mint during a slow fetch is accepted under zero skew", func(t *testing.T) {
+	// margins against the 1.5s fake-clock sleeps do not depend on host load.
+	runSnapshotClockTest(t, "mint during a slow fetch is accepted under zero skew", func(t *testing.T) {
 		now := time.Now().UTC().Truncate(time.Second)
 		s := newSigner(t)
 		fetch := func(string) (map[string]any, error) {
@@ -1028,7 +1036,7 @@ func TestSnapshotFutureBoundToleratesCheckerLatency(t *testing.T) {
 		// After a 1.5 s sibling, an instant registry with created_at one
 		// second past the injected `now` is already behind the wall clock
 		// when checked and must be accepted.
-		t.Run("behind the post-fetch clock is accepted", func(t *testing.T) {
+		runSnapshotClockTest(t, "behind the post-fetch clock is accepted", func(t *testing.T) {
 			slow, fast := newSigner(t), newSigner(t)
 			slowReg := Registry{Name: "slow", URL: "https://slow", PublicKeys: []string{slow.pinned}}
 			fastReg := Registry{Name: "fast", URL: "https://fast", PublicKeys: []string{fast.pinned}}
@@ -1051,28 +1059,30 @@ func TestSnapshotFutureBoundToleratesCheckerLatency(t *testing.T) {
 		// The same shape with created_at ahead of the post-fetch clock
 		// (now + skew + 3 s, i.e. ~1.5 s past the checker's clock after the
 		// sibling's fetch) is genuinely future and must still refuse.
-		for _, skew := range []time.Duration{0, 30 * time.Second} {
-			slow, fast := newSigner(t), newSigner(t)
-			slowReg := Registry{Name: "slow", URL: "https://slow", PublicKeys: []string{slow.pinned}}
-			fastReg := Registry{Name: "fast", URL: "https://fast", PublicKeys: []string{fast.pinned}}
-			fetch := func(url string) (map[string]any, error) {
-				if url == slowReg.URL {
-					time.Sleep(1500 * time.Millisecond)
-					return slow.sign(snapshotBody(5, now.Add(time.Second))), nil
+		synctest.Test(t, func(t *testing.T) {
+			for _, skew := range []time.Duration{0, 30 * time.Second} {
+				slow, fast := newSigner(t), newSigner(t)
+				slowReg := Registry{Name: "slow", URL: "https://slow", PublicKeys: []string{slow.pinned}}
+				fastReg := Registry{Name: "fast", URL: "https://fast", PublicKeys: []string{fast.pinned}}
+				fetch := func(url string) (map[string]any, error) {
+					if url == slowReg.URL {
+						time.Sleep(1500 * time.Millisecond)
+						return slow.sign(snapshotBody(5, now.Add(time.Second))), nil
+					}
+					return fast.sign(snapshotBody(5, now.Add(skew).Add(3*time.Second))), nil
 				}
-				return fast.sign(snapshotBody(5, now.Add(skew).Add(3*time.Second))), nil
+				tampered, warnings := CheckSnapshotsWithPolicy(
+					[]Registry{slowReg, fastReg}, t.TempDir(), fetch, now, 0, skew)
+				if tampered[slowReg.URL] {
+					t.Fatalf("skew %v: the slow registry's own mint must be accepted: %v", skew, warnings)
+				}
+				if !tampered[fastReg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "fast snapshot timestamp is too far in the future") {
+					t.Fatalf("skew %v: a timestamp ahead of the post-fetch clock must refuse: %v %v", skew, tampered, warnings)
+				}
 			}
-			tampered, warnings := CheckSnapshotsWithPolicy(
-				[]Registry{slowReg, fastReg}, t.TempDir(), fetch, now, 0, skew)
-			if tampered[slowReg.URL] {
-				t.Fatalf("skew %v: the slow registry's own mint must be accepted: %v", skew, warnings)
-			}
-			if !tampered[fastReg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "fast snapshot timestamp is too far in the future") {
-				t.Fatalf("skew %v: a timestamp ahead of the post-fetch clock must refuse: %v %v", skew, tampered, warnings)
-			}
-		}
+		})
 	})
-	t.Run("now plus skew plus two seconds still refuses", func(t *testing.T) {
+	runSnapshotClockTest(t, "now plus skew plus two seconds still refuses", func(t *testing.T) {
 		now := time.Now().UTC().Truncate(time.Second)
 		for _, skew := range []time.Duration{0, 30 * time.Second} {
 			s := newSigner(t)
