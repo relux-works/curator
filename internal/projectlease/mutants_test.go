@@ -105,10 +105,9 @@ func TestLeaseNarrowingMutants(t *testing.T) {
 					}
 				}
 				if tc.pkg == "cmd/curator" {
-					// These GC witnesses recover synthetic journals and never
-					// fingerprint or mutate the host toolchain. Reuse the CLI
-					// helper mode so a parallel package's host lock cannot
-					// prevent the positive control or plant from reaching them.
+					// All CLI witnesses here recover synthetic journals without
+					// fingerprinting or mutating the host toolchain. Helper mode
+					// keeps its lock from consuming either control's watchdog.
 					cmd.Env = append(cmd.Env, "CURATOR_TEST_CLI_HELPER=1")
 				}
 				return cmd.CombinedOutput()
