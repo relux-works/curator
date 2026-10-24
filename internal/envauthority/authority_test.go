@@ -24,7 +24,7 @@ func TestManagedAuthorityInventory(t *testing.T) {
 	for _, adapter := range envregistry.Registry {
 		for _, node := range []bool{true, false} {
 			t.Run(adapter.ID+map[bool]string{true: "/node", false: "/per-home"}[node], func(t *testing.T) {
-				home := t.TempDir()
+				home := filepath.Clean(t.TempDir())
 				dir := filepath.Join(home, "environments", "orphan", adapter.ID)
 				if adapter.ID == envregistry.OpenCode {
 					dir = filepath.Join(dir, "opencode")
@@ -98,7 +98,7 @@ func TestManagedAuthorityBoundary(t *testing.T) {
 	}
 	for _, variant := range []string{"root-link", "profile-link", "marker-link", "writable", "malformed"} {
 		t.Run(variant, func(t *testing.T) {
-			home := t.TempDir()
+			home := filepath.Clean(t.TempDir())
 			root := filepath.Join(home, "environments")
 			dir := filepath.Join(root, "example", envregistry.CodexCLI)
 			if err := privatedir.MakeAll(dir); err != nil {
