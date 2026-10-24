@@ -12,6 +12,14 @@ import (
 )
 
 func prepareManagerHome(path string) error {
+	resolved, missing, err := resolveExistingPrefix(path, "manager home")
+	if err != nil {
+		return err
+	}
+	path = resolved
+	for index := len(missing) - 1; index >= 0; index-- {
+		path = filepath.Join(path, missing[index])
+	}
 	for _, rel := range []string{"", "state", "state/locks", "state/locks/v1"} {
 		if err := privatedir.Prepare(filepath.Join(path, filepath.FromSlash(rel))); err != nil {
 			return err

@@ -20,6 +20,7 @@ func TestWindowsPrivateManagerNarrowingMutants(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct{ name, file, before, after, pkg, run, assertion string }{
+		{"creation-alias-prefix", "internal/managerlock/open_windows.go", "resolved, missing, err := resolveExistingPrefix(path, \"manager home\")", "resolved, missing, err := path, []string(nil), error(nil)", "managerlock", "^TestWindowsPrivateMissingHomeAlias$", "aliased private home creation failed"},
 		{"manager-boundary", "internal/managerlock/open_windows.go", "privatedir.Prepare(filepath.Join(path, filepath.FromSlash(rel)))", "privatedir.MakeAll(filepath.Join(path, filepath.FromSlash(rel)))", "managerlock", "^TestWindowsPrivateLockReplacement$", "manager directory lost private DACL"},
 		{"lock-creation", "internal/managerlock/open_windows.go", "privatedir.Create(path, 0o600)", "os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)", "managerlock", "^TestWindowsPrivateLockReplacement$", "manager lock lost private DACL"},
 		{"lock-delete-sharing", "internal/managerlock/open_windows.go", "windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE", "windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE", "managerlock", "^TestWindowsPrivateLockReplacement$", "Windows lock replacement witness unavailable"},

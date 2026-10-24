@@ -59,34 +59,39 @@ func canonicalAbsolute(path, label string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve %s: %w", label, err)
 	}
-	absolute = filepath.Clean(absolute)
+	resolved, missing, err := resolveExistingPrefix(filepath.Clean(absolute), label)
+	if err != nil {
+		return "", err
+	}
+	return canonicalWithExistingPrefix(resolved, missing, label)
+}
+
+// resolveExistingPrefix preserves the spelling of a missing suffix separately
+// from the physical existing prefix. Creation must not use a provisional
+// case-folded identity as its path on case-sensitive Windows directories.
+func resolveExistingPrefix(absolute, label string) (string, []string, error) {
 	resolved, err := filepath.EvalSymlinks(absolute)
 	if err == nil {
-		return canonicalWithExistingPrefix(filepath.Clean(resolved), nil, label)
+		return filepath.Clean(resolved), nil, nil
 	}
 	if !os.IsNotExist(err) {
-		return "", fmt.Errorf("resolve %s symlinks: %w", label, err)
+		return "", nil, fmt.Errorf("resolve %s symlinks: %w", label, err)
 	}
-
-	// A first mutation may address a not-yet-created manager home. Resolve the
-	// longest existing prefix so its identity does not change after the missing
-	// suffix is created through a symlinked ancestor.
 	prefix := absolute
 	suffix := make([]string, 0, 4)
 	for {
 		parent := filepath.Dir(prefix)
 		if parent == prefix {
-			return "", fmt.Errorf("resolve existing prefix for %s: %w", label, err)
+			return "", nil, fmt.Errorf("resolve existing prefix for %s: %w", label, err)
 		}
 		suffix = append(suffix, filepath.Base(prefix))
 		prefix = parent
-
 		resolved, err = filepath.EvalSymlinks(prefix)
 		if err == nil {
-			return canonicalWithExistingPrefix(filepath.Clean(resolved), suffix, label)
+			return filepath.Clean(resolved), suffix, nil
 		}
 		if !os.IsNotExist(err) {
-			return "", fmt.Errorf("resolve %s symlinks: %w", label, err)
+			return "", nil, fmt.Errorf("resolve %s symlinks: %w", label, err)
 		}
 	}
 }
