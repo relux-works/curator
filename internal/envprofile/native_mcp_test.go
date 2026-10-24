@@ -633,7 +633,7 @@ func TestProfileMCPExecutableQualificationInert(t *testing.T) {
 
 // The fixture home is private on each platform and installs successfully.
 // Broadened home or managed-home mutation rights still cause the production
-// route check to refuse, without publishing native/ownership/skill payloads
+// manager-lock or route check to refuse, without publishing native/ownership/skill payloads
 // or repairing the caller's permissions. Windows exercises actual DACLs.
 func TestProfileMCPPrivateFixtureBoundary(t *testing.T) {
 	for _, id := range []string{"claude_code", "codex_cli"} {

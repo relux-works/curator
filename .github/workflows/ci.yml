@@ -269,6 +269,13 @@ jobs:
         shell: bash
         run: bash .github/ci/ledger-consistency.sh .temp/ci-evidence/ledger
 
+      # Run the real deep-clone/reopen witness before the long Windows suite.
+      # The full suite still runs and records this required root in Go JSON.
+      - name: Windows Git long-path preflight
+        if: runner.os == 'Windows'
+        shell: bash
+        run: env -u GIT_DIR -u GIT_WORK_TREE go test -count=1 -timeout=5m ./internal/gitops -run '^Test(CloneLongDestination|GitLongPathProcessSetting)$'
+
       # Runs the planned package set and enforces .github/ci/platform-cases.tsv:
       # the Windows runner must execute the DACL, reparse-point and `.cmd`
       # launcher cases; the unix runners must execute the ownership, no-follow,

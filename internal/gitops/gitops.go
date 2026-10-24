@@ -221,9 +221,16 @@ func isolatedGitEnv() (env []string, cleanup func(), err error) {
 	return env, cleanup, nil
 }
 
+// gitCommand enables Windows long paths before Git reads repository metadata.
+// Local core.longpaths alone can take effect too late for object access, so
+// clone, subsequent commands and streamed object readers share this option.
+func gitCommand(args ...string) *exec.Cmd {
+	return exec.Command("git", append([]string{"-c", "core.longpaths=true"}, args...)...) // #nosec G204 -- fixed binary; callers build validated arguments
+}
+
 // runWithEnv runs one git invocation with an explicit environment.
 func runWithEnv(dir string, env []string, args ...string) (string, error) {
-	cmd := exec.Command("git", args...) // #nosec G204 -- fixed binary, arguments are built by this package
+	cmd := gitCommand(args...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
@@ -276,9 +283,9 @@ func cloneWith(remoteURL, destination string, runFn func(dir string, args ...str
 	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
 		return err
 	}
-	// Git for Windows needs the process option during template initialization,
-	// before clone writes its local configuration. Persist it for later fetches.
-	if _, err := runFn("", "-c", "core.longpaths=true", "clone", "--config", "core.longpaths=true", "--", trimmed, destination); err != nil {
+	// gitCommand supplies the early process option; retain the local setting
+	// for later repository consumers outside this package too.
+	if _, err := runFn("", "clone", "--config", "core.longpaths=true", "--", trimmed, destination); err != nil {
 		_ = os.RemoveAll(destination)
 		return fmt.Errorf("git clone failed for %s -> %s: %w", remoteURL, destination, err)
 	}
@@ -596,7 +603,7 @@ func (e *UnsupportedLinkError) Error() string {
 // space-padded, "-" for non-blobs and "BAD" for an object the repository
 // cannot read; paths unquoted.
 func listTree(repo, tree string) ([]treeEntry, error) {
-	cmd := exec.Command("git", "-C", repo, "ls-tree", "-r", "-l", "-z", "--full-tree", tree) // #nosec G204 -- fixed binary and flags; tree is a resolved object id
+	cmd := gitCommand("-C", repo, "ls-tree", "-r", "-l", "-z", "--full-tree", tree)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -816,7 +823,7 @@ func writeBlobs(repo string, entries []treeEntry) error {
 	if len(entries) == 0 {
 		return nil
 	}
-	cmd := exec.Command("git", "-C", repo, "cat-file", "--batch") // #nosec G204 -- fixed binary and flags
+	cmd := gitCommand("-C", repo, "cat-file", "--batch")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	stdin, err := cmd.StdinPipe()
