@@ -190,6 +190,9 @@ func TestResourceLimitsStayInsideManagerBounds(t *testing.T) {
 		normalized.Processes != defaultProcessLimit {
 		t.Fatalf("defaults = %s", normalized)
 	}
+	// These are synthetic invalid declarations, not running watchdogs. The
+	// timeout exceeds the unchanged manager maximum by one second; this
+	// table checks normalization only and launches no process.
 	for _, limits := range []ResourceLimits{
 		{Timeout: defaultBuildTimeout + time.Second},
 		{OutputBytes: defaultBuildOutput + 1},
