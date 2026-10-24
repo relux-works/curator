@@ -18,8 +18,8 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/install"
-	"github.com/relux-works/curator/internal/transaction"
 	"github.com/relux-works/curator/internal/testgitenv"
+	"github.com/relux-works/curator/internal/transaction"
 )
 
 type nativeGlobalFixture struct {
