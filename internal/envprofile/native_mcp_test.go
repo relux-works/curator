@@ -897,10 +897,11 @@ func TestProfileMCPCurrentAdmission(t *testing.T) {
 // A signed version tag can authorize an unsigned exact commit in the legacy
 // profile cache without project-only origin metadata. Moving that tag to a
 // different commit cannot authorize the frozen snapshot; both cases replay
-// the current source signer list without fetching.
+// the current source signer list without fetching. Valid signed provenance
+// cannot bypass a home whose mutation permissions broaden before publication.
 func TestProfileMCPSignedTagReplay(t *testing.T) {
-	for _, changed := range []bool{false, true} {
-		t.Run(map[bool]string{false: "valid", true: "different-commit"}[changed], func(t *testing.T) {
+	for _, variant := range []string{"valid", "different-commit", "broadened-home"} {
+		t.Run(variant, func(t *testing.T) {
 			fx, req := nativeWriterFixture(t)
 			req.Environments = []string{"codex_cli"}
 			source := "github.com/example/native-mcp"
@@ -911,20 +912,41 @@ func TestProfileMCPSignedTagReplay(t *testing.T) {
 			key, pub := statusSignerKey(t)
 			gitStatusCommand(t, repo, "-c", "gpg.format=ssh", "-c", "user.signingkey="+key, "tag", "-s", "-m", "fixture", "v1.2.0")
 			req.Policy.SourceSigners = map[string][]contextresolve.Signer{source: {{Type: "ssh", Key: pub}}}
-			if changed {
+			if variant == "different-commit" {
 				gitStatusCommand(t, repo, "commit", "--allow-empty", "-m", "different")
 				gitStatusCommand(t, repo, "tag", "-d", "v1.2.0")
 				gitStatusCommand(t, repo, "-c", "gpg.format=ssh", "-c", "user.signingkey="+key, "tag", "-s", "-m", "fixture", "v1.2.0")
 			}
+			if variant == "broadened-home" {
+				req.beforePublish = func() {
+					restore, e := makeWorldWritableSingleDirectoryForTest(fx.home)
+					if e != nil {
+						t.Fatal(e)
+					}
+					t.Cleanup(func() {
+						if e := restore(); e != nil {
+							t.Error(e)
+						}
+					})
+				}
+			}
 			result, err := ProfileMCP(req)
-			if changed {
+			switch variant {
+			case "broadened-home":
+				requireMCPError(t, err, "permissions:")
+				if result.Published {
+					t.Fatal("signed replay published through broadened ACL")
+				}
+				nativeAbsent(t, nativeWriterPath(fx, "codex_cli"))
+				nativeAbsent(t, nativeMCPLedger(fx.home, fx.profile, "codex_cli"))
+			case "different-commit":
 				requireMCPError(t, err, contextresolve.DiagSourceUnsigned)
 				if result.Published {
 					t.Fatalf("wrong tag commit admitted: %+v %v", result, err)
 				}
 				nativeAbsent(t, nativeWriterPath(fx, "codex_cli"))
 				nativeAbsent(t, nativeMCPLedger(fx.home, fx.profile, "codex_cli"))
-			} else {
+			default:
 				if err != nil || !result.Published {
 					t.Fatalf("valid tag refused: %+v %v", result, err)
 				}
@@ -1130,7 +1152,7 @@ func TestProfileMCPTOMLMultilineClosingRuns(t *testing.T) {
 // installs and immediately reports unchanged. Unix modes do not qualify ACLs.
 func TestProfileMCPLedgerParentBeforeFirstInstall(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("Unix permission-bit witnesses")
+		t.Skip("POSIX permission-bit witnesses; Windows DACL controls run separately")
 	}
 	for _, mode := range []os.FileMode{0o700, 0o755, 0o777} {
 		t.Run(fmt.Sprintf("%o", mode), func(t *testing.T) {
@@ -1185,7 +1207,7 @@ func TestProfileMCPPreviewSkillPreimages(t *testing.T) {
 	for _, variant := range []string{"absent", "identical", "changed", "extra", "wrong-mode"} {
 		t.Run(variant, func(t *testing.T) {
 			if variant == "wrong-mode" && runtime.GOOS == "windows" {
-				t.Skip("Unix mode preimage")
+				t.Skip("POSIX permission-bit witnesses; Windows DACL controls run separately")
 			}
 			fx, req := nativeWriterFixture(t)
 			req.Environments = []string{"claude_code"}
@@ -1355,7 +1377,7 @@ func TestProfileMCPLegacyEnrollmentRoute(t *testing.T) {
 // directory's mode changes. The unchanged mode is a successful control above.
 func TestProfileMCPLedgerParentPermissionRace(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("Unix permission-bit witness")
+		t.Skip("POSIX permission-bit witnesses; Windows DACL controls run separately")
 	}
 	fx, req := nativeWriterFixture(t)
 	req.Environments = []string{"claude_code"}

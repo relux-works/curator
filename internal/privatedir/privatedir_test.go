@@ -190,3 +190,32 @@ func TestProtectTreeSecuresDirectoriesAndFiles(t *testing.T) {
 		t.Fatalf("protected file rejected: %v", err)
 	}
 }
+
+// Named private creation carries the owner-only shape immediately, and an
+// existing name is never reopened or overwritten by the exclusive operation.
+func TestCreateFileIsPrivateAndExclusive(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "payload")
+	f, err := Create(path, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString("preserved"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateFile(path); err != nil {
+		t.Fatalf("new named file not private: %v", err)
+	}
+	if f, err := Create(path, 0o600); !errors.Is(err, os.ErrExist) {
+		if f != nil {
+			_ = f.Close()
+		}
+		t.Fatalf("existing name accepted: %v", err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil || string(b) != "preserved" {
+		t.Fatalf("existing payload changed: %q %v", b, err)
+	}
+}

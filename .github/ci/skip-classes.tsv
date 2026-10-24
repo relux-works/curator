@@ -141,3 +141,5 @@ host-capability	^host refuses replacement of an open lock: sharing violation$	al
 platform-control	^CIP root identities support macOS/Linux$	allow	the CLI flow skips only when GOOS is neither darwin nor linux, matching the imported filesystem registration qualification
 host-capability	^host refuses unlink of an open lock: sharing violation$	allow	only Windows Remove failure matching syscall.Errno(32) skips the removed-lock fixture; valid witness validation runs first and other errors remain fatal
 platform-control	^exact mode bits are Unix-specific$	allow	only generated-drift mode cases skip on Windows, where Unix permission-bit identity is not observable; byte and path drift still execute
+
+platform-control	^POSIX permission-bit witnesses; Windows DACL controls run separately$	allow	POSIX private-parent and file-mode witnesses run on Unix; Windows executes protected-DACL publication and broadened-ACL refusal controls

@@ -106,6 +106,9 @@ func (kind TargetKind) valid() bool {
 // because a link carries no generation file. A KindExchange target requires
 // a present PreimageDigest and present StagedSource, with no generation fields.
 type Target struct {
+	// PrivateFile requires a regular, owner-only replacement, created privately
+	// and revalidated before publication, including after process restart.
+	PrivateFile        bool
 	Class              string
 	Identifier         string
 	Kind               TargetKind
@@ -175,6 +178,7 @@ type RemovalEntry struct {
 
 // TargetRecord is the complete path-backed recovery record for one target.
 type TargetRecord struct {
+	PrivateFile         bool           `json:"private_file,omitempty"`
 	Class               string         `json:"class"`
 	Identifier          string         `json:"identifier"`
 	Kind                TargetKind     `json:"kind,omitempty"`

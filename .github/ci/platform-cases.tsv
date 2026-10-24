@@ -900,3 +900,16 @@ internal/envprofile	TestProfileMCPPrivateFixtureBoundary	linux,darwin,windows	-	
 internal/envprofile	TestProfileMCPExecutableQualificationInert	linux,darwin,windows	-	-	executable byte qualification never executes its input; an explicitly invoked portable tripwire proves the observation instrument
 internal/envprofile	TestMCPSignedTagFixturesWithoutAmbientIdentity	linux,darwin,windows	-	-	empty ambient Git identity cannot hide missing fixture author or committer settings; all three signed-tag fixtures reach their strict assertions
 internal/gitops	TestCloneLongDestination	linux,darwin,windows	-	-	clone enables persistent cache long-path support before index-pack; fetch, exact ref resolution and payload extraction work with pack-file paths beyond MAX_PATH while suspicious URLs leave no destination
+
+# MCP native writer Windows publication and exact platform controls.
+internal/privatedir	TestCreateFileIsPrivateAndExclusive	linux,darwin,windows	-	-	private named creation is exclusive and immediately validates as owner-only
+internal/transaction	TestPrivateFilePublication	linux,darwin,windows	-	-	private staging and publication survive restart while foreign-read sources and sidecars refuse
+internal/transaction	TestPrivateFileRejectsOtherShapes	linux,darwin,windows	-	-	private-file plans refuse deletion and directory publication before changing live bytes
+internal/envprofile	TestProfileMCPPrivatePublishedFiles	linux,darwin,windows	-	-	published payloads validate private and status refuses a later foreign-read ownership grant
+internal/envprofile	TestProfileMCPPrivateSkillPreimage	linux,darwin,windows	-	-	identical private skills admit while read-only or foreign-readable preimages refuse without changing payloads
+internal/envprofile	TestProfileMCPLedgerParentBeforeFirstInstall	linux,darwin	windows	platform-control	POSIX parent-mode witnesses run on Unix; Windows runs private and broadened-DACL controls
+internal/envprofile	TestProfileMCPLedgerParentPermissionRace	linux,darwin	windows	platform-control	POSIX parent chmod race runs on Unix; Windows runs broadened-DACL publication refusals
+internal/envprofile	TestProfileMCPPreviewSkillPreimages/wrong-mode	linux,darwin	windows	platform-control	POSIX group-read mode difference runs on Unix; Windows runs foreign-read DACL and read-only preimage controls
+internal/envprofile	TestProjectMCPAuthorizedReplayGates/snapshot_mode	linux,darwin	windows	platform-control	POSIX executable-bit snapshot mutation runs on Unix; Windows has no portable execute bit and runs byte and authority mutations
+internal/transaction	TestPrivateFileBoundaryMutation	linux,darwin,windows	-	-	the last boundary callback cannot broaden a private sidecar and still publish it
+internal/envprofile	TestMCPWindowsNarrowingControls	windows	-	-	Windows overlays must trigger named privacy, preimage, replay and long-path regression assertions

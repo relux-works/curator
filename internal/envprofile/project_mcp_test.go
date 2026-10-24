@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -190,6 +191,9 @@ func lockedProjectMCP(t *testing.T, policy Policy, signedTag bool) (string, stri
 func TestProjectMCPAuthorizedReplayGates(t *testing.T) {
 	for _, mode := range []string{"valid", "project", "manifest", "portable", "skills lock", "snapshot", "snapshot mode", "missing snapshot", "authority", "policy", "revoked"} {
 		t.Run(mode, func(t *testing.T) {
+			if mode == "snapshot mode" && runtime.GOOS == "windows" {
+				t.Skip("Windows does not expose portable executable permission bits")
+			}
 			policy := Policy{}
 			home, root, lock, decls, _ := lockedProjectMCP(t, policy, false)
 			project, hash := "project", lock.ManifestSHA256

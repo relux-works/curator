@@ -183,6 +183,12 @@ func ProfileMCP(req ProfileMCPRequest) (result *ProfileMCPResult, resultErr erro
 	}
 	inputs := map[string]string{}
 	capture := func(path string) error {
+		// Git prints forward slashes on Windows. Journal inputs require the
+		// native absolute clean spelling, including for absent packed-refs.
+		path, err := filepath.Abs(filepath.FromSlash(path))
+		if err != nil {
+			return err
+		}
 		digest, err := transaction.DigestPath(path)
 		if err == nil {
 			inputs[path] = digest
@@ -598,11 +604,20 @@ func ProfileMCP(req ProfileMCPRequest) (result *ProfileMCPResult, resultErr erro
 					return result, fmt.Errorf("%s: existing skill projection differs", mcpnative.AuthorityUnavailable)
 				}
 				for path, body := range projected {
+					if e := privatedir.ValidateFile(path); e != nil {
+						return result, fmt.Errorf("%s: existing skill preimage is untrusted: %w", mcpnative.AuthorityUnavailable, e)
+					}
 					observed, e := mcpRead(req.Home, path, false)
 					if e != nil {
 						return result, e
 					}
-					want, e := transaction.DigestRegularPayload(body, 0o600)
+					mode := os.FileMode(0o600)
+					if runtime.GOOS == "windows" {
+						// A writable Windows regular file reports 0666. Its
+						// owner-only access was proved by the DACL check above.
+						mode = 0o666
+					}
+					want, e := transaction.DigestRegularPayload(body, mode)
 					if e != nil {
 						return result, e
 					}
@@ -783,7 +798,7 @@ func publishNativeMCP(op *operation, req ProfileMCPRequest, writes map[string][]
 		}
 		return recheck()
 	}
-	stage, err := os.MkdirTemp(req.Home, ".mcp-stage-*")
+	stage, err := privatedir.TempStaging(req.Home, ".mcp-stage-*")
 	if err != nil {
 		return err
 	}
@@ -793,7 +808,7 @@ func publishNativeMCP(op *operation, req ProfileMCPRequest, writes map[string][]
 		paths = append(paths, path)
 	}
 	sort.Strings(paths)
-	for i, path := range paths {
+	for _, path := range paths {
 		preimage, err := transaction.DigestPath(path)
 		if err != nil {
 			return err
@@ -801,11 +816,19 @@ func publishNativeMCP(op *operation, req ProfileMCPRequest, writes map[string][]
 		if want, ok := preimages[path]; ok && want != preimage {
 			return fmt.Errorf("transaction_input_changed: native preimage changed")
 		}
-		temp := filepath.Join(stage, fmt.Sprint(i))
-		if err = os.WriteFile(temp, writes[path], 0o600); err != nil {
+		file, err := privatedir.CreateTemp(stage, "payload-*")
+		if err != nil {
 			return err
 		}
-		plan.Targets = append(plan.Targets, transaction.Target{Class: "profile-mcp", Identifier: path, LivePath: path, StagedSource: temp, PreimageDigest: preimage})
+		_, writeErr := file.Write(writes[path])
+		closeErr := file.Close()
+		if writeErr != nil {
+			return writeErr
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+		plan.Targets = append(plan.Targets, transaction.Target{PrivateFile: true, Class: "profile-mcp", Identifier: path, LivePath: path, StagedSource: file.Name(), PreimageDigest: preimage})
 	}
 	if err = validate(); err != nil {
 		return err
