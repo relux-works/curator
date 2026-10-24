@@ -3,6 +3,9 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -85,9 +88,9 @@ func nativeOwnedProcesses(root int) ([]nativeOwnedProcess, string) {
 	return pids, trace.String()
 }
 
-// The diagnostic preserves a deadline failure even when SIGQUIT joins the real
-// blocked fixture. A normally completed child still succeeds through wait.
-// Neither path reads an exec output buffer until its writer has joined.
+// A normally completed child succeeds through wait. A blocked child supplies
+// joined Go stacks, and the real watchdog must fail its subprocess test with
+// that diagnostic. Output is read only after its exec writer has joined.
 func TestNativeCommandTimeoutDiagnostics(t *testing.T) {
 	for _, blocked := range []bool{false, true} {
 		t.Run(fmt.Sprint(blocked), func(t *testing.T) {
@@ -116,9 +119,25 @@ func TestNativeCommandTimeoutDiagnostics(t *testing.T) {
 			}
 			// Allow the helper to enter its test before collecting a real Go stack.
 			time.Sleep(time.Second)
+			if os.Getenv("CURATOR_NATIVE_DIAGNOSTIC_WATCHDOG") == "1" {
+				child.waitWithin(t, time.Millisecond)
+				t.Fatal("watchdog returned success")
+			}
 			diagnostic := child.timeoutDiagnostic()
 			if !child.finished || !strings.Contains(diagnostic, "production CLI did not finish after release") || !strings.Contains(diagnostic, "TestNativeCommandDiagnosticProcess") || !strings.Contains(diagnostic, "SIGQUIT") {
 				t.Fatalf("timeout lost failure or blocked child stack: %s", diagnostic)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			watchdog := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestNativeCommandTimeoutDiagnostics$/^true$")
+			watchdog.Env = append(os.Environ(), cliHelperProcess+"=1", "CURATOR_NATIVE_DIAGNOSTIC_WATCHDOG=1")
+			output, err := watchdog.CombinedOutput()
+			var exit *exec.ExitError
+			if !errors.As(err, &exit) || exit.ExitCode() != 1 || ctx.Err() != nil ||
+				!bytes.Contains(output, []byte("production CLI did not finish after release")) ||
+				!bytes.Contains(output, []byte("SIGQUIT")) ||
+				bytes.Contains(output, []byte("watchdog returned success")) {
+				t.Fatalf("timeout lost failing verdict: %v\n%s", err, output)
 			}
 		})
 	}
