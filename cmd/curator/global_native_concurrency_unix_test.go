@@ -265,7 +265,8 @@ func TestGlobalNativeOwnerRemoveBeforeInstall(t *testing.T) {
 		}
 	}
 	defer release()
-	installing := startNativeCommand(t, fixture, "global", "install")
+	// Probe before another installer can acquire the lock and mask a missing
+	// removal lock; holding the home lock alone does not prove this ownership.
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
 	manager, err := managerlock.New(filepath.Join(fixture.home, ".curator"))
@@ -278,6 +279,7 @@ func TestGlobalNativeOwnerRemoveBeforeInstall(t *testing.T) {
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("paused remove did not hold the global operation lock: %v", err)
 	}
+	installing := startNativeCommand(t, fixture, "global", "install")
 	installing.pending(t)
 	requireNativeClosure(t, fixture, false)
 	release()

@@ -352,11 +352,12 @@ func TestNodeAuthorityKeepsBorrowedRepairLock(t *testing.T) {
 	}
 }
 
-// ApplyMigration refuses a full node carrier before recovering real prepared context
-// intent; the per-home control recovers that same intent and succeeds.
+// ApplyMigration refuses node and malformed carriers before recovering real
+// prepared context intent. Malformed authority retains the conflict report and
+// operator choice; the per-home control recovers the same intent and succeeds.
 func TestMigrationNodeAuthorityBeforeRecovery(t *testing.T) {
-	for _, node := range []bool{true, false} {
-		t.Run(fmt.Sprintf("node=%v", node), func(t *testing.T) {
+	for _, authority := range []string{"node", "per-home", "malformed"} {
+		t.Run(authority, func(t *testing.T) {
 			fx, _, seed := claudeRepairFixture(t, envregistry.FormReferenced)
 			target := filepath.Join(filepath.Dir(seed), "CLAUDE.md")
 			desired := readClaudeState(t, target)
@@ -393,8 +394,14 @@ func TestMigrationNodeAuthorityBeforeRecovery(t *testing.T) {
 			if err := lock.Close(); err != nil {
 				t.Fatal(err)
 			}
-			if node {
+			switch authority {
+			case "node":
 				writeNodeAuthorityMarker(t, fx)
+			case "malformed":
+				markerPath := filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.ClaudeCode), envmarker.Name)
+				if err := os.WriteFile(markerPath, []byte("{not a marker"), 0600); err != nil {
+					t.Fatal(err)
+				}
 			}
 			req := fx.migrateRequest()
 			req.Profile, req.EnvID = fx.profile, envregistry.ClaudeCode
@@ -408,10 +415,17 @@ func TestMigrationNodeAuthorityBeforeRecovery(t *testing.T) {
 			recoveries := 0
 			req.transactionOptions = []transaction.Option{transaction.WithHooks(transaction.Hooks{ObserveRecovery: func() { recoveries++ }})}
 			result, err := ApplyMigration(req)
-			t.Logf("node=%v recovery_calls=%d refusal=%v", node, recoveries, err)
+			t.Logf("authority=%s recovery_calls=%d refusal=%v", authority, recoveries, err)
 
-			if node {
-				if err == nil || !strings.Contains(err.Error(), "credential_injection_unavailable:") {
+			if authority != "per-home" {
+				want := "credential_injection_unavailable:"
+				if authority == "malformed" {
+					want = envregistry.DiagCredentialConflict
+					if err == nil || result == nil || result.Report == nil || !strings.Contains(err.Error(), "back the marker up") {
+						t.Errorf("malformed authority lost operator choice: %+v; %v", result, err)
+					}
+				}
+				if err == nil || !strings.Contains(err.Error(), want) {
 					t.Errorf("locked node authority diagnostic: %v", err)
 				}
 
