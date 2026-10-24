@@ -86,6 +86,18 @@ func newID() string {
 	return "p" + hex.EncodeToString(b)
 }
 func (s Store) begin(create bool) (*operation, error) {
+	return s.beginValidated(create, nil)
+}
+
+// beginValidated checks admission before locking and again under the home lock,
+// before reading or migrating protected state. Ordinary registry callers retain
+// their existing admission contract through begin.
+func (s Store) beginValidated(create bool, validate func() error) (*operation, error) {
+	if validate != nil {
+		if err := validate(); err != nil {
+			return nil, err
+		}
+	}
 	abs, err := filepath.Abs(s.Home)
 	if err != nil {
 		return nil, err
@@ -113,6 +125,11 @@ func (s Store) begin(create bool) (*operation, error) {
 			_ = lock.Close()
 		}
 	}()
+	if validate != nil {
+		if err := validate(); err != nil {
+			return nil, err
+		}
+	}
 	if err := pathboundary.ValidateRoot(m.Home()); err != nil {
 		return nil, err
 	}

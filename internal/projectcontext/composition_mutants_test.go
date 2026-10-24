@@ -2,6 +2,7 @@ package projectcontext
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -105,4 +106,148 @@ func compositionGo() string {
 		return binary
 	}
 	return "go"
+}
+
+// Claim: removing each entry's shared authority calls makes that entry's node
+// witness fail before malformed protected state is read. Each plant must compile
+// and exit at the named behavioral assertion; a later visitor refusal is not
+// evidence that an earlier entry gate ran. Production sources stay untouched.
+func TestCompositionCredentialNarrowingControls(t *testing.T) {
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+		t.Skip("CIP filesystem binding supports macOS/Linux")
+	}
+	if os.Getenv("CURATOR_PROJECT_COMPOSITION_MUTANTS") != "1" {
+		t.Skip("explicit bounded mutation lane")
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		entry, file, function, home string
+		calls                       int
+	}{
+		{"preview", "composition.go", "func (s Store) PreviewComposition(", "s.Home", 1},
+		{"publish", "composition_authority.go", "func (a Authority) PublishComposition(", "a.Store.Home", 2},
+		{"resolve", "composition_authority.go", "func (a Authority) Resolve(", "a.Store.Home", 1},
+		{"authorize", "composition_authority.go", "func (a Authority) Authorize(", "a.Store.Home", 1},
+		{"visit", "../envprofile/composition.go", "func VisitCompositionProfile(", "home", 2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.entry, func(t *testing.T) {
+			file := filepath.Clean(filepath.Join(cwd, tc.file))
+			b, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			source := string(b)
+			if strings.Count(source, tc.function) != 1 {
+				t.Fatal("authority function anchor not unique")
+			}
+			start := strings.Index(source, tc.function)
+			end := len(source)
+			if n := strings.Index(source[start:], "\nfunc "); n >= 0 {
+				end = start + n
+			}
+			body := source[start:end]
+			call := "envauthority.Validate(" + tc.home + ")"
+			if strings.Count(body, call) != tc.calls {
+				t.Fatalf("authority call anchor count differs: %s", tc.entry)
+			}
+			// Retain an import reference while removing every gate call of this entry.
+			body = strings.ReplaceAll(body, call, "func() error { _ = envauthority.Validate; return nil }()")
+			dir := t.TempDir()
+			replacement := filepath.Join(dir, "authority.go")
+			if err := os.WriteFile(replacement, []byte(source[:start]+body+source[end:]), 0600); err != nil {
+				t.Fatal(err)
+			}
+			overlay := filepath.Join(dir, "overlay.json")
+			mapping, err := json.Marshal(map[string]any{"Replace": map[string]string{file: replacement}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(overlay, mapping, 0600); err != nil {
+				t.Fatal(err)
+			}
+			witness := "TestCompositionCredentialAuthorityBeforeState/" + tc.entry + "/node=true"
+			cmd := exec.Command(compositionGo(), "test", "-p=2", "-overlay", overlay, "-count=1", "-timeout=2m", "-v", "-run", "^TestCompositionCredentialAuthorityBeforeState$/^"+tc.entry+"$/^node=true$", ".")
+			cmd.Dir = cwd
+			for _, e := range os.Environ() {
+				if !strings.HasPrefix(e, "GIT_DIR=") && !strings.HasPrefix(e, "GIT_WORK_TREE=") {
+					cmd.Env = append(cmd.Env, e)
+				}
+			}
+			out, err := cmd.CombinedOutput()
+			var exit *exec.ExitError
+			if !errors.As(err, &exit) || exit.ExitCode() != 1 || !strings.Contains(string(out), "--- FAIL: "+witness) || !strings.Contains(string(out), "composition authority admission missing before state") || strings.Contains(string(out), "[build failed]") {
+				t.Fatalf("authority plant did not hit intended witness: %v\n%s", err, out)
+			}
+			t.Logf("%s: caught intended authority-before-state witness (exit 1)", tc.entry)
+		})
+	}
+}
+
+// Claim: the pre-lock gate alone cannot satisfy held admission, first
+// publication or callback reentry. Each omitted recheck must fail its dedicated
+// boundary witness rather than compiling badly or missing the injection seam.
+func TestCompositionCredentialBoundaryNarrowingControls(t *testing.T) {
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+		t.Skip("CIP filesystem binding supports macOS/Linux")
+	}
+	if os.Getenv("CURATOR_PROJECT_COMPOSITION_MUTANTS") != "1" {
+		t.Skip("explicit bounded mutation lane")
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct{ name, file, test, old, replacement, witness string }{
+		{"under-lock", "store.go", "TestCompositionCredentialAuthorityUnderLock", `}()
+	if validate != nil {`, `}()
+	if validate != nil && false {`, "expected pre-lock and held checks"},
+		{"publication", "composition_authority.go", "TestCompositionCredentialPublicationBoundary", `if err = envauthority.Validate(a.Store.Home); err != nil {`, `if err = error(nil); err != nil {`, "publication authority recheck missing"},
+		{"visitor-reentry", "../envprofile/composition.go", "TestCompositionCredentialVisitorReentry", `if err := envauthority.Validate(home); err != nil {
+			return err
+		}`, `if err := error(nil); err != nil {
+			return err
+		}`, "visitor authority recheck missing"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			file := filepath.Clean(filepath.Join(cwd, tc.file))
+			b, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Count(string(b), tc.old) != 1 {
+				t.Fatal("boundary plant anchor not unique")
+			}
+			dir := t.TempDir()
+			replacement := filepath.Join(dir, "boundary.go")
+			if err := os.WriteFile(replacement, []byte(strings.Replace(string(b), tc.old, tc.replacement, 1)), 0600); err != nil {
+				t.Fatal(err)
+			}
+			overlay := filepath.Join(dir, "overlay.json")
+			mapping, err := json.Marshal(map[string]any{"Replace": map[string]string{file: replacement}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(overlay, mapping, 0600); err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.Command(compositionGo(), "test", "-p=2", "-overlay", overlay, "-count=1", "-timeout=2m", "-v", "-run", "^"+tc.test+"$/^node=true$", ".")
+			cmd.Dir = cwd
+			for _, e := range os.Environ() {
+				if !strings.HasPrefix(e, "GIT_DIR=") && !strings.HasPrefix(e, "GIT_WORK_TREE=") {
+					cmd.Env = append(cmd.Env, e)
+				}
+			}
+			out, err := cmd.CombinedOutput()
+			var exit *exec.ExitError
+			if !errors.As(err, &exit) || exit.ExitCode() != 1 || !strings.Contains(string(out), "--- FAIL: "+tc.test+"/node=true") || !strings.Contains(string(out), tc.witness) || strings.Contains(string(out), "[build failed]") {
+				t.Fatalf("boundary plant did not hit intended witness: %v\n%s", err, out)
+			}
+			t.Logf("%s: caught intended boundary witness (exit 1)", tc.name)
+		})
+	}
 }

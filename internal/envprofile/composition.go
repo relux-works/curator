@@ -5,12 +5,13 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/contextlock"
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/identifiers"
 )
 
-// VisitCompositionProfile reads only the explicitly selected lock and its
-// complete protected closure. The caller holds the manager home lock and must
-// copy any needed bytes during visit. No machine-current fallback, acquisition,
+// VisitCompositionProfile checks manager-wide credential authority, then reads
+// the explicitly selected lock and its complete protected closure. The caller
+// holds the manager home lock and must copy any needed bytes during visit. No machine-current fallback, acquisition,
 // repair or managed-home publication occurs here. Pins and boundaries are
 // checked on both sides of the visitor, including members it does not consume.
 func VisitCompositionProfile(home, name, expected string, visit func(*contextlock.Lock, contextlock.Member, string) error) error {
@@ -18,6 +19,9 @@ func VisitCompositionProfile(home, name, expected string, visit func(*contextloc
 		return fmt.Errorf("invalid composition profile selection")
 	}
 	check := func() (*contextlock.Lock, error) {
+		if err := envauthority.Validate(home); err != nil {
+			return nil, err
+		}
 		if err := validateLockBoundary(home, name, nil); err != nil {
 			return nil, err
 		}
@@ -59,6 +63,9 @@ func VisitCompositionProfile(home, name, expected string, visit func(*contextloc
 		cleanup()
 		if e != nil {
 			return e
+		}
+		if err := envauthority.Validate(home); err != nil {
+			return err
 		}
 	}
 

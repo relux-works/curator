@@ -895,3 +895,9 @@ internal/projectcontext	TestCompositionPolicyMetadata	linux,darwin	windows	platf
 internal/envprofile	TestPinnedCompositionSnapshotPrivacy	linux,darwin,windows	-	-	pinned composition captures are private before use and missing pins leave no staging
 internal/projectcontext	TestCompositionPublishedVectors	linux,darwin,windows	-	-	the production composition reader enforces all pinned grammar vectors
 internal/projectcontext	TestCompositionSchemaControl	linux,darwin,windows	-	-	pinned schema accepts its control and rejects the intended memory-on plant
+internal/projectcontext	TestCompositionCredentialAuthority	linux,darwin	windows	platform-control	all five composition entries reject selected and orphan node markers in both modes while per-home controls preserve caller lock ownership
+internal/projectcontext	TestCompositionCredentialAuthorityBeforeState	linux,darwin	windows	platform-control	composition node admission precedes malformed protected state while per-home controls reach the read
+internal/projectcontext	TestCompositionCredentialAuthorityBeforeLock	linux,darwin	windows	platform-control	preview and publication refuse node authority before absent lock access without creating lock state
+internal/projectcontext	TestCompositionCredentialAuthorityUnderLock	linux,darwin	windows	platform-control	composition constructor rechecks real credential authority under the acquired home lock
+internal/projectcontext	TestCompositionCredentialPublicationBoundary	linux,darwin	windows	platform-control	node authority appearing at publication prevents the immutable record write while per-home publishes
+internal/projectcontext	TestCompositionCredentialVisitorReentry	linux,darwin	windows	platform-control	node authority introduced by a visitor stops the next member callback while per-home visits the full closure

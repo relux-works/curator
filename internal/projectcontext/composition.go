@@ -11,6 +11,7 @@ import (
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/contextpkg"
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
@@ -43,7 +44,7 @@ type compositionPlan struct {
 // PreviewComposition performs only protected input reads. It acquires no lease
 // and publishes neither a composition record nor generated agent-visible files.
 func (s Store) PreviewComposition(ctx context.Context, req ComposeRequest) (CompositionPreview, error) {
-	op, err := s.begin(false)
+	op, err := s.beginValidated(false, func() error { return envauthority.Validate(s.Home) })
 	if err != nil {
 		return CompositionPreview{}, err
 	}

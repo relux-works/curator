@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
@@ -51,7 +52,7 @@ type compositionEnvelope struct {
 // this method does not mutate the managed home, profile lock or lease state.
 func (a Authority) PublishComposition(ctx context.Context, req ComposeRequest, expected string, ownerRef string) (Composition, error) {
 	req.Policy = canonicalCompositionPolicy(req.Policy)
-	op, err := a.Store.begin(false)
+	op, err := a.Store.beginValidated(false, func() error { return envauthority.Validate(a.Store.Home) })
 	if err != nil {
 		return Composition{}, err
 	}
@@ -125,6 +126,9 @@ func (a Authority) PublishComposition(ctx context.Context, req ComposeRequest, e
 		if err = op.lock.Held().Validate(filepath.Dir(op.root)); err != nil {
 			return Composition{}, err
 		}
+		if err = envauthority.Validate(a.Store.Home); err != nil {
+			return Composition{}, err
+		}
 		if err = writeAtomic(dir, name, b); err != nil {
 			return Composition{}, err
 		}
@@ -155,6 +159,9 @@ func (a Authority) bound(op *operation, id string) error {
 
 // Resolve rechecks a retained composition under the caller's held home lock.
 func (a Authority) Resolve(ctx context.Context, held managerlock.Held, ref, sha256 string) (Composition, error) {
+	if err := envauthority.Validate(a.Store.Home); err != nil {
+		return Composition{}, err
+	}
 	if err := ctx.Err(); err != nil {
 		return Composition{}, err
 	}
@@ -225,6 +232,9 @@ func (a Authority) resolve(ctx context.Context, op *operation, ref, hash string)
 
 // Authorize rechecks current principal authority and the complete composition.
 func (a Authority) Authorize(ctx context.Context, held managerlock.Held, c Composition, ownerRef string) error {
+	if err := envauthority.Validate(a.Store.Home); err != nil {
+		return err
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
