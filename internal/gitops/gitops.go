@@ -293,9 +293,9 @@ func cloneWith(remoteURL, destination string, runFn func(dir string, args ...str
 	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
 		return err
 	}
-	// Git for Windows otherwise fails on pack paths below deep cache roots.
-	// Clone --config applies before checkout and persists for later fetches.
-	if _, err := runFn("", "clone", "--config", "core.longpaths=true", "--", trimmed, destination); err != nil {
+	// Git for Windows needs the process option during template initialization,
+	// before clone writes its local configuration. Persist it for later fetches.
+	if _, err := runFn("", "-c", "core.longpaths=true", "clone", "--config", "core.longpaths=true", "--", trimmed, destination); err != nil {
 		_ = os.RemoveAll(destination)
 		return fmt.Errorf("git clone failed for %s -> %s: %w", remoteURL, destination, err)
 	}

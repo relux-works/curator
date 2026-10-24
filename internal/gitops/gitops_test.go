@@ -170,8 +170,9 @@ func TestFetchAndSubmodules(t *testing.T) {
 	}
 }
 
-// Clone opts its own cache into long-path support before Git writes pack
-// files, independently of ambient defaults. Fetch/ref lookup and exact
+// Clone enables long-path support during initialization and persists it
+// in its own cache before Git writes pack files, independently of ambient
+// defaults. Fetch/ref lookup and exact
 // payload extraction remain usable when pack-file paths exceed MAX_PATH.
 // The cache directory itself fits the separate Windows process-directory limit.
 func TestCloneLongDestination(t *testing.T) {
