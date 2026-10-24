@@ -133,6 +133,23 @@ func TestWindowsCloneMetadataJunctions(t *testing.T) {
 	for _, longLink := range []bool{false, true} {
 		t.Run(map[bool]string{false: "long-target", true: "long-link"}[longLink], func(t *testing.T) {
 			root := cloneTestRoot(t)
+			// A short junction remains admissible beside the long-target
+			// refusal; rejecting every junction cannot satisfy this control.
+			validTarget, validLink := filepath.Join(root, "valid-target"), filepath.Join(root, "valid-link")
+			if err := os.Mkdir(validTarget, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if out, err := exec.Command("cmd", "/c", "mklink", "/J", validLink, validTarget).CombinedOutput(); err != nil {
+				t.Fatalf("valid junction fixture: %v: %s", err, out)
+			}
+			t.Cleanup(func() {
+				if err := os.Remove(validLink); err != nil {
+					t.Errorf("remove valid junction: %v", err)
+				}
+			})
+			if err := CheckCloneDestination(filepath.Join(validLink, "new")); err != nil {
+				t.Fatalf("short junction refused: %v", err)
+			}
 			long := filepath.Join(root, strings.Repeat("j", 134-utf16PathLength(root)-1))
 			short := filepath.Join(root, "short")
 			target, link := long, short
