@@ -304,8 +304,9 @@ func TestCompositionCredentialAuthorityBeforeLock(t *testing.T) {
 }
 
 // Claim: the shared operation constructor rechecks real authority after lock
-// acquisition and before protected-state reads. A marker inserted at that seam
-// yields the exact node refusal and no subsequent writes; per-home succeeds.
+// acquisition and before protected-state reads. A marker inserted after the
+// successful pre-lock check yields the exact node refusal and no subsequent
+// writes; per-home succeeds. The injection is independent of the held recheck.
 // This is a deterministic constructor seam, not a claim of hostile-UID safety.
 func TestCompositionCredentialAuthorityUnderLock(t *testing.T) {
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
@@ -314,22 +315,26 @@ func TestCompositionCredentialAuthorityUnderLock(t *testing.T) {
 	for _, node := range []bool{false, true} {
 		t.Run(fmt.Sprintf("node=%v", node), func(t *testing.T) {
 			f := newCompositionCredentialFixture(t, "strict", "preview")
-			calls := 0
+			injected := false
 			var gate error
 			var before map[string]string
 			op, err := f.store.beginValidated(false, func() error {
-				calls++
-				if calls == 2 {
+				verdict := envauthority.Validate(f.store.Home)
+				if !injected {
+					if verdict != nil {
+						t.Fatalf("pre-lock authority setup: %v", verdict)
+					}
+					injected = true
 					gate = compositionCredentialMarker(t, f.fixture, node, false)
 					before = compositionCredentialSnapshot(t, f.store.Home)
 				}
-				return envauthority.Validate(f.store.Home)
+				return verdict
 			})
 			if op != nil {
 				op.close()
 			}
-			if calls != 2 {
-				t.Fatalf("expected pre-lock and held checks, got %d", calls)
+			if !injected {
+				t.Fatal("pre-lock marker injection not applied")
 			}
 			if node {
 				if err == nil || err.Error() != gate.Error() || op != nil {

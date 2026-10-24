@@ -204,7 +204,7 @@ func TestCompositionCredentialBoundaryNarrowingControls(t *testing.T) {
 	cases := []struct{ name, file, test, old, replacement, witness string }{
 		{"under-lock", "store.go", "TestCompositionCredentialAuthorityUnderLock", `}()
 	if validate != nil {`, `}()
-	if validate != nil && false {`, "expected pre-lock and held checks"},
+	if validate != nil && false {`, "under-lock authority admission missing"},
 		{"publication", "composition_authority.go", "TestCompositionCredentialPublicationBoundary", `if err = envauthority.Validate(a.Store.Home); err != nil {`, `if err = error(nil); err != nil {`, "publication authority recheck missing"},
 		{"visitor-reentry", "../envprofile/composition.go", "TestCompositionCredentialVisitorReentry", `if err := envauthority.Validate(home); err != nil {
 			return err
