@@ -64,6 +64,12 @@ func TestCodexSeedCNarrowingControls(t *testing.T) {
 			}
 			cmd := exec.Command(binary, "test", "-overlay", overlayPath, "-count=1", "-timeout=2m", "-v", "-run", m.run, m.pkg)
 			cmd.Dir = root
+			if m.pkg == "./cmd/curator" {
+				// This fixture touches only a synthetic manager home. Reuse the
+				// CLI helper contract so a parallel package does not hold its
+				// unrelated host-toolchain lock across this bounded child.
+				cmd.Env = append(os.Environ(), "CURATOR_TEST_CLI_HELPER=1")
+			}
 			output, err := cmd.CombinedOutput()
 			exit, ok := err.(*exec.ExitError)
 			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "--- FAIL: "+m.fails+" ") || !strings.Contains(string(output), m.message) {
