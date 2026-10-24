@@ -245,7 +245,7 @@ func TestPublicationSerializesLeaseAcquisition(t *testing.T) {
 	var unblock sync.Once
 	var firstPublication sync.Once
 	defer func() { unblock.Do(func() { close(release) }) }()
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), leaseTestCompletionBudget())
 	defer cancel()
 	f.m.hooks = transaction.Hooks{Observe: func(e transaction.Event) {
 		if e.Point == transaction.PointPrepared {

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -249,6 +250,15 @@ func TestBusyUpdateAndIdleReuse(t *testing.T) {
 	}
 }
 
+// Completion budgets accommodate Windows durable-write latency; no test claims
+// a three-second publication guarantee or relaxes the ordering assertions.
+func leaseTestCompletionBudget() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 30 * time.Second
+	}
+	return 3 * time.Second
+}
+
 // Wait releases the home lock between checks: a terminated/reconciled session
 // can unblock an update. Cancellation preserves bytes and names the session.
 func TestBusyWaitAndCancellation(t *testing.T) {
@@ -279,7 +289,7 @@ func TestBusyWaitAndCancellation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(3 * time.Second):
+	case <-time.After(leaseTestCompletionBudget()):
 		t.Fatal("wait never completed")
 	}
 }

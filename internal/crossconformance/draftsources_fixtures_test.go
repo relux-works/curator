@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/sourcelock"
 	"github.com/relux-works/curator/internal/testcli"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 // Shared fixtures for the draft-sources conformance suites. Every helper
@@ -95,7 +97,7 @@ func writeManifestDependencySkill(t *testing.T, dir, name string, schema int, re
 func draftProject(t *testing.T, payload string, skills map[string]string) (project, home string) {
 	t.Helper()
 	project = t.TempDir()
-	home = t.TempDir()
+	home = testgitenv.ShortTempDir(t)
 	for dir, name := range skills {
 		writeDraftSkill(t, filepath.Join(project, filepath.FromSlash(dir)), name)
 	}
@@ -307,7 +309,7 @@ func TestDraftDigestSkipsManagerLocksOnEverySeparator(t *testing.T) {
 // which is what the refused-install probes assert around
 // install.Project.
 func TestDraftTreeDigestIgnoresManagerLockFiles(t *testing.T) {
-	home := t.TempDir()
+	home := testgitenv.ShortTempDir(t)
 	locks := filepath.Join(home, "state", "locks", "v1")
 	if err := os.MkdirAll(locks, 0o755); err != nil {
 		t.Fatal(err)
@@ -350,6 +352,9 @@ func runCurator(t *testing.T, home, configPath string, extraEnv []string, args .
 func setupCLIProject(t *testing.T, root string) (configPath, project, home string) {
 	t.Helper()
 	home = filepath.Join(root, "cli-home")
+	if runtime.GOOS == "windows" {
+		home = testgitenv.ShortTempDir(t)
+	}
 	configPath = filepath.Join(home, "config.json")
 	skillsRoot := filepath.Join(root, "skills-root")
 	project = filepath.Join(root, "project")

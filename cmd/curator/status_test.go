@@ -271,7 +271,7 @@ func writeCompiledSkillRepo(t *testing.T, skill string) {
 // test can pin the pre-compiled-command behaviour of the same surfaces.
 func legacyProject(t *testing.T) (string, string) {
 	t.Helper()
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	configPath := filepath.Join(root, "home", "config.json")
 	skillsRoot := filepath.Join(root, "skills")
 	project := filepath.Join(root, "project")

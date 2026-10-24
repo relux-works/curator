@@ -43,7 +43,7 @@ func TestRequirementDeclarationSurvivesIdentity(t *testing.T) {
 				if kind == contextlock.KindSkill && (got.Mode != req.Mode || !reflect.DeepEqual(got.Commands, req.Commands)) {
 					t.Fatalf("skill metadata: %+v", got)
 				}
-				manager := newGitManager(t.TempDir())
+				manager := newGitManager(gitFixtureHome(t))
 				key, err := manager.Identity(got.Kind, got.Name, got.Source)
 				if err != nil || key != canonical {
 					t.Fatalf("identity = %q, %v", key, err)

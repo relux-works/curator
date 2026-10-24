@@ -139,7 +139,7 @@ func newPinTransportFixture(t *testing.T) *pinTransportFixture {
 	t.Helper()
 	native := pinHomes(t)
 	pinOperatorHome(t, t.TempDir())
-	f := &pinTransportFixture{home: t.TempDir(), root: t.TempDir(), preserved: map[string]string{}}
+	f := &pinTransportFixture{home: gitFixtureHome(t), root: t.TempDir(), preserved: map[string]string{}}
 	f.ids = newGitIdentities(t)
 	existing := t.TempDir()
 	writePackage(t, existing, "existing", "1.0.0", "existing bytes\n")

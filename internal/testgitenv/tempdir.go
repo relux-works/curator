@@ -11,19 +11,21 @@ import (
 )
 
 // ShortTempDir keeps Windows Git cache fixtures inside the qualified metadata
-// budget without adding the test/subtest name to their root. Hosted runners
-// provide a short RUNNER_TEMP; other Windows runs can set a short TMP. Unix
-// keeps testing.T.TempDir, and every Windows directory has the same private
-// DACL required of other managed-home fixtures.
+// budget without adding the test/subtest name to their root. Windows uses a
+// private directory at the ordinary temporary volume's root: RUNNER_TEMP can
+// be on another drive, breaking fixture renames and relative links. Unix keeps
+// testing.T.TempDir. Every Windows directory has the private DACL required of
+// other managed-home fixtures before any fixture data is written.
 func ShortTempDir(t testing.TB) string {
 	t.Helper()
 	if runtime.GOOS != "windows" {
 		return t.TempDir()
 	}
-	base := os.Getenv("RUNNER_TEMP")
-	if base == "" {
-		base = os.TempDir()
+	ordinary, err := filepath.Abs(os.TempDir())
+	if err != nil {
+		t.Fatal(err)
 	}
+	base := filepath.VolumeName(ordinary) + string(os.PathSeparator)
 	dir, err := os.MkdirTemp(base, "c-")
 	if err != nil {
 		t.Fatal(err)

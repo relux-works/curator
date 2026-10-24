@@ -385,7 +385,7 @@ func TestCanonicalGitRejectsFileRemote(t *testing.T) {
 // mutant that restores the old bypass admits it here and must fail this
 // test.
 func TestGateSourceRejectsFileRemote(t *testing.T) {
-	manager := newGitManager(t.TempDir())
+	manager := newGitManager(gitFixtureHome(t))
 	if err := manager.gateSource("file:///tmp/pkg"); err == nil {
 		t.Fatal("gateSource must refuse a file:// source")
 	} else if !strings.Contains(err.Error(), DiagSourceInvalid) {
