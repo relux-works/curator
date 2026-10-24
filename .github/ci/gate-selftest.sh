@@ -323,6 +323,7 @@ host-capability	internal/projectlease	TestLeaseTransactionPolicyCurrentLock	host
 host-capability	internal/projectlease	TestGCReferenceWitness	host refuses replacement of an open lock: sharing violation
 platform-control	cmd/curator	TestProjectAdmissionCLIFlow	CIP root identities support macOS/Linux
 host-capability	internal/managerlock	TestHeldWitnessRejectsRemovedLock	host refuses unlink of an open lock: sharing violation
+platform-control	internal/projectlease	TestIdleRepairGeneratedDrift/mode	exact mode bits are Unix-specific
 TRAIN_SKIPS
 done
 
