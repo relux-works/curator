@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/projectmcp"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -95,6 +96,9 @@ func TestProjectMCPCacheOriginRefused(t *testing.T) {
 // is a typed unreadable route and cannot masquerade as absence.
 func TestProjectMCPRouteReadBoundary(t *testing.T) {
 	root := t.TempDir()
+	if err := privatedir.Protect(root); err != nil {
+		t.Fatal(err)
+	}
 	if err := validateMCPRoute(root, filepath.Join(root, "missing", "entry")); err != nil {
 		t.Fatal(err)
 	}

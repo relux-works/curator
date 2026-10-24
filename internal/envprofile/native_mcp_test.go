@@ -76,6 +76,9 @@ func nativeWrite(t *testing.T, path string, body []byte) {
 	if err := os.WriteFile(path, body, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if err := privatedir.ProtectFile(path); err != nil {
+		t.Fatal(err)
+	}
 }
 func nativeRead(t *testing.T, path string) []byte {
 	t.Helper()
@@ -408,9 +411,18 @@ func TestProfileMCPUnreadableAndNoFollow(t *testing.T) {
 					p := nativeMCPLedger(fx.home, fx.profile, id)
 					nativeWrite(t, p, body)
 					if kind == "unprotected-marker" {
-						if e = os.Chmod(p, 0o644); e != nil {
-							t.Fatal(e)
+						// The shared permission plant operates on an existing handle;
+						// for this regular file it broadens the DACL on Windows
+						// as well as the permission bits on Unix.
+						restore, err := makeWorldWritableSingleDirectoryForTest(p)
+						if err != nil {
+							t.Fatal(err)
 						}
+						t.Cleanup(func() {
+							if err := restore(); err != nil {
+								t.Error(err)
+							}
+						})
 					}
 				case "missing-owner":
 					if _, err := ProfileMCP(req); err != nil {
@@ -584,17 +596,26 @@ func TestProfileMCPLegacyWriterRefusesEnrollment(t *testing.T) {
 	}
 }
 
-// Vendor qualification compares inert executable bytes without running them;
-// the bounded script tripwire proves a mismatch cannot execute native commands.
+// Qualification reads executable bytes without running them on any platform.
+// The mismatched digest refuses, while an explicitly invoked copy of this
+// test binary proves the bounded execution tripwire actually detects a call.
 func TestProfileMCPExecutableQualificationInert(t *testing.T) {
 	root := t.TempDir()
 	marker := filepath.Join(root, "executed")
-	path := filepath.Join(root, "native")
-	script := []byte("#!/bin/sh\nprintf called > '" + marker + "'\n")
-	if err := os.WriteFile(path, script, 0o700); err != nil {
+	path := filepath.Join(root, "mcp-qualification-tripwire")
+	if runtime.GOOS == "windows" {
+		path += ".exe"
+	}
+	executable, err := os.Executable()
+	if err != nil {
 		t.Fatal(err)
 	}
-	want := strings.TrimPrefix(mcpnative.Digest(script), "sha256:")
+	payload := nativeRead(t, executable)
+	if err := os.WriteFile(path, payload, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CURATOR_TEST_MCP_QUALIFICATION_TRIPWIRE", marker)
+	want := strings.TrimPrefix(mcpnative.Digest(payload), "sha256:")
 	if !nativeMCPExecutableMatches(path, want) {
 		t.Fatal("matching bytes refused")
 	}
@@ -602,13 +623,79 @@ func TestProfileMCPExecutableQualificationInert(t *testing.T) {
 		t.Fatal("different bytes qualified")
 	}
 	nativeAbsent(t, marker)
-	// Deliberate bounded fixture plant establishes the tripwire really detects
-	// execution, rather than merely relying on an absent output file.
 	if err := exec.Command(path).Run(); err != nil {
 		t.Fatal(err)
 	}
 	if string(nativeRead(t, marker)) != "called" {
 		t.Fatal("execution tripwire plant did not fire")
+	}
+}
+
+// The fixture home is private on each platform and installs successfully.
+// Broadened home or managed-home mutation rights still cause the production
+// route check to refuse, without publishing native/ownership/skill payloads
+// or repairing the caller's permissions. Windows exercises actual DACLs.
+func TestProfileMCPPrivateFixtureBoundary(t *testing.T) {
+	for _, id := range []string{"claude_code", "codex_cli"} {
+		for _, mode := range []string{"private", "home", "managed-home"} {
+			t.Run(id+"/"+mode, func(t *testing.T) {
+				fx, req := nativeWriterFixture(t)
+				req.Environments = []string{id}
+				if err := privatedir.Validate(fx.home); err != nil {
+					t.Fatalf("fixture home is not private: %v", err)
+				}
+				body := []byte{}
+				if id == "claude_code" {
+					body = []byte("{}\n")
+				}
+				nativeWrite(t, nativeWriterPath(fx, id), body)
+				// Establish the normal empty operation-lock footprint before
+				// planting permissions, so the snapshot covers payload effects.
+				op, err := beginOperation(fx.home)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := op.close(); err != nil {
+					t.Fatal(err)
+				}
+				widened := ""
+				if mode != "private" {
+					widened = fx.home
+					if mode == "managed-home" {
+						widened = ManagedHomeDir(fx.home, fx.profile, id)
+					}
+					restore, err := makeWorldWritableSingleDirectoryForTest(widened)
+					if err != nil {
+						t.Fatal(err)
+					}
+					t.Cleanup(func() {
+						if err := restore(); err != nil {
+							t.Error(err)
+						}
+					})
+				}
+				before := snapshotMCPRecovery(t, fx.home)
+				result, err := ProfileMCP(req)
+				if mode == "private" {
+					if err != nil || !result.Published || len(result.Rows) != 1 || result.Rows[0].State != "added" {
+						t.Fatalf("private install: %+v %v", result, err)
+					}
+					return
+				}
+				if err == nil || !strings.Contains(err.Error(), "permissions:") || result.Published {
+					t.Fatalf("broadened mutation rights accepted: %+v %v", result, err)
+				}
+				if privatedir.Validate(widened) == nil {
+					t.Fatal("refusal repaired broadened permissions")
+				}
+				if !reflect.DeepEqual(before, snapshotMCPRecovery(t, fx.home)) {
+					t.Fatal("refusal changed payload bytes")
+				}
+				nativeAbsent(t, nativeMCPLedger(fx.home, fx.profile, id))
+				adapter, _ := envregistry.ByID(id)
+				nativeAbsent(t, filepath.Join(ManagedHomeDir(fx.home, fx.profile, id), adapter.SkillsDir, "myskill"))
+			})
+		}
 	}
 }
 

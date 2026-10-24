@@ -35,6 +35,9 @@ type managedFixture struct {
 func writeManagedFixture(t *testing.T, profile string) *managedFixture {
 	t.Helper()
 	home := t.TempDir()
+	if err := privatedir.Protect(home); err != nil {
+		t.Fatal(err)
+	}
 	native := map[string]string{}
 	for _, id := range []string{"claude_code", "codex_cli", "opencode-native", "pi"} {
 		native[id] = t.TempDir()

@@ -39,6 +39,12 @@ func gitFileURLFor(slashed, volume string) string {
 // exercise the loader set CURATOR_CONFIG/CURATOR_SYSTEM_CONFIG to their own
 // files with t.Setenv, which overrides this base for the test.
 func TestMain(m *testing.M) {
+	if strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe") == "mcp-qualification-tripwire" {
+		if err := os.WriteFile(os.Getenv("CURATOR_TEST_MCP_QUALIFICATION_TRIPWIRE"), []byte("called"), 0o600); err != nil {
+			os.Exit(2)
+		}
+		os.Exit(0)
+	}
 	if name := filepath.Base(os.Args[0]); name == "pin-transport" || name == "pin-transport.exe" {
 		os.Exit(runPinTransport())
 	}
