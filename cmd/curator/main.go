@@ -2378,6 +2378,10 @@ func (c cli) cmdGC() int {
 		return code
 	}
 	home := cfg.Home()
+	if err := envauthority.Validate(home); err != nil {
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+		return exitFail
+	}
 	manager, err := managerlock.New(home)
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)

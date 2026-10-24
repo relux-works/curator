@@ -323,7 +323,7 @@ Run the seed and carrier checks with
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envprofile ./internal/envmarker -run 'TestCodexSeedC|TestMarker7' -count=1`.
 Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envauthority ./internal/envprofile ./internal/install ./cmd/curator -run 'Test(ManagedAuthority|CredentialAuthorityEntryPoints|MigrationNodeAuthorityBeforeRecovery|Operation.*Authority|TransactionRecoveredAuthority|AuthorityChange|CaptureCredentialAuthority|GlobalCredentialAuthorityEntries|InstallCredentialAuthority)' -count=1`
 for manager-wide authority admission before mutation and recovery, with synthetic
-node refusals and per-home controls. The seed checks include 18 isolated narrowing
+node refusals and per-home controls. The seed checks include 19 isolated narrowing
 plants, including a gate moved after recovery. Go writes test artifacts to its
 configured cache and disposable test directories; validation logs belong under `.temp/`.
 
