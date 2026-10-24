@@ -27,7 +27,7 @@ import (
 // tests.
 
 func TestInstallUseSwitchesAndAgrees(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	first := t.TempDir()
 	writePackage(t, first, "alpha", "1.0.0", "alpha\n")
@@ -77,7 +77,7 @@ func TestInstallUseSwitchesAndAgrees(t *testing.T) {
 // A mutant that only moves the pointer (no materialization, no failure)
 // succeeds the install and moves current, and must fail this test.
 func TestInstallUsePartialLeavesCurrent(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	first := t.TempDir()
 	writePackage(t, first, "alpha", "1.0.0", "alpha\n")
@@ -127,7 +127,7 @@ func TestInstallUsePartialLeavesCurrent(t *testing.T) {
 // classifies it as path, bypasses the allowlist, and installs the planted
 // bytes — and must fail this test.
 func TestOperandShadowedByDirectoryResolvesAsGit(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	work := t.TempDir()
 	planted := filepath.Join(work, "github.com", "evil-org", "pkg")
@@ -167,7 +167,7 @@ func TestAbsentPathOperandWithRequirementIsRefConflict(t *testing.T) {
 		{Operand: "./missing-relative-pkg", Tag: "v1.0.0"},
 	}
 	for _, options := range cases {
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		_, _, _, err := Install(home, options)
 		if err == nil || !strings.Contains(err.Error(), DiagRefConflict) {
 			t.Fatalf("operand %q err = %v, want %s", options.Operand, err, DiagRefConflict)
@@ -285,7 +285,7 @@ func TestInstallRefusesANonSourceOperand(t *testing.T) {
 			continue
 		}
 		t.Run(tc.operand, func(t *testing.T) {
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			_, _, _, err := Install(home, InstallOptions{Operand: tc.operand})
 			if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
 				t.Fatalf("operand %q err = %v, want %s", tc.operand, err, DiagSourceInvalid)

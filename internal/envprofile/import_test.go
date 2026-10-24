@@ -68,7 +68,7 @@ func seedCurrentDefault(t *testing.T, home string) {
 // imported at version 1.0.0 through the ordinary path pipeline —
 // state-hash pin, strict audit, lock — and the native file is untouched.
 func TestImportLosslessInstallsThroughPathPipeline(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
@@ -113,7 +113,7 @@ func TestImportLosslessInstallsThroughPathPipeline(t *testing.T) {
 // LF, lists modules in ascending environment-identifier order, and stores
 // the exact bytes.
 func TestImportNormalizesOrdersAndPins(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["codex_cli"], "AGENTS.md", "codex\r\nline\r\n")
@@ -170,7 +170,7 @@ func TestNormalizeImportText(t *testing.T) {
 // skills entry: the lossy classification stops with
 // environment_import_lossy and the loss list, installing nothing.
 func TestImportLossyStopsWithoutConsent(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
@@ -198,7 +198,7 @@ func TestImportLossyStopsWithoutConsent(t *testing.T) {
 // the per-operation consent flag: the import proceeds and re-reports the
 // loss list as warnings under the same diagnostic.
 func TestImportLossyProceedsWithConsent(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
@@ -234,7 +234,7 @@ func TestImportLossyProceedsWithConsent(t *testing.T) {
 // file that cannot be read: the failed read is always a loss, never an
 // absence.
 func TestImportUnreadableRootIsLoss(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
@@ -263,7 +263,7 @@ func TestImportUnreadableRootIsLoss(t *testing.T) {
 // file that is not valid UTF-8: normalization is content-preserving, so
 // the file is a loss.
 func TestImportInvalidUTF8IsLoss(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\xff\n")
@@ -283,7 +283,7 @@ func TestImportInvalidUTF8IsLoss(t *testing.T) {
 // section 9.1 rules stops on the unmanaged file without --takeover —
 // converging it remains the takeover switch's job.
 func TestImportPartialActivationKeepsLock(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
@@ -309,7 +309,7 @@ func TestImportPartialActivationKeepsLock(t *testing.T) {
 // is already installed: the import stops with profile_import_name_taken
 // before any write, leaving the installed profile alone.
 func TestImportNameTakenBeforeAnyWrite(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
@@ -368,7 +368,7 @@ func gitSkillCheckout(t *testing.T, ids *gitIdentities, dir, name, identity stri
 // entry pinned by revision, installs through the path pipeline, and warns
 // environment_import_skill_foreign.
 func TestImportSkillForeignPinnedByRevision(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
@@ -405,7 +405,7 @@ func TestImportSkillForeignPinnedByRevision(t *testing.T) {
 // a valid install marker: the marker's source identity and resolved commit
 // recover the exact declaration pinned by revision.
 func TestImportSkillMarkerRecovery(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
@@ -452,7 +452,7 @@ func TestImportSkillMarkerRecovery(t *testing.T) {
 // and then takes over the switch: the environment markers record
 // imported_from_native and the profile list reports the imported marker.
 func TestImportRecordsImportedFromNative(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
@@ -510,7 +510,7 @@ func TestImportRecordsImportedFromNative(t *testing.T) {
 // detected nor a loss. Without the marker check the import reassembles
 // modules each carrying a full generation header.
 func TestImportSkipsManagedRootContext(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	installIdleProfile(t, home, "acme")
 	managed, err := os.ReadFile(filepath.Join(homes["claude_code"], "CLAUDE.md"))
@@ -565,7 +565,7 @@ func TestImportSkipsManagedRootContext(t *testing.T) {
 // keys, so the excess mapping entry is an unmappable surface, hence a
 // loss). Identical repeats collapse with no loss.
 func TestImportDivergentSkillsAreLoss(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
@@ -650,7 +650,7 @@ func TestImportDivergentSkillsAreLoss(t *testing.T) {
 // never treated as absence (§8.4), so the surface contributes no skills
 // and the ledger file itself is the loss.
 func TestImportLedgerFailureIsLoss(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
@@ -680,7 +680,7 @@ func TestImportLedgerFailureIsLoss(t *testing.T) {
 // the root-context file is detected as native input and the lossless
 // import installs it.
 func TestImportAbsentMarkerDetectsNative(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
@@ -704,7 +704,7 @@ func TestImportAbsentMarkerDetectsNative(t *testing.T) {
 // nor silently dropped. The marker file itself joins the loss list and the
 // consent gate stops the import.
 func TestImportCorruptMarkerIsLoss(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	installIdleProfile(t, home, "acme")
 	marker := filepath.Join(homes["claude_code"], envmarker.Name)
@@ -773,7 +773,7 @@ func TestImportCorruptMarkerIsLoss(t *testing.T) {
 // corrupt marker, the failed read is a loss naming the marker file, never
 // absence and never a silent drop.
 func TestImportUnreadableMarkerIsLoss(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	installIdleProfile(t, home, "acme")
 	marker := filepath.Join(homes["claude_code"], envmarker.Name)

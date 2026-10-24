@@ -34,7 +34,7 @@ type managedFixture struct {
 
 func writeManagedFixture(t *testing.T, profile string) *managedFixture {
 	t.Helper()
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	if err := privatedir.Protect(home); err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func writeManagedFixture(t *testing.T, profile string) *managedFixture {
 	for _, id := range []string{"claude_code", "codex_cli", "opencode-native", "pi"} {
 		native[id] = t.TempDir()
 	}
-	fx := &managedFixture{home: home, profile: profile, native: native, xdg: t.TempDir(), launch: t.TempDir()}
+	fx := &managedFixture{home: home, profile: profile, native: native, xdg: gitFixtureHome(t), launch: gitFixtureHome(t)}
 	sourceDir := filepath.Join(t.TempDir(), profile+"-source")
 	if err := os.Mkdir(sourceDir, 0o700); err != nil {
 		t.Fatal(err)

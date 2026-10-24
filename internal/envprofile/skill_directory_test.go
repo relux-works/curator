@@ -115,7 +115,7 @@ func TestSkillDirectoryMetadata(t *testing.T) {
 func driveDirectoryVector(t *testing.T, tc directoryVector) {
 	t.Helper()
 	f := directoryFixtureLoad(t)
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	operator := t.TempDir()
 	pinOperatorHome(t, operator)
 	native := pinHomes(t)
@@ -502,7 +502,7 @@ func directoryAssertLinks(t *testing.T, home, profile string, native map[string]
 		}
 	}
 	check(nativeLink)
-	req := ResolveRequest{Home: home, Profile: profile, EnvID: "codex_cli", LaunchDir: t.TempDir(), Repair: true, Machine: envregistry.DefaultMachineConfig(), Detect: func(envregistry.Adapter) string { return "unknown" }, NativeHomeOf: func(id string) (string, error) { return native[id], nil }, OperatorXDG: t.TempDir()}
+	req := ResolveRequest{Home: home, Profile: profile, EnvID: "codex_cli", LaunchDir: gitFixtureHome(t), Repair: true, Machine: envregistry.DefaultMachineConfig(), Detect: func(envregistry.Adapter) string { return "unknown" }, NativeHomeOf: func(id string) (string, error) { return native[id], nil }, OperatorXDG: gitFixtureHome(t)}
 	if _, err := Resolve(req); err != nil {
 		t.Fatalf("managed materialization: %v", err)
 	}

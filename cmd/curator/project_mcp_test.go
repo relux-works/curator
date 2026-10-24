@@ -15,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/projectmcpstate"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 func writeProjectMCP(t *testing.T, path string, value any) {
@@ -46,7 +47,7 @@ func patchMCPConfig(t *testing.T, path, key string, value any) {
 }
 func mcpCLISetup(t *testing.T, server map[string]any) (string, string, string) {
 	t.Helper()
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	cfg, project := setupCLIProject(t, root)
 	for _, dir := range []string{filepath.Dir(cfg), project} {
 		if err := privatedir.ProtectTree(dir); err != nil {
@@ -84,7 +85,7 @@ func mcpCLISetup(t *testing.T, server map[string]any) (string, string, string) {
 // is invoked once as the positive control for the observation instrument.
 func TestProjectMCPProductionReplay(t *testing.T) {
 	cfg, project, repo := mcpCLISetup(t, map[string]any{"transport": "stdio", "command": "mcp-stage-a-tripwire", "args": []string{}, "environments": []string{"muse", "claude_code", "codex_cli", "pi", "opencode"}})
-	bin := t.TempDir()
+	bin := testgitenv.ShortTempDir(t)
 	exe, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -96,7 +97,7 @@ func TestProjectMCPProductionReplay(t *testing.T) {
 	if err := os.WriteFile(target, readProjectMCP(t, exe), 0700); err != nil {
 		t.Fatal(err)
 	}
-	tripwire := filepath.Join(t.TempDir(), "invoked")
+	tripwire := filepath.Join(testgitenv.ShortTempDir(t), "invoked")
 	t.Setenv("CURATOR_TEST_MCP_TRIPWIRE", tripwire)
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	if err := exec.Command(target).Run(); err == nil {
@@ -136,7 +137,7 @@ func TestProjectMCPProductionReplay(t *testing.T) {
 	if err := os.Rename(repo, repo+"-offline"); err != nil {
 		t.Fatal(err)
 	}
-	trace := filepath.Join(t.TempDir(), "git-trace")
+	trace := filepath.Join(testgitenv.ShortTempDir(t), "git-trace")
 	t.Setenv("GIT_TRACE", trace)
 	for _, args := range [][]string{{"install", "app", "--dry-run"}, {"install", "app"}, {"status", "app"}} {
 		homeBefore := snapshotHelpTree(t, filepath.Dir(cfg))
@@ -199,7 +200,7 @@ func TestProjectMCPProductionReplay(t *testing.T) {
 // Inline admission is refused before gitignore repair or source acquisition;
 // ignored project-supplied approval and scope options cannot activate stage B.
 func TestProjectMCPInlineRefusalBeforeWrites(t *testing.T) {
-	cfg, project := setupCLIProject(t, t.TempDir())
+	cfg, project := setupCLIProject(t, testgitenv.ShortTempDir(t))
 	writeProjectMCP(t, filepath.Join(project, "Skillfile.json"), map[string]any{"schema_version": 3, "skills": []any{}, "mcp_servers": map[string]any{"tool": map[string]any{"server": map[string]any{"transport": "http", "url": "https://service.example/mcp", "environments": []string{"codex_cli", "muse"}}, "install": map[string]any{"approval": true, "scope": "user"}}}})
 	before := readProjectMCP(t, filepath.Join(project, ".gitignore"))
 	for _, args := range [][]string{{"project", "resolve", "app"}, {"install", "app", "--dry-run"}, {"install", "app", "--fix-gitignore"}} {
@@ -240,7 +241,7 @@ func TestProjectMCPGlobalDispatch(t *testing.T) {
 // creates existing operation-lock bookkeeping. Consumer state stays unchanged,
 // and malformed inputs and ignored option values never enter output.
 func TestProjectMCPMalformedSiblingReporting(t *testing.T) {
-	cfg, project := setupCLIProject(t, t.TempDir())
+	cfg, project := setupCLIProject(t, testgitenv.ShortTempDir(t))
 	writeProjectMCP(t, filepath.Join(project, "Skillfile.json"), map[string]any{"schema_version": 3, "skills": []any{}, "mcp_servers": map[string]any{
 		"a-valid": map[string]any{"server": map[string]any{"transport": "http", "url": "https://safe.example/mcp", "environments": []string{"codex_cli"}}},
 		"bad":     map[string]any{"server": map[string]any{"transport": "http", "url": "https://safe.example/mcp", "private": "AKIA1234567890ABCDEF"}},

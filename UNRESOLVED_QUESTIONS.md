@@ -1,5 +1,12 @@
 # Unresolved questions
 
+- TASK-261022-qwkhwj: Windows Git metadata is limited to 259 UTF-16 units,
+  with 126 reserved for fixed SHA-256/maintenance paths and a normal clone-root
+  maximum of 133. New over-budget clones refuse before creating cache parents.
+  A short private metadata layout is the follow-up option; its identity,
+  privacy, no-follow and cleanup contract needs a separate design.
+  [Measured bound and supported layout](docs/windows-git-paths.md).
+
 - BUG-261016-mlpvtn — self-hosted Linux CI: workflow/ref concurrency cannot
   bound competing repositories, and the go-v1 probe has no CI timeout knob.
   Host-wide scheduling authority or a separate qualification decision remains

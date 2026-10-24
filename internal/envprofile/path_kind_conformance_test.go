@@ -103,7 +103,7 @@ func TestPathKindMCPVectorsDriveInstallEntry(t *testing.T) {
 
 func driveGitMCPAdmission(t *testing.T) {
 	t.Helper()
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	tool := gitRepo(t, map[string]string{
@@ -121,7 +121,7 @@ func driveGitMCPAdmission(t *testing.T) {
 
 func drivePathMCPRefusal(t *testing.T, tc pathMCPKindVector) {
 	t.Helper()
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	pathPackage := filepath.Join(t.TempDir(), "path-package")
 	pathMCPPackage(t, pathPackage)
@@ -200,7 +200,7 @@ func drivePathBoundaryVector(t *testing.T, tc pathBoundaryVector) string {
 		}
 		return ""
 	case "path-root-no-system-modules-admitted":
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		pinHomes(t)
 		root := filepath.Join(t.TempDir(), "root")
 		writeManifestPackage(t, root, `{"schema_version":1,"name":"team-context","version":"1.0.0"}`+"\n", nil)
@@ -210,7 +210,7 @@ func drivePathBoundaryVector(t *testing.T, tc pathBoundaryVector) string {
 		assertPathResolveCurrent(t, home, "team-context", Policy{}, tc)
 		return ""
 	case "path-import-no-system-modules-admitted":
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		pinHomes(t)
 		seams := pinImportSeams(t)
 		seedCurrentDefault(t, home)
@@ -265,7 +265,7 @@ func drivePathBoundaryVector(t *testing.T, tc pathBoundaryVector) string {
 
 func newVectorPathOverlay(t *testing.T, system bool) (string, string, string, Policy) {
 	t.Helper()
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root := filepath.Join(t.TempDir(), "root")
 	writeManifestPackage(t, root, `{"schema_version":1,"name":"team-context","version":"1.0.0"}`+"\n", nil)
@@ -315,7 +315,7 @@ func assertPathResolveCurrent(t *testing.T, home, profile string, policy Policy,
 		t.Fatalf("trusted path source did not emit a current fragment: vector=%+v result=%s", tc, result.Document)
 	}
 	status, err := StatusOf(StatusRequest{
-		Home: home, Machine: envregistry.DefaultMachineConfig(), Policy: policy, LaunchDir: t.TempDir(),
+		Home: home, Machine: envregistry.DefaultMachineConfig(), Policy: policy, LaunchDir: gitFixtureHome(t),
 		Detect:       func(envregistry.Adapter) string { return "unknown" },
 		NativeHomeOf: func(id string) (string, error) { return filepath.Join(home, "native", id), nil },
 		OperatorXDG:  filepath.Join(home, "xdg"),
@@ -377,7 +377,7 @@ func driveUntrustedOverlayInstall(t *testing.T, tc pathBoundaryVector, checkStat
 	if err := validatePathDirectory(overlay); err == nil || !strings.Contains(err.Error(), "permissions") {
 		t.Fatalf("world-writable path source validation = %v, want permissions refusal", err)
 	}
-	request := ResolveRequest{Home: home, Profile: "team-context", EnvID: "claude_code", LaunchDir: t.TempDir(),
+	request := ResolveRequest{Home: home, Profile: "team-context", EnvID: "claude_code", LaunchDir: gitFixtureHome(t),
 		Machine: envregistry.DefaultMachineConfig(), Policy: policy}
 	result, err := Resolve(request)
 	if err == nil || result != nil || !strings.Contains(err.Error(), tc.Diagnostic) || !strings.Contains(err.Error(), tc.NamesCheck) {
@@ -403,7 +403,7 @@ func driveUntrustedOverlayInstall(t *testing.T, tc pathBoundaryVector, checkStat
 func driveWrongOwnerVector(t *testing.T, tc pathBoundaryVector) string {
 	t.Helper()
 	if tc.Origin == "onboarding-import" {
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		pinHomes(t)
 		seams := pinImportSeams(t)
 		seedCurrentDefault(t, home)
@@ -459,7 +459,7 @@ func drivePathOverlayUntrustedRepair(t *testing.T, tc pathBoundaryVector) string
 
 func assertResolveUntrusted(t *testing.T, home, profile string, policy Policy, tc pathBoundaryVector) string {
 	t.Helper()
-	result, err := Resolve(ResolveRequest{Home: home, Profile: profile, EnvID: "claude_code", LaunchDir: t.TempDir(),
+	result, err := Resolve(ResolveRequest{Home: home, Profile: profile, EnvID: "claude_code", LaunchDir: gitFixtureHome(t),
 		Machine: envregistry.DefaultMachineConfig(), Policy: policy})
 	if err == nil || result != nil || !strings.Contains(err.Error(), tc.Diagnostic) || !strings.Contains(err.Error(), tc.NamesCheck) {
 		t.Fatalf("Resolve = (%v, %v), want %s naming %s", result, err, tc.Diagnostic, tc.NamesCheck)
@@ -478,7 +478,7 @@ func driveNonRegularVector(t *testing.T, tc pathBoundaryVector) string {
 
 func drivePathRootTransitiveSystemRefusal(t *testing.T, tc pathBoundaryVector) {
 	t.Helper()
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	leaf := gitRepo(t, map[string]string{
@@ -538,7 +538,7 @@ func drivePathDryRunVector(t *testing.T, tc pathBoundaryVector) string {
 	}
 	beforeHome := hashTreeForTest(t, home)
 	beforeSource := hashTreeForTest(t, overlay)
-	result, err := Resolve(ResolveRequest{Home: home, Profile: "team-context", EnvID: "claude_code", LaunchDir: t.TempDir(),
+	result, err := Resolve(ResolveRequest{Home: home, Profile: "team-context", EnvID: "claude_code", LaunchDir: gitFixtureHome(t),
 		Machine: envregistry.DefaultMachineConfig(), Policy: policy, Repair: false})
 	if tc.Diagnostic != "" {
 		if err == nil || result != nil || !strings.Contains(err.Error(), tc.Diagnostic) || !strings.Contains(err.Error(), tc.FailingCheck) ||

@@ -90,7 +90,7 @@ func TestProfileSkillProjectionDamagedStore(t *testing.T) {
 // ErrSkillProjectionIdentity, never prepares a transaction, preserves the old
 // directory and immutable input, and removes its scratch. Clean retry succeeds.
 func TestSkillProjectionRebuildSourceRefusal(t *testing.T) {
-	home, source := t.TempDir(), t.TempDir()
+	home, source := gitFixtureHome(t), gitFixtureHome(t)
 	writeGitFile(t, source, "SKILL.md", "# Guide\n")
 	skill, err := projectSkill(home, source, hashing.VersionV2)
 	if err != nil {
@@ -147,7 +147,7 @@ func TestSkillProjectionRebuildSourceRefusal(t *testing.T) {
 func TestSkillProjectionRebuildRollback(t *testing.T) {
 	for _, point := range []transaction.Point{transaction.PointAfterBackup, transaction.PointAfterInstall, transaction.PointTargetCommitted} {
 		t.Run(string(point), func(t *testing.T) {
-			home, source := t.TempDir(), t.TempDir()
+			home, source := gitFixtureHome(t), gitFixtureHome(t)
 			writeGitFile(t, source, "SKILL.md", "# Guide\n")
 			writeGitFile(t, source, "references/guide.md", "visible\n")
 			skill, err := projectSkill(home, source, hashing.VersionV2)
@@ -269,7 +269,7 @@ func TestSkillProjectionSharedRebuild(t *testing.T) {
 // A fresh operation recovers without source bytes, clears the journal and keeps
 // the installed identity; recovery does not need the caller's staging directory.
 func TestSkillProjectionRebuildRecovery(t *testing.T) {
-	home, source := t.TempDir(), t.TempDir()
+	home, source := gitFixtureHome(t), gitFixtureHome(t)
 	writeGitFile(t, source, "SKILL.md", "# Guide\n")
 	skill, err := projectSkill(home, source, hashing.VersionV2)
 	if err != nil {

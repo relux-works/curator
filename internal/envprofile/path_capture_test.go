@@ -32,7 +32,7 @@ func pathSourceGit(t *testing.T, dir string, args ...string) {
 // checkout: the installed entry carries dirty and untracked bytes, not
 // only the Git HEAD tree.
 func TestPathInstallCapturesDirtyUntrackedInsideGit(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root := filepath.Join(t.TempDir(), "root")
 	writeSeedPackage(t, root, "acme")

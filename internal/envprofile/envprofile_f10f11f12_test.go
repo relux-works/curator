@@ -41,7 +41,7 @@ func migrationHomeWithSkill(t *testing.T, ids *gitIdentities, identity string) (
 	t.Helper()
 	skill := gitRepo(t, map[string]string{"README.md": "skill\n"}, "v1.0.0")
 	operand := ids.serve(skill, "https://"+identity)
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	if err := os.MkdirAll(filepath.Join(home, "global"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestSourceAllowlistRejectsAdjacentPathSegment(t *testing.T) {
 	}, "v1.0.0")
 	ids := newGitIdentities(t)
 	operand := ids.serve(repo, "https://example.com/org-evil/pkg")
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	policy := Policy{AllowedSources: []string{"example.com/org"}}
 	_, _, _, err := Install(home, InstallOptions{Operand: operand, Policy: policy})
 	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
@@ -292,7 +292,7 @@ func TestRevokedSkillMemberIsRefused(t *testing.T) {
 			`"requires": {"skills": {"bad": {"git": "` + skillOperand + `", "range": "*"}}}}` + "\n",
 		"context/a.md": "clean\n",
 	}, "v1.0.0")
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	policy := Policy{Revocations: []string{"source:example.com/evil-skill"}}
 	_, _, _, err := Install(home, InstallOptions{
 		Operand: ids.serve(root, "https://example.com/clean"), Policy: policy,
@@ -321,7 +321,7 @@ func TestRevokedMCPMemberIsRefused(t *testing.T) {
 			`"requires": {"mcp": {"tool": {"git": "` + mcpOperand + `", "range": "*"}}}}` + "\n",
 		"context/a.md": "clean\n",
 	}, "v1.0.0")
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	policy := Policy{Revocations: []string{"source:example.com/evil-tool"}}
 	_, _, _, err := Install(home, InstallOptions{
 		Operand: ids.serve(root, "https://example.com/clean"), Policy: policy,
@@ -343,7 +343,7 @@ func TestStrictAuditCanaryFailureBlocksInstall(t *testing.T) {
 	previous := canaryPasses
 	canaryPasses = func() bool { return false }
 	defer func() { canaryPasses = previous }()
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	source := t.TempDir()
 	writePackage(t, source, "acme", "1.0.0", "hello\n")
 	_, _, _, err := Install(home, InstallOptions{Operand: source})
@@ -399,7 +399,7 @@ func TestGateSourceRejectsFileRemote(t *testing.T) {
 // marker shape.
 func TestFileOperandIsRefused(t *testing.T) {
 	for _, operand := range []string{"file:///tmp/never-there-pkg", "FILE:///tmp/never-there-pkg"} {
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		_, _, _, err := Install(home, InstallOptions{Operand: operand})
 		if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
 			t.Fatalf("operand %s: err = %v, want %s", operand, err, DiagSourceInvalid)
@@ -427,7 +427,7 @@ func TestFileRequirementSourceIsRefused(t *testing.T) {
 			`"requires": {"contexts": {"dep": {"git": "file:///tmp/never-there-dep", "range": "*"}}}}` + "\n",
 		"context/a.md": "clean\n",
 	}, "v1.0.0")
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	_, _, _, err := Install(home, InstallOptions{Operand: ids.serve(root, "https://example.com/clean")})
 	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
 		t.Fatalf("requirement err = %v, want %s", err, DiagSourceInvalid)

@@ -26,7 +26,7 @@ func TestProfileInstallMarkdownScope(t *testing.T) {
 		{"declared-contact", "Read https://api.example.net/guide\n", `{"network":["api.example.net"]}`, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			pinHomes(t)
 			ids := newGitIdentities(t)
 			skill := gitRepo(t, map[string]string{
@@ -124,7 +124,7 @@ func TestProfileInstallMarkdownCaseAliasesCLI(t *testing.T) {
 			if tc.alias && !insensitive {
 				allowed, published = true, ""
 			}
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			pinOperatorHome(t, home)
 			homes := pinHomes(t)
 			ids := newGitIdentities(t)

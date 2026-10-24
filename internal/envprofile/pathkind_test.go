@@ -23,7 +23,7 @@ import (
 // naming no existing entry: the absence is profile_source_path_missing,
 // never a failed read.
 func TestMissingPathOperandIsPathMissing(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	absent := filepath.Join(t.TempDir(), "absent")
 	_, _, _, err := Install(home, InstallOptions{Operand: absent})
@@ -39,7 +39,7 @@ func TestMissingPathOperandIsPathMissing(t *testing.T) {
 // machine-declared overlay naming no existing entry: the overlay failure
 // carries the source's section 1.1 absence diagnostic.
 func TestMissingOverlayPathIsPathMissing(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root := filepath.Join(t.TempDir(), "root")
 	writeManifestPackage(t, root,
@@ -63,7 +63,7 @@ func TestMissingOverlayPathIsPathMissing(t *testing.T) {
 // naming a regular file: a path package is a directory tree, so the
 // operand is profile_source_invalid.
 func TestNonDirectoryPathIsSourceInvalid(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	file := filepath.Join(t.TempDir(), "file")
 	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
@@ -78,7 +78,7 @@ func TestNonDirectoryPathIsSourceInvalid(t *testing.T) {
 // TestNestedGitIsSourceInvalid drives Install with a .git entry below the
 // source root: the snapshot is profile_source_invalid.
 func TestNestedGitIsSourceInvalid(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := filepath.Join(t.TempDir(), "source")
 	writeManifestPackage(t, source,
@@ -97,7 +97,7 @@ func TestNestedGitIsSourceInvalid(t *testing.T) {
 // TestSymlinkInPathIsUntrusted drives Install with a symbolic link in the
 // source tree: the section 4 source-boundary refusal is environment_store_untrusted.
 func TestSymlinkInPathIsUntrusted(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := filepath.Join(t.TempDir(), "source")
 	writeManifestPackage(t, source,
@@ -118,7 +118,7 @@ func TestSymlinkInPathIsUntrusted(t *testing.T) {
 // folding to one platform path: the snapshot is profile_source_invalid
 // before anything is written.
 func TestFoldedPathsAreSourceInvalid(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := filepath.Join(t.TempDir(), "source")
 	writeManifestPackage(t, source,
@@ -147,7 +147,7 @@ func TestFoldedPathsAreSourceInvalid(t *testing.T) {
 // root: the entry is excluded from the immutable snapshot and the install
 // succeeds.
 func TestRootGitExcluded(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := filepath.Join(t.TempDir(), "source")
 	writeManifestPackage(t, source,
@@ -175,7 +175,7 @@ func TestRootGitExcluded(t *testing.T) {
 // module directory cannot be read: the failure is
 // profile_source_path_unreadable, never absence.
 func TestUnreadablePathIsUnreadable(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := filepath.Join(t.TempDir(), "source")
 	writeManifestPackage(t, source,
@@ -223,7 +223,7 @@ func TestUnreadablePathIsUnreadable(t *testing.T) {
 // and must fail this test; a mutant that routes a same-source path install
 // through updateLocked keeps the pin on reinstall and must fail it too.
 func TestPathSnapshotImmutableAcrossUpdateSyncUse(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	source := filepath.Join(t.TempDir(), "source")
 	writeManifestPackage(t, source,
@@ -317,7 +317,7 @@ func TestPathSnapshotImmutableAcrossUpdateSyncUse(t *testing.T) {
 // checked on every resolve and mutating profile operation.
 // Production entry points: Import, ListWithPolicy, UpdateWithPolicy.
 func TestPathUpdateAllSucceedsWithImportedProfile(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "native\n")
@@ -355,7 +355,7 @@ func TestPathUpdateAllSucceedsWithImportedProfile(t *testing.T) {
 // that itself cannot be read: the canonical §1.1 condition reports
 // profile_source_path_unreadable leading, never profile_source_invalid.
 func TestUnreadablePathRootLeadsUnreadable(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := filepath.Join(t.TempDir(), "source")
 	writeManifestPackage(t, source,
@@ -383,7 +383,7 @@ func TestUnreadablePathRootLeadsUnreadable(t *testing.T) {
 // request. Production entry point: UpdateWithPolicy. A mutant dropping the
 // empty-pin refusal or moving it after source refresh must fail this test.
 func TestUpdatePathWithoutStatePinIsSourceInvalid(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	var requests atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -434,7 +434,7 @@ func TestUpdatePathWithoutStatePinIsSourceInvalid(t *testing.T) {
 // returning the old lock as unchanged with a nil error on the read failure
 // (§8.4: a failed read turned into "nothing to do") must fail this test.
 func TestUpdatePathMissingSnapshotIsSourceInvalid(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := filepath.Join(t.TempDir(), "source")
 	writeManifestPackage(t, source,
@@ -466,7 +466,7 @@ func TestUpdatePathMissingSnapshotIsSourceInvalid(t *testing.T) {
 // UpdateWithPolicy. A mutant deleting the snapshot-name check admits the
 // mismatched snapshot and must fail this test.
 func TestUpdatePathSnapshotNameMismatchIsSourceInvalid(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := filepath.Join(t.TempDir(), "source")
 	writeManifestPackage(t, source,
@@ -509,7 +509,7 @@ func TestUpdatePathSnapshotNameMismatchIsSourceInvalid(t *testing.T) {
 // and a mutant restricting it to the current profile restores it for every
 // non-current profile; both must fail this test.
 func TestPathReinstallBareAndNonCurrentMovesPin(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	bare := filepath.Join(t.TempDir(), "source")
 	writeManifestPackage(t, bare,
@@ -592,7 +592,7 @@ func TestPathReinstallBareAndNonCurrentMovesPin(t *testing.T) {
 // overlay joins the closure.
 func installBlockingOverlayRoot(t *testing.T) (home, root string, oldHash string) {
 	t.Helper()
-	home = t.TempDir()
+	home = gitFixtureHome(t)
 	pinHomes(t)
 	root = filepath.Join(t.TempDir(), "root")
 	writeManifestPackage(t, root,

@@ -241,7 +241,7 @@ func assertManagedEntry(t *testing.T, path, want string, storeRoot string) {
 
 func setupVectorSwitch(t *testing.T, fixtures map[string]writeNofollowFixture) (home, native string) {
 	t.Helper()
-	home = t.TempDir()
+	home = gitFixtureHome(t)
 	pinHomes(t)
 	source := t.TempDir()
 	writePackage(t, source, "acme", "1.0.0", string(fixtureBytes(t, fixtures, "managed-root-context")))

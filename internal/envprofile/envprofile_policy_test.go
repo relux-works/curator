@@ -140,7 +140,7 @@ func TestPolicyFromConfigCarriesStateWaiverHashVersion(t *testing.T) {
 // gate (`scope == "" && !clearScope`) succeeds on the machine clear and
 // must fail this test.
 func TestMachineClearReachesSeamGate(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	first := t.TempDir()
 	writePackage(t, first, "one", "1.0.0", "one\n")

@@ -95,7 +95,7 @@ func TestProfileNetworkContactVectors(t *testing.T) {
 					"agent-context.json": `{"schema_version":1,"name":"network-profile","version":"1.0.0","requires":{"skills":{"network-fixture":{"git":"` + operand + `","range":"*"}}}}`,
 					"README.md":          "network profile\n",
 				}, "v1.0.0")
-				home := t.TempDir()
+				home := gitFixtureHome(t)
 				pinHomes(t)
 				info, _, _, err := Install(home, InstallOptions{Operand: ids.serve(profile, "https://example.com/profiles/network-profile")})
 				if !tc.Expected.Passes {

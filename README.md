@@ -388,6 +388,13 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+Windows Git acquisitions enforce a [measured metadata path budget](docs/windows-git-paths.md)
+before creating clone/cache directories. Over-budget roots receive
+`git_metadata_path_too_long`; use a short manager home. Unix path behavior is
+unchanged. Run `env -u GIT_DIR -u GIT_WORK_TREE go test -count=1 ./internal/gitops ./internal/testgitenv`
+for the metadata budget, actual Windows limit and fixture lifecycle controls;
+keep local evidence under task-scoped `.temp/`.
+
 Native profile/global ownership regression checks run separately with
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./cmd/curator -run '^TestGlobalNativeOwner'`,
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envprofile -run '^TestNativeSkillOwner'`,

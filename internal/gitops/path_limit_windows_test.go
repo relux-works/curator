@@ -12,6 +12,7 @@ import (
 	"testing"
 	"unicode/utf16"
 
+	"github.com/relux-works/curator/internal/testgitenv"
 	"golang.org/x/sys/windows"
 )
 
@@ -92,7 +93,11 @@ func TestWindowsGitMetadataLimit(t *testing.T) {
 			if packed {
 				suffix = filepath.Join(".git", "objects", "pack", "pack-"+strings.Repeat("0", 40)+".keep")
 			}
-			t.Logf("measured %s root bound=%d; first refused=%d; metadata bound=%d UTF-16 units; suffix=%s", name, low, high, low+1+len(suffix), suffix)
+			measured := low + 1 + len(suffix)
+			if measured != windowsGitMetadataLimit {
+				t.Fatalf("measured metadata bound %d differs from qualified bound %d", measured, windowsGitMetadataLimit)
+			}
+			t.Logf("measured %s root bound=%d; first refused=%d; metadata bound=%d UTF-16 units; suffix=%s", name, low, high, measured, suffix)
 		})
 	}
 }
@@ -109,4 +114,9 @@ func windowsLongTestPath(t *testing.T, path string) string {
 		t.Fatal(fmt.Errorf("expand fixture path: length=%d: %w", n, err))
 	}
 	return windows.UTF16ToString(buf[:n])
+}
+
+func cloneTestRoot(t *testing.T) string {
+	t.Helper()
+	return windowsLongTestPath(t, testgitenv.ShortTempDir(t))
 }

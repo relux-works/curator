@@ -45,7 +45,7 @@ func claudeHome(t *testing.T) string {
 // against a native home carrying an unmanaged root-context file: the entry
 // fails with environment_surface_unmanaged_conflict and writes nothing.
 func TestUseWithoutTakeoverRefusesUnmanaged(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	installIdleProfile(t, home, "acme")
 	native := claudeHome(t)
@@ -82,7 +82,7 @@ func TestUseWithoutTakeoverRefusesUnmanaged(t *testing.T) {
 // backup generation before the first write, the managed bytes land, and
 // the replace notice names the backup.
 func TestUseTakeoverBacksUpAndNotifies(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	installIdleProfile(t, home, "acme")
 	native := claudeHome(t)
@@ -131,7 +131,7 @@ func TestUseTakeoverBacksUpAndNotifies(t *testing.T) {
 // store: the entry stops with environment_foreign_manager_detected and the
 // explicit abort-or-take-over choice; the flag takes over with backup.
 func TestForeignSymlinkStopsSwitch(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	installIdleProfile(t, home, "acme")
 	native := claudeHome(t)
@@ -195,7 +195,7 @@ func TestForeignSymlinkStopsSwitch(t *testing.T) {
 // the non-blocking environment_foreign_manager_suspected warning names
 // the manager, and the switch still converges.
 func TestTakeoverWarnsDotfileHeuristic(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	installIdleProfile(t, home, "acme")
 	native := claudeHome(t)
@@ -235,7 +235,7 @@ func TestTakeoverWarnsDotfileHeuristic(t *testing.T) {
 // target is a directory, so this catches replacing the production Lstat with
 // Stat, which would incorrectly report chezmoi as present.
 func TestTakeoverSymlinkedDotfileManagerStateDoesNotWarn(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	installIdleProfile(t, home, "acme")
 	native := claudeHome(t)
@@ -311,7 +311,7 @@ func TestTakeoverSymlinkedDotfileManagerStateDoesNotWarn(t *testing.T) {
 // unmanaged state: list, status, and bare resolve report without writing
 // a backup, a marker, or a prompt.
 func TestReadOnlyCommandsNeverOnboard(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	installIdleProfile(t, home, "acme")
 	native := claudeHome(t)
@@ -349,7 +349,7 @@ func TestReadOnlyCommandsNeverOnboard(t *testing.T) {
 // the flag the repair fails, with it the file is backed up and the home
 // provisions.
 func TestRepairTakeoverProvisionsManagedHome(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	installIdleProfile(t, home, "acme")
 	managed := ManagedHomeDir(home, "acme", "claude_code")

@@ -36,7 +36,7 @@ func migrationRevisionFixture(t *testing.T, files map[string]string) (home, comm
 	}
 	commit = strings.TrimSpace(string(out))
 	operand := ids.serve(bare, "https://example.com/skills/binary-skill")
-	home = t.TempDir()
+	home = gitFixtureHome(t)
 	pinHomes(t)
 	global := filepath.Join(home, "global")
 	if err := os.MkdirAll(global, 0o755); err != nil {

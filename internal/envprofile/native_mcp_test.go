@@ -445,7 +445,7 @@ func TestProfileMCPUnreadableAndNoFollow(t *testing.T) {
 					if err := privatedir.MakeAll(filepath.Dir(ManagedHomeDir(fx.home, fx.profile, id))); err != nil {
 						t.Fatal(err)
 					}
-					if err := os.Symlink(t.TempDir(), ManagedHomeDir(fx.home, fx.profile, id)); err != nil {
+					if err := os.Symlink(gitFixtureHome(t), ManagedHomeDir(fx.home, fx.profile, id)); err != nil {
 						t.Fatal(err)
 					}
 				}

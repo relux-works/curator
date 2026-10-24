@@ -406,7 +406,7 @@ func TestMuseGlobalReconciliationUsesExplicitProvisioning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	participates, err := managedAdapterParticipates(home, "acme", adapter)
 	if err != nil || participates {
 		t.Fatalf("unprovisioned Muse participated: %v %v", participates, err)

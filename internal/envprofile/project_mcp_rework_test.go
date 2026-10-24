@@ -24,7 +24,7 @@ func TestProjectMCPCacheSourceBinding(t *testing.T) {
 	} {
 		t.Run(pair[0], func(t *testing.T) {
 			ids := newGitIdentities(t)
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			for index, source := range pair {
 				payload, _ := json.Marshal(map[string]any{"schema_version": 1, "name": "tool", "version": "1.0.0", "server": map[string]any{"transport": "stdio", "command": "runtime", "args": []string{source}}})
 				repo := gitRepo(t, map[string]string{"agent-mcp.json": string(payload)}, "v1.0.0")
@@ -39,7 +39,7 @@ func TestProjectMCPCacheSourceBinding(t *testing.T) {
 					t.Fatal(err)
 				}
 				policy := Policy{AllowedSources: []string{source}, MCPAllowlist: []string{source}}
-				for _, cache := range []string{home, t.TempDir()} {
+				for _, cache := range []string{home, gitFixtureHome(t)} {
 					entries, _, err := ResolveProjectMCP(cache, map[string]projectmcp.Declaration{"tool": decl}, policy)
 					if err != nil || len(entries) != 1 {
 						t.Fatalf("source %d: %v", index, err)
@@ -95,7 +95,7 @@ func TestProjectMCPCacheOriginRefused(t *testing.T) {
 // A genuinely absent descendant is creatable, whereas an untraversable parent
 // is a typed unreadable route and cannot masquerade as absence.
 func TestProjectMCPRouteReadBoundary(t *testing.T) {
-	root := t.TempDir()
+	root := gitFixtureHome(t)
 	if err := privatedir.Protect(root); err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestProjectMCPRouteReadBoundary(t *testing.T) {
 // and the legacy repository remains untouched for its existing consumers.
 func TestProjectMCPLegacyCacheIsNotAuthority(t *testing.T) {
 	ids := newGitIdentities(t)
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	first := "packages.example/a_b/tool"
 	second := "packages.example/a/b_tool"
 	for _, source := range []string{first, second} {

@@ -45,7 +45,7 @@ func gitRun(t *testing.T, dir string, args ...string) {
 // §2.3 rows in ascending package-name byte order — the stdio command,
 // args, and env_names listed — and the empty allowlist warns.
 func TestInstallSurfacesMCPDeclarations(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	alphaRepo := gitRepo(t, map[string]string{
@@ -80,7 +80,7 @@ func TestInstallSurfacesMCPDeclarations(t *testing.T) {
 // root with no declaration packages surfaces no rows, and the allowlist
 // warning still fires.
 func TestInstallSurfacingSilentWithoutMCP(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root := t.TempDir()
 	writePackage(t, root, "acme", "1.0.0", "hello\n")
@@ -102,7 +102,7 @@ func TestUpdateSurfacesCandidateMCPSet(t *testing.T) {
 	if _, err := gitLookPath(); err != nil {
 		t.Skip("no git on PATH")
 	}
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	toolRepo := gitRepo(t, map[string]string{
@@ -144,7 +144,7 @@ func TestUpdateSurfacesCandidateMCPSet(t *testing.T) {
 // install, update, and status: an empty effective allowlist warns on
 // every operation and a non-empty one stays silent.
 func TestAllowlistWarningOperations(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root := t.TempDir()
 	writePackage(t, root, "acme", "1.0.0", "hello\n")

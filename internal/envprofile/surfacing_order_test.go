@@ -103,7 +103,7 @@ func requireSingleEmission(t *testing.T, sink *lockObservingSink, info Info, wan
 // a helper's output.
 func observeLiveInstallEmission(t *testing.T) (home, operand string) {
 	t.Helper()
-	home = t.TempDir()
+	home = gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	operand = serveOrderRoot(t, ids, "withmcp", serveOrderTool(t, ids))
@@ -128,7 +128,7 @@ func observeLiveInstallEmission(t *testing.T) (home, operand string) {
 // the order tests and the surfacing_order vector driver.
 func observeLiveUpdateEmission(t *testing.T) {
 	t.Helper()
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	toolOperand := serveOrderTool(t, ids)
@@ -207,7 +207,7 @@ func TestUpdateEmitsSurfacingBeforePublication(t *testing.T) {
 // moves, the row arrives while lock.json still holds the old lock
 // bytes, and Info carries no rows to reprint.
 func TestReinstallEmitsSurfacingBeforePublication(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	toolOperand := serveOrderTool(t, ids)
@@ -256,7 +256,7 @@ func TestReinstallEmitsSurfacingBeforePublication(t *testing.T) {
 // the later journal publication fails, but the row has already reached
 // the sink.
 func TestSurfacingEmittedDespitePublicationFailure(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	seed := t.TempDir()
@@ -302,7 +302,7 @@ func (failingSink) Write([]byte) (int, error) { return 0, errors.New("sink refus
 // refuses every write: the install still succeeds, because §2.3
 // surfacing is informative and never fails the operation.
 func TestSurfacingSinkWriteFailureIsNonFatal(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	operand := serveOrderRoot(t, ids, "withmcp", serveOrderTool(t, ids))

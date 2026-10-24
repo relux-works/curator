@@ -1364,7 +1364,7 @@ func TestMigrateMarkerDriftRefuses(t *testing.T) {
 // TestMigrateSyscallFailureRollsBack — so this pins the OS boundary,
 // not the entry.
 func TestMigrateFailedRelinkKeepsOldLink(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	full := filepath.Join(ManagedHomeDir(home, "acme", "pi"), "auth.json")
 	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 		t.Fatal(err)

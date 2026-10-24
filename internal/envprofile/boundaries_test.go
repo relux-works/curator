@@ -23,7 +23,7 @@ func writeSeedPackage(t *testing.T, root, name string) {
 // TestPathInstallAdmitsOrdinaryDirectory proves ordinary profile paths remain
 // available through the environment context store.
 func TestPathInstallAdmitsOrdinaryDirectory(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root := filepath.Join(t.TempDir(), "root")
 	writeSeedPackage(t, root, "acme")
@@ -43,7 +43,7 @@ func TestPathInstallAdmitsOrdinaryDirectory(t *testing.T) {
 // contract: profile path sources use the environment context store and do
 // not inherit project Skillfile source admission rules.
 func TestLegacyPathInstallIgnoresStoreOverlap(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	// The context store root is manager-protected state (environments §4):
 	// create it the way the manager does so only the overlap rule is tested.
@@ -64,7 +64,7 @@ func TestLegacyPathInstallIgnoresStoreOverlap(t *testing.T) {
 // TestPathOverlayAdmitsOrdinaryDirectory proves path overlays keep joining
 // the profile closure through the environment context store.
 func TestPathOverlayAdmitsOrdinaryDirectory(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root := filepath.Join(t.TempDir(), "root")
 	writeSeedPackage(t, root, "acme")

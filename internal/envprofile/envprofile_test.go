@@ -68,7 +68,7 @@ func pinOperatorHome(t *testing.T, dir string) {
 // TestInstallPathAndList drives the production Install for a path operand:
 // the profile resolves, audits, locks, stores, and lists with its hash.
 func TestInstallPathAndList(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := t.TempDir()
 	writePackage(t, source, "acme", "1.0.0", "hello\n")
@@ -105,7 +105,7 @@ func TestInstallPathAndList(t *testing.T) {
 // carrying secret material fails installation. A mutant that skips the
 // audit must fail this test.
 func TestInstallRejectsSecretMember(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := t.TempDir()
 	writePackage(t, source, "evil", "1.0.0", "key AKIA1234567890ABCDEF here\n")
@@ -122,7 +122,7 @@ func TestInstallRejectsSecretMember(t *testing.T) {
 // TestReinstallSameSourceIsAnUpdate checks re-installing an installed path
 // with the same requirement re-resolves as an update.
 func TestReinstallSameSourceIsAnUpdate(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := t.TempDir()
 	writePackage(t, source, "acme", "1.0.0", "hello\n")
@@ -144,7 +144,7 @@ func TestReinstallSameSourceIsAnUpdate(t *testing.T) {
 // TestNameTaken narrows the name gate: a different source under an
 // installed name fails with profile_name_taken.
 func TestNameTaken(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	first, second := t.TempDir(), t.TempDir()
 	writePackage(t, first, "acme", "1.0.0", "hello\n")
@@ -162,7 +162,7 @@ func TestNameTaken(t *testing.T) {
 // machine scope: the claude root context is a copied file, the others are
 // store links, and every home carries a marker for the profile.
 func TestUseMaterializesLinkedHomes(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	source := t.TempDir()
 	writePackage(t, source, "acme", "1.0.0", "hello\n")
@@ -206,7 +206,7 @@ func TestUseMaterializesLinkedHomes(t *testing.T) {
 // TestUseReplacesWithBackup checks versioned backups: switching profiles
 // backs up the replaced file into .agent-environment-backup/1/.
 func TestUseReplacesWithBackup(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	first, second := t.TempDir(), t.TempDir()
 	writePackage(t, first, "one", "1.0.0", "one\n")
@@ -238,7 +238,7 @@ func TestUseReplacesWithBackup(t *testing.T) {
 // environment_surface_unmanaged_conflict, the other homes still switch, and
 // the recorded current is unchanged with profile_use_partial.
 func TestUsePartialRecordsNothing(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	source := t.TempDir()
 	writePackage(t, source, "acme", "1.0.0", "hello\n")
@@ -290,7 +290,7 @@ func TestUsePartialRecordsNothing(t *testing.T) {
 // TestRemoveRefusesCurrent narrows the removal gate: a profile current in
 // any scope fails with profile_in_use.
 func TestRemoveRefusesCurrent(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := t.TempDir()
 	writePackage(t, source, "acme", "1.0.0", "hello\n")
@@ -305,7 +305,7 @@ func TestRemoveRefusesCurrent(t *testing.T) {
 // TestRemovePurgeCleansHomes checks --purge removes the recorded surfaces,
 // markers, and backups of the profile's homes.
 func TestRemovePurgeCleansHomes(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	first, second := t.TempDir(), t.TempDir()
 	writePackage(t, first, "one", "1.0.0", "one\n")
@@ -340,7 +340,7 @@ func TestRemovePurgeCleansHomes(t *testing.T) {
 // removed; TestPathSnapshotImmutableAcrossUpdateSyncUse extends it to sync,
 // use, reinstall, and the imported-profile update-all shape.)
 func TestUpdatePathLeavesLockInPlace(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := t.TempDir()
 	writePackage(t, source, "acme", "1.0.0", "hello\n")
@@ -374,7 +374,7 @@ func TestInstallGitResolvesNetworkIdentity(t *testing.T) {
 	}, "v1.0.0")
 	ids := newGitIdentities(t)
 	operand := ids.serve(repo, "https://example.com/groot")
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	info, _, _, err := Install(home, InstallOptions{Operand: operand})
 	if err != nil {
 		t.Fatal(err)
@@ -397,7 +397,7 @@ func TestInstallGitResolvesNetworkIdentity(t *testing.T) {
 // TestInstallSurfacesSystemModuleWarning checks the always-warn class: a
 // system module installs fine and is reported in warnings.
 func TestInstallSurfacesSystemModuleWarning(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := t.TempDir()
 	manifest := `{"schema_version": 1, "name": "sys", "version": "1.0.0",` +
@@ -465,7 +465,7 @@ func gitRepo(t *testing.T, files map[string]string, tag string) string {
 // warning: a stdio server whose command is absent from PATH installs with a
 // warning, never a failure.
 func TestInstallSurfacesUnresolvedMCPCommand(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	mcpRepo := gitRepo(t, map[string]string{
@@ -495,7 +495,7 @@ func TestInstallSurfacesUnresolvedMCPCommand(t *testing.T) {
 // TestUpdateDefaultIsBlocked narrows the migration gate: the builtin local
 // profile never moves.
 func TestUpdateDefaultIsBlocked(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	if _, _, err := Update(home, DefaultProfile); err == nil || !strings.Contains(err.Error(), DiagUpdateBlocked) {
 		t.Fatalf("error %v carries no %s", err, DiagUpdateBlocked)
@@ -506,7 +506,7 @@ func TestUpdateDefaultIsBlocked(t *testing.T) {
 // scoped current without moving the machine current, and --clear drops the
 // record and re-materializes the scope from the machine default.
 func TestScopedUseAndClear(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	first, second := t.TempDir(), t.TempDir()
 	writePackage(t, first, "one", "1.0.0", "one\n")
@@ -554,7 +554,7 @@ func TestScopedUseAndClear(t *testing.T) {
 // unreadable install record fails the listing rather than silently dropping
 // the profile. Reserved state without a record (scoped/) is skipped.
 func TestListFailsOnCorruptRecord(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := t.TempDir()
 	writePackage(t, source, "acme", "1.0.0", "hello\n")
@@ -589,7 +589,7 @@ func TestInstallDirectoryRejectsSecretUnderSubdirectory(t *testing.T) {
 		"sub/context/a.md": directorySecret(),
 	}, "v1.0.0")
 	ids := newGitIdentities(t)
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	if _, _, _, err := Install(home, InstallOptions{Operand: ids.serve(repo, "https://example.com/acme"), Directory: "sub"}); err == nil {
 		t.Fatal("directory-addressed secret member must fail installation")
 	} else if !strings.Contains(err.Error(), DiagSourceInvalid) {
@@ -618,7 +618,7 @@ func TestInstallTransitiveDirectoryRejectsSecret(t *testing.T) {
 			`"requires": {"contexts": {"dep": {"git": "` + depOperand + `", "range": "*", "directory": "sub"}}}}` + "\n",
 		"context/a.md": "clean\n",
 	}, "v1.0.0")
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	if _, _, _, err := Install(home, InstallOptions{Operand: ids.serve(root, "https://example.com/clean")}); err == nil {
 		t.Fatal("transitive directory-addressed secret member must fail installation")
 	} else if !strings.Contains(err.Error(), DiagSourceInvalid) {
@@ -629,7 +629,7 @@ func TestInstallTransitiveDirectoryRejectsSecret(t *testing.T) {
 // TestEnsureDefaultCreatesLocalProfile checks the §9.4 migration: the first
 // use of the profile surface creates the builtin local default umbrella.
 func TestEnsureDefaultCreatesLocalProfile(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	if err := EnsureDefault(home); err != nil {
 		t.Fatal(err)
 	}
@@ -655,7 +655,7 @@ func TestEnsureDefaultCreatesLocalProfile(t *testing.T) {
 // All four must work on a fresh manager home: the default lock pins a real
 // store entry, and the contextless root materializes markers alone.
 func TestDefaultProfileMaterializesOnFreshHome(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	profiles, err := List(home)
 	if err != nil {
@@ -713,7 +713,7 @@ func TestEnsureDefaultMigratesGlobalSkills(t *testing.T) {
 	skill := gitRepo(t, map[string]string{"README.md": "skill\n"}, "v1.0.0")
 	ids := newGitIdentities(t)
 	skillOperand := ids.serve(skill, "https://example.com/skills/hello")
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	if err := os.MkdirAll(filepath.Join(home, "global"), 0o755); err != nil {
 		t.Fatal(err)
@@ -760,7 +760,7 @@ func TestEnsureDefaultMigratesGlobalSkills(t *testing.T) {
 // with environment_lock_unavailable instead of racing the holder.
 // Production entry point: Install.
 func TestMutationLockContention(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	old := lockTimeout
 	lockTimeout = 50 * time.Millisecond
 	defer func() { lockTimeout = old }()
@@ -788,7 +788,7 @@ func TestMutationLockContention(t *testing.T) {
 // point: List, which recovers journals on lock entry. A mutant that drops
 // the recovery must fail this test.
 func TestIncompleteJournalRecoversOnEntry(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	if err := os.MkdirAll(ProfilesDir(home), 0o755); err != nil {
 		t.Fatal(err)
@@ -851,7 +851,7 @@ func TestIncompleteJournalRecoversOnEntry(t *testing.T) {
 // published records carry the exact bytes the operation resolved.
 // Production entry points: Install, Use.
 func TestOperationsLeaveNoJournalResidue(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := t.TempDir()
 	writePackage(t, source, "acme", "1.0.0", "hello\n")

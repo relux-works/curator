@@ -38,7 +38,7 @@ func TestProfileInstallMarkdownContextCLI(t *testing.T) {
 		{"reserved", "Read https://api.example/guide\n", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			pinOperatorHome(t, home)
 			homes := pinHomes(t)
 			profile := t.TempDir()
@@ -113,7 +113,7 @@ func TestProfileInstallMarkdownMCP(t *testing.T) {
 		{"reserved", "Read https://api.example/guide\n", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			pinOperatorHome(t, home)
 			pinHomes(t)
 			ids := newGitIdentities(t)

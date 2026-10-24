@@ -48,7 +48,7 @@ func provision(t *testing.T, fx *managedFixture, envID string, machine envregist
 }
 
 func TestStatusSignerPostureUnknownWithoutCachedSource(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	const source = "github.com/example/signed"
 	rows := sourceSignerPosture(StatusRequest{
 		Home: home,
@@ -67,7 +67,7 @@ func TestStatusSignerPostureUnknownWithoutCachedSource(t *testing.T) {
 }
 
 func TestStatusSignerPostureReadFailureIsNonCurrent(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	const source = "github.com/example/signed"
 	manager := newGitManager(home)
 	if err := os.MkdirAll(manager.reposDir(), 0o755); err != nil {
@@ -193,7 +193,7 @@ func TestSignerPostureVectorsAtStatus(t *testing.T) {
 	for _, vector := range vectors.PostureCases {
 		t.Run(vector.Name, func(t *testing.T) {
 			pinHomes(t)
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			privateKey := ""
 			sourceSigners := make(map[string][]contextresolve.Signer, len(vector.Allowlists))
 			for source, signers := range vector.Allowlists {
@@ -693,7 +693,7 @@ func TestClaudeSeedMergePreservesToolState(t *testing.T) {
 // tests prove end to end; this level pins the rows, where the launch
 // directory is injectable.
 func TestStatusShellHookTrustFromLaunchProject(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	project := filepath.Join(t.TempDir(), "project")
 	if err := os.MkdirAll(filepath.Join(project, ".agents"), 0o755); err != nil {
 		t.Fatal(err)
@@ -751,7 +751,7 @@ func TestStatusShellHookTrustFromLaunchProject(t *testing.T) {
 	}
 
 	// Outside any project the recorded path stays known.
-	status, err = StatusOf(StatusRequest{Home: home, Machine: envregistry.DefaultMachineConfig(), LaunchDir: t.TempDir()})
+	status, err = StatusOf(StatusRequest{Home: home, Machine: envregistry.DefaultMachineConfig(), LaunchDir: gitFixtureHome(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -798,7 +798,7 @@ func parseTrustStamp(t *testing.T, value string) time.Time {
 // the cmd/curator tests, where the exit code is evidence of the trust
 // posture alone.
 func TestStatusShellHookTrustMissingUnreadableAndStateFailures(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	envPath := filepath.Join(t.TempDir(), "project", ".agents", "env.sh")
 	if err := os.MkdirAll(filepath.Dir(envPath), 0o755); err != nil {
 		t.Fatal(err)
@@ -813,7 +813,7 @@ func TestStatusShellHookTrustMissingUnreadableAndStateFailures(t *testing.T) {
 	if _, err := hookapproval.ApproveFile(home, envPath, hookapproval.ApprovedByOperator, parseTrustStamp(t, "2026-09-17T00:00:00Z")); err != nil {
 		t.Fatal(err)
 	}
-	outside := StatusRequest{Home: home, Machine: envregistry.DefaultMachineConfig(), LaunchDir: t.TempDir()}
+	outside := StatusRequest{Home: home, Machine: envregistry.DefaultMachineConfig(), LaunchDir: gitFixtureHome(t)}
 
 	status, err := StatusOf(outside)
 	if err != nil {

@@ -61,7 +61,7 @@ func TestInstallBlocksBothV1CollidingSkillTrees(t *testing.T) {
 
 	for _, tc := range collision {
 		t.Run(tc.name, func(t *testing.T) {
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			skillRepo := gitRepo(t, tc.files, "v1.0.0")
 			skillOperand := ids.serve(skillRepo, "https://example.com/"+tc.name+"-skill")
 			rootRepo := gitRepo(t, skillDependencyRootFiles(tc.name, skillOperand), "v1.0.0")
@@ -79,7 +79,7 @@ func TestInstallBlocksBothV1CollidingSkillTrees(t *testing.T) {
 	}
 
 	t.Run("nul-free-skill-still-installs", func(t *testing.T) {
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		skillRepo := gitRepo(t, map[string]string{
 			"SKILL.md":     "---\nname: framing-data\ndescription: Framing data fixture.\n---\n",
 			"assets/a.bin": "x",
@@ -100,7 +100,7 @@ func TestInstallBlocksBothV1CollidingSkillTrees(t *testing.T) {
 
 func TestInstallBlocksDeepNULFileInContextPathSnapshot(t *testing.T) {
 	enableV1WritersForTest(t)
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	source := t.TempDir()
 	writeGitFile(t, source, "agent-context.json", `{"schema_version": 1, "name": "nul-context", "version": "1.0.0",`+

@@ -39,7 +39,7 @@ func chapterOrder(t *testing.T, path string) []string {
 // production Install and returns the manager home and profile name.
 func installComposedPair(t *testing.T) (string, string) {
 	t.Helper()
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root := filepath.Join(t.TempDir(), "root")
 	writeManifestPackage(t, root,
@@ -108,7 +108,7 @@ func TestPrecedencePrimitivesDriveEmission(t *testing.T) {
 // TestPrecedenceTieKeepsTopologicalOrder drives the production switch with
 // equal weights under both placements: placement never inverts a tie.
 func TestPrecedenceTieKeepsTopologicalOrder(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root := filepath.Join(t.TempDir(), "root")
 	writeManifestPackage(t, root,
@@ -193,7 +193,7 @@ func lockMember(lock *contextlock.Lock, name string) (contextlock.Member, bool) 
 // machine-declared path overlay: the overlay joins the closure beside the
 // root, the lock flags it overlay, and its weight is the machine default.
 func TestPathOverlayJoinsClosure(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root := filepath.Join(t.TempDir(), "root")
 	writeManifestPackage(t, root,
@@ -253,7 +253,7 @@ func TestPathOverlayJoinsClosure(t *testing.T) {
 // TestOverlayExplicitWeightOverridesDefault drives Install with a declared
 // weight: rule 4 outranks the manifest weight.
 func TestOverlayExplicitWeightOverridesDefault(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root := filepath.Join(t.TempDir(), "root")
 	writeManifestPackage(t, root,
@@ -288,7 +288,7 @@ func TestOverlayExplicitWeightOverridesDefault(t *testing.T) {
 // machine-declared git overlay: the overlay resolves jointly with the
 // root and the lock flags it overlay with the declared weight.
 func TestGitOverlayJoinsClosure(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	overlayOperand := gitContextRepo(t, ids, "https://example.com/personal",
@@ -341,7 +341,7 @@ func TestPathOverlayFormIsSourceInvalid(t *testing.T) {
 	for name, spec := range specs {
 		spec := spec
 		t.Run(name, func(t *testing.T) {
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			pinHomes(t)
 			root := filepath.Join(t.TempDir(), "root")
 			writeManifestPackage(t, root,
@@ -386,7 +386,7 @@ func TestOverlayInvalidSourceKindIsSourceInvalid(t *testing.T) {
 	}
 	for _, source := range sources {
 		t.Run(source, func(t *testing.T) {
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			pinHomes(t)
 			root := filepath.Join(t.TempDir(), "root")
 			writeManifestPackage(t, root,
@@ -444,7 +444,7 @@ func TestSCPOverlayResolvesAsGit(t *testing.T) {
 	for spelling, wantIdentity := range spellings {
 		spelling, wantIdentity := spelling, wantIdentity
 		t.Run(spelling, func(t *testing.T) {
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			pinHomes(t)
 			ids := newGitIdentities(t)
 			overlayOperand := gitContextRepo(t, ids, spelling,
@@ -488,7 +488,7 @@ func TestSCPOverlayResolvesAsGit(t *testing.T) {
 // overlays carrying one package name: the repeated declaration is
 // environment_composition_invalid.
 func TestOverlayRepeatedNameIsCompositionInvalid(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root := filepath.Join(t.TempDir(), "root")
 	writeManifestPackage(t, root,
@@ -520,7 +520,7 @@ func TestOverlayRepeatedNameIsCompositionInvalid(t *testing.T) {
 // overlay whose package name repeats the root: the declaration is
 // environment_composition_invalid.
 func TestOverlayDuplicateNameIsCompositionInvalid(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root := filepath.Join(t.TempDir(), "root")
 	writeManifestPackage(t, root,
@@ -547,7 +547,7 @@ func TestOverlayDuplicateNameIsCompositionInvalid(t *testing.T) {
 // composition policy: the declared overlay list empties and the root
 // resolves alone.
 func TestForbiddenOverlaysResolveAlone(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	root := filepath.Join(t.TempDir(), "root")
 	writeManifestPackage(t, root,
@@ -583,7 +583,7 @@ func TestForbiddenOverlaysResolveAlone(t *testing.T) {
 // whose package is an overlay member of another installed profile's lock:
 // the removal fails with profile_in_use.
 func TestRemoveRefusesOverlayOfAnotherProfile(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	overlay := filepath.Join(t.TempDir(), "overlay")
 	writeManifestPackage(t, overlay,
@@ -655,7 +655,7 @@ func TestWeightRulesApplyInOrder(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			home := t.TempDir()
+			home := gitFixtureHome(t)
 			pinHomes(t)
 			ids := newGitIdentities(t)
 			leafOperand := gitContextRepo(t, ids, "https://example.com/leaf",
@@ -689,7 +689,7 @@ func TestWeightRulesApplyInOrder(t *testing.T) {
 // same closure would pin 30, without rule 3 it would pin 20, and without
 // rule 2 it would pin 5.
 func TestWeightRulesAllFourDisagree(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	leafOperand := gitContextRepo(t, ids, "https://example.com/leaf",
@@ -741,7 +741,7 @@ func TestWeightRulesAllFourDisagree(t *testing.T) {
 // both on a requirement edge with a weight and in the weights map: the
 // lock fails with context_weights_duplicate.
 func TestWeightDuplicateRefused(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	leafOperand := gitContextRepo(t, ids, "https://example.com/leaf",
@@ -761,7 +761,7 @@ func TestWeightDuplicateRefused(t *testing.T) {
 // TestWeightUnknownRefused drives Install where the root weights map names
 // a package outside the closure: context_weight_unknown.
 func TestWeightUnknownRefused(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	leafOperand := gitContextRepo(t, ids, "https://example.com/leaf",
@@ -782,7 +782,7 @@ func TestWeightUnknownRefused(t *testing.T) {
 // carries a non-empty weights map: context_weights_not_root at resolution
 // time, even though the snapshot itself validates.
 func TestNonRootWeightsMapRefused(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	ids := newGitIdentities(t)
 	leafManifest := `{"schema_version": 1, "name": "leaf", "version": "1.0.0",` +
@@ -831,7 +831,7 @@ func TestWeightConflictErrorAndWarning(t *testing.T) {
 		return Policy{}, rootOperand, leafOperand
 	}
 	t.Run("error", func(t *testing.T) {
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		pinHomes(t)
 		_, rootOperand, _ := build(t, "")
 		_, _, _, err := Install(home, InstallOptions{Operand: rootOperand})
@@ -840,7 +840,7 @@ func TestWeightConflictErrorAndWarning(t *testing.T) {
 		}
 	})
 	t.Run("warning", func(t *testing.T) {
-		home := t.TempDir()
+		home := gitFixtureHome(t)
 		pinHomes(t)
 		_, rootOperand, _ := build(t, ` "weights": {"leaf": 9},`)
 		// The root manifest above declares the weights map entry, so the

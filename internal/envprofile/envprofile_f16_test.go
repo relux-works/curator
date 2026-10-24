@@ -65,7 +65,7 @@ func homeMarker(t *testing.T, dir string) *envmarker.Marker {
 // the machine current moves to gamma, and the listing keeps both scope rows.
 // A mutant that skips at most one scoped adapter must fail this test.
 func TestMachineUseSkipsScopedAdapter(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	scopeFixture(t, home)
 	gamma := t.TempDir()
@@ -151,7 +151,7 @@ func TestMachineUseSkipsScopedAdapter(t *testing.T) {
 // machine current; a narrowing mutant that clears only one leaves the other
 // equal-default record behind.
 func TestMachineUseClearsEveryScopeEqualToNewDefault(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	scopeFixture(t, home)
 	gamma := t.TempDir()
@@ -190,7 +190,7 @@ func TestMachineUseClearsEveryScopeEqualToNewDefault(t *testing.T) {
 // the production Install activation: install --use performs the §9.2 switch,
 // so it skips both scoped homes exactly like profile use does.
 func TestInstallUseSkipsScopedAdapter(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	scopeFixture(t, home)
 	gamma := t.TempDir()
@@ -237,7 +237,7 @@ func TestInstallUseSkipsScopedAdapter(t *testing.T) {
 // a narrowed switch still writes exactly its own home and moves no machine
 // current, even after a machine-scope switch ran over a scope record.
 func TestScopedUseStillSwitchesOnlyThatHome(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	scopeFixture(t, home)
 	gamma, delta := t.TempDir(), t.TempDir()
@@ -285,7 +285,7 @@ func TestScopedUseStillSwitchesOnlyThatHome(t *testing.T) {
 // one backup generation. The unconditional-pass mutant writes scoped homes
 // twice (duplicate results and backup generations) and must fail this test.
 func TestSyncWritesScopedHomeOnce(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	homes := pinHomes(t)
 	scopeFixture(t, home)
 	gamma := t.TempDir()
@@ -341,7 +341,7 @@ func TestSyncWritesScopedHomeOnce(t *testing.T) {
 // "env:codex_cli" and must fail this test on every platform; on Windows it
 // additionally fails the switch itself with profile_use_partial.
 func TestScopedRecordFilenameIsPortable(t *testing.T) {
-	home := t.TempDir()
+	home := gitFixtureHome(t)
 	pinHomes(t)
 	first, second := t.TempDir(), t.TempDir()
 	writePackage(t, first, "one", "1.0.0", "one\n")
