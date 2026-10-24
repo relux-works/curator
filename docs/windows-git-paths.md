@@ -40,9 +40,9 @@ This is a fixed metadata-layout budget, not a guarantee for arbitrary remote
 ref names, custom templates or third-party Git extensions. Those inputs can
 still cause Git to refuse an operation. Unix path behavior is unchanged.
 
-`testgitenv.ShortTempDir` creates private fixture homes at the root of the
-ordinary temporary volume, without embedding long test names. It uses the same
-volume as `t.TempDir` so fixture renames and relative links remain valid even
+`testgitenv.ShortTempDir` creates private fixture homes and isolated temporary
+bases at the root of the ordinary temporary volume, without embedding long test
+names. It uses the same volume as `t.TempDir` so fixture renames and relative links remain valid even
 when the runner's `RUNNER_TEMP` is on another drive. Cleanup removes each home.
 Explicit over-budget fixtures still exercise the refusal and its no-write
 invariant. Run:

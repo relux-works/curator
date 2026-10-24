@@ -305,7 +305,7 @@ jobs:
         run: >-
           env -u GIT_DIR -u GIT_WORK_TREE go test -count=1 -timeout=10m
           ./cmd/curator ./internal/crossconformance ./internal/install
-          -run '^(TestGlobalNativeOwnerCleanBootstrapInstall|TestMuseCLIAuthParentBoundary|TestSecurityPostureProfileInstallRefusesMCPDeclarations|TestDraftSourcesSemanticCasesBatch[23]|TestProjectDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot|TestGlobalDryRunRemovesItsOperationPrivateRootOnFailure)$'
+          -run '^(TestGlobalNativeOwnerCleanBootstrapInstall|TestMuseCLIAuthParentBoundary|TestSecurityPostureProfileInstallRefusesMCPDeclarations|TestDraftSourcesSemanticCasesBatch[23]|Test(Project|Global)DryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot|Test(Global)?DryRunRemovesItsOperationPrivateRootOnFailure|TestAuthoritativeDryRunCasesMutateNothingPersistent|TestDryRunEffectBindingsSeeWhatARealOperationWrites)$'
 
       - name: Windows lease compatibility preflight
         if: runner.os == 'Windows'

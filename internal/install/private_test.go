@@ -11,15 +11,17 @@ import (
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 // isolateTempDir points every ephemeral allocation of one test at a directory
 // nothing else writes to, so the complete temporary footprint of a run is
 // observable. Call it after the fixture finished allocating its own temporary
-// directories, otherwise those land inside the isolated root as well.
+// directories, otherwise those land inside the isolated root as well. Windows
+// needs a short base so nested clone metadata fits the supported path budget.
 func isolateTempDir(t *testing.T) string {
 	t.Helper()
-	base := t.TempDir()
+	base := testgitenv.ShortTempDir(t)
 	// TMPDIR is the POSIX lookup; TMP and TEMP are the Windows ones.
 	t.Setenv("TMPDIR", base)
 	t.Setenv("TMP", base)
@@ -213,14 +215,15 @@ func TestGlobalDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot(t *testing
 
 // TestDryRunRemovesItsOperationPrivateRootOnFailure covers the other half of
 // the lifecycle: a dry run that fails inside planning still leaves nothing
-// temporary behind.
+// temporary behind. The refused build plan must name the planted protection
+// failure; a clone or setup error cannot satisfy this cleanup witness.
 func TestDryRunRemovesItsOperationPrivateRootOnFailure(t *testing.T) {
 	e := newEnv(t)
 	e.buildSkill("build-skill", "alpha")
 	origin := e.relocate("build-skill", filepath.Join(t.TempDir(), "origin"))
 	e.declareCloned("build-skill", origin)
 	base := isolateTempDir(t)
-	deps, _, cache, _ := newFakeDeps(t)
+	deps, _, cache, builder := newFakeDeps(t)
 	cache.byCommand["alpha"] = buildcache.Result{
 		Status: buildcache.Unsupported, Reason: "platform protection is unavailable",
 	}
@@ -229,6 +232,15 @@ func TestDryRunRemovesItsOperationPrivateRootOnFailure(t *testing.T) {
 	if result.Status != "failed" {
 		t.Fatalf("dry-run status = %q, want failed: %+v", result.Status, result)
 	}
+	if len(result.Builds) != 1 || result.Builds[0].Outcome() != BuildUnsupported ||
+		result.Builds[0].Skill() != "build-skill" ||
+		result.Builds[0].Reason() != "platform protection is unavailable" {
+		t.Fatalf("dry-run did not reach the planted protection refusal: %+v", result)
+	}
+	if len(builder.calls) != 0 {
+		t.Fatalf("refused dry-run invoked the builder: %v", builder.calls)
+	}
+
 	requireTempDirEmpty(t, base, "a failed project dry run")
 	requireAbsent(t, e.persistentPaths())
 }
@@ -242,7 +254,7 @@ func TestGlobalDryRunRemovesItsOperationPrivateRootOnFailure(t *testing.T) {
 	e.globalDeclareCloned("build-skill", origin)
 	userHome := t.TempDir()
 	base := isolateTempDir(t)
-	deps, _, cache, _ := newFakeDeps(t)
+	deps, _, cache, builder := newFakeDeps(t)
 	cache.byCommand["alpha"] = buildcache.Result{
 		Status: buildcache.Unsupported, Reason: "platform protection is unavailable",
 	}
@@ -251,6 +263,15 @@ func TestGlobalDryRunRemovesItsOperationPrivateRootOnFailure(t *testing.T) {
 	if result.Status != "failed" {
 		t.Fatalf("global dry-run status = %q, want failed: %+v", result.Status, result)
 	}
+	if len(result.Builds) != 1 || result.Builds[0].Outcome() != BuildUnsupported ||
+		result.Builds[0].Skill() != "build-skill" ||
+		result.Builds[0].Reason() != "platform protection is unavailable" {
+		t.Fatalf("dry-run did not reach the planted protection refusal: %+v", result)
+	}
+	if len(builder.calls) != 0 {
+		t.Fatalf("refused dry-run invoked the builder: %v", builder.calls)
+	}
+
 	requireTempDirEmpty(t, base, "a failed global dry run")
 }
 
