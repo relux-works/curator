@@ -17,3 +17,7 @@ func makeWorldWritableDirectoryForTest(string) (func() error, error) {
 func makeWorldWritableSingleDirectoryForTest(path string) (func() error, error) {
 	return makeWorldWritableDirectoryForTest(path)
 }
+
+func makeWorldReadableFileForTest(string) (func() error, error) {
+	return nil, fmt.Errorf("foreign file permissions unavailable on this platform")
+}
