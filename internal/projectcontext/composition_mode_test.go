@@ -157,7 +157,7 @@ func TestCompositionNativeProfileOnly(t *testing.T) {
 			if !reflect.DeepEqual(receipt.Files, p.ProfileDocumentReceipt) {
 				t.Fatal("profile inventory differs")
 			}
-			if !bytes.Equal(p.Files[filepath.ToSlash(filepath.Join(adapter.SkillsDir, "project-skill", "SKILL.md"))], []byte("# project-skill\n")) {
+			if !bytes.Equal(p.Files[filepath.ToSlash(filepath.Join(adapter.SkillsDir, "project-skill", "SKILL.md"))], []byte(compositionSkillDocument("project-skill", "# project-skill\n"))) {
 				t.Fatal("approved whole-skill context bytes lost")
 			}
 			if len(p.Skills) != 1 || p.Skills[0].Layer != "project" {
@@ -307,7 +307,11 @@ func TestCompositionRegistrationMode(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, err = f.store.Locate(f.root)
-		required(t, err, "project_context_drift")
+		if mode == nil {
+			required(t, err, "project_context_invalid")
+		} else {
+			required(t, err, "project_context_drift")
+		}
 		if mode != nil {
 			required(t, err, "invalid protected registration")
 		}
@@ -318,7 +322,7 @@ func TestCompositionRegistrationMode(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = f.store.Locate(f.root)
-	required(t, err, "project_context_drift")
+	required(t, err, "project_context_invalid")
 	if err = os.WriteFile(state, before, 0600); err != nil {
 		t.Fatal(err)
 	}

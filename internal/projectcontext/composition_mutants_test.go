@@ -16,7 +16,7 @@ import (
 // Opt in explicitly; the ordinary suite keeps only production behavior tests.
 func TestCompositionNarrowingMutants(t *testing.T) {
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
-		t.Skip("manager-backed witnesses require supported CIP filesystem binding")
+		t.Skip("CIP filesystem binding supports macOS/Linux")
 	}
 	if os.Getenv("CURATOR_PROJECT_COMPOSITION_MUTANTS") != "1" {
 		t.Skip("explicit bounded mutation lane")
@@ -26,6 +26,13 @@ func TestCompositionNarrowingMutants(t *testing.T) {
 		t.Fatal(err)
 	}
 	cases := []struct{ name, file, test, old, new, witness string }{
+		{"ignore-durable-root-lapses", "composition_held.go", "TestCompositionRetainedRootLapse", `op.loadLapses(root)`, `error(nil)`, "want project_registration_mismatch"},
+		{"ignore-missing-cwd-root-loss", "registration.go", "TestCompositionMissingCWDObservesRootLoss", `if err != nil {
+		return Registration{}, op.observeUnavailableCWD(cwd)
+	}`, `if err != nil {
+		return Registration{}, fail("project_registration_mismatch", "CWD unavailable")
+	}`, "restored nested registration revived"},
+		{"retain-null-waiver-map", "composition.go", "TestCompositionPolicyMetadata", `if policy.System.Waivers == nil {`, `if policy.System.Waivers == nil && false {`, "default policy publication cannot resolve"},
 		{"project-only-owners", "composition.go", "TestCompositionCommandCollision", "s := skills[name]\n\t\tfor _, command", "s := skills[name]\n if s.Layer != \"project\" { continue }\n\t\tfor _, command", "want command collision"},
 		{"project-first-root", "composition_types.go", "TestCompositionRootBytes", `return bytes.Join(parts, []byte{'\n'})`, `if len(parts)>1 { parts[0],parts[len(parts)-1]=parts[len(parts)-1],parts[0] }; return bytes.Join(parts, []byte{'\n'})`, "root bytes differ"},
 		{"no-lf-separator", "composition_types.go", "TestCompositionRootBytes", `return bytes.Join(parts, []byte{'\n'})`, `return bytes.Join(parts, nil)`, "root bytes differ"},

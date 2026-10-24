@@ -887,3 +887,11 @@ internal/envprofile	TestGlobalNativeOwnershipNarrowingControls/omit-parent-mode-
 internal/envprofile	TestGlobalNativeOwnershipNarrowingControls/omit-timeout-child-stacks	linux,darwin	windows	platform-control	removing SIGQUIT loses the owned child stack and fails the timeout diagnostic control; signal diagnostics use the Unix fixture
 internal/envprofile	TestGlobalNativeOwnershipNarrowingControls/ignore-timeout-process-identity	linux,darwin	windows	platform-control	removing the recorded start identity check fails the stale PID cleanup witness; the diagnostic fixture uses Unix signals
 internal/envprofile	TestGlobalNativeOwnershipNarrowingControls/omit-timeout-failure-verdict	linux,darwin	windows	platform-control	removing the watchdog failure verdict fails the real blocked-child subprocess control; signal diagnostics use the Unix fixture
+
+# Composition integration preserves landed admission and private staging boundaries.
+internal/projectcontext	TestCompositionRetainedRootLapse	linux,darwin	windows	platform-control	held readers refuse durable root lapses and missing or malformed companion evidence
+internal/projectcontext	TestCompositionMissingCWDObservesRootLoss	linux,darwin	windows	platform-control	missing nested registered CWD latches root loss without lapsing a valid parent
+internal/projectcontext	TestCompositionPolicyMetadata	linux,darwin	windows	platform-control	empty waiver maps round-trip while planted null metadata refuses without replacement
+internal/envprofile	TestPinnedCompositionSnapshotPrivacy	linux,darwin,windows	-	-	pinned composition captures are private before use and missing pins leave no staging
+internal/projectcontext	TestCompositionPublishedVectors	linux,darwin,windows	-	-	the production composition reader enforces all pinned grammar vectors
+internal/projectcontext	TestCompositionSchemaControl	linux,darwin,windows	-	-	pinned schema accepts its control and rejects the intended memory-on plant

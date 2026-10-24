@@ -53,6 +53,7 @@ func (s Store) PreviewComposition(ctx context.Context, req ComposeRequest) (Comp
 }
 func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositionPlan, error) {
 	var result compositionPlan
+	req.Policy = canonicalCompositionPolicy(req.Policy)
 	if err := ctx.Err(); err != nil {
 		return result, err
 	}
@@ -104,7 +105,7 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 		if err != nil {
 			return err
 		}
-		defer dir.Close()
+		defer func() { _ = dir.Close() }()
 		capt, err := captureTree(dir, "", false)
 		if err != nil {
 			return err
@@ -353,7 +354,7 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 		Precedence      contextlock.Precedence
 		Modules         []OrderedModule
 		Skills          []EffectiveSkill
-		Commands        []CommandOwner
+		Commands        []CompositionCommandOwner
 		ConcurrentState bool
 	}{req.Policy, r.Precedence, out.Modules, out.Skills, owners, req.ConcurrentState}
 	policyBytes, err := canonical(policyObject)
@@ -539,8 +540,8 @@ func checkCompositionRequirements(reqs []compositionRequirement, skills map[stri
 	}
 	return nil
 }
-func compositionCommands(skills map[string]compositionSkill) ([]CommandOwner, error) {
-	owners := map[string]CommandOwner{}
+func compositionCommands(skills map[string]compositionSkill) ([]CompositionCommandOwner, error) {
+	owners := map[string]CompositionCommandOwner{}
 	for _, name := range sortedKeys(skills) {
 		s := skills[name]
 		for _, command := range sortedKeys(s.spec.Commands) {
@@ -557,10 +558,10 @@ func compositionCommands(skills map[string]compositionSkill) ([]CommandOwner, er
 					return nil, fail("project_context_drift", "command artifact missing")
 				}
 			}
-			owners[command] = CommandOwner{command, name, artifact}
+			owners[command] = CompositionCommandOwner{command, name, artifact}
 		}
 	}
-	out := []CommandOwner{}
+	out := []CompositionCommandOwner{}
 	for _, name := range sortedKeys(owners) {
 		out = append(out, owners[name])
 	}
@@ -594,4 +595,13 @@ func compositionReceipt(files map[string][]byte, executable map[string]bool, ada
 		return MaterializationReceipt{}, err
 	}
 	return receipt, nil
+}
+
+// canonicalCompositionPolicy keeps an absent waiver set as an explicit map in
+// retained metadata. The exact-case decoder refuses null maps at readback.
+func canonicalCompositionPolicy(policy CompositionPolicy) CompositionPolicy {
+	if policy.System.Waivers == nil {
+		policy.System.Waivers = map[string]bool{}
+	}
+	return policy
 }

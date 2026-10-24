@@ -383,6 +383,9 @@ func (s Store) LocateFor(cwd, profileName, env string) (result Registration, res
 		return Registration{}, err
 	}
 	defer op.close()
+	return op.locateFor(cwd, profileName, env)
+}
+func (op *operation) locateFor(cwd, profileName, env string) (Registration, error) {
 	canonical, err := filepath.EvalSymlinks(cwd)
 	if err != nil {
 		return Registration{}, op.observeUnavailableCWD(cwd)
@@ -391,9 +394,6 @@ func (s Store) LocateFor(cwd, profileName, env string) (result Registration, res
 	if err != nil || !st.IsDir() {
 		return Registration{}, op.observeUnavailableCWD(cwd)
 	}
-	return op.locateFor(canonical, profileName, env)
-}
-func (op *operation) locateFor(canonical, profileName, env string) (Registration, error) {
 	best := ""
 	matches := []registered{}
 	for _, id := range sortedRegistrationIDs(op.state) {
