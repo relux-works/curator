@@ -31,6 +31,7 @@ import (
 	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/contextpkg"
 	"github.com/relux-works/curator/internal/contextstore"
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
@@ -3476,8 +3477,5 @@ func (req *ResolveRequest) validateActivationCredentialSource() error {
 // Schema acceptance preserves node identity; it does not authorize treating a
 // node-bound home as the older per-home credential policy.
 func requirePerHomeCredentialSource(marker *envmarker.Marker) error {
-	if marker != nil && marker.CredentialSource != nil && marker.CredentialSource.Source != nil {
-		return fmt.Errorf("%s: node credential source activation is not supported", envregistry.DiagCredentialInjectionUnavailable)
-	}
-	return nil
+	return envauthority.RequirePerHome(marker)
 }

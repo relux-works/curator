@@ -38,6 +38,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
@@ -1814,6 +1815,12 @@ func removeMigrationJournal(home string) error {
 // failure fails before anything changes. It returns the pre-recovery
 // summary for reporting, or nil when no journal was present.
 func recoverMigrationJournal(home string, op *operation, announce io.Writer, symlink func(string, string) error, rename func(string, string) error) (*MigrateRecovery, error) {
+	if err := op.lock.AssertHeld(); err != nil {
+		return nil, err
+	}
+	if err := envauthority.Validate(home); err != nil {
+		return nil, err
+	}
 	journal, err := readMigrationJournal(home)
 	if err != nil {
 		return nil, fmt.Errorf("migration journal %s is unusable (%v): back it up out of band, verify every managed link by hand, and only then remove it and re-run `curator env migrate --plan`",

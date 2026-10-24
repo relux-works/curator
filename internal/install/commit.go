@@ -14,6 +14,7 @@ import (
 
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/hookapproval"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/scopes"
@@ -117,6 +118,9 @@ const defaultMaxRestarts = 3
 // commit phase publishes and re-reads through exactly one cache boundary
 // instead of two that could disagree about the same home.
 func (deps CommitDeps) resolve(home string, inspector CacheInspector) (CommitDeps, error) {
+	if err := envauthority.Validate(home); err != nil {
+		return CommitDeps{}, err
+	}
 	if deps.Locks == nil {
 		manager, err := managerlock.New(home)
 		if err != nil {

@@ -16,6 +16,7 @@ import (
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/devsub"
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envfiles"
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/globalbins"
@@ -647,6 +648,9 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
 
 // GlobalInit creates an empty global Skillfile.
 func GlobalInit(home string) (string, error) {
+	if err := envauthority.Validate(home); err != nil {
+		return "", err
+	}
 	root := GlobalRoot(home)
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return "", err

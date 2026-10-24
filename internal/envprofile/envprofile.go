@@ -43,6 +43,7 @@ import (
 	"github.com/relux-works/curator/internal/contextpkg"
 	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/contextstore"
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/hashing"
@@ -329,6 +330,9 @@ func Current(home string) (string, error) {
 
 // SetCurrent records the machine current profile.
 func SetCurrent(home, name string) error {
+	if err := envauthority.Validate(home); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(ProfilesDir(home), 0o755); err != nil {
 		return err
 	}
@@ -371,6 +375,9 @@ func ScopedCurrents(home string) (map[string]string, error) {
 
 // SetScoped records (or with clear=true, drops) a scope's current profile.
 func SetScoped(home, scope, name string, clearScope bool) error {
+	if err := envauthority.Validate(home); err != nil {
+		return err
+	}
 	file := filepath.Join(ScopedDir(home), scopeFileName(scope))
 	if clearScope {
 		err := os.Remove(file)

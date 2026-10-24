@@ -11,6 +11,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/transaction"
@@ -36,9 +37,15 @@ type operation struct {
 	undo           *globalUndo
 }
 
+// newOperationEngine keeps recovery observation available to entry-point tests.
+var newOperationEngine = transaction.New
+
 // beginCaptureOperation never provisions a home or invokes recovery. The
 // observer validates every journal before reporting pending recovery.
 func beginCaptureOperation(home string, options ...transaction.Option) (*operation, error) {
+	if err := envauthority.Validate(home); err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
 	defer cancel()
 	manager, err := managerlock.New(home)
@@ -52,8 +59,12 @@ func beginCaptureOperation(home string, options ...transaction.Option) (*operati
 		}
 		return nil, fmt.Errorf("%s: acquire capture lock: %w", DiagLockUnavailable, err)
 	}
+	if err := envauthority.Validate(home); err != nil {
+		_ = lock.Close()
+		return nil, err
+	}
 	op := &operation{lock: lock}
-	op.engine, err = transaction.New(home, options...)
+	op.engine, err = newOperationEngine(home, options...)
 	if err == nil {
 		var pending bool
 		pending, err = op.engine.PendingRecovery(lock)
@@ -80,8 +91,12 @@ func beginOperation(home string, options ...transaction.Option) (*operation, err
 }
 
 // beginOperationValidated checks read-only inputs under the lock before journal
-// recovery can write. Other operations retain the ordinary recovery path.
+// recovery can write. All mutations also validate manager-wide authority.
 func beginOperationValidated(home string, validate func() error, options ...transaction.Option) (*operation, error) {
+	// Refuse before even creating mutation-lock state in an existing node home.
+	if err := envauthority.Validate(home); err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
 	defer cancel()
 	manager, err := managerlock.New(home)
@@ -92,13 +107,18 @@ func beginOperationValidated(home string, validate func() error, options ...tran
 	if err != nil {
 		return nil, fmt.Errorf("%s: acquire the manager-home mutation lock: %v", DiagLockUnavailable, err)
 	}
+	// Authority may have changed while waiting for the lock.
+	if err := envauthority.Validate(home); err != nil {
+		_ = lock.Close()
+		return nil, err
+	}
 	if validate != nil {
 		if err := validate(); err != nil {
 			_ = lock.Close()
 			return nil, err
 		}
 	}
-	engine, err := transaction.New(home, options...)
+	engine, err := newOperationEngine(home, options...)
 	if err != nil {
 		_ = lock.Close()
 		return nil, err
@@ -106,9 +126,18 @@ func beginOperationValidated(home string, validate func() error, options ...tran
 	recovered, err := engine.RecoverWithOutcome(lock)
 	if err != nil {
 		_ = lock.Close()
+		if isCredentialRefusal(err) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("recover incomplete profile transactions: %w", err)
 	}
-	return &operation{lock: lock, engine: engine, recovered: recovered}, nil
+	op := &operation{lock: lock, engine: engine, recovered: recovered}
+	// Previously durable intent may itself replace the authority marker.
+	if err := envauthority.Validate(home); err != nil {
+		_ = op.close()
+		return nil, op.recoveryRefusal(err)
+	}
+	return op, nil
 }
 
 // Preserve the original diagnostic and error chain while reporting only an

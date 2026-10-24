@@ -351,3 +351,87 @@ func TestNodeAuthorityKeepsBorrowedRepairLock(t *testing.T) {
 		})
 	}
 }
+
+// ApplyMigration refuses a full node carrier before recovering real prepared context
+// intent; the per-home control recovers that same intent and succeeds.
+func TestMigrationNodeAuthorityBeforeRecovery(t *testing.T) {
+	for _, node := range []bool{true, false} {
+		t.Run(fmt.Sprintf("node=%v", node), func(t *testing.T) {
+			fx, _, seed := claudeRepairFixture(t, envregistry.FormReferenced)
+			target := filepath.Join(filepath.Dir(seed), "CLAUDE.md")
+			desired := readClaudeState(t, target)
+			if err := os.WriteFile(target, []byte("pending old context"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			manager, err := managerlock.New(fx.home)
+			if err != nil {
+				t.Fatal(err)
+			}
+			lock, err := manager.AcquireHomeOnly(context.Background(), false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			engine, err := transaction.New(fx.home)
+			if err != nil {
+				t.Fatal(err)
+			}
+			staged := filepath.Join(t.TempDir(), "target")
+			if err := os.WriteFile(staged, desired, 0600); err != nil {
+				t.Fatal(err)
+			}
+			digest, err := transaction.DigestTarget(transaction.KindBytes, target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = engine.Prepare(lock, transaction.Plan{TransactionID: "node-authority-pending", ProjectIdentity: "profiles", Targets: []transaction.Target{{Class: "profile", Identifier: target, Kind: transaction.KindBytes, LivePath: target, StagedSource: staged, PreimageDigest: digest}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if pending, err := engine.PendingRecovery(lock); err != nil || !pending {
+				t.Fatalf("pending setup: %v %v", pending, err)
+			}
+			if err := lock.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if node {
+				writeNodeAuthorityMarker(t, fx)
+			}
+			req := fx.migrateRequest()
+			req.Profile, req.EnvID = fx.profile, envregistry.ClaudeCode
+			plan, err := PlanMigration(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Expect = plan.Hash
+			before := nativeSnapshot(t, fx.home)
+			nativeBefore := nativeSnapshot(t, fx.native[envregistry.ClaudeCode])
+			recoveries := 0
+			req.transactionOptions = []transaction.Option{transaction.WithHooks(transaction.Hooks{ObserveRecovery: func() { recoveries++ }})}
+			result, err := ApplyMigration(req)
+			t.Logf("node=%v recovery_calls=%d refusal=%v", node, recoveries, err)
+
+			if node {
+				if err == nil || !strings.Contains(err.Error(), "credential_injection_unavailable:") {
+					t.Errorf("locked node authority diagnostic: %v", err)
+				}
+
+				if recoveries != 0 {
+					t.Error("migration node refusal entered recovery")
+				}
+				if nativeSnapshot(t, fx.home) != before {
+					t.Error("migration authority refusal mutated pending state")
+				}
+			} else {
+				if err != nil || result == nil {
+					t.Fatalf("per-home recovery: %v", err)
+				}
+				if recoveries != 1 || string(readClaudeState(t, target)) != string(desired) {
+					t.Fatal("per-home control did not recover real intent")
+				}
+			}
+			if nativeSnapshot(t, fx.native[envregistry.ClaudeCode]) != nativeBefore {
+				t.Error("recovery resolution changed native state")
+			}
+		})
+	}
+}
