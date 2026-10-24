@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 // These tests drive the production run() entry point for the env config and
@@ -18,7 +19,7 @@ import (
 func writeMachineConfig(t *testing.T, text string) stubConfigSource {
 	t.Helper()
 	source, _ := profileHome(t)
-	home := t.TempDir()
+	home := testgitenv.ShortTempDir(t)
 	path := filepath.Join(home, "config.json")
 	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
 		t.Fatal(err)

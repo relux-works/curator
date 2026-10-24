@@ -294,6 +294,29 @@ jobs:
           ./internal/envprofile ./cmd/curator
           -run '^(TestWindowsMCPMetadataRootRefusal|TestMCPWindowsNarrowingControls|TestProfileMCP.*|TestProjectMCP.*|TestProjectRefreshGitBranchMembershipChangeThroughCLI)$'
 
+      # Check the formerly cross-volume fixture paths and the slow Windows
+      # lease control before the long suite. These are additional positives;
+      # full Go JSON qualification still requires every case below.
+      - name: Windows fixture compatibility preflight
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+        run: >-
+          env -u GIT_DIR -u GIT_WORK_TREE go test -count=1 -timeout=10m
+          ./cmd/curator ./internal/crossconformance ./internal/install
+          -run '^(TestGlobalNativeOwnerCleanBootstrapInstall|TestMuseCLIAuthParentBoundary|TestSecurityPostureProfileInstallRefusesMCPDeclarations|TestDraftSourcesSemanticCasesBatch[23]|TestProjectDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot|TestGlobalDryRunRemovesItsOperationPrivateRootOnFailure)$'
+
+      - name: Windows lease compatibility preflight
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+        run: >-
+          env -u GIT_DIR -u GIT_WORK_TREE go test -count=1 -timeout=10m
+          ./internal/projectlease
+          -run '^(TestBusyWaitAndCancellation|TestPublicationSerializesLeaseAcquisition|TestLeaseNarrowingMutants)$/^ownership-during-rollback$'
+
       # Runs the planned package set and enforces .github/ci/platform-cases.tsv:
       # the Windows runner must execute the DACL, reparse-point and `.cmd`
       # launcher cases; the unix runners must execute the ownership, no-follow,

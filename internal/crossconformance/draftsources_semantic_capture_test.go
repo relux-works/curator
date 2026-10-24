@@ -15,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/snapshot"
 	"github.com/relux-works/curator/internal/sourcelock"
 	"github.com/relux-works/curator/internal/staging"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 // Capture and audit-state semantic rows (§3–§4): mutation detection,
@@ -81,7 +82,7 @@ func driveCaptureMutation(t *testing.T, c draftSemanticCase) {
 // source_snapshot_changed and stores nothing.
 func driveFrozenCopyMutation(t *testing.T, _ draftSemanticCase) {
 	base := t.TempDir()
-	home := t.TempDir()
+	home := testgitenv.ShortTempDir(t)
 	pkg := filepath.Join(base, "pkg")
 	writeDraftSkill(t, pkg, "review")
 	extra := filepath.Join(pkg, "a.md")
@@ -257,7 +258,7 @@ func driveMissingAuditReport(t *testing.T, _ draftSemanticCase) {
 
 func draftAuditWitness(t *testing.T, mode, failOn, script string) (*config.Config, audit.SourceSubject) {
 	t.Helper()
-	home := t.TempDir()
+	home := testgitenv.ShortTempDir(t)
 	cfg := &config.Config{Path: filepath.Join(home, "config.json"), Audit: config.Audit{Enabled: true, Mode: mode, FailOn: failOn, Backend: "null"}}
 	frozen := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(frozen, "scripts"), 0o755); err != nil {

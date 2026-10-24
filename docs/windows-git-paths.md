@@ -40,10 +40,12 @@ This is a fixed metadata-layout budget, not a guarantee for arbitrary remote
 ref names, custom templates or third-party Git extensions. Those inputs can
 still cause Git to refuse an operation. Unix path behavior is unchanged.
 
-For Windows fixture runs, use a short `TMP` or the hosted runner's `RUNNER_TEMP`.
-`testgitenv.ShortTempDir` creates private, task-lifetime fixture homes there
-without embedding long test names. Explicit over-budget fixtures still exercise
-the refusal and its no-write invariant. Run:
+`testgitenv.ShortTempDir` creates private fixture homes at the root of the
+ordinary temporary volume, without embedding long test names. It uses the same
+volume as `t.TempDir` so fixture renames and relative links remain valid even
+when the runner's `RUNNER_TEMP` is on another drive. Cleanup removes each home.
+Explicit over-budget fixtures still exercise the refusal and its no-write
+invariant. Run:
 
 ```sh
 env -u GIT_DIR -u GIT_WORK_TREE go test -count=1 -v ./internal/gitops ./internal/testgitenv

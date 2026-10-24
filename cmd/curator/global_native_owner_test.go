@@ -19,6 +19,7 @@ import (
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/transaction"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 type nativeGlobalFixture struct {
@@ -27,7 +28,7 @@ type nativeGlobalFixture struct {
 
 func newNativeGlobalFixture(t *testing.T) nativeGlobalFixture {
 	t.Helper()
-	home := t.TempDir()
+	home := testgitenv.ShortTempDir(t)
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(home, ".claude"))

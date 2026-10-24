@@ -12,6 +12,7 @@ import (
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/registry"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 // Currentness, substitution, and marker-plan semantic rows (§4): the
@@ -81,7 +82,7 @@ func driveAttestedNetworkCurrent(t *testing.T, _ draftSemanticCase) {
 func draftLegacyProject(t *testing.T) (project, home, skillsRoot string) {
 	t.Helper()
 	project = t.TempDir()
-	home = t.TempDir()
+	home = testgitenv.ShortTempDir(t)
 	skillsRoot = t.TempDir()
 	skillDir := filepath.Join(skillsRoot, "review")
 	if err := os.MkdirAll(skillDir, 0o755); err != nil {

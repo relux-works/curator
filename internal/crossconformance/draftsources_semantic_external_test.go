@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/stateread"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 // External-evidence semantic rows (§11): each recorded field of an
@@ -62,7 +63,7 @@ func externalBaseline(t *testing.T, substituted bool) (project, home string, arm
 	t.Helper()
 	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
 	project = t.TempDir()
-	home = t.TempDir()
+	home = testgitenv.ShortTempDir(t)
 	writeExternalSkill(t, filepath.Join(project, "skills", "review"), "review")
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
 		t.Fatal(err)

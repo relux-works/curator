@@ -17,6 +17,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/sourcelock"
 	"github.com/relux-works/curator/internal/testcli"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 // Transport-revision-2 semantic rows (repository-transport §§4-7): every
@@ -823,7 +824,7 @@ func driveV2ExternalMirrorAdmitted(t *testing.T, _ draftSemanticCase) {
 	tool, logPath := v2FetchTool(t, map[string]v2FetchArm{mirrorGit: {fileRepo: bare}})
 	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
 	project := t.TempDir()
-	home := t.TempDir()
+	home := testgitenv.ShortTempDir(t)
 	writeV2ExternalSkill(t, filepath.Join(project, "skills", "review"), declaredGit, commit)
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
@@ -899,7 +900,7 @@ func driveV2ExternalRefused(t *testing.T, skillGit, policyDoc, providersDoc stri
 	tool, logPath := v2FetchTool(t, map[string]v2FetchArm{})
 	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
 	project := t.TempDir()
-	home := t.TempDir()
+	home := testgitenv.ShortTempDir(t)
 	writeV2ExternalSkill(t, filepath.Join(project, "skills", "review"), skillGit, strings.Repeat("0", 40))
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
 		t.Fatal(err)

@@ -304,7 +304,7 @@ func TestMissingPinManagerAttemptBoundAndCacheOnlyDefault(t *testing.T) {
 	ids := newGitIdentities(t)
 	repo := gitRepo(t, map[string]string{"agent-context.json": `{"schema_version":1,"name":"dep","version":"1.0.0"}`}, "v1.0.0")
 	url := ids.serve(repo, "https://example.com/bounded-pin")
-	manager := newGitManager(t.TempDir())
+	manager := newGitManager(gitFixtureHome(t))
 	source, err := manager.Identity("context", "dep", url)
 	if err != nil {
 		t.Fatal(err)
@@ -388,7 +388,7 @@ func TestMissingPinManifestRejectsMalformedBeforeAcquisition(t *testing.T) {
 	ids := newGitIdentities(t)
 	repo := gitRepo(t, map[string]string{"sentinel": "valid source"}, "v1.0.0")
 	url := ids.serve(repo, "https://example.com/malformed-pin")
-	manager := newGitManager(t.TempDir())
+	manager := newGitManager(gitFixtureHome(t))
 	source, err := manager.Identity("context", "dep", url)
 	if err != nil {
 		t.Fatal(err)

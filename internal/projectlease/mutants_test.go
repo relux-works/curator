@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -83,7 +84,14 @@ func TestLeaseNarrowingMutants(t *testing.T) {
 				if tc.pkg == "cmd/curator" {
 					pkgPath = "./cmd/curator"
 				}
-				args := []string{"test", "-count=1", "-timeout=90s", "-v", pkgPath, "-run", "^" + tc.run + "$"}
+				deadline := "90s"
+				if runtime.GOOS == "windows" {
+					// The positive recovery matrix passed in 65s in the full
+					// stream; its nested control hit 90s during a durable rename.
+					// Timeout or panic still cannot qualify as an intended kill.
+					deadline = "5m"
+				}
+				args := []string{"test", "-count=1", "-timeout=" + deadline, "-v", pkgPath, "-run", "^" + tc.run + "$"}
 				if overlay != "" {
 					args = append([]string{"test", "-overlay", overlay}, args[1:]...)
 				}

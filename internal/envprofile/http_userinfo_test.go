@@ -133,7 +133,7 @@ func TestHTTPUserinfoDeclarationBoundaries(t *testing.T) {
 					t.Fatalf("safe declaration/metadata: %+v; want %s", got, want)
 				}
 				for _, source := range []string{got.Source, tc.declared} {
-					manager := newGitManager(t.TempDir())
+					manager := newGitManager(gitFixtureHome(t))
 					key, err := manager.Identity(kind, "dep", source)
 					if err != nil || key != "example.com/team/dep" {
 						t.Fatalf("identity: %q %v", key, err)
@@ -159,7 +159,7 @@ func TestHTTPUserinfoRefusals(t *testing.T) {
 		"https://user@example.com/team/dep.git#fragment",
 	} {
 		t.Run(declaration, func(t *testing.T) {
-			manager := newGitManager(t.TempDir())
+			manager := newGitManager(gitFixtureHome(t))
 			if _, err := manager.Identity("context", "dep", declaration); err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
 				t.Fatalf("direct identity must refuse: %v", err)
 			}
