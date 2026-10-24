@@ -59,6 +59,10 @@ func TestNativeCommandProcess(_ *testing.T) {
 	os.Exit(94)
 }
 
+// A CLI can run the production two-minute compiler before verification and
+// publication. This fixture watchdog is not a CLI latency requirement.
+const nativeCommandWatchdog = 3 * time.Minute
+
 type nativeCommand struct {
 	cmd      *exec.Cmd
 	done     chan error
@@ -90,7 +94,7 @@ func startNativeCommand(t *testing.T, fixture nativeGlobalFixture, args ...strin
 }
 func (child *nativeCommand) wait(t *testing.T) {
 	t.Helper()
-	child.waitWithin(t, 40*time.Second)
+	child.waitWithin(t, nativeCommandWatchdog)
 }
 
 func (child *nativeCommand) waitWithin(t *testing.T, timeout time.Duration) {
@@ -116,7 +120,7 @@ func (child *nativeCommand) pending(t *testing.T) {
 }
 func waitNativePath(t *testing.T, path string) {
 	t.Helper()
-	deadline := time.Now().Add(20 * time.Second)
+	deadline := time.Now().Add(nativeCommandWatchdog)
 	for {
 		if _, err := os.Stat(path); err == nil {
 			return
@@ -229,7 +233,7 @@ func TestGlobalNativeOwnerRemoveBeforeInstall(t *testing.T) {
 	}
 	removing := startNativeCommand(t, fixture, "global", "remove", "shared-skill")
 	connect := func() *os.File {
-		deadline := time.Now().Add(10 * time.Second)
+		deadline := time.Now().Add(nativeCommandWatchdog)
 		for {
 			fd, err := syscall.Open(path, syscall.O_WRONLY|syscall.O_NONBLOCK, 0600)
 			if err == nil {
