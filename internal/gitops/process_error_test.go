@@ -10,6 +10,7 @@ import (
 // Successful Git output remains available, while failed processes retain both
 // their execution cause and diagnostics. An absent executable has no stderr and
 // must not become the same empty diagnostic as an unavailable commit object.
+// Nonempty Git output keeps its existing framing for transport classification.
 func TestRunWithEnvPreservesProcessError(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		out, err := runWithEnv(t.TempDir(), gitEnv(), "--version")
@@ -20,7 +21,7 @@ func TestRunWithEnvPreservesProcessError(t *testing.T) {
 	t.Run("exit-with-stderr", func(t *testing.T) {
 		out, err := runWithEnv(t.TempDir(), append(gitEnv(), "LC_ALL=C"), "--curator-invalid-option")
 		var exit *exec.ExitError
-		if out != "" || !errors.As(err, &exit) || exit.ExitCode() == 0 || !strings.Contains(err.Error(), "unknown option") {
+		if out != "" || !errors.As(err, &exit) || exit.ExitCode() == 0 || !strings.Contains(err.Error(), "failed: unknown option:") {
 			t.Fatalf("Git failure lost process cause or stderr: output=%q, err=%v", out, err)
 		}
 	})
