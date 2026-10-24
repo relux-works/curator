@@ -281,6 +281,19 @@ jobs:
         shell: bash
         run: env -u GIT_DIR -u GIT_WORK_TREE go test -count=1 -timeout=5m ./internal/gitops ./internal/testgitenv
 
+      # Catch metadata-root fixture regressions and calibrated Windows MCP
+      # gates before the long install package. Full Go JSON evidence still
+      # requires all these cases again in the complete suite below.
+      - name: Windows MCP metadata preflight
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+        run: >-
+          env -u GIT_DIR -u GIT_WORK_TREE go test -count=1 -timeout=10m
+          ./internal/envprofile ./cmd/curator
+          -run '^(TestWindowsMCPMetadataRootRefusal|TestMCPWindowsNarrowingControls|TestProfileMCP.*|TestProjectMCP.*)$'
+
       # Runs the planned package set and enforces .github/ci/platform-cases.tsv:
       # the Windows runner must execute the DACL, reparse-point and `.cmd`
       # launcher cases; the unix runners must execute the ownership, no-follow,
