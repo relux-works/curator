@@ -15,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/projectlease"
 )
 
@@ -41,8 +42,8 @@ func TestCollectCannotSweepNewOwnerLease(t *testing.T) {
 				if replace {
 					replaceGCLock(t, home)
 				}
-				child := exec.Command(os.Args[0], "-test.run=^TestGCNewLeaseOwnerHelper$", "-test.v")
-				child.Env = append(os.Environ(), "CURATOR_TEST_GC_OWNER_HOME="+home, "CURATOR_TEST_GC_OWNER_KEY="+string(key))
+				child := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestGCNewLeaseOwnerHelper$", "-test.timeout=90s", "-test.v")
+				child.Env = append(os.Environ(), "CURATOR_TEST_GC_OWNER_HOME="+home, "CURATOR_TEST_GC_OWNER_KEY="+string(key), "CURATOR_TEST_GC_OWNER_EXPECT="+map[bool]string{false: "held", true: "replaced"}[replace])
 				out, err := child.CombinedOutput()
 				if replace && (err != nil || !strings.Contains(string(out), "new lease committed")) {
 					t.Fatalf("child admission: %v\n%s", err, out)
@@ -88,6 +89,8 @@ func replaceGCLock(t *testing.T, home string) {
 
 // The helper performs actual Acquire and a durable Status check; a held-name
 // sibling must produce the specific deadline instead of a setup failure.
+// Only the held negative bounds lock waiting; replacement has no 100ms budget
+// for durable publication and is bounded by the child test timeout instead.
 func TestGCNewLeaseOwnerHelper(t *testing.T) {
 	home := os.Getenv("CURATOR_TEST_GC_OWNER_HOME")
 	if home == "" {
@@ -98,10 +101,20 @@ func TestGCNewLeaseOwnerHelper(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
-	defer cancel()
+	expect := os.Getenv("CURATOR_TEST_GC_OWNER_EXPECT")
+	ctx := t.Context()
+	if expect == "held" {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
+		defer cancel()
+	} else if expect != "replaced" {
+		t.Fatal("missing child ownership expectation")
+	}
 	_, err = m.Acquire(ctx, projectlease.Request{LeaseID: "next", ContextRef: a.c.Ref, ContextSHA256: a.c.SHA256, OwnerRef: "principal:operator", SessionRef: "session:first", Generation: 1})
-	if errors.Is(err, context.DeadlineExceeded) {
+	if expect == "held" {
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("held lock did not enforce its deadline: %v", err)
+		}
 		t.Log("expected lock deadline")
 		return
 	}
@@ -139,7 +152,13 @@ func TestGCSweepBoundariesRetainOwnership(t *testing.T) {
 				if boundary == "external-snapshot" {
 					path = filepath.Join(home, "external-build-cache", "snapshots", strings.Repeat("a", 64))
 				}
-				if err = os.MkdirAll(path, 0700); err != nil {
+				if boundary != "runtime" {
+					fixtureStore := &buildrepo.DiskProtectedStore{Root: filepath.Join(home, "external-build-cache")}
+					if err := fixtureStore.PrepareNamespaces(buildrepo.LegacyReceiptSchemaVersion); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if err = privatedir.MakeAll(path); err != nil {
 					t.Fatal(err)
 				}
 				if err = os.WriteFile(filepath.Join(path, "witness"), []byte("keep until acquisition verified"), 0600); err != nil {
@@ -191,7 +210,11 @@ func TestCollectRechecksBeforeExternalSweep(t *testing.T) {
 		t.Run(map[bool]string{false: "held", true: "replaced"}[replace], func(t *testing.T) {
 			home := protectedTestHome(t)
 			path := filepath.Join(home, "external-build-cache", buildrepo.ArtifactsDir(buildrepo.LegacyReceiptSchemaVersion), strings.Repeat("a", 64))
-			if err := os.MkdirAll(path, 0700); err != nil {
+			fixtureStore := &buildrepo.DiskProtectedStore{Root: filepath.Join(home, "external-build-cache")}
+			if err := fixtureStore.PrepareNamespaces(buildrepo.LegacyReceiptSchemaVersion); err != nil {
+				t.Fatal(err)
+			}
+			if err := privatedir.MakeAll(path); err != nil {
 				t.Fatal(err)
 			}
 			lm, err := managerlock.New(home)

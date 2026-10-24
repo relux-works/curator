@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/projectlease"
 )
 
@@ -36,7 +37,7 @@ func TestCollectProjectLeaseReferencesAndUnknown(t *testing.T) {
 	backdateEntry(t, home, kept, 30*24*time.Hour)
 	backdateEntry(t, home, orphan, 30*24*time.Hour)
 	for _, entry := range []string{"tool/kept", "tool/orphan"} {
-		if err := os.MkdirAll(filepath.Join(home, "runtime", entry), 0700); err != nil {
+		if err := privatedir.MakeAll(filepath.Join(home, "runtime", entry)); err != nil {
 			t.Fatal(err)
 		}
 	}

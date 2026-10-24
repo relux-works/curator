@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/projectlease"
 	"github.com/relux-works/curator/internal/transaction"
 )
@@ -47,7 +48,7 @@ func TestCollectProjectLeaseForeignLockInterleaving(t *testing.T) {
 	ctx := context.Background()
 	home := protectedTestHome(t)
 	for _, entry := range []string{"first", "next", "orphan"} {
-		if err := os.MkdirAll(filepath.Join(home, "runtime", "tool", entry), 0700); err != nil {
+		if err := privatedir.MakeAll(filepath.Join(home, "runtime", "tool", entry)); err != nil {
 			t.Fatal(err)
 		}
 	}
