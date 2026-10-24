@@ -257,7 +257,7 @@ func writeAtomic(root, name string, b []byte) error {
 	if err := pathboundary.ValidateRoot(root); err != nil {
 		return err
 	}
-	f, err := os.CreateTemp(root, ".write-*")
+	f, err := privatedir.CreateTemp(root, ".write-*")
 	if err != nil {
 		return err
 	}
@@ -329,26 +329,10 @@ func (op *operation) put(c captured) (string, string, error) {
 		return "", "", err
 	}
 	defer func() { _ = os.RemoveAll(stage) }()
-	for _, e := range c.Manifest.Files {
-		if !relative(e.Path) {
-			return "", "", fail("project_context_invalid", "unsafe snapshot path")
-		}
-		p := filepath.Join(stage, "files", filepath.FromSlash(e.Path))
-		if err = privatedir.MakeAll(filepath.Dir(p)); err != nil {
-			return "", "", err
-		}
-		mode := os.FileMode(0600)
-		if e.Mode == "0700" {
-			mode = 0700
-		}
-		if err = os.WriteFile(p, c.Bytes[e.Path], mode); err != nil {
-			return "", "", err
-		}
-	}
-	b, _ := canonical(c.Manifest)
-	if err = os.WriteFile(filepath.Join(stage, "manifest.json"), b, 0600); err != nil {
+	if err = writeSnapshotStage(stage, c); err != nil {
 		return "", "", err
 	}
+
 	// No active record can reference a partially published tree. Re-read exact
 	// inventory before atomic rename; an orphan after a crash has no authority.
 	if err = syncTree(stage); err != nil {
@@ -365,6 +349,37 @@ func (op *operation) put(c captured) (string, string, error) {
 	}
 	return ref, h, nil
 }
+
+// writeSnapshotStage writes only manager-owned private staging. The public
+// admission still requires its independently qualified filesystem identity.
+func writeSnapshotStage(stage string, c captured) error {
+	if err := privatedir.Prepare(stage); err != nil {
+		return err
+	}
+	var err error
+	for _, e := range c.Manifest.Files {
+		if !relative(e.Path) {
+			return fail("project_context_invalid", "unsafe snapshot path")
+		}
+		p := filepath.Join(stage, "files", filepath.FromSlash(e.Path))
+		if err = privatedir.MakeAll(filepath.Dir(p)); err != nil {
+			return err
+		}
+		mode := os.FileMode(0600)
+		if e.Mode == "0700" {
+			mode = 0700
+		}
+		if err = os.WriteFile(p, c.Bytes[e.Path], mode); err != nil {
+			return err
+		}
+	}
+	b, _ := canonical(c.Manifest)
+	if err = os.WriteFile(filepath.Join(stage, "manifest.json"), b, 0600); err != nil {
+		return err
+	}
+	return privatedir.ProtectTree(stage)
+}
+
 func (op *operation) get(ref, hash string) (captured, error) {
 	var empty captured
 	if !hexRE.MatchString(hash) || ref != snapshotRef(hash) {

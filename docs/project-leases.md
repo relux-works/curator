@@ -143,6 +143,14 @@ Unix mode-bit checks apply on macOS/Linux. No Windows native project adapter
 qualification is implied. Native exclusion, actual provider start, auth and
 composition construction are separate integration/qualification leaves.
 
+Windows publication uses `internal/privatedir` for protected owner-only files
+and directories, including transaction copies and journals. Manager initialization
+may adopt its owned, unprotected inheriting directory; explicit foreign grants
+and protected permission drift refuse without normalization. Lock handles allow
+delete-sharing so stable-name replacement remains observable. The live
+handle/path identity check, rather than a sharing denial, invalidates a stale
+acquisition before publication or recovery.
+
 ## Verification
 
 Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/managerlock ./internal/projectlease ./internal/scopes`

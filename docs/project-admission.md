@@ -155,6 +155,12 @@ candidates; they have no extra item arms in leaf 1.
 
 ## Authority and bounds
 
+Windows record creation and snapshot staging use the shared `internal/privatedir`
+helper to retain protected owner-only DACLs. A staging directory with an explicit
+foreign grant refuses before writing. These storage checks do not qualify native
+Windows CIP filesystem identities or admission; that platform boundary remains
+unchanged.
+
 State lives in the private `project-context/` namespace below the configured
 manager home. Its ledger, snapshots and locks use no-follow reads, bounded
 inventories, owner/write-boundary checks, complete byte/entry/mode verification,
