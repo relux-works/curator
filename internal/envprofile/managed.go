@@ -2733,6 +2733,11 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	if err != nil {
 		return nil, err
 	}
+	// Admit the marker authority before store repair, identity migration or
+	// native-state inspection can enter a mutation/recovery path.
+	if err := req.validateActivationCredentialSource(); err != nil {
+		return nil, err
+	}
 	selection, err := req.Machine.CredentialStoreFor(req.Profile, adapter.ID)
 	if err != nil {
 		return nil, err
@@ -2883,6 +2888,10 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 	}
 	var prepared *claudeSeedPlan
 	validate := func() error {
+		// Recheck authority under the mutation lock before journal recovery.
+		if err := req.validateActivationCredentialSource(); err != nil {
+			return err
+		}
 		if err := req.validatePreservedLock(); err != nil {
 			return err
 		}
@@ -2942,6 +2951,12 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 	op, err := beginOperationValidated(req.Home, validate, req.transactionOptions...)
 	if err != nil {
 		return nil, err
+	}
+	// Recovery may replace the marker as well as the lock. Refuse before
+	// callers publish any further repair using the recovered authority.
+	if err := req.validateActivationCredentialSource(); err != nil {
+		_ = op.close()
+		return nil, op.recoveryRefusal(err)
 	}
 	op.claudePrepared = prepared
 	// Recovery can take time while the tool changes its input. Refresh before
@@ -3185,12 +3200,13 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	return result, nil
 }
 
-// isCredentialRefusal reports whether a repair error is already a §7.7
-// credential refusal, which surfaces as itself rather than wrapped in
+// isCredentialRefusal reports whether a repair error is already a credential
+// or inherited-source refusal, which surfaces as itself rather than wrapped in
 // environment_repair_failed.
 func isCredentialRefusal(err error) bool {
 	return err != nil && (strings.Contains(err.Error(), envregistry.DiagCredentialConflict) ||
-		strings.Contains(err.Error(), envregistry.DiagCredentialUnsupported))
+		strings.Contains(err.Error(), envregistry.DiagCredentialUnsupported) ||
+		strings.Contains(err.Error(), envregistry.DiagCredentialInjectionUnavailable))
 }
 
 // checkProfileCollision fails provisioning with environment_path_collision
@@ -3384,6 +3400,35 @@ func (p *homePlan) mcp(req *ResolveRequest, servers []contextmaterialize.MCPServ
 		Copies:        &copies,
 	}
 	return nil
+}
+
+// validateActivationCredentialSource reads only a boundary-validated marker.
+// It also runs under the repair lock before recovery; an absent marker remains
+// eligible for ordinary per-home provisioning.
+func (req *ResolveRequest) validateActivationCredentialSource() error {
+	if _, err := validateResolveRoots(req.Home, req.boundaryOwnerLookup); err != nil {
+		return err
+	}
+	if err := validateMarkerBoundary(req.Home, req.Profile, req.EnvID, req.boundaryOwnerLookup); err != nil {
+		return err
+	}
+	root := EnvRoot(req.Home)
+	homeRel, err := managedRelative(root, ManagedHomeDir(req.Home, req.Profile, req.EnvID))
+	if err != nil {
+		return err
+	}
+	if err := checkManagedPrivateTarget(root, managedJoin(homeRel, envmarker.Name)); err != nil {
+		return err
+	}
+	read := req.readStateFile
+	if read == nil {
+		read = stateread.ReadFile
+	}
+	marker, err := envmarker.ReadWith(ManagedHomeDir(req.Home, req.Profile, req.EnvID), read)
+	if err != nil {
+		return err
+	}
+	return requirePerHomeCredentialSource(marker)
 }
 
 // Schema acceptance preserves node identity; it does not authorize treating a

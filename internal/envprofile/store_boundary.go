@@ -285,6 +285,9 @@ func rebuildUntrustedStoreEntry(req *ResolveRequest, expectedLockHash string, fa
 	}
 	op, err := req.beginRepairOperation()
 	if err != nil {
+		if isCredentialRefusal(err) {
+			return err
+		}
 		return fmt.Errorf("%s: %v", DiagRepairFailed, err)
 	}
 	defer func() { _ = op.close() }()
