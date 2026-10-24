@@ -42,6 +42,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/opaquescan"
+	"github.com/relux-works/curator/internal/projectlease"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/rustsource"
 	"github.com/relux-works/curator/internal/scopes"
@@ -1428,10 +1429,13 @@ func (c cli) cmdList() int {
 
 func (c cli) cmdProject(args []string) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: project requires a subcommand: add, resolve, refresh")
+		_, _ = fmt.Fprintln(c.stderr, "curator: project requires a subcommand: add, resolve, refresh, register, rebind, inspect, package, preview, approve, revoke")
 		return exitUsage
 	}
 	switch args[0] {
+	case "register", "rebind", "inspect", "package", "preview", "approve", "revoke":
+		return c.cmdProjectContext(args[0], args[1:])
+
 	case "add":
 		flags := c.newFlagSet("project add")
 		agentsRaw := flags.String("agents", "", "comma-separated target agents")
@@ -2419,11 +2423,11 @@ func collectUnderLock(home string, lock *managerlock.HomeLock, policy envprofile
 	if err := envprofile.PreflightCurrentPathSources(home, policy); err != nil {
 		return scopes.MaintenanceResult{}, err
 	}
-	engine, err := transaction.New(home)
+	engine, err := transaction.New(home, transaction.WithCommitCheck(projectlease.TransactionCheck(home)))
 	if err != nil {
 		return scopes.MaintenanceResult{}, fmt.Errorf("open the install transaction journal: %w", err)
 	}
-	if err := engine.Recover(lock); err != nil {
+	if _, err := projectlease.RecoverUnderLock(home, lock, engine); err != nil {
 		return scopes.MaintenanceResult{}, fmt.Errorf("recover incomplete install transactions: %w", err)
 	}
 	journalKeys, err := engine.ReferencedBuildKeys(lock)

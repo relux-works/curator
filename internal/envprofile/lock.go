@@ -14,6 +14,7 @@ import (
 	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/privatedir"
+	"github.com/relux-works/curator/internal/projectlease"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -64,7 +65,7 @@ func beginCaptureOperation(home string, options ...transaction.Option) (*operati
 		return nil, err
 	}
 	op := &operation{lock: lock}
-	op.engine, err = newOperationEngine(home, options...)
+	op.engine, err = newOperationEngine(home, append(options, transaction.WithCommitCheck(projectlease.TransactionCheck(home)))...)
 	if err == nil {
 		var pending bool
 		pending, err = op.engine.PendingRecovery(lock)
@@ -118,12 +119,12 @@ func beginOperationValidated(home string, validate func() error, options ...tran
 			return nil, err
 		}
 	}
-	engine, err := newOperationEngine(home, options...)
+	engine, err := newOperationEngine(home, append(options, transaction.WithCommitCheck(projectlease.TransactionCheck(home)))...)
 	if err != nil {
 		_ = lock.Close()
 		return nil, err
 	}
-	recovered, err := engine.RecoverWithOutcome(lock)
+	recovered, err := projectlease.RecoverUnderLock(home, lock, engine)
 	if err != nil {
 		_ = lock.Close()
 		if isCredentialRefusal(err) {

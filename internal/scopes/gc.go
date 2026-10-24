@@ -10,7 +10,9 @@ import (
 
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildrepo"
+	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/projectlease"
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -23,6 +25,9 @@ import (
 // It collects the runtime store only. Collect is the locked maintenance entry
 // point that also sweeps the protected build cache.
 func CollectRuntime(home string) ([]string, error) {
+	if projectlease.HasState(home) {
+		return nil, fmt.Errorf("project leases require serialized Collect; runtime sweep skipped")
+	}
 	marked := markScopes(home)
 	if err := pruneConsumers(home, marked); err != nil {
 		return nil, err
@@ -91,11 +96,27 @@ func Collect(request MaintenanceRequest) (MaintenanceResult, error) {
 	if err := requireHomeLock(request.Lock); err != nil {
 		return MaintenanceResult{}, err
 	}
+	leaseRoots, err := projectlease.ReferencesUnderLock(request.Home, request.Lock)
+	if err != nil {
+		return MaintenanceResult{}, fmt.Errorf("project lease references unreadable; runtime and build sweeps skipped: %w", err)
+	}
+	owner, ok := request.Lock.(interface{ Held() managerlock.Held })
+	if !ok {
+		return MaintenanceResult{}, managerlock.ErrNotHeld
+	}
+	witness := owner.Held()
+	check := func() error { return witness.Validate(request.Home) }
 	marked := markScopes(request.Home)
+	for _, entry := range leaseRoots.RuntimeEntries {
+		marked.runtime[entry] = true
+	}
 	result := MaintenanceResult{Warnings: marked.warnings()}
 
 	// Consumer pruning stays inside this pass, under the caller's lock.
-	if err := pruneConsumers(request.Home, marked); err != nil {
+	if err := check(); err != nil {
+		return result, err
+	}
+	if err := pruneConsumersChecked(request.Home, marked, check); err != nil {
 		return result, err
 	}
 	if len(marked.uncertain) > 0 {
@@ -104,7 +125,7 @@ func Collect(request MaintenanceRequest) (MaintenanceResult, error) {
 			"build cache sweep skipped: the live reference set could not be proven complete")
 		return result, nil
 	}
-	removedRuntime, err := sweepRuntime(request.Home, marked.runtime)
+	removedRuntime, err := sweepRuntimeChecked(request.Home, marked.runtime, check)
 	result.RemovedRuntime = removedRuntime
 	if err != nil {
 		return result, err
@@ -119,17 +140,24 @@ func Collect(request MaintenanceRequest) (MaintenanceResult, error) {
 		cache = store
 	}
 	referenced := append(append([]string(nil), marked.builds...), request.JournalKeys...)
+	referenced = append(referenced, leaseRoots.BuildKeys...)
+	if err := check(); err != nil {
+		return result, err
+	}
 	sweep, err := cache.Sweep(buildcache.SweepRequest{
 		Referenced: referenced,
 		Now:        request.Now,
 		Grace:      request.Grace,
-	}, request.Lock)
+	}, maintenanceLock{check: check})
 	result.RemovedBuilds = sweep.Removed
 	result.Warnings = append(result.Warnings, sweep.Warnings...)
 	if err != nil {
 		return result, fmt.Errorf("sweep the protected build cache: %w", err)
 	}
-	externalRemoved, externalErr := buildrepo.Collect(filepath.Join(request.Home, "external-build-cache"), referenced, request.Now, request.Grace)
+	if err := check(); err != nil {
+		return result, err
+	}
+	externalRemoved, externalErr := buildrepo.CollectChecked(filepath.Join(request.Home, "external-build-cache"), referenced, request.Now, request.Grace, check)
 	result.RemovedBuilds = append(result.RemovedBuilds, externalRemoved...)
 	if externalErr != nil {
 		return result, fmt.Errorf("sweep the external build cache: %w", externalErr)
@@ -142,10 +170,17 @@ func Collect(request MaintenanceRequest) (MaintenanceResult, error) {
 // it is: overwriting it would destroy the only record of which checkouts may
 // still reference a build artifact.
 func pruneConsumers(home string, marked marks) error {
+	return pruneConsumersChecked(home, marked, func() error { return nil })
+}
+
+func pruneConsumersChecked(home string, marked marks, check func() error) error {
+	if err := check(); err != nil {
+		return err
+	}
 	if marked.registryUnknown {
 		return nil
 	}
-	return ReplaceConsumers(home, marked.consumers)
+	return replaceConsumersChecked(home, marked.consumers, check)
 }
 
 func requireHomeLock(lock HomeLock) error {
@@ -343,7 +378,20 @@ func readScope(skillsDir string) scopeMarks {
 	return scope
 }
 
+// maintenanceLock retains the acquisition that produced the mark set; each
+// downstream AssertHeld must prove that same acquisition is still current.
+type maintenanceLock struct{ check func() error }
+
+func (lock maintenanceLock) AssertHeld() error { return lock.check() }
+
 func sweepRuntime(home string, referenced map[string]bool) ([]string, error) {
+	return sweepRuntimeChecked(home, referenced, func() error { return nil })
+}
+
+func sweepRuntimeChecked(home string, referenced map[string]bool, check func() error) ([]string, error) {
+	if err := check(); err != nil {
+		return nil, err
+	}
 	runtimeRoot := filepath.Join(home, "runtime")
 	listing, err := stateread.ReadDir(runtimeRoot)
 	if err != nil {
@@ -371,6 +419,9 @@ func sweepRuntime(home string, referenced map[string]bool) ([]string, error) {
 			}
 			key := skill.Name() + "/" + commit.Name()
 			if !referenced[key] {
+				if err := check(); err != nil {
+					return removed, err
+				}
 				if err := os.RemoveAll(filepath.Join(runtimeRoot, skill.Name(), commit.Name())); err != nil {
 					return removed, err
 				}
@@ -382,6 +433,9 @@ func sweepRuntime(home string, referenced map[string]bool) ([]string, error) {
 			return removed, err
 		}
 		if remaining.Kind == stateread.KindAbsent || len(remaining.Entries) == 0 {
+			if err := check(); err != nil {
+				return removed, err
+			}
 			_ = os.Remove(skillPath)
 		}
 	}

@@ -24,7 +24,7 @@ func copyTarget(source, destination string) error {
 	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("unsafe staged transaction source: %s", source)
 	}
-	if err := os.Mkdir(destination, info.Mode().Perm()); err != nil {
+	if err := makePublicationDirectory(destination, info.Mode().Perm()); err != nil {
 		return err
 	}
 	if err := copyDirectory(source, destination); err != nil {
@@ -56,7 +56,7 @@ func copyDirectory(source, destination string) error {
 				return err
 			}
 		case info.IsDir() && info.Mode()&os.ModeSymlink == 0:
-			if err := os.Mkdir(destinationPath, info.Mode().Perm()); err != nil {
+			if err := makePublicationDirectory(destinationPath, info.Mode().Perm()); err != nil {
 				return err
 			}
 			if err := copyDirectory(sourcePath, destinationPath); err != nil {
@@ -78,7 +78,7 @@ func copyRegular(source, destination string, mode os.FileMode) (result error) {
 		return err
 	}
 	defer func() { result = errors.Join(result, input.Close()) }()
-	output, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode) // #nosec G304 -- deterministic sibling staging
+	output, err := createPublicationFile(destination, mode)
 	if err != nil {
 		return err
 	}

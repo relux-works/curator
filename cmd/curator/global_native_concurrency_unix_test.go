@@ -73,6 +73,7 @@ func startNativeCommand(t *testing.T, fixture nativeGlobalFixture, args ...strin
 	child.cmd.Env = append(os.Environ(), cliHelperProcess+"=1", cliHelperConfig+"="+fixture.config, "CURATOR_NATIVE_COMMAND_HELPER=1", "CURATOR_NATIVE_GIT_CONFIG="+os.Getenv("GIT_CONFIG_GLOBAL"))
 	child.cmd.Stdout = &child.output
 	child.cmd.Stderr = &child.output
+	child.cmd.WaitDelay = 5 * time.Second
 	if err := child.cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +102,7 @@ func (child *nativeCommand) waitWithin(t *testing.T, timeout time.Duration) {
 			t.Fatalf("production CLI failed: %v\n%s", err, child.output.String())
 		}
 	case <-time.After(timeout):
-		t.Fatalf("production CLI did not finish after release within %s", timeout)
+		t.Fatal(child.timeoutDiagnostic())
 	}
 }
 func (child *nativeCommand) pending(t *testing.T) {

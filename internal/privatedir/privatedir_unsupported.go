@@ -26,7 +26,15 @@ func protectPrivate(string) error {
 	return fmt.Errorf("private directories are unsupported on this platform")
 }
 
+func preparePrivate(string) error {
+	return fmt.Errorf("private directories are unsupported on this platform")
+}
+
 func createPrivateTempFile(string, string) (*os.File, error) {
+	return nil, fmt.Errorf("private files are unsupported on this platform")
+}
+
+func createPrivateNamedFile(string, os.FileMode) (*os.File, error) {
 	return nil, fmt.Errorf("private files are unsupported on this platform")
 }
 

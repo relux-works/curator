@@ -71,7 +71,7 @@ func runFailSafeAcrossTwoPasses(t *testing.T, test failSafeCase) {
 
 	cache := &recordingCache{}
 	for pass := 1; pass <= 2; pass++ {
-		result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
+		result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
 		if err != nil {
 			t.Fatalf("pass %d: %v", pass, err)
 		}
@@ -252,7 +252,7 @@ func TestNonDirectoryScopeMembersDoNotBlockMaintenance(t *testing.T) {
 	}
 
 	cache := &recordingCache{}
-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
+	result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -368,7 +368,7 @@ func TestARepeatedRegistryMemberNeverEmptiesTheRegistry(t *testing.T) {
 
 	cache := &recordingCache{}
 	for pass := 1; pass <= 2; pass++ {
-		result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
+		result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
 		if err != nil {
 			t.Fatalf("pass %d: %v", pass, err)
 		}
@@ -388,7 +388,7 @@ func TestARepeatedRegistryMemberNeverEmptiesTheRegistry(t *testing.T) {
 	if err := ReplaceConsumers(home, []string{project}); err != nil {
 		t.Fatal(err)
 	}
-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
+	result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
 	if err != nil {
 		t.Fatal(err)
 	}

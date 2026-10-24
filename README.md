@@ -84,6 +84,19 @@ Registry requests use bounded per-attempt and total deadlines. GET requests retr
 
 Canonical skill stores preserve unmanaged content. Install refuses named stale siblings or selected destinations without proven preceding ownership before publishing installation targets. Source ownership requires a readable regular marker, reached without links, whose JSON object carries recognized schema 5 or 6 and names that node. Invalid build evidence remains repairable; missing, unreadable or mismatching ownership evidence refuses with `source_ownership_unproven`. Owned content can still be updated or removed. Adapter takeover and backup rules remain unchanged.
 
+## Book
+
+The standalone Russian [Curator book](docs/book/ru/00-dlya-kogo.md) explains
+context layers, profiles, managed homes, environments, launch routes, MCP and
+the accepted project-context design. The [outline](docs/book/OUTLINE.ru.md) maps
+the chapters, CLI scenarios and glossary.
+
+Build with `docs/book/build.sh` (pandoc 3.x, WeasyPrint 69+, PT fonts).
+The output is `docs/book/curator-book.ru.pdf`, which is ignored by Git.
+Run `docs/book/check-figures.sh` to verify figure inventory and source hashes.
+PlantUML/Graphviz render commands, tooling tests and artifact locations are in
+[book tooling](docs/book/README.md).
+
 ## Commands without profile setup
 
 Shell profile changes are not required. After `curator install`, agents can invoke project commands through `.agents/bin/<command>` on Unix and `.agents\bin\<command>.cmd` on Windows. Global installation publishes non-destructive forwarding shims to a safe user directory already on `PATH` when one is available; otherwise Curator reports the canonical global bin location. Installed launchers carry the project command directory and resolved system dependency directories themselves, preserve the inherited `PATH`, and return the child command status.
@@ -162,6 +175,7 @@ curator list       # list configured projects and declared skills
 
 ```bash
 curator project add      # register a project alias and path in the machine configuration
+curator project register # bind a checkout identity for explicit project-context admission
 curator project resolve  # resolve transitive dependencies for a project closure
 ```
 
@@ -341,6 +355,29 @@ and `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/adapters -run '^TestGlob
 They use temporary homes; keep validation logs under `.temp/`. See
 [native profile skills](docs/native-profile-skills.md) for the ownership contract.
 
+The [native permissions and memory research](.research/permissions-memory/README.md)
+uses opt-in Go probes, Python 3, Git and macOS `sandbox-exec`. Run
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/permissions-memory -count=1 -v`;
+exact-digest vendor opt-ins and fresh `.temp/` evidence roots are documented
+in its guide. `collect.py` publishes bounded synthetic observations. Complete
+Codex/Muse permissions and memory-off surfaces remain unqualified.
+
+For explicit project-context packaging and approval, see
+[project admission](docs/project-admission.md). The new `project register`,
+`inspect`, `package`, `preview`, `approve`, `revoke` and `rebind` controls use Go
+and Git; they create protected admission state and perform no native launch.
+Observed root loss requires explicit rebind, even with a full approval ledger.
+Previews retain approved skill
+semantics and refuse known native login-state files before snapshot publication.
+Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectcontext -count=1`
+and the documented opt-in Go-overlay mutation lane. Keep logs in `.temp/`.
+
+The [project lease manager](docs/project-leases.md) provides stable Werkstatt
+homes and protected session lifetime operations for composition integration.
+Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/managerlock ./internal/projectlease ./internal/scopes`
+for lease, transaction, GC and bounded narrowing controls. Store local logs and
+private build caches under `.temp/`; no project launch CLI is exposed yet.
+
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.
 Vendor tests skip unless `CODEX_EXCL_BINARY` selects the exact build and
@@ -355,6 +392,12 @@ uses Go, Python 3, Git and macOS `sandbox-exec`. Run
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-claude -count=1 -v`;
 vendor probes require the pinned binary opt-in and write evidence under `.temp/`.
 See its README for gated replay, MCP fixtures and expected-red controls.
+
+The [Claude permissions and memory replay](.research/claude-permissions-memory/README.md)
+measures 2.1.305 and 2.1.307 separately using the same offline tools. Run
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/claude-permissions-memory -count=1 -v`.
+Its guide lists exact-digest opt-ins, per-atom verdicts, Python collectors and
+narrowing controls; private fixtures go under `.temp/`.
 
 Run `go test ./cmd/curator -run 'Test(RegisteredSubcommandHelpNoWrites|CommandHelp)'`
 for built-in and nested command help, zero-write snapshots, the init positive

@@ -17,6 +17,7 @@ import (
 	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/hookapproval"
 	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/projectlease"
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/staging"
 	"github.com/relux-works/curator/internal/transaction"
@@ -129,11 +130,11 @@ func (deps CommitDeps) resolve(home string, inspector CacheInspector) (CommitDep
 		deps.Locks = &managerLocks{manager: manager}
 	}
 	if deps.Journal == nil {
-		engine, err := transaction.New(home, transaction.WithHooks(deps.Hooks))
+		engine, err := transaction.New(home, transaction.WithHooks(deps.Hooks), transaction.WithCommitCheck(projectlease.TransactionCheck(home)))
 		if err != nil {
 			return CommitDeps{}, fmt.Errorf("open the install transaction journal: %w", err)
 		}
-		deps.Journal = engine
+		deps.Journal = &leaseRecoveryJournal{Engine: engine, home: home}
 	}
 	if deps.Publisher == nil {
 		if publisher, capable := inspector.(CachePublisher); capable && publisher != nil {
@@ -1097,4 +1098,16 @@ func uniqueSorted(values []string) []string {
 	}
 	sort.Strings(unique)
 	return unique
+}
+
+// The real default journal preserves lease lifecycle semantics even when
+// recovery is entered by install rather than by the project lease manager.
+type leaseRecoveryJournal struct {
+	*transaction.Engine
+	home string
+}
+
+func (journal *leaseRecoveryJournal) Recover(lock transaction.HomeLock) error {
+	_, err := projectlease.RecoverUnderLock(journal.home, lock, journal.Engine)
+	return err
 }

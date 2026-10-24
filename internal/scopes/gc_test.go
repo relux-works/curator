@@ -1,6 +1,7 @@
 package scopes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -14,12 +15,31 @@ import (
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/buildsource"
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/marker"
 )
 
 type testHomeLock struct{ err error }
 
 func (lock testHomeLock) AssertHeld() error { return lock.err }
+
+// Positive collector fixtures borrow a real acquisition witness for their
+// exact home. The old AssertHeld-only stub remains for explicit refusals and
+// cache-only tests, never as proof at the lease-aware collection boundary.
+func collectWithTestHomeLock(t *testing.T, request MaintenanceRequest) (MaintenanceResult, error) {
+	t.Helper()
+	manager, err := managerlock.New(request.Home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock, err := manager.AcquireHomeOnly(context.Background(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = lock.Close() }()
+	request.Lock = lock
+	return Collect(request)
+}
 
 // recordingCache stands in for the protected store so a scopes test can assert
 // exactly which references the mark phase produced without publishing real
@@ -156,7 +176,7 @@ func TestCollectMarksBuildKeysFromEveryBuildBearingMarkerSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	cache := &recordingCache{}
-	if _, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache}); err != nil {
+	if _, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache}); err != nil {
 		t.Fatal(err)
 	}
 	sort.Strings(want)
@@ -228,7 +248,7 @@ func TestCollectMarksBuildKeysFromEveryLiveScope(t *testing.T) {
 	installBuildMarker(t, HybridSkillsRoot(home), "skill-h", strings.Repeat("c", 40), "h-tool", hybridKey)
 
 	cache := &recordingCache{result: buildcache.SweepResult{Removed: []string{string(buildKey("9"))}}}
-	result, err := Collect(MaintenanceRequest{
+	result, err := collectWithTestHomeLock(t, MaintenanceRequest{
 		Home: home, Lock: testHomeLock{}, Cache: cache,
 		JournalKeys: []string{string(journalKey)},
 	})
@@ -271,7 +291,7 @@ func TestCollectMarksRuntimeFromEverySupportedMarkerSchema(t *testing.T) {
 	}
 
 	cache := &recordingCache{}
-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
+	result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,7 +370,7 @@ func TestCollectSkipsTheBuildSweepOnUnprovableReferences(t *testing.T) {
 			test.arrange(t, home, project)
 
 			cache := &recordingCache{}
-			result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
+			result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -407,7 +427,7 @@ func TestCollectPrunesConsumersInsideTheSamePass(t *testing.T) {
 	}
 
 	cache := &recordingCache{}
-	if _, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache}); err != nil {
+	if _, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache}); err != nil {
 		t.Fatal(err)
 	}
 	consumers := mustLoadConsumers(t, home)
@@ -437,7 +457,7 @@ func TestCollectReportsSweepFailuresWithoutLosingRuntimeWork(t *testing.T) {
 		err:    fmt.Errorf("injected sweep failure"),
 		result: buildcache.SweepResult{Warnings: []string{"retained something"}},
 	}
-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
+	result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache})
 	if err == nil {
 		t.Fatal("a sweep failure was swallowed")
 	}
@@ -456,7 +476,7 @@ func TestCollectForwardsTheSweepClockAndGrace(t *testing.T) {
 	now := time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC)
 	var seen buildcache.SweepRequest
 	cache := &forwardingCache{observe: func(request buildcache.SweepRequest) { seen = request }}
-	if _, err := Collect(MaintenanceRequest{
+	if _, err := collectWithTestHomeLock(t, MaintenanceRequest{
 		Home: home, Lock: testHomeLock{}, Cache: cache, Now: now, Grace: 3 * time.Hour,
 	}); err != nil {
 		t.Fatal(err)
@@ -470,7 +490,7 @@ func TestCollectForwardsTheSweepClockAndGrace(t *testing.T) {
 // real protected store instead of silently doing nothing.
 func TestCollectResolvesTheRealStoreByDefault(t *testing.T) {
 	home := t.TempDir()
-	result, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}})
+	result, err := collectWithTestHomeLock(t, MaintenanceRequest{Home: home, Lock: testHomeLock{}})
 	if err != nil {
 		t.Fatal(err)
 	}

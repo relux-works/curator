@@ -15,6 +15,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -62,7 +63,7 @@ func makeDurableDirectories(path string) error {
 	if err := makeDurableDirectories(parent); err != nil {
 		return err
 	}
-	if err := os.Mkdir(path, 0o700); err != nil && !os.IsExist(err) {
+	if err := privatedir.Make(path); err != nil && !os.IsExist(err) {
 		return err
 	}
 	if err := syncDirectory(path); err != nil {
@@ -72,6 +73,9 @@ func makeDurableDirectories(path string) error {
 }
 
 func (engine *Engine) saveJournal(journal *Journal) error {
+	if err := engine.checkOwnership(); err != nil {
+		return err
+	}
 	if err := engine.validateJournal(journal); err != nil {
 		return err
 	}
@@ -90,7 +94,7 @@ func (engine *Engine) saveJournal(journal *Journal) error {
 	if tombState.Kind == stateread.KindPresent {
 		return corruptionf("journal cleanup tomb exists while saving transaction %s", journal.TransactionID)
 	}
-	temporary, err := os.CreateTemp(engine.journalRoot, ".journal-*.tmp")
+	temporary, err := privatedir.CreateTemp(engine.journalRoot, ".journal-*.tmp")
 	if err != nil {
 		return err
 	}
@@ -116,6 +120,9 @@ func (engine *Engine) saveJournal(journal *Journal) error {
 	}
 	pathState, err := stateread.Lstat(path)
 	if err != nil {
+		return err
+	}
+	if err := engine.checkOwnership(); err != nil {
 		return err
 	}
 	if pathState.Kind == stateread.KindPresent {
@@ -693,6 +700,9 @@ func validateRemovalStart(kind TargetKind, path, expectedDigest string) (bool, e
 }
 
 func removeDurablyUnrecorded(path, expectedDigest string, afterRename, afterRemoval func() error) error {
+	return removeUnrecordedChecked(path, expectedDigest, afterRename, afterRemoval, func() error { return nil })
+}
+func removeUnrecordedChecked(path, expectedDigest string, afterRename, afterRemoval, check func() error) error {
 	if expectedDigest == "" {
 		expectedDigest = DigestAbsent
 	}
@@ -722,6 +732,9 @@ func removeDurablyUnrecorded(path, expectedDigest string, afterRename, afterRemo
 		if err := verifyRemovalDigest(KindBytes, path, expectedDigest); err != nil {
 			return err
 		}
+		if err := check(); err != nil {
+			return err
+		}
 		if err := durableRenameNoReplace(path, tomb); err != nil {
 			return err
 		}
@@ -743,10 +756,10 @@ func removeDurablyUnrecorded(path, expectedDigest string, afterRename, afterRemo
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	return removeTreeDurably(tomb, afterRemoval)
+	return removeTreeChecked(tomb, afterRemoval, check)
 }
 
-func removeTreeDurably(path string, afterRemoval func() error) error {
+func removeTreeChecked(path string, afterRemoval, check func() error) error {
 	info, err := os.Lstat(path)
 	if os.IsNotExist(err) {
 		return nil
@@ -763,10 +776,13 @@ func removeTreeDurably(path string, afterRemoval func() error) error {
 			return err
 		}
 		for _, entry := range entries {
-			if err := removeTreeDurably(filepath.Join(path, entry.Name()), afterRemoval); err != nil {
+			if err := removeTreeChecked(filepath.Join(path, entry.Name()), afterRemoval, check); err != nil {
 				return err
 			}
 		}
+	}
+	if err := check(); err != nil {
+		return err
 	}
 	if err := os.Remove(path); err != nil {
 		return err
@@ -780,7 +796,7 @@ func removeTreeDurably(path string, afterRemoval func() error) error {
 	return nil
 }
 
-func removeDurablyWithEntries(kind TargetKind, path, expectedDigest string, entries []RemovalEntry, afterRename, afterRemoval func() error) error {
+func removeDurablyWithEntries(kind TargetKind, path, expectedDigest string, entries []RemovalEntry, afterRename, afterRemoval, check func() error) error {
 	if err := validateRemovalEntries(entries); err != nil {
 		return corruptionf("durable removal for %s has invalid manifest: %v", path, err)
 	}
@@ -803,6 +819,9 @@ func removeDurablyWithEntries(kind TargetKind, path, expectedDigest string, entr
 			return err
 		}
 		if err := validateRemovalTree(path, entries, true); err != nil {
+			return err
+		}
+		if err := check(); err != nil {
 			return err
 		}
 		if err := durableRenameNoReplace(path, tomb); err != nil {
@@ -843,6 +862,9 @@ func removeDurablyWithEntries(kind TargetKind, path, expectedDigest string, entr
 			return err
 		}
 		if err := verifyRemovalEntry(current, info, entry); err != nil {
+			return err
+		}
+		if err := check(); err != nil {
 			return err
 		}
 		if err := os.Remove(current); err != nil {
@@ -955,6 +977,9 @@ func journalDigest(journal *Journal) (string, error) {
 }
 
 func (engine *Engine) removeJournalDurably(journal *Journal) error {
+	if err := engine.checkOwnership(); err != nil {
+		return err
+	}
 	// Every terminal journal removal funnels through here (committed
 	// cleanup and completed rollback), so the retained per-write
 	// boundary check is released with it. A failed removal leaves the
@@ -966,7 +991,7 @@ func (engine *Engine) removeJournalDurably(journal *Journal) error {
 	if err != nil {
 		return err
 	}
-	return removeDurably(engine.journalPath(journal.TransactionID), digest)
+	return removeUnrecordedChecked(engine.journalPath(journal.TransactionID), digest, nil, nil, engine.checkOwnership)
 }
 
 func compareTargetRecords(left, right TargetRecord) int {

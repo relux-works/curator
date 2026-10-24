@@ -12,6 +12,20 @@ import (
 // transaction or cleaning a journal/tomb. Invalid or unreadable evidence is an
 // error even when another record already establishes pending recovery.
 func (engine *Engine) PendingRecovery(lock HomeLock) (bool, error) {
+	return engine.pendingRecovery(lock, "")
+}
+
+// PendingRecoveryFor observes pending intent for exactly one transaction owner.
+// It still validates the complete inventory: unrelated unreadable intent cannot
+// be silently ignored. Observation never commits, repairs or cleans a record.
+func (engine *Engine) PendingRecoveryFor(lock HomeLock, projectIdentity string) (bool, error) {
+	if projectIdentity == "" {
+		return false, journalf("pending transaction owner is empty")
+	}
+	return engine.pendingRecovery(lock, projectIdentity)
+}
+
+func (engine *Engine) pendingRecovery(lock HomeLock, projectIdentity string) (bool, error) {
 	if err := requireHomeLock(lock); err != nil {
 		return false, err
 	}
@@ -34,14 +48,19 @@ func (engine *Engine) PendingRecovery(lock HomeLock) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	pending := false
 	for _, id := range ids {
-		if _, err := engine.loadJournal(id); err != nil {
+		journal, err := engine.loadJournal(id)
+		if err != nil {
 			var pathErr *os.PathError
 			if errors.As(err, &pathErr) {
 				return false, stateread.UnusableError(pathErr.Path, err)
 			}
 			return false, err
 		}
+		if projectIdentity == "" || journal.ProjectIdentity == projectIdentity {
+			pending = true
+		}
 	}
-	return len(ids) != 0, nil
+	return pending, nil
 }
