@@ -172,7 +172,8 @@ func TestFetchAndSubmodules(t *testing.T) {
 
 // Clone opts its own cache into long-path support before Git writes pack
 // files, independently of ambient defaults. Fetch/ref lookup and exact
-// payload extraction remain usable beyond the Windows MAX_PATH boundary.
+// payload extraction remain usable when pack-file paths exceed MAX_PATH.
+// The cache directory itself fits the separate Windows process-directory limit.
 func TestCloneLongDestination(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "gitconfig")
 	if err := os.WriteFile(configPath, []byte("[core]\nlongpaths = false\n"), 0o600); err != nil {
@@ -181,8 +182,12 @@ func TestCloneLongDestination(t *testing.T) {
 	t.Setenv("GIT_CONFIG_GLOBAL", configPath)
 	src := makeRepo(t)
 	dest := t.TempDir()
-	for len(dest) < 300 {
+	for len(dest) < 200 {
 		dest = filepath.Join(dest, strings.Repeat("cache", 8))
+	}
+	packPath := filepath.Join(dest, ".git", "objects", "pack", "pack-"+strings.Repeat("0", 40)+".keep")
+	if len(dest) >= 248 || len(packPath) <= 260 {
+		t.Fatalf("witness does not isolate the pack-file limit: directory=%d pack=%d", len(dest), len(packPath))
 	}
 	if err := Clone("--upload-pack=forbidden", dest); err == nil || !strings.Contains(err.Error(), "suspicious git URL") {
 		t.Fatalf("invalid source accepted: %v", err)
