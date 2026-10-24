@@ -12,6 +12,7 @@ import (
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -309,5 +310,44 @@ func TestRecoveredNodeAuthorityBeforeStorePublication(t *testing.T) {
 	}
 	if nativeSnapshot(t, fx.native[envregistry.ClaudeCode]) != nativeBefore {
 		t.Error("recovered authority changed native state")
+	}
+}
+
+// With main's borrowed-operation path, post-validation refusal must leave the
+// outer mutation lock held. The per-home control returns that same operation.
+// The read seam models an authority change between the two locked validations.
+func TestNodeAuthorityKeepsBorrowedRepairLock(t *testing.T) {
+	for _, node := range []bool{true, false} {
+		t.Run(fmt.Sprintf("node=%v", node), func(t *testing.T) {
+			fx, req, _ := claudeRepairFixture(t, envregistry.FormReferenced)
+			op, err := beginOperation(fx.home)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = op.close() }()
+			req.borrowedOperation = op
+			reads := 0
+			req.readStateFile = func(path string) (stateread.File, error) {
+				reads++
+				if node && reads == 2 {
+					writeNodeAuthorityMarker(t, fx)
+				}
+				return stateread.ReadFile(path)
+			}
+			result, err := req.beginRepairOperation()
+			if reads != 2 {
+				t.Fatalf("locked validations: %d", reads)
+			}
+			if node {
+				if err == nil || !strings.HasPrefix(err.Error(), "credential_injection_unavailable:") || result != nil {
+					t.Errorf("borrowed authority refusal: %v", err)
+				}
+			} else if err != nil || result != op {
+				t.Errorf("per-home borrowed operation: %v", err)
+			}
+			if err := op.lock.AssertHeld(); err != nil {
+				t.Errorf("authority refusal closed the borrowed lock: %v", err)
+			}
+		})
 	}
 }

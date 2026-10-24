@@ -2993,7 +2993,9 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 	// Recovery may replace the marker as well as the lock. Refuse before
 	// callers publish any further repair using the recovered authority.
 	if err := req.validateActivationCredentialSource(); err != nil {
-		_ = op.close()
+		if req.borrowedOperation == nil {
+			_ = op.close()
+		}
 		return nil, op.recoveryRefusal(err)
 	}
 	op.claudePrepared = prepared
