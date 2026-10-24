@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/staging"
 )
 
@@ -106,6 +107,9 @@ func (engine *Engine) Prepare(lock HomeLock, plan Plan) (*Journal, error) {
 			continue
 		}
 		if err := engine.stageTarget(journal, index); err != nil {
+			return nil, engine.abortPreparation(journal, err)
+		}
+		if err := validatePrivateReplacement(target, target.StagedPath); err != nil {
 			return nil, engine.abortPreparation(journal, err)
 		}
 		got, err := target.digest(target.StagedPath)
@@ -223,6 +227,11 @@ func (engine *Engine) buildJournal(plan Plan) (*Journal, []string, error) {
 				return nil, nil, err
 			}
 			source = filepath.Clean(source)
+			if target.PrivateFile {
+				if err := privatedir.ValidateFile(source); err != nil {
+					return nil, nil, fmt.Errorf("private transaction source: %w", err)
+				}
+			}
 			if source == live {
 				return nil, nil, fmt.Errorf("target %s/%s stages from its live path", target.Class, target.Identifier)
 			}
@@ -242,6 +251,7 @@ func (engine *Engine) buildJournal(plan Plan) (*Journal, []string, error) {
 			}
 		}
 		record := TargetRecord{
+			PrivateFile:        target.PrivateFile,
 			Class:              target.Class,
 			Identifier:         target.Identifier,
 			Kind:               target.Kind,
@@ -465,6 +475,9 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 			return err
 		}
 		if current == target.DesiredDigest {
+			if err := validatePrivateReplacement(target, target.LivePath); err != nil {
+				return err
+			}
 			target.State = StateCommitted
 			if err := engine.saveJournal(journal); err != nil {
 				return err
@@ -478,6 +491,9 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 			return err
 		}
 		if target.DesiredDigest != DigestAbsent {
+			if err := validatePrivateReplacement(target, target.StagedPath); err != nil {
+				return err
+			}
 			stagedDigest, err := target.digest(target.StagedPath)
 			if err != nil || stagedDigest != target.DesiredDigest {
 				if err == nil {
@@ -486,6 +502,11 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 				return err
 			}
 			if err := engine.checkBoundary(journal, index); err != nil {
+				return err
+			}
+			// The caller's last boundary callback can itself expose a changed
+			// sidecar. Recheck privacy after that callback, before publication.
+			if err := validatePrivateReplacement(target, target.StagedPath); err != nil {
 				return err
 			}
 			if err := durableRenameNoReplace(target.StagedPath, target.LivePath); err != nil {
@@ -504,6 +525,9 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 		}
 		return engine.emit(journal, index, PointTargetCommitted)
 	case StateCommitted:
+		if err := validatePrivateReplacement(target, target.LivePath); err != nil {
+			return err
+		}
 		current, err := target.digest(target.LivePath)
 		if err != nil {
 			return err

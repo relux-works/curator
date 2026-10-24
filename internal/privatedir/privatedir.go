@@ -59,6 +59,10 @@ func CreateTemp(dir, pattern string) (*os.File, error) {
 	return createPrivateTempFile(dir, pattern)
 }
 
+// CreateFile exclusively creates an owner-only regular file at path. Existing
+// names, including links, are refused. The private shape is attached at creation.
+func CreateFile(path string) (*os.File, error) { return createPrivateFile(path) }
+
 // ValidateFile proves that path is a regular, non-link owner-only file.
 func ValidateFile(path string) error { return validatePrivateFile(path) }
 

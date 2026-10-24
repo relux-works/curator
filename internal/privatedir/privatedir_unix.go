@@ -35,6 +35,10 @@ func createPrivateTempFile(dir, pattern string) (*os.File, error) {
 	return os.CreateTemp(dir, pattern)
 }
 
+func createPrivateFile(path string) (*os.File, error) {
+	return os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600) // #nosec G304 -- caller-selected new private name; O_EXCL refuses existing files and links.
+}
+
 func validatePrivateFile(path string) error {
 	info, err := os.Lstat(path)
 	if err != nil {
