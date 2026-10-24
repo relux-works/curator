@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -223,20 +224,21 @@ func TestClientRejectsUnknownNonce(t *testing.T) {
 	}
 }
 
-// TestRunSessionTerminatesDescendants proves the worker-domain teardown
-// reaps an interpreter descendant that outlives the interpreter itself.
-// Skipping the teardown leaves the descendant alive past the return.
-// The descendant publishes its identity through the stdout protocol
-// report, never through a side file (the write confinement grants the
-// derived path set plus the null device, nothing else); the spawned
-// program is the granted interpreter itself, so the exec denial allows
-// the spawn wherever it enforces.
+// The descendant acknowledges readiness, then cannot exit normally until the
+// test releases it after session teardown. A survival marker rejects missing
+// domain termination independently of elapsed time. The barrier lives inside
+// the granted project root; the PID still arrives through the stdout report.
 func TestRunSessionTerminatesDescendants(t *testing.T) {
 	fixture := newLaunchFixture(t, os.Args[0])
 	fixture.request.ProjectRoot = fixture.root
-	fixture.declareCapabilities(t, `{"filesystem": "repo", "env_read": ["STUB_SPAWN_SLEEP", "STUB_SPAWN_SECONDS"]}`)
+	barrier := filepath.Join(fixture.root, "descendant-barrier")
+	if err := os.Mkdir(barrier, 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.WriteFile(filepath.Join(barrier, "release"), nil, 0600) })
+	fixture.declareCapabilities(t, `{"filesystem": "repo", "env_read": ["STUB_SPAWN_SLEEP", "STUB_SPAWN_BARRIER"]}`)
 	fixture.request.HostEnvironment = []string{
-		"STUB_SPAWN_SLEEP=1", "STUB_SPAWN_SECONDS=120"}
+		"STUB_SPAWN_SLEEP=1", "STUB_SPAWN_BARRIER=" + barrier}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -252,11 +254,21 @@ func TestRunSessionTerminatesDescendants(t *testing.T) {
 		t.Fatal("the interpreter descendant published no identity")
 	}
 	pid := report.SpawnPid
-	for processAlive(pid) && t.Context().Err() == nil {
+	if err := os.WriteFile(filepath.Join(barrier, "release"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	// Three minutes only guards a hang, above the session's 60-second
+	// allowance. A normally exiting survivor fails through its marker.
+	watchdog, stop := context.WithTimeout(t.Context(), 3*time.Minute)
+	defer stop()
+	for processAlive(pid) && watchdog.Err() == nil {
 		time.Sleep(50 * time.Millisecond)
 	}
 	if processAlive(pid) {
-		t.Fatalf("descendant %d outlived the worker domain teardown", pid)
+		t.Fatalf("hang guard: descendant %d did not terminate after release", pid)
+	}
+	if _, err := os.Stat(filepath.Join(barrier, "survived-"+strconv.Itoa(pid))); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("descendant %d outlived the worker domain teardown: survival marker err=%v", pid, err)
 	}
 }
 

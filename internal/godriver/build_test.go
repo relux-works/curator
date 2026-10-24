@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"go/build"
 	"os"
 	"path/filepath"
@@ -394,8 +395,8 @@ func TestBuildRequiresThePackageCommandSurface(t *testing.T) {
 	}
 }
 
-// The ordinary startup control retains both real descendant identities and
-// the production worker-domain teardown path.
+// Descendants cannot exit normally before the post-teardown release. A survivor
+// must publish a marker before exit, so natural expiry cannot satisfy this test.
 func TestBuildTerminatesTheCompleteWorkerDomain(t *testing.T) {
 	testBuildTerminatesTheCompleteWorkerDomain(t, 0)
 }
@@ -409,10 +410,13 @@ func TestBuildWaitsForDelayedDescendantReadiness(t *testing.T) {
 func testBuildTerminatesTheCompleteWorkerDomain(t *testing.T, readyDelayMS int) {
 	t.Helper()
 	fixture := newSnapshotFixture(t)
-	pidFile := filepath.Join(t.TempDir(), "descendants")
+	barrier := t.TempDir()
+	pidFile := filepath.Join(barrier, "descendants")
+	release := func() { _ = os.WriteFile(filepath.Join(barrier, "release"), nil, 0600) }
+	t.Cleanup(release) // Unblock test-owned children even if setup fails.
 	fixture.start(stubScript{
 		ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact",
-		SpawnChildren: 2, SpawnPidFile: pidFile, SpawnSeconds: 120, SpawnReadyDelayMS: readyDelayMS,
+		SpawnChildren: 2, SpawnPidFile: pidFile, SpawnBarrier: barrier, SpawnReadyDelayMS: readyDelayMS,
 	})
 	if _, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 60 * time.Second})); err != nil {
 		t.Fatal(err)
@@ -425,16 +429,28 @@ func testBuildTerminatesTheCompleteWorkerDomain(t *testing.T, readyDelayMS int) 
 	if len(pids) != 2 {
 		t.Fatalf("descendant pids = %v, want two", pids)
 	}
+	// Build has joined the worker after issuing domain termination. Releasing
+	// now is causal: only a descendant missed by teardown can write a marker.
+	if err := os.WriteFile(filepath.Join(barrier, "release"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	// Three minutes is only a hang guard (above the two-minute manager build
+	// budget), not a death verdict. Normal survivors fail via their marker.
+	watchdog, cancel := context.WithTimeout(t.Context(), 3*time.Minute)
+	defer cancel()
 	for _, raw := range pids {
 		pid, convErr := strconv.Atoi(raw)
 		if convErr != nil {
 			t.Fatal(convErr)
 		}
-		for processAlive(pid) && t.Context().Err() == nil {
+		for processAlive(pid) && watchdog.Err() == nil {
 			time.Sleep(50 * time.Millisecond)
 		}
 		if processAlive(pid) {
-			t.Fatalf("descendant %d outlived the worker domain teardown", pid)
+			t.Fatalf("hang guard: descendant %d did not terminate after release", pid)
+		}
+		if _, err := os.Stat(filepath.Join(barrier, "survived-"+raw)); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("descendant %d outlived the worker domain teardown: survival marker err=%v", pid, err)
 		}
 	}
 }

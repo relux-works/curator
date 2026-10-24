@@ -44,25 +44,33 @@ type script struct {
 
 	SpawnChildren     int    `json:"spawn_children"`
 	SpawnPidFile      string `json:"spawn_pid_file"`
-	SpawnSeconds      int    `json:"spawn_seconds"`
+	SpawnBarrier      string `json:"spawn_barrier"`
 	SpawnReadyDelayMS int    `json:"spawn_ready_delay_ms"`
 }
 
 func main() { os.Exit(run(os.Args[1:])) }
 
 func run(argv []string) int {
-	if len(argv) >= 3 && argv[0] == "sleep" {
-		seconds, _ := strconv.Atoi(argv[1])
-		if len(argv) > 3 {
-			delay, _ := strconv.Atoi(argv[3])
-			time.Sleep(time.Duration(delay) * time.Millisecond)
-		}
-		appendLine(argv[2], strconv.Itoa(os.Getpid()))
+	if len(argv) == 4 && argv[0] == "barrier-child" {
+		delay, _ := strconv.Atoi(argv[3])
+		time.Sleep(time.Duration(delay) * time.Millisecond)
+		appendLine(argv[1], strconv.Itoa(os.Getpid()))
 		if _, err := os.Stdout.Write([]byte{1}); err != nil {
 			return 1
 		}
-		time.Sleep(time.Duration(seconds) * time.Second)
-		return 0
+		// No finite lifetime: only the owning test's release signal permits
+		// normal exit. The marker distinguishes survival from forced death.
+		for {
+			if _, err := os.Stat(filepath.Join(argv[2], "release")); err == nil {
+				if err := os.WriteFile(filepath.Join(argv[2], "survived-"+strconv.Itoa(os.Getpid())), []byte("survived"), 0600); err != nil {
+					return 1
+				}
+				return 0
+			} else if !os.IsNotExist(err) {
+				return 1
+			}
+			time.Sleep(10 * time.Millisecond) // Signal polling cadence, never an exit deadline.
+		}
 	}
 	executable, err := os.Executable()
 	if err != nil {
@@ -207,12 +215,8 @@ func build(loaded script, argv []string) int {
 		if err != nil {
 			return 1
 		}
-		seconds := loaded.SpawnSeconds
-		if seconds == 0 {
-			seconds = 120
-		}
 		for index := 0; index < loaded.SpawnChildren; index++ {
-			child := exec.Command(executable, "sleep", strconv.Itoa(seconds), loaded.SpawnPidFile, strconv.Itoa(loaded.SpawnReadyDelayMS)) // #nosec G204 -- test double models a Go tool child
+			child := exec.Command(executable, "barrier-child", loaded.SpawnPidFile, loaded.SpawnBarrier, strconv.Itoa(loaded.SpawnReadyDelayMS)) // #nosec G204 -- test double models a Go tool child
 			child.Env = os.Environ()
 			ready, err := child.StdoutPipe()
 			if err != nil {

@@ -62,13 +62,25 @@ func main() {
 }
 
 func run() int {
-	if os.Getenv("STUB_SLEEP_CHILD") == "1" {
-		seconds, _ := strconv.Atoi(os.Getenv("STUB_SPAWN_SECONDS"))
-		if seconds <= 0 {
-			seconds = 120
+	if os.Getenv("STUB_BARRIER_CHILD") == "1" {
+		barrier := os.Getenv("STUB_SPAWN_BARRIER")
+		// Acknowledge a live child before publishing the interpreter report.
+		if _, err := os.Stdout.Write([]byte{1}); err != nil {
+			return 1
 		}
-		time.Sleep(time.Duration(seconds) * time.Second)
-		return 0
+		// No finite lifetime: only the owning test's release signal permits
+		// normal exit. A marker distinguishes survival from forced death.
+		for {
+			if _, err := os.Stat(filepath.Join(barrier, "release")); err == nil {
+				if err := os.WriteFile(filepath.Join(barrier, "survived-"+strconv.Itoa(os.Getpid())), []byte("survived"), 0600); err != nil {
+					return 1
+				}
+				return 0
+			} else if !os.IsNotExist(err) {
+				return 1
+			}
+			time.Sleep(10 * time.Millisecond) // Signal polling cadence, never an exit deadline.
+		}
 	}
 	if marker := os.Getenv("STUB_MARKER"); marker != "" {
 		file, err := os.OpenFile(marker, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
@@ -80,19 +92,28 @@ func run() int {
 	spawnPid := 0
 	spawnErr := ""
 	if os.Getenv("STUB_SPAWN_SLEEP") == "1" {
-		child := exec.Command(os.Args[0], "sleep-child")
-		child.Env = append(os.Environ(), "STUB_SLEEP_CHILD=1")
-		if err := child.Start(); err != nil {
+		child := exec.Command(os.Args[0], "barrier-child")
+		child.Env = append(os.Environ(), "STUB_BARRIER_CHILD=1")
+		ready, err := child.StdoutPipe()
+		if err != nil {
 			spawnErr = err.Error()
-		} else if child.Process != nil {
-			spawnPid = child.Process.Pid
+		} else if err := child.Start(); err != nil {
+			_ = ready.Close()
+			spawnErr = err.Error()
+		} else {
+			var acknowledgement [1]byte
+			if _, err := io.ReadFull(ready, acknowledgement[:]); err != nil {
+				spawnErr = err.Error()
+			} else if acknowledgement[0] != 1 {
+				spawnErr = "invalid child readiness acknowledgement"
+			} else {
+				spawnPid = child.Process.Pid
+			}
+			_ = ready.Close()
 			_ = child.Process.Release()
 		}
-		// Deliberately not waited: the descendant must outlive this
-		// interpreter so the test proves the worker-domain teardown reaps
-		// it. A successful start is proof of life: the child sleeps far
-		// longer than the session, so no wait is needed before the
-		// interpreter exits.
+		// Deliberately not waited: readiness precedes the report, and normal
+		// exit requires a test-controlled release after session teardown.
 	}
 	stdin, _ := io.ReadAll(os.Stdin)
 	cwd, _ := os.Getwd()

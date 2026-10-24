@@ -94,7 +94,7 @@ type stubScript struct {
 
 	SpawnChildren     int    `json:"spawn_children"`
 	SpawnPidFile      string `json:"spawn_pid_file"`
-	SpawnSeconds      int    `json:"spawn_seconds"`
+	SpawnBarrier      string `json:"spawn_barrier"`
 	SpawnReadyDelayMS int    `json:"spawn_ready_delay_ms"`
 }
 

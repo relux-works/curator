@@ -137,8 +137,26 @@ func TestManagerProcessRunnerRejectsNonzeroExitAndCombinedOutputOverflow(t *test
 	}
 }
 
+// A descendant blocks until a post-teardown release and records survival before
+// normal exit. Redirecting its streams lets the direct worker be joined even
+// when the group kill is missing; natural expiry cannot satisfy the verdict.
 func TestManagerProcessRunnerTimeoutCleansDescendantProcessGroup(t *testing.T) {
-	executor, permit, inputs, runner := realPortableFixture(t, `sleep 30 & child=$!; printf '%s' "$child" >"$CURATOR_OUTPUT_ROOT/child.pid"; wait "$child"`)
+	barrier := t.TempDir()
+	t.Cleanup(func() { _ = os.WriteFile(filepath.Join(barrier, "release"), nil, 0600) })
+	executor, permit, inputs, runner := realPortableFixture(t, `
+(
+  : >"$CURATOR_TEST_BARRIER/ready"
+  while [ ! -e "$CURATOR_TEST_BARRIER/release" ]; do sleep 0.01; done
+  printf survived >"$CURATOR_TEST_BARRIER/survived"
+) >/dev/null 2>&1 &
+child=$!
+printf '%s' "$child" >"$CURATOR_OUTPUT_ROOT/child.pid"
+wait "$child"`)
+	permit.Environment["CURATOR_TEST_BARRIER"] = barrier
+	// This three-minute watchdog exceeds the unchanged 30-second production
+	// allowance. It guards hangs; the survival marker supplies the verdict.
+	watchdog, stop := context.WithTimeout(t.Context(), 3*time.Minute)
+	defer stop()
 	permit.ResourceLimits.WallTimeMillis = 30_000
 	permit.ResourceLimitID, _ = permit.ResourceLimits.ID()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -155,30 +173,42 @@ func TestManagerProcessRunnerTimeoutCleansDescendantProcessGroup(t *testing.T) {
 		if readErr == nil {
 			parsed, parseErr := strconv.Atoi(strings.TrimSpace(string(payload)))
 			if parseErr == nil && parsed > 0 {
-				pid = parsed
-				break
+				if _, err := os.Stat(filepath.Join(barrier, "ready")); err == nil {
+					pid = parsed
+					break
+				}
 			}
 		} else if !errors.Is(readErr, os.ErrNotExist) {
 			t.Fatal(readErr)
 		}
-		if t.Context().Err() != nil {
-			t.Fatal("portable child did not publish its startup handshake")
+		if watchdog.Err() != nil {
+			t.Fatal("hang guard: portable child did not publish its startup handshake")
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 	cancel()
-	err := <-result
+	var err error
+	select {
+	case err = <-result:
+	case <-watchdog.Done():
+		t.Fatal("hang guard: portable worker did not join after cancellation")
+	}
 	var diagnostic *DiagnosticError
 	if !errors.As(err, &diagnostic) || diagnostic.Code != "portable_process_timeout" {
 		t.Fatalf("timeout err=%v", err)
 	}
-	for t.Context().Err() == nil {
-		if killErr := syscall.Kill(pid, 0); killErr == syscall.ESRCH {
-			return
-		}
+	if err := os.WriteFile(filepath.Join(barrier, "release"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	for syscall.Kill(pid, 0) != syscall.ESRCH && watchdog.Err() == nil {
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatalf("descendant pid %d survived portable timeout", pid)
+	if watchdog.Err() != nil {
+		t.Fatal("hang guard: portable descendant did not terminate after release")
+	}
+	if _, err := os.Stat(filepath.Join(barrier, "survived")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("descendant pid %d survived portable timeout: survival marker err=%v", pid, err)
+	}
 }
 
 func TestManagerProcessRunnerRejectsOutputAndReplayEscapeBindings(t *testing.T) {
