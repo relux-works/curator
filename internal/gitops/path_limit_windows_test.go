@@ -3,6 +3,7 @@
 package gitops
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -20,6 +21,10 @@ import (
 func TestWindowsGitMetadataLimit(t *testing.T) {
 	src := makeRepo(t)
 	root := windowsLongTestPath(t, t.TempDir())
+	configPath := filepath.Join(t.TempDir(), "gitconfig")
+	if err := os.WriteFile(configPath, []byte("[core]\nlongpaths = false\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("GIT_TEMPLATE_DIR", t.TempDir())
 	t.Logf("Git version: %s", gitRun(t, src, "version"))
 	for _, packed := range []bool{false, true} {
@@ -44,21 +49,26 @@ func TestWindowsGitMetadataLimit(t *testing.T) {
 				defer func() { _ = os.RemoveAll(dest) }()
 				for _, args := range [][]string{
 					{"clone", "--config", "core.longpaths=true", "--", remote, dest},
-					{"-C", dest, "fetch", "--all", "--tags", "--prune"},
-					{"-C", dest, "show", "v1:SKILL.md"},
+					{"fetch", "--all", "--tags", "--prune"},
+					{"show", "v1:SKILL.md"},
 				} {
 					cmd := exec.Command("git", append([]string{"-c", "core.longpaths=true"}, args...)...)
-					cmd.Env = gitEnv()
-					output, err := cmd.CombinedOutput()
+					cmd.Env = append(gitEnv(), "GIT_CONFIG_GLOBAL="+configPath)
+					if args[0] != "clone" {
+						cmd.Dir = dest
+					}
+					var stdout, stderr bytes.Buffer
+					cmd.Stdout, cmd.Stderr = &stdout, &stderr
+					err := cmd.Run()
 					if err != nil {
-						if !strings.Contains(string(output), "Filename too long") {
-							t.Fatalf("unrelated Git probe failure at root=%d: %v\n%s", length, err, output)
+						if !strings.Contains(stderr.String(), "Filename too long") {
+							t.Fatalf("unrelated Git probe failure at root=%d: %v\n%s", length, err, stderr.String())
 						}
-						t.Logf("root=%d refused: %s", length, strings.TrimSpace(string(output)))
+						t.Logf("root=%d refused: %s", length, strings.TrimSpace(stderr.String()))
 						return false
 					}
-					if args[len(args)-1] == "v1:SKILL.md" && strings.TrimSpace(string(output)) != "v1" {
-						t.Fatalf("probe did not read exact payload: %s", output)
+					if args[len(args)-1] == "v1:SKILL.md" && strings.TrimSpace(stdout.String()) != "v1" {
+						t.Fatalf("probe did not read exact payload: %s", stdout.String())
 					}
 				}
 				return true
