@@ -1,6 +1,6 @@
 //go:build unix
 
-package closureexec
+package testcli
 
 import (
 	"encoding/json"
@@ -24,7 +24,7 @@ func TestPortableDescendantNarrowingControl(t *testing.T) {
 		{"omit-group-kill", "portable_process_unix.go", "_ = syscall.Kill(-command.Process.Pid, syscall.SIGKILL)", "_ = command.Process.Kill()", "TestManagerProcessRunnerTimeoutCleansDescendantProcessGroup", "survived portable timeout: survival marker"},
 	} {
 		t.Run(plant.name, func(t *testing.T) {
-			sourcePath, err := filepath.Abs(plant.file)
+			sourcePath, err := filepath.Abs(filepath.Join("..", "closureexec", plant.file))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -37,10 +37,10 @@ func TestPortableDescendantNarrowingControl(t *testing.T) {
 				t.Fatal("descendant plant anchor not unique")
 			}
 			run := func(overlay string) ([]byte, error) {
-				// The 90-second hang guard is below the former 120-second natural
-				// lifetime, but above the fixture's 60-second worker allowance plus
-				// 30 seconds for warm setup. Only the assertion supplies a verdict.
-				args := []string{"test", "-count=1", "-timeout=90s", "-v", "-run", "^" + plant.witness + "$", "."}
+				// The 90-second hang guard exceeds the unchanged 30-second
+				// fixture allowance plus warm setup. Only the post-teardown
+				// survival assertion supplies a verdict.
+				args := []string{"test", "-count=1", "-timeout=90s", "-v", "-run", "^" + plant.witness + "$", "../closureexec"}
 				if overlay != "" {
 					args = append([]string{"test", "-overlay", overlay}, args[1:]...)
 				}
