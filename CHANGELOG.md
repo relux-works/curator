@@ -4,6 +4,36 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+## v0.15.0-rc.9 — 2026-10-24
+
+### Fixed
+
+- Native global skills have exactly one owner. A skill that a profile requires
+  and that is also declared globally is published once, by the profile's
+  paired publication. Global add and install stage and verify the private
+  build before paired publication takes the manager-home lock, so a slow
+  `go build` no longer blocks profile sync. Global remove serializes with
+  add and install.
+- A failed global publication is compensated without losing operator state.
+  Compensation checks the recorded postimage (content, parent mode and owner)
+  before every rollback write. If an operator changed the file or directory,
+  compensation keeps the change, reports it, and keeps the pending recovery
+  record. A compensation error now ends a declaration-generation restart
+  instead of being reported as success.
+- Claude Code seed publication prepares its paths before the final input
+  comparison and publishes through a direct rename, so an external update to
+  the seed made during preparation is no longer overwritten. A narrower
+  scheduling race remains and is documented.
+- Repaired skill projections are swapped by atomic name exchange on macOS and
+  Linux, with the previous tree retained for rollback and recovery. Readers
+  never observe a missing projection name.
+- Manifest dependency requirements keep their declared transport (SSH or
+  HTTPS) through identity resolution, while resolver and cache keys stay
+  canonical.
+- Username-only HTTP(S) userinfo is stripped from dependency sources before it
+  reaches resolver diagnostics or acquisition metadata. Password userinfo is
+  still refused.
+
 ## v0.15.0-rc.8 — 2026-10-22
 
 ### Added
