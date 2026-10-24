@@ -92,9 +92,10 @@ type stubScript struct {
 	PrivateFileName  string `json:"private_file_name"`
 	PrivateFileBytes int    `json:"private_file_bytes"`
 
-	SpawnChildren int    `json:"spawn_children"`
-	SpawnPidFile  string `json:"spawn_pid_file"`
-	SpawnSeconds  int    `json:"spawn_seconds"`
+	SpawnChildren     int    `json:"spawn_children"`
+	SpawnPidFile      string `json:"spawn_pid_file"`
+	SpawnSeconds      int    `json:"spawn_seconds"`
+	SpawnReadyDelayMS int    `json:"spawn_ready_delay_ms"`
 }
 
 // stubCall is one recorded invocation of the stub Go launcher.

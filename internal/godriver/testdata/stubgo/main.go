@@ -9,6 +9,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,9 +42,10 @@ type script struct {
 	PrivateFileName  string `json:"private_file_name"`
 	PrivateFileBytes int    `json:"private_file_bytes"`
 
-	SpawnChildren int    `json:"spawn_children"`
-	SpawnPidFile  string `json:"spawn_pid_file"`
-	SpawnSeconds  int    `json:"spawn_seconds"`
+	SpawnChildren     int    `json:"spawn_children"`
+	SpawnPidFile      string `json:"spawn_pid_file"`
+	SpawnSeconds      int    `json:"spawn_seconds"`
+	SpawnReadyDelayMS int    `json:"spawn_ready_delay_ms"`
 }
 
 func main() { os.Exit(run(os.Args[1:])) }
@@ -51,7 +53,14 @@ func main() { os.Exit(run(os.Args[1:])) }
 func run(argv []string) int {
 	if len(argv) >= 3 && argv[0] == "sleep" {
 		seconds, _ := strconv.Atoi(argv[1])
+		if len(argv) > 3 {
+			delay, _ := strconv.Atoi(argv[3])
+			time.Sleep(time.Duration(delay) * time.Millisecond)
+		}
 		appendLine(argv[2], strconv.Itoa(os.Getpid()))
+		if _, err := os.Stdout.Write([]byte{1}); err != nil {
+			return 1
+		}
 		time.Sleep(time.Duration(seconds) * time.Second)
 		return 0
 	}
@@ -203,16 +212,27 @@ func build(loaded script, argv []string) int {
 			seconds = 120
 		}
 		for index := 0; index < loaded.SpawnChildren; index++ {
-			child := exec.Command(executable, "sleep", strconv.Itoa(seconds), loaded.SpawnPidFile) // #nosec G204 -- test double models a Go tool child
+			child := exec.Command(executable, "sleep", strconv.Itoa(seconds), loaded.SpawnPidFile, strconv.Itoa(loaded.SpawnReadyDelayMS)) // #nosec G204 -- test double models a Go tool child
 			child.Env = os.Environ()
+			ready, err := child.StdoutPipe()
+			if err != nil {
+				return 1
+			}
 			if err := child.Start(); err != nil {
+				_ = ready.Close()
 				fmt.Fprintln(os.Stderr, "stubgo: cannot start tool child:", err)
 				return 1
 			}
+			// Child acknowledgement follows PID publication. Scheduling and
+			// intentional startup delays cannot race the build result.
+			var acknowledgement [1]byte
+			_, readyErr := io.ReadFull(ready, acknowledgement[:])
+			_ = ready.Close()
+			if readyErr != nil || acknowledgement[0] != 1 {
+				fmt.Fprintln(os.Stderr, "stubgo: tool child did not acknowledge readiness:", readyErr)
+				return 1
+			}
 		}
-		// Let the children publish their identities before the build result
-		// returns, so teardown is observed against live processes.
-		time.Sleep(500 * time.Millisecond)
 	}
 	if loaded.BuildStderr != "" {
 		_, _ = os.Stderr.WriteString(loaded.BuildStderr)

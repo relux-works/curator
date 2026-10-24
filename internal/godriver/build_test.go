@@ -394,12 +394,25 @@ func TestBuildRequiresThePackageCommandSurface(t *testing.T) {
 	}
 }
 
+// The ordinary startup control retains both real descendant identities and
+// the production worker-domain teardown path.
 func TestBuildTerminatesTheCompleteWorkerDomain(t *testing.T) {
+	testBuildTerminatesTheCompleteWorkerDomain(t, 0)
+}
+
+// A deliberate two-second child startup delay must complete through explicit
+// readiness, preserving both PID publications before production teardown.
+func TestBuildWaitsForDelayedDescendantReadiness(t *testing.T) {
+	testBuildTerminatesTheCompleteWorkerDomain(t, 2000)
+}
+
+func testBuildTerminatesTheCompleteWorkerDomain(t *testing.T, readyDelayMS int) {
+	t.Helper()
 	fixture := newSnapshotFixture(t)
 	pidFile := filepath.Join(t.TempDir(), "descendants")
 	fixture.start(stubScript{
 		ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact",
-		SpawnChildren: 2, SpawnPidFile: pidFile, SpawnSeconds: 120,
+		SpawnChildren: 2, SpawnPidFile: pidFile, SpawnSeconds: 120, SpawnReadyDelayMS: readyDelayMS,
 	})
 	if _, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 60 * time.Second})); err != nil {
 		t.Fatal(err)
