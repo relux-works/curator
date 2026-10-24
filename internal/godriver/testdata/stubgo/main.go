@@ -16,6 +16,8 @@ import (
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 type script struct {
@@ -61,13 +63,16 @@ func run(argv []string) int {
 		// No finite lifetime: only the owning test's release signal permits
 		// normal exit. The marker distinguishes survival from forced death.
 		for {
-			if _, err := os.Stat(filepath.Join(argv[2], "release")); err == nil {
+			// Keep an absent release distinct from an unreadable barrier.
+			state, err := stateread.Stat(filepath.Join(argv[2], "release"))
+			if err != nil {
+				return 1
+			}
+			if state.Kind == stateread.KindPresent {
 				if err := os.WriteFile(filepath.Join(argv[2], "survived-"+strconv.Itoa(os.Getpid())), []byte("survived"), 0600); err != nil {
 					return 1
 				}
 				return 0
-			} else if !os.IsNotExist(err) {
-				return 1
 			}
 			time.Sleep(10 * time.Millisecond) // Signal polling cadence, never an exit deadline.
 		}
