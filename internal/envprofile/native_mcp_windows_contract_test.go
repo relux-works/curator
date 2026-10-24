@@ -2,14 +2,17 @@ package envprofile
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/mcpnative"
 	"github.com/relux-works/curator/internal/privatedir"
+	"github.com/relux-works/curator/internal/transaction"
 )
 
 // Production publishes private native files, ownership records, skills and
@@ -138,6 +141,73 @@ func TestProfileMCPPrivateSkillPreimage(t *testing.T) {
 				if !bytes.Equal(body, nativeRead(t, path)) {
 					t.Fatal("existing skill bytes changed")
 				}
+			}
+		})
+	}
+}
+
+// A protected DACL at creation is insufficient if a later grant appears on the
+// staged ownership file. The persisted private contract refuses that grant
+// before publication and restores prior payloads; its unchanged sibling admits.
+func TestProfileMCPPrivateStagingBoundary(t *testing.T) {
+	for _, broaden := range []bool{false, true} {
+		t.Run(map[bool]string{false: "private", true: "foreign-read"}[broaden], func(t *testing.T) {
+			fx, req := nativeWriterFixture(t)
+			beforeLock := nativeRead(t, lockPath(fx.home, fx.profile))
+			ledger := nativeMCPLedger(fx.home, fx.profile, "codex_cli")
+			observed := false
+			req.transactionOptions = []transaction.Option{transaction.WithHooks(transaction.Hooks{Observe: func(event transaction.Event) {
+				if event.Point != transaction.PointPrepared {
+					return
+				}
+				path := filepath.Join(fx.home, "state", "transactions", "v1", event.TransactionID+".json")
+				var journal transaction.Journal
+				if err := json.Unmarshal(nativeRead(t, path), &journal); err != nil {
+					t.Fatal(err)
+				}
+				for _, target := range journal.Targets {
+					if target.LivePath != ledger {
+						continue
+					}
+					observed = true
+					if !broaden {
+						return
+					}
+					restore, err := makeWorldReadableFileForTest(target.StagedPath)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if privatedir.ValidateFile(target.StagedPath) == nil {
+						t.Fatal("staged foreign-read plant missed")
+					}
+					t.Cleanup(func() {
+						if _, err := os.Lstat(target.StagedPath); err == nil {
+							if err := restore(); err != nil {
+								t.Error(err)
+							}
+						} else if !os.IsNotExist(err) {
+							t.Error(err)
+						}
+					})
+				}
+			}})}
+			result, err := ProfileMCP(req)
+			if !observed {
+				t.Fatal("ownership staging boundary not observed")
+			}
+			if broaden {
+				if err == nil || !strings.Contains(err.Error(), "private transaction replacement") || result.Published {
+					t.Fatalf("private staged grant accepted: %+v %v", result, err)
+				}
+				if !bytes.Equal(beforeLock, nativeRead(t, lockPath(fx.home, fx.profile))) {
+					t.Fatal("staged refusal changed profile lock")
+				}
+				for _, id := range req.Environments {
+					nativeAbsent(t, nativeMCPLedger(fx.home, fx.profile, id))
+					nativeAbsent(t, nativeWriterPath(fx, id))
+				}
+			} else if err != nil || !result.Published {
+				t.Fatalf("private staged positive: %+v %v", result, err)
 			}
 		})
 	}

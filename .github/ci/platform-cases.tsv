@@ -900,3 +900,8 @@ internal/envprofile	TestProfileMCPPreviewSkillPreimages/wrong-mode	linux,darwin	
 internal/envprofile	TestProjectMCPAuthorizedReplayGates/snapshot_mode	linux,darwin	windows	platform-control	POSIX executable-bit snapshot mutation runs on Unix; Windows has no portable execute bit and runs byte and authority mutations
 internal/transaction	TestPrivateFileBoundaryMutation	linux,darwin,windows	-	-	the last boundary callback cannot broaden a private sidecar and still publish it
 internal/envprofile	TestMCPWindowsNarrowingControls	windows	-	-	Windows overlays must trigger named privacy, preimage, replay and long-path regression assertions
+
+# MCP integration retains landed compensation and commit gates.
+internal/envprofile	TestMCPProtectedPublicationCompensation	linux,darwin,windows	-	-	protected publication captures compensation preimages and refuses an operator postimage edit without partial restoration
+internal/transaction	TestMCPPrivateCommitAndInputGates	linux,darwin,windows	-	-	private commit and fresh recovery preserve independent commit-admission and frozen-input refusals with valid private publication controls
+internal/envprofile	TestProfileMCPPrivateStagingBoundary	linux,darwin,windows	-	-	private ownership staging admits unchanged bytes and refuses a later foreign-read grant before publication while retaining prior lock bytes
