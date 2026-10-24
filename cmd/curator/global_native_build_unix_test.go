@@ -193,9 +193,9 @@ func TestGlobalNativeOwnerPausedBuild(t *testing.T) {
 	resumed = true
 	// Completion is not a latency assertion: the production worker permits a
 	// two-minute real build, followed by toolchain verification/publication.
-	// Keep the shorter watchdog for the separate lock-order controls.
+	// Lock-order assertions happen at the paused barrier, before this wait.
 	released := time.Now()
-	child.waitWithin(t, 3*time.Minute)
+	child.waitWithin(t, nativeCommandWatchdog)
 	t.Logf("released real build completed in %s", time.Since(released))
 	requireCompiledNativeOwner(t, fixture)
 	fixture.command(t, exitOK, "global", "remove", "build-skill")
@@ -209,7 +209,7 @@ func TestGlobalNativeOwnerPausedBuild(t *testing.T) {
 
 func waitNativeBuildWorker(t *testing.T, child *nativeCommand) int {
 	t.Helper()
-	deadline := time.Now().Add(40 * time.Second)
+	deadline := time.Now().Add(nativeCommandWatchdog)
 	for time.Now().Before(deadline) {
 		select {
 		case err := <-child.done:
@@ -252,4 +252,12 @@ func waitNativeBuildWorker(t *testing.T, child *nativeCommand) int {
 	}
 	t.Fatal("owned build worker did not reach its persistent permit barrier")
 	return 0
+}
+
+// The fixture completion watchdog must cover the production two-minute build
+// plus publication. Lock-order negatives remain at the unreleased barrier.
+func TestNativeCommandWatchdogBudget(t *testing.T) {
+	if nativeCommandWatchdog <= 2*time.Minute {
+		t.Fatal("native fixture watchdog does not cover production build and publication")
+	}
 }
