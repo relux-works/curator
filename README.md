@@ -314,6 +314,13 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+The marker/snapshot schema regexp engine is pinned to regexp2 v1.11.5, which
+fixes stale timeout deadlines after idle. Run
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envmarker -run TestMarker7AfterRegexpClockIdle -count=1`
+for full-carrier name controls around an idle restart, and
+`env -u GIT_DIR -u GIT_WORK_TREE go test github.com/dlclark/regexp2 -run TestIncorrectDeadline -count=1`
+for the upstream deterministic deadline regression. Keep output under `.temp/`.
+
 New Codex managed homes use provisioning seed revision C: top-level `projects`
 and `mcp_servers` are excluded, while unrelated decoded TOML values survive.
 Existing A/B/C and pre-rule seeds keep their bytes and recorded revision.

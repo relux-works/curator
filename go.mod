@@ -7,7 +7,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/x/term v0.2.1
-	github.com/dlclark/regexp2 v1.11.0
+	github.com/dlclark/regexp2 v1.11.5
 	github.com/relux-works/skill-go-testing-tools/tuitestkit v0.1.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	golang.org/x/net v0.47.0
