@@ -256,8 +256,8 @@ func TestExtractTerminatesCatFileOnMidStreamFramingError(t *testing.T) {
 	gitRun(t, repo, "init", "-q", "-b", "main")
 	commit := commitRawTree(t, repo, []string{"100644 blob " + blobOID(t, repo, "x") + "\tsmall.txt"})
 	shimDir := t.TempDir()
-	shim := "#!/bin/sh\nif [ \"$3\" = cat-file ]; then\n  printf '%s blob 1\\n' " + strings.Repeat("0", 40) +
-		"\n  head -c 8388608 /dev/zero\n  exit 0\nfi\nexec '" + realGit + "' \"$@\"\n"
+	shim := "#!/bin/sh\nfor arg in \"$@\"; do\nif [ \"$arg\" = cat-file ]; then\n  printf '%s blob 1\\n' " + strings.Repeat("0", 40) +
+		"\n  head -c 8388608 /dev/zero\n  exit 0\nfi\ndone\nexec '" + realGit + "' \"$@\"\n"
 	if err := os.WriteFile(filepath.Join(shimDir, "git"), []byte(shim), 0o755); err != nil {
 		t.Fatal(err)
 	}

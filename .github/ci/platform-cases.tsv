@@ -899,7 +899,7 @@ internal/projectcontext	TestCompositionCredentialVisitorReentry	linux,darwin	win
 internal/envprofile	TestProfileMCPPrivateFixtureBoundary	linux,darwin,windows	-	-	private fixtures install on both native adapters; broadened home and managed-home mutation rights refuse without payload changes or permission repair
 internal/envprofile	TestProfileMCPExecutableQualificationInert	linux,darwin,windows	-	-	executable byte qualification never executes its input; an explicitly invoked portable tripwire proves the observation instrument
 internal/envprofile	TestMCPSignedTagFixturesWithoutAmbientIdentity	linux,darwin,windows	-	-	empty ambient Git identity cannot hide missing fixture author or committer settings; all three signed-tag fixtures reach their strict assertions
-internal/gitops	TestCloneLongDestination	linux,darwin,windows	-	-	clone enables persistent cache long-path support before index-pack; fetch, exact ref resolution and payload extraction work with pack-file paths beyond MAX_PATH while suspicious URLs leave no destination
+internal/gitops	TestCloneLongDestination	linux,darwin,windows	-	-	process-level long-path support admits a template beyond MAX_PATH and reopens deep loose objects for fetch, exact ref resolution and extraction; bounded real packed transport persists the setting, and suspicious URLs leave no destination
 
 # MCP native writer Windows publication and exact platform controls.
 internal/privatedir	TestCreateFileIsPrivateAndExclusive	linux,darwin,windows	-	-	private named creation is exclusive and immediately validates as owner-only
@@ -918,3 +918,4 @@ internal/envprofile	TestMCPWindowsNarrowingControls	windows	-	-	Windows overlays
 internal/envprofile	TestMCPProtectedPublicationCompensation	linux,darwin,windows	-	-	protected publication captures compensation preimages and refuses an operator postimage edit without partial restoration
 internal/transaction	TestMCPPrivateCommitAndInputGates	linux,darwin,windows	-	-	private commit and fresh recovery preserve independent commit-admission and frozen-input refusals with valid private publication controls
 internal/envprofile	TestProfileMCPPrivateStagingBoundary	linux,darwin,windows	-	-	private ownership staging admits unchanged bytes and refuses a later foreign-read grant before publication while retaining prior lock bytes
+internal/gitops	TestGitLongPathProcessSetting	linux,darwin,windows	-	-	regular and isolated real Git commands override a disabled local long-path setting for that process without rewriting it; direct Git controls confirm the disabled setting remains

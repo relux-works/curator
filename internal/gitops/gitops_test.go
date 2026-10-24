@@ -171,7 +171,8 @@ func TestFetchAndSubmodules(t *testing.T) {
 }
 
 // Clone enables long-path support before copying a template beyond MAX_PATH
-// and persists it for a real packed transfer, independently of ambient defaults.
+// and can reopen its loose objects for fetch, resolution and exact extraction.
+// It also persists the setting for a real packed transfer despite ambient defaults.
 // The packed fixture stays below Git's independent absolute metadata-path limit;
 // this test does not claim arbitrary-length repository roots are supported.
 func TestCloneLongDestination(t *testing.T) {
@@ -252,5 +253,37 @@ func TestCloneLongDestination(t *testing.T) {
 				t.Fatalf("long-path payload = %q: %v", body, err)
 			}
 		})
+	}
+}
+
+// Both regular and isolated Git commands override a disabled local long-path
+// setting for that process, without changing the caller's local configuration.
+// The direct Git controls prove the disabled setting is live before and after.
+func TestGitLongPathProcessSetting(t *testing.T) {
+	repo := makeRepo(t)
+	gitRun(t, repo, "config", "--local", "core.longpaths", "false")
+	if got := gitRun(t, repo, "config", "--local", "--get", "core.longpaths"); got != "false" {
+		t.Fatalf("disabled local control = %q", got)
+	}
+	env, cleanup, err := isolatedGitEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	for _, tc := range []struct {
+		name string
+		run  func() (string, error)
+	}{
+		{"regular", func() (string, error) { return run(repo, "config", "--get", "core.longpaths") }},
+		{"isolated", func() (string, error) {
+			return runWithEnv(repo, env, withIsolatedConfigArgs([]string{"config", "--get", "core.longpaths"})...)
+		}},
+	} {
+		if got, err := tc.run(); err != nil || got != "true" {
+			t.Fatalf("process long-path setting (%s) = %q, want true: %v", tc.name, got, err)
+		}
+	}
+	if got := gitRun(t, repo, "config", "--local", "--get", "core.longpaths"); got != "false" {
+		t.Fatalf("process option rewrote local setting: %q", got)
 	}
 }
