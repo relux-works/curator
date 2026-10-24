@@ -10,6 +10,7 @@ import (
 
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // All registered managed layouts (including nested OpenCode) and orphaned
@@ -28,7 +29,7 @@ func TestManagedAuthorityInventory(t *testing.T) {
 				if adapter.ID == envregistry.OpenCode {
 					dir = filepath.Join(dir, "opencode")
 				}
-				if err := os.MkdirAll(dir, 0700); err != nil {
+				if err := privatedir.MakeAll(dir); err != nil {
 					t.Fatal(err)
 				}
 				payload := raw
@@ -48,10 +49,26 @@ func TestManagedAuthorityInventory(t *testing.T) {
 					t.Fatalf("full carrier setup: %v", err)
 				}
 				path := filepath.Join(dir, envmarker.Name)
-				if err := os.WriteFile(path, payload, 0600); err != nil {
+				file, err := privatedir.Create(path, 0600)
+				if err != nil {
 					t.Fatal(err)
 				}
-				err := Validate(home)
+				_, writeErr := file.Write(payload)
+				closeErr := file.Close()
+				if writeErr != nil || closeErr != nil {
+					t.Fatalf("private marker setup: %v %v", writeErr, closeErr)
+				}
+				// Shared creators must establish private objects before the
+				// authority verdict, independently of the parent temp ACL.
+				for current := dir; current != home; current = filepath.Dir(current) {
+					if err := privatedir.Validate(current); err != nil {
+						t.Fatalf("private managed directory setup: %v", err)
+					}
+				}
+				if err := privatedir.ValidateFile(path); err != nil {
+					t.Fatalf("private managed marker setup: %v", err)
+				}
+				err = Validate(home)
 				if node {
 					if err == nil || !strings.HasPrefix(err.Error(), "credential_injection_unavailable:") {
 						t.Fatalf("node diagnostic: %v", err)
@@ -84,7 +101,7 @@ func TestManagedAuthorityBoundary(t *testing.T) {
 			home := t.TempDir()
 			root := filepath.Join(home, "environments")
 			dir := filepath.Join(root, "example", envregistry.CodexCLI)
-			if err := os.MkdirAll(dir, 0700); err != nil {
+			if err := privatedir.MakeAll(dir); err != nil {
 				t.Fatal(err)
 			}
 			path := filepath.Join(dir, envmarker.Name)

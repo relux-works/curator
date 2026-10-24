@@ -13,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/gitops"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // Production entry point: Install -> installLocked -> contextresolve.Resolve.
@@ -31,7 +32,7 @@ func TestInstallMissingDependencyPin(t *testing.T) {
 			}
 			beforeProfile := hashTreeForTest(t, ProfileDir(home, "existing"))
 			beforeDefault := hashTreeForTest(t, ProfileDir(home, DefaultProfile))
-			if err := os.MkdirAll(EnvRoot(home), 0o700); err != nil {
+			if err := privatedir.MakeAll(EnvRoot(home)); err != nil {
 				t.Fatal(err)
 			}
 			beforeManaged := hashTreeForTest(t, EnvRoot(home))

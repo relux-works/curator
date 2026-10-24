@@ -11,6 +11,7 @@ import (
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -83,7 +84,7 @@ func TestInstallCredentialAuthority(t *testing.T) {
 					t.Fatal(err)
 				}
 				dir := envprofile.ManagedHomeDir(e.home, "orphan", "codex_cli")
-				if err = os.MkdirAll(dir, 0700); err != nil {
+				if err = privatedir.MakeAll(dir); err != nil {
 					t.Fatal(err)
 				}
 				if err = os.WriteFile(filepath.Join(dir, envmarker.Name), raw, 0600); err != nil {
