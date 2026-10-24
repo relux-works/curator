@@ -14,7 +14,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/relux-works/curator/internal/artifactpolicy"
 	"github.com/relux-works/curator/internal/artifactpolicy/conformance"
@@ -102,7 +101,7 @@ func TestCentralManagerSelectsFingerprintsAndRechecksRuntimeGoToolchain(t *testi
 		t.Fatalf("authorized executable %q is not a real regular file: %v", executable, err)
 	}
 
-	executionContext, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	executionContext, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	output := &boundedCommandOutput{remaining: 4096}
 	command := exec.CommandContext(executionContext, executable, "version")

@@ -433,7 +433,7 @@ func realGitAccess(t *testing.T, gitconfig string) (Access, string) {
 		}
 		environment = append(environment, entry)
 	}
-	return Access{Git: git, Home: home, Environ: environment, Timeout: 30 * time.Second}, home
+	return Access{Git: git, Home: home, Environ: environment, Timeout: DefaultTimeout}, home
 }
 
 func assertPlatformGuidance(t *testing.T, err error, lead string) {
@@ -483,7 +483,7 @@ func fakeAccess(t *testing.T, mode string) (Access, string) {
 		environ = append(environ, "SYSTEMROOT="+os.Getenv("SYSTEMROOT"))
 	}
 	return Access{
-		Git: self, Home: filepath.Join(dir, "home"), Environ: environ, Timeout: 30 * time.Second,
+		Git: self, Home: filepath.Join(dir, "home"), Environ: environ, Timeout: DefaultTimeout,
 	}, dir
 }
 

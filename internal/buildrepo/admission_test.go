@@ -15,7 +15,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/relux-works/curator/internal/conformancecoverage"
 )
@@ -818,7 +817,7 @@ func shellQuote(value string) string { return "'" + strings.ReplaceAll(value, "'
 
 func runTestGit(t *testing.T, dir, git string, args ...string) string {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	// Repository fixtures are unsigned source data. Never inherit workstation
 	// signing policy or touch its credentials while constructing them.

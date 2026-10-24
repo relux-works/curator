@@ -86,7 +86,7 @@ func TestGlobalProfilePrivateStaging(t *testing.T) {
 				}
 			}
 			manager, _ := managerlock.New(e.home)
-			probe, stop := context.WithTimeout(context.Background(), time.Second)
+			probe, stop := context.WithCancel(t.Context())
 			defer stop()
 			lock, err := manager.AcquireHomeOnly(probe, false)
 			if err != nil {

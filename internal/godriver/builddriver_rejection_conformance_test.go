@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"sort"
 	"testing"
-	"time"
 )
 
 // driverRejectionVector is the authoritative rejection record. Only the fields
@@ -73,7 +72,7 @@ func graphRejection(edit func(*workerFixture, *[]packageJSON)) func(t *testing.T
 			edit(fixture, &items)
 		}
 		fixture.start(stubScript{ListStdout: string(encodePackages(t, items...)), Artifact: "artifact"})
-		_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
+		_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout}))
 		calls := fixture.sourceAwareCalls()
 		if len(calls) != 1 || calls[0].Argv[0] != "list" {
 			t.Fatalf("source-aware calls = %+v, the compiler must not start after a graph rejection", calls)
@@ -89,7 +88,7 @@ func snapshotRejection(edit func(*workerFixture)) func(t *testing.T) error {
 		fixture := newSnapshotFixture(t)
 		edit(fixture)
 		fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
-		_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
+		_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout}))
 		if calls := fixture.sourceAwareCalls(); len(calls) != 0 {
 			t.Fatalf("source-aware calls = %+v, no Go child may start", calls)
 		}
@@ -102,7 +101,7 @@ func listFailure(stderr string) func(t *testing.T) error {
 	return func(t *testing.T) error {
 		fixture := newSnapshotFixture(t)
 		fixture.start(stubScript{ListExit: 1, ListStderr: stderr})
-		_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
+		_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout}))
 		if calls := fixture.sourceAwareCalls(); len(calls) != 1 {
 			t.Fatalf("source-aware calls = %d, want exactly the fixed go list", len(calls))
 		}
@@ -119,7 +118,7 @@ func buildFailure(stderr string) func(t *testing.T) error {
 			ListStdout: string(encodePackages(t, fixture.rootPackage())),
 			BuildExit:  1, BuildStderr: stderr,
 		})
-		_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
+		_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout}))
 		calls := fixture.sourceAwareCalls()
 		if len(calls) != 2 || calls[1].Argv[0] != "build" {
 			t.Fatalf("source-aware calls = %+v, want the fixed list then build", calls)
@@ -457,7 +456,7 @@ func directiveRejection(content string, pgo bool) func(t *testing.T) error {
 			writeTestFile(t, filepath.Join(fixture.sourceDir, "default.pgo"), []byte("profile"), 0o644)
 		}
 		fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
-		_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
+		_, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: defaultBuildTimeout}))
 		if calls := fixture.sourceAwareCalls(); len(calls) != 1 {
 			t.Fatalf("source-aware calls = %d, the compiler must not start", len(calls))
 		}

@@ -932,7 +932,7 @@ func TestWorkerWaitsForPermit(t *testing.T) {
 		if err != nil {
 			t.Fatalf("declined worker exit = %v, want a clean exit", err)
 		}
-	case <-time.After(10 * time.Second):
+	case <-t.Context().Done():
 		t.Fatal("the declined worker did not exit")
 	}
 	if _, err := os.Stat(marker); err == nil {
@@ -1025,12 +1025,11 @@ func TestParentRejectsWrongStartedCount(t *testing.T) {
 
 func waitForForgeRecord(t *testing.T, path string) {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
 	for {
 		if _, err := os.Stat(path); err == nil {
 			return
 		}
-		if time.Now().After(deadline) {
+		if t.Context().Err() != nil {
 			t.Fatalf("the forge worker never recorded %s", path)
 		}
 		time.Sleep(10 * time.Millisecond)

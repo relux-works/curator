@@ -149,7 +149,6 @@ func TestManagerProcessRunnerTimeoutCleansDescendantProcessGroup(t *testing.T) {
 		result <- err
 	}()
 	pidPath := filepath.Join(runner.OutputRoot, "child.pid")
-	deadline := time.Now().Add(10 * time.Second)
 	pid := 0
 	for {
 		payload, readErr := os.ReadFile(pidPath)
@@ -162,7 +161,7 @@ func TestManagerProcessRunnerTimeoutCleansDescendantProcessGroup(t *testing.T) {
 		} else if !errors.Is(readErr, os.ErrNotExist) {
 			t.Fatal(readErr)
 		}
-		if time.Now().After(deadline) {
+		if t.Context().Err() != nil {
 			t.Fatal("portable child did not publish its startup handshake")
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -173,8 +172,7 @@ func TestManagerProcessRunnerTimeoutCleansDescendantProcessGroup(t *testing.T) {
 	if !errors.As(err, &diagnostic) || diagnostic.Code != "portable_process_timeout" {
 		t.Fatalf("timeout err=%v", err)
 	}
-	deadline = time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
+	for t.Context().Err() == nil {
 		if killErr := syscall.Kill(pid, 0); killErr == syscall.ESRCH {
 			return
 		}

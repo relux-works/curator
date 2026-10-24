@@ -169,7 +169,7 @@ func nativeCommandOutcome(t *testing.T, child *nativeCommand) (int, string) {
 			t.Fatal(err)
 		}
 		return exit.ExitCode(), child.output.String()
-	case <-time.After(40 * time.Second):
+	case <-time.After(nativeCommandWatchdog):
 		t.Fatal("production CLI did not finish after release")
 		return -1, ""
 	}

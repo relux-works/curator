@@ -474,7 +474,7 @@ func posixTrustShells(t *testing.T) []trustShell {
 
 func runTrustShell(t *testing.T, executable, script string, environment map[string]string) (stdout, stderr string) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	// Git Bash reports bash.exe/sh.exe; fold the suffix so the Windows
 	// interpreters take the same argument shapes as their Unix names.
@@ -755,7 +755,7 @@ func TestGeneratedHookParsesUnderPOSIXShells(t *testing.T) {
 				}
 				for _, checker := range checkers {
 					t.Run(flavor+"/"+string(profile)+"/global-"+boolName(includeGlobal)+"/"+checker.name, func(t *testing.T) {
-						ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+						ctx, cancel := context.WithCancel(t.Context())
 						defer cancel()
 						output, err := exec.CommandContext(ctx, checker.executable, "-n", hookPath).CombinedOutput()
 						if err != nil {

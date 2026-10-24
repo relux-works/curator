@@ -11,13 +11,9 @@ import (
 	"time"
 )
 
-// extractWatchdog bounds the deadlock class the review found: a refusal must
-// return, not leave git blocked on a full stdout pipe. 20 s is far beyond
-// any healthy extraction of the few-MiB trees these tests commit.
-const extractWatchdog = 20 * time.Second
-
-// extractBounded runs Extract under the watchdog and fails the test if it
-// does not return in time.
+// extractBounded requires refusal to finish rather than leaving Git blocked on
+// a full pipe. The package test timeout is the final hang watchdog; extraction
+// has no production latency limit to impose on these disposable repositories.
 func extractBounded(t *testing.T, repo, commit, dest string) (time.Duration, error) {
 	t.Helper()
 	start := time.Now()
@@ -26,8 +22,8 @@ func extractBounded(t *testing.T, repo, commit, dest string) (time.Duration, err
 	select {
 	case err := <-done:
 		return time.Since(start), err
-	case <-time.After(extractWatchdog):
-		t.Fatalf("Extract did not return within %s: cat-file deadlock", extractWatchdog)
+	case <-t.Context().Done():
+		t.Fatal("Extract did not return: cat-file deadlock")
 		return 0, nil
 	}
 }

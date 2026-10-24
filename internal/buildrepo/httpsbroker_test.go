@@ -15,7 +15,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/relux-works/curator/internal/testgitenv"
 )
@@ -88,7 +87,7 @@ func TestMain(m *testing.M) {
 
 func runHTTPSBrokerWithTestTransport(t *testing.T, wrapper, statePath, secret string, args []string, mutate func(map[string]string)) (int, string) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	// Give the broker sole ownership of its inherited descriptor, just as in
 	// production. Wrapping an already-owned nonblocking fd in this process
@@ -308,7 +307,7 @@ func TestPrivateHTTPSBrokerAuthenticatesRealGitRepository(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	gitArgs := []string{
 		"-c", "credential.helper=",

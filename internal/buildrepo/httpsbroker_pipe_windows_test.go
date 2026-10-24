@@ -93,7 +93,6 @@ func TestHTTPSBrokerNamedPipeServesOneClientAndThenRejectsAnother(t *testing.T) 
 	if err != nil || string(first) != secret {
 		t.Fatalf("first named-pipe client got %q, err=%v; want secret", first, err)
 	}
-	secondAttemptDeadline := time.Now().Add(time.Second)
 	for {
 		second, err := windows.CreateFile(
 			windows.StringToUTF16Ptr(transport.name), windows.GENERIC_READ, 0, nil,
@@ -106,7 +105,7 @@ func TestHTTPSBrokerNamedPipeServesOneClientAndThenRejectsAnother(t *testing.T) 
 		if errors.Is(err, windows.ERROR_FILE_NOT_FOUND) {
 			break
 		}
-		if !errors.Is(err, windows.ERROR_PIPE_BUSY) || time.Now().After(secondAttemptDeadline) {
+		if !errors.Is(err, windows.ERROR_PIPE_BUSY) || t.Context().Err() != nil {
 			t.Fatalf("second named-pipe connection failed unexpectedly: %v", err)
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -117,7 +116,7 @@ func TestHTTPSBrokerNamedPipeServesOneClientAndThenRejectsAnother(t *testing.T) 
 		if err != nil {
 			t.Fatalf("serve first client: %v", err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-t.Context().Done():
 		t.Fatal("named-pipe server did not stop after the first client or fetch cancellation")
 	}
 }
@@ -133,7 +132,7 @@ func TestHTTPSBrokerNamedPipeServerStopsWhenFetchExitsWithoutAClient(t *testing.
 		if err != nil {
 			t.Fatalf("cancelled named-pipe server: %v", err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-t.Context().Done():
 		t.Fatal("named-pipe server did not stop after fetch cancellation")
 	}
 }

@@ -291,7 +291,7 @@ func TestBusyWaitAndCancellation(t *testing.T) {
 			select {
 			case <-waiting.waiting:
 			case err := <-done:
-				t.Fatalf("busy update completed before %s: %v", action, err)
+				t.Fatalf("busy update did not wait for %s: %v", action, err)
 			}
 			if action == "cancel" {
 				cancel()
@@ -317,7 +317,7 @@ func TestBusyWaitAndCancellation(t *testing.T) {
 				// No production latency limit: the package test timeout is the final
 				// hang watchdog. Success depends on reconciliation, not scheduler speed.
 				if err = <-done; err != nil {
-					t.Fatalf("reconciled update failed: %v", err)
+					t.Fatalf("busy update did not wait for reconcile: %v", err)
 				}
 			}
 			generated, err := os.ReadFile(filepath.Join(f.home, homeRelative(f.c), "AGENTS.md"))
