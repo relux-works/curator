@@ -291,6 +291,30 @@ func AddDecl(projectRoot, name, refKind, refValue, git, source string) error {
 	if err != nil {
 		return err
 	}
+	payload, err := withDecl(obj, filePath, name, refKind, refValue, git, source)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filePath, payload, 0o644)
+}
+
+// WithDecl returns the validated declaration edit without writing shared state.
+// Installers can compile a prospective global add before publishing it.
+func WithDecl(payload []byte, filePath, name, refKind, refValue, git, source string) ([]byte, error) {
+	if err := protocoljson.Validate(payload); err != nil {
+		return nil, err
+	}
+	var obj map[string]any
+	if err := json.Unmarshal(payload, &obj); err != nil {
+		return nil, err
+	}
+	if obj == nil {
+		return nil, fmt.Errorf("%s must contain a JSON object", filePath)
+	}
+	return withDecl(obj, filePath, name, refKind, refValue, git, source)
+}
+
+func withDecl(obj map[string]any, filePath, name, refKind, refValue, git, source string) ([]byte, error) {
 	decl := map[string]any{"name": name, refKind: refValue}
 	if git != "" {
 		decl["git"] = git
@@ -312,9 +336,10 @@ func AddDecl(projectRoot, name, refKind, refValue, git, source string) error {
 	}
 	obj["skills"] = skills
 	if _, err := Parse(obj, filePath); err != nil {
-		return err
+		return nil, err
 	}
-	return writeJSON(filePath, obj)
+	data, err := json.MarshalIndent(obj, "", "  ")
+	return append(data, '\n'), err
 }
 
 // RemoveDecl removes a declaration by name.

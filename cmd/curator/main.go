@@ -1558,7 +1558,7 @@ func (c cli) cmdGlobal(args []string) int {
 		if err != nil || len(positional) < 1 {
 			return exitUsage
 		}
-		refKind, refValue := pickRef(*tag, *branch, *revision)
+		refKind, _ := pickRef(*tag, *branch, *revision)
 		if refKind == "" {
 			_, _ = fmt.Fprintln(c.stderr, "curator: specify exactly one of --tag, --branch, --revision")
 			return exitUsage
@@ -1576,19 +1576,7 @@ func (c cli) cmdGlobal(args []string) int {
 			_, _ = fmt.Fprintf(c.stderr, "curator: %s not found at %s; run 'curator global init' first\n", manifest.Name, manifest.PathIn(install.GlobalRoot(cfg.Home())))
 			return exitFail
 		}
-		info, err := envprofile.GlobalAdd(cfg.Home(), envprofile.DirectSkill{
-			Name: positional[0], Git: *git, Tag: *tag, Revision: *revision,
-		}, envprofile.PolicyFromConfig(cfg), machineFromConfig(cfg), c.profileNativeHomeResolver())
-		if err != nil {
-			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
-			return exitFail
-		}
-		_, _ = fmt.Fprintf(c.stdout, "installed global skill %s in profile %s (lock %s)\n", positional[0], info.Name, info.LockHash)
-		if err := manifest.AddDecl(install.GlobalRoot(cfg.Home()), positional[0], refKind, refValue, *git, ""); err != nil {
-			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
-			return exitFail
-		}
-		return c.runGlobalInstallModeWithProfile(cfg, nil, false, true)
+		return c.runGlobalInstallModeWithProfile(cfg, nil, false, &envprofile.DirectSkill{Name: positional[0], Git: *git, Tag: *tag, Revision: *revision})
 	case "install":
 		return c.runGlobalInstall(cfg, args[1:])
 	case "adopt":
@@ -1596,6 +1584,22 @@ func (c cli) cmdGlobal(args []string) int {
 	case "remove":
 		if len(args) < 2 {
 			return exitUsage
+		}
+		// Install holds this operation lock across profile and legacy publication.
+		// Serialize the declaration writer with that whole operation, before
+		// taking any home lock, so the publishers cannot consume different sets.
+		manager, err := managerlock.New(cfg.Home())
+		if err != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+			return exitFail
+		}
+		operation := manager.NewOperation(false)
+		defer func() { _ = operation.Close() }()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if _, err := operation.AcquireProjects(ctx, install.GlobalRoot(cfg.Home())); err != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator: acquire the global operation lock:", err)
+			return exitFail
 		}
 		if err := manifest.RemoveDecl(install.GlobalRoot(cfg.Home()), args[1]); err != nil {
 			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
@@ -1829,10 +1833,10 @@ func (c cli) runGlobalInstall(cfg *config.Config, args []string) int {
 }
 
 func (c cli) runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
-	return c.runGlobalInstallModeWithProfile(cfg, args, fetch, false)
+	return c.runGlobalInstallModeWithProfile(cfg, args, fetch, nil)
 }
 
-func (c cli) runGlobalInstallModeWithProfile(cfg *config.Config, args []string, fetch, profileAlreadyMaterialized bool) int {
+func (c cli) runGlobalInstallModeWithProfile(cfg *config.Config, args []string, fetch bool, addition *envprofile.DirectSkill) int {
 	opts, positional, all, auditMode, err := c.installFlags(args)
 	if err != nil || len(positional) != 0 || all {
 		if err == nil {
@@ -1847,14 +1851,6 @@ func (c cli) runGlobalInstallModeWithProfile(cfg *config.Config, args []string, 
 		cfgCopy.Audit.Enabled = true
 		cfgCopy.Audit.Mode = auditMode
 		cfg = &cfgCopy
-	}
-	if len(args) == 0 && !opts.DryRun && !fetch && !profileAlreadyMaterialized {
-		info, err := envprofile.GlobalInstall(cfg.Home(), envprofile.PolicyFromConfig(cfg), machineFromConfig(cfg), c.profileNativeHomeResolver())
-		if err != nil {
-			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
-			return exitFail
-		}
-		_, _ = fmt.Fprintf(c.stdout, "installed global skills from profile %s (lock %s)\n", info.Name, info.LockHash)
 	}
 	authority, err := preflightCLIExecution(context.Background(), cfg)
 	if err != nil {
@@ -1876,6 +1872,30 @@ func (c cli) runGlobalInstallModeWithProfile(cfg *config.Config, args []string, 
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
+	}
+	if len(args) == 0 && !opts.DryRun && !fetch {
+		opts.GlobalAddition = addition
+		opts.WithGlobalProfile = func(lock install.HomeLock, next func() install.Result) (install.Result, error) {
+			result := install.Result{Alias: "global", Path: install.GlobalRoot(cfg.Home())}
+			var legacyErr error
+			info, err := envprofile.GlobalSkillTransaction(cfg.Home(), envprofile.PolicyFromConfig(cfg), machineFromConfig(cfg), addition, c.profileNativeHomeResolver(), lock, func() error {
+				result = next()
+				if result.Status == "failed" {
+					legacyErr = fmt.Errorf("global legacy publication failed: %s", strings.Join(result.Errors, "; "))
+					return legacyErr
+				}
+				return nil
+			})
+			if err != nil {
+				result.Status = "failed"
+				if err != legacyErr {
+					return result, err
+				}
+			} else {
+				result.Messages = append(result.Messages, fmt.Sprintf("installed global skills from profile %s (lock %s)", info.Name, info.LockHash))
+			}
+			return result, nil
+		}
 	}
 	result := install.Global(cfg, userHome, opts)
 	c.printResult(result)

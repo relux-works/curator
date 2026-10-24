@@ -25,6 +25,7 @@ import (
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/devsub"
 	"github.com/relux-works/curator/internal/envfiles"
+	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/gitignore"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/hashing"
@@ -42,6 +43,15 @@ import (
 
 // Options control one installation run.
 type Options struct {
+	// WithGlobalProfile runs the profile and legacy publishers under one held
+	// manager-home lock after private staging and revalidation. The wrapper
+	// compensates profile state on refusal.
+	// A returned profile error stops automatic restarts, including when the
+	// continuation requested one but its compensation could not finish.
+	WithGlobalProfile func(HomeLock, func() Result) (Result, error)
+	// GlobalAddition is staged as a prospective declaration; the profile
+	// transaction publishes it only after every private build succeeds.
+	GlobalAddition *envprofile.DirectSkill
 	// Operation identifies the user-visible manager operation. The zero value
 	// is an install for existing programmatic callers.
 	Operation    Operation

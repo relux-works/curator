@@ -1,6 +1,8 @@
 package install
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,8 +14,10 @@ import (
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/devsub"
 	"github.com/relux-works/curator/internal/envfiles"
+	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/globalbins"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/hashing"
@@ -72,8 +76,8 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 	//
 	// The machine-wide manifest lives under GlobalRoot(home), which is this
 	// run's own operation identity, but that proves nothing about it:
-	// `curator global add` and `curator global remove` rewrite it through
-	// manifest.AddDecl and manifest.RemoveDecl without taking that lock. It is
+	// CLI declaration writers share that project lock, but manual edits may
+	// still change the document during private compilation. It is
 	// therefore observed exactly like a project manifest: one read, and the
 	// generation recorded for it is the generation of the bytes that read
 	// returned, so a declaration that moves during the run restarts closure
@@ -94,6 +98,21 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 	if globalManifest.SchemaVersion != manifest.SchemaVersion {
 		result.failf("global: Skillfile schema %d is unsupported; global scope requires schema %d", globalManifest.SchemaVersion, manifest.SchemaVersion)
 		return result, nil
+	}
+
+	if addition := opts.GlobalAddition; addition != nil {
+		kind, value := "tag", addition.Tag
+		if addition.Revision != "" {
+			kind, value = "revision", addition.Revision
+		}
+		globalManifestPayload, err = manifest.WithDecl(globalManifestPayload, manifest.PathIn(GlobalRoot(home)), addition.Name, kind, value, addition.Git, "")
+		if err == nil {
+			globalManifest, err = manifest.ParseBytes(globalManifestPayload, manifest.PathIn(GlobalRoot(home)))
+		}
+		if err != nil {
+			result.failf("%v", err)
+			return result, nil
+		}
 	}
 
 	agents := globalManifest.Agents
@@ -389,40 +408,87 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 			return result, nil
 		}
 	}
-	outcome, commitErr := runCommit(opts.context(), commitRequest{
-		scope:    "global",
-		home:     home,
-		deps:     deps,
-		commit:   commit,
-		plan:     plan,
-		staged:   staged,
-		observed: observed,
-		stageTargets: func(scoped scopeCommit) (scopeTargets, error) {
-			// A migrated node publishes its script runtime under the
-			// source-v1 key of the same staged package its marker
-			// records; every other node keeps the commit-keyed leaf.
-			var runtimeKeys map[string]string
-			if legacy != nil {
-				runtimeKeys = legacy.RuntimeKeys
-			}
-			return stageGlobalTargets(globalTargetRequest{
-				cfg: cfg, home: home, userHome: userHome, platform: platform,
-				nodes: nodes, agents: agents, effectiveLocale: effectiveLocale,
-				mcpFound: mcpFound, attestations: registryResult.Attestations,
-				skillsDir: skillsDir, binDir: binDir,
-				plan: plan, deps: deps, scoped: scoped,
-				external: externalStaged, externalStoreRoot: externalPlan.deps.StoreRoot,
-				runtimeKeys: runtimeKeys, legacy: legacy,
-			})
-		},
-	})
-	result.Messages = append(result.Messages, outcome.messages...)
-	result.Messages = append(result.Messages, outcome.warnings...)
-	result.BuildCacheRetained = outcome.retainedBuilds
-	if commitErr != nil {
-		return result.failCommit(externalTransactionFailure(commitErr, externalStaged))
+	// No shared publication, including the profile continuation, may precede
+	// verified private staging. Revalidate before the profile can mutate state.
+	var publicationHome HomeLock
+	if opts.WithGlobalProfile != nil {
+		lock, err := commit.Locks.AcquireHome(opts.context())
+		if err != nil {
+			result.failf("acquire the manager-home lock: %v", err)
+			return result, nil
+		}
+		defer func() { _ = lock.Close() }()
+		if err := commit.Journal.Recover(lock); err != nil {
+			result.failf("%v", err)
+			return result, nil
+		}
+		if restart := observed.recheck(plan, deps.Cache); restart != nil {
+			return result, restart
+		}
+		publicationHome = lock
+		commit.Locks = globalHeldLocks{LockBroker: commit.Locks, home: lock}
 	}
-	return result, nil
+	publish := func() Result {
+		if opts.GlobalAddition != nil {
+			// The paired profile transaction has just published this exact
+			// prospective edit. Advance only that observation, from one read;
+			// arbitrary declaration changes must still refuse and compensate.
+			document, err := readDocument(manifest.PathIn(GlobalRoot(home)))
+			if err != nil || !bytes.Equal(document.payload, globalManifestPayload) {
+				result.failf("global declaration differs from the staged addition: %v", err)
+				return result
+			}
+			observed.observeDocument(globalManifestKey, manifest.PathIn(GlobalRoot(home)), document.generation)
+		}
+		outcome, commitErr := runCommit(opts.context(), commitRequest{
+			scope:    "global",
+			home:     home,
+			deps:     deps,
+			commit:   commit,
+			plan:     plan,
+			staged:   staged,
+			observed: observed,
+			stageTargets: func(scoped scopeCommit) (scopeTargets, error) {
+				// A migrated node publishes its script runtime under the
+				// source-v1 key of the same staged package its marker
+				// records; every other node keeps the commit-keyed leaf.
+				var runtimeKeys map[string]string
+				if legacy != nil {
+					runtimeKeys = legacy.RuntimeKeys
+				}
+				return stageGlobalTargets(globalTargetRequest{
+					cfg: cfg, home: home, userHome: userHome, platform: platform,
+					nodes: nodes, agents: agents, effectiveLocale: effectiveLocale,
+					mcpFound: mcpFound, attestations: registryResult.Attestations,
+					skillsDir: skillsDir, binDir: binDir,
+					plan: plan, deps: deps, scoped: scoped,
+					external: externalStaged, externalStoreRoot: externalPlan.deps.StoreRoot,
+					runtimeKeys: runtimeKeys, legacy: legacy,
+				})
+			},
+		})
+		result.Messages = append(result.Messages, outcome.messages...)
+		result.Messages = append(result.Messages, outcome.warnings...)
+		result.BuildCacheRetained = outcome.retainedBuilds
+		if commitErr != nil {
+			result, restart = result.failCommit(externalTransactionFailure(commitErr, externalStaged))
+			if restart != nil && opts.WithGlobalProfile != nil {
+				result.failf("%v", restart)
+			}
+		}
+		return result
+	}
+	if opts.WithGlobalProfile != nil {
+		var profileErr error
+		result, profileErr = opts.WithGlobalProfile(publicationHome, publish)
+		if profileErr != nil {
+			restart = nil
+			result.failf("%v", profileErr)
+		}
+	} else {
+		result = publish()
+	}
+	return result, restart
 }
 
 // globalTargetRequest is the scope-specific input of global target staging.
@@ -549,9 +615,23 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
 	targets.plan.Merge(envPlan)
 
 	sort.Strings(contextNames)
-	mirror, err := adapters.StageGlobal(
+	identities := map[string]*contextlock.Member{}
+	for _, node := range request.nodes {
+		directory := normalizedNodeDirectory(node)
+		if directory == "." {
+			directory = ""
+		}
+		identities[node.Name] = &contextlock.Member{
+			Kind: contextlock.KindSkill, Name: node.Name, Source: node.Identity,
+			Commit: node.Resolved.Commit, Directory: directory,
+		}
+	}
+	mirror, err := adapters.StageGlobalWithOwnership(
 		stageRoot, request.home, request.userHome, request.agents, contextNames, request.cfg.AdapterMode,
-		contextSources(targets.plan, request.skillsDir, contextNames), admitted)
+		contextSources(targets.plan, request.skillsDir, contextNames), admitted,
+		func(adapterRoot, name string) (bool, error) {
+			return envprofile.OwnsNativeSkill(request.home, adapterRoot, name, identities[name])
+		})
 	if err != nil {
 		return scopeTargets{}, err
 	}
@@ -572,4 +652,27 @@ func GlobalInit(home string) (string, error) {
 		return "", err
 	}
 	return manifest.EnsureEmpty(root)
+}
+
+// globalHeldLocks borrows a lock owned by the enclosing paired publication.
+// Project locks were already acquired before that home lock; inner recovery
+// and commit may assert it but cannot release it between the two publishers.
+type globalHeldLocks struct {
+	LockBroker
+	home HomeLock
+}
+
+func (locks globalHeldLocks) AcquireHome(_ context.Context) (HomeLock, error) {
+	return globalBorrowedHome{locks.home}, locks.home.AssertHeld()
+}
+
+type globalBorrowedHome struct{ HomeLock }
+
+func (globalBorrowedHome) Close() error { return nil }
+
+func (lock globalBorrowedHome) AssertCurrent() error {
+	if current, ok := lock.HomeLock.(interface{ AssertCurrent() error }); ok {
+		return current.AssertCurrent()
+	}
+	return fmt.Errorf("global operation requires current manager lock")
 }

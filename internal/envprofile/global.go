@@ -2,6 +2,7 @@ package envprofile
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -12,11 +13,12 @@ import (
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/manifest"
 )
 
 // DirectSkill is one machine-level direct skill declaration accepted by the
-// global skill commands. The lock stores the resolved commit; its source and
-// revision are sufficient to replay that exact declaration later.
+// global skill commands. Current Skillfile declarations carry the machine
+// constraints; the lock records their resolved result.
 type DirectSkill struct {
 	Name     string
 	Git      string
@@ -35,18 +37,25 @@ func GlobalAdd(home string, skill DirectSkill, policy Policy, machine envregistr
 	return globalSkillOperation(home, policy, machine, &skill, nativeHomeOf)
 }
 
-// GlobalInstall replays the current profile lock's resolved skill members and
-// materializes them. It is also the retry path after a sync takeover.
+// GlobalInstall resolves the current Skillfile and live profile requirements,
+// then materializes them. Previous resolved members are not declarations.
 func GlobalInstall(home string, policy Policy, machine envregistry.MachineConfig, nativeHomeOf func(string) (string, error)) (Info, error) {
 	return globalSkillOperation(home, policy, machine, nil, nativeHomeOf)
 }
 
 func globalSkillOperation(home string, policy Policy, machine envregistry.MachineConfig, addition *DirectSkill, nativeHomeOf func(string) (string, error)) (Info, error) {
-	op, err := beginOperation(home)
+	return globalSkillOperationWithOperation(home, policy, machine, addition, nativeHomeOf, nil)
+}
+
+func globalSkillOperationWithOperation(home string, policy Policy, machine envregistry.MachineConfig, addition *DirectSkill, nativeHomeOf func(string) (string, error), borrowed *operation) (Info, error) {
+	op, err := borrowed, error(nil)
+	if op == nil {
+		op, err = beginOperation(home)
+	}
 	if err != nil {
 		return Info{}, err
 	}
-	closed := false
+	closed := borrowed != nil
 	closeOperation := func() {
 		if !closed {
 			_ = op.close()
@@ -54,11 +63,17 @@ func globalSkillOperation(home string, policy Policy, machine envregistry.Machin
 		}
 	}
 	defer closeOperation()
+	if err := op.capture(ProfileDir(home, DefaultProfile), CurrentFile(home)); err != nil {
+		return Info{}, err
+	}
 	if err := ensureDefault(op, home, policy); err != nil {
 		return Info{}, err
 	}
 	profile, err := currentOrDefault(home)
 	if err != nil {
+		return Info{}, err
+	}
+	if err := op.capture(ProfileDir(home, profile)); err != nil {
 		return Info{}, err
 	}
 	source, err := readSource(home, profile)
@@ -102,6 +117,11 @@ func globalSkillOperation(home string, policy Policy, machine envregistry.Machin
 		}
 	}
 	info := Info{Name: profile, Source: source, Lock: result.Lock, LockHash: newHash, Current: true, Warnings: warnings}
+	for _, adapter := range envregistry.Registry {
+		if err := op.noteParents(filepath.Join(ManagedHomeDir(home, profile, adapter.ID), envmarker.Name)); err != nil {
+			return info, err
+		}
+	}
 	// Preflight both managed and in-place homes while the manager lock is held.
 	// A static unmanaged conflict is found before any surface is written, while
 	// the extended lock and immutable entries are already published.
@@ -109,7 +129,7 @@ func globalSkillOperation(home string, policy Policy, machine envregistry.Machin
 		return info, err
 	}
 	if err := preflightInPlaceScope(home, profile, "", policy, nativeHomeOf); err != nil {
-		return info, err
+		return info, globalInPlaceError(err)
 	}
 	nativeResults, err := materializeScopeWithNativeHome(op, home, profile, "", policy, nativeHomeOf)
 	if err != nil {
@@ -117,11 +137,11 @@ func globalSkillOperation(home string, policy Policy, machine envregistry.Machin
 	}
 	for _, result := range nativeResults {
 		if !result.OK {
-			return info, fmt.Errorf("%s", result.Detail)
+			return info, globalInPlaceError(fmt.Errorf("%s", result.Detail))
 		}
 	}
 	closeOperation()
-	if _, err := syncManagedProfile(home, profile, policy, machine, nativeHomeOf); err != nil {
+	if _, err := syncManagedProfileWithOperation(home, profile, policy, machine, nativeHomeOf, borrowed); err != nil {
 		return info, err
 	}
 	return info, nil
@@ -181,19 +201,31 @@ func globalSkillInput(home, profile string, source Source, oldLock *contextlock.
 	}
 	input.Overlays = overlays
 	input.MCPAllowlist = policy.MCPAllowlist
-	for _, member := range oldLock.Members {
-		if member.Kind != contextlock.KindSkill {
-			continue
+	// Exact Skillfile declarations constrain the selected profile alongside its
+	// requirements (§9.4). Resolve disagreements before any surface is written;
+	// a late adapter conflict would already have rematerialized the old profile.
+	global, err := manifest.Load(filepath.Join(home, "global"))
+	if err != nil {
+		return contextresolve.Input{}, fmt.Errorf("%s: global Skillfile: %v", DiagSourceInvalid, err)
+	}
+	if global != nil {
+		for _, decl := range global.Skills {
+			if decl.Git == "" || (decl.Ref.Kind != "tag" && decl.Ref.Kind != "revision") || (addition != nil && decl.Name == addition.Name) {
+				continue
+			}
+			identity, err := canonicalGit(decl.Git)
+			if err != nil {
+				return contextresolve.Input{}, fmt.Errorf("%s: global skill %q: %v", DiagSourceInvalid, decl.Name, err)
+			}
+			manager.recordRaw(identity, decl.Git)
+			requirement := contextresolve.Requirement{Kind: contextlock.KindSkill, Name: decl.Name, Source: identity}
+			if decl.Ref.Kind == "tag" {
+				requirement.Tag = decl.Ref.Value
+			} else {
+				requirement.Revision = decl.Ref.Value
+			}
+			input.Direct = append(input.Direct, requirement)
 		}
-		if addition != nil && member.Name == addition.Name {
-			continue
-		}
-		if member.Source == "" || member.Commit == "" {
-			return contextresolve.Input{}, fmt.Errorf("%s: skill %q in profile %q lock has no replayable Git pin", DiagSourceInvalid, member.Name, profile)
-		}
-		input.Direct = append(input.Direct, contextresolve.Requirement{
-			Kind: contextlock.KindSkill, Name: member.Name, Source: member.Source, Revision: member.Commit, Directory: member.Directory,
-		})
 	}
 	if addition != nil {
 		identity, err := canonicalGit(addition.Git)
@@ -297,6 +329,10 @@ func preflightManagedProfile(home, profile string, policy Policy, machine envreg
 }
 
 func syncManagedProfile(home, profile string, policy Policy, machine envregistry.MachineConfig, nativeHomeOf func(string) (string, error)) ([]EntryResult, error) {
+	return syncManagedProfileWithOperation(home, profile, policy, machine, nativeHomeOf, nil)
+}
+
+func syncManagedProfileWithOperation(home, profile string, policy Policy, machine envregistry.MachineConfig, nativeHomeOf func(string) (string, error), op *operation) ([]EntryResult, error) {
 	var results []EntryResult
 	var failures []string
 	for _, adapter := range envregistry.Registry {
@@ -312,7 +348,7 @@ func syncManagedProfile(home, profile string, policy Policy, machine envregistry
 		}
 		_, err = Resolve(ResolveRequest{
 			Home: home, Profile: profile, EnvID: adapter.ID, Machine: machine,
-			Repair: true, Policy: policy, NativeHomeOf: nativeHomeOf,
+			Repair: true, Policy: policy, NativeHomeOf: nativeHomeOf, borrowedOperation: op,
 		})
 		result := EntryResult{Adapter: adapter.ID, Home: ManagedHomeDir(home, profile, adapter.ID), OK: err == nil}
 		if err != nil {

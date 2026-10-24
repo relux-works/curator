@@ -45,7 +45,7 @@ const (
 // instead of a mock.
 func TestMain(m *testing.M) {
 	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
-		os.Exit(godriver.RunWorker(os.Stdin, os.Stdout))
+		os.Exit(runNativeBuildWorker())
 	}
 	// Before any branch that runs tests: a CLI helper child runs git too.
 	restoreGitEnv := testgitenv.Isolate()

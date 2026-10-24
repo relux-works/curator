@@ -190,6 +190,12 @@ curator global update   # update global source repositories
 curator global upgrade  # upgrade global skill packages
 ```
 
+Global removal serializes with install/add across profile and legacy publication.
+It edits the declaration; the next install reconciles installed surfaces.
+Private compilation retains the global operation lock while leaving the manager-home
+lock available to profile sync. Both publishers revalidate and commit under the
+home lock after staged builds succeed.
+
 </details>
 
 <details>
@@ -318,6 +324,12 @@ Run the seed and carrier checks with
 Go writes test artifacts to its configured cache and disposable test directories;
 validation logs belong under `.temp/`.
 
+Native profile/global ownership regression checks run separately with
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./cmd/curator -run '^TestGlobalNativeOwner'`,
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envprofile -run '^TestNativeSkillOwner'`,
+and `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/adapters -run '^TestGlobalProfileOwner'`.
+They use temporary homes; keep validation logs under `.temp/`. See
+[native profile skills](docs/native-profile-skills.md) for the ownership contract.
 
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.
@@ -353,6 +365,12 @@ Run `go test ./internal/audit -run 'Test(GateEffectiveCapabilityCacheCrossover|C
 for both cache orders, v1/v2 framing, and behavioral narrowing mutants. Run
 `go test ./internal/skillspec -run TestCapabilitiesNullRejectedFromV3`
 for schema-3-through-9 capability-object and purpose-statement validation.
+Run `go test ./internal/envprofile -run '^TestGlobalProfileCompensation' -count=1`
+for exact postimage, byte, mode, owner-identity, absence and no-follow compensation
+witnesses, including parent chmod and empty-directory preservation.
+Run `go test ./cmd/curator -run '^TestGlobalNativeOwnerCompensation' -count=1`
+for production restart, failed compensation, operator replacement, parent chmod
+and pending profile-lock recovery controls. Temporary logs belong under `.temp/`.
 Run `go test ./internal/envprofile -run 'Test(StrictAuditMemberCapabilityCacheIsolation|MigratedGlobalSkillNetworkCapabilities)'`
 for migration admission and cache isolation between skill, context and MCP
 members. Cache ruleset 4 separates these verdicts from rulesets 2 and 3 without
