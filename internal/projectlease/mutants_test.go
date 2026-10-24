@@ -22,6 +22,7 @@ func TestLeaseNarrowingMutants(t *testing.T) {
 		goTool = "go"
 	}
 	cases := []struct{ name, file, before, after, pkg, run, message string }{
+		{"acquisition-returns-before-lock", "internal/projectlease/manager.go", "func (m *Manager) Acquire(ctx context.Context, r Request) (Binding, error) {", "func (m *Manager) Acquire(ctx context.Context, r Request) (Binding, error) {\n if r.LeaseID == \"two\" { return Binding{}, nil }", "projectlease", "TestPublicationSerializesLeaseAcquisition", "acquisition passed an in-flight update:"},
 		{"busy-update-does-not-retry", "internal/projectlease/manager.go", "case <-timer.C:\n\t\t}", "case <-timer.C: return lastBusy\n\t\t}", "projectlease", "TestBusyWaitAndCancellation/reconcile", "reconciled update failed:"},
 		{"consumer-pruning-acquisition", "internal/scopes/consumers.go", "if err := check(); err != nil {\n\t\treturn err\n\t}\n\treturn os.WriteFile(filepath.Join(home, ConsumersName), payload, 0o644)", "return os.WriteFile(filepath.Join(home, ConsumersName), payload, 0o644)", "scopes", "TestGCPruningRetainsOwnership", "stale pruning overwrote registry"},
 
