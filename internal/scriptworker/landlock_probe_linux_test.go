@@ -140,8 +140,8 @@ func TestLandlockProbeCancellationKillsProcessGroup(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer release.Close()
-			defer hold.Close()
+			defer func() { _ = release.Close() }()
+			defer func() { _ = hold.Close() }()
 			if err := os.WriteFile(manager, []byte("#!/bin/sh\n/bin/sh -c 'read release <&3' &\necho $! > \"$2/descendant\"\nwait\n"), 0o700); err != nil {
 				t.Fatal(err)
 			}

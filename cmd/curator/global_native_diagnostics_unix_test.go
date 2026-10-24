@@ -105,8 +105,8 @@ func TestNativeCommandTimeoutDiagnostics(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer ready.Close()
-			defer writer.Close()
+			defer func() { _ = ready.Close() }()
+			defer func() { _ = writer.Close() }()
 			child.cmd.ExtraFiles = []*os.File{writer}
 			child.cmd.Stdout = &child.output
 			child.cmd.Stderr = &child.output
