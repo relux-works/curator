@@ -20,6 +20,7 @@ import (
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/sourcelock"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 const draftStatusPayload = `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
@@ -38,7 +39,7 @@ func pinV1MarkerWriters(t *testing.T) {
 // returns the config path and project root.
 func setupDraftStatusProject(t *testing.T) (configPath, project string) {
 	t.Helper()
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	configPath, project = setupCLIProject(t, root)
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(draftStatusPayload), 0o644); err != nil {
 		t.Fatal(err)
@@ -289,7 +290,7 @@ func TestDraftStatusStaleManifestRefuses(t *testing.T) {
 // resolved nor installed, so status prints the refusal and --check is
 // nonzero — never an empty, silent success.
 func TestDraftStatusStaleEmptyLockRefuses(t *testing.T) {
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	configPath, project := setupCLIProject(t, root)
 	empty := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[]}`
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(empty), 0o644); err != nil {

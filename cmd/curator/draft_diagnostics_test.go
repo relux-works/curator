@@ -21,6 +21,7 @@ import (
 	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/sourcelock"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 // Documented acquisition shapes (docs/cli.md, README.md). Absolute and
@@ -181,7 +182,7 @@ func TestEndpointExhaustionCarriesRemediation(t *testing.T) {
 // The flag spellings print the schema-2 workflow; the bare word "help"
 // continues to resolve as a project alias.
 func TestDraftProjectResolveHelp(t *testing.T) {
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	configPath, _ := setupCLIProject(t, root)
 	helpDir := filepath.Join(root, "help")
 	if err := os.MkdirAll(helpDir, 0o755); err != nil {
@@ -301,7 +302,7 @@ func TestDraftDocumentedLocalShapesThroughCLI(t *testing.T) {
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
-			root := t.TempDir()
+			root := testgitenv.ShortTempDir(t)
 			configPath, project := setupCLIProject(t, root)
 			t.Setenv("CURATOR_CONFIG", configPath)
 			pkgs := filepath.Join(project, "pkgs")
@@ -357,7 +358,7 @@ func quotePath(path string) string {
 // machine source-policy.json from the test home, never the operator's.
 func setupRemediationProject(t *testing.T) (configPath, project, home string) {
 	t.Helper()
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	configPath, project = setupCLIProject(t, root)
 	t.Setenv("CURATOR_CONFIG", configPath)
 	writeCLISkill(t, filepath.Join(project, "pkgs", "review"), "review")
@@ -719,7 +720,7 @@ func withDraftGitArms(t *testing.T, failingURL, failingStderr, rewriteURL, bare 
 // installed marker binds the policy-selected commit. A malformed pin in
 // the same file fails closed with remediation and publishes nothing.
 func TestDraftMachinePolicySetupThroughCLI(t *testing.T) {
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	bare, commit := setupKitBare(t, root)
 	const declaredURL = "https://fixture.test/kit.git"
 	withRewrittenGitURL(t, declaredURL, bare)
@@ -781,7 +782,7 @@ func TestDraftMachinePolicySetupThroughCLI(t *testing.T) {
 // TestDraftDocumentedGitRevisionThroughCLI runs the documented revision
 // pin through the real verbs: resolve, install, and status.
 func TestDraftDocumentedGitRevisionThroughCLI(t *testing.T) {
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	bare, commit := setupKitBare(t, root)
 	const declaredURL = "https://fixture.test/kit.git"
 	withRewrittenGitURL(t, declaredURL, bare)
@@ -852,7 +853,7 @@ func TestDraftAvailabilityFallbackThroughCLI(t *testing.T) {
 	const failingURL = "https://fixture.test/kit.git"
 	const failingFatal = "fatal: unable to access 'https://fixture.test/kit.git/': Could not resolve host: fixture.test"
 	const alternateURL = "git@fixture.test:kit.git"
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	bare, commit := setupKitBare(t, root)
 	withDraftGitArms(t, failingURL, failingFatal, alternateURL, bare)
 
@@ -936,7 +937,7 @@ func TestDraftLaunchConsumesFrozenRuntimeThroughCLI(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("executes POSIX skill commands")
 	}
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	configPath, project := setupCLIProject(t, root)
 	t.Setenv("CURATOR_CONFIG", configPath)
 	scriptDir := filepath.Join(project, "pkgs", "review")

@@ -31,6 +31,7 @@ import (
 	"github.com/relux-works/curator/internal/rustsource"
 	"github.com/relux-works/curator/internal/scriptworker"
 	"github.com/relux-works/curator/internal/stateread"
+	"github.com/relux-works/curator/internal/testgitenv"
 	"github.com/relux-works/curator/internal/version"
 )
 
@@ -1101,7 +1102,7 @@ func buildHTTPSGitHome(t *testing.T) string {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not available")
 	}
-	home := t.TempDir()
+	home := testgitenv.ShortTempDir(t)
 	if err := os.WriteFile(filepath.Join(home, ".gitconfig"), []byte("[credential]\n\thelper = store\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}

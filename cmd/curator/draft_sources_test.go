@@ -24,6 +24,7 @@ import (
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/sourcelock"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 func writeCLISkill(t *testing.T, dir, name string) {
@@ -91,7 +92,7 @@ func setupCLIProject(t *testing.T, root string) (configPath, project string) {
 }
 
 func TestProjectResolveLocalCreatesLockThroughCLI(t *testing.T) {
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	configPath, project := setupCLIProject(t, root)
 	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
@@ -163,7 +164,7 @@ func TestProjectResolveLocalCreatesLockThroughCLI(t *testing.T) {
 }
 
 func TestProjectResolveSchema1KeepsReadOnlyMeaning(t *testing.T) {
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	configPath, project := setupCLIProject(t, root)
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(`{"schema_version":1,"agents":["codex_cli"],"skills":[]}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -181,7 +182,7 @@ func TestProjectResolveSchema1KeepsReadOnlyMeaning(t *testing.T) {
 
 func TestProjectResolveIgnoresRemovedSwitch(t *testing.T) {
 	t.Setenv("CURATOR_DRAFT_SOURCES_V1", "0")
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	configPath, project := setupCLIProject(t, root)
 	payload := `{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["review"]}]}`
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
@@ -221,7 +222,7 @@ func TestProjectResolveGitSelectionThroughCLI(t *testing.T) {
 	if err != nil {
 		t.Skip("git is not available")
 	}
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	// Fixture repository holding one package under skills/review.
 	work := filepath.Join(root, "kit-work")
 	bare := filepath.Join(root, "kit.git")
@@ -302,7 +303,7 @@ func setupScriptGitCLI(t *testing.T) (configPath, project, commit, cachedScript,
 	if err != nil {
 		t.Skip("git is not available")
 	}
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	work := filepath.Join(root, "kit-work")
 	bare = filepath.Join(root, "kit.git")
 	if err := os.MkdirAll(work, 0o755); err != nil {
@@ -419,7 +420,7 @@ const cliConsumerPayload = `{"schema_version":2,"sources":{"s":{"path":"."}},"sk
 // temp config's skills root, so the explicit attempt must resolve with
 // zero acquisitions and the frozen install must stay green.
 func TestProjectResolveTransitiveProviderUsesConfiguredRootThroughCLI(t *testing.T) {
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	configPath, project := setupCLIProject(t, root)
 	initCLIProviderRepo(t, filepath.Join(root, "skills-root", "provider"))
 	writeCLIConsumerSkill(t, filepath.Join(project, "pkgs", "review"), "review")
@@ -451,7 +452,7 @@ func TestProjectResolveTransitiveProviderUsesConfiguredRootThroughCLI(t *testing
 // CWD while the configured root has none, so the explicit attempt must
 // fall through to acquisition and fail instead of finding the CWD copy.
 func TestProjectResolveTransitiveProviderIgnoresProcessCWDThroughCLI(t *testing.T) {
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	configPath, project := setupCLIProject(t, root)
 	writeCLIConsumerSkill(t, filepath.Join(project, "pkgs", "review"), "review")
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(cliConsumerPayload), 0o644); err != nil {
@@ -547,7 +548,7 @@ func TestProjectResolveGitAliasSelectionThroughCLI(t *testing.T) {
 	if err != nil {
 		t.Skip("git is not available")
 	}
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	work := filepath.Join(root, "kit-work")
 	bare := filepath.Join(root, "kit.git")
 	if err := os.MkdirAll(work, 0o755); err != nil {
@@ -643,7 +644,7 @@ func initCLILegacyRepo(t *testing.T, dir, name string) {
 func TestProjectResolveLegacyConfiguredGitThroughCLI(t *testing.T) {
 	for _, mode := range []string{"default", "custom-source"} {
 		t.Run(mode, func(t *testing.T) {
-			root := t.TempDir()
+			root := testgitenv.ShortTempDir(t)
 			configPath, project := setupCLIProject(t, root)
 			skillsRoot := filepath.Join(root, "skills-root")
 			source := "review"
@@ -709,7 +710,7 @@ func TestProjectResolveLegacyConfiguredGitThroughCLI(t *testing.T) {
 func TestProjectResolveLegacyNetworkGitThroughCLI(t *testing.T) {
 	for _, mode := range []string{"default", "custom-source"} {
 		t.Run(mode, func(t *testing.T) {
-			root := t.TempDir()
+			root := testgitenv.ShortTempDir(t)
 			configPath, project := setupCLIProject(t, root)
 			skillsRoot := filepath.Join(root, "skills-root")
 			source := "review"
@@ -779,7 +780,7 @@ func TestProjectResolveLegacyNetworkGitThroughCLI(t *testing.T) {
 // schema-2 marker); real-install and pinned-reinstall coverage for the
 // legacy member lives in the dedicated legacy tests above.
 func TestProjectResolveLegacyMixedThroughCLI(t *testing.T) {
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	configPath, project := setupCLIProject(t, root)
 	skillsRoot := filepath.Join(root, "skills-root")
 	initCLILegacyRepo(t, filepath.Join(skillsRoot, "legacy-review"), "legacy-review")
@@ -885,7 +886,7 @@ func cloneBareResolveCommit(t *testing.T, root, work, declaredURL, realGit strin
 // attempt; the pinned resolve must lock tag v1 and install it for real.
 func TestProjectResolveGitTagDiffersFromHEADThroughCLI(t *testing.T) {
 	realGit := requireRealGit(t)
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	work := filepath.Join(root, "kit-work")
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		t.Fatal(err)
@@ -934,7 +935,7 @@ func TestProjectResolveGitTagDiffersFromHEADThroughCLI(t *testing.T) {
 // local bare repository behind the same fixture-only Git shim used above.
 func TestProjectResolveCanonicalRepositorySourceThroughCLI(t *testing.T) {
 	realGit := requireRealGit(t)
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	work := filepath.Join(root, "kit-work")
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		t.Fatal(err)
@@ -982,7 +983,7 @@ func TestProjectResolveCanonicalRepositorySourceThroughCLI(t *testing.T) {
 // lock alpha alone; the pinned resolve must lock both and consume them.
 func TestProjectResolveGitCollectionPinnedToTagThroughCLI(t *testing.T) {
 	realGit := requireRealGit(t)
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	work := filepath.Join(root, "kit-work")
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		t.Fatal(err)
@@ -1037,7 +1038,7 @@ func TestProjectResolveGitCollectionPinnedToTagThroughCLI(t *testing.T) {
 // pinned reinstall.
 func TestProjectRefreshGitBranchMembershipChangeThroughCLI(t *testing.T) {
 	realGit := requireRealGit(t)
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	work := filepath.Join(root, "kit-work")
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		t.Fatal(err)
@@ -1202,7 +1203,7 @@ func TestProjectResolveDraftAllowlistLegacyThroughCLI(t *testing.T) {
 	realGit := requireRealGit(t)
 	const deniedURL = "https://denied.test/review.git"
 	t.Run("denied", func(t *testing.T) {
-		root := t.TempDir()
+		root := testgitenv.ShortTempDir(t)
 		configPath, project := setupCLIProject(t, root)
 		setCLIAllowedSources(t, configPath, []string{"allowed.test"})
 		home := filepath.Dir(configPath)
@@ -1240,7 +1241,7 @@ func TestProjectResolveDraftAllowlistLegacyThroughCLI(t *testing.T) {
 		}
 	})
 	t.Run("allowed", func(t *testing.T) {
-		root := t.TempDir()
+		root := testgitenv.ShortTempDir(t)
 		configPath, project := setupCLIProject(t, root)
 		setCLIAllowedSources(t, configPath, []string{"denied.test"})
 		skillsRoot := filepath.Join(root, "skills-root")
@@ -1275,7 +1276,7 @@ func TestProjectResolveDraftAllowlistTransitiveThroughCLI(t *testing.T) {
 	realGit := requireRealGit(t)
 	const providerURL = "https://denied.test/provider.git"
 	t.Run("denied", func(t *testing.T) {
-		root := t.TempDir()
+		root := testgitenv.ShortTempDir(t)
 		configPath, project := setupCLIProject(t, root)
 		setCLIAllowedSources(t, configPath, []string{"allowed.test"})
 		home := filepath.Dir(configPath)
@@ -1313,7 +1314,7 @@ func TestProjectResolveDraftAllowlistTransitiveThroughCLI(t *testing.T) {
 		}
 	})
 	t.Run("allowed", func(t *testing.T) {
-		root := t.TempDir()
+		root := testgitenv.ShortTempDir(t)
 		configPath, project := setupCLIProject(t, root)
 		setCLIAllowedSources(t, configPath, []string{"denied.test"})
 		initCLIProviderRepo(t, filepath.Join(root, "skills-root", "provider"))
@@ -1421,7 +1422,7 @@ func setupLegacyBranchRefresh(t *testing.T, payload string) (configPath, project
 // to succeed there.
 func setupLegacyBranchRefreshWithSkill(t *testing.T, payload string, writeSkill func(t *testing.T, dir, name string)) (configPath, project, home, work, bare, checkout, oldCommit string) {
 	t.Helper()
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	work = filepath.Join(root, "upstream-work")
 	writeSkill(t, work, "review")
 	runGit(t, work, "init", "-q", "-b", "main")
@@ -1603,7 +1604,7 @@ func TestProjectRefreshLegacyNetworkGitBranchThroughCLI(t *testing.T) {
 // stays stale, so only a fetch of the transitive repository can resolve
 // the refresh.
 func TestProjectRefreshTransitiveTagAdvanceThroughCLI(t *testing.T) {
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	const providerURL = "https://fixture.test/provider.git"
 	providerWork := filepath.Join(root, "provider-work")
 	writeCLISkill(t, providerWork, "provider")
@@ -1834,7 +1835,7 @@ func TestProjectRefreshRemoteEnumerationFailurePreservesStateThroughCLI(t *testi
 // succeeds from the local tag while the git call log carries no fetch.
 func TestProjectResolveOriginLessSkipsFetchThroughCLI(t *testing.T) {
 	realGit := requireRealGit(t)
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	configPath, project := setupCLIProject(t, root)
 	initCLILegacyRepo(t, filepath.Join(root, "skills-root", "review"), "review")
 	payload := `{"schema_version":2,"skills":[{"name":"review","tag":"v1"}]}`
@@ -1909,7 +1910,7 @@ func countFetchLogLines(t *testing.T, logPath string) int {
 // resolve clones, so it must fetch zero times; the refresh fetches once.
 func TestProjectRefreshAliasFetchDedupedThroughCLI(t *testing.T) {
 	realGit := requireRealGit(t)
-	root := t.TempDir()
+	root := testgitenv.ShortTempDir(t)
 	work := filepath.Join(root, "kit-work")
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		t.Fatal(err)
