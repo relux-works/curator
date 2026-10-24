@@ -77,7 +77,7 @@ func (manager *Manager) prepare() error {
 	if manager.prepared {
 		return nil
 	}
-	if err := os.MkdirAll(manager.configuredHome, 0o700); err != nil {
+	if err := prepareManagerHome(manager.configuredHome); err != nil {
 		return fmt.Errorf("create manager home: %w", err)
 	}
 	canonical, err := canonicalAbsolute(manager.configuredHome, "manager home")

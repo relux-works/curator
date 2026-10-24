@@ -13,7 +13,7 @@
 // without importing internal/buildcache (which itself depends on
 // internal/closureexec).
 //
-// The four operations deliberately mirror the call sites they serve:
+// Directory operations mirror the call sites they serve:
 //
 //   - Make creates one directory that is private the instant it becomes
 //     observable, like os.Mkdir(path, 0o700) is on Unix.
@@ -21,6 +21,8 @@
 //     creation, like os.MkdirAll(path, 0o700) is on Unix.
 //   - Validate proves an existing path is a real, unlinked, owner-only
 //     directory this manager could have created.
+//   - Prepare creates private state or adopts an owned, inheriting Windows
+//     directory while refusing an explicit foreign grant or protected drift.
 //   - Protect makes an existing directory the caller just created private,
 //     for the one case (os.MkdirTemp) where creation cannot carry the shape.
 //
@@ -51,6 +53,11 @@ func Validate(path string) error { return validatePrivate(path) }
 // creation API cannot attach the private shape atomically (os.MkdirTemp); a
 // directory created by Make or MakeAll never needs it.
 func Protect(path string) error { return protectPrivate(path) }
+
+// Prepare establishes a private owned directory. Windows can adopt an owned
+// directory with an unprotected inherited ACL, but never rewrites a protected
+// invalid ACL or an explicit foreign grant. Unix validates the existing mode.
+func Prepare(path string) error { return preparePrivate(path) }
 
 // CreateTemp creates an owner-only regular file with a unique name in dir.
 // Unlike os.CreateTemp on Windows, it attaches the owner-only DACL at file

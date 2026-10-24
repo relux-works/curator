@@ -31,6 +31,13 @@ func protectPrivate(path string) error {
 	return os.Chmod(path, 0o700) // #nosec G302 -- a private directory, not a regular file.
 }
 
+func preparePrivate(path string) error {
+	if err := makeAllPrivate(path); err != nil {
+		return err
+	}
+	return validatePrivate(path)
+}
+
 func createPrivateTempFile(dir, pattern string) (*os.File, error) {
 	return os.CreateTemp(dir, pattern)
 }

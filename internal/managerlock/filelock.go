@@ -30,14 +30,12 @@ func acquireFileLockMode(ctx context.Context, path string, onRelease func(), cre
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	flags := os.O_RDWR
 	if create {
-		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		if err := makeLockDirectories(filepath.Dir(path)); err != nil {
 			return nil, fmt.Errorf("create manager lock state: %w", err)
 		}
-		flags |= os.O_CREATE
 	}
-	file, err := os.OpenFile(path, flags, 0o600) // #nosec G304 -- path is derived below the canonical manager home
+	file, err := openManagerLock(path, create)
 	if err != nil {
 		return nil, fmt.Errorf("open manager lock: %w", err)
 	}

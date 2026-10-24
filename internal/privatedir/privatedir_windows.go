@@ -352,6 +352,10 @@ func protectPrivateFile(path string) error {
 		info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0 {
 		return fmt.Errorf("%s is not a regular, non-link file", path)
 	}
+	return protectPrivateHandle(handle, path)
+}
+
+func protectPrivateHandle(handle windows.Handle, path string) error {
 	user, err := windows.GetCurrentProcessToken().GetTokenUser()
 	if err != nil {
 		return err
@@ -368,12 +372,13 @@ func protectPrivateFile(path string) error {
 	status, _, _ := setSecurityInfo.Call(
 		uintptr(handle), uintptr(windows.SE_FILE_OBJECT),
 		uintptr(windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION),
-		uintptr(unsafe.Pointer(user.User.Sid)), 0, uintptr(unsafe.Pointer(acl)), 0,
+		uintptr(unsafe.Pointer(user.User.Sid)), 0, uintptr(unsafe.Pointer(acl)), 0, // #nosec G103 -- SetSecurityInfo receives typed, API-built SID/ACL pointers kept alive below.
 	)
 	if status != 0 {
 		return fmt.Errorf("set owner-only file DACL on %s: %w", path, syscall.Errno(status))
 	}
 	runtime.KeepAlive(acl)
+	runtime.KeepAlive(user)
 	return nil
 }
 
@@ -494,4 +499,99 @@ func openNoFollow(path string) (windows.Handle, error) {
 		return 0, &os.PathError{Op: "open", Path: path, Err: err}
 	}
 	return handle, nil
+}
+
+// preparePrivate adopts only an owned, unprotected directory. All changes
+// operate on the inspected no-follow handle; explicit foreign grants and
+// already-protected invalid descriptors are refusals, never repair inputs.
+func preparePrivate(path string) error {
+	if err := makeAllPrivate(path); err != nil {
+		return err
+	}
+	handle, err := openPrivateFile(path, windows.READ_CONTROL|windows.WRITE_DAC|windows.WRITE_OWNER)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = windows.CloseHandle(handle) }()
+	var info windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(handle, &info); err != nil {
+		return err
+	}
+	if info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY == 0 || info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+		return fmt.Errorf("%s is not a private directory", path)
+	}
+	descriptor, err := windows.GetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
+	if err != nil {
+		return err
+	}
+	control, _, err := descriptor.Control()
+	if err != nil {
+		return err
+	}
+	if control&windows.SE_DACL_PROTECTED != 0 {
+		return validatePrivateHandle(path, handle)
+	}
+	owner, _, err := descriptor.Owner()
+	if err != nil || owner == nil || !owner.IsValid() {
+		return fmt.Errorf("%s has no valid owner", path)
+	}
+	token := windows.GetCurrentProcessToken()
+	user, err := token.GetTokenUser()
+	if err != nil {
+		return err
+	}
+	defaultOwner, err := privateTokenDefaultOwner(token)
+	if err != nil {
+		return err
+	}
+	if !privateDirectoryOwnerAllowed(owner, user.User.Sid, defaultOwner) {
+		return fmt.Errorf("%s owner does not match the effective user", path)
+	}
+
+	acl, _, err := descriptor.DACL()
+	if err != nil || acl == nil {
+		return fmt.Errorf("%s has no DACL", path)
+	}
+	for index := uint32(0); index < uint32(acl.AceCount); index++ {
+		var ace *windows.ACCESS_ALLOWED_ACE
+		if err := windows.GetAce(acl, index, &ace); err != nil || ace == nil {
+			return fmt.Errorf("read %s inherited DACL entry: %w", path, err)
+		}
+		if ace.Header.AceFlags&windows.INHERITED_ACE != 0 {
+			continue
+		}
+		if ace.Header.AceType != windows.ACCESS_ALLOWED_ACE_TYPE {
+			return fmt.Errorf("%s DACL contains an explicit unsupported entry", path)
+		}
+		sid := (*windows.SID)(unsafe.Pointer(&ace.SidStart)) // #nosec G103 -- fixed ACCESS_ALLOWED_ACE layout: the SID begins at SidStart.
+		if sid == nil || !sid.IsValid() || (!owner.Equals(sid) && !user.User.Sid.Equals(sid)) {
+			return fmt.Errorf("%s DACL contains an explicit foreign grant", path)
+		}
+	}
+	if err := protectPrivateHandle(handle, path); err != nil {
+		return err
+	}
+	return validatePrivateHandle(path, handle)
+}
+
+func privateTokenDefaultOwner(token windows.Token) (*windows.SID, error) {
+	size := uint32(64)
+	for {
+		buffer := make([]byte, size)
+		err := windows.GetTokenInformation(token, windows.TokenOwner, &buffer[0], size, &size)
+		if err == nil {
+			owner := (*struct{ Owner *windows.SID })(unsafe.Pointer(&buffer[0])).Owner // #nosec G103 -- TOKEN_OWNER layout from the API-sized buffer.
+			if owner == nil || !owner.IsValid() {
+				return nil, fmt.Errorf("invalid default token owner")
+			}
+			return owner.Copy()
+		}
+		if !errors.Is(err, windows.ERROR_INSUFFICIENT_BUFFER) || int(size) <= len(buffer) {
+			return nil, err
+		}
+	}
+}
+
+func privateDirectoryOwnerAllowed(owner, effective, defaultOwner *windows.SID) bool {
+	return owner != nil && owner.IsValid() && ((effective != nil && owner.Equals(effective)) || (defaultOwner != nil && owner.Equals(defaultOwner)))
 }
