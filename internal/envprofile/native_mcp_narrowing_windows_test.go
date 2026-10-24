@@ -29,7 +29,7 @@ func TestMCPWindowsNarrowingControls(t *testing.T) {
 	for _, tc := range []struct {
 		name, file, old, replacement, pkg, test, witness string
 	}{
-		{"private-publication", "internal/envprofile/native_mcp.go", "PrivateFile: true", "PrivateFile: false", "./internal/envprofile", "^TestProfileMCPPrivatePublishedFiles$/^private$", "production file is not private"},
+		{"private-publication", "internal/envprofile/native_mcp.go", "PrivateFile: true", "PrivateFile: false", "./internal/envprofile", "^TestProfileMCPPrivateStagingBoundary$/^foreign-read$", "private staged grant accepted"},
 		{"skill-privacy", "internal/envprofile/native_mcp.go", "if e := privatedir.ValidateFile(path); e != nil {", "if e := privatedir.ValidateFile(path); false && e != nil {", "./internal/envprofile", "^TestProfileMCPPrivateSkillPreimage$/^foreign-read$", "want mcp_native_writer_authority_unavailable"},
 		{"writable-mode", "internal/envprofile/native_mcp.go", "mode = 0o666", "mode = 0o600", "./internal/envprofile", "^TestProfileMCPPrivateSkillPreimage$/^private$", "identical private preimage"},
 		{"frozen-native-path", "internal/envprofile/native_mcp.go", "path, err := filepath.Abs(filepath.FromSlash(path))", "_, err := filepath.Abs(filepath.FromSlash(path))", "./internal/envprofile", "^TestProfileMCPSignedTagReplay$/^valid$", "invalid frozen read input"},
