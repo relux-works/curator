@@ -170,11 +170,10 @@ func TestFetchAndSubmodules(t *testing.T) {
 	}
 }
 
-// Clone enables long-path support during initialization and persists it
-// in its own cache before Git writes pack files, independently of ambient
-// defaults. Fetch/ref lookup and exact
-// payload extraction remain usable when pack-file paths exceed MAX_PATH.
-// The cache directory itself fits the separate Windows process-directory limit.
+// Clone enables long-path support before template initialization and persists
+// it for packed transfers, independently of ambient defaults. The two witnesses
+// isolate template and pack paths exceeding MAX_PATH from Git's separate
+// absolute GIT_DIR length guard during a file:// clone.
 func TestCloneLongDestination(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "gitconfig")
 	if err := os.WriteFile(configPath, []byte("[core]\nlongpaths = false\n"), 0o600); err != nil {
@@ -182,44 +181,68 @@ func TestCloneLongDestination(t *testing.T) {
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", configPath)
 	src := makeRepo(t)
-	dest := t.TempDir()
-	for len(dest) < 200 {
-		dest = filepath.Join(dest, strings.Repeat("cache", 8))
-	}
-	packPath := filepath.Join(dest, ".git", "objects", "pack", "pack-"+strings.Repeat("0", 40)+".keep")
-	if len(dest) >= 248 || len(packPath) <= 260 {
-		t.Fatalf("witness does not isolate the pack-file limit: directory=%d pack=%d", len(dest), len(packPath))
-	}
-	if err := Clone("--upload-pack=forbidden", dest); err == nil || !strings.Contains(err.Error(), "suspicious git URL") {
-		t.Fatalf("invalid source accepted: %v", err)
-	}
-	if _, err := os.Lstat(dest); !os.IsNotExist(err) {
-		t.Fatalf("refused clone created destination: %v", err)
-	}
-	remote := "file://" + filepath.ToSlash(src)
-	if filepath.VolumeName(src) != "" {
-		remote = "file:///" + filepath.ToSlash(src)
-	}
-	// file:// exercises index-pack, rather than the local hard-link fast path.
-	if err := Clone(remote, dest); err != nil {
-		t.Fatal(err)
-	}
-	if got := gitRun(t, dest, "config", "--local", "--get", "core.longpaths"); got != "true" {
-		t.Fatalf("cache long-path support = %q, want true", got)
-	}
-	if err := Fetch(dest); err != nil {
-		t.Fatal(err)
-	}
-	ref, err := Resolve(dest, "tag", "v1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	snapshot := filepath.Join(t.TempDir(), "snapshot")
-	if err := Extract(dest, ref.Commit, snapshot); err != nil {
-		t.Fatal(err)
-	}
-	body, err := os.ReadFile(filepath.Join(snapshot, "SKILL.md"))
-	if err != nil || string(body) != "v1" {
-		t.Fatalf("long-path payload = %q: %v", body, err)
+	for _, tc := range []struct {
+		name   string
+		length int
+		packed bool
+	}{
+		{"initialization", 238, false},
+		{"packed-transfer", 210, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			if len(root)+1 >= tc.length {
+				t.Fatalf("temporary root leaves no room for long-path witness: %d", len(root))
+			}
+			dest := filepath.Join(root, strings.Repeat("c", tc.length-len(root)-1))
+			template := t.TempDir()
+			name := strings.Repeat("template", 5)
+			if err := os.WriteFile(filepath.Join(template, name), []byte("template"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("GIT_TEMPLATE_DIR", template)
+			packPath := filepath.Join(dest, ".git", "objects", "pack", "pack-"+strings.Repeat("0", 40)+".keep")
+			if len(dest) >= 248 || len(packPath) <= 260 || !tc.packed && len(filepath.Join(dest, ".git", name)) <= 260 || tc.packed && len(filepath.Join(dest, ".git")) > 220 {
+				t.Fatalf("invalid long-path witness: directory=%d pack=%d", len(dest), len(packPath))
+			}
+			if err := Clone("--upload-pack=forbidden", dest); err == nil || !strings.Contains(err.Error(), "suspicious git URL") {
+				t.Fatalf("invalid source accepted: %v", err)
+			}
+			if _, err := os.Lstat(dest); !os.IsNotExist(err) {
+				t.Fatalf("refused clone created destination: %v", err)
+			}
+			remote := src
+			if tc.packed {
+				// file:// exercises index-pack instead of the local hard-link path.
+				remote = "file://" + filepath.ToSlash(src)
+				if filepath.VolumeName(src) != "" {
+					remote = "file:///" + filepath.ToSlash(src)
+				}
+			}
+			if err := Clone(remote, dest); err != nil {
+				t.Fatal(err)
+			}
+			if got := gitRun(t, dest, "config", "--local", "--get", "core.longpaths"); got != "true" {
+				t.Fatalf("cache long-path support = %q, want true", got)
+			}
+			if body, err := os.ReadFile(filepath.Join(dest, ".git", name)); err != nil || string(body) != "template" {
+				t.Fatalf("long-path template = %q: %v", body, err)
+			}
+			if err := Fetch(dest); err != nil {
+				t.Fatal(err)
+			}
+			ref, err := Resolve(dest, "tag", "v1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			snapshot := filepath.Join(t.TempDir(), "snapshot")
+			if err := Extract(dest, ref.Commit, snapshot); err != nil {
+				t.Fatal(err)
+			}
+			body, err := os.ReadFile(filepath.Join(snapshot, "SKILL.md"))
+			if err != nil || string(body) != "v1" {
+				t.Fatalf("long-path payload = %q: %v", body, err)
+			}
+		})
 	}
 }

@@ -35,7 +35,7 @@ func TestMCPWindowsNarrowingControls(t *testing.T) {
 		{"frozen-native-path", "internal/envprofile/native_mcp.go", "path, err := filepath.Abs(filepath.FromSlash(path))", "_, err := filepath.Abs(filepath.FromSlash(path))", "./internal/envprofile", "^TestProfileMCPSignedTagReplay$/^valid$", "invalid frozen read input"},
 		{"source-privacy", "internal/transaction/engine.go", "if err := privatedir.ValidateFile(source); err != nil {", "if err := privatedir.ValidateFile(source); false && err != nil {", "./internal/transaction", "^TestPrivateFilePublication$/^commit$/^source$", "shared source accepted"},
 		{"staged-privacy", "internal/transaction/staging.go", "if target.PrivateFile {\n\t\tif err := privatedir.ValidateFile(path); err != nil {", "if false && target.PrivateFile {\n\t\tif err := privatedir.ValidateFile(path); err != nil {", "./internal/transaction", "^TestPrivateFilePublication$/^recovery$/^staged$", "shared staged file accepted"},
-		{"clone-initialization", "internal/gitops/gitops.go", "runFn(\"\", \"-c\", \"core.longpaths=true\", \"clone\",", "runFn(\"\", \"clone\",", "./internal/gitops", "^TestCloneLongDestination$", "Filename too long"},
+		{"clone-initialization", "internal/gitops/gitops.go", "runFn(\"\", \"-c\", \"core.longpaths=true\", \"clone\",", "runFn(\"\", \"clone\",", "./internal/gitops", "^TestCloneLongDestination$/^initialization$", "Filename too long"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(root, filepath.FromSlash(tc.file))
@@ -43,6 +43,8 @@ func TestMCPWindowsNarrowingControls(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			// A Windows checkout may use CRLF; plants describe Go source lines.
+			body = []byte(strings.ReplaceAll(string(body), "\r\n", "\n"))
 			if strings.Count(string(body), tc.old) != 1 {
 				t.Fatal("narrowing plant must match exactly once")
 			}
@@ -60,6 +62,7 @@ func TestMCPWindowsNarrowingControls(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				body = []byte(strings.ReplaceAll(string(body), "\r\n", "\n"))
 				old := "if err := privatedir.ValidateFile(source); err != nil {"
 				if strings.Count(string(body), old) != 1 {
 					t.Fatal("second source privacy plant must match exactly once")
