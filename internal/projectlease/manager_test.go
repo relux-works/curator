@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -249,15 +248,6 @@ func TestBusyUpdateAndIdleReuse(t *testing.T) {
 	if string(raw) != "next\n" {
 		t.Fatal("idle update absent")
 	}
-}
-
-// Completion budgets accommodate Windows durable-write latency; no test claims
-// a three-second publication guarantee or relaxes the ordering assertions.
-func leaseTestCompletionBudget() time.Duration {
-	if runtime.GOOS == "windows" {
-		return 30 * time.Second
-	}
-	return 3 * time.Second
 }
 
 // waitObservedContext reports when production selects on cancellation after a

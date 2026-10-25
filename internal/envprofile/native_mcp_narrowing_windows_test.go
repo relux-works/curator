@@ -89,6 +89,8 @@ func TestMCPWindowsNarrowingControls(t *testing.T) {
 			if err := os.WriteFile(overlayPath, overlay, 0o600); err != nil {
 				t.Fatal(err)
 			}
+			// These process limits only bound hangs; timeout is never detection.
+			// The named behavioral refusal below must still be observed.
 			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 			defer cancel()
 			// The executable and arguments are fixed toolchain/test inputs.

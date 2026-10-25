@@ -74,6 +74,8 @@ func TestMCPCredentialAuthorityNarrowingControls(t *testing.T) {
 			if binary == "" {
 				binary = "go"
 			}
+			// The outer five-minute and child four-minute limits only bound hangs.
+			// Detection requires exit 1 and the named authority assertion below.
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, binary, "test", "-overlay", overlay, "-count=1", "-timeout=4m", "-v", "-run", tc.run, "./internal/envprofile") // #nosec G204 -- fixed bounded test arguments and selected Go toolchain

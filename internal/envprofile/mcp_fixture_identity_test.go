@@ -44,6 +44,8 @@ func TestMCPSignedTagFixturesWithoutAmbientIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// These process limits only bound a stuck fixture, not signature latency.
+	// Success requires all three named children to report their real assertions.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	tests := []string{"TestProfileMCPSignedTagReplay", "TestProjectMCPLocalSignerCacheOrigin", "TestProjectMCPTagSignatureReplay"}
