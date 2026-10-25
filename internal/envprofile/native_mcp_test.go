@@ -450,12 +450,18 @@ func TestProfileMCPUnreadableAndNoFollow(t *testing.T) {
 					}
 				}
 				before, _ := os.ReadFile(path)
+				want := mcpnative.Unreadable
+				if kind == "parent-link" {
+					// The manager-wide authority gate rejects a linked managed-home
+					// parent before native planning; both modes preserve its bytes.
+					want = envregistry.DiagStoreUntrusted
+				}
 				readonly := req
 				readonly.Mode = "status"
 				_, readErr := ProfileMCP(readonly)
-				requireMCPError(t, readErr, mcpnative.Unreadable)
+				requireMCPError(t, readErr, want)
 				result, err := ProfileMCP(req)
-				requireMCPError(t, err, mcpnative.Unreadable)
+				requireMCPError(t, err, want)
 				if result.Published {
 					t.Fatal("unreadable plan published")
 				}
