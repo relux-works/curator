@@ -706,25 +706,38 @@ func TestEnvStatusReportsShellHookTrustPosture(t *testing.T) {
 // interpreter (host-capability), never the platform alone.
 func e2eBash(t *testing.T) string {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		if executable := windowsGitBash(os.Getenv("PATH")); executable != "" {
+			return executable
+		}
+		t.Skip("bash is unavailable (Git Bash absent on this runner)")
+		return ""
+	}
 	for _, name := range []string{"bash", "sh"} {
 		if executable, err := exec.LookPath(name); err == nil {
 			return executable
 		}
 	}
-	if runtime.GOOS == "windows" {
-		for _, candidate := range []string{
-			`C:\Program Files\Git\bin\bash.exe`,
-			`C:\Program Files\Git\usr\bin\bash.exe`,
-			`C:\Program Files\Git\bin\sh.exe`,
-			`C:\Program Files\Git\usr\bin\sh.exe`,
-		} {
-			if _, err := os.Stat(candidate); err == nil {
-				return candidate
-			}
-		}
-		t.Skip("bash is unavailable (Git Bash absent on this runner)")
-	}
 	t.Skip("bash is unavailable (no POSIX shell on this runner)")
+	return ""
+}
+
+// windowsGitBash searches only the Git for Windows directories admitted by
+// the isolated PATH. A System32 WSL launcher is never a POSIX test interpreter.
+func windowsGitBash(path string) string {
+	for _, directory := range filepath.SplitList(path) {
+		parent := filepath.Dir(directory)
+		if strings.EqualFold(filepath.Base(parent), "usr") {
+			parent = filepath.Dir(parent)
+		}
+		if !strings.EqualFold(filepath.Base(directory), "bin") || !strings.EqualFold(filepath.Base(parent), "Git") {
+			continue
+		}
+		candidate := filepath.Join(directory, "bash.exe")
+		if info, err := os.Stat(candidate); err == nil && info.Mode().IsRegular() {
+			return candidate
+		}
+	}
 	return ""
 }
 

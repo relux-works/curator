@@ -285,6 +285,63 @@ assert 'a skip with an unrecognised reason fails'   1 run_gate "$S" env CI_GATE_
 assert 'a host-capability skip is recorded and allowed' 0 run_gate "$S" env CI_GATE_GOOS=windows
 
 # Claim: the PATH helper uses registered re-exec wording; explicit Go absence
+# and missing ssh-keygen have narrow host-capability declarations on every OS.
+# Positive skips must be recorded in their intended class. Nearby undeclared
+# reasons and removal of exactly the accepting row must still fail that skip.
+assert_contains 'PATH child uses registered helper-process wording' \
+  't.Skip("helper process: only runs in the planted PATH subprocess")' \
+  "$ROOTDIR/cmd/curator/testpath_test.go"
+for path_goos in linux darwin windows; do
+  for path_kind in helper go signer; do
+    case "$path_kind" in
+      helper)
+        path_reason='helper process: only runs in the planted PATH subprocess'
+        path_nearby='only runs in the planted PATH subprocess'
+        path_pattern='helper process'
+        path_class='helper-process'
+        ;;
+      go)
+        path_reason='real Go toolchain unavailable: selected executable is unavailable: stat /fixture/absent-go: no such file or directory'
+        path_nearby="unexpected: $path_reason"
+        path_pattern='^real Go toolchain unavailable: '
+        path_class='host-capability'
+        ;;
+      signer)
+        path_reason='ssh-keygen is unavailable'
+        path_nearby='ssh-keygen is unavailable unexpectedly'
+        path_pattern='^ssh-keygen is unavailable$'
+        path_class='host-capability'
+        ;;
+    esac
+    { ev pass internal/buildcache TestWindowsProtectedStateMatrix
+      ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
+      ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+      evout internal/testfixture TestDeclaredPathSkip "$path_reason"
+      ev skip internal/testfixture TestDeclaredPathSkip; } >"$S"
+    assert "declared PATH $path_kind skip passes on $path_goos" 0 \
+      run_gate "$S" env CI_GATE_GOOS="$path_goos"
+    assert_contains 'PATH skip is recorded with its intended class and allowed verdict' \
+      "$(printf '%s\tallowed-' "$path_class")" "$WORK/gate-ev/skips-observed.tsv"
+
+    awk -F'\t' -v pattern="$path_pattern" '$2 != pattern' "$CLASSES" >"$WORK/path-classes-minus.tsv"
+    assert "missing PATH $path_kind declaration refuses on $path_goos" 1 \
+      run_gate "$S" env CI_GATE_GOOS="$path_goos" CI_SKIP_CLASSES="$WORK/path-classes-minus.tsv"
+    assert_contains 'missing PATH declaration fails for the intended skip' \
+      'UNCLASSIFIED' "$WORK/gate-ev/skips-observed.tsv"
+
+    { ev pass internal/buildcache TestWindowsProtectedStateMatrix
+      ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
+      ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+      evout internal/testfixture TestDeclaredPathSkip "$path_nearby"
+      ev skip internal/testfixture TestDeclaredPathSkip; } >"$S"
+    assert "nearby undeclared PATH $path_kind skip refuses on $path_goos" 1 \
+      run_gate "$S" env CI_GATE_GOOS="$path_goos"
+    assert_contains 'nearby PATH reason remains unclassified' \
+      'UNCLASSIFIED' "$WORK/gate-ev/skips-observed.tsv"
+  done
+done
+
+
 # Claim: each exact imported fixture skip retains its declared class on all
 # hosts; removing its row or extending its reason is rejected as unclassified.
 for train_goos in linux darwin windows; do
