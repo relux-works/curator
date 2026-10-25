@@ -141,6 +141,7 @@ type ResolveRequest struct {
 	readRegularFile      func(string) (stateread.File, error)
 	boundaryOwnerLookup  pathboundary.OwnerLookup
 	storeRepairAttempted bool
+	nativeHomeFallback   bool
 	// credentialRelease scopes policy derivation to caller-supplied evidence.
 	// Nil permits vendor observation; content verification supplies unknown.
 	credentialRelease *string
@@ -196,7 +197,9 @@ func (req *ResolveRequest) nativeHome(id string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("%s: unregistered environment %q", envregistry.DiagUnknown, id)
 	}
-	return NativeHome(adapter)
+	native, fallback, err := nativeHomeAt(adapter, req.Home)
+	req.nativeHomeFallback = req.nativeHomeFallback || fallback
+	return native, err
 }
 
 // detected resolves the tool release through the seam.
@@ -2734,7 +2737,21 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 
 // resolveVerified shares source admission while choosing the verification boundary.
 // Capture uses verifyHomeContent and forbids repair before entering this function.
-func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistry.Adapter, Source, *contextlock.Lock, string) *verification) (*ResolveResult, error) {
+func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistry.Adapter, Source, *contextlock.Lock, string) *verification) (result *ResolveResult, resultErr error) {
+	defer func() {
+		if !req.nativeHomeFallback {
+			return
+		}
+		if result == nil {
+			result = &ResolveResult{}
+		}
+		for _, warning := range result.Warnings {
+			if warning == nativeHomeFallbackNotice {
+				return
+			}
+		}
+		result.Warnings = append(result.Warnings, nativeHomeFallbackNotice)
+	}()
 	if req.PreserveLock && !req.Repair {
 		return nil, fmt.Errorf("usage: env resolve --preserve-lock requires --repair")
 	}
@@ -2856,7 +2873,7 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 		return repairUnderLock(&req, adapter, source)
 	}
 	if req.Repair {
-		row, err := nativeSkillsState(req.Home, profile, adapter.ID, req.NativeHomeOf)
+		row, err := nativeSkillsState(req.Home, profile, adapter.ID, req.nativeHome)
 		if err != nil {
 			return nil, err
 		}
@@ -3061,12 +3078,12 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 			return nil, err
 		}
 	}
-	row, err := nativeSkillsState(req.Home, req.Profile, adapter.ID, req.NativeHomeOf)
+	row, err := nativeSkillsState(req.Home, req.Profile, adapter.ID, req.nativeHome)
 	if err != nil {
 		return nil, err
 	}
 	if row != nil && row.State != "current" {
-		if err := preflightInPlaceScope(req.Home, req.Profile, adapter.ID, req.Policy, req.NativeHomeOf); err != nil {
+		if err := preflightInPlaceScope(req.Home, req.Profile, adapter.ID, req.Policy, req.nativeHome); err != nil {
 			return nil, err
 		}
 	}

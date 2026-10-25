@@ -234,6 +234,13 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
 
 </details>
 
+When a caller already uses a managed environment, Curator excludes that managed
+root and its symlink aliases as native seed or credential origins. For
+`env resolve`, it selects the operator HOME default and reports that fallback. This is a current native
+selection, not recovery of a previous selector. Existing credential links must
+still match the selected native path; repair preserves conflicting links and
+refuses them. No marker upgrade is required for this default-native repair.
+
 > **Important:** a managed home either shares your native login or logs in by itself. Claude Code on macOS always logs in by itself, so every profile you use with it needs one login in its home before the first launch or spawn; otherwise the launch stops with "Not logged in". See [Logging in to managed homes](docs/environment-config.md#logging-in-to-managed-homes).
 >
 > [Agent logins](docs/agent-logins.md) explains Claude Code, Codex CLI and Muse storage and session requirements. The **rc.7** machine selector defaults to `native`: `curator env config set credential_store.<profile>.<env-id> <value>` accepts `native`, `file`, or `keychain`. Managed Muse maps native/unset/file to file and emits v4; other explicit store application remains disabled pending qualified mappings and successor consumers. Native policy is resolved once per operation; see [machine policy](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice).
