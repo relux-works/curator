@@ -34,13 +34,13 @@ func isolateCLIPath() (func(), error) {
 func cliTestPath(directory string) string {
 	dirs := []string{directory}
 	if runtime.GOOS == "windows" {
-		// cmd.exe and the standard Git for Windows command directory are the
-		// system tools these fixtures need. No caller PATH entries are kept.
+		// Keep Git's POSIX tools (including ssh-keygen) ahead of System32,
+		// whose bash.exe may be a WSL launcher. No caller PATH is retained.
+		if root := os.Getenv("ProgramFiles"); root != "" {
+			dirs = append(dirs, filepath.Join(root, "Git", "bin"), filepath.Join(root, "Git", "usr", "bin"), filepath.Join(root, "Git", "cmd"))
+		}
 		if root := os.Getenv("SystemRoot"); root != "" {
 			dirs = append(dirs, filepath.Join(root, "System32"))
-		}
-		if root := os.Getenv("ProgramFiles"); root != "" {
-			dirs = append(dirs, filepath.Join(root, "Git", "cmd"))
 		}
 	} else {
 		dirs = append(dirs, "/usr/bin", "/bin")

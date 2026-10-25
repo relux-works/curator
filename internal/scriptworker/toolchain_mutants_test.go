@@ -23,8 +23,10 @@ func TestFixtureBuilderSkipNarrowingMutant(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const before = "goTool := testtoolchain.Go(t)\n\tstubOnce.Do(func() {"
-	const after = "stubOnce.Do(func() {\n\t\tgoTool := testtoolchain.Go(t)"
+	// Git for Windows may check out this Go source with CRLF endings.
+	data = []byte(strings.ReplaceAll(string(data), "\r\n", "\n"))
+	const before = "func stubInterpreterBinary(t *testing.T) string {\n\tt.Helper()\n\tgoTool := testtoolchain.Go(t)\n\tstubOnce.Do(func() {"
+	const after = "func stubInterpreterBinary(t *testing.T) string {\n\tt.Helper()\n\tstubOnce.Do(func() {\n\t\tgoTool := testtoolchain.Go(t)"
 	if strings.Count(string(data), before) != 1 {
 		t.Fatal("fixture skip mutation anchor is not unique")
 	}
