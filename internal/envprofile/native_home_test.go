@@ -446,7 +446,7 @@ func TestNativeHomePhysicalContainment(t *testing.T) {
 	for _, mode := range []string{"selector", "selector-missing-child", "manager", "manager-missing-child"} {
 		t.Run(mode, func(t *testing.T) {
 			if !caseAlias {
-				t.Skip("fixture does not expose this same-directory case alias")
+				t.Skip("test filesystem is case-sensitive: fixture does not expose this same-directory case alias")
 			}
 			selected, managerPath := filepath.Join(aliasRoot, "profile", "codex_cli"), manager
 			if strings.HasPrefix(mode, "manager") {
@@ -457,7 +457,7 @@ func TestNativeHomePhysicalContainment(t *testing.T) {
 				}
 				aliasManager, err := os.Stat(managerPath)
 				if err != nil || !os.SameFile(actualManager, aliasManager) {
-					t.Skip("fixture does not expose a same-directory manager case alias")
+					t.Skip("test filesystem is case-sensitive: fixture does not expose a same-directory manager case alias")
 				}
 				selected = managed
 			}
@@ -482,7 +482,7 @@ func TestNativeHomePhysicalContainment(t *testing.T) {
 	for _, mode := range []string{"default-without-selector", "default-after-managed-selector"} {
 		t.Run(mode, func(t *testing.T) {
 			if !caseAlias {
-				t.Skip("fixture does not expose this same-directory case alias")
+				t.Skip("test filesystem is case-sensitive: fixture does not expose this same-directory case alias")
 			}
 			aliasHome := filepath.Join(aliasRoot, "profile", "codex_cli")
 			missingDefault := filepath.Join(aliasHome, ".codex")
@@ -508,7 +508,7 @@ func TestNativeHomePhysicalContainment(t *testing.T) {
 	}
 	t.Run("case-distinct-outside", func(t *testing.T) {
 		if caseAlias {
-			t.Skip("fixture aliases these names instead of keeping distinct directories")
+			t.Skip("this host folds the alias: fixture aliases these names instead of keeping distinct directories")
 		}
 		if err := os.MkdirAll(aliasRoot, 0700); err != nil {
 			t.Fatal(err)
