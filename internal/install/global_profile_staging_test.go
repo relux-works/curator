@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/managerlock"
@@ -18,6 +17,7 @@ import (
 // Private compilation holds the global project lock, leaves the home lock
 // available, and cannot publish profile or canonical state on failure/cancel.
 // The fake compiler isolates the install boundary; the CLI witness uses real Go.
+// Separate probes cancel on actual contention, not elapsed acquisition time.
 func TestGlobalProfilePrivateStaging(t *testing.T) {
 	for _, mode := range []string{"success", "failure", "cancel"} {
 		t.Run(mode, func(t *testing.T) {
@@ -34,16 +34,18 @@ func TestGlobalProfilePrivateStaging(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				probe, stop := context.WithTimeout(context.Background(), 100*time.Millisecond)
-				defer stop()
-				lock, err := manager.AcquireHomeOnly(probe, false)
+				homeProbe, stopHome := context.WithCancel(t.Context())
+				defer stopHome()
+				lock, err := manager.AcquireHomeOnly(privateStagingContentionContext{homeProbe, stopHome}, false)
 				if err != nil {
 					t.Fatalf("private staging held the home lock: %v", err)
 				}
 				_ = lock.Close()
 				project := manager.NewOperation(false)
 				defer func() { _ = project.Close() }()
-				if _, err := project.AcquireProjects(probe, GlobalRoot(e.home)); !errors.Is(err, context.DeadlineExceeded) {
+				probe, stop := context.WithCancel(t.Context())
+				defer stop()
+				if _, err := project.AcquireProjects(privateStagingContentionContext{probe, stop}, GlobalRoot(e.home)); !errors.Is(err, context.Canceled) {
 					t.Fatalf("private staging did not preserve project contention: %v", err)
 				}
 				if published {
@@ -95,6 +97,19 @@ func TestGlobalProfilePrivateStaging(t *testing.T) {
 			_ = lock.Close()
 		})
 	}
+}
+
+// Done is consulted by the real manager lock after an unsuccessful OS lock
+// attempt. A held lock therefore cancels the probe without a timer; preparing
+// and acquiring an available lock have only the enclosing test's hang guard.
+type privateStagingContentionContext struct {
+	context.Context
+	cancel context.CancelFunc
+}
+
+func (c privateStagingContentionContext) Done() <-chan struct{} {
+	c.cancel()
+	return c.Context.Done()
 }
 
 // An addition absent from the live Skillfile is compiled before its declaration
