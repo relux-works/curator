@@ -11,7 +11,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextmaterialize"
@@ -642,6 +641,8 @@ func authorizeComposition(t *testing.T, a Authority, c Composition, owner string
 // Claim: resolver callbacks consume a valid caller-held witness without
 // reacquisition, and refuse zero, stale and other-home witnesses. Borrowed
 // reads neither close the owner's lock nor turn invalid authority into state.
+// Cancellation is triggered only if a lock acquisition reaches its contention
+// wait; ordinary Resolve/Authorize work has no scheduling deadline.
 func TestCompositionHeldAuthority(t *testing.T) {
 	f := compositionFixture(t, "codex_cli", nil)
 	packageApproved(t, f, false)
@@ -665,13 +666,13 @@ func TestCompositionHeldAuthority(t *testing.T) {
 	}
 	lock := compositionLock(t, f.store.Home)
 	held := lock.Held()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	if _, err = a.Resolve(ctx, held, c.Ref, c.SHA256); err != nil {
-		t.Fatal(err)
+	if _, err = a.Resolve(compositionContentionContext{ctx, cancel}, held, c.Ref, c.SHA256); err != nil {
+		t.Fatalf("held Resolve failed without reacquisition: %v", err)
 	}
-	if err = a.Authorize(ctx, held, c, owner); err != nil {
-		t.Fatal(err)
+	if err = a.Authorize(compositionContentionContext{ctx, cancel}, held, c, owner); err != nil {
+		t.Fatalf("held Authorize failed without reacquisition: %v", err)
 	}
 	if err = held.Validate(f.store.Home); err != nil {
 		t.Fatal("borrowed resolver released caller lock")
@@ -712,4 +713,17 @@ func TestCompositionAdapterRelease(t *testing.T) {
 
 func compositionSkillDocument(name, body string) string {
 	return "---\nname: " + name + "\ndescription: Inert composition fixture\n---\n" + body
+}
+
+// Done is consulted by the real manager lock only after an unsuccessful OS
+// acquisition. An erroneous reacquisition therefore cancels deterministically.
+// The enclosing Go test timeout remains the hang guard for unrelated stalls.
+type compositionContentionContext struct {
+	context.Context
+	cancel context.CancelFunc
+}
+
+func (c compositionContentionContext) Done() <-chan struct{} {
+	c.cancel()
+	return c.Context.Done()
 }

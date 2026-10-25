@@ -43,6 +43,22 @@ func TestCompositionNarrowingMutants(t *testing.T) {
 		{"ignore-publication-principal", "composition_authority.go", "TestCompositionAuthority", "if ownerRef != op.state.Principal {", "if ownerRef != op.state.Principal && false {", "want project_item_unapproved"},
 		{"ignore-authorization-principal", "composition_authority.go", "TestCompositionAuthority", "if !tagged(ownerRef, \"principal\") || ownerRef != op.state.Principal {", "if (!tagged(ownerRef, \"principal\") || ownerRef != op.state.Principal) && false {", "want project_item_unapproved"},
 		{"ignore-cwd-binding", "composition_authority.go", "TestCompositionAuthority", "r, err := op.registered(id)", "if op != nil { return nil }; r, err := op.registered(id)", "want project_registration_mismatch"},
+		{"reacquire-held-resolve", "composition_authority.go", "TestCompositionHeldAuthority", `func (a Authority) Resolve(ctx context.Context, held managerlock.Held, ref, sha256 string) (Composition, error) {`, `func (a Authority) Resolve(ctx context.Context, held managerlock.Held, ref, sha256 string) (Composition, error) {
+ if held.Validate(a.Store.Home) == nil {
+  m, err := managerlock.New(a.Store.Home)
+  if err != nil { panic(err) }
+  lock, err := m.AcquireHomeOnly(ctx, false)
+  if err == nil { _ = lock.Close() }
+ }
+`, "held Resolve failed without reacquisition"},
+		{"reacquire-held-authorize", "composition_authority.go", "TestCompositionHeldAuthority", `func (a Authority) Authorize(ctx context.Context, held managerlock.Held, c Composition, ownerRef string) error {`, `func (a Authority) Authorize(ctx context.Context, held managerlock.Held, c Composition, ownerRef string) error {
+ if held.Validate(a.Store.Home) == nil {
+  m, err := managerlock.New(a.Store.Home)
+  if err != nil { panic(err) }
+  lock, err := m.AcquireHomeOnly(ctx, false)
+  if err == nil { _ = lock.Close() }
+ }
+`, "held Authorize failed without reacquisition"},
 		{"ignore-held-witness", "../managerlock/managerlock.go", "TestCompositionHeldAuthority", "func (h Held) Validate(home string) error {", "func (h Held) Validate(home string) error { if home != \"\" { return nil }", "zero witness accepted"},
 		{"ignore-preview-digest", "composition_authority.go", "TestCompositionAuthority", "!hexRE.MatchString(expected) || plan.Preview.SHA256 != expected", "(!hexRE.MatchString(expected) || plan.Preview.SHA256 != expected) && false", "want project_context_drift"},
 		{"allow-adapter-range", "composition_types.go", "TestCompositionAdapterRelease", "invalidProviderVersion(a.ProviderVersion)", "false", "want invalid adapter release contract"},
@@ -66,6 +82,14 @@ func TestCompositionNarrowingMutants(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			if strings.HasPrefix(tc.name, "reacquire-held-") {
+				positive := exec.Command(compositionGo(), "test", "-count=1", "-timeout=2m", "-v", "-run", "^"+tc.test+"$", ".")
+				positive.Dir = cwd
+				out, err := positive.CombinedOutput()
+				if err != nil || !strings.Contains(string(out), "--- PASS: "+tc.test) {
+					t.Fatalf("held authority positive failed: %v\n%s", err, out)
+				}
+			}
 			file := filepath.Join(cwd, tc.file)
 			source, err := os.ReadFile(file)
 			if err != nil {
@@ -93,6 +117,12 @@ func TestCompositionNarrowingMutants(t *testing.T) {
 				}
 			}
 			out, err := cmd.CombinedOutput()
+			if strings.HasPrefix(tc.name, "reacquire-held-") {
+				var exit *exec.ExitError
+				if !errors.As(err, &exit) || exit.ExitCode() != 1 || !strings.Contains(string(out), "context canceled") {
+					t.Fatalf("reacquisition did not fail at contention: %v\n%s", err, out)
+				}
+			}
 			if err == nil || !strings.Contains(string(out), "--- FAIL: "+tc.test) || !strings.Contains(string(out), tc.witness) || strings.Contains(string(out), "[build failed]") {
 				t.Fatalf("mutant did not hit intended witness: %v\n%s", err, out)
 			}

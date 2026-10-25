@@ -380,6 +380,8 @@ func TestOperationRecoveredNodeAuthority(t *testing.T) {
 
 // Node authority refuses before waiting for a busy mutation lock. The per-home
 // neighbor reaches the real contention refusal and succeeds after release.
+// The 25ms correctness deadline applies only while the fixture holds the lock;
+// the released positive uses the unchanged production lock budget.
 // Full snapshots, including lock bytes, bracket acquisition/release because
 // Windows forbids reading the file while its exclusive byte-range lock is held.
 func TestOperationAuthorityBeforeLock(t *testing.T) {
@@ -419,6 +421,7 @@ func TestOperationAuthorityBeforeLock(t *testing.T) {
 				t.Fatal("busy authority refusal mutated or entered recovery")
 			}
 			if !node {
+				lockTimeout = priorTimeout
 				op, err = beginOperation(fx.home)
 				if err != nil {
 					t.Fatalf("released per-home positive: %v", err)
