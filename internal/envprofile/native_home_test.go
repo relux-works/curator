@@ -306,10 +306,10 @@ func TestNativeHomeSelectionBoundaries(t *testing.T) {
 }
 
 // Broken/looping selector links are inspection failures, never a default or
-// absent origin; a HOME default which is itself managed is also refused.
+// absent origin; a non-directory ancestor and a managed HOME default also refuse.
 func TestNativeHomeUnsafeSelectionRefuses(t *testing.T) {
 	adapter, _ := adapterByID("codex_cli")
-	for _, name := range []string{"dangling", "loop", "managed-default"} {
+	for _, name := range []string{"dangling", "loop", "file-parent", "managed-default"} {
 		t.Run(name, func(t *testing.T) {
 			operator := t.TempDir()
 			manager := filepath.Join(t.TempDir(), "manager")
@@ -324,6 +324,11 @@ func TestNativeHomeUnsafeSelectionRefuses(t *testing.T) {
 				t.Setenv("HOME", operator)
 				t.Setenv("USERPROFILE", operator)
 				value = operator
+			} else if name == "file-parent" {
+				if err := os.WriteFile(value, []byte("not a directory"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				value = filepath.Join(value, "child")
 			} else {
 				target := value
 				if name == "dangling" {
@@ -404,4 +409,119 @@ func TestManagedCallerCustomOriginConflictRefuses(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Physical containment must recognize same-directory case aliases where the
+// fixture filesystem supports them, without folding genuinely distinct names.
+// Missing children below that same managed root stay managed and are not made.
+func TestNativeHomePhysicalContainment(t *testing.T) {
+	adapter, _ := adapterByID("codex_cli")
+	manager := filepath.Join(t.TempDir(), "manager")
+	root := EnvRoot(manager)
+	managed := filepath.Join(root, "profile", "codex_cli")
+	if err := os.MkdirAll(managed, 0700); err != nil {
+		t.Fatal(err)
+	}
+	operator := t.TempDir()
+	t.Setenv("HOME", operator)
+	t.Setenv("USERPROFILE", operator)
+	want := filepath.Join(operator, ".codex")
+	outside := filepath.Join(t.TempDir(), "outside")
+	if err := os.MkdirAll(outside, 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CODEX_HOME", outside)
+	if got, fallback, err := nativeHomeAt(adapter, manager); err != nil || got != outside || fallback {
+		t.Fatalf("outside-native positive control: got %q fallback=%v err=%v", got, fallback, err)
+	}
+
+	aliasRoot := filepath.Join(manager, "ENVIRONMENTS")
+	original, err := os.Stat(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alias, aliasErr := os.Stat(aliasRoot)
+	caseAlias := aliasErr == nil && os.SameFile(original, alias)
+	for _, mode := range []string{"selector", "selector-missing-child", "manager", "manager-missing-child"} {
+		t.Run(mode, func(t *testing.T) {
+			if !caseAlias {
+				t.Skip("fixture does not expose this same-directory case alias")
+			}
+			selected, managerPath := filepath.Join(aliasRoot, "profile", "codex_cli"), manager
+			if strings.HasPrefix(mode, "manager") {
+				managerPath = filepath.Join(filepath.Dir(manager), "MANAGER")
+				actualManager, err := os.Stat(manager)
+				if err != nil {
+					t.Fatal(err)
+				}
+				aliasManager, err := os.Stat(managerPath)
+				if err != nil || !os.SameFile(actualManager, aliasManager) {
+					t.Skip("fixture does not expose a same-directory manager case alias")
+				}
+				selected = managed
+			}
+			missing := strings.HasSuffix(mode, "missing-child")
+			if missing {
+				selected = filepath.Join(selected, "absent", "child")
+			}
+			t.Setenv("CODEX_HOME", selected)
+			got, fallback, err := nativeHomeAt(adapter, managerPath)
+			if err != nil || got != want || !fallback {
+				t.Errorf("same-directory managed alias must fall back: got %q fallback=%v err=%v", got, fallback, err)
+			}
+			if missing {
+				if _, err := os.Lstat(selected); !os.IsNotExist(err) {
+					t.Errorf("selection materialized absent child: %v", err)
+				}
+			}
+		})
+	}
+	// Both an absent selector and a managed selector must refuse when the
+	// HOME default has a missing tail under the same physical managed root.
+	for _, mode := range []string{"default-without-selector", "default-after-managed-selector"} {
+		t.Run(mode, func(t *testing.T) {
+			if !caseAlias {
+				t.Skip("fixture does not expose this same-directory case alias")
+			}
+			aliasHome := filepath.Join(aliasRoot, "profile", "codex_cli")
+			missingDefault := filepath.Join(aliasHome, ".codex")
+			if _, err := os.Lstat(missingDefault); !os.IsNotExist(err) {
+				t.Fatalf("default fixture must start absent: %v", err)
+			}
+			t.Setenv("HOME", aliasHome)
+			t.Setenv("USERPROFILE", aliasHome)
+			selector := ""
+			wantFallback := mode == "default-after-managed-selector"
+			if wantFallback {
+				selector = aliasHome
+			}
+			t.Setenv("CODEX_HOME", selector)
+			got, fallback, err := nativeHomeAt(adapter, manager)
+			if err == nil || !strings.Contains(err.Error(), "native HOME default for codex_cli is inside the managed environments root") || got != "" || fallback != wantFallback {
+				t.Errorf("managed default must refuse: got %q fallback=%v err=%v", got, fallback, err)
+			}
+			if _, err := os.Lstat(missingDefault); !os.IsNotExist(err) {
+				t.Errorf("refusal materialized absent default: %v", err)
+			}
+		})
+	}
+	t.Run("case-distinct-outside", func(t *testing.T) {
+		if caseAlias {
+			t.Skip("fixture aliases these names instead of keeping distinct directories")
+		}
+		if err := os.MkdirAll(aliasRoot, 0700); err != nil {
+			t.Fatal(err)
+		}
+		distinct, err := os.Stat(aliasRoot)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if os.SameFile(original, distinct) {
+			t.Fatal("case-distinct fixture unexpectedly names the managed directory")
+		}
+		t.Setenv("CODEX_HOME", aliasRoot)
+		if got, fallback, err := nativeHomeAt(adapter, manager); err != nil || got != aliasRoot || fallback {
+			t.Errorf("case-distinct outside home must remain native: got %q fallback=%v err=%v", got, fallback, err)
+		}
+	})
 }

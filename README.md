@@ -235,7 +235,7 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
 </details>
 
 When a caller already uses a managed environment, Curator excludes that managed
-root and its symlink aliases as native seed or credential origins. For
+root and its filesystem aliases as native seed or credential origins. For
 `env resolve`, it selects the operator HOME default and reports that fallback. This is a current native
 selection, not recovery of a previous selector. Existing credential links must
 still match the selected native path; repair preserves conflicting links and
