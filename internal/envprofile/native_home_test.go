@@ -316,7 +316,8 @@ func TestNativeHomeUnsafeSelectionRefuses(t *testing.T) {
 			t.Setenv("HOME", operator)
 			t.Setenv("USERPROFILE", operator)
 			value := filepath.Join(t.TempDir(), "selector")
-			if name == "managed-default" {
+			switch name {
+			case "managed-default":
 				operator = filepath.Join(EnvRoot(manager), "profile", "codex_cli")
 				if err := os.MkdirAll(operator, 0700); err != nil {
 					t.Fatal(err)
@@ -324,12 +325,12 @@ func TestNativeHomeUnsafeSelectionRefuses(t *testing.T) {
 				t.Setenv("HOME", operator)
 				t.Setenv("USERPROFILE", operator)
 				value = operator
-			} else if name == "file-parent" {
+			case "file-parent":
 				if err := os.WriteFile(value, []byte("not a directory"), 0600); err != nil {
 					t.Fatal(err)
 				}
 				value = filepath.Join(value, "child")
-			} else {
+			default:
 				target := value
 				if name == "dangling" {
 					target = value + "-missing"
