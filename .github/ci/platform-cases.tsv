@@ -70,8 +70,15 @@ internal/buildcache	TestUnixProtectedStateMatrix	linux,darwin	-	-	unix ownership
 internal/buildcache	TestUnixProtectionHelperFailuresFailClosed	linux,darwin	-	-	unix protection helpers fail closed rather than degrading the boundary
 internal/config	TestBootstrapAndAddProject	linux,darwin,windows	-	-	asserts the manager config is written with private (0o600) ownership bits on unix
 
-# ====================================================================# Profile source paths: absence and read failures stay distinct
-# ====================================================================
+# ===========================================================================
+# Managed authority: native boundaries run everywhere; mode bits are POSIX-only
+# ===========================================================================
+internal/envauthority	TestManagedAuthorityBoundary	linux,darwin,windows	-	-	unsafe and malformed authority cannot authorize managed-home mutation
+internal/envauthority	TestManagedAuthorityBoundary/writable	linux,darwin	windows	platform-control	the writable-marker witness uses POSIX mode bits; Windows records the exact declared skip while the parent boundary cases still execute
+
+# ===========================================================================
+# Profile source paths: absence and read failures stay distinct
+# ===========================================================================
 cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/missing_operand	linux,darwin,windows	-	-	a missing profile source operand reports profile_source_path_missing only
 cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/unreadable_root	linux,darwin	windows	platform-control	the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account
 cmd/curator	TestProfilePathOperandDiagnosticsDistinguishAbsenceAndUnreadable/unreadable_module_directory	linux,darwin	windows	platform-control	the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account
@@ -929,3 +936,10 @@ internal/testgitenv	TestShortTempDirIsPrivateAndCleaned	linux,darwin,windows	-	-
 cmd/curator	TestWindowsDraftAcquisitionMetadataBoundary	windows	-	-	draft source clone callers retain the typed refusal at root 134 before cache creation while roots 132 and 133 clone exact fixture bytes
 internal/install	TestWindowsSourceReplayMetadataBoundary	windows	-	-	fresh exact-commit source replay admits roots 132 and 133 with locked bytes and refuses 134 with the typed diagnostic and no fetch, cache, snapshot or lock changes
 internal/gitops	TestWindowsExistingCacheMetadataExemption	windows	-	-	all five existing-repository fetch entries retain a pre-existing root 134 checkout and its locked commit without applying new-cache admission
+
+# MCP manager-wide credential authority on the combined main stack.
+internal/envprofile	TestProfileMCPCredentialAuthority	linux,darwin,windows	-	-	all profile MCP modes reject schema-valid orphan node authority before callbacks or writes and admit paired per-home controls
+internal/envprofile	TestProjectMCPCredentialAuthority	linux,darwin,windows	-	-	all four project MCP entries reject node authority without Git callbacks or manager/project writes and admit per-home controls
+internal/envprofile	TestProfileMCPCredentialPublicationBoundary	linux,darwin,windows	-	-	node authority introduced before MCP publication prevents parent creation and payload writes while per-home publishes
+internal/envprofile	TestProjectMCPAuthorityBeforeState	linux,darwin,windows	-	-	MCP authority precedes empty acquisition and invalid or missing lock processing with explicit per-home diagnostic controls
+internal/envprofile	TestMCPCredentialAuthorityNarrowingControls	linux,darwin,windows	-	-	six bounded plants fail at intended MCP admission or prepublication assertions rather than setup or timeout

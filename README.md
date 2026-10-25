@@ -463,6 +463,9 @@ The profile MCP editor uses Go and the existing TOML parser. Run
 and the [writer consumer checks](docs/profile-mcp-native-writer.md#validation).
 Keep private homes, Go state, logs and narrowing plants under task-scoped
 `.temp/`; the CLI writes protected records below the configured manager home.
+Its profile and project MCP entry points also run the manager-wide credential
+authority gate; the writer guide documents the paired node/per-home checks and
+six bounded admission/publication narrowing controls.
 
 For the pinned Codex project-source exclusion probes, use
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./.research/project-exclusion-codex -count=1 -v`.

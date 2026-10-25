@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/contextpkg"
 	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/contextstore"
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/hashing"
@@ -83,6 +84,9 @@ func PreflightProjectMCP(decls map[string]projectmcp.Declaration, policy Policy)
 // Git/version/signer resolver and strict package audit, then freezes snapshots.
 // It does not publish a lock, ownership record or native configuration.
 func ResolveProjectMCP(home string, decls map[string]projectmcp.Declaration, policy Policy) (entries []projectmcpstate.Entry, warnings []string, resultErr error) {
+	if err := envauthority.Validate(home); err != nil {
+		return nil, nil, err
+	}
 	if err := PreflightProjectMCP(decls, policy); err != nil {
 		return nil, nil, err
 	}
@@ -104,6 +108,9 @@ func ResolveProjectMCP(home string, decls map[string]projectmcp.Declaration, pol
 	fetched := map[string]bool{}
 	for _, req := range requirements {
 		if !fetched[req.Source] {
+			if err := envauthority.Validate(home); err != nil {
+				return nil, nil, err
+			}
 			if err := manager.fetch(req.Source); err != nil {
 				return nil, nil, err
 			}
@@ -116,6 +123,9 @@ func ResolveProjectMCP(home string, decls map[string]projectmcp.Declaration, pol
 	}
 	for _, name := range projectmcp.Names(decls) {
 		member := resolved[name]
+		if err := envauthority.Validate(home); err != nil {
+			return nil, nil, err
+		}
 		stage, err := os.MkdirTemp("", "curator-project-mcp-*")
 		if err != nil {
 			return nil, nil, err
@@ -135,6 +145,9 @@ func ResolveProjectMCP(home string, decls map[string]projectmcp.Declaration, pol
 	// cached; failed lock publication still leaves previous consumers untouched.
 	for _, name := range projectmcp.Names(decls) {
 		member := resolved[name]
+		if err := envauthority.Validate(home); err != nil {
+			return nil, nil, err
+		}
 		store, err := manager.ensureEntry(home, member)
 		if err != nil {
 			return nil, nil, err
@@ -218,6 +231,9 @@ func projectMCPEntry(home string, manager *gitManager, entry string, member cont
 // PublishProjectMCPLock commits the portable lock, its protected authority copy,
 // and unchanged source-lock/bindings records in one existing journal transaction.
 func PublishProjectMCPLock(home, root string, lock *projectmcpstate.Lock, other map[string][]byte) (resultErr error) {
+	if err := envauthority.Validate(home); err != nil {
+		return err
+	}
 	if err := lock.Validate(); err != nil {
 		return err
 	}
@@ -233,6 +249,9 @@ func PublishProjectMCPLock(home, root string, lock *projectmcpstate.Lock, other 
 	records[ProjectMCPLockPath(root)] = payload
 	records[private] = payload
 	validate := func() error {
+		if err := envauthority.Validate(home); err != nil {
+			return err
+		}
 		for path := range records {
 			boundary := root
 			if within, err := filepath.Rel(home, path); err == nil && within != ".." && !strings.HasPrefix(within, ".."+string(os.PathSeparator)) {
@@ -271,17 +290,22 @@ func PublishProjectMCPLock(home, root string, lock *projectmcpstate.Lock, other 
 		return err
 	}
 	boundaries := &staging.Boundaries{Snapshot: snapshot, Durable: durable, Admitted: []string{filepath.Join(root, "Skillfile.json")}}
+	op, err := beginOperationValidated(home, validate)
+	if err != nil {
+		return err
+	}
+	defer func() { resultErr = errors.Join(resultErr, op.close()) }()
+	// Recovery may replace a frozen input. Recheck before creating parents,
+	// as well as at the transaction publication boundary below.
+	if err := validate(); err != nil {
+		return err
+	}
 	if err := privatedir.MakeAll(filepath.Dir(private)); err != nil {
 		return err
 	}
 	if err := privatedir.Validate(filepath.Dir(private)); err != nil {
 		return err
 	}
-	op, err := beginOperationValidated(home, validate)
-	if err != nil {
-		return err
-	}
-	defer func() { resultErr = errors.Join(resultErr, op.close()) }()
 	return op.publishProtected(records, boundaries, validate)
 }
 
@@ -300,6 +324,9 @@ func RestoreProjectMCP(home, root, project, manifestHash string, decls map[strin
 }
 
 func replayProjectMCP(home, root, project, manifestHash string, decls map[string]projectmcp.Declaration, policy Policy, restore bool) (resultLock *projectmcpstate.Lock, resultWarnings []string, resultErr error) {
+	if err := envauthority.Validate(home); err != nil {
+		return nil, nil, err
+	}
 	var observedLock *projectmcpstate.Lock
 	defer func() {
 		if resultErr != nil && resultLock == nil {
@@ -397,6 +424,9 @@ func replayProjectMCP(home, root, project, manifestHash string, decls map[string
 			return nil, nil, err
 		}
 		if metadata.Kind == stateread.KindAbsent && restore {
+			if err := envauthority.Validate(home); err != nil {
+				return nil, nil, err
+			}
 			if err := restoreProjectMCPSnapshot(home, manager, member, decl, entry, policy); err != nil {
 				return nil, nil, err
 			}
@@ -422,6 +452,9 @@ func replayProjectMCP(home, root, project, manifestHash string, decls map[string
 			return nil, nil, fmt.Errorf("source_snapshot_changed: MCP content/server identity differs")
 		}
 		warnings = append(warnings, memberWarnings...)
+	}
+	if err := envauthority.Validate(home); err != nil {
+		return nil, nil, err
 	}
 	return lock, warnings, nil
 }

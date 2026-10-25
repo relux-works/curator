@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/contextpkg"
 	"github.com/relux-works/curator/internal/contextresolve"
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
@@ -168,6 +169,9 @@ func ProfileMCP(req ProfileMCPRequest) (result *ProfileMCPResult, resultErr erro
 			}
 		}
 	}()
+	if err := envauthority.Validate(req.Home); err != nil {
+		return result, err
+	}
 	if req.Scope != "profile" {
 		return result, fmt.Errorf("mcp_contribution_policy_refused: project_scope_shared_home")
 	}
@@ -246,6 +250,9 @@ func ProfileMCP(req ProfileMCPRequest) (result *ProfileMCPResult, resultErr erro
 	}
 	sort.Strings(req.Environments)
 	validateInputs := func() error {
+		if err := envauthority.Validate(req.Home); err != nil {
+			return err
+		}
 		for path, want := range inputs {
 			got, err := transaction.DigestPath(path)
 			if err != nil || got != want {
@@ -713,6 +720,9 @@ func stageMCPContextFiles(destination string, skill skillOf, writes map[string][
 }
 
 func publishNativeMCP(op *operation, req ProfileMCPRequest, writes map[string][]byte, preimages, inputs map[string]string, planning staging.Snapshot, validate func() error) error {
+	if err := validate(); err != nil {
+		return err
+	}
 	// Private parents are created only after all pair/source refusals. Capture
 	// their identities after creation and before staging. No native credential
 	// path is inspected or copied by this writer.
@@ -893,7 +903,7 @@ func mcpObserve(home, path string, private bool) (stateread.File, string, error)
 }
 
 func profileMCPDiagnostic(err error) string {
-	for _, code := range []string{mcpnative.AuthorityUnavailable, mcpnative.Conflict, mcpnative.Unreadable, "transaction_input_changed", DiagMaterializeRecoveryRequired, "profile_source_invalid", "mcp_package_not_allowed", "source_signers_missing", "mcp_contribution_policy_refused"} {
+	for _, code := range []string{envregistry.DiagCredentialInjectionUnavailable, mcpnative.AuthorityUnavailable, mcpnative.Conflict, mcpnative.Unreadable, "transaction_input_changed", DiagMaterializeRecoveryRequired, "profile_source_invalid", "mcp_package_not_allowed", "source_signers_missing", "mcp_contribution_policy_refused"} {
 		if strings.Contains(err.Error(), code) {
 			return code
 		}

@@ -103,6 +103,17 @@ recovery separately from `published`. A changed frozen input refuses and
 rolls the interrupted payload back under the existing transaction rules.
 No launch fragment is exposed by this entrypoint.
 
+Every profile MCP mode and project MCP acquisition, publication, replay and
+restore entry validates manager-wide credential authority before reading its
+inputs or creating cache/lock state. A schema-valid node credential marker,
+including one in an orphan profile, returns `credential_injection_unavailable`.
+This does not grant ownership-action authority. Per-home authority remains
+supported. Journaled mutation paths retain the shared checks before lock creation,
+under the lock and after recovery; native publication rechecks authority
+together with its frozen inputs before creating private payload parents.
+Project lock publication likewise creates its private parents only after
+locked validation and recovery, then rechecks its frozen manifest at publication.
+
 ## Validation
 
 On Windows, Git-backed profile and project MCP caches obey the
@@ -119,6 +130,7 @@ qualification. Each test states its specific claim beside the test.
 ```sh
 env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/mcpnative ./internal/transaction ./internal/config
 env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envprofile -run TestProfileMCP
+env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envprofile -run 'Test(ProjectMCPCredentialAuthority|ProjectMCPAuthorityBeforeState|MCPCredentialAuthorityNarrowingControls)'
 env -u GIT_DIR -u GIT_WORK_TREE go test ./cmd/curator -run 'Test(ProfileMCPCLI|RegisteredSubcommandHelpNoWrites|CommandHelp)'
 ```
 
