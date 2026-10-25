@@ -1,6 +1,7 @@
 package envprofile
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -140,22 +141,45 @@ func TestProjectMCPCredentialAuthority(t *testing.T) {
 
 // A node carrier introduced by the existing prepublication seam refuses before
 // the writer creates private parents or stages payloads; per-home still writes.
+// The exact active lock keeps its inventory/metadata coverage while Windows
+// holds its byte-range lock; its bytes are compared before and after release.
 func TestProfileMCPCredentialPublicationBoundary(t *testing.T) {
 	for _, node := range []bool{true, false} {
 		t.Run(fmt.Sprintf("node=%v", node), func(t *testing.T) {
 			fx, req := nativeWriterFixture(t)
 			mcpAuthorityCarrier(t, fx.home, false)
-			var expected string
+			lock := authorityTestLock(t, fx.home)
+			if err := lock.Close(); err != nil {
+				t.Fatal(err)
+			}
+			activeLock := claudeFreshnessLockPath(t, fx.home)
+			lockBytes := nativeRead(t, activeLock)
+			var expected map[string]claudeRefusalEntry
 			req.beforePublish = func() {
 				mcpAuthorityCarrier(t, fx.home, node)
-				expected = nativeSnapshot(t, fx.home)
+				var err error
+				expected, err = claudeFreshnessSnapshot(fx.home, activeLock)
+				if err != nil {
+					t.Fatal(err)
+				}
 			}
 			result, err := ProfileMCP(req)
+			if expected == nil {
+				t.Fatal("MCP publication seam was not reached")
+			}
+			if !bytes.Equal(lockBytes, nativeRead(t, activeLock)) {
+				t.Fatal("MCP publication changed manager lock bytes")
+			}
 			if node {
 				if err == nil || !strings.HasPrefix(err.Error(), envregistry.DiagCredentialInjectionUnavailable+":") {
 					t.Fatalf("MCP publication authority recheck missing: %v", err)
 				}
-				if result.Published || nativeSnapshot(t, fx.home) != expected {
+				after, snapshotErr := claudeFreshnessSnapshot(fx.home, activeLock)
+				if snapshotErr != nil {
+					t.Fatal(snapshotErr)
+				}
+				assertClaudeRefusalSnapshot(t, expected, after)
+				if result.Published || t.Failed() {
 					t.Fatal("MCP publication authority refusal wrote after the marker changed")
 				}
 			} else if err != nil || !result.Published {
