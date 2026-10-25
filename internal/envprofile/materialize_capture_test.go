@@ -320,6 +320,9 @@ func TestMaterializeCaptureWaitReselectsAndTimeout(t *testing.T) {
 		t.Fatal("selected policy before acquiring lock")
 	}
 	_ = lock.Close()
+	// The released positive control uses the production lock budget; only
+	// the refusal above needs a deliberately short deadline.
+	lockTimeout = old
 	if _, err := CaptureMaterialize(req); err != nil {
 		t.Fatal("released control:", err)
 	}
@@ -333,9 +336,6 @@ func TestMaterializeCaptureWaitReselectsAndTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The released positive control uses the production lock budget; only
-	// the refusal above needs a deliberately short deadline.
-	lockTimeout = old
 	result := make(chan error, 1)
 	req.Capture = func(c *MaterializeCapture) ([]byte, error) {
 		if c.Request.Profile != "capture" || c.Request.Machine.Permissions["capture"] != "native" {

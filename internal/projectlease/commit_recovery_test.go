@@ -25,7 +25,7 @@ type collectProbe struct {
 
 func collectInProcess(t *testing.T, home, mode string) collectProbe {
 	t.Helper()
-	cmd := exec.Command(os.Args[0], "-test.run=^TestLeaseCollectorProcessHelper$", "-test.v")
+	cmd := exec.Command(os.Args[0], "-test.run=^TestLeaseCollectorProcessHelper$", "-test.v", "-test.timeout=3m")
 	cmd.Env = append(os.Environ(), "CURATOR_TEST_PENDING_GC_HOME="+home, "CURATOR_TEST_PENDING_GC_MODE="+mode)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -96,7 +96,13 @@ func TestAcquireRevalidatesPreparedLock(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				observation := collectInProcess(t, f.home, "try")
+				// Only refusal on the unchanged lock has a correctness deadline.
+				// A replacement owner may spend arbitrary time preparing its lock.
+				mode := "try"
+				if replace {
+					mode = "collect"
+				}
+				observation := collectInProcess(t, f.home, mode)
 				if observation.Acquired != replace {
 					t.Fatalf("second owner acquired=%v with replace=%v: %s", observation.Acquired, replace, observation.Error)
 				}
