@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 const nativeHomeFallbackNotice = "Managed caller home is not a native origin; using the operator HOME default. This does not recover the prior native selector."
@@ -63,6 +64,30 @@ func nativePathIsManaged(path, managerHome string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	rootState, err := stateread.Stat(root)
+	if err != nil {
+		return false, err
+	}
+	if rootState.Kind == stateread.KindPresent {
+		// EvalSymlinks preserves component case on some filesystems. Compare
+		// actual ancestors to the managed root instead of case-folding names:
+		// case-distinct directories must remain distinct on filesystems that
+		// support them. Missing candidate tails are inspected without creation.
+		for current := candidate; ; current = filepath.Dir(current) {
+			state, err := stateread.Stat(current)
+			if err != nil {
+				return false, err
+			}
+			if state.Kind == stateread.KindPresent && os.SameFile(rootState.Info, state.Info) {
+				return true, nil
+			}
+			if filepath.Dir(current) == current {
+				return false, nil
+			}
+		}
+	}
+	// No managed root exists yet. Preserve lexical containment of its
+	// unresolved tail after canonicalizing the existing ancestors above.
 	rel, err := filepath.Rel(root, candidate)
 	if err != nil {
 		// Different Windows volumes cannot contain each other.
@@ -92,12 +117,12 @@ func nativeComparablePath(path string) (string, error) {
 		if !os.IsNotExist(err) {
 			return "", err
 		}
-		_, inspectErr := os.Lstat(current)
-		if inspectErr == nil {
-			return "", err
-		}
-		if !os.IsNotExist(inspectErr) {
+		state, inspectErr := stateread.Lstat(current)
+		if inspectErr != nil {
 			return "", inspectErr
+		}
+		if state.Kind == stateread.KindPresent {
+			return "", err
 		}
 		parent := filepath.Dir(current)
 		if parent == current {
