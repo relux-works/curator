@@ -1,0 +1,13 @@
+=== RUN   TestChecker
+--- PASS: TestChecker (0.24s)
+=== RUN   TestOfflineBoundary
+--- PASS: TestOfflineBoundary (0.50s)
+=== RUN   TestP7ResumeTrustGate
+    tui_test.go:113: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    tui_test.go:133: skills.catalog_load outcome=ready map[project_skills:1 user_skills:1]
+    tui_test.go:134: hook.admission outcome=ready map[handlers:2 inactive:0 runnable:2]
+    tui_test.go:135: mcp.config.resolve outcome=ready map[server_count:2 trusted_project_source_count:1 user_settings_source_count:1]
+    tui_test.go:137: resumed project hook did not execute
+--- FAIL: TestP7ResumeTrustGate (8.42s)
+FAIL
+FAIL	github.com/relux-works/curator/.research/muse1413/resume-trust	9.504s

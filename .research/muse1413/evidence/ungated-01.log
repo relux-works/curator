@@ -1,0 +1,89 @@
+=== RUN   TestVendorIntakeBoundary
+=== RUN   TestVendorIntakeBoundary/unset
+=== RUN   TestVendorIntakeBoundary/wrong-digest
+--- PASS: TestVendorIntakeBoundary (0.06s)
+    --- PASS: TestVendorIntakeBoundary/unset (0.03s)
+    --- PASS: TestVendorIntakeBoundary/wrong-digest (0.03s)
+=== RUN   TestMuse1413Identity
+    intake_test.go:45: vendor replay requires MUSE1413_BINARY, MUSE1413_CURATOR and MUSE1413_RUN_ROOT; no qualification from a skip
+--- SKIP: TestMuse1413Identity (0.00s)
+=== RUN   TestObservationChecker
+--- PASS: TestObservationChecker (0.00s)
+=== RUN   TestMuse1413OfflineBoundary
+    replay_test.go:365: vendor replay requires MUSE1413_BINARY, MUSE1413_CURATOR and MUSE1413_RUN_ROOT; no qualification from a skip
+--- SKIP: TestMuse1413OfflineBoundary (0.00s)
+=== RUN   TestFrozenSnapshot
+=== RUN   TestFrozenSnapshot/regular
+=== RUN   TestFrozenSnapshot/altered
+=== RUN   TestFrozenSnapshot/extra
+=== RUN   TestFrozenSnapshot/listed-symlink
+=== RUN   TestFrozenSnapshot/unlisted-dangling-link
+=== RUN   TestFrozenSnapshot/missing
+--- PASS: TestFrozenSnapshot (0.31s)
+    --- PASS: TestFrozenSnapshot/regular (0.10s)
+    --- PASS: TestFrozenSnapshot/altered (0.04s)
+    --- PASS: TestFrozenSnapshot/extra (0.09s)
+    --- PASS: TestFrozenSnapshot/listed-symlink (0.04s)
+    --- PASS: TestFrozenSnapshot/unlisted-dangling-link (0.03s)
+    --- PASS: TestFrozenSnapshot/missing (0.02s)
+=== RUN   TestFrozenSnapshotSourceInputs
+=== RUN   TestFrozenSnapshotSourceInputs/regular
+=== RUN   TestFrozenSnapshotSourceInputs/listed-symlink
+=== RUN   TestFrozenSnapshotSourceInputs/unlisted-dangling-link
+--- PASS: TestFrozenSnapshotSourceInputs (0.42s)
+    --- PASS: TestFrozenSnapshotSourceInputs/regular (0.18s)
+    --- PASS: TestFrozenSnapshotSourceInputs/listed-symlink (0.11s)
+    --- PASS: TestFrozenSnapshotSourceInputs/unlisted-dangling-link (0.13s)
+=== RUN   TestReferenceSnapshotPhysicalClosure
+    replay_test.go:617: set MUSE1413_SPEC_PYTHON and MUSE1413_SPEC for the published reference CLI
+--- SKIP: TestReferenceSnapshotPhysicalClosure (0.00s)
+=== RUN   TestMuse1413ParserRefusals
+    replay_test.go:738: vendor replay requires MUSE1413_BINARY, MUSE1413_CURATOR and MUSE1413_RUN_ROOT; no qualification from a skip
+--- SKIP: TestMuse1413ParserRefusals (0.00s)
+=== RUN   TestMuse1413LoaderMatrix
+    replay_test.go:760: vendor replay requires MUSE1413_BINARY, MUSE1413_CURATOR and MUSE1413_RUN_ROOT; no qualification from a skip
+--- SKIP: TestMuse1413LoaderMatrix (0.00s)
+=== RUN   TestMuse1413InteractiveExclusionRegression
+    replay_test.go:802: vendor replay requires MUSE1413_BINARY, MUSE1413_CURATOR and MUSE1413_RUN_ROOT; no qualification from a skip
+--- SKIP: TestMuse1413InteractiveExclusionRegression (0.00s)
+=== RUN   TestMuse1413WorkspaceResidual
+    replay_test.go:828: vendor replay requires MUSE1413_BINARY, MUSE1413_CURATOR and MUSE1413_RUN_ROOT; no qualification from a skip
+--- SKIP: TestMuse1413WorkspaceResidual (0.00s)
+=== RUN   TestMuse1413ExecInteractiveKeyObservation
+    replay_test.go:863: vendor replay requires MUSE1413_BINARY, MUSE1413_CURATOR and MUSE1413_RUN_ROOT; no qualification from a skip
+--- SKIP: TestMuse1413ExecInteractiveKeyObservation (0.00s)
+=== RUN   TestReviewContradictoryObservation
+=== RUN   TestReviewContradictoryObservation/overflow-count
+=== RUN   TestReviewContradictoryObservation/count-one-then-zero
+=== RUN   TestReviewContradictoryObservation/outcome-ready-then-failed
+=== RUN   TestReviewContradictoryObservation/duplicate-count
+=== RUN   TestReviewContradictoryObservation/duplicate-outcome
+=== RUN   TestReviewContradictoryObservation/quoted-decoy
+=== RUN   TestReviewContradictoryObservation/malformed-count
+=== RUN   TestReviewContradictoryObservation/count-zero-then-one
+=== RUN   TestReviewContradictoryObservation/outcome-failed-then-ready
+=== RUN   TestReviewContradictoryObservation/duplicate-event
+--- PASS: TestReviewContradictoryObservation (0.00s)
+    --- PASS: TestReviewContradictoryObservation/overflow-count (0.00s)
+    --- PASS: TestReviewContradictoryObservation/count-one-then-zero (0.00s)
+    --- PASS: TestReviewContradictoryObservation/outcome-ready-then-failed (0.00s)
+    --- PASS: TestReviewContradictoryObservation/duplicate-count (0.00s)
+    --- PASS: TestReviewContradictoryObservation/duplicate-outcome (0.00s)
+    --- PASS: TestReviewContradictoryObservation/quoted-decoy (0.00s)
+    --- PASS: TestReviewContradictoryObservation/malformed-count (0.00s)
+    --- PASS: TestReviewContradictoryObservation/count-zero-then-one (0.00s)
+    --- PASS: TestReviewContradictoryObservation/outcome-failed-then-ready (0.00s)
+    --- PASS: TestReviewContradictoryObservation/duplicate-event (0.00s)
+PASS
+ok  	github.com/relux-works/curator/.research/muse1413	0.977s
+=== RUN   TestChecker
+    replay_test.go:302: requires digest-pinned MUSE1413_RESUME_BINARY and task-local MUSE1413_RESUME_RUN_ROOT; skipped is unmeasured
+--- SKIP: TestChecker (0.00s)
+=== RUN   TestOfflineBoundary
+    replay_test.go:320: requires digest-pinned MUSE1413_RESUME_BINARY and task-local MUSE1413_RESUME_RUN_ROOT; skipped is unmeasured
+--- SKIP: TestOfflineBoundary (0.00s)
+=== RUN   TestP7ResumeTrustGate
+    tui_test.go:105: requires digest-pinned MUSE1413_RESUME_BINARY and task-local MUSE1413_RESUME_RUN_ROOT; skipped is unmeasured
+--- SKIP: TestP7ResumeTrustGate (0.00s)
+PASS
+ok  	github.com/relux-works/curator/.research/muse1413/resume-trust	0.196s

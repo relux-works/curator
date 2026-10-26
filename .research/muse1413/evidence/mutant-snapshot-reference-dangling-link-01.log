@@ -1,0 +1,12 @@
+=== RUN   TestReferenceSnapshotPhysicalClosure
+=== RUN   TestReferenceSnapshotPhysicalClosure/regular
+=== RUN   TestReferenceSnapshotPhysicalClosure/listed-symlink
+=== RUN   TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link
+    replay_test.go:632: unlisted-dangling-link reference exit=0: Reference check_bundle accepted exact frozen metadata and complete regular-file closure
+--- FAIL: TestReferenceSnapshotPhysicalClosure (2.00s)
+    --- PASS: TestReferenceSnapshotPhysicalClosure/regular (0.78s)
+    --- PASS: TestReferenceSnapshotPhysicalClosure/listed-symlink (0.43s)
+    --- FAIL: TestReferenceSnapshotPhysicalClosure/unlisted-dangling-link (0.80s)
+FAIL
+FAIL	github.com/relux-works/curator/.temp/TASK-261026-jk47fn/mutant-snapshot-reference-dangling-link	2.296s
+FAIL

@@ -1,0 +1,24 @@
+startup-002.txt
+event="trust.resolve" outcome="untrusted" source="missing_store" duration_ms=0
+event="rules.context_load" outcome="ready" reason="none" sources=1 user_sources=1 project_sources=0 foreign_sources=0 skipped_oversize=0 skipped_untrusted=1 authorization_blocks=1 rendered_bytes=361 duration_ms=0
+event="skills.catalog_load" outcome="ready" reason="none" skills=1 user_skills=1 project_skills=0 diagnostics=1 invalid=0 untrusted=1 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="partial" handlers=2 runnable=1 inactive=1 diagnostics=0 advisories=0 duration_ms=0
+event="mcp.config.resolve" stage="startup" outcome="ready" reason="none" source_count=1 admitted_plugin_source_count=0 trusted_project_source_count=0 user_settings_source_count=1 server_count=1 warning_count=0 server_failure_count=0 duration_ms=0
+
+startup-030.txt
+event="skills.catalog_load" outcome="ready" reason="none" skills=2 user_skills=1 project_skills=1 diagnostics=0 invalid=0 untrusted=0 shadowed=0 marker_invalid=0 duration_ms=0
+event="hook.admission" outcome="ready" handlers=2 runnable=2 inactive=0 diagnostics=0 advisories=0 duration_ms=0
+event="mcp.config.resolve" stage="startup" outcome="ready" reason="none" source_count=2 admitted_plugin_source_count=0 trusted_project_source_count=1 user_settings_source_count=1 server_count=2 warning_count=0 server_failure_count=0 duration_ms=0
+
+resume-trust.txt
+Do you trust this workspace?
+2  Quit
+
+resume-rules.txt
+Do you trust this workspace?
+2  Quit
+user: $CONFIG_DIR/AGENTS.md
+project: none
+
+project-hook marker: exact synthetic MUSE_EXCL_HOOK bytes verified after resume; absent before trust
+approved-hook marker: exact synthetic MUSE_EXCL_HOOK bytes verified before resume

@@ -1,0 +1,62 @@
+[
+  {
+    "mutant": "checker-one-skill",
+    "expected_failing_test": "TestObservationChecker",
+    "exit": 1,
+    "log": "mutant-checker-one-skill-01.log"
+  },
+  {
+    "mutant": "checker-duplicate-count",
+    "expected_failing_test": "TestReviewContradictoryObservation",
+    "exit": 1,
+    "log": "mutant-checker-duplicate-count-01.log"
+  },
+  {
+    "mutant": "checker-duplicate-outcome",
+    "expected_failing_test": "TestReviewContradictoryObservation",
+    "exit": 1,
+    "log": "mutant-checker-duplicate-outcome-01.log"
+  },
+  {
+    "mutant": "snapshot-extra-entry",
+    "expected_failing_test": "TestFrozenSnapshot",
+    "exit": 1,
+    "log": "mutant-snapshot-extra-entry-01.log"
+  },
+  {
+    "mutant": "snapshot-go-listed-link",
+    "expected_failing_test": "TestFrozenSnapshot|TestFrozenSnapshotSourceInputs",
+    "exit": 1,
+    "log": "mutant-snapshot-go-listed-link-01.log"
+  },
+  {
+    "mutant": "snapshot-reference-listed-link",
+    "expected_failing_test": "TestReferenceSnapshotPhysicalClosure",
+    "exit": 1,
+    "log": "mutant-snapshot-reference-listed-link-01.log"
+  },
+  {
+    "mutant": "snapshot-reference-dangling-link",
+    "expected_failing_test": "TestReferenceSnapshotPhysicalClosure",
+    "exit": 1,
+    "log": "mutant-snapshot-reference-dangling-link-01.log"
+  },
+  {
+    "mutant": "intake-one-foreign-build",
+    "expected_failing_test": "TestVendorIntakeBoundary",
+    "exit": 1,
+    "log": "mutant-intake-one-foreign-build-01.log"
+  },
+  {
+    "mutant": "offline-loopback",
+    "expected_failing_test": "TestMuse1413OfflineBoundary",
+    "exit": 1,
+    "log": "mutant-offline-loopback-01.log"
+  },
+  {
+    "mutant": "offline-one-keychain-file",
+    "expected_failing_test": "TestMuse1413OfflineBoundary",
+    "exit": 1,
+    "log": "mutant-offline-one-keychain-file-01.log"
+  }
+]

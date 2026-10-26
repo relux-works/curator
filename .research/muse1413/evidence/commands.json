@@ -1,0 +1,346 @@
+[
+  {
+    "command": [
+      "go",
+      "build",
+      "-o",
+      ".temp/TASK-261026-jk47fn/curator",
+      "./cmd/curator"
+    ],
+    "exit": 0,
+    "log": "build-curator-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.research/muse1413/resume-trust",
+      "-count=1",
+      "-v",
+      "-json"
+    ],
+    "exit": 1,
+    "duration_s": 11.341,
+    "log": "resume-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.research/muse1413/...",
+      "-count=1",
+      "-v"
+    ],
+    "environment": {
+      "MUSE1413_BINARY": "",
+      "MUSE1413_RESUME_BINARY": "",
+      "MUSE1413_SPEC": "",
+      "MUSE1413_SPEC_PYTHON": ""
+    },
+    "exit": 0,
+    "duration_s": 1.865,
+    "log": "ungated-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "vet",
+      "./.research/muse1413/..."
+    ],
+    "exit": 0,
+    "duration_s": 2.863,
+    "log": "harness-vet-01.log"
+  },
+  {
+    "command": [
+      "golangci-lint",
+      "run",
+      "./.research/muse1413/..."
+    ],
+    "exit": 1,
+    "duration_s": 13.908,
+    "log": "harness-lint-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.research/muse1413/resume-trust",
+      "-count=1",
+      "-v",
+      "-json"
+    ],
+    "exit": 0,
+    "duration_s": 8.915,
+    "log": "resume-02.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.research/muse1413/resume-trust",
+      "-count=1",
+      "-v",
+      "-json"
+    ],
+    "exit": 0,
+    "duration_s": 8.218,
+    "log": "resume-03.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261026-jk47fn/mutant-checker-one-skill",
+      "-run",
+      "^(TestObservationChecker)$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "duration_s": 0.934,
+    "log": "mutant-checker-one-skill-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261026-jk47fn/mutant-checker-duplicate-count",
+      "-run",
+      "^(TestReviewContradictoryObservation)$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "duration_s": 1.4,
+    "log": "mutant-checker-duplicate-count-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261026-jk47fn/mutant-checker-duplicate-outcome",
+      "-run",
+      "^(TestReviewContradictoryObservation)$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "duration_s": 0.72,
+    "log": "mutant-checker-duplicate-outcome-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261026-jk47fn/mutant-snapshot-extra-entry",
+      "-run",
+      "^(TestFrozenSnapshot)$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "duration_s": 1.432,
+    "log": "mutant-snapshot-extra-entry-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261026-jk47fn/mutant-snapshot-go-listed-link",
+      "-run",
+      "^(TestFrozenSnapshot|TestFrozenSnapshotSourceInputs)$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "duration_s": 1.199,
+    "log": "mutant-snapshot-go-listed-link-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261026-jk47fn/mutant-snapshot-reference-listed-link",
+      "-run",
+      "^(TestReferenceSnapshotPhysicalClosure)$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "duration_s": 2.873,
+    "log": "mutant-snapshot-reference-listed-link-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261026-jk47fn/mutant-snapshot-reference-dangling-link",
+      "-run",
+      "^(TestReferenceSnapshotPhysicalClosure)$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "duration_s": 4.016,
+    "log": "mutant-snapshot-reference-dangling-link-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261026-jk47fn/mutant-intake-one-foreign-build",
+      "-run",
+      "^(TestVendorIntakeBoundary)$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "duration_s": 1.154,
+    "log": "mutant-intake-one-foreign-build-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261026-jk47fn/mutant-offline-loopback",
+      "-run",
+      "^(TestMuse1413OfflineBoundary)$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "duration_s": 1.326,
+    "log": "mutant-offline-loopback-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.temp/TASK-261026-jk47fn/mutant-offline-one-keychain-file",
+      "-run",
+      "^(TestMuse1413OfflineBoundary)$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 1,
+    "duration_s": 2.278,
+    "log": "mutant-offline-one-keychain-file-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.research/muse1413/resume-trust",
+      "-count=1",
+      "-v",
+      "-json"
+    ],
+    "exit": 0,
+    "duration_s": 8.55,
+    "log": "resume-04.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.research/muse1413",
+      "-run",
+      "^TestMuse1413LoaderMatrix$/exec/linked/skills",
+      "-count=1",
+      "-v",
+      "-json"
+    ],
+    "environment": {
+      "MUSE1413_OMIT_EXCLUSION": "exec"
+    },
+    "exit": 1,
+    "duration_s": 9.724,
+    "log": "plant-exec-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.research/muse1413/resume-trust",
+      "-run",
+      "^TestOfflineBoundary$",
+      "-count=1",
+      "-v"
+    ],
+    "environment": {
+      "MUSE1413_RESUME_MUTANT": "network"
+    },
+    "exit": 1,
+    "duration_s": 1.184,
+    "log": "resume-control-network-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.research/muse1413/resume-trust",
+      "-run",
+      "^TestOfflineBoundary$",
+      "-count=1",
+      "-v"
+    ],
+    "environment": {
+      "MUSE1413_RESUME_MUTANT": "keychains"
+    },
+    "exit": 1,
+    "duration_s": 1.817,
+    "log": "resume-control-keychains-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.research/muse1413",
+      "-run",
+      "^TestMuse1413LoaderMatrix$/interactive/linked/skills",
+      "-count=1",
+      "-v",
+      "-json"
+    ],
+    "environment": {
+      "MUSE1413_OMIT_EXCLUSION": "interactive"
+    },
+    "exit": 0,
+    "duration_s": 8.903,
+    "log": "plant-interactive-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "build",
+      "./..."
+    ],
+    "exit": 0,
+    "duration_s": 1.8,
+    "log": "build-01.log"
+  },
+  {
+    "command": [
+      "go",
+      "vet",
+      "./.research/muse1413/..."
+    ],
+    "exit": 0,
+    "duration_s": 0.204,
+    "log": "harness-vet-02.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.research/muse1413",
+      "-count=1",
+      "-v",
+      "-json"
+    ],
+    "exit": 0,
+    "duration_s": 124.111,
+    "log": "replay-01.log"
+  }
+]

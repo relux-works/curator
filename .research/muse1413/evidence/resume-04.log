@@ -1,0 +1,16 @@
+=== RUN   TestChecker
+--- PASS: TestChecker (0.20s)
+=== RUN   TestOfflineBoundary
+--- PASS: TestOfflineBoundary (1.24s)
+=== RUN   TestP7ResumeTrustGate
+    tui_test.go:114: rules.context_load outcome=ready map[foreign_sources:0 project_sources:0 user_sources:1]
+    tui_test.go:115: skills.catalog_load outcome=ready map[project_skills:0 user_skills:1]
+    tui_test.go:116: hook.admission outcome=partial map[handlers:2 inactive:1 runnable:1]
+    tui_test.go:117: mcp.config.resolve outcome=ready map[server_count:1 trusted_project_source_count:0 user_settings_source_count:1]
+    tui_test.go:143: skills.catalog_load outcome=ready map[project_skills:1 user_skills:1]
+    tui_test.go:144: hook.admission outcome=ready map[handlers:2 inactive:0 runnable:2]
+    tui_test.go:145: mcp.config.resolve outcome=ready map[server_count:2 trusted_project_source_count:1 user_settings_source_count:1]
+    tui_test.go:149: resume retains root snapshot but trusting revives project skill/hook/MCP catalogs; child execution unmeasured
+--- PASS: TestP7ResumeTrustGate (6.01s)
+PASS
+ok  	github.com/relux-works/curator/.research/muse1413/resume-trust	7.836s
