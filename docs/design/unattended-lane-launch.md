@@ -74,7 +74,7 @@ script is no longer needed.
 
 | Parameter | Value for an owner-approved lane | Owner of the value |
 | --- | --- | --- |
-| Permission mode | `yolo` (Codex: approval and sandbox bypass) | Operator, per lane |
+| Permission mode | Unenrolled lanes: `yolo` (Codex: approval and sandbox bypass), admitted only against the lane record (section 1.1). `native-project` and `strict` lanes: no bypass; refused until section 2.5's open decision | Operator, per lane |
 | Shell environment policy | `inherit=core` plus an explicit `set` list | Operator, per lane class |
 | Process environment | Allowlisted base; operator SSH agent and provider tokens removed | Launcher |
 | Git identity and signing | Human author name and email; agent signing key through a dedicated agent socket | Operator; key custody per CIP-0024 |
@@ -103,17 +103,73 @@ records operator decision Q-D3 (2026-10-05): untracked silence resolves to
 (`SPEC.md` §4.3 item 4 and §4.6; `cmd/curator-run/main.go`,
 `resolvePermission`). Decision 0018 still says headless silence resolves to
 `native`; the SPEC marks the matching amendments as pending. The consequence
-for this note is direct: on a host without the force-`native` lock, every
-lane that names no permission mode runs with the sandbox bypassed.
+for this note: on a host without the force-`native` lock, an untracked lane
+whose mode comes from built-in silence runs with the sandbox bypassed. That
+means no flag, no profile setting and no launcher-global value. Without a
+flag, configured `native` at the profile or global level resolves `native`,
+unless a profile `yolo` outranks the global value. A tracked native
+launch resolves `native` from its own built-in default and refuses `yolo`
+outright.
 
-Proposed rule: a lane may run `yolo` only when an owner-approved lane record
-names it. Hosts that run unattended lanes set the launcher-global default
-to `native`, so silence never bypasses. The lane record then carries
-`permissions: yolo` with the approving operator and time. A flag on the
-command line does not carry approval, because any process that can invoke
-curator-run can type it. Enforcing the rule against a same-UID agent needs
-a protected record (section 2.1); until then it constrains cooperative
-launchers only.
+The mode alone does not decide the effective posture, for two reasons:
+
+- **Precedence.** The resolver ranks the flag first, then the profile
+  setting, then the launcher-global `defaults.json` value
+  (`SPEC.md` §4.3; `internal/execution/permission.go`, `ResolvePermission`).
+  A profile with `permissions.mode=yolo` therefore resolves `yolo` on a
+  host whose global default is `native`. The global default only decides
+  silence.
+- **Native mode is not a posture.** "Explicit `native` means no launcher
+  override and does not promise a prompting posture" (`SPEC.md` §4.3). In
+  untracked native mode the launcher does not inspect policy selectors in
+  arguments after `--`, which may request their own native policy. Stored
+  Codex settings, such as `approval_policy` and `sandbox_mode` in any config
+  layer the release reads, can also relax approval or sandbox. The
+  launcher's stored-policy inspection is best effort: it reports the
+  relaxations it detects on the `effective-native-policy` line
+  (`SPEC.md` §4.6) and never turns an uninspected source into a clean
+  claim. The SPEC states that the typed interface is not a security
+  boundary.
+
+Proposed rule: an unattended launch passes a permission admission gate
+before the provider starts. The gate compares the effective posture with
+the owner-approved lane record. It is not satisfied by a setting at any one
+level. The effective posture has three inputs:
+
+1. the resolved mode and its source (flag, profile, global or built-in);
+2. the stored native policy for the selected home and checkout, with every
+   settings source the provider release reads either inspected or named as
+   uninspected;
+3. the native argument suffix after `--`.
+
+The lane record carries `permissions` (`yolo` or `native`), the approving
+operator and the approval time. The gate admits the launch only in these
+cases:
+
+- The record approves `yolo`, the lane is unenrolled (section 2.5), and
+  the resolved mode is `yolo`, from any source.
+- The record names `native`, the resolved mode is `native`, the inspection
+  covers every settings source with no relaxation, and the native suffix is
+  empty or contains only arguments from a closed list that the launcher
+  parses and that carries no policy selector.
+
+Every other combination refuses before start. That covers resolved `yolo`
+without an approving record, a detected relaxation under a `native` record,
+an uninspected settings source, an unparsed native argument and a missing
+or unreadable record. A refusal names the input that failed. The gate is a
+new unattended-launch contract in the launcher SPEC (question 1 in
+section 4). The current untracked behavior, which forwards native arguments
+verbatim and only reports relaxations, stays unchanged for attended
+launches.
+
+A launcher-global `native` default on agent hosts remains useful as a
+default, so that silence on an ungated attended launch does not bypass. It is
+not an approval gate. A flag on the command line does not carry approval
+either, because any process that can invoke curator-run can type it.
+Enforcing the gate against a same-UID agent needs a protected record
+(section 2.1); until then it constrains cooperative launchers only. That
+residual is separate from the precedence gap above, which affects
+cooperative launches too.
 
 ### 1.2 `inherit=core` and the explicit set list
 
@@ -172,15 +228,23 @@ The FRONT-DOOR secret check stays as a second guard on what a record adds
 (`FRONT-DOOR.md` §5.3), and its own text calls it "a guard against
 mistakes, not a secret classifier".
 
-Today no front door scrubs. Direct curator-run passes `os.Environ()` to the
-provider in both modes (`internal/plan/plan.go`, `Request.Env`). The hosted
-Werkstatt route adds the record's `child_env` after the secret check and the
-reserved-name list, which refuses `CODEX_HOME`, `OPENAI_API_KEY`,
-`CODEX_API_KEY` and the XDG names (`FRONT-DOOR.md` §9.2). How the session
-manager builds the provider's base environment is the manager's contract and
-was not verified for this note. The target one-shot exec route resets the
-environment in the root launcher before it drops privileges (`README.md`,
-Target one-shot exec mode).
+Four environments exist at the baseline, and each has its own boundary:
+
+| Environment | Who builds it | Contents at baseline |
+| --- | --- | --- |
+| Direct provider environment | curator-run, direct `curator run` | The full caller environment: `os.Environ()` in both modes (`internal/plan/plan.go`, `Request.Env`). No scrubbing |
+| Hosted plugin environment | curator-run's session-manager client, for the plugin process it starts | An allowlist: `PATH`, `HOME`, `XDG_STATE_HOME` and `XDG_CONFIG_HOME` when absolute (canonicalized), `TERM` for `attach` only, and the protocol marker `CURATOR_RUN_PROTOCOL` (`internal/sessionmanager/client/transport_unix.go`, `PluginEnvironment`, applied in `command`). Caller `SSH_AUTH_SOCK`, provider tokens and a stale `A2A_SESSION_ID` do not cross |
+| Delegated `child_env` | The Werkstatt record's author, carried in the launch request | Non-secret literals that pass the secret check and the closed reserved-name list, which refuses `CODEX_HOME`, `OPENAI_API_KEY`, `CODEX_API_KEY`, the XDG names and other credential channels (`FRONT-DOOR.md` §5.3, §9.2). The launcher adds `A2A_AGENT`; the manager adds `A2A_SESSION_ID` (§6.3) |
+| Final hosted provider environment | The session manager | Its own base plus `child_env`. The manager's contract; not verified for this note |
+
+The plugin allowlist is an implemented boundary between the caller and the
+plugin process. It does not prove that the final provider environment is
+clean: the manager composes that from its own base, which this note did not
+inspect. The target one-shot exec route resets the environment in the root
+launcher before it drops privileges (`README.md`, Target one-shot exec mode).
+The proposed allowlisted base therefore applies to the direct provider
+environment, where no scrubbing exists, and is a requirement on the
+manager's base for the hosted route.
 
 ### 1.4 Agent Git identity and signing
 
@@ -237,10 +301,10 @@ for it; "target" means an accepted design that is not implemented.
 | Parameter | Direct `curator run` | Hosted lane (`curator-run werkstatt up`) | Dispatcher one-shot exec |
 | --- | --- | --- | --- |
 | Status of the door | Exists | Exists; delegated route signed off for Claude and Codex (`FRONT-DOOR.md` §5.8) | Target, not implemented (`SPEC.md` §10) |
-| Permission mode | Exists: flag, profile, global default; silence resolves `yolo` (Q-D3). Proposed: global `native` default and lane-record approval | Exists: same ladder, no per-record member. Proposed: `permissions` member in the lane record | Target: the plan carries the mode; the executor never infers a default |
+| Permission mode | Exists: flag, profile, global default; untracked silence resolves `yolo` (Q-D3); native arguments uninspected. Proposed: unattended admission gate over the effective posture against the lane record (section 1.1) | Exists: same ladder, no per-record member. Proposed: `permissions` member in the lane record and the same gate | Target: the plan carries the mode; the executor never infers a default |
 | Sandbox | Bypassed by `yolo` | Exists: record `sandbox` is `none` or `workspace-write` | Target: separate agent account and zero egress (R-NET-TOOL) |
 | Shell environment policy | Proposed: launcher-emitted `-c` pairs | Proposed: same pairs in the hosted request | Proposed: same pairs in the sealed plan |
-| Process environment | Exists: full caller environment inherited. Proposed: allowlisted base | Exists: record `child_env` with secret check and reserved names; manager base not verified | Target: root launcher resets the environment |
+| Process environment | Exists: full caller environment inherited. Proposed: allowlisted base | Exists: plugin process gets an allowlisted environment; record `child_env` with secret check and reserved names; manager base for the provider not verified. Proposed: allowlisted manager base | Target: root launcher resets the environment |
 | Git identity and signing | Proposed: from the lane record | Exists: through `child_env` (`FRONT-DOOR.md` §6.3) | Target: per-account keys; signing service later |
 | `A2A_AGENT`, `A2A_SESSION_ID` | Caller-supplied | Exists: launcher sets `A2A_AGENT`; manager sets `A2A_SESSION_ID` | Target: per-station identity |
 | State directories | Proposed: per-lane `TMPDIR` and caches | Exists: per-Werkstatt launcher state; caches through `child_env` | Target: per-account home |
@@ -281,7 +345,8 @@ approved for unattended launches. Each entry names:
 | Field | Meaning |
 | --- | --- |
 | `entry_id` | Stable identifier, used by grants and revocation |
-| `repository` | Canonical identity: the accepted remote spellings (credential-free) and the root commit object ID |
+| `repository` | The root commit object ID and one canonical destination: transport, host, port and repository path, plus the pinned host key fingerprints for SSH |
+| `remote_spellings` | Accepted credential-free remote URLs. Each spelling, including one that uses an SSH host alias, maps to the entry's canonical destination (section 2.2, step 2) |
 | `environments` | Exact adapter identities, such as `codex_cli`; no wildcard |
 | `project_trust` | Whether Codex project trust may be seeded |
 | `hooks` | Allowed hook definitions, each bound to its content digest; empty means no hook trust is seeded |
@@ -290,8 +355,16 @@ approved for unattended launches. Each entry names:
 | `review_by` | Date after which the entry stops granting until the operator renews it |
 
 The policy keys on repository identity. A path only says where a checkout
-happens to be, and a different repository can appear there later. At launch, Curator matches the checkout's
-identity against the policy and then grants that one exact path.
+happens to be, and a different repository can appear there later. At
+launch, Curator matches the checkout's identity against the policy and then
+grants that one exact path.
+
+The identity tuple (configured remote, root commit) is local data that any
+process with write access to the checkout can edit. A match proves which
+operator consent applies to this checkout: consent provenance. It does not
+prove who owns the repository or that the checkout's content is authentic.
+Content authenticity rests on signed review and branch protection, never on
+trust seeding.
 
 The policy lives in private machine-local Curator state, beside the CIP-0020
 ledger and outside profiles, snapshots, locks and exports. Only the operator
@@ -316,36 +389,119 @@ use. The steps are:
 1. Admit the exact checkout path with CIP-0020 no-follow semantics and read
    its repository identity without running repository hooks or
    configuration-defined commands.
-2. Match the identity against the policy. Both the remote and the root
-   commit must match one entry, and the entry must list the environment and
-   the lane. No match, an ambiguous match or an unreadable identity means no
-   seeding.
+2. Match the identity against the policy. The root commit and the
+   configured remote spelling must both match one entry, and the entry must
+   list the environment and the lane. Curator compares the configured URL
+   without applying `insteadOf` and refuses when a rewrite rule matches it.
+   Then it binds the spelling to the entry's canonical destination:
+   - An HTTPS spelling must name the canonical host and path directly.
+   - For an SSH spelling, Curator evaluates the SSH configuration that the
+     lane's Git transport will use: the file named in `GIT_SSH_COMMAND`, the
+     user and the system configuration. The resolved host name and port must
+     equal the canonical destination, and a `HostKeyAlias` must name the
+     canonical host. The known-hosts entries for that host must carry the
+     pinned fingerprints and no other key. Host key checking must not be
+     disabled for it.
+   - This applies to a canonical host name as well as to an alias, because a
+     `Host` block can redirect either.
+   - A destination whose evaluation depends on `Match exec`, `ProxyCommand`,
+     `ProxyJump` or `KnownHostsCommand`, or that cannot be evaluated without
+     the network and without running configuration-defined commands,
+     refuses. `ssh -G` evaluates `Match` blocks, `exec` conditions included,
+     so it qualifies as the evaluator only behind a scan that refuses those
+     directives first. The evaluator is a qualification item, and alias
+     support in the first slice is question 8 in section 4.
+
+   No match, an ambiguous match, an unbound spelling or an unreadable
+   identity means no seeding.
 3. Record a ledger grant for the exact path and environment. The grant
    carries the policy `entry_id`, the digest of the policy entry at grant
-   time and the full identity tuple.
+   time, the full identity tuple and the bound canonical destination.
 4. Project the grant into the managed `config.toml` as the single key
    `[projects."<exact path>"].trust_level = "trusted"`, through the CIP-0020
    §6 projection journal.
-5. For each hook that Codex would load from the checkout, compare its
-   definition digest with the entry's `hooks` list. Seed hook trust only for
-   listed digests. A changed or unlisted hook stays untrusted and keeps its
-   prompt.
-6. Report the grant IDs and seeded keys in the launch output and the lane
-   record.
+5. For an unattended launch, run the hook admission gate described below.
+   It refuses before start when any hook input is unlisted or cannot be
+   established.
+6. Seed hook trust only for listed digests, and only on a release whose
+   hook state is qualified (see below).
+7. Report the grant IDs, seeded keys, hook admission result and any
+   ungoverned native trust in the launch output and the lane record.
+
+Steps 1, 2 and 5 run at every launch preparation, including resume and
+restart, even when a grant already exists. A changed alias destination,
+remote or hook set therefore takes effect before the next start. These checks bind the configuration at preparation time.
+A lane with the sandbox bypassed can edit its SSH configuration or known
+hosts afterwards (T7).
 
 CIP-0020 closes its event set to `explicit-grant`, `implicit-launch` and
 `implicit-bind`. A policy-derived grant has different provenance from all
 three, so this design needs a CIP-0020 amendment that adds a `policy-grant`
 event (question 2 in section 4).
 
+**Hook admission gate.** The digest list must decide which repository hooks
+an unattended lane may run, whatever native approvals already exist. A
+managed home can already hold a native hook approval for this checkout: from
+an earlier attended launch, from another lane that shares the profile home
+(section 1.5), or from a copied seed. Declining to seed an unlisted hook
+does not undo such an approval. CIP-0020 §5 states that native vendor state
+is not an attestation of Curator trust. The gate therefore decides from two
+inputs, before any provider process starts:
+
+1. **Definitions.** The effective set of repository hook definitions that
+   the provider release would load for this checkout, under its qualified
+   discovery rules. Every definition's digest must appear in the entry's
+   `hooks` list.
+2. **Approvals.** The native hook approvals in the managed home that apply
+   to this checkout. Every approved hash must belong to a listed digest.
+
+The gate refuses an unattended start when a definition is unlisted, when an
+approval does not belong to a listed digest, or when either set cannot be
+established. Unreadable hook state, an unqualified release and an
+unparseable definition all count as "cannot be established". Curator does
+not delete a foreign approval, because CIP-0020 preserves tool-owned state.
+It reports the approval as ungoverned trust, and the operator removes it or
+lists its digest. An attended launch keeps the provider's own prompt for
+unlisted hooks and reports ungoverned approvals without refusing.
+
 Codex 0.163.0 persists hook trust as a per-hook hash decision, separate from
 project trust; the binary carries a `HookStateToml` type with a
 `trusted_hash` field. The [Codex source-exclusion record](../qualification/project-source-exclusion-codex.md)
-measured that hook metadata "still requires its separate native hash-trust
-decision". Neither the storage shape nor its lookup is qualified. CIP-0020
-§5 applies unchanged: an unqualified release or shape refuses automatic
-projection, so hook trust seeding stays off until a per-release
-qualification covers merge, lookup and revocation.
+measured hook discovery: `hooks/list` returns home and project hooks for a
+trusted project and only the home hook under distrust. It measured that hook
+metadata "still requires its separate native hash-trust decision", and left
+hook execution unmeasured. Neither the storage shape nor its lookup is
+qualified. CIP-0020 §5 applies unchanged: an unqualified release or shape
+refuses automatic projection. A trusted project loads its project hooks,
+so until that qualification exists the gate cannot establish either input
+for a trusted checkout. Every unattended launch through this admission path
+therefore refuses until Codex hook discovery and hook state are qualified
+(question 6 in section 4). Hand-started lanes outside this path keep their
+current posture, described under Current state.
+
+Hook trust seeding stays off, and the gate admits no trusted checkout,
+until a per-release qualification covers these cases:
+
+- merge, lookup and revocation of seeded hook state;
+- refusal for an unlisted hook, a changed hook and a pre-existing foreign
+  approval;
+- an unreadable hook state;
+- behavior when a hook definition changes inside a running session.
+
+**Reload inside a running session.** The gate runs at every preparation,
+including resume, but cannot intercept a hook added or edited after start.
+Whether Codex 0.163.0 reloads hook definitions during a session is
+unmeasured. If it does, a hook changed in-session runs without a prompt only
+when its new hash already has a native approval. The approvals gate keeps
+foreign approvals out at start, so such an approval would have to appear
+during the session. Proposed required behavior: the qualification measures
+reload. If reload exists, the launcher records the gated definition set,
+and the next preparation reports any difference and gates the new set. The
+residual is in-session
+execution of a hook whose hash gained an approval mid-session. A lane with
+the sandbox bypassed can run the same code directly, so the residual adds
+no capability to the lane itself (section 3.5). Owner: operator, until
+separate homes per lane remove shared approvals.
 
 ### 2.3 Recording, revocation and audit
 
@@ -384,11 +540,43 @@ project. It approves no project item. `protocol/project-context.md` §1
 states that native trust must not substitute for item approval, and that
 rule applies here unchanged.
 
-| Launch mode | Where trust is seeded | What hook trust means | State at baseline |
-| --- | --- | --- | --- |
-| Unenrolled (today's lanes) | The exact checkout path in the profile's managed home | Project hooks run natively once trusted; the hook digest list is the only gate | Exists as a launch; seeding is proposed |
-| `native-project` | Only the prepared Werkstatt worktree in its project-view home (`protocol/project-context.md` §5) | Same as unenrolled: repository hooks load natively, so only listed digests are seeded | Codex launch refuses `project_context_unsupported` because repository MCP permission keys survive ([Codex composition delivery](../project-adapter-codex.md)) |
-| `strict` | Only the prepared worktree; a certified adapter suppresses repository hooks | Not seeded: strict exclusion keeps repository hooks out, and a seeded entry would widen it | Codex refuses `native-source-exclusion` |
+The permission mode does not carry across modes either. The section 1
+`yolo` value is a legacy bypass profile for unenrolled lanes only. CIP-0024
+requires, for `native-project` stations, that "Manager-programmed
+permissions MUST remain default deny and immune to project permission
+files; native memory MUST remain off", and that an adapter unable to
+enforce these requirements must refuse (`cips/CIP-0024-agent-stations.md`,
+Wave 1 project mode). The native-project amendment states the same rule and
+the `project_context_unsupported` refusal
+([`protocol/project-context.md` §5.1 at `2510171c`](https://github.com/relux-works/curator-spec/blob/2510171ca9e7a4a9d2b69e7b2e7ec23b6d11bb8a/protocol/project-context.md#51-explicit-native-project-mode)).
+Every first-slice composition carries `memory: "off"`
+(`protocol/project-context.md` §1).
+
+An approval and sandbox bypass is the opposite of a default-deny policy:
+the harness asks for nothing and denies nothing. Operator approval of a lane
+does not turn a bypass into manager-programmed default deny, and it cannot
+make hard denies hold. This design therefore keeps the combination of
+`yolo` with `native-project` or `strict` refused. A lane in either mode
+needs these properties, enforced by an adapter that certifies its
+`permissions` and `memory-off` surfaces for the exact release:
+
+- manager grants and hard denies, programmed into the harness as default
+  deny;
+- project permission files that change nothing, even as restrictions;
+- native memory off at startup, reload, resume and child entry.
+
+The section 1.1 admission gate refuses `yolo` for these modes before start,
+whatever the lane record says. Today's lanes bypass the sandbox because
+builds, tests, Git signing and a2a delivery need the network, the agent
+socket and paths outside the checkout. Those needs must become manager
+grants for a station; how a grant expresses them under Codex's approval and
+sandbox controls is an open spec decision (question 7 in section 4).
+
+| Launch mode | Permission mode | Where trust is seeded | What hook trust means | State at baseline |
+| --- | --- | --- | --- | --- |
+| Unenrolled (today's lanes) | `yolo` only with an approving lane record and a passing admission gate (section 1.1) | The exact checkout path in the profile's managed home | Project hooks run natively once trusted; the hook admission gate decides, independently of existing native approvals (section 2.2) | Exists as a launch; seeding and both gates are proposed |
+| `native-project` | Manager-programmed default deny with grants and hard denies; `memory: "off"`. `yolo` refused | Only the prepared Werkstatt worktree in its project-view home (`protocol/project-context.md` §5) | Repository hooks load natively, so the hook admission gate applies as for unenrolled lanes | Codex launch refuses `project_context_unsupported` because repository MCP permission keys survive ([Codex composition delivery](../project-adapter-codex.md)) |
+| `strict` | As `native-project`; `yolo` refused | Only the prepared worktree; a certified adapter suppresses repository hooks | Not seeded: strict exclusion keeps repository hooks out, and a seeded entry would widen it | Codex refuses `native-source-exclusion` |
 
 In `native-project` mode the policy gates whether an unattended lane may
 prepare a Werkstatt for that repository at all. The Codex adapter already
@@ -397,7 +585,8 @@ consent behind that write. CIP-0024 makes `native-project` the wave-1 mode
 for stations and requires status to show "project sources not isolated"
 (`cips/CIP-0024-agent-stations.md`, Wave 1 project mode). In strict mode the
 policy only gates project trust for the worktree. A mode change needs the
-operator's explicit update; the policy never selects a mode.
+operator's explicit update; the policy never selects a mode, and never
+selects a permission mode.
 
 ## 3. Threat model
 
@@ -460,43 +649,61 @@ per approved lane.
 
 **T2. Malicious or changed hooks in a trusted project.** A commit adds or
 edits a hook in a repository whose project trust is pre-approved. Codex runs
-project hooks once the project is trusted and the hook is trusted.
-Mitigations: hook trust is seeded only for listed definition digests, so a
-changed hook keeps its prompt and an unattended launch refuses; no front
-door maps `--dangerously-bypass-hook-trust`; strict mode does not seed hook
-trust at all. Residual: an approved hook can still run code that changes
-between launches, for example a script it calls; the digest covers only the
-hook definition. Owner: operator, who approves hook
-entries.
+project hooks once the project is trusted and the hook is trusted. A native
+approval already in a shared managed home can make an unlisted hook trusted
+without any seeding. Mitigations: the hook admission gate (section 2.2)
+refuses an unattended start when any repository hook definition is unlisted,
+when any native approval for the checkout does not belong to a listed
+digest, or when either set cannot be established; seeding covers only listed
+digests on a qualified release; no front door maps
+`--dangerously-bypass-hook-trust`; strict mode does not seed hook trust at
+all. Residual: an approved hook can still run code that changes between
+launches, for example a script it calls; the digest covers only the hook
+definition. A hook changed inside a running session is outside the gate
+until the next preparation (section 2.2, Reload inside a running session).
+Owner: operator, who approves hook entries.
 
 **T3. Trust seeded for the wrong repository through a path or remote
-alias.** A different repository appears at an approved path, or a fork,
-mirror or `insteadOf` rewrite makes a foreign remote look approved.
-Mitigations: the policy keys on remote and root commit together, so a
-replacement repository at the same path fails the root commit and a fork
-with the same root fails the remote; CIP-0020 no-follow admission refuses
-symlinked paths and rechecks identity before each use; the policy lists
-accepted remote spellings explicitly, and Curator compares the configured
-URL without applying `insteadOf`, refusing when a rewrite rule matches; SSH
-host aliases count only when the entry lists them. Seeds copied from a
-native config can carry broad ancestor entries, including the filesystem
-root, and CIP-0020 records that it cannot assert how a vendor treats
-ancestor trust. Proposed: Curator reports such entries in managed homes as
-ungoverned trust. Residual: a byte-identical clone at an approved identity
-is indistinguishable (Decision 0026, Security impact). Owner: Curator
-maintainers for the matching rules; operator for the entries.
+alias.** A different repository appears at an approved path. A fork,
+mirror or `insteadOf` rewrite makes a foreign remote look approved. An SSH
+`Host` block retargets an approved spelling, alias or canonical host name,
+to a server that hosts a fork with the same root while the configured
+remote and root commit stay unchanged. Mitigations: the policy keys on
+remote and root commit together, so a replacement repository at the same
+path fails the root commit and a fork with the same root fails the remote;
+CIP-0020 no-follow admission refuses symlinked paths and rechecks identity
+before each use; Curator compares the configured URL without applying
+`insteadOf`, refusing when a rewrite rule matches; every accepted spelling
+is bound to the entry's canonical destination and pinned host key, and
+re-evaluated at every preparation without network access or
+configuration-defined commands (section 2.2, step 2). An allowed alias
+string is never itself treated as identity. Seeds copied from a native
+config can carry broad ancestor entries, including the filesystem root, and
+CIP-0020 records that it cannot assert how a vendor treats ancestor trust.
+Proposed: Curator reports such entries in managed homes as ungoverned
+trust. Residual: the identity tuple and the SSH configuration are local
+data, so a match proves consent provenance, not ownership or content
+authenticity (section 2.1); a byte-identical clone at an approved identity
+is indistinguishable (Decision 0026, Security impact); a same-UID lane can
+edit the SSH configuration after preparation (T7). Owner: Curator
+maintainers for the matching and binding rules; operator for the entries
+and pinned keys.
 
 **T4. Credential exposure through the inherited environment.** A provider
 token or the operator's SSH agent socket reaches the lane, and a command
 prints or uses it. Mitigations: the allowlisted base environment of section
-1.3; `inherit=core` for the shell tool; the FRONT-DOOR secret check and
-reserved names on records; credentials delivered only through Curator's
-admitted channels (`protocol/project-context.md` §1). Residual: direct
-curator-run inherits the full caller environment until the allowlist is
-implemented, so the caller must scrub; a same-UID lane can also read
+1.3; the existing plugin-environment allowlist on the hosted route, which
+keeps caller sockets and tokens out of the plugin process; `inherit=core`
+for the shell tool; the FRONT-DOOR secret check and reserved names on
+records; credentials delivered only through Curator's admitted channels
+(`protocol/project-context.md` §1). Residual: direct curator-run inherits
+the full caller environment until the allowlist is implemented, so the
+caller must scrub; the hosted provider's final environment depends on the
+manager's base, which is not verified; a same-UID lane can also read
 credential files that UID can read, such as other managed homes' login
-files. Owner: launcher maintainers for the allowlist; operator for the
-same-UID exposure until separate accounts exist.
+files. Owner: launcher maintainers for the direct allowlist; manager
+maintainers for the hosted base; operator for the same-UID exposure until
+separate accounts exist.
 
 **T5. Cross-lane interference on a shared host and UID.** One lane edits
 another lane's checkout, managed home, trust entries, hooks or caches, or
@@ -550,22 +757,30 @@ prompt; it adds no containment. The controls that bound the damage sit
 outside the lane: separate OS accounts per station, a signing service that
 keeps keys out of the lane, push keys scoped to the lane's repositories,
 branch protection with signed review before landing, and egress limits.
-The operator accepts this risk per lane by approving `yolo` for it, and the
-lane record must show that approval.
+The operator accepts this risk per unenrolled lane by approving `yolo` for
+it. The lane record must show that approval, and the section 1.1 admission
+gate refuses an unattended launch whose effective posture bypasses without
+it. No approval extends this risk to a `native-project` or `strict` lane
+(section 2.5).
 
 ## 4. Open questions for the owner
 
-1. **Default permission mode on agent hosts.** Q-D3 resolves silence to
-   `yolo`, while Decision 0018 says `native`. Recommendation: set the
-   launcher-global default to `native` on hosts that run unattended lanes,
-   carry `yolo` only in owner-approved lane records, and file the pending
-   Decision 0018 amendment so spec and launcher agree.
+1. **Permission admission on agent hosts.** Q-D3 resolves untracked silence
+   to `yolo`, while Decision 0018 says `native`, and neither level of the
+   ladder is an approval gate (section 1.1). Recommendation: add the
+   unattended admission gate over the effective posture (resolved mode and
+   source, stored native policy, native suffix) to the launcher SPEC as a
+   contract for unattended launches; set the launcher-global default to
+   `native` on agent hosts as a default only; carry `yolo` only in
+   owner-approved lane records; and file the pending Decision 0018
+   amendment so spec and launcher agree.
 2. **Grant event for policy-derived trust.** Recommendation: amend CIP-0020
    with a `policy-grant` event that names the policy entry and its digest,
    rather than minting `explicit-grant` records on the operator's behalf.
 3. **Hook trust seeding.** Recommendation: allow it only for digest-listed
    hooks after per-release qualification of the Codex hook state; keep every
-   other hook on the human prompt.
+   other hook on the human prompt for attended launches, and behind the
+   hook admission gate for unattended ones.
 4. **Unknown project in an unattended launch.** Recommendation: refuse
    before start with `workspace_untrusted`, rather than start a session that
    waits on a hidden prompt.
@@ -573,3 +788,26 @@ lane record must show that approval.
    policy in Curator private state with operator-only commands now, accept
    the same-UID tamper risk (T7) explicitly, and move it under the CIP-0024
    root-owned trust pin with the first station pilot.
+6. **Unattended launches before the Codex hook qualification.** The hook
+   admission gate refuses every trusted checkout until Codex hook discovery
+   and hook state are qualified (section 2.2). Recommendation: no interim
+   relaxation. Make the Codex hook qualification, including the negative
+   cases and the reload measurement, the first implementation item. Keep
+   unattended lanes on today's hand-started path until it passes. Also
+   allocate a managed home per unattended lane rather than per profile, so
+   that attended launches cannot leave approvals in it.
+7. **Permission grants for `native-project` stations.** Section 2.5 keeps
+   `yolo` refused in `native-project` and `strict`, while stations need the
+   network, an agent socket and paths outside the worktree. Recommendation:
+   keep the combination refused, and decide in a CIP-0024 follow-up how
+   manager grants for egress, the signing socket and named paths map onto a
+   certified Codex `permissions` surface with hard denies. Do not accept an
+   operator-approved bypass as a substitute.
+8. **SSH host aliases for automatic trust.** Section 2.2 binds every
+   spelling to a canonical destination and pinned host key, with an SSH
+   configuration evaluator that runs no commands. Recommendation: in the
+   first slice, accept only spellings that name the canonical host directly,
+   with the same destination and host-key check. Add alias bindings when a
+   lane needs one; the evaluator and its refusal of `Match exec`,
+   `ProxyCommand`, `ProxyJump` and `KnownHostsCommand` are qualification
+   items either way.
