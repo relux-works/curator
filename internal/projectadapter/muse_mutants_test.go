@@ -19,6 +19,10 @@ func TestMuseNarrowingMutants(t *testing.T) {
 	}
 	_ = offlineHome(t) // Preserve the supported filesystem/platform bound.
 	cases := []struct{ name, file, pkg, test, old, new, witness string }{
+		{"hardlink-count", "muse_links_unix.go", ".", "TestMuseOfflineHardlinks", `return ok && stat.Nlink == 1`, `return ok && stat.Nlink >= 1`, "hardlink was not rejected"},
+		{"entry-identity", "muse.go", ".", "TestMuseEntryIdentity", `os.SameFile(before, after) && `, ``, "distinct inode accepted"},
+		{"required-parents", "muse.go", ".", "TestMuseOfflineDirectoryIntegrity/missing-state", `if statErr != nil || !info.IsDir() || info.Mode()&fs.ModeSymlink != 0 {`, `if false && (statErr != nil || !info.IsDir() || info.Mode()&fs.ModeSymlink != 0) {`, "directory drift was not rejected"},
+		{"directory-privacy", "muse.go", ".", "TestMuseOfflineDirectoryIntegrity/extra-mode", `if statErr != nil || info.Mode() != fs.ModeDir|0700 {`, `if false && (statErr != nil || info.Mode() != fs.ModeDir|0700) {`, "directory drift was not rejected"},
 		{"project-document-first", "../projectcontext/composition_types.go", "../projectcontext", "TestMuseOfflineComposition", `return bytes.Join(parts, []byte{'\n'})`, `if len(parts)>1 { parts[0],parts[len(parts)-1]=parts[len(parts)-1],parts[0] }; return bytes.Join(parts, []byte{'\n'})`, "profile-first exact separator lost"},
 		{"repository-approval-imported", "muse.go", ".", "TestMuseRepositoryControls/config/muse/approval.json", `func musePath(p string) bool {`, `func musePath(p string) bool { if p == "config/muse/approval.json" { return true }`, "want unapproved_control_path"},
 		{"interactive-allowed", "muse.go", ".", "TestMuseLaunchRefused", `return LaunchContribution{}, &Unsupported{LaunchForm, reason}`, `return LaunchContribution{}, nil`, "unsafe launch accepted"},

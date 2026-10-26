@@ -28,7 +28,7 @@ func offlineFixture() MuseOfflineInput {
 func offlineHome(t *testing.T) string {
 	t.Helper()
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
-		t.Skip("first-slice filesystem qualification is macOS/Linux only")
+		t.Skip("CIP filesystem binding supports macOS/Linux")
 	}
 	parent := t.TempDir()
 	if err := os.Chmod(parent, 0700); err != nil {

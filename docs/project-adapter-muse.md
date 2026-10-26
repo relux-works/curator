@@ -36,8 +36,12 @@ named `unsupported` omissions; no native writer path is invented. The pinned
 certifies no Muse writable MCP surface.
 
 `VerifyMuseOffline` checks the exact offline file set, regular-file types,
-hashes, sizes and modes without changing the receipt. It rejects links and
-extra/missing files. This is an offline inventory checker, not a verifier for
+hashes, sizes and modes without changing the receipt. It rejects symlinks,
+files with a link count other than one, and extra/missing files. The walked
+entry, open descriptor and live path must retain the same file identity, mode,
+size, modification time and single-link status across reading. All four XDG
+parents must still exist as real directories, and every directory in the
+allocation must retain mode 0700. Extra empty private directories remain allowed. This is an offline inventory checker, not a verifier for
 native mutable state or a concurrent live-home transaction. A process interrupted
 while copying can leave an incomplete inert allocation; it grants no session
 authority and must not be consumed as a successful result.

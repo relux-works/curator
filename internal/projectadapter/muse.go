@@ -23,9 +23,14 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
+// MuseVersion is the exact release measured for the offline adapter.
 const MuseVersion = "1.4.11-R6667.1"
-const ModeStrict = "strict"
-const ModeNativeProject = "native-project"
+
+// ModeStrict preserves the Muse-facing spelling of the shared strict mode.
+const ModeStrict = Strict
+
+// ModeNativeProject preserves the shared native-project mode.
+const ModeNativeProject = NativeProject
 
 // MuseCertification reports full strict surfaces, not individual loader
 // observations. The measured exec foreign-context flag does not qualify strict
@@ -91,10 +96,13 @@ func MuseLaunch(version, platform, mode, form string) (LaunchContribution, error
 	return LaunchContribution{}, &Unsupported{NativeSourceExclusion, "strict_surface_unqualified"}
 }
 
+// MuseMCPItem identifies a retained MCP contribution and its requirement.
 type MuseMCPItem struct {
 	ItemID   string
 	Required bool
 }
+
+// Omission records an explicitly unsupported optional contribution.
 type Omission struct{ ItemID, Reason string }
 
 // MuseOfflineInput must come from retained I-COMP data after protected
@@ -221,7 +229,7 @@ func MaterializeMuseOffline(ctx context.Context, home string, input MuseOfflineI
 	if err != nil {
 		return result, offlineError("offline parent unreadable")
 	}
-	defer parent.Close()
+	defer func() { _ = parent.Close() }()
 	if err = parent.Mkdir(name, 0700); err != nil {
 		return result, offlineError("offline allocation already exists or is unavailable")
 	}
@@ -235,7 +243,7 @@ func MaterializeMuseOffline(ctx context.Context, home string, input MuseOfflineI
 	if err != nil {
 		return result, offlineError("offline allocation unreadable")
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	adapter, err := envregistry.ByID(envregistry.Muse)
 	if err != nil {
 		return result, err
@@ -293,7 +301,17 @@ func VerifyMuseOffline(home string, generated map[string]Surface) error {
 	if err != nil {
 		return offlineError("offline allocation unreadable")
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
+	adapter, err := envregistry.ByID(envregistry.Muse)
+	if err != nil {
+		return err
+	}
+	for _, pair := range adapter.HomeVariables {
+		info, statErr := root.Lstat(pair[1])
+		if statErr != nil || !info.IsDir() || info.Mode()&fs.ModeSymlink != 0 {
+			return offlineError("offline required parent unavailable")
+		}
+	}
 	seen := 0
 	err = fs.WalkDir(root.FS(), ".", func(p string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -303,6 +321,10 @@ func VerifyMuseOffline(home string, generated map[string]Surface) error {
 			return offlineError("offline link detected")
 		}
 		if entry.IsDir() {
+			info, statErr := entry.Info()
+			if statErr != nil || info.Mode() != fs.ModeDir|0700 {
+				return offlineError("offline directory mode differs")
+			}
 			return nil
 		}
 		s, ok := generated[p]
@@ -313,12 +335,25 @@ func VerifyMuseOffline(home string, generated map[string]Surface) error {
 		if e != nil || !info.Mode().IsRegular() || info.Size() != s.Size || uint32(info.Mode().Perm()) != s.Mode {
 			return offlineError("offline metadata differs")
 		}
-		f, e := root.Open(filepath.FromSlash(p))
+		if !museSingleLink(info) {
+			return offlineError("offline hardlink detected")
+		}
+		f, e := openGenerated(root, filepath.FromSlash(p))
 		if e != nil {
 			return offlineError("offline entry unreadable")
 		}
+		opened, statErr := f.Stat()
+		if statErr != nil || !museEntryUnchanged(info, opened) {
+			_ = f.Close()
+			return offlineError("offline entry identity differs")
+		}
 		b, e := io.ReadAll(io.LimitReader(f, (16<<20)+1))
+		after, afterErr := f.Stat()
+		live, liveErr := root.Lstat(filepath.FromSlash(p))
 		closeErr := f.Close()
+		if afterErr != nil || liveErr != nil || !museEntryUnchanged(info, after) || !museEntryUnchanged(info, live) {
+			return offlineError("offline entry identity differs")
+		}
 		if e != nil || closeErr != nil || sum(b) != s.SHA256 {
 			return offlineError("offline bytes differ")
 		}
@@ -332,4 +367,12 @@ func VerifyMuseOffline(home string, generated map[string]Surface) error {
 		return offlineError("offline entry set differs")
 	}
 	return nil
+}
+
+// Compare the walked entry with the open descriptor and the live path. Matching
+// bytes and timestamps alone cannot establish that they name the same inode.
+func museEntryUnchanged(before, after os.FileInfo) bool {
+	return os.SameFile(before, after) && before.Mode() == after.Mode() &&
+		before.Size() == after.Size() && before.ModTime().Equal(after.ModTime()) &&
+		museSingleLink(before) && museSingleLink(after)
 }
