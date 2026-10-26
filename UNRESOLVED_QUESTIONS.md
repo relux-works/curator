@@ -1,5 +1,12 @@
 # Unresolved questions
 
+- TASK-261026-6b5ioc: Profile skill runtime needs a successor lock allocation
+  and an explicit reconciliation boundary that preserves unrelated machine
+  declarations. Enrollment readiness needs a skill-owned probe/report contract
+  and approval batching rules. Per-profile command roots also need versioned
+  fragment, snapshot, and GC bindings before concurrent command isolation.
+  [Design and owner recommendations](docs/design/profile-skill-runtime.md#owner-decisions).
+
 - TASK-261022-qwkhwj: Windows Git metadata is limited to 259 UTF-16 units,
   with 126 reserved for fixed SHA-256/maintenance paths and a normal clone-root
   maximum of 133. New over-budget clones refuse before creating cache parents.

@@ -491,6 +491,12 @@ controls and task-local `.temp/` evidence.
 The [unattended lane launch design note](docs/design/unattended-lane-launch.md)
 proposes the launch profile for unattended agent lanes, an owner-approved
 project trust policy over the workspace trust ledger, and their threat model.
+The [profile skill runtime design](docs/design/profile-skill-runtime.md)
+proposes full/runtime skill installation through profiles, enrollment readiness,
+and a later lock-bound command root. Its acceptance matrix defines future
+implementation tests. For this design-only change, use `git diff --check`
+and verify the pinned source references with `git show`; save review evidence
+under `.temp/`.
 The [offline Muse project adapter](docs/project-adapter-muse.md) copies retained
 strict composition bytes into a new four-XDG allocation and checks its complete
 receipt. Both strict and native-project launch contributions currently refuse
