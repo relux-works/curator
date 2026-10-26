@@ -55,3 +55,8 @@
   and native resume excerpts are committed under this module. Absolute paths,
   raw synthetic sessions, tmux PIDs and installed-binary locators remain ignored.
   PR exact-head checks and review/handoff evidence are attached to the task.
+- Final-source harness lint and ungated suite pass as harness-lint-03 and
+  ungated-02. A full added-file `git diff --check` reports the mandatory
+  space-plus-tab context encoding in unified mutant patches. The non-patch
+  diff passes separately; all patch encodings were validated by actual
+  application and intended failing behavioral tests, not stripped as prose.

@@ -342,5 +342,33 @@
     "exit": 0,
     "duration_s": 124.111,
     "log": "replay-01.log"
+  },
+  {
+    "command": [
+      "golangci-lint",
+      "run",
+      "./.research/muse1413/..."
+    ],
+    "exit": 0,
+    "duration_s": 0.815,
+    "log": "harness-lint-03.log"
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "./.research/muse1413/...",
+      "-count=1",
+      "-v"
+    ],
+    "environment": {
+      "MUSE1413_BINARY": "",
+      "MUSE1413_RESUME_BINARY": "",
+      "MUSE1413_SPEC": "",
+      "MUSE1413_SPEC_PYTHON": ""
+    },
+    "exit": 0,
+    "duration_s": 1.885,
+    "log": "ungated-02.log"
   }
 ]

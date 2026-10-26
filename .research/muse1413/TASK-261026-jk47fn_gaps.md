@@ -83,6 +83,10 @@ the invocation. Main and P7 source identities are in observations.json.
 | `go vet ./.research/muse1413/...` | 0 | [`harness-vet-02.log`](evidence/harness-vet-02.log) |
 | `go test ./.research/muse1413 -count=1 -v -json` | 0 | [`replay-01.log`](evidence/replay-01.log) |
 
+Final-source checks additionally pass: [harness lint](evidence/harness-lint-03.log)
+and [ungated tests](evidence/ungated-02.log), both exit 0. Their exact argv and
+unset opt-ins are in commands.json.
+
 The full main replay drives 45 vendor loader/parser cases (43 exit 0,
 two exit 2) plus version inspection. Main offline controls and published
 reference-checker positive/negative cases pass. The ungated explicit package
