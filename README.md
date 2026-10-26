@@ -488,6 +488,9 @@ previews retain native project prose/config. Run
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectadapter ./internal/projectcontext -count=1`.
 The guide documents native opt-in regressions, bundle provenance, narrowing
 controls and task-local `.temp/` evidence.
+The [unattended lane launch design note](docs/design/unattended-lane-launch.md)
+proposes the launch profile for unattended agent lanes, an owner-approved
+project trust policy over the workspace trust ledger, and their threat model.
 The [offline Muse project adapter](docs/project-adapter-muse.md) copies retained
 strict composition bytes into a new four-XDG allocation and checks its complete
 receipt. Both strict and native-project launch contributions currently refuse
