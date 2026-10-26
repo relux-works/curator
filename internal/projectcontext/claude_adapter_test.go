@@ -210,7 +210,7 @@ func TestClaudeCompositionMaterialization(t *testing.T) {
 			if string(settings) != "{\"permissions\":{\"allow\":[],\"defaultMode\":\"dontAsk\",\"deny\":[\"mcp__*\"]}}\n" {
 				t.Fatal("repository permission imported")
 			}
-			if string(p.Files["skills/manual/SKILL.md"]) != "# manual\n" || string(p.Files["skills/manual/references/manual.md"]) != "Whole skill reference.\n" {
+			if string(p.Files["skills/manual/SKILL.md"]) != compositionSkillDocument("manual", "# manual\n") || string(p.Files["skills/manual/references/manual.md"]) != "Whole skill reference.\n" {
 				t.Fatal("whole skill missing")
 			}
 			if string(p.Files[contextmaterialize.MCPClaudePath]) != "{\"mcpServers\":{\"approved-server\":{\"args\":[\"one\",\"two\"],\"command\":\"fixture-server\",\"type\":\"stdio\"}}}\n" {
