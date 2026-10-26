@@ -133,7 +133,7 @@ platform-control	^Unix (special )?permission bits are the tested metadata$	allow
 platform-control	^requires unprivileged Unix directory permissions$	allow	the nested-native compensation fixture needs Unix mode-bit denial; its portable ownership controls run on all hosts
 
 # Exact imported fixture reasons, tied to their existing condition guards.
-opt-in	^explicit bounded mutation lane$	allow	registration admission source plants run only with CURATOR_PROJECT_ADMISSION_MUTANTS=1; ordinary admission controls remain required
+opt-in	^explicit bounded mutation lane$	allow	admission and adapter source plants require explicit mutation opt-ins; ordinary behavioral controls remain required
 host-capability	^case-sensitive filesystem$	allow	registration alias fixture requires two spellings of the same existing root; distinct paths exercise ordinary checkout isolation instead
 platform-control	^CIP filesystem binding supports macOS/Linux(; pure composition contracts remain portable)?$	allow	the imported fixture skips only when GOOS is neither darwin nor linux; registration fails closed as unsupported on those hosts
 platform-control	^native receipt mode bits are Unix-specific$	allow	only ignore-mode-drift skips when os.PathSeparator is the Windows separator; other receipt plants execute
@@ -144,3 +144,5 @@ host-capability	^host refuses unlink of an open lock: sharing violation$	allow	o
 platform-control	^exact mode bits are Unix-specific$	allow	only generated-drift mode cases skip on Windows, where Unix permission-bit identity is not observable; byte and path drift still execute
 
 platform-control	^POSIX permission-bit witnesses; Windows DACL controls run separately$	allow	POSIX private-parent and file-mode witnesses run on Unix; Windows executes protected-DACL publication and broadened-ACL refusal controls
+
+platform-control	^symlink fixture requires Unix$	allow	the Codex manager-reader link and file-ancestor controls require the Unix fixture; ordinary metadata cases remain portable

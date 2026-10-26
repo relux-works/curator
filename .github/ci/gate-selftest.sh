@@ -388,6 +388,7 @@ for project_reason in \
   'CIP filesystem binding supports macOS/Linux' \
   'CIP filesystem binding supports macOS/Linux; pure composition contracts remain portable' \
   'native contribution witnesses require measured host tuple' \
+  'symlink fixture requires Unix' \
   'host refuses unlink of an open lock: sharing violation'; do
   { ev pass internal/buildcache TestWindowsProtectedStateMatrix
     ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
@@ -401,6 +402,7 @@ for project_reason in \
   case "$project_reason" in
     CIP*) project_pattern='^CIP filesystem binding' ;;
     native*) project_pattern='^native contribution witnesses' ;;
+    symlink*) project_pattern='^symlink fixture requires Unix$' ;;
     host*) project_pattern='^host refuses unlink' ;;
   esac
   awk -F'\t' -v pattern="$project_pattern" 'index($2, pattern) != 1' "$CLASSES" >"$WORK/project-classes-minus.tsv"

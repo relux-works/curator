@@ -26,7 +26,7 @@ import (
 // This exercises manager-side delivery, not a certified vendor start.
 func TestCodexAdapterCompositionEndToEnd(t *testing.T) {
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
-		t.Skip("I-COMP registration requires macOS/Linux filesystem identity")
+		t.Skip("CIP filesystem binding supports macOS/Linux")
 	}
 	base := t.TempDir()
 	home := filepath.Join(base, "manager")
@@ -73,7 +73,7 @@ func TestCodexAdapterCompositionEndToEnd(t *testing.T) {
 	}
 	f := fixture{store, checkout, registration}
 	skill := filepath.Join(checkout, "tool")
-	write(t, filepath.Join(skill, "SKILL.md"), "# Approved tool\n")
+	write(t, filepath.Join(skill, "SKILL.md"), compositionSkillDocument("tool", "# Approved tool\n"))
 	write(t, filepath.Join(skill, "references/data.txt"), "Whole skill bytes.\n")
 	write(t, filepath.Join(skill, "agent-skill.json"), `{"schema_version":3,"commands":{},"capabilities":{"network":"none","filesystem":"none","exec":"none","secrets":"none","env_read":"none","prompt_scope":"none"}}`)
 	d := declaration("tool", "tool", false)

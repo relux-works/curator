@@ -228,7 +228,7 @@ func held(t *testing.T, home string) managerlock.Held {
 // refuses without changing any affected file or replacing the baseline.
 func TestCodexMaterializeAndDrift(t *testing.T) {
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
-		t.Skip("project materialization boundary is qualified on macOS/Linux; rendering contracts remain portable")
+		t.Skip("CIP filesystem binding supports macOS/Linux; pure composition contracts remain portable")
 	}
 	for _, kind := range []string{"bytes", "mode", "missing", "extra", "symlink", "override"} {
 		t.Run(kind, func(t *testing.T) {
@@ -367,7 +367,7 @@ func TestCodexInputBoundaries(t *testing.T) {
 // The success control is the complete materialization test above.
 func TestCodexPublicationBoundaries(t *testing.T) {
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
-		t.Skip("project materialization boundary is qualified on macOS/Linux; rendering contracts remain portable")
+		t.Skip("CIP filesystem binding supports macOS/Linux; pure composition contracts remain portable")
 	}
 	for _, kind := range []string{"zero-lock", "other-lock", "cancelled", "allocation", "overlap", "linked-parent"} {
 		t.Run(kind, func(t *testing.T) {
