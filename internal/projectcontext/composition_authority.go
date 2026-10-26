@@ -52,6 +52,7 @@ type compositionEnvelope struct {
 // this method does not mutate the managed home, profile lock or lease state.
 func (a Authority) PublishComposition(ctx context.Context, req ComposeRequest, expected string, ownerRef string) (Composition, error) {
 	req.Policy = canonicalCompositionPolicy(req.Policy)
+	req.Claude = canonicalClaudeControls(req.Claude)
 	op, err := a.Store.beginValidated(false, func() error { return envauthority.Validate(a.Store.Home) })
 	if err != nil {
 		return Composition{}, err

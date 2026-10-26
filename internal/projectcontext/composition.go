@@ -56,6 +56,7 @@ func (s Store) PreviewComposition(ctx context.Context, req ComposeRequest) (Comp
 func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositionPlan, error) {
 	var result compositionPlan
 	req.Policy = canonicalCompositionPolicy(req.Policy)
+	req.Claude = canonicalClaudeControls(req.Claude)
 	if err := ctx.Err(); err != nil {
 		return result, err
 	}

@@ -24,6 +24,7 @@ func TestClaudeNarrowingMutants(t *testing.T) {
 		t.Fatal(err)
 	}
 	cases := []struct{ name, file, test, old, new, witness string }{
+		{"uncanonical-empty-grants", "claude_adapter.go", "TestClaudeEmptyControlsPublication", `out.AllowTools = append([]string{}, input.AllowTools...)`, `out.AllowTools = input.AllowTools`, "published empty controls cannot resolve"},
 		{"project-before-profile", "composition_types.go", "TestClaudeCompositionMaterialization", `return bytes.Join(parts, []byte{'\n'})`, `if len(parts)>1 {parts[0],parts[len(parts)-1]=parts[len(parts)-1],parts[0]}; return bytes.Join(parts, []byte{'\n'})`, "Claude profile-first bytes differ"},
 		{"repository-permissions", "composition.go", "TestClaudeCompositionMaterialization", "\tpolicyObject := struct {", "if req.Claude!=nil { b,_:=os.ReadFile(filepath.Join(r.Record.ProjectRoot,\".claude/settings.json\"));out.Files[\"settings.json\"]=b };\n\tpolicyObject := struct {", "repository permission imported"},
 		{"omit-setting-sources", "claude_adapter.go", "TestClaudeCompositionMaterialization", `"--setting-sources", "user", `, ``, "Claude source controls missing"},

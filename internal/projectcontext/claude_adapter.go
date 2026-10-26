@@ -34,6 +34,18 @@ type ClaudeControls struct {
 	DenyTools  []string
 }
 
+// canonicalClaudeControls preserves empty grants as arrays in protected records.
+// Copy the request so caller-owned slices and nil values remain untouched.
+func canonicalClaudeControls(input *ClaudeControls) *ClaudeControls {
+	if input == nil {
+		return nil
+	}
+	out := *input
+	out.AllowTools = append([]string{}, input.AllowTools...)
+	out.DenyTools = append([]string{}, input.DenyTools...)
+	return &out
+}
+
 // ClaudeDiagnostic is a typed project refusal with no filesystem locators.
 type ClaudeDiagnostic struct {
 	Code    string
