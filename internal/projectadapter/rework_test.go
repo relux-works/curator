@@ -17,7 +17,7 @@ import (
 // or receipt recapture; existing receipted roots retain byte-drift protection.
 func TestCodexInstructionInventory(t *testing.T) {
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
-		t.Skip("qualified filesystem boundary")
+		t.Skip("CIP filesystem binding supports macOS/Linux")
 	}
 	for _, profile := range []string{"empty", "root", "system"} {
 		for _, addition := range []string{"AGENTS.md", "AGENTS.override.md"} {
@@ -100,7 +100,7 @@ func TestCodexSystemBundle(t *testing.T) {
 // drift refuse without repairs or receipt changes, next to unchanged reuse.
 func TestCodexSystemBundleDrift(t *testing.T) {
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
-		t.Skip("qualified filesystem boundary")
+		t.Skip("CIP filesystem binding supports macOS/Linux")
 	}
 	for _, kind := range []string{"bytes", "marker", "mode", "missing", "extra", "file-link", "directory-link"} {
 		t.Run(kind, func(t *testing.T) {
@@ -224,7 +224,7 @@ func TestCodexManagerMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	for _, name := range []string{"absent", "missing-parent/absent"} {
 		metadata, err := managerMetadata(root, base, name)
 		if err != nil || metadata.Kind != stateread.KindAbsent {

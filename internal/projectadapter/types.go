@@ -14,6 +14,7 @@ type Surface struct {
 // SurfaceName identifies a provider surface in a certification report.
 type SurfaceName string
 
+// Surface names cover manager outputs and required launch constraints.
 const (
 	Context               SurfaceName = "context"
 	Skills                SurfaceName = "skills"

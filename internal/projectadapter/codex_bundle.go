@@ -28,7 +28,7 @@ func codexSystemSkills(archive []byte) (map[string][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer zipped.Close()
+	defer func() { _ = zipped.Close() }()
 	reader := tar.NewReader(zipped)
 	files := map[string][]byte{}
 	for {

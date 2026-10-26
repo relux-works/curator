@@ -44,7 +44,7 @@ func (p *Plan) Materialize(ctx context.Context, held managerlock.Held, managerHo
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	current := ""
 	for _, part := range parts[:4] {
 		current = filepath.Join(current, part)
@@ -67,7 +67,7 @@ func (p *Plan) Materialize(ctx context.Context, held managerlock.Held, managerHo
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(stage)
+	defer func() { _ = os.RemoveAll(stage) }()
 	for name, b := range p.files {
 		if err = ctx.Err(); err != nil {
 			return err
@@ -118,7 +118,7 @@ func (p *Plan) Verify(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	for name, expected := range p.generated {
 		if err = ctx.Err(); err != nil {
 			return err
