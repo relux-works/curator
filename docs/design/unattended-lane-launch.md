@@ -162,9 +162,11 @@ section 4). The current untracked behavior, which forwards native arguments
 verbatim and only reports relaxations, stays unchanged for attended
 launches.
 
-A launcher-global `native` default on agent hosts remains useful as a
-default, so that silence on an ungated attended launch does not bypass. It is
-not an approval gate. A flag on the command line does not carry approval
+A launcher-global `native` default on agent hosts prevents the built-in
+resolver fallback from selecting `yolo` when nothing names a mode. It does
+not constrain the effective provider policy: `native` adds no override, so
+unsafe stored provider settings stay in force on an ungated attended launch.
+It is not an approval gate. A flag on the command line does not carry approval
 either, because any process that can invoke curator-run can type it.
 Enforcing the gate against a same-UID agent needs a protected record
 (section 2.1); until then it constrains cooperative launchers only. That
@@ -489,19 +491,23 @@ until a per-release qualification covers these cases:
 - behavior when a hook definition changes inside a running session.
 
 **Reload inside a running session.** The gate runs at every preparation,
-including resume, but cannot intercept a hook added or edited after start.
-Whether Codex 0.163.0 reloads hook definitions during a session is
-unmeasured. If it does, a hook changed in-session runs without a prompt only
-when its new hash already has a native approval. The approvals gate keeps
-foreign approvals out at start, so such an approval would have to appear
-during the session. Proposed required behavior: the qualification measures
-reload. If reload exists, the launcher records the gated definition set,
-and the next preparation reports any difference and gates the new set. The
-residual is in-session
-execution of a hook whose hash gained an approval mid-session. A lane with
-the sandbox bypassed can run the same code directly, so the residual adds
-no capability to the lane itself (section 3.5). Owner: operator, until
-separate homes per lane remove shared approvals.
+including resume, but decides only the hook set present at that
+preparation. It cannot intercept a hook added or edited after start. The
+gate admits an existing approval for any listed digest, including a digest
+whose definition is absent from the startup set, so an in-session
+definition can match a hash that was already listed and approved at start
+without any new approval. Whether and how Codex 0.163.0 reloads, looks up
+and executes hook definitions during a session is unmeasured; the
+source-exclusion record leaves hook execution unmeasured. Proposed required
+behavior: the qualification measures reload, lookup and execution. If
+reload exists, the launcher records the gated definition set, and the next
+preparation reports any difference and gates the new set. The residual is
+every in-session hook-set change outside the startup decision, including a
+definition that uses a retained approved hash, which the allowlist may
+still authorize. A lane with the sandbox bypassed can run the same code
+directly, so the residual adds no capability to the lane itself (section
+3.5). Owner: operator, until separate homes per lane remove shared
+approvals.
 
 ### 2.3 Recording, revocation and audit
 
