@@ -2372,6 +2372,9 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
 			continue
 		}
 		full := filepath.Join(plan.homeDir, filepath.FromSlash(path))
+		if v.checkClaudeCredentialLink(req, plan, path, target) {
+			continue
+		}
 		if plan.adapter.ID == envregistry.Muse {
 			state := req.inspectMuseAuth(full, target)
 			if !state.live && (state.err == nil || !strings.Contains(state.err.Error(), envregistry.DiagPassthroughUnreadable)) {
