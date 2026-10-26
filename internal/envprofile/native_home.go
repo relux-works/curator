@@ -86,17 +86,68 @@ func nativePathIsManaged(path, managerHome string) (bool, error) {
 			}
 		}
 	}
-	// No managed root exists yet. Preserve lexical containment of its
-	// unresolved tail after canonicalizing the existing ancestors above.
-	rel, err := filepath.Rel(root, candidate)
-	if err != nil {
-		// Different Windows volumes cannot contain each other.
-		if !strings.EqualFold(filepath.VolumeName(root), filepath.VolumeName(candidate)) {
-			return false, nil
+	// An absent root still has an existing physical ancestor. Rebase both
+	// unresolved tails on that identity so aliases of the manager directory
+	// cannot change containment before the environments directory is created.
+	anchor := filepath.Dir(root)
+	for {
+		state, err := stateread.Stat(anchor)
+		if err != nil {
+			return false, err
 		}
+		if state.Kind == stateread.KindPresent {
+			for current := candidate; ; current = filepath.Dir(current) {
+				candidateState, err := stateread.Stat(current)
+				if err != nil {
+					return false, err
+				}
+				if candidateState.Kind == stateread.KindPresent && os.SameFile(state.Info, candidateState.Info) {
+					rootTail, err := filepath.Rel(anchor, root)
+					if err != nil {
+						return false, err
+					}
+					candidateTail, err := filepath.Rel(current, candidate)
+					if err != nil {
+						return false, err
+					}
+					return nativeMissingTailContains(current, rootTail, candidateTail)
+				}
+				if filepath.Dir(current) == current {
+					return false, nil
+				}
+			}
+		}
+		parent := filepath.Dir(anchor)
+		if parent == anchor {
+			return false, fmt.Errorf("managed root has no observable physical ancestor")
+		}
+		anchor = parent
+	}
+}
+
+func nativeMissingTailContains(anchor, rootTail, candidateTail string) (bool, error) {
+	rel, err := filepath.Rel(rootTail, candidateTail)
+	if err != nil {
 		return false, err
 	}
-	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)), nil
+	if rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return true, nil
+	}
+	rootParts := strings.Split(rootTail, string(filepath.Separator))
+	candidateParts := strings.Split(candidateTail, string(filepath.Separator))
+	if len(candidateParts) >= len(rootParts) && strings.EqualFold(rootTail, filepath.Join(candidateParts[:len(rootParts)]...)) {
+		// Existing differently spelled children prove distinct identities when
+		// the root spelling is absent. With both spellings absent, no identity
+		// establishes filesystem case semantics: refuse instead of guessing.
+		state, err := stateread.Stat(filepath.Join(anchor, candidateParts[0]))
+		if err != nil {
+			return false, err
+		}
+		if state.Kind == stateread.KindAbsent {
+			return false, fmt.Errorf("cannot establish case identity of absent managed-root tails")
+		}
+	}
+	return false, nil
 }
 
 // Missing native directories are valid first-provisioning inputs. Resolve the

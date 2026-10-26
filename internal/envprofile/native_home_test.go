@@ -526,3 +526,126 @@ func TestNativeHomePhysicalContainment(t *testing.T) {
 		}
 	})
 }
+
+// An absent managed root must not change selection through a same-inode
+// manager alias. Outside native homes remain valid; selection creates nothing.
+func TestNativeHomeAbsentManagedRootContainment(t *testing.T) {
+	adapter, _ := adapterByID("codex_cli")
+	for _, mode := range []string{"outside", "selector", "default-without-selector", "default-after-managed-selector"} {
+		t.Run(mode, func(t *testing.T) {
+			manager := filepath.Join(t.TempDir(), "manager")
+			if err := os.Mkdir(manager, 0700); err != nil {
+				t.Fatal(err)
+			}
+			operator := t.TempDir()
+			t.Setenv("HOME", operator)
+			t.Setenv("USERPROFILE", operator)
+			aliasManager := filepath.Join(filepath.Dir(manager), "MANAGER")
+			if mode != "outside" {
+				original, err := os.Stat(manager)
+				if err != nil {
+					t.Fatal(err)
+				}
+				alias, err := os.Stat(aliasManager)
+				if err != nil || !os.SameFile(original, alias) {
+					t.Skip("test filesystem is case-sensitive: fixture does not expose a same-directory manager case alias")
+				}
+			}
+			candidate := filepath.Join(EnvRoot(aliasManager), "profile", "codex_cli")
+			if mode == "outside" {
+				candidate = filepath.Join(t.TempDir(), "native")
+				if err := os.Mkdir(candidate, 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			selector := candidate
+			isDefault := strings.HasPrefix(mode, "default-")
+			if isDefault {
+				t.Setenv("HOME", candidate)
+				t.Setenv("USERPROFILE", candidate)
+				if mode == "default-without-selector" {
+					selector = ""
+				}
+			}
+			t.Setenv("CODEX_HOME", selector)
+			for _, rootPresent := range []bool{false, true} {
+				if rootPresent {
+					if err := os.Mkdir(EnvRoot(manager), 0700); err != nil {
+						t.Fatal(err)
+					}
+				}
+				got, fallback, err := nativeHomeAt(adapter, manager)
+				switch {
+				case mode == "outside":
+					if err != nil || got != candidate || fallback {
+						t.Errorf("outside positive with rootPresent=%v: got %q fallback=%v err=%v", rootPresent, got, fallback, err)
+					}
+				case isDefault:
+					wantFallback := selector != ""
+					if err == nil || !strings.Contains(err.Error(), "native HOME default for codex_cli is inside the managed environments root") || got != "" || fallback != wantFallback {
+						t.Errorf("managed default with rootPresent=%v: got %q fallback=%v err=%v", rootPresent, got, fallback, err)
+					}
+				default:
+					want := filepath.Join(operator, ".codex")
+					if err != nil || got != want || !fallback {
+						t.Errorf("managed selector with rootPresent=%v: got %q fallback=%v err=%v", rootPresent, got, fallback, err)
+					}
+				}
+				if mode != "outside" {
+					if state, err := stateread.Lstat(candidate); err != nil || state.Kind != stateread.KindAbsent {
+						t.Errorf("selection changed absent candidate with rootPresent=%v: state=%v err=%v", rootPresent, state.Kind, err)
+					}
+				}
+				if !rootPresent {
+					if state, err := stateread.Lstat(EnvRoot(manager)); err != nil || state.Kind != stateread.KindAbsent {
+						t.Errorf("selection created managed root: state=%v err=%v", state.Kind, err)
+					}
+				}
+			}
+		})
+	}
+}
+
+// Missing case-variant tails have no identity evidence and must refuse. Once
+// created, the filesystem establishes either a managed alias or a distinct home.
+func TestNativeHomeAbsentRootCaseIdentity(t *testing.T) {
+	adapter, _ := adapterByID("codex_cli")
+	manager := filepath.Join(t.TempDir(), "manager")
+	if err := os.Mkdir(manager, 0700); err != nil {
+		t.Fatal(err)
+	}
+	operator := t.TempDir()
+	t.Setenv("HOME", operator)
+	t.Setenv("USERPROFILE", operator)
+	outside := filepath.Join(t.TempDir(), "native")
+	if err := os.Mkdir(outside, 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CODEX_HOME", outside)
+	if got, fallback, err := nativeHomeAt(adapter, manager); err != nil || got != outside || fallback {
+		t.Fatalf("outside positive: got %q fallback=%v err=%v", got, fallback, err)
+	}
+	candidate := filepath.Join(manager, "ENVIRONMENTS", "profile", "codex_cli")
+	t.Setenv("CODEX_HOME", candidate)
+	if got, fallback, err := nativeHomeAt(adapter, manager); err == nil || !strings.Contains(err.Error(), "cannot establish case identity of absent managed-root tails") || got != "" || fallback {
+		t.Errorf("ambiguous missing tail must refuse: got %q fallback=%v err=%v", got, fallback, err)
+	}
+	if state, err := stateread.Lstat(filepath.Join(manager, "ENVIRONMENTS")); err != nil || state.Kind != stateread.KindAbsent {
+		t.Fatalf("refusal changed absent tail: state=%v err=%v", state.Kind, err)
+	}
+	if err := os.MkdirAll(candidate, 0700); err != nil {
+		t.Fatal(err)
+	}
+	rootState, err := stateread.Stat(EnvRoot(manager))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, fallback, err := nativeHomeAt(adapter, manager)
+	if rootState.Kind == stateread.KindPresent {
+		if err != nil || got != filepath.Join(operator, ".codex") || !fallback {
+			t.Errorf("existing managed alias must fall back: got %q fallback=%v err=%v", got, fallback, err)
+		}
+	} else if err != nil || got != candidate || fallback {
+		t.Errorf("existing case-distinct outside must remain native: got %q fallback=%v err=%v", got, fallback, err)
+	}
+}
