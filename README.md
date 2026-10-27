@@ -405,6 +405,17 @@ no platform obligation is excluded. Raw streams and manifests are uploaded as
 `race-evidence-<platform>`. Run `go test ./tools/envprofilerace ./tools/ciworkflow`
 for coverage, refusal and workflow wiring controls.
 
+The `-lane windows-test` mode runs the ordinary Windows `internal/envprofile`,
+`internal/install` and `cmd/curator` tests across four shared jobs, with indices
+0 through 3. Each retains the 120m package timeout and must finish below 3600s.
+Run `go run ./tools/envprofilerace -lane windows-test -shard 0 -dir .temp/ci-evidence/windows-shard`
+on native Windows. The Test job downloads `windows-test-shard-<index>` artifacts
+and uses `go run ./tools/envprofilerace -lane windows-test -mode merge -dir .temp/windows-test-shards -out .temp/windows-merged.json`
+to admit the complete per-package native inventories and actual completions.
+Only the resulting `.packages` list removes packages from execution; their full
+JSON still reaches the unchanged platform gate in `test-evidence-windows-latest`.
+Linux/macOS ordinary tests and all race selectors retain their previous behavior.
+
 The marker/snapshot schema regexp engine is pinned to regexp2 v1.11.5, which
 fixes stale timeout deadlines after idle. Run
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envmarker -run TestMarker7AfterRegexpClockIdle -count=1`

@@ -31,6 +31,8 @@
 #   CI_REQUIRE_FULL_ROOT     1 = the root must serve every package
 #   CI_ENVPROFILE_SHARDS     downloaded same-head race artifacts; verified before
 #                            replacing envprofile with their combined JSON
+#   CI_WINDOWS_TEST_SHARDS   four native Windows test artifacts for the three
+#                            measured slow packages; admits their complete union
 #
 # The gate never rewrites, relaxes or retries a failing run.
 
@@ -108,6 +110,25 @@ run_stage() {
 }
 
 TEST_RC=0
+
+if [ -n "${CI_WINDOWS_TEST_SHARDS:-}" ]; then
+	if [ -n "${GO_TEST_FLAGS:-}" ] || [ "$GO_TEST_TIMEOUT" != '120m' ] ||
+		[ -n "${CI_ENVPROFILE_SHARDS:-}" ]; then
+		echo 'test-gate: Windows shard evidence requires the ordinary 120m lane' >&2
+		exit 2
+	fi
+	"$GO" run ./tools/envprofilerace -lane windows-test -mode merge \
+		-dir "$CI_WINDOWS_TEST_SHARDS" -out "$EVIDENCE/windows-merged.json" || exit 1
+	while IFS= read -r package; do
+		if ! grep -qxF "$package" "$SERVED"; then
+			echo "test-gate: admitted Windows package is not served: $package" >&2
+			exit 2
+		fi
+	done <"$EVIDENCE/windows-merged.json.packages"
+	cat "$EVIDENCE/windows-merged.json" >>"$JSON"
+	grep -vxF -f "$EVIDENCE/windows-merged.json.packages" "$SERVED" >"$EVIDENCE/plan-served-windows-remaining.txt"
+	SERVED="$EVIDENCE/plan-served-windows-remaining.txt"
+fi
 
 # Race jobs execute envprofile on separate runners. Admit only a complete,
 # same-head/platform union, then keep its subtests in the ordinary platform gate.

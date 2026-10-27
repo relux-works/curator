@@ -158,7 +158,87 @@ jobs:
   # excluded on linux with its fail-closed rejection asserted there. Nothing is
   # dropped without appearing in the uploaded evidence.
   # ---------------------------------------------------------------------------
+  # Four jobs share all three measured slow Windows packages; no OS cross product.
+  windows-test-shards:
+    name: Windows tests (shard ${{ matrix.shard }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Checkout authoritative protocol suite
+        uses: actions/checkout@v4
+        with:
+          repository: relux-works/curator-spec
+          ref: ${{ env.SPEC_PIN }}
+          path: protocol-spec
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify pnpm pin matches Go constant
+        shell: bash
+        run: bash .github/ci/pnpm-pin-guard.sh
+
+      - name: Install pinned pnpm via npm
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Lane-local prefix: npm stages a REAL pnpm package root here, which
+          # the TestRealPinnedPNPM* cases need (they resolve the executable
+          # and stage dir(dir(entrypoint))). A corepack dispatcher shim
+          # provides no such root (rehearsal: MODULE_NOT_FOUND).
+          npm install -g --prefix "$RUNNER_TEMP/pnpm-prefix" "pnpm@${{ env.PNPM_PIN }}"
+          # npm lays out the global bin dir per platform ($prefix/bin on unix,
+          # the prefix root itself on Windows); prepend both so the pinned
+          # pnpm is first on PATH on every runner and outranks any ambient
+          # shim (macbook-iv run 35072267145).
+          echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
+          echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
+
+      - name: Verify rust pin matches Go constant
+        shell: bash
+        run: bash .github/ci/rust-pin-guard.sh
+
+      # rustup is the installer on every runner: the hosted images ship it,
+      # and the self-hosted runner gets it once per
+      # docs/self-hosted-runner-setup.md. The install step reads the channel
+      # from rust-toolchain.toml (verified above against
+      # internal/rustsource.SupportedRustToolchainVersion), installs exactly
+      # that toolchain, and prepends the rustup shim directory to PATH, so
+      # `rustc -vV` in the rustsource production cases resolves the pinned
+      # release instead of failing the lane (rose-air run 35121791685).
+      - name: Install pinned Rust toolchain via rustup
+        shell: bash
+        run: bash .github/ci/install-rust-toolchain.sh
+
+      - name: Verify Go toolchain identity
+        shell: bash
+        run: bash .github/ci/toolchain-identity.sh
+
+      - name: Run Windows shard (120m timeout, <60m per package)
+        shell: bash
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+        run: env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS -u GIT_CONFIG_COUNT -u GIT_CONFIG_PARAMETERS -u CODEX_HOME -u CLAUDE_CONFIG_DIR -u PI_CODING_AGENT_DIR -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME HOME="$(mktemp -d)" go run ./tools/envprofilerace -lane windows-test -shard ${{ matrix.shard }} -dir .temp/ci-evidence/windows-shard
+      - name: Upload Windows shard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-shard-${{ matrix.shard }}
+          path: .temp/ci-evidence/windows-shard/
+          if-no-files-found: error
+
   test:
+    if: ${{ !cancelled() }}
+    needs: windows-test-shards
     name: Test (${{ matrix.os }})
     # Linux entries run on the repository's self-hosted Linux runners when the
     # LINUX_SELF_HOSTED repository variable is true, for pushes, dispatches and
@@ -334,7 +414,23 @@ jobs:
       # 25.7%, 15.5%, 31.0%, and 14.9%. Run 35713206841 hit 1800.165s in
       # Test/ubuntu and run 35994653101 hit 1800.100s in Race/ubuntu during
       # runner contention. Every lane retains Go's fatal per-package timeout.
+      - name: Download Windows test shards
+        if: runner.os == 'Windows'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: windows-test-shard-*
+          path: .temp/windows-test-shards
+      - name: Windows go test + platform-case gate
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+          GO_TEST_TIMEOUT: 120m
+          CI_WINDOWS_TEST_SHARDS: .temp/windows-test-shards
+        run: env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS -u GIT_CONFIG_COUNT -u GIT_CONFIG_PARAMETERS -u CODEX_HOME -u CLAUDE_CONFIG_DIR -u PI_CODING_AGENT_DIR -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME HOME="$(mktemp -d)" bash .github/ci/test-gate.sh .temp/ci-evidence/test
+
       - name: go test + platform-case gate
+        if: runner.os != 'Windows'
         shell: bash
         env:
           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1

@@ -1,4 +1,4 @@
-// Command envprofilerace partitions envprofile race tests and verifies their evidence.
+// Command envprofilerace partitions CI test lanes and verifies their evidence.
 package main
 
 import (
@@ -81,11 +81,20 @@ func selector(tests []string) string {
 }
 
 func inventory() ([]string, error) {
-	cmd := exec.Command("go", "test", "-race", "-list", ".", "./internal/envprofile")
+	return nativeInventory("./internal/envprofile", true)
+}
+
+func nativeInventory(path string, race bool) ([]string, error) {
+	args := []string{"test"}
+	if race {
+		args = append(args, "-race")
+	}
+	// #nosec G204 -- Callers supply fixed package constants; no shell is invoked.
+	cmd := exec.Command("go", append(args, "-list", ".", path)...)
 	cmd.Stderr = os.Stderr
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("list race tests: %w", err)
+		return nil, fmt.Errorf("list tests for %s: %w", path, err)
 	}
 	var tests []string
 	for _, line := range strings.Split(string(out), "\n") {
@@ -94,7 +103,7 @@ func inventory() ([]string, error) {
 		}
 	}
 	if len(tests) == 0 {
-		return nil, fmt.Errorf("empty race test inventory")
+		return nil, fmt.Errorf("empty test inventory for %s", path)
 	}
 	sort.Strings(tests)
 	return tests, nil
@@ -180,6 +189,10 @@ func runShard(dir string, shard int) error {
 // Require completed top-level tests, not just the planned -run expression.
 // Subtest obligations and skip classification remain with platform-case-gate.sh.
 func validateStream(data []byte, tests []string) (float64, error) {
+	return validatePackageStream(data, tests, pkg, marginSeconds)
+}
+
+func validatePackageStream(data []byte, tests []string, packageName string, margin float64) (float64, error) {
 	want := map[string]bool{}
 	for _, name := range tests {
 		want[name] = true
@@ -197,7 +210,7 @@ func validateStream(data []byte, tests []string) (float64, error) {
 		if err != nil {
 			return 0, fmt.Errorf("invalid test JSON: %w", err)
 		}
-		if e.Package != pkg {
+		if e.Package != packageName {
 			return 0, fmt.Errorf("unexpected package %q", e.Package)
 		}
 		if e.Action == "fail" {
@@ -222,8 +235,8 @@ func validateStream(data []byte, tests []string) (float64, error) {
 	if packages != 1 {
 		return 0, fmt.Errorf("want one passing package, got %d", packages)
 	}
-	if elapsed <= 0 || elapsed >= marginSeconds {
-		return 0, fmt.Errorf("package elapsed %.3fs outside (0,%d)s margin", elapsed, marginSeconds)
+	if elapsed <= 0 || elapsed >= margin {
+		return 0, fmt.Errorf("package elapsed %.3fs outside (0,%.0f)s margin", elapsed, margin)
 	}
 	return elapsed, nil
 }
@@ -280,27 +293,34 @@ func mergeEvidence(dir, out string, tests []string, commit, goos string) error {
 }
 
 func main() {
+	lane := flag.String("lane", "race", "race or windows-test")
 	mode := flag.String("mode", "run", "run or merge")
 	dir := flag.String("dir", "", "shard output, or downloaded artifact directory")
 	out := flag.String("out", "", "merged JSON output")
 	shard := flag.Int("shard", -1, "zero-based shard index")
 	flag.Parse()
 	var err error
-	switch *mode {
-	case "run":
-		err = runShard(*dir, *shard)
-	case "merge":
-		var tests []string
-		var commit string
-		tests, err = inventory()
-		if err == nil {
-			commit, err = sourceCommit()
+	if *lane == "windows-test" {
+		err = windowsLane(*mode, *dir, *out, *shard)
+	} else if *lane != "race" {
+		err = fmt.Errorf("unknown lane %q", *lane)
+	} else {
+		switch *mode {
+		case "run":
+			err = runShard(*dir, *shard)
+		case "merge":
+			var tests []string
+			var commit string
+			tests, err = inventory()
+			if err == nil {
+				commit, err = sourceCommit()
+			}
+			if err == nil {
+				err = mergeEvidence(*dir, *out, tests, commit, runtime.GOOS)
+			}
+		default:
+			err = fmt.Errorf("unknown mode %q", *mode)
 		}
-		if err == nil {
-			err = mergeEvidence(*dir, *out, tests, commit, runtime.GOOS)
-		}
-	default:
-		err = fmt.Errorf("unknown mode %q", *mode)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "envprofilerace:", err)

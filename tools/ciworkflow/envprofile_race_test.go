@@ -72,12 +72,12 @@ func TestEnvprofileRaceWiring(t *testing.T) {
 	}
 	for name, pair := range map[string][2]string{
 		"dropped-shard":        {"shard: [0, 1, 2, 3, 4, 5, 6, 7, 8]", "shard: [0, 1, 2, 3, 4, 5, 6, 7]"},
-		"skipped-failure-gate": {"    if: ${{ !cancelled() }}", "    if: success()"},
+		"skipped-failure-gate": {"    if: ${{ !cancelled() }}\n    needs: envprofile-race", "    if: success()\n    needs: envprofile-race"},
 		"no-dependency":        {"needs: envprofile-race", "needs: test"},
 		"only-main":            {"  envprofile-race:\n", "  envprofile-race:\n    if: github.event_name == 'push'\n"},
 		"wrong-platform":       {"pattern: envprofile-race-${{ matrix.os }}-*", "pattern: envprofile-race-ubuntu-latest-*"},
 		"no-consumption":       {"CI_ENVPROFILE_SHARDS: .temp/envprofile-shards", "CI_OTHER_SHARDS: .temp/envprofile-shards"},
-		"lost-selector":        {"-shard ${{ matrix.shard }}", "-shard 0"},
+		"lost-selector":        {"./tools/envprofilerace -shard ${{ matrix.shard }}", "./tools/envprofilerace -shard 0"},
 		"lost-upload":          {"name: envprofile-race-${{ matrix.os }}-${{ matrix.shard }}", "name: envprofile-race-${{ matrix.os }}"},
 	} {
 		t.Run(name, func(t *testing.T) {
