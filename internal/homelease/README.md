@@ -66,8 +66,15 @@ tombstone; it makes no claim to have killed any process.
 Run the store, schema, journal and writer regressions with:
 
 ```sh
-env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS go test ./internal/homelease/... ./internal/envprofile ./internal/transaction ./internal/projectlease ./internal/scopes ./cmd/curator
+runner_home=$(mktemp -d)
+env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS HOME="$runner_home" \
+  go test ./internal/homelease/... ./internal/envprofile ./internal/transaction ./internal/projectlease ./internal/scopes ./cmd/curator
 ```
+
+The envprofile and CLI package entry points additionally isolate native defaults
+before tests and verify protected operator context/marker/skill identities on
+exit. Their bounded negative controls use synthetic original homes only; see
+[`testhomeguard`](../testhomeguard/README.md).
 
 The exact accepted **131 paired schema vectors** run in
 `state.TestAcceptedSchemaCorpus`. Runtime tests exercise real temporary stores,
