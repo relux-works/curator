@@ -17,7 +17,7 @@ const controlOrigin = "CURATOR_TEST_NATIVE_GUARD_ORIGIN"
 // Control proves the actual package-exit guard detects a bounded write through
 // an unpinned HOME. Both child original homes are temporary fixture directories;
 // the plant never selects the OS account home. The paired isolated write passes.
-func Control(t *testing.T, childTest string) {
+func Control(t *testing.T, childTest string, childEnv ...string) {
 	t.Helper()
 	for _, mode := range []string{"isolated", "plant"} {
 		t.Run(mode, func(t *testing.T) {
@@ -37,6 +37,7 @@ func Control(t *testing.T, childTest string) {
 				cmd.Env = append(cmd.Env, entry)
 			}
 			cmd.Env = append(cmd.Env, "HOME="+origin, "USERPROFILE="+origin, "XDG_CONFIG_HOME="+filepath.Join(origin, ".config"), controlMode+"="+mode, controlOrigin+"="+origin)
+			cmd.Env = append(cmd.Env, childEnv...)
 			out, err := cmd.CombinedOutput()
 			if mode == "plant" {
 				exit, ok := err.(*exec.ExitError)
@@ -76,9 +77,16 @@ func Child(t *testing.T, resolve func() (string, error)) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	inside, err := filepath.Rel(origin, path)
-	if err != nil || (mode == "plant") != (inside != ".." && !strings.HasPrefix(inside, ".."+string(filepath.Separator))) {
-		t.Fatal("plant resolved an unexpected native home")
+	allowedRoot := isolatedHome
+	if mode == "plant" {
+		allowedRoot = origin
+	}
+	if !filepath.IsAbs(allowedRoot) {
+		t.Fatal("missing synthetic write boundary")
+	}
+	inside, err := filepath.Rel(allowedRoot, path)
+	if err != nil || inside == ".." || strings.HasPrefix(inside, ".."+string(filepath.Separator)) {
+		t.Fatal("control resolved outside its synthetic write boundary")
 	}
 	if err := os.MkdirAll(path, 0700); err != nil {
 		t.Fatal(err)
