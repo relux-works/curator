@@ -169,12 +169,15 @@ func TestSnapshotIdentity(t *testing.T) {
 	}
 }
 
-// Root runtime churn and the two exact session-projector metadata leaves are
-// ignored. Profile payloads at adjacent and deeper paths still fail with an
+const fixtureBucketID = "01234567-0123-0123-0123-0123456789ab_abcdef01-abcd-abcd-abcd-abcdef012345"
+
+// Root runtime churn and regular leaves of a registered native runtime bucket
+// are ignored. Profile payloads at adjacent and deeper paths still fail with an
 // equal-size/restored-mtime content mutation, including manifests and backups.
 func TestRuntimeChurnAndRenderedPayloads(t *testing.T) {
 	root := t.TempDir()
-	protected := []string{"settings.json", ".claude.json", ".agent-environment.json", ".agent-environment-backup/settings.json", "skills/copied/manifest.json", "skills/synced/fixture/SKILL.md", "skills/synced/fixture/nested/manifest.json"}
+	bucket := "skills/synced/" + fixtureBucketID
+	protected := []string{"settings.json", ".claude.json", ".agent-environment.json", ".agent-environment-backup/settings.json", ".agent-context/modules/fixture/instruction.md", "skills/copied/manifest.json", bucket + "/SKILL.md", bucket + "/nested/manifest.json"}
 	write := func(name, body string) {
 		t.Helper()
 		path := filepath.Join(root, filepath.FromSlash(name))
@@ -188,12 +191,15 @@ func TestRuntimeChurnAndRenderedPayloads(t *testing.T) {
 	for _, name := range protected {
 		write(name, "before")
 	}
+	write("skills/synced/.bucket-"+fixtureBucketID, "registered")
+	write(bucket+"/manifest.json", "before")
+	write(bucket+"/.last-complete-round", "before")
 	before, err := snapshot([]string{root})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// These are native-root runtime names, never exclusions inside skill payloads.
-	for _, name := range []string{"sessions/event", "history/event", "history.jsonl", "sqlite/state", "state_5.sqlite", "state_5.sqlite-wal", "state_5.sqlite-shm", "models_cache/event", "models_cache.json", "global-state/event", "global-state.json", ".global-state.json", "shell-snapshots/event", "todos/event", "statsig/event", "backups/event", "logs/event", "projects/event", "skills/synced/fixture/manifest.json", "skills/synced/fixture/.last-complete-round"} {
+	for _, name := range []string{"sessions/event", "history/event", "history.jsonl", "sqlite/state", "state_5.sqlite", "state_5.sqlite-wal", "state_5.sqlite-shm", "models_cache/event", "models_cache.json", "global-state/event", "global-state.json", ".global-state.json", "shell-snapshots/event", "todos/event", "statsig/event", "backups/event", "logs/event", "projects/event", bucket + "/manifest.json", bucket + "/.last-complete-round"} {
 		write(name, "runtime")
 	}
 	after, err := snapshot([]string{root})
