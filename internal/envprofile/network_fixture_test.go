@@ -1,7 +1,9 @@
 package envprofile
 
 import (
+	"fmt"
 	"github.com/relux-works/curator/internal/testgitenv"
+	"github.com/relux-works/curator/internal/testhomeguard"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,6 +60,11 @@ func TestMain(m *testing.M) {
 	if name := filepath.Base(os.Args[0]); name == "git" || name == "git.exe" {
 		os.Exit(runMissingPinGit())
 	}
+	guard, err := testhomeguard.Start()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	// Scrub ambient Git and native roots before declaring this package's
 	// explicit fixture homes; isolation must not erase those selected roots.
 	restoreGitEnv := testgitenv.Isolate()
@@ -96,7 +103,7 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	restoreGitEnv()
 	_ = os.RemoveAll(testHome)
-	os.Exit(code)
+	os.Exit(guard.Finish(code))
 }
 
 // gitIdentities serves local git repositories under fake canonical network

@@ -29,6 +29,7 @@ import (
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/testgitenv"
+	"github.com/relux-works/curator/internal/testhomeguard"
 	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
@@ -47,24 +48,30 @@ func TestMain(m *testing.M) {
 		if path := os.Getenv("CURATOR_TEST_MCP_TRIPWIRE"); path != "" {
 			_ = os.WriteFile(path, []byte("invoked"), 0600)
 		}
-		os.Exit(97)
+		exitGuardedTests(97)
 	}
 
 	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
-		os.Exit(runNativeBuildWorker())
+		exitGuardedTests(runNativeBuildWorker())
+	}
+	var guardErr error
+	testNativeHomeGuard, guardErr = testhomeguard.Start()
+	if guardErr != nil {
+		fmt.Fprintln(os.Stderr, guardErr)
+		exitGuardedTests(2)
 	}
 	// Before any branch that runs tests: a CLI helper child runs git too.
 	restoreGitEnv := testgitenv.Isolate()
 	if os.Getenv(cliHelperProcess) == "1" {
 		code := m.Run()
 		restoreGitEnv()
-		os.Exit(code)
+		exitGuardedTests(code)
 	}
 	restorePath, err := isolateCLIPath()
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "isolate CLI test PATH:", err)
 		restoreGitEnv()
-		os.Exit(1)
+		exitGuardedTests(1)
 	}
 	// The parent already holds the host-toolchain lock. These children run
 	// only PATH isolation witnesses, including their explicit provider cases.
@@ -88,12 +95,12 @@ func TestMain(m *testing.M) {
 		code := m.Run()
 		restorePath()
 		restoreGitEnv()
-		os.Exit(code)
+		exitGuardedTests(code)
 	}
 	code := m.Run()
 	restorePath()
 	restoreGitEnv()
-	os.Exit(code)
+	exitGuardedTests(code)
 }
 
 func TestCLIHelperProcess(t *testing.T) {
@@ -110,9 +117,9 @@ func TestCLIHelperProcess(t *testing.T) {
 		}
 	}
 	if separator < 0 {
-		os.Exit(exitUsage)
+		exitGuardedTests(exitUsage)
 	}
-	os.Exit(run(os.Args[separator+1:], fileConfigSource(os.Getenv(cliHelperConfig)), os.Stdout, os.Stderr))
+	exitGuardedTests(run(os.Args[separator+1:], fileConfigSource(os.Getenv(cliHelperConfig)), os.Stdout, os.Stderr))
 }
 
 // capture runs one CLI invocation with a private config source and output
