@@ -1,0 +1,15 @@
+{
+  "cases": [
+    {"name": "unchanged", "path": ["admitted"], "value": false, "expected": []},
+    {"name": "same-version-different-bytes", "path": ["releases", "codex", "sha256"], "value": "0000000000000000000000000000000000000000000000000000000000000000", "expected": ["release"]},
+    {"name": "new-version-same-verdicts", "path": ["releases", "claude", "version"], "value": "synthetic-next", "expected": ["release"]},
+    {"name": "unknown-becomes-pass", "path": ["verdicts", "muse/interactive/permissions", "verdict"], "value": "pass", "expected": ["verdict"]},
+    {"name": "fail-becomes-pass", "path": ["verdicts", "muse/exec/memory-off", "verdict"], "value": "pass", "expected": ["verdict"]},
+    {"name": "pass-becomes-fail", "path": ["verdicts", "claude/exec/project-mcp", "verdict"], "baseline_value": "pass", "value": "fail", "expected": ["verdict"]},
+    {"name": "pass-becomes-unknown", "path": ["verdicts", "claude/exec/project-mcp", "verdict"], "baseline_value": "pass", "value": "unknown", "expected": ["verdict"]},
+    {"name": "missing-form", "path": ["verdicts", "codex/resume/hooks"], "delete": true, "expected": ["invalid"]},
+    {"name": "unrecognized-verdict", "path": ["verdicts", "codex/exec/hooks", "verdict"], "value": "qualified", "expected": ["invalid"]},
+    {"name": "admission-injection", "path": ["admitted"], "value": true, "expected": ["invalid"]},
+    {"name": "missing-evidence", "path": ["verdicts", "claude/exec/project-mcp", "evidence"], "value": "", "expected": ["invalid"]}
+  ]
+}

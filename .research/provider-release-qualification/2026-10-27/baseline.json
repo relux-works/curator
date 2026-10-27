@@ -1,0 +1,205 @@
+{
+  "format": "provider-release-observations-v1",
+  "platform": "darwin/arm64",
+  "observed_date": "2026-10-27",
+  "admitted": false,
+  "releases": {
+    "codex": {
+      "sha256": "8813367285524ac798dd96d1b071aea30d58708c7226fd236cd275cf1cfdee31",
+      "size_bytes": 249952688,
+      "version": "0.163.0"
+    },
+    "claude": {
+      "sha256": "85d8c08707fcfd1e78ffa0204eefbc6ec9e4fe22f375fb2767ef85d957ed3161",
+      "size_bytes": 276185504,
+      "version": "2.1.311"
+    },
+    "muse": {
+      "sha256": "9fd40ae9c6dfb847e3ef58b61405c004d0ebbf19ceb0297be966f750b3b84aa0",
+      "size_bytes": 408650416,
+      "version": "1.4.13-R6996.1"
+    }
+  },
+  "verdicts": {
+    "codex/interactive/permissions": {
+      "verdict": "unknown",
+      "evidence": "C1: TestCodexShellDenial and TestNestedSandboxControl; no successful sandboxed write positive, no universal manager ceiling. Startup stopped at trust; no tool/model turn or memory cycle. No exec-to-interactive transfer."
+    },
+    "codex/interactive/memory-off": {
+      "verdict": "unknown",
+      "evidence": "C2: fresh read and dedicated manual tools pass; spontaneous automatic writes unmeasured. Startup stopped at trust; no tool/model turn or memory cycle. No exec-to-interactive transfer."
+    },
+    "codex/interactive/project-mcp": {
+      "verdict": "unknown",
+      "evidence": "C3: explicit tool gates pass; shared app-server trust/MCP pairs pass, but complete manager-only project MCP policy and form parity are unproved. Startup stopped at trust; no tool/model turn or memory cycle. No exec-to-interactive transfer."
+    },
+    "codex/interactive/project-trust": {
+      "verdict": "unknown",
+      "evidence": "C4: private PTY prompts for trust; app-server trusted/untrusted config pairs pass; no complete form-specific operator binding. Startup stopped at trust; no tool/model turn or memory cycle. No exec-to-interactive transfer."
+    },
+    "codex/interactive/hooks": {
+      "verdict": "unknown",
+      "evidence": "C5: hooks/list pairs measure catalogs only; no native hook execution/denial pair for this form. Startup stopped at trust; no tool/model turn or memory cycle. No exec-to-interactive transfer."
+    },
+    "codex/exec/permissions": {
+      "verdict": "unknown",
+      "evidence": "C1: TestCodexShellDenial and TestNestedSandboxControl; no successful sandboxed write positive, no universal manager ceiling."
+    },
+    "codex/exec/memory-off": {
+      "verdict": "unknown",
+      "evidence": "C2: fresh read and dedicated manual tools pass; spontaneous automatic writes unmeasured."
+    },
+    "codex/exec/project-mcp": {
+      "verdict": "unknown",
+      "evidence": "C3: explicit tool gates pass; shared app-server trust/MCP pairs pass, but complete manager-only project MCP policy and form parity are unproved."
+    },
+    "codex/exec/project-trust": {
+      "verdict": "unknown",
+      "evidence": "C4: private PTY prompts for trust; app-server trusted/untrusted config pairs pass; no complete form-specific operator binding."
+    },
+    "codex/exec/hooks": {
+      "verdict": "unknown",
+      "evidence": "C5: hooks/list pairs measure catalogs only; no native hook execution/denial pair for this form."
+    },
+    "codex/resume/permissions": {
+      "verdict": "unknown",
+      "evidence": "C1: TestCodexShellDenial and TestNestedSandboxControl; no successful sandboxed write positive, no universal manager ceiling."
+    },
+    "codex/resume/memory-off": {
+      "verdict": "fail",
+      "evidence": "C2: TestCodexMemoryResume; actual exec resume --last retains earlier enabled-memory assistant text despite all five off flags."
+    },
+    "codex/resume/project-mcp": {
+      "verdict": "unknown",
+      "evidence": "C3: explicit tool gates pass; shared app-server trust/MCP pairs pass, but complete manager-only project MCP policy and form parity are unproved."
+    },
+    "codex/resume/project-trust": {
+      "verdict": "unknown",
+      "evidence": "C4: private PTY prompts for trust; app-server trusted/untrusted config pairs pass; no complete form-specific operator binding."
+    },
+    "codex/resume/hooks": {
+      "verdict": "unknown",
+      "evidence": "C5: hooks/list pairs measure catalogs only; no native hook execution/denial pair for this form."
+    },
+    "claude/interactive/permissions": {
+      "verdict": "unknown",
+      "evidence": "A1: granted and denied Bash/Edit/Write/MCP pairs pass; WebFetch positive and full source isolation do not. Startup stopped at trust; no tool/model turn or memory cycle. No exec-to-interactive transfer."
+    },
+    "claude/interactive/memory-off": {
+      "verdict": "unknown",
+      "evidence": "A2: seeded automatic read-off passes; no discriminating spontaneous automatic-write activation. Startup stopped at trust; no tool/model turn or memory cycle. No exec-to-interactive transfer."
+    },
+    "claude/interactive/project-mcp": {
+      "verdict": "unknown",
+      "evidence": "A3: fresh strict-mcp-config has actual process-start pairs; other entry forms have no project-source process pair. Startup stopped at trust; no tool/model turn or memory cycle. No exec-to-interactive transfer."
+    },
+    "claude/interactive/project-trust": {
+      "verdict": "unknown",
+      "evidence": "A4: private PTY displays trust prompt before hook; no complete per-form operator grant binding. Startup stopped at trust; no tool/model turn or memory cycle. No exec-to-interactive transfer."
+    },
+    "claude/interactive/hooks": {
+      "verdict": "unknown",
+      "evidence": "A5: fresh project hook executes without a persisted checkout trust grant; strict source exclusion also removes native project context. Startup stopped at trust; no tool/model turn or memory cycle. No exec-to-interactive transfer."
+    },
+    "claude/exec/permissions": {
+      "verdict": "fail",
+      "evidence": "A1: TestProjectPermissions/none,project,local; both repository deny sources defeat manager Read grant while native project/profile context remains."
+    },
+    "claude/exec/memory-off": {
+      "verdict": "unknown",
+      "evidence": "A2: seeded automatic read-off passes; no discriminating spontaneous automatic-write activation."
+    },
+    "claude/exec/project-mcp": {
+      "verdict": "pass",
+      "evidence": "A3: TestP5MCP exclude-false strict true/false, empty/nonempty project sets, approved true/false; strict config excludes actual foreign process while retaining approved process. Fresh print only."
+    },
+    "claude/exec/project-trust": {
+      "verdict": "fail",
+      "evidence": "A4/A5: TestP4Hooks/exclude-false plus startup claude-exec hook_effect=true; native project hook executes in fresh untrusted print. Repository permission allows are separately ignored in 2.1.311."
+    },
+    "claude/exec/hooks": {
+      "verdict": "fail",
+      "evidence": "A4/A5: TestP4Hooks/exclude-false plus startup claude-exec hook_effect=true; native project hook executes in fresh untrusted print. Repository permission allows are separately ignored in 2.1.311."
+    },
+    "claude/resume/permissions": {
+      "verdict": "unknown",
+      "evidence": "A1: granted and denied Bash/Edit/Write/MCP pairs pass; WebFetch positive and full source isolation do not."
+    },
+    "claude/resume/memory-off": {
+      "verdict": "fail",
+      "evidence": "A2: TestMemoryResumeHistory; real --resume retains enabled-origin automatic-memory marker after setting CLAUDE_CODE_DISABLE_AUTO_MEMORY=1."
+    },
+    "claude/resume/project-mcp": {
+      "verdict": "unknown",
+      "evidence": "A3: fresh strict-mcp-config has actual process-start pairs; other entry forms have no project-source process pair."
+    },
+    "claude/resume/project-trust": {
+      "verdict": "unknown",
+      "evidence": "A4: private PTY displays trust prompt before hook; no complete per-form operator grant binding."
+    },
+    "claude/resume/hooks": {
+      "verdict": "unknown",
+      "evidence": "A5: fresh project hook executes without a persisted checkout trust grant; strict source exclusion also removes native project context."
+    },
+    "muse/interactive/permissions": {
+      "verdict": "unknown",
+      "evidence": "M1: individual tool flags pass except managed bash positive; no manager-wide ceiling or repository permission-source isolation proof. Startup stopped at trust; no tool/model turn or memory cycle. No exec-to-interactive transfer."
+    },
+    "muse/interactive/memory-off": {
+      "verdict": "unknown",
+      "evidence": "M2: disable-write still permits real read_memory; same-ID exec re-entry retains memory. Canonical interactive resume is a different form. Startup stopped at trust; no tool/model turn or memory cycle. No exec-to-interactive transfer."
+    },
+    "muse/interactive/project-mcp": {
+      "verdict": "unknown",
+      "evidence": "M3: fresh untrusted exec excludes project config; trusting real resume revives catalog; working MCP tool enforcement unmeasured. Startup stopped at trust; no tool/model turn or memory cycle. No exec-to-interactive transfer."
+    },
+    "muse/interactive/project-trust": {
+      "verdict": "unknown",
+      "evidence": "M4: private PTY and real retained-session resume prompt for trust; hook/MCP behavior changes after synthetic trust. Exact operator/hook-byte grant binding unmeasured. Startup stopped at trust; no tool/model turn or memory cycle. No exec-to-interactive transfer."
+    },
+    "muse/interactive/hooks": {
+      "verdict": "unknown",
+      "evidence": "M5: approved hook runs in fresh untrusted exec, project hook only after resume trust; no complete manager hook policy across lifecycle. Startup stopped at trust; no tool/model turn or memory cycle. No exec-to-interactive transfer."
+    },
+    "muse/exec/permissions": {
+      "verdict": "unknown",
+      "evidence": "M1: individual tool flags pass except managed bash positive; no manager-wide ceiling or repository permission-source isolation proof."
+    },
+    "muse/exec/memory-off": {
+      "verdict": "fail",
+      "evidence": "M2: disable-write still permits real read_memory; same-ID exec re-entry retains memory. Canonical interactive resume is a different form."
+    },
+    "muse/exec/project-mcp": {
+      "verdict": "unknown",
+      "evidence": "M3: fresh untrusted exec excludes project config; trusting real resume revives catalog; working MCP tool enforcement unmeasured."
+    },
+    "muse/exec/project-trust": {
+      "verdict": "unknown",
+      "evidence": "M4: private PTY and real retained-session resume prompt for trust; hook/MCP behavior changes after synthetic trust. Exact operator/hook-byte grant binding unmeasured."
+    },
+    "muse/exec/hooks": {
+      "verdict": "unknown",
+      "evidence": "M5: approved hook runs in fresh untrusted exec, project hook only after resume trust; no complete manager hook policy across lifecycle."
+    },
+    "muse/resume/permissions": {
+      "verdict": "unknown",
+      "evidence": "M1: individual tool flags pass except managed bash positive; no manager-wide ceiling or repository permission-source isolation proof."
+    },
+    "muse/resume/memory-off": {
+      "verdict": "unknown",
+      "evidence": "M2: disable-write still permits real read_memory; same-ID exec re-entry retains memory. Canonical interactive resume is a different form."
+    },
+    "muse/resume/project-mcp": {
+      "verdict": "unknown",
+      "evidence": "M3: fresh untrusted exec excludes project config; trusting real resume revives catalog; working MCP tool enforcement unmeasured."
+    },
+    "muse/resume/project-trust": {
+      "verdict": "unknown",
+      "evidence": "M4: private PTY and real retained-session resume prompt for trust; hook/MCP behavior changes after synthetic trust. Exact operator/hook-byte grant binding unmeasured."
+    },
+    "muse/resume/hooks": {
+      "verdict": "unknown",
+      "evidence": "M5: approved hook runs in fresh untrusted exec, project hook only after resume trust; no complete manager hook policy across lifecycle."
+    }
+  }
+}

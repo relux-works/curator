@@ -1,0 +1,84 @@
+{
+  "controls": [
+    {
+      "case": "unchanged",
+      "caught": [],
+      "admitted": false
+    },
+    {
+      "case": "same-version-different-bytes",
+      "caught": [
+        "release"
+      ],
+      "admitted": false
+    },
+    {
+      "case": "new-version-same-verdicts",
+      "caught": [
+        "release"
+      ],
+      "admitted": false
+    },
+    {
+      "case": "unknown-becomes-pass",
+      "caught": [
+        "verdict"
+      ],
+      "admitted": false
+    },
+    {
+      "case": "fail-becomes-pass",
+      "caught": [
+        "verdict"
+      ],
+      "admitted": false
+    },
+    {
+      "case": "pass-becomes-fail",
+      "caught": [
+        "verdict"
+      ],
+      "admitted": false
+    },
+    {
+      "case": "pass-becomes-unknown",
+      "caught": [
+        "verdict"
+      ],
+      "admitted": false
+    },
+    {
+      "case": "missing-form",
+      "caught": [
+        "invalid"
+      ],
+      "admitted": false
+    },
+    {
+      "case": "unrecognized-verdict",
+      "caught": [
+        "invalid"
+      ],
+      "admitted": false
+    },
+    {
+      "case": "admission-injection",
+      "caught": [
+        "invalid"
+      ],
+      "admitted": false
+    },
+    {
+      "case": "missing-evidence",
+      "caught": [
+        "invalid"
+      ],
+      "admitted": false
+    },
+    {
+      "case": "all-pass-never-admits",
+      "admitted": false
+    }
+  ],
+  "admitted": false
+}

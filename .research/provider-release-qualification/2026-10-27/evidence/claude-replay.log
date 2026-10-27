@@ -1,0 +1,124 @@
+=== RUN   TestIntakeBoundary
+=== RUN   TestIntakeBoundary/missing
+=== RUN   TestIntakeBoundary/wrong-digest
+--- PASS: TestIntakeBoundary (1.11s)
+    --- PASS: TestIntakeBoundary/missing (0.03s)
+    --- PASS: TestIntakeBoundary/wrong-digest (0.01s)
+=== RUN   TestOfflineBoundary
+--- PASS: TestOfflineBoundary (0.71s)
+=== RUN   TestIdentity
+--- PASS: TestIdentity (2.94s)
+=== RUN   TestPermissions
+=== RUN   TestPermissions/fresh
+=== RUN   TestPermissions/fresh/Bash/deny-false
+=== RUN   TestPermissions/fresh/Bash/deny-true
+=== RUN   TestPermissions/fresh/Edit/deny-false
+=== RUN   TestPermissions/fresh/Edit/deny-true
+=== RUN   TestPermissions/fresh/Write/deny-false
+=== RUN   TestPermissions/fresh/Write/deny-true
+=== RUN   TestPermissions/fresh/WebFetch/deny-false
+=== RUN   TestPermissions/fresh/WebFetch/deny-true
+=== RUN   TestPermissions/fresh/MCP/deny-false
+=== RUN   TestPermissions/fresh/MCP/deny-true
+=== RUN   TestPermissions/resume
+=== RUN   TestPermissions/resume/Bash/deny-false
+=== RUN   TestPermissions/resume/Bash/deny-true
+=== RUN   TestPermissions/resume/Edit/deny-false
+=== RUN   TestPermissions/resume/Edit/deny-true
+=== RUN   TestPermissions/resume/Write/deny-false
+=== RUN   TestPermissions/resume/Write/deny-true
+=== RUN   TestPermissions/resume/WebFetch/deny-false
+=== RUN   TestPermissions/resume/WebFetch/deny-true
+=== RUN   TestPermissions/resume/MCP/deny-false
+=== RUN   TestPermissions/resume/MCP/deny-true
+=== RUN   TestPermissions/child
+=== RUN   TestPermissions/child/Bash/deny-false
+=== RUN   TestPermissions/child/Bash/deny-true
+=== RUN   TestPermissions/child/Edit/deny-false
+=== RUN   TestPermissions/child/Edit/deny-true
+=== RUN   TestPermissions/child/Write/deny-false
+=== RUN   TestPermissions/child/Write/deny-true
+=== RUN   TestPermissions/child/WebFetch/deny-false
+=== RUN   TestPermissions/child/WebFetch/deny-true
+=== RUN   TestPermissions/child/MCP/deny-false
+=== RUN   TestPermissions/child/MCP/deny-true
+--- PASS: TestPermissions (68.80s)
+    --- PASS: TestPermissions/fresh (18.50s)
+        --- PASS: TestPermissions/fresh/Bash/deny-false (2.23s)
+        --- PASS: TestPermissions/fresh/Bash/deny-true (1.71s)
+        --- PASS: TestPermissions/fresh/Edit/deny-false (1.98s)
+        --- PASS: TestPermissions/fresh/Edit/deny-true (2.31s)
+        --- PASS: TestPermissions/fresh/Write/deny-false (1.61s)
+        --- PASS: TestPermissions/fresh/Write/deny-true (1.58s)
+        --- PASS: TestPermissions/fresh/WebFetch/deny-false (1.45s)
+        --- PASS: TestPermissions/fresh/WebFetch/deny-true (1.34s)
+        --- PASS: TestPermissions/fresh/MCP/deny-false (1.86s)
+        --- PASS: TestPermissions/fresh/MCP/deny-true (2.42s)
+    --- PASS: TestPermissions/resume (27.45s)
+        --- PASS: TestPermissions/resume/Bash/deny-false (3.70s)
+        --- PASS: TestPermissions/resume/Bash/deny-true (1.91s)
+        --- PASS: TestPermissions/resume/Edit/deny-false (2.40s)
+        --- PASS: TestPermissions/resume/Edit/deny-true (1.78s)
+        --- PASS: TestPermissions/resume/Write/deny-false (2.18s)
+        --- PASS: TestPermissions/resume/Write/deny-true (2.66s)
+        --- PASS: TestPermissions/resume/WebFetch/deny-false (2.06s)
+        --- PASS: TestPermissions/resume/WebFetch/deny-true (2.30s)
+        --- PASS: TestPermissions/resume/MCP/deny-false (3.58s)
+        --- PASS: TestPermissions/resume/MCP/deny-true (4.88s)
+    --- PASS: TestPermissions/child (22.85s)
+        --- PASS: TestPermissions/child/Bash/deny-false (1.82s)
+        --- PASS: TestPermissions/child/Bash/deny-true (2.51s)
+        --- PASS: TestPermissions/child/Edit/deny-false (1.97s)
+        --- PASS: TestPermissions/child/Edit/deny-true (2.57s)
+        --- PASS: TestPermissions/child/Write/deny-false (2.21s)
+        --- PASS: TestPermissions/child/Write/deny-true (2.04s)
+        --- PASS: TestPermissions/child/WebFetch/deny-false (2.36s)
+        --- PASS: TestPermissions/child/WebFetch/deny-true (2.21s)
+        --- PASS: TestPermissions/child/MCP/deny-false (2.49s)
+        --- PASS: TestPermissions/child/MCP/deny-true (2.67s)
+=== RUN   TestProjectPermissions
+=== RUN   TestProjectPermissions/none
+=== RUN   TestProjectPermissions/project
+=== RUN   TestProjectPermissions/local
+--- PASS: TestProjectPermissions (5.61s)
+    --- PASS: TestProjectPermissions/none (2.17s)
+    --- PASS: TestProjectPermissions/project (1.34s)
+    --- PASS: TestProjectPermissions/local (2.09s)
+=== RUN   TestBuiltinCeiling
+=== RUN   TestBuiltinCeiling/empty
+=== RUN   TestBuiltinCeiling/Read
+--- PASS: TestBuiltinCeiling (3.80s)
+    --- PASS: TestBuiltinCeiling/empty (1.79s)
+    --- PASS: TestBuiltinCeiling/Read (2.02s)
+=== RUN   TestMemory
+=== RUN   TestMemory/off-false/fresh
+=== RUN   TestMemory/off-false/resume
+=== RUN   TestMemory/off-false/child
+=== RUN   TestMemory/off-true/fresh
+=== RUN   TestMemory/off-true/resume
+=== RUN   TestMemory/off-true/child
+--- PASS: TestMemory (8.61s)
+    --- PASS: TestMemory/off-false/fresh (1.13s)
+    --- PASS: TestMemory/off-false/resume (1.75s)
+    --- PASS: TestMemory/off-false/child (1.63s)
+    --- PASS: TestMemory/off-true/fresh (1.03s)
+    --- PASS: TestMemory/off-true/resume (2.12s)
+    --- PASS: TestMemory/off-true/child (0.94s)
+=== RUN   TestMemoryDirectedWrite
+=== RUN   TestMemoryDirectedWrite/fresh/off-false
+=== RUN   TestMemoryDirectedWrite/fresh/off-true
+=== RUN   TestMemoryDirectedWrite/resume/off-false
+=== RUN   TestMemoryDirectedWrite/resume/off-true
+=== RUN   TestMemoryDirectedWrite/child/off-false
+=== RUN   TestMemoryDirectedWrite/child/off-true
+--- PASS: TestMemoryDirectedWrite (9.18s)
+    --- PASS: TestMemoryDirectedWrite/fresh/off-false (1.23s)
+    --- PASS: TestMemoryDirectedWrite/fresh/off-true (1.48s)
+    --- PASS: TestMemoryDirectedWrite/resume/off-false (1.49s)
+    --- PASS: TestMemoryDirectedWrite/resume/off-true (2.15s)
+    --- PASS: TestMemoryDirectedWrite/child/off-false (0.87s)
+    --- PASS: TestMemoryDirectedWrite/child/off-true (1.95s)
+=== RUN   TestMemoryResumeHistory
+--- PASS: TestMemoryResumeHistory (1.19s)
+PASS
+ok  	github.com/relux-works/curator/.tmp/TASK-261027-pu2vvu/claude-01/stage	102.506s
