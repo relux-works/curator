@@ -135,6 +135,14 @@ func approve(t *testing.T, f fixture) Event {
 	}
 	return *ev
 }
+func entryRevision(t *testing.T, f fixture, id string) uint64 {
+	t.Helper()
+	list, e := f.store.List(context.Background())
+	if e != nil {
+		t.Fatal(e)
+	}
+	return list.EntryRevisions[id]
+}
 func observeGranted(_ context.Context, _ Selection, ev Event) (hookObservation, error) {
 	return hookObservation{append([]Hook{}, ev.Surfaces.Hooks...), []Hook{}}, nil
 }
@@ -211,6 +219,7 @@ func TestPolicyRevocationNextStart(t *testing.T) {
 	}
 	c := Command{Kind: "operator-policy-command/1", Operation: "revoke", Issuer: f.command.Command.Issuer, Time: time.Now().UTC().Format(time.RFC3339), Reason: "Revoke fixture", EntryID: "build"}
 	c.Issuer.Approval = strings.Repeat("c", 64)
+	c.EntryRevision = entryRevision(t, f, c.EntryID)
 	rev := signed(t, c, f.operator, f.actor)
 	if _, e = f.store.Apply(ctx, rev); e != nil {
 		t.Fatal(e)
@@ -413,6 +422,7 @@ func TestPolicyEditRevokesOldEvent(t *testing.T) {
 	c.Issuer.Approval = strings.Repeat("e", 64)
 	c.Time = time.Now().UTC().Format(time.RFC3339)
 	c.Reason = "Narrow hooks"
+	c.EntryRevision = entryRevision(t, f, c.EntryID)
 	p := *c.Policy
 	p.Issuer = c.Issuer
 	p.Time = c.Time

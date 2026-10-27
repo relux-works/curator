@@ -3,6 +3,9 @@
 - TASK-261027-1yechk: CIP-0020 policy command names and authenticated approval
   transport are not specified. This slice proposes `env trust key/grant/revoke/list/read`
   with one-time operator key enrollment and operator/actor signed commands.
+  Rework adds a signed `entry_revision` ordering boundary. Stale revisions and
+  ambiguous active entries use existing `workspace_trust_policy_authority`
+  with distinct reasons; confirm that mapping or specify dedicated codes.
   Runtime destination evaluation and complete native hook discovery, approval,
   reload and revocation remain unqualified, even for an empty hook grant;
   production read refuses `workspace_trust_adapter_unqualified`. Keep provider

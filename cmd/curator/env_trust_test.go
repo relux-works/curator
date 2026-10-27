@@ -138,6 +138,11 @@ func TestOperatorPolicyCLI(t *testing.T) {
 		t.Fatal("read/list changed state", err)
 	}
 	command.Operation = "revoke"
+	var inspection operatorpolicy.Inspection
+	if err = json.Unmarshal([]byte(invoke(exitOK, "", "env", "trust", "list")), &inspection); err != nil {
+		t.Fatal(err)
+	}
+	command.EntryRevision = inspection.EntryRevisions[command.EntryID]
 	command.Policy = nil
 	command.Selection = nil
 	command.Issuer.Approval = strings.Repeat("b", 64)

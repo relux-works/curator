@@ -36,18 +36,31 @@ func (s Store) read(ctx context.Context, sel Selection, observer observe) (*Deli
 	}
 	defer op.close()
 	var ev *Event
+	profileMismatch := false
+	active := 0
 	for i := len(op.state.Events) - 1; i >= 0; i-- {
 		candidate := &op.state.Events[i]
 		saved := op.state.Selections[candidate.ID]
 		if saved.Checkout == sel.Checkout && saved.Path == sel.Path && saved.Environment == sel.Environment && saved.Lane == sel.Lane {
 			if saved.Profile != sel.Profile {
-				return nil, refusal("project_context_drift")
+				profileMismatch = true
+				continue
 			}
-			ev = candidate
-			break
+			if candidate.State.Status == "active" {
+				active++
+				if active > 1 {
+					return nil, refusalDetail("workspace_trust_policy_authority", "ambiguous active entries for selection")
+				}
+				ev = candidate
+			} else if ev == nil {
+				ev = candidate
+			}
 		}
 	}
 	if ev == nil {
+		if profileMismatch {
+			return nil, refusal("project_context_drift")
+		}
 		return nil, refusal("workspace_untrusted")
 	}
 	if ev.State.Status == "revoked" {
@@ -82,6 +95,11 @@ func (s Store) read(ctx context.Context, sel Selection, observer observe) (*Deli
 	if e != nil {
 		if strings.HasPrefix(e.Error(), "workspace_trust_repository_changed:") {
 			return lapse("workspace_trust_repository_changed")
+		}
+		if strings.HasPrefix(e.Error(), "workspace_trust_symlink:") {
+			// An unavailable or linked registered root is observed identity loss,
+			// not a transient opportunity to restore the old consent later.
+			return lapse("workspace_trust_symlink")
 		}
 		return nil, e
 	}
@@ -123,6 +141,7 @@ func (s Store) read(ctx context.Context, sel Selection, observer observe) (*Deli
 // contain only sanitized canonical destinations and hook IDs/digests. Native
 // home projections are unsupported, so touched homes/cleanup are always empty.
 type Inspection struct {
+	EntryRevisions map[string]uint64 `json:"entry_revisions"`
 	Policies       map[string]Policy `json:"policies"`
 	Current        []PolicyStatus    `json:"current"`
 	Events         []Event           `json:"events"`
@@ -157,5 +176,5 @@ func (s Store) List(ctx context.Context) (Inspection, error) {
 		current = append(current, PolicyStatus{PolicyRef{id, hash(policy)}, status})
 	}
 	sort.Slice(current, func(i, j int) bool { return current[i].Policy.ID < current[j].Policy.ID })
-	return Inspection{op.state.Policies, current, op.state.Events, []string{}, []string{}}, nil
+	return Inspection{EntryRevisions: op.entryRevisions(), Policies: op.state.Policies, Current: current, Events: op.state.Events, TouchedHomes: []string{}, PendingCleanup: []string{}}, nil
 }

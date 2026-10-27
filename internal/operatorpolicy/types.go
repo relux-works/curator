@@ -21,7 +21,8 @@ const maxState = 4 << 20
 var idPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$`)
 var digestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
-func refusal(code string) error { return fmt.Errorf("%s: operator policy admission refused", code) }
+func refusal(code string) error               { return fmt.Errorf("%s: operator policy admission refused", code) }
+func refusalDetail(code, detail string) error { return fmt.Errorf("%w (%s)", refusal(code), detail) }
 func canonical(v any) ([]byte, error) {
 	b, e := json.Marshal(v)
 	if e != nil {
@@ -142,12 +143,15 @@ type Selection struct {
 // Command is signed in its entirety by the approving operator AND the actor.
 // Approval is an immutable opaque digest reference, not a claimed capability.
 type Command struct {
-	Kind           string     `json:"kind"`
-	Operation      string     `json:"operation"`
-	Issuer         Issuer     `json:"issuer"`
-	Time           string     `json:"time"`
-	Reason         string     `json:"reason"`
-	EntryID        string     `json:"entry_id"`
+	Kind      string `json:"kind"`
+	Operation string `json:"operation"`
+	Issuer    Issuer `json:"issuer"`
+	Time      string `json:"time"`
+	Reason    string `json:"reason"`
+	EntryID   string `json:"entry_id"`
+	// EntryRevision counts retained successful commands for this entry. Zero
+	// is omitted for first commands and compatibility with existing audit bytes.
+	EntryRevision  uint64     `json:"entry_revision,omitempty"`
 	Policy         *Policy    `json:"policy,omitempty"`
 	Selection      *Selection `json:"selection,omitempty"`
 	ActorPublicKey string     `json:"actor_public_key"`

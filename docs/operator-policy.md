@@ -37,6 +37,10 @@ project trust, submit a fresh signed `grant` command for the same entry with
 an empty or narrower hook list. Every effective hook definition digest binds
 its executable, arguments, trigger and execution-affecting settings.
 
+Only one active entry may match a complete checkout/path/environment/lane/
+profile/lock selection. A conflicting grant refuses without changing state.
+Reads also refuse ambiguous legacy state, before consulting an adapter.
+
 ## Signed command input
 
 The closed `operator-policy-command/1` body contains:
@@ -46,6 +50,8 @@ The closed `operator-policy-command/1` body contains:
   `approval_ref` (64 lowercase hex), and `actor` with kind `operator` or `keeper`
   and its own principal reference;
 - `actor_public_key`: base64 Ed25519 key authorized for this exact command;
+- `entry_revision`: the entry's current monotonically increasing revision
+  from `list.entry_revisions[entry_id]`; omit it for revision zero;
 - for `grant`, `policy` and `selection`; for `revoke`, both are absent.
 
 The envelope contains `command`, `approval_signature`, and `actor_signature`.
@@ -55,6 +61,23 @@ verifies possession of the actor key bound by that approval. An operator actor
 must match the enrolled operator principal/key. Reusing `approval_ref` for
 other bytes refuses. Caller role strings, package signatures and unsigned
 requests confer no authority. Duplicate/unknown/misspelled members refuse.
+
+The revision is the number of retained successful grant/revoke commands for
+that entry, including commands for removed policies and revokes with no event.
+An absent entry in `entry_revisions` has revision zero. Every new command must
+bind the current revision in both signatures. Accepted commands increase it;
+rejected commands and idempotent retries do not. Revoking an entry therefore
+invalidates pending unused approvals for that entry, even if their signed
+timestamps equal or follow the revoke's timestamp. A keeper must obtain fresh
+operator approval after reading the new revision; changing the revision alone
+invalidates the signatures. This boundary also serializes competing updates.
+Existing audit commands with no revision remain verifiable at their original
+bytes, but cannot be newly applied to an entry with a nonzero revision.
+
+Stale revisions and ambiguous entries use the existing refusal code
+`workspace_trust_policy_authority` with distinct sanitized reasons. CIP-0020
+and Decision 0031 provide no dedicated code for either case; maintainer
+confirmation of that diagnostic mapping remains an open question.
 
 `policy` contains the complete CIP-0020 entry: `entry_id`, `root_commit`,
 `canonical_destination`, `remote_spellings`, `environments`, `lanes`,
@@ -87,6 +110,11 @@ Unknown/unmatched projects refuse with `workspace_untrusted`. Revoked events
 refuse with `workspace_trust_grant_revoked`; profile/lock drift refuses with
 `project_context_drift`. Changed repository/filesystem identity and expiry
 retain a terminal lapse, requiring fresh consent. Refusals emit no stdout.
+
+A missing, renamed, non-directory or linked registered checkout retains that
+lapse before the initial `workspace_trust_symlink` refusal. Restoring the old
+directory still refuses `workspace_untrusted`; only a new signed grant at
+the current entry revision can create new consent. Prior lapse history remains.
 `list` is read-only and retains prior policy digests, issuers and state history.
 
 **No real provider release is qualified for policy-grant destination evaluation
@@ -121,6 +149,11 @@ and clear `CODEX_HOME` and `CLAUDE_CONFIG_DIR`. Logs belong under `.temp/`.
 | --- | --- |
 | Package trust/hooks, forged or absent approval/actor, changed signed scope | `TestPolicyAuthorityPairs`, `TestPolicyPackageDeclarationPairs`, `TestOperatorPolicyCLI` |
 | Revoked consent on next start, replay/idempotent revoke | `TestPolicyRevocationNextStart` |
+| Unused pre-revoke approval, equal/newer signed clocks, fresh post-revoke control | `TestReviewerDelayedApprovalAfterRevoke` |
+| Revocation without an event, retained revision, forged revision, fresh signature | `TestPolicyRevisionRetainedWithoutEvent` |
+| Missing checkout/restore terminal lapse and new approval control | `TestReviewerMissingCheckoutLapse` |
+| Duplicate active write and distinct lane control | `TestReviewerAmbiguousEntries` |
+| Authenticated legacy ambiguity in both event orders, public/core reads | `TestReviewerLegacyAmbiguousRead` |
 | Changed effective hook, unlisted native approval, empty list, unreadable hook state | `TestPolicyHookPairs` (internal observer only) |
 | Exact project/environment/lane, selected or installed profile/lock drift | `TestPolicyScopePairs` |
 | Policy digest, missing/malformed private state, unknown event, audit/journal | `TestPolicyPrivateStatePairs` |

@@ -391,8 +391,10 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 Operator policy trust/hook commands and the per-start admission boundary are
 in [operator policy](docs/operator-policy.md). `curator env trust grant/revoke`
 consume authenticated signed commands; `list` inspects private event history,
-and `read` refuses unqualified runtime adapters. Run
-`env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS HOME=$(mktemp -d) go test ./internal/operatorpolicy ./cmd/curator -run 'Test(Policy|ProductionReadQualification|SignedCommand|OperatorPolicy)' -count=1`.
+including retained entry revisions for signing new commands. Missing checkouts
+retain terminal lapse, and ambiguous active selections refuse. `read` refuses
+unqualified runtime adapters. Run
+`env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS HOME=$(mktemp -d) go test ./internal/operatorpolicy ./cmd/curator -run 'Test(Policy|Reviewer|ProductionReadQualification|SignedCommand|OperatorPolicy)' -count=1`.
 Both packages isolate host/vendor homes in `TestMain`; save validation logs in
 `.temp/`. No native home projection or unattended provider qualification is
 claimed by this command/storage slice.

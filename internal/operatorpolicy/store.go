@@ -94,6 +94,17 @@ func (s Store) begin(ctx context.Context, bootstrap bool) (*operation, error) {
 	return op, nil
 }
 func (op *operation) close() { _ = op.held.Close() }
+
+// entryRevisions derives a durable ordering boundary from the immutable audit,
+// including revocations of entries no longer present in Policies. No clock or
+// separate counter file can reset the boundary on delete/recreate.
+func (op *operation) entryRevisions() map[string]uint64 {
+	revisions := map[string]uint64{}
+	for _, a := range op.state.Audit {
+		revisions[a.Command.EntryID]++
+	}
+	return revisions
+}
 func (op *operation) validate(now time.Time) error {
 	s := op.state
 	if s.Version != 1 || s.Keys == nil || s.Audit == nil || s.Policies == nil || s.Events == nil || s.Selections == nil || s.Journal == nil || len(s.Journal) != 0 || len(s.Keys) != 1 || len(s.Events) > 1024 || len(s.Audit) > 2048 {
@@ -273,6 +284,9 @@ func (s Store) Apply(ctx context.Context, a SignedCommand) (*Event, error) {
 		}
 		return nil, refusal("workspace_trust_policy_authority")
 	}
+	if c.EntryRevision != op.entryRevisions()[c.EntryID] {
+		return nil, refusalDetail("workspace_trust_policy_authority", "signed entry revision is not current")
+	}
 	if c.Operation == "revoke" {
 		if e = revoke(op.state.Events, c.EntryID, c.Issuer, c.Time, c.Reason); e != nil {
 			return nil, e
@@ -283,6 +297,11 @@ func (s Store) Apply(ctx context.Context, a SignedCommand) (*Event, error) {
 	}
 	p := *c.Policy
 	sel := *c.Selection
+	for _, existing := range op.state.Events {
+		if existing.State.Status == "active" && existing.Policy.ID != c.EntryID && op.state.Selections[existing.ID] == sel {
+			return nil, refusalDetail("workspace_trust_policy_authority", "ambiguous active entries for selection")
+		}
+	}
 	until, _ := timestamp(p.ReviewBy)
 	if !now.Before(until) || !has(p.Environments, sel.Environment) || !has(p.Lanes, sel.Lane) {
 		return nil, refusal("workspace_untrusted")
