@@ -10,16 +10,7 @@ import (
 )
 
 func checkAbsoluteTestHome(run string) bool {
-	if !strings.Contains(run, `test_home="$(cd "$test_home" && pwd -P)"`) ||
-		!strings.Contains(run, `[[ "$test_home" = /* ]]`) || !strings.Contains(run, `HOME="$test_home"`) {
-		return false
-	}
-	for _, name := range []string{"GIT_DIR", "GIT_WORK_TREE", "SSH_AUTH_SOCK", "GOFLAGS", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
-		if !strings.Contains(run, "-u "+name+" ") {
-			return false
-		}
-	}
-	return true
+	return strings.HasPrefix(run, "bash .github/ci/isolated-test.sh ") && !strings.Contains(run, "\n")
 }
 
 func checkUnixShards(data []byte) error {
@@ -124,8 +115,9 @@ func TestUnixShardsWiring(t *testing.T) {
 		"lost-upload":              {"name: unix-test-shard-${{ matrix.os }}-${{ matrix.shard }}", "name: unix-test-shard-fixed"},
 		"wrong-platform-artifacts": {"pattern: unix-test-shard-${{ matrix.os }}-*", "pattern: unix-test-shard-*"},
 		"lost-selector":            {"-lane unix-test -shard ${{ matrix.shard }}", "-lane unix-test -shard 0"},
-		"lost-absolute-home":       {`[[ "$test_home" = /* ]]`, `true`},
-		"relative-home":            {`HOME="$test_home"`, `HOME=.temp/home`},
+		"lost-boundary":            {"bash .github/ci/isolated-test.sh go run", "go run"},
+		"lost-consumer-boundary":   {"bash .github/ci/isolated-test.sh bash .github/ci/test-gate.sh", "bash .github/ci/test-gate.sh"},
+		"relative-home":            {"bash .github/ci/isolated-test.sh go run", "HOME=.temp/home go run"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			changed := strings.Replace(string(good), pair[0], pair[1], 1)

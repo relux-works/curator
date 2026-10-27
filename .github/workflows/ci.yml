@@ -315,12 +315,7 @@ jobs:
         shell: bash
         env:
           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
-        run: |
-          set -euo pipefail
-          test_home="$(mktemp -d)"
-          test_home="$(cd "$test_home" && pwd -P)"
-          [[ "$test_home" = /* ]]
-          env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS -u GIT_CONFIG_COUNT -u GIT_CONFIG_PARAMETERS -u CODEX_HOME -u CLAUDE_CONFIG_DIR -u PI_CODING_AGENT_DIR -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME HOME="$test_home" go run ./tools/envprofilerace -lane unix-test -shard ${{ matrix.shard }} -dir .temp/ci-evidence/unix-shard
+        run: bash .github/ci/isolated-test.sh go run ./tools/envprofilerace -lane unix-test -shard ${{ matrix.shard }} -dir .temp/ci-evidence/unix-shard
       - name: Upload Unix shard
         if: always()
         uses: actions/upload-artifact@v4
@@ -542,12 +537,7 @@ jobs:
           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
           CI_UNIX_TEST_SHARDS: .temp/unix-test-shards
           GO_TEST_TIMEOUT: ${{ runner.os == 'Windows' && '120m' || '60m' }}
-        run: |
-          set -euo pipefail
-          test_home="$(mktemp -d)"
-          test_home="$(cd "$test_home" && pwd -P)"
-          [[ "$test_home" = /* ]]
-          env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS -u GIT_CONFIG_COUNT -u GIT_CONFIG_PARAMETERS -u CODEX_HOME -u CLAUDE_CONFIG_DIR -u PI_CODING_AGENT_DIR -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME HOME="$test_home" bash .github/ci/test-gate.sh .temp/ci-evidence/test
+        run: bash .github/ci/isolated-test.sh bash .github/ci/test-gate.sh .temp/ci-evidence/test
 
       - name: Upload gate evidence
         if: always()
