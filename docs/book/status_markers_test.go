@@ -56,9 +56,10 @@ func TestAdjacentStatusMarkers(t *testing.T) {
 	}
 }
 
-// The real build script and pandoc accept the valid adjacent pair, but refuse
-// an unknown second marker before invoking the PDF renderer or replacing prior
-// PDF bytes. Only WeasyPrint is instrumented; this is not a PDF-layout test.
+// The real build script and pandoc accept the valid adjacent pair in the state
+// chapter, but refuse an unknown second marker before invoking the PDF
+// renderer or replacing prior PDF bytes. Only WeasyPrint is instrumented and
+// the figure render pass is skipped; this is not a PDF-layout test.
 func TestBuildAdjacentStatusMarkerGate(t *testing.T) {
 	requireFigureTools(t)
 	if _, err := exec.LookPath("pandoc"); err != nil {
@@ -72,12 +73,15 @@ func TestBuildAdjacentStatusMarkerGate(t *testing.T) {
 		{"unknown_second", "⟦решено⟧⟦готово⟧", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			requireCheckTools(t)
 			root := figureFixture(t)
-			for _, name := range []string{"build.sh", "template.html", "style.css"} {
+			for _, name := range []string{"build.sh", "check.sh", "template.html", "style.css"} {
 				write(t, filepath.Join(root, name), read(t, name))
 			}
 			write(t, filepath.Join(root, "filters", "book.lua"), read(t, statusFilter()))
-			write(t, filepath.Join(root, "ru", "00-chapter.md"), tc.markers+"\n\n![Figure](../diagrams/figure.png)\n")
+			// Markers are allowed only in the state chapter, so check.sh passes
+			// and the filter is the gate under test.
+			write(t, filepath.Join(root, "ru", "11-gde-my.md"), "# Где мы\n\n"+tc.markers+"\n")
 			if err := os.Chmod(filepath.Join(root, "check-figures.sh"), 0o700); err != nil {
 				t.Fatal(err)
 			}
@@ -93,7 +97,7 @@ printf rendered > "$last"
 			pdf := filepath.Join(root, "output.pdf")
 			write(t, pdf, "prior PDF")
 			cmd := exec.Command("bash", filepath.Join(root, "build.sh"), "ru", pdf)
-			cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(renderer)+string(os.PathListSeparator)+os.Getenv("PATH"))
+			cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(renderer)+string(os.PathListSeparator)+os.Getenv("PATH"), "BOOK_SKIP_FIGURE_RENDER=1")
 			out, err := cmd.CombinedOutput()
 			called := filepath.Join(root, "bin", "renderer-called")
 			if !tc.unknown {
@@ -148,6 +152,67 @@ func TestAdjacentStatusMarkerNarrowingControl(t *testing.T) {
 		exit, ok := err.(*exec.ExitError)
 		if !ok || exit.ExitCode() != 1 || !strings.Contains(string(out), "--- FAIL: TestBuildAdjacentStatusMarkerGate/unknown_second") || !strings.Contains(string(out), "status build expected unknown-marker rejection:") {
 			t.Fatalf("adjacent-marker mutant did not fail its intended build assertion: %s (%v)", out, err)
+		}
+	}
+}
+
+// With a real pandoc, all five editorial labels become badges and an unknown
+// label is rejected. This validates the filter, not typography or PDF layout.
+func TestStatusMarkers(t *testing.T) {
+	pandoc, err := exec.LookPath("pandoc")
+	if err != nil {
+		t.Skip("pandoc unavailable; PDF toolchain check required separately")
+	}
+	labels := []string{"работает сегодня", "решено", "спецификация", "предложено", "открыто"}
+	for _, label := range append(labels, "готово") {
+		t.Run(label, func(t *testing.T) {
+			filter := "filters/book.lua"
+			if override := os.Getenv("BOOK_STATUS_FILTER"); override != "" {
+				filter = override
+			}
+			cmd := exec.Command(pandoc, "-f", "markdown", "-t", "html5", "--lua-filter", filter)
+			cmd.Stdin = strings.NewReader("Текст ⟦" + label + "⟧.\n")
+			out, err := cmd.CombinedOutput()
+			if label == "готово" {
+				if err == nil || !strings.Contains(string(out), "unknown status marker: готово") {
+					t.Fatalf("unknown status not rejected: %s (%v)", out, err)
+				}
+				return
+			}
+			if err != nil || !strings.Contains(string(out), `class="status `) || strings.Contains(string(out), "⟦") {
+				t.Fatalf("valid status did not become a badge: %s (%v)", out, err)
+			}
+		})
+	}
+}
+
+// The status gate control proves the unknown-label witness detects a fallback
+// that silently renders unknown labels, with an accepted-label positive control.
+func TestStatusMarkerNarrowingControl(t *testing.T) {
+	if _, err := exec.LookPath("pandoc"); err != nil {
+		t.Skip("pandoc unavailable")
+	}
+	original := read(t, "filters/book.lua")
+	needle := `error("unknown status marker: " .. label)`
+	if strings.Count(original, needle) != 1 {
+		t.Fatal("status control plant no longer applies exactly once")
+	}
+	mutant := filepath.Join(t.TempDir(), "filter.lua")
+	write(t, mutant, strings.Replace(original, needle, `class = "open"`, 1))
+	binary, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, label := range []string{"решено", "готово"} {
+		cmd := exec.Command(binary, "-test.run=^TestStatusMarkers$/^"+label+"$", "-test.v")
+		cmd.Env = append(os.Environ(), "BOOK_STATUS_FILTER="+mutant)
+		out, err := cmd.CombinedOutput()
+		if label == "решено" {
+			if err != nil {
+				t.Fatalf("mutant broke positive setup: %s (%v)", out, err)
+			}
+		} else if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 1 || !strings.Contains(string(out), "unknown status not rejected:") {
+			t.Fatalf("status mutant not killed by intended assertion: %s (%v)", out, err)
 		}
 	}
 }

@@ -1,0 +1,63 @@
+# Former source: context-order.puml, removed in the move to the book kit; it
+# remains in the repository history.
+# Order of the parts of the instruction file in the managed home. Drawn as a
+# record layout: the four parts stand in file order inside the managed home,
+# the harness reads the composed file. Content follows context-order.puml and
+# chapter "Слои контекста"; the note on the profile root carries the
+# native-project rule of the project context contract (CIP-0002): there the
+# file is the profile root only.
+layout = "stack"
+alt = "Порядок частей файла инструкций в управляемом доме: проект добавляет одобренные части ниже корневого контекста профиля."
+
+[groups.home]
+label = "Управляемый дом"
+role = "service"
+
+[nodes.root]
+group = "home"
+role = "store"
+name = "Корневой контекст профиля"
+text = "собран из выбранного lock для этой агентской среды; проект его не заменяет"
+note = "В режиме `native-project` файл состоит только из этой части."
+
+[nodes.general]
+group = "home"
+role = "store"
+name = "Общий контекст проекта"
+text = "одобренная часть для всех агентских сред"
+
+[nodes.env]
+group = "home"
+role = "store"
+name = "Контекст проекта для среды"
+text = "одобренная часть, например для `codex_cli`"
+
+[nodes.deep]
+group = "home"
+role = "store"
+name = "Уточнения более глубокой области"
+text = "одобренная часть подкаталога, после более широкой области"
+note = "Порядок выражает намерение композиции. Поздний абзац разрешений не выдаёт."
+
+[nodes.harness]
+role = "agent"
+name = "Харнес"
+text = "читает собранный файл инструкций"
+note = "В строгом режиме квалифицированный адаптер исключает неодобренные управляющие файлы чекаута."
+
+[[links]]
+from = "root"
+to = "general"
+
+[[links]]
+from = "general"
+to = "env"
+
+[[links]]
+from = "env"
+to = "deep"
+
+[[links]]
+from = "home"
+to = "harness"
+label = "файл `AGENTS.md` или `CLAUDE.md`"
