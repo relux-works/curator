@@ -477,6 +477,9 @@ func Parse(payload []byte) (*Lock, error) {
 			Overlay    *bool           `json:"overlay"`
 		} `json:"members"`
 	}
+	if err := validateExactJSONKeys(payload, &raw); err != nil {
+		return nil, fmt.Errorf("invalid lock: %w", err)
+	}
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&raw); err != nil {
 		return nil, fmt.Errorf("invalid lock: %w", err)

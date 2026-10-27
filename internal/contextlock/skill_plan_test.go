@@ -1,10 +1,15 @@
 package contextlock
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
+
+	"github.com/relux-works/curator/internal/protocoljson"
 	"strings"
 	"testing"
 )
@@ -261,5 +266,141 @@ func TestProfileSkillPlanStrictMemberAndLegacyPresence(t *testing.T) {
 				t.Fatalf("member shape refusal: %v", err)
 			}
 		})
+	}
+}
+
+// PSP01/05: lowercase carriers preserve the literal binding; each reviewer
+// alias and its duplicate-case form must refuse rather than normalize to it.
+func TestProfileSkillPlanCaseAliases(t *testing.T) {
+	var fixture struct {
+		Lock              json.RawMessage
+		RuntimeLockSHA256 string `json:"runtime_lock_sha256"`
+	}
+	planFixture(t, "baseline.json", &fixture)
+	lock, err := Parse(fixture.Lock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if digest, err := lock.Hash(); err != nil || digest != fixture.RuntimeLockSHA256 {
+		t.Fatalf("lowercase binding: %s %v", digest, err)
+	}
+	var object map[string]any
+	decoder := json.NewDecoder(bytes.NewReader(fixture.Lock))
+	decoder.UseNumber()
+	if err := decoder.Decode(&object); err != nil {
+		t.Fatal(err)
+	}
+	plan := object["skill_plan"]
+	for _, tc := range []struct {
+		name  string
+		input any
+		path  []any
+		plan  bool
+	}{
+		{"plan-schema-version", plan, []any{"schema_version"}, true},
+		{"plan-nodes", plan, []any{"nodes"}, true},
+		{"node-kind", plan, []any{"nodes", 0, "kind"}, true},
+		{"edge-mode", plan, []any{"edges", 0, "mode"}, true},
+		{"lock-member-kind", object, []any{"members", 0, "kind"}, false},
+		{"lock-plan-digest", object, []any{"skill_plan_sha256"}, false},
+	} {
+		for _, duplicate := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/duplicate=%v", tc.name, duplicate), func(t *testing.T) {
+				assertCaseAliasRefused(t, tc.input, tc.path, duplicate, tc.plan, fixture.RuntimeLockSHA256)
+			})
+		}
+	}
+	// Walk the independent published fixture, covering every recursive object
+	// shape including constraints, refs, consumers and enclosing precedence.
+	for _, tc := range []struct {
+		name  string
+		input any
+		plan  bool
+	}{{"plan", plan, true}, {"lock", object, false}} {
+		var paths [][]any
+		var walk func(any, []any)
+		walk = func(value any, path []any) {
+			switch value := value.(type) {
+			case map[string]any:
+				keys := make([]string, 0, len(value))
+				for key := range value {
+					keys = append(keys, key)
+				}
+				sort.Strings(keys)
+				for _, key := range keys {
+					next := append(append([]any{}, path...), key)
+					paths = append(paths, next)
+					walk(value[key], next)
+				}
+			case []any:
+				for i, child := range value {
+					walk(child, append(append([]any{}, path...), i))
+				}
+			}
+		}
+		walk(tc.input, nil)
+		for _, path := range paths {
+			for _, duplicate := range []bool{false, true} {
+				t.Run(fmt.Sprintf("recursive-%s/%v/duplicate=%v", tc.name, path, duplicate), func(t *testing.T) {
+					assertCaseAliasRefused(t, tc.input, path, duplicate, tc.plan, fixture.RuntimeLockSHA256)
+				})
+			}
+		}
+	}
+}
+
+func assertCaseAliasRefused(t *testing.T, input any, path []any, duplicate, isPlan bool, baselineHash string) {
+	t.Helper()
+	original, err := protocoljson.MarshalCanonical(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if isPlan {
+		if _, err := ParseSkillPlan(original); err != nil {
+			t.Fatalf("lowercase control: %v", err)
+		}
+	} else {
+		if _, err := Parse(original); err != nil {
+			t.Fatalf("lowercase control: %v", err)
+		}
+	}
+	var mutated any
+	decoder := json.NewDecoder(bytes.NewReader(original))
+	decoder.UseNumber()
+	if err := decoder.Decode(&mutated); err != nil {
+		t.Fatal(err)
+	}
+	parent := mutated
+	for _, step := range path[:len(path)-1] {
+		switch step := step.(type) {
+		case string:
+			parent = parent.(map[string]any)[step]
+		case int:
+			parent = parent.([]any)[step]
+		}
+	}
+	object := parent.(map[string]any)
+	key := path[len(path)-1].(string)
+	object[strings.ToUpper(key)] = object[key]
+	if !duplicate {
+		delete(object, key)
+	}
+	payload, err := protocoljson.MarshalCanonical(mutated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(payload, original) {
+		t.Fatal("alias was not planted")
+	}
+	if !isPlan && HashBytes(payload) == baselineHash {
+		t.Fatal("mutated input retained baseline digest")
+	}
+	if isPlan {
+		_, err = ParseSkillPlan(payload)
+	} else {
+		_, err = Parse(payload)
+	}
+	if err == nil || !strings.Contains(err.Error(), "exact JSON key") {
+		t.Fatalf("want exact JSON key refusal, got %v", err)
 	}
 }
