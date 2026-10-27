@@ -14,6 +14,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/pathboundary"
+	"github.com/relux-works/curator/internal/skillruntime"
 	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
 )
@@ -29,6 +30,12 @@ import (
 // before returning an error. This compensation does not replace crash recovery
 // of individual profile and install transactions.
 func GlobalSkillTransaction(home string, policy Policy, machine envregistry.MachineConfig, addition *DirectSkill, nativeHomeOf func(string) (string, error), lock transaction.HomeLock, next func() error) (info Info, resultErr error) {
+	if err := refusePreparedSkillPlanAdoption(home, ""); err != nil {
+		return Info{}, err
+	}
+	if err := skillruntime.RefuseUnadmitted(home); err != nil {
+		return Info{}, err
+	}
 	if err := lock.AssertHeld(); err != nil {
 		return Info{}, err
 	}

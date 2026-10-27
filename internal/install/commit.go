@@ -19,6 +19,7 @@ import (
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/projectlease"
 	"github.com/relux-works/curator/internal/scopes"
+	"github.com/relux-works/curator/internal/skillruntime"
 	"github.com/relux-works/curator/internal/staging"
 	"github.com/relux-works/curator/internal/transaction"
 )
@@ -130,7 +131,12 @@ func (deps CommitDeps) resolve(home string, inspector CacheInspector) (CommitDep
 		deps.Locks = &managerLocks{manager: manager}
 	}
 	if deps.Journal == nil {
-		engine, err := transaction.New(home, transaction.WithHooks(deps.Hooks), transaction.WithCommitCheck(projectlease.TransactionCheck(home)))
+		engine, err := transaction.New(home, transaction.WithHooks(deps.Hooks), transaction.WithCommitCheck(func(w transaction.HomeLock, j transaction.Journal) error {
+			if err := skillruntime.RefuseUnadmitted(home); err != nil {
+				return err
+			}
+			return projectlease.TransactionCheck(home)(w, j)
+		}))
 		if err != nil {
 			return CommitDeps{}, fmt.Errorf("open the install transaction journal: %w", err)
 		}
@@ -1108,6 +1114,9 @@ type leaseRecoveryJournal struct {
 }
 
 func (journal *leaseRecoveryJournal) Recover(lock transaction.HomeLock) error {
+	if err := skillruntime.RefuseUnadmitted(journal.home); err != nil {
+		return err
+	}
 	_, err := projectlease.RecoverUnderLock(journal.home, lock, journal.Engine)
 	return err
 }
