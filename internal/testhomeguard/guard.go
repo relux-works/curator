@@ -15,6 +15,8 @@ import (
 
 const Changed = "testhomeguard: protected native home changed"
 
+var isolatedHome string
+
 type identity struct {
 	info os.FileInfo
 	link string
@@ -103,6 +105,7 @@ func Start() (*Guard, error) {
 			return nil, err
 		}
 	}
+	isolatedHome = g.home
 	return g, nil
 }
 
@@ -128,6 +131,18 @@ func (g *Guard) Finish(code int) int {
 			}
 			if !same(a, b) {
 				fmt.Fprintf(os.Stderr, "%s [%s]\n", Changed, fingerprint(root))
+				paths := map[string]bool{}
+				for path := range a {
+					paths[path] = true
+				}
+				for path := range b {
+					paths[path] = true
+				}
+				for path := range paths {
+					if !same(map[string]identity{path: a[path]}, map[string]identity{path: b[path]}) {
+						fmt.Fprintf(os.Stderr, "testhomeguard: changed entry [%s]\n", fingerprint(path))
+					}
+				}
 			}
 		}
 		code = 1
@@ -245,8 +260,17 @@ func same(a, b map[string]identity) bool {
 		if !ok || (x.info == nil) != (y.info == nil) {
 			return false
 		}
-		if x.info != nil && (!os.SameFile(x.info, y.info) || x.info.Mode() != y.info.Mode() || x.info.Size() != y.info.Size() || !x.info.ModTime().Equal(y.info.ModTime())) {
-			return false
+		if x.info != nil {
+			if !os.SameFile(x.info, y.info) || x.info.Mode() != y.info.Mode() {
+				return false
+			}
+			// Directory timestamps and sizes reflect unrelated runtime files
+			// (for example Codex SQLite sidecars), not directory identity.
+			// Protected children and the complete skill-entry set are compared
+			// separately, including file timestamps, sizes and context hashes.
+			if !x.info.IsDir() && (x.info.Size() != y.info.Size() || !x.info.ModTime().Equal(y.info.ModTime())) {
+				return false
+			}
 		}
 		if x.link != y.link || x.hash != y.hash {
 			return false
