@@ -59,12 +59,11 @@ func TestMain(m *testing.M) {
 	if code, parent := testhomeguard.Supervise(fixtureChild); parent {
 		os.Exit(code)
 	}
-	// Ambient isolation runs once. Fixture children inherit the parent's Git
-	// boundary and their deliberately supplied native HOME and provider roots.
-	restoreGitEnv := func() {}
+	// Shared isolation always neutralizes Git. Restore only explicitly selected
+	// fixture roots before dispatch; ambient roots stay pinned by testgitenv.
+	previousHome, _ := os.UserHomeDir()
+	restoreGitEnv := isolateCLIProcess(fixtureChild)
 	if !fixtureChild {
-		previousHome, _ := os.UserHomeDir()
-		restoreGitEnv = testgitenv.Isolate()
 		if err := testhomeguard.CheckIsolation(previousHome); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			restoreGitEnv()
