@@ -628,6 +628,19 @@ the caller owns its scratch directory and cleanup. Run
 actual ancestry prefix with hostile repository/storage, signing and trace
 channels, compares every disposable decoy file, and checks shell/Go prefix
 parity plus fixture-local tracing.
+The shell boundary reads the NUL-delimited process environment with `env -0`,
+including inherited Git names that Bash's exported-variable table omits.
+It refuses with exit 2 before fixture commands when a Git name cannot be
+safely unset as a shell identifier, or complete enumeration cannot be verified.
+Environment values stay in a pipe and are never recorded. Ordinary unknown
+identifiers are scrubbed; only the two fixture Git defaults are reintroduced.
+`TestShellCompleteGitPrefixNames` inspects a raw child before Go's TestMain,
+pairs nonidentifier and enumeration-failure refusals with real two-commit
+ancestry/tracing controls, and checks complete outside preimages. Run the
+helper suite with Bash 5 on PATH to cover its nonidentifier inheritance;
+`CURATOR_TEST_PREFIX_BASH=/absolute/path/to/bash` selects another Bash for
+this focused test without adding skips. These checks cover the inherited
+Git prefix, not arbitrary executable or non-Git command channels.
 `TestPhysicalTemporaryRoots` covers absolute, relative `.tmp` and symlinked
 temporary roots plus cwd changes; a platform that cannot create a directory
 symlink fails that control with an explicit error. These checks use synthetic data;
