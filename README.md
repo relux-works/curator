@@ -388,6 +388,22 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+`tools/envprofilerace` partitions the native `internal/envprofile` race-build
+list into eight deterministic shards with exact `-run` selectors. CI runs
+`go run ./tools/envprofilerace -shard 0 -dir .temp/ci-evidence/envprofile`
+(with indices 0 through 7) in isolated homes. Each shard retains the 60m package
+timeout and must finish below 1800s. The Race job downloads every same-platform
+artifact and `test-gate.sh` invokes
+`go run ./tools/envprofilerace -mode merge -dir .temp/envprofile-shards -out .temp/envprofile-merged.json`
+to require the full current test list, exact source/platform, passing packages,
+and exactly one completed event for each selected top-level test. New tests
+are assigned automatically. The existing platform-case gate checks required
+subcases and every skip against the combined shard and remaining-package JSON;
+no platform obligation is excluded. Raw streams and manifests are uploaded as
+`envprofile-race-<platform>-<index>` artifacts; combined evidence remains in
+`race-evidence-<platform>`. Run `go test ./tools/envprofilerace ./tools/ciworkflow`
+for coverage, refusal and workflow wiring controls.
+
 The marker/snapshot schema regexp engine is pinned to regexp2 v1.11.5, which
 fixes stale timeout deadlines after idle. Run
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envmarker -run TestMarker7AfterRegexpClockIdle -count=1`

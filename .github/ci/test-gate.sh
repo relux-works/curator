@@ -29,6 +29,8 @@
 #   GO_TEST_FLAGS            extra flags, word split (e.g. "-race")
 #   CURATOR_CONFORMANCE_ROOT required; forwarded to the served packages untouched
 #   CI_REQUIRE_FULL_ROOT     1 = the root must serve every package
+#   CI_ENVPROFILE_SHARDS     downloaded same-head race artifacts; verified before
+#                            replacing envprofile with their combined JSON
 #
 # The gate never rewrites, relaxes or retries a failing run.
 
@@ -106,6 +108,22 @@ run_stage() {
 }
 
 TEST_RC=0
+
+# Race jobs execute envprofile on separate runners. Admit only a complete,
+# same-head/platform union, then keep its subtests in the ordinary platform gate.
+# Other lanes still execute the unpartitioned package.
+if [ -n "${CI_ENVPROFILE_SHARDS:-}" ]; then
+	if [ "${GO_TEST_FLAGS:-}" != '-race' ] ||
+		! grep -qxF "$MODULE/internal/envprofile" "$SERVED"; then
+		echo 'test-gate: envprofile shard evidence requires the served race package' >&2
+		exit 2
+	fi
+	"$GO" run ./tools/envprofilerace -mode merge -dir "$CI_ENVPROFILE_SHARDS" \
+		-out "$EVIDENCE/envprofile-merged.json" || exit 1
+	cat "$EVIDENCE/envprofile-merged.json" >>"$JSON"
+	grep -vxF "$MODULE/internal/envprofile" "$SERVED" >"$EVIDENCE/plan-served-remaining.txt"
+	SERVED="$EVIDENCE/plan-served-remaining.txt"
+fi
 
 # --- served: the root is exported ------------------------------------------
 if [ -s "$SERVED" ]; then

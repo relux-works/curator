@@ -494,7 +494,58 @@ jobs:
   # toolchain there and this repository has no measurement that the hosted
   # image satisfies it. Recorded, not silently dropped.
   # ---------------------------------------------------------------------------
+  # Every test is selected exactly once from the native race-build test list.
+  # The Race job verifies actual completed events, then runs the unchanged
+  # platform-case gate over their union and the other packages' JSON.
+  envprofile-race:
+    name: Envprofile race (${{ matrix.os }}, shard ${{ matrix.shard }})
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Initialize private Go state
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash .github/ci/isolate-go-state.sh
+      - name: Checkout authoritative protocol suite
+        uses: actions/checkout@v4
+        with:
+          repository: relux-works/curator-spec
+          ref: ${{ env.SPEC_PIN }}
+          path: protocol-spec
+      - uses: actions/setup-go@v5
+        with:
+          cache: ${{ runner.environment != 'self-hosted' || runner.os != 'Linux' }}
+          go-version-file: go.mod
+      - name: Verify Go toolchain identity
+        shell: bash
+        run: bash .github/ci/toolchain-identity.sh
+      - name: Run envprofile race shard (60m timeout, <30m margin)
+        shell: bash
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+        run: env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS -u CODEX_HOME -u CLAUDE_CONFIG_DIR -u PI_CODING_AGENT_DIR -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME HOME="$(mktemp -d)" go run ./tools/envprofilerace -shard ${{ matrix.shard }} -dir .temp/ci-evidence/envprofile
+      - name: Upload envprofile race shard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: envprofile-race-${{ matrix.os }}-${{ matrix.shard }}
+          path: .temp/ci-evidence/envprofile/
+          if-no-files-found: error
+      - name: Restore runner temporary tree permissions
+        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/restore-runner-tmp.sh
+
   race:
+    needs: envprofile-race
     name: Race (${{ matrix.os }})
     # Snapshot publication refuses ACL-bearing retained ancestry. Qualified
     # self-hosted Linux runners meet this boundary; the hosted Linux image
@@ -581,10 +632,17 @@ jobs:
       # half of the 60m per-package timeout. Run 35994653101 later reached the
       # old 30m deadline during ubuntu runner contention; the timeout still
       # expires and fails a package that genuinely hangs.
+      - name: Download envprofile race shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: envprofile-race-${{ matrix.os }}-*
+          path: .temp/envprofile-shards
+
       - name: go test -race + platform-case gate
         shell: bash
         env:
           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+          CI_ENVPROFILE_SHARDS: .temp/envprofile-shards
           GO_TEST_FLAGS: -race
           GO_TEST_TIMEOUT: 60m
         run: bash .github/ci/test-gate.sh .temp/ci-evidence/race

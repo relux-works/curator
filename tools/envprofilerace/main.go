@@ -1,0 +1,296 @@
+// Command envprofilerace partitions envprofile race tests and verifies their evidence.
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"hash/fnv"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"reflect"
+	"regexp"
+	"runtime"
+	"sort"
+	"strings"
+)
+
+const shardCount = 8
+const pkg = "github.com/relux-works/curator/internal/envprofile"
+const timeout = "60m"
+const marginSeconds = 1800
+
+type manifest struct {
+	Commit   string
+	GOOS     string
+	Shard    int
+	Tests    []string
+	Selector string
+	ExitCode int
+}
+
+type event struct {
+	Action  string
+	Package string
+	Test    string
+	Elapsed float64
+}
+
+func shardFor(name string) int {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(name))
+	return int(h.Sum64() % shardCount)
+}
+
+func partition(tests []string) ([][]string, error) {
+	shards := make([][]string, shardCount)
+	seen := map[string]bool{}
+	for _, name := range tests {
+		if name == "" || strings.Contains(name, "/") || seen[name] {
+			return nil, fmt.Errorf("invalid or duplicate test %q", name)
+		}
+		seen[name] = true
+		i := shardFor(name)
+		shards[i] = append(shards[i], name)
+	}
+	for i := range shards {
+		sort.Strings(shards[i])
+		if len(shards[i]) == 0 {
+			return nil, fmt.Errorf("empty shard %d", i)
+		}
+	}
+	return shards, nil
+}
+
+func selector(tests []string) string {
+	escaped := make([]string, len(tests))
+	for i, name := range tests {
+		escaped[i] = regexp.QuoteMeta(name)
+	}
+	return "^(" + strings.Join(escaped, "|") + ")$"
+}
+
+func inventory() ([]string, error) {
+	cmd := exec.Command("go", "test", "-race", "-list", ".", "./internal/envprofile")
+	cmd.Stderr = os.Stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("list race tests: %w", err)
+	}
+	var tests []string
+	for _, line := range strings.Split(string(out), "\n") {
+		if strings.HasPrefix(line, "Test") || strings.HasPrefix(line, "Example") || strings.HasPrefix(line, "Fuzz") {
+			tests = append(tests, line)
+		}
+	}
+	if len(tests) == 0 {
+		return nil, fmt.Errorf("empty race test inventory")
+	}
+	sort.Strings(tests)
+	return tests, nil
+}
+
+func sourceCommit() (string, error) {
+	// Actions checks out GITHUB_SHA (including the PR merge revision). Local
+	// callers with detached Git metadata pass the same explicit source pin
+	// before clearing Git selectors from the test environment.
+	if sha := os.Getenv("GITHUB_SHA"); sha != "" {
+		if !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(sha) {
+			return "", fmt.Errorf("GITHUB_SHA must be a full commit revision")
+		}
+		return sha, nil
+	}
+	out, err := exec.Command("git", "rev-parse", "HEAD").CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("source revision: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+func runShard(dir string, shard int) error {
+	if shard < 0 || shard >= shardCount {
+		return fmt.Errorf("shard must be 0..%d", shardCount-1)
+	}
+	tests, err := inventory()
+	if err != nil {
+		return err
+	}
+	shards, err := partition(tests)
+	if err != nil {
+		return err
+	}
+	commit, err := sourceCommit()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	stream, err := os.Create(filepath.Join(dir, "go-test.json"))
+	if err != nil {
+		return err
+	}
+	defer stream.Close()
+	m := manifest{Commit: commit, GOOS: runtime.GOOS, Shard: shard, Tests: tests, Selector: selector(shards[shard])}
+	cmd := exec.Command("go", "test", "-race", "-json", "-count=1", "-timeout="+timeout, "-run", m.Selector, "./internal/envprofile")
+	cmd.Stdout = stream
+	cmd.Stderr = os.Stderr
+	fmt.Printf("envprofilerace: shard %d/%d, %d of %d tests, timeout=%s\n", shard, shardCount, len(shards[shard]), len(tests), timeout)
+	runErr := cmd.Run()
+	if runErr != nil {
+		m.ExitCode = 1
+	}
+	data, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "manifest.json"), data, 0644); err != nil {
+		return err
+	}
+	if runErr != nil {
+		return runErr
+	}
+	data, err = os.ReadFile(filepath.Join(dir, "go-test.json"))
+	if err != nil {
+		return err
+	}
+	elapsed, err := validateStream(data, shards[shard])
+	if err != nil {
+		return err
+	}
+	fmt.Printf("envprofilerace: shard %d PASS %.3fs (<%ds)\n", shard, elapsed, marginSeconds)
+	return nil
+}
+
+// Require completed top-level tests, not just the planned -run expression.
+// Subtest obligations and skip classification remain with platform-case-gate.sh.
+func validateStream(data []byte, tests []string) (float64, error) {
+	want := map[string]bool{}
+	for _, name := range tests {
+		want[name] = true
+	}
+	seen := map[string]bool{}
+	packages := 0
+	var elapsed float64
+	dec := json.NewDecoder(bytes.NewReader(data))
+	for {
+		var e event
+		err := dec.Decode(&e)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return 0, fmt.Errorf("invalid test JSON: %w", err)
+		}
+		if e.Package != pkg {
+			return 0, fmt.Errorf("unexpected package %q", e.Package)
+		}
+		if e.Action == "fail" {
+			return 0, fmt.Errorf("failed test/package %s", e.Test)
+		}
+		if e.Test == "" && e.Action == "pass" {
+			packages++
+			elapsed = e.Elapsed
+		}
+		if e.Test != "" && !strings.Contains(e.Test, "/") && (e.Action == "pass" || e.Action == "skip") {
+			if !want[e.Test] || seen[e.Test] {
+				return 0, fmt.Errorf("unexpected or duplicate test %s", e.Test)
+			}
+			seen[e.Test] = true
+		}
+	}
+	for _, name := range tests {
+		if !seen[name] {
+			return 0, fmt.Errorf("missing completed test %s", name)
+		}
+	}
+	if packages != 1 {
+		return 0, fmt.Errorf("want one passing package, got %d", packages)
+	}
+	if elapsed <= 0 || elapsed >= marginSeconds {
+		return 0, fmt.Errorf("package elapsed %.3fs outside (0,%d)s margin", elapsed, marginSeconds)
+	}
+	return elapsed, nil
+}
+
+func mergeEvidence(dir, out string, tests []string, commit, goos string) error {
+	shards, err := partition(tests)
+	if err != nil {
+		return err
+	}
+	paths, err := filepath.Glob(filepath.Join(dir, "*", "manifest.json"))
+	if err != nil {
+		return err
+	}
+	if len(paths) != shardCount {
+		return fmt.Errorf("want %d shard manifests, got %d", shardCount, len(paths))
+	}
+	seen := map[int]bool{}
+	var merged bytes.Buffer
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		var m manifest
+		if err := json.Unmarshal(data, &m); err != nil {
+			return err
+		}
+		if m.Shard < 0 || m.Shard >= shardCount || seen[m.Shard] {
+			return fmt.Errorf("invalid or duplicate shard %d", m.Shard)
+		}
+		seen[m.Shard] = true
+		if m.Commit != commit || m.GOOS != goos || m.ExitCode != 0 || !reflect.DeepEqual(m.Tests, tests) || m.Selector != selector(shards[m.Shard]) {
+			return fmt.Errorf("shard %d: source/platform/inventory/selector/exit mismatch", m.Shard)
+		}
+		data, err = os.ReadFile(filepath.Join(filepath.Dir(path), "go-test.json"))
+		if err != nil {
+			return err
+		}
+		elapsed, err := validateStream(data, shards[m.Shard])
+		if err != nil {
+			return fmt.Errorf("shard %d: %w", m.Shard, err)
+		}
+		fmt.Printf("envprofilerace: verified shard %d: %d tests, %.3fs\n", m.Shard, len(shards[m.Shard]), elapsed)
+		merged.Write(data)
+		merged.WriteByte('\n')
+	}
+	// Publish only after the complete union has been verified.
+	if err := os.WriteFile(out, merged.Bytes(), 0644); err != nil {
+		return err
+	}
+	fmt.Printf("envprofilerace: union equals full race list: %d tests across %d shards\n", len(tests), shardCount)
+	return nil
+}
+
+func main() {
+	mode := flag.String("mode", "run", "run or merge")
+	dir := flag.String("dir", "", "shard output, or downloaded artifact directory")
+	out := flag.String("out", "", "merged JSON output")
+	shard := flag.Int("shard", -1, "zero-based shard index")
+	flag.Parse()
+	var err error
+	switch *mode {
+	case "run":
+		err = runShard(*dir, *shard)
+	case "merge":
+		var tests []string
+		var commit string
+		tests, err = inventory()
+		if err == nil {
+			commit, err = sourceCommit()
+		}
+		if err == nil {
+			err = mergeEvidence(*dir, *out, tests, commit, runtime.GOOS)
+		}
+	default:
+		err = fmt.Errorf("unknown mode %q", *mode)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "envprofilerace:", err)
+		os.Exit(1)
+	}
+}
