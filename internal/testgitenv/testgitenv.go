@@ -10,6 +10,7 @@ package testgitenv
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -69,11 +70,36 @@ func Isolate() func() {
 		for key, value := range previous {
 			mustEnv(os.Setenv(key, value))
 		}
-		if err := os.RemoveAll(dir); err != nil {
+		if err := removeIsolatedHome(dir); err != nil {
 			fmt.Fprintln(os.Stderr, "testgitenv: remove isolated home:", err)
 			os.Exit(2)
 		}
 	}
+}
+
+// Go's module cache leaves read-only directories under an otherwise private
+// HOME. Restore access only on directories in this owned tree. The permission
+// walk does not follow symlinks or chmod regular files.
+func removeIsolatedHome(dir string) error {
+	if err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if !entry.IsDir() {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		return os.Chmod(path, info.Mode()|0o700)
+	}); err != nil {
+		return err
+	}
+	return os.RemoveAll(dir)
 }
 
 func managed(key string) bool {

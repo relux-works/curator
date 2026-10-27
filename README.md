@@ -603,4 +603,6 @@ XDG_DATA_HOME/XDG_STATE_HOME/XDG_CACHE_HOME so they cannot bypass HOME pinning.
 Tests can still set explicit fixture configuration inside that boundary.
 Run `go test -count=1 ./internal/testgitenv` for real hostile-repository and
 home-preservation regressions, or `go test ./...` for the full suite.
-`TestMain` removes its temporary homes; optional logs belong under `.temp/`.
+`TestMain` removes its temporary homes, including read-only module-cache
+directories; its permission walk never follows symlinks or chmods regular
+files. Optional logs belong under `.temp/`.
