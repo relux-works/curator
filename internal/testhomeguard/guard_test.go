@@ -22,8 +22,15 @@ func TestSnapshotIdentity(t *testing.T) {
 			must(os.MkdirAll(filepath.Join(root, "skills"), 0700))
 			must(os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("before"), 0600))
 			must(os.WriteFile(filepath.Join(root, ".agent-environment.json"), []byte("before"), 0600))
-			must(os.Symlink("first", filepath.Join(root, "AGENTS.md")))
-			must(os.Symlink("first", filepath.Join(root, "skills", "myskill")))
+			if shape == "context-link" || shape == "skill-link" {
+				path := filepath.Join(root, "AGENTS.md")
+				if shape == "skill-link" {
+					path = filepath.Join(root, "skills", "myskill")
+				}
+				if err := os.Symlink("first", path); err != nil {
+					t.Skipf("symlink unavailable: %v", err)
+				}
+			}
 			before, err := snapshot([]string{root})
 			must(err)
 			switch shape {
