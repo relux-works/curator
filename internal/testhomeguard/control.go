@@ -38,7 +38,7 @@ func Control(t *testing.T, childTest string, childEnv ...string) {
 				}
 			}
 			if mode == "overflow" || mode == "forged-overflow" {
-				f, err := os.OpenFile(filepath.Join(origin, ".claude", "CLAUDE.md"), os.O_WRONLY, 0600)
+				f, err := os.OpenFile(filepath.Join(origin, ".claude", "CLAUDE.md"), os.O_WRONLY, 0600) // #nosec G304 -- origin is this control's t.TempDir.
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -50,7 +50,7 @@ func Control(t *testing.T, childTest string, childEnv ...string) {
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, os.Args[0], "-test.v", "-test.run=^"+childTest+"$")
+			cmd := exec.CommandContext(ctx, os.Args[0], "-test.v", "-test.run=^"+childTest+"$") // #nosec G204,G702 -- Reexecutes this test binary with a test-selected child name; no shell.
 			for _, entry := range os.Environ() {
 				key, _, _ := strings.Cut(entry, "=")
 				switch key {
@@ -119,7 +119,7 @@ func Child(t *testing.T, resolve func() (string, error)) {
 	}
 	t.Log("synthetic child reached")
 	origin := os.Getenv(controlOrigin)
-	marker, err := os.ReadFile(filepath.Join(origin, "guard-fixture"))
+	marker, err := os.ReadFile(filepath.Join(origin, "guard-fixture")) // #nosec G304 -- Synthetic control marker, supplied only by Control's isolated child environment.
 	if err != nil || string(marker) != "synthetic origin" {
 		t.Fatal("missing synthetic guard origin")
 	}

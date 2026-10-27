@@ -30,13 +30,13 @@ func Supervise(fixtureChild bool) (int, bool) {
 		fmt.Fprintln(os.Stderr, err)
 		return 2, true
 	}
-	cmd := exec.Command(os.Args[0], os.Args[1:]...)
+	cmd := exec.Command(os.Args[0], os.Args[1:]...) // #nosec G204,G702 -- Reexecutes this test binary without a shell, retaining the test invocation.
 	observer, err := newObserver()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "testhomeguard: cannot establish observer handoff")
 		return 2, true
 	}
-	defer observer.Close()
+	defer func() { _ = observer.Close() }()
 	for _, entry := range os.Environ() {
 		key, _, _ := strings.Cut(entry, "=")
 		if key != supervisorPID && key != observerAddress && key != observerKey {
