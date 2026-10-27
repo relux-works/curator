@@ -18,7 +18,11 @@ func exitGuardedTests(code int) {
 }
 
 // Both child controls exercise this package's actual TestMain exit boundary.
-func TestNativeHomeGuard(t *testing.T) { testhomeguard.Control(t, "TestNativeHomeGuardChild") }
+func TestNativeHomeGuard(t *testing.T) {
+	// Reuse the parent's prepared Go toolchain; taking its lock again would
+	// deadlock the control child before it reaches the package-exit guard.
+	testhomeguard.Control(t, "TestNativeHomeGuardChild", cliHelperProcess+"=1")
+}
 
 // This named child resolves native defaults only within synthetic fixture homes.
 func TestNativeHomeGuardChild(t *testing.T) {

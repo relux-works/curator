@@ -7,11 +7,14 @@ be established. It pins HOME, USERPROFILE and all XDG roots to fresh temporary
 directories and clears inherited Claude, Codex and Pi home overrides.
 
 The protected snapshot includes the OS-account home and inherited native-home
-overrides. It records lstat identity, mode, size, modification time, instruction
+overrides. It records lstat identity and mode, file size and modification time, instruction
 symlink targets, hashes of regular CLAUDE.md, AGENTS.md and environment markers,
 and skill-entry identities. It reads no credential files and does not hash
 instruction symlink destinations. A changed or unreadable postimage fails the
-package. Only the newly allocated isolation directory is cleaned up.
+package. Directory size and modification time are excluded: runtime sidecar
+creation does not replace the directory or change a protected child. Directory
+identity, mode, protected children and the complete immediate skill-entry set
+remain checked. Only the newly allocated isolation directory is cleaned up.
 
 `Control` and `Child` test the real package exit boundary using synthetic
 original HOME directories. The negative child restores only that synthetic
@@ -27,7 +30,7 @@ runner_home=$(mktemp -d)
 env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS HOME="$runner_home" \
   go test -count=1 -v ./internal/envprofile -run '^TestNativeHomeGuard'
 env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS HOME="$runner_home" \
-  CURATOR_TEST_CLI_HELPER=1 go test -count=1 -v ./cmd/curator -run '^TestNativeHomeGuard'
+  go test -count=1 -v ./cmd/curator -run '^TestNativeHomeGuard'
 ```
 
 Fixture-specific overrides remain useful for independence between tests. They
