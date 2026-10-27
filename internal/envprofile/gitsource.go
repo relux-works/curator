@@ -599,10 +599,11 @@ func sshPublicKeyFromSignature(payload []byte) (string, error) {
 		offset += length
 		return value, nil
 	}
-	version, err := readString()
-	if err != nil || string(version) != "1" {
+	// SSHSIG version is a uint32, not a length-prefixed SSH string.
+	if offset+4 > len(decoded) || binary.BigEndian.Uint32(decoded[offset:offset+4]) != 1 {
 		return "", fmt.Errorf("SSH signature version is unsupported")
 	}
+	offset += 4
 	keyBlob, err := readString()
 	if err != nil {
 		return "", err

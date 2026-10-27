@@ -58,3 +58,12 @@
   profile-only composition receipts require the separate mode-aware I-COMP
   follow-up; existing additive receipts must not be rebaselined.
   [Offline adapter scope and evidence](docs/project-adapter-muse.md).
+
+## Source-scoped release-only admission
+
+The platform/Curator release key lists separate source authority, but environments
+§1.4 explicitly permits tag OR commit verification and requires commit verification
+for revision selections. Strict release-only sources need an owner/spec decision
+on source-scoped signature-object policy and explicit-revision behavior. Existing
+commit/revision consumers remain supported; no global replacement or ad hoc flag
+is implemented. Public signer enrollment alone is not strict tag-only enforcement.
