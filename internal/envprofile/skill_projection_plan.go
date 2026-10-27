@@ -28,6 +28,7 @@ import (
 // It grants no runtime, command-publication or adoption authority.
 type SkillPlanPreparation func([]*closure.Node) error
 
+// SkillDrift reports one unrelated direct installation without repairing it.
 type SkillDrift struct {
 	Name     string
 	Declared manifest.Ref
@@ -35,6 +36,7 @@ type SkillDrift struct {
 	State    string  // in-sync, drift or unknown; absence is drift.
 }
 
+// SkillPlanResult contains the prepared lock binding and unrelated drift.
 type SkillPlanResult struct {
 	Lock     *contextlock.Lock
 	LockHash string
