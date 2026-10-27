@@ -197,9 +197,10 @@ credentials or model inference. The synthetic request fixtures are transport
 stimuli, not substitute provider implementations: real native tools produce
 the effects. Incomplete native operations remain unknown.
 
-`replay.py` copies existing Go witnesses into fresh `.tmp` stages. Only exact
-binary/version pins and the required `.temp` → `.tmp` root guard change;
-assertions and counterexamples are preserved. Source SHA manifests are
+`replay.py` copies existing Go witnesses into fresh `.tmp` stages. Staged changes
+are exact binary/version pins, the required `.temp` → `.tmp` root guard and
+optional Codex-only introspection selection; assertions and counterexamples
+are preserved. Source SHA manifests are
 checked before vendor execution. Every group has a PID, zero-exit receipt,
 source hashes and sanitized public log. Native children are fixed-response
 behavioral probes, not delegated development agents.
@@ -238,6 +239,7 @@ were not repeated after the interrupted session.
 | `publish.py` | `python3 .research/provider-release-qualification/2026-10-27/publish.py --scratch .tmp/TASK-261027-pu2vvu` | sanitized `evidence/` only |
 | `canary.py` | Commands below | JSON disposition; no policy/board writes |
 | `check_canary.py` | Paired CLI evidence controls; command below | fresh `.tmp` bundles and `results.json`; no vendor execution |
+| `candidate.py`, `check_candidate.py` | Explicit all-provider research pins and paired native intake controls | candidate receipts and scratch control results; never admission |
 
 Reproduce from the repository root with privately prepared read-only binary
 copies named `codex`, `claude`, `muse` in `FROZEN_BINARIES`. Use a fresh scratch
@@ -285,6 +287,23 @@ tables, native homes or baseline, installs anything, creates a scheduler or
 automatically approves a release. A proposed scheduled integration can open a
 task after exit 2; that external automation is not installed by this research.
 Future candidate bytes need an explicit research pin/review before replay.
+
+The [0.164.0 follow-up](../2026-10-27-codex-0.164.0/README.md) adds that
+explicit input without changing this record's baseline pins or evidence.
+`replay.py --candidate FILE` and `startup.py --candidate FILE` accept a
+`provider-release-candidate-v1` manifest with platform `darwin/arm64`,
+`admitted: false` and exact `version`/`sha256` for all three providers.
+Missing or mismatched pins refuse before a fixture or native execution.
+Receipts retain the canonical candidate. `replay.py codex` and
+`startup.py --provider codex` select only Codex observations. Without a
+candidate, historical baseline pins remain the execution gate.
+
+Canary `--candidate FILE --binaries DIR` accepts that pin format, checks all
+three binary digests, and compares version/bytes to the unchanged baseline.
+A pin manifest contains no verdict evidence, so this mode explicitly reports
+verdict drift as unmeasured. The existing complete observation-matrix mode
+still verifies its proof bundle and compares all 45 cells. Neither input form
+can admit a release. Candidate pins do not establish effective behavior.
 
 ```sh
 python3 "$R/canary.py" --self-test

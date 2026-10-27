@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import re
+from candidate import check_binaries, load_candidate
 
 PROVIDERS = ("codex", "claude", "muse")
 FORMS = ("interactive", "exec", "resume")
@@ -130,18 +131,35 @@ def controls(baseline, fixture, root):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--baseline", type=Path, default=Path(__file__).with_name("baseline.json"))
-    mode = p.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--candidate", type=Path, help="a separately reviewed observation matrix")
-    mode.add_argument("--binaries", type=Path, help="hash frozen copies only; never execute foreign bytes")
-    mode.add_argument("--self-test", action="store_true")
+    p.add_argument("--candidate", type=Path, help="research pin manifest or separately reviewed observation matrix")
+    p.add_argument("--binaries", type=Path, help="hash frozen copies only; optionally check candidate pins")
+    p.add_argument("--self-test", action="store_true")
     a = p.parse_args()
+    if not (a.self_test or a.candidate or a.binaries) or (a.self_test and (a.candidate or a.binaries)):
+        p.error("select self-test, binaries, or candidate (optionally with binaries)")
     try:
         baseline = json.loads(a.baseline.read_text())
         validate(baseline, a.baseline.resolve().parent)
+        incoming = json.loads(a.candidate.read_text()) if a.candidate else None
+        if a.candidate and not isinstance(incoming, dict):
+            raise ValueError("candidate must be an object")
         if a.self_test:
             result = {"controls": controls(baseline, json.loads(Path(__file__).with_name("canary-fixture.json").read_text()), a.baseline.resolve().parent), "admitted": False}
             code = 0
-        elif a.binaries:
+        elif a.candidate and incoming.get("format") == "provider-release-candidate-v1":
+            candidate = load_candidate(a.candidate)
+            if a.binaries:
+                check_binaries(a.binaries, candidate["releases"], PROVIDERS)
+            changes = []
+            for name in PROVIDERS:
+                for field in ("version", "sha256"):
+                    old, new = baseline["releases"][name][field], candidate["releases"][name][field]
+                    if old != new:
+                        changes.append({"kind": "release", "provider": name, "field": field, "before": old, "after": new})
+            result = {"admitted": False, "qualification_required": bool(changes), "changes": changes,
+                      "candidate": candidate, "verdict_drift": "not measured by a pin manifest"}
+            code = 2 if changes else 0
+        elif a.binaries and not a.candidate:
             changes = []
             for name in PROVIDERS:
                 digest = hashlib.sha256((a.binaries / name).read_bytes()).hexdigest()
@@ -152,6 +170,8 @@ def main():
                       "disposition": "freeze candidate; open qualification task; collect paired offline observations; independent review before any policy change" if changes else "same bytes; no admission implied"}
             code = 2 if changes else 0
         else:
+            if a.binaries:
+                raise ValueError("binaries may be combined only with a candidate pin manifest")
             result = compare(baseline, json.loads(a.candidate.read_text()), a.baseline.resolve().parent, a.candidate.resolve().parent)
             code = 2 if result["qualification_required"] else 0
     except (OSError, ValueError, TypeError, KeyError) as e:
