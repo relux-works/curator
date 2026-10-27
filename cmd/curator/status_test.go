@@ -71,6 +71,22 @@ func TestMain(m *testing.M) {
 	// The parent already holds the host-toolchain lock. These children run
 	// only PATH isolation witnesses, including their explicit provider cases.
 	if os.Getenv(cliPathChild) == "1" {
+		if os.Getenv(cliPathPlant) != "" {
+			homes, err := cliUnitHomes()
+			if err == nil {
+				for key, value := range homes {
+					if err = os.Setenv(key, value); err != nil {
+						break
+					}
+				}
+			}
+			if err != nil {
+				_, _ = fmt.Fprintln(os.Stderr, "restore selected PATH-fixture homes:", err)
+				restorePath()
+				restoreGitEnv()
+				os.Exit(1)
+			}
+		}
 		code := m.Run()
 		restorePath()
 		restoreGitEnv()
@@ -221,13 +237,29 @@ func forwardCLIUnitHomes(t *testing.T, overrides map[string]string) string {
 
 func restoreCLIUnitHomes(t *testing.T) {
 	t.Helper()
-	homes := map[string]string{}
-	if err := json.Unmarshal([]byte(os.Getenv(cliHelperHomes)), &homes); err != nil {
+	homes, err := cliUnitHomes()
+	if err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME"} {
-		t.Setenv(key, homes[key])
+	for key, value := range homes {
+		t.Setenv(key, value)
 	}
+}
+
+func cliUnitHomes() (map[string]string, error) {
+	homes := map[string]string{}
+	if err := json.Unmarshal([]byte(os.Getenv(cliHelperHomes)), &homes); err != nil {
+		return nil, err
+	}
+	if len(homes) != 3 {
+		return nil, errors.New("missing explicit fixture homes")
+	}
+	for key := range homes {
+		if key != "HOME" && key != "USERPROFILE" && key != "XDG_CONFIG_HOME" {
+			return nil, fmt.Errorf("unexpected fixture home key %q", key)
+		}
+	}
+	return homes, nil
 }
 
 func cloneEnvironment(environment map[string]string) map[string]string {
