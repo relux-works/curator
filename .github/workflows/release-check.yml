@@ -1,0 +1,40 @@
+name: Release snapshot
+
+on:
+  pull_request:
+    paths: ["release/**", ".goreleaser.yml", ".github/workflows/release*.yml", "go.mod", "go.sum", "RELEASE_SIGNERS"]
+  push:
+    branches: [main]
+    paths: ["release/**", ".goreleaser.yml", ".github/workflows/release*.yml", "go.mod", "go.sum", "RELEASE_SIGNERS"]
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Exercise source and missing-artifact controls
+        run: env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK python3 -m unittest discover -s release -p 'test_*.py' -v
+      - uses: anchore/sbom-action/download-syft@v0
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: v2.17.0
+          args: check
+      - name: Build every platform and channel without publication or credentials
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: v2.17.0
+          args: release --snapshot --clean --skip=sign,notarize
+      - name: Verify packaged companions and channel manifests
+        run: |
+          python3 release/bundle.py artifacts .tmp/dist
+          python3 release/bundle.py channels .tmp/dist

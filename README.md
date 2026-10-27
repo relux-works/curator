@@ -11,10 +11,10 @@ Version v0.1 development is complete: all twelve phases in [docs/implementation-
 ## Install
 
 <details open>
-<summary>Homebrew (macOS, Linux)</summary>
+<summary>Homebrew cask (macOS)</summary>
 
 ```bash
-brew install relux-works/tap/curator
+brew install --cask relux-works/tap/curator
 ```
 
 </details>
@@ -56,6 +56,8 @@ go install github.com/relux-works/curator/cmd/curator@latest
 ```
 
 </details>
+
+The bundled release configuration installs `curator` and `curator-run` together through the macOS cask, Linux deb/rpm packages and AUR `curator-bin`. Windows uses the existing Scoop bucket and carries Curator only. The installer script and `go install` currently install Curator alone. See [the release channel matrix, source gates and snapshot commands](release/README.md).
 
 Debian and RPM packages ship with every release alongside SBOMs and cosign signatures. macOS binaries are Developer ID signed (Relux Works, LLC). Run the verification command to check any downloaded artifact:
 
@@ -387,6 +389,8 @@ Curator conforms to an open specification. Independent implementations include [
 Curator uses an in-repository task board in `.task-board/`. Automated gates run under `.github/ci/` and mirror `Makefile` targets; see [docs/ci-gates.md](docs/ci-gates.md) for gate definitions, evidence paths, platform carve-out rules, and suite consumption requirements.
 
 ### Tools
+
+Release tooling uses Python/SSH source and payload gates, GoReleaser OSS 2.17.0 and Syft for SBOMs. Run the [release checks](release/README.md#local-checks); snapshots and exported launcher sources stay under `.tmp/`, and local validation logs belong under task-scoped `.temp/`.
 
 The marker/snapshot schema regexp engine is pinned to regexp2 v1.11.5, which
 fixes stale timeout deadlines after idle. Run
