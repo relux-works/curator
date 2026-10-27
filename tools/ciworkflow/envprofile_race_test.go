@@ -33,7 +33,7 @@ func checkEnvprofileRace(data []byte) error {
 		return fmt.Errorf("missing envprofile-race job")
 	}
 	race := wf.Jobs["race"]
-	if shards.If != "" || shards.Strategy.FailFast || !reflect.DeepEqual(shards.Strategy.Matrix.Shard, []int{0, 1, 2, 3, 4, 5, 6, 7}) || !reflect.DeepEqual(shards.Strategy.Matrix.OS, race.Strategy.Matrix.OS) || !reflect.DeepEqual(shards.RunsOn, race.RunsOn) {
+	if shards.If != "" || shards.Strategy.FailFast || !reflect.DeepEqual(shards.Strategy.Matrix.Shard, []int{0, 1, 2, 3, 4, 5, 6, 7, 8}) || !reflect.DeepEqual(shards.Strategy.Matrix.OS, race.Strategy.Matrix.OS) || !reflect.DeepEqual(shards.RunsOn, race.RunsOn) {
 		return fmt.Errorf("shards must run every index on both Race platforms with identical routing, on main and PRs")
 	}
 	if race.Needs != "envprofile-race" || race.If != "${{ !cancelled() }}" {
@@ -71,7 +71,7 @@ func TestEnvprofileRaceWiring(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, pair := range map[string][2]string{
-		"dropped-shard":        {"shard: [0, 1, 2, 3, 4, 5, 6, 7]", "shard: [0, 1, 2, 3, 4, 5, 6]"},
+		"dropped-shard":        {"shard: [0, 1, 2, 3, 4, 5, 6, 7, 8]", "shard: [0, 1, 2, 3, 4, 5, 6, 7]"},
 		"skipped-failure-gate": {"    if: ${{ !cancelled() }}", "    if: success()"},
 		"no-dependency":        {"needs: envprofile-race", "needs: test"},
 		"only-main":            {"  envprofile-race:\n", "  envprofile-race:\n    if: github.event_name == 'push'\n"},

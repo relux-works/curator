@@ -18,7 +18,9 @@ import (
 	"strings"
 )
 
-const shardCount = 8
+const hashShardCount = 8
+const shardCount = hashShardCount + 1
+const ownershipControls = "TestGlobalNativeOwnershipNarrowingControls"
 const pkg = "github.com/relux-works/curator/internal/envprofile"
 const timeout = "60m"
 const marginSeconds = 1800
@@ -40,9 +42,14 @@ type event struct {
 }
 
 func shardFor(name string) int {
+	// The most expensive measured mutation suite gets its own runner. Keep
+	// all other assignments stable, including tests discovered in the future.
+	if name == ownershipControls {
+		return hashShardCount
+	}
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(name))
-	return int(h.Sum64() % shardCount)
+	return int(h.Sum64() % hashShardCount)
 }
 
 func partition(tests []string) ([][]string, error) {

@@ -389,9 +389,10 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 ### Tools
 
 `tools/envprofilerace` partitions the native `internal/envprofile` race-build
-list into eight deterministic shards with exact `-run` selectors. CI runs
+list into eight deterministic name-hash shards plus a dedicated shard for the
+measured ownership mutation suite, with exact `-run` selectors. CI runs
 `go run ./tools/envprofilerace -shard 0 -dir .temp/ci-evidence/envprofile`
-(with indices 0 through 7) in isolated homes. Each shard retains the 60m package
+(with indices 0 through 8) in isolated homes. Each shard retains the 60m package
 timeout and must finish below 1800s. The Race job downloads every same-platform
 artifact and `test-gate.sh` invokes
 `go run ./tools/envprofilerace -mode merge -dir .temp/envprofile-shards -out .temp/envprofile-merged.json`

@@ -17,6 +17,7 @@ func fixtureTests() []string {
 	for i := 0; i < 80; i++ {
 		names = append(names, fmt.Sprintf("TestCase%03d", i))
 	}
+	names = append(names, ownershipControls)
 	return names
 }
 
@@ -27,6 +28,15 @@ func TestPartitionCoverage(t *testing.T) {
 	shards, err := partition(tests)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(shards[hashShardCount]) != 1 || shards[hashShardCount][0] != ownershipControls {
+		t.Fatal("ownership controls must run alone")
+	}
+	// Removing or renaming the dedicated suite must fail instead of quietly
+	// retiring its runner; the full-list and platform gates still check cases.
+	ordinary := fixtureTests()
+	if _, err := partition(ordinary[:len(ordinary)-1]); err == nil || !strings.Contains(err.Error(), fmt.Sprintf("empty shard %d", hashShardCount)) {
+		t.Fatalf("missing ownership suite: %v", err)
 	}
 	for _, name := range tests {
 		matches := 0
@@ -173,7 +183,7 @@ func TestMergeControls(t *testing.T) {
 			want := "source/platform/inventory/selector/exit mismatch"
 			switch plant {
 			case "missing-shard":
-				want = "want 8 shard manifests, got 7"
+				want = fmt.Sprintf("want %d shard manifests, got %d", shardCount, shardCount-1)
 			case "duplicate-shard":
 				want = "invalid or duplicate shard"
 			case "missing-test":
