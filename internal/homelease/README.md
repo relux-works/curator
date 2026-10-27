@@ -2,8 +2,9 @@
 
 This package implements the Curator side of the `home-lease/1` refusal
 contract in [curator-spec](https://github.com/relux-works/curator-spec/blob/3f8ffb7f15213872c66ceec28501b9e51d56ac5c/protocol/home-leases.md).
-It is under qualification. Production session observation is not connected:
-the command entry point passes no `Observer`, so bind refuses
+It is under qualification. The command entry point reads the public
+`curator-run session-manager observe` contract through `SessionManagerObserver`.
+That closed v1 contract lacks required independent proofs, so bind refuses
 `environment_lease_authority_refused/authority_unavailable` and release of a
 blocking lease refuses
 `environment_lease_release_unconfirmed/session_state_unknown`.
@@ -84,12 +85,15 @@ check preimages immediately, before their positive controls. The repair/acquire
 race uses a second process and a continuous real lock. Collector controls remove
 an unreferenced runtime neighbor while retaining prepared/unknown references.
 
-These tests do **not** constitute complete execution of all 68 semantic pairs.
+The [68-pair qualification map](qualification.md) names each semantic pair,
+its actual Go tests and its remaining limits. These tests do **not** constitute
+complete execution of all 68 semantic pairs.
 Consumer vectors HL21–HL24, including launcher `op.json` settlement and zero
 manager calls on terminal replay, require the actual consumer implementation.
 Writer coverage still needs a complete corpus adapter for all variants of the
-18 writer rows, especially borrowed legacy/global continuation, native MCP
-ownership combinations and interrupted custom migration recovery. Build-key
+18 writer rows, especially global-add compensation and interrupted custom migration recovery.
+Borrowed global continuation and a two-environment native MCP batch have paired
+real writer controls; these do not cover every ownership combination. Build-key
 marking is tested; compiled-artifact publication and sweep qualification belong
 to the build-cache suite. Remote installations whose final name is unresolved,
 and several legacy whole-manager operations, currently guard conservatively;
