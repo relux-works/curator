@@ -97,6 +97,14 @@ func beginOperation(home string, options ...transaction.Option) (*operation, err
 // beginOperationValidated checks read-only inputs under the lock before journal
 // recovery can write. All mutations also validate manager-wide authority.
 func beginOperationValidated(home string, validate func() error, options ...transaction.Option) (*operation, error) {
+	return beginOperationGuarded(home, validate, nil, options...)
+}
+
+func beginOperationSelected(home string, validate func() error, selectTargets func() ([]string, error), options ...transaction.Option) (*operation, error) {
+	return beginOperationSelectedRecovery(home, validate, selectTargets, true, options...)
+}
+
+func beginOperationSelectedRecovery(home string, validate func() error, selectTargets func() ([]string, error), recoverPending bool, options ...transaction.Option) (*operation, error) {
 	// Refuse before even creating mutation-lock state in an existing node home.
 	if err := envauthority.Validate(home); err != nil {
 		return nil, err
@@ -122,12 +130,24 @@ func beginOperationValidated(home string, validate func() error, options ...tran
 			return nil, err
 		}
 	}
+	targets, err := selectTargets()
+	if err != nil {
+		_ = lock.Close()
+		return nil, err
+	}
+	if err := homeLeaseGuard(home, lock, targets); err != nil {
+		_ = lock.Close()
+		return nil, err
+	}
 	engine, err := newOperationEngine(home, options...)
 	if err != nil {
 		_ = lock.Close()
 		return nil, err
 	}
-	recovered, err := projectlease.RecoverUnderLock(home, lock, engine)
+	var recovered bool
+	if recoverPending {
+		recovered, err = projectlease.RecoverUnderLock(home, lock, engine)
+	}
 	if err != nil {
 		_ = lock.Close()
 		if isCredentialRefusal(err) {

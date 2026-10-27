@@ -251,7 +251,7 @@ func List(home string) ([]Info, error) {
 // ListWithPolicy lists under the machine gates of policy (environments
 // §9.1). The CLI passes the gates of its already-loaded configuration.
 func ListWithPolicy(home string, policy Policy) ([]Info, error) {
-	op, err := beginOperation(home)
+	op, err := beginOperationSelected(home, nil, func() ([]string, error) { return homeLeaseDefaultTargets(home) })
 	if err != nil {
 		return nil, err
 	}
@@ -329,8 +329,14 @@ func Current(home string) (string, error) {
 }
 
 // SetCurrent records the machine current profile.
-func SetCurrent(home, name string) error {
+func setCurrentDirect(op *operation, home, name string) error {
+	if err := op.lock.AssertHeld(); err != nil {
+		return err
+	}
 	if err := envauthority.Validate(home); err != nil {
+		return err
+	}
+	if err := homeLeaseGuardSelection(op, home, name, ""); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(ProfilesDir(home), 0o755); err != nil {
@@ -374,8 +380,15 @@ func ScopedCurrents(home string) (map[string]string, error) {
 }
 
 // SetScoped records (or with clear=true, drops) a scope's current profile.
-func SetScoped(home, scope, name string, clearScope bool) error {
+func setScopedDirect(op *operation, home, scope, name string, clearScope bool) error {
+	if err := op.lock.AssertHeld(); err != nil {
+		return err
+	}
 	if err := envauthority.Validate(home); err != nil {
+		return err
+	}
+	environment, _ := splitScope(scope)
+	if err := homeLeaseGuardSelection(op, home, name, environment); err != nil {
 		return err
 	}
 	file := filepath.Join(ScopedDir(home), scopeFileName(scope))
@@ -713,7 +726,7 @@ func Install(home string, options InstallOptions) (Info, bool, bool, error) {
 	if err := options.Policy.checkHardenedProfileMutation(); err != nil {
 		return Info{}, false, false, err
 	}
-	op, err := beginOperation(home)
+	op, err := beginOperationSelected(home, nil, func() ([]string, error) { return homeLeaseInstallTargets(home, options) })
 	if err != nil {
 		return Info{}, false, false, err
 	}
@@ -1195,7 +1208,7 @@ func UpdateWithOptions(home, name string, options UpdateOptions) (Info, bool, er
 	if err := options.Policy.checkHardenedProfileMutation(); err != nil {
 		return Info{}, false, err
 	}
-	op, err := beginOperation(home)
+	op, err := beginOperationGuarded(home, nil, homeLeaseProfileTargets(home, name, ""))
 	if err != nil {
 		return Info{}, false, err
 	}
@@ -1429,7 +1442,7 @@ func fetchLockedSources(manager *gitManager, lock *contextlock.Lock) error {
 // under it, which is already atomic at the granularity the manager
 // observes, so no journal is needed for the removal itself.
 func Remove(home, name string, purge bool) error {
-	op, err := beginOperation(home)
+	op, err := beginOperationGuarded(home, nil, homeLeaseProfileTargets(home, name, ""))
 	if err != nil {
 		return err
 	}
@@ -2002,7 +2015,7 @@ func EnsureDefault(home string) error {
 // machine gates of policy (environments §9.1). The CLI passes the gates of
 // its already-loaded configuration.
 func EnsureDefaultWithPolicy(home string, policy Policy) error {
-	op, err := beginOperation(home)
+	op, err := beginOperationSelected(home, nil, func() ([]string, error) { return homeLeaseDefaultTargets(home) })
 	if err != nil {
 		return err
 	}
@@ -2014,6 +2027,9 @@ func ensureDefault(op *operation, home string, policy Policy) error {
 	if _, err := readSource(home, DefaultProfile); err == nil {
 		return nil
 	} else if !isStateAbsent(err) {
+		return err
+	}
+	if err := homeLeaseGuard(home, op.lock, homeLeaseProfileTargets(home, DefaultProfile, "")); err != nil {
 		return err
 	}
 	staging, err := os.MkdirTemp("", "curator-default-root-*")
