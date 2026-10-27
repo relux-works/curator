@@ -590,3 +590,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for working agreements: board-first workf
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+### Git fixture isolation
+
+Test packages that create or drive scratch Git repositories call the neutral
+`internal/testgitenv.Isolate` helper from `TestMain`, before `m.Run`. It removes
+inherited repository, index, config and ceiling selectors and `SSH_AUTH_SOCK`,
+uses an empty global Git config with system config disabled, and pins HOME and
+XDG_CONFIG_HOME to disposable directories (also USERPROFILE on Windows).
+Tests can still set explicit fixture configuration inside that boundary.
+Run `go test -count=1 ./internal/testgitenv` for real hostile-repository and
+home-preservation regressions, or `go test ./...` for the full suite.
+`TestMain` removes its temporary homes; optional logs belong under `.temp/`.
