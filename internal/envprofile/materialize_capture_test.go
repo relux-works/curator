@@ -359,7 +359,9 @@ func TestMaterializeCaptureWaitReselectsAndTimeout(t *testing.T) {
 		t.Fatal("machine selected while lock held")
 	case <-time.After(30 * time.Millisecond):
 	}
-	if err := SetCurrent(fx.home, "capture"); err != nil {
+	// Plant the cooperating writer's result while this test owns its lock;
+	// the public setter now acquires that lock itself.
+	if err := os.WriteFile(CurrentFile(fx.home), []byte("capture\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	_ = lock.Close()
@@ -818,7 +820,8 @@ func TestMaterializeCaptureAuthorizingDrift(t *testing.T) {
 				}
 				switch change {
 				case "selection":
-					if err := SetCurrent(fx.home, "replacement-current"); err != nil {
+					// An external writer deliberately violates the capture lock.
+					if err := os.WriteFile(CurrentFile(fx.home), []byte("replacement-current\n"), 0600); err != nil {
 						return nil, err
 					}
 				case "marker-identity", "lock-identity":

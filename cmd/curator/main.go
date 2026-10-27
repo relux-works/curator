@@ -282,6 +282,9 @@ func (c cli) run(args []string) int {
 		_, _ = fmt.Fprint(c.stderr, usage)
 		return exitUsage
 	}
+	if len(args) >= 2 && args[0] == "env" && args[1] == "lease" {
+		return c.cmdEnv(args[1:])
+	}
 	if rejectsTakeover(args) {
 		_, _ = fmt.Fprintln(c.stderr, "curator: --takeover applies only with --repair for env resolve; also available for profile install --use, profile use, profile sync, and profile update")
 		return exitUsage

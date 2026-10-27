@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/homelease"
 )
 
 // machineFromConfig threads the effective machine knobs used by environment
@@ -63,11 +65,20 @@ func (c cli) profileNativeHomeResolver() func(string) (string, error) {
 
 func (c cli) cmdEnv(args []string) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config | migrate | unmanage")
+		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config | migrate | unmanage | lease")
 		return exitUsage
 	}
+	if args[0] == "lease" {
+		return homelease.RunCLI(context.Background(), args[1:], func() (*homelease.Manager, error) {
+			cfg, code := c.loadConfig()
+			if code != exitOK {
+				return nil, fmt.Errorf("lease configuration unavailable")
+			}
+			return envprofile.HomeLeaseManager(envprofile.ResolveRequest{Home: cfg.Home(), Machine: machineFromConfig(cfg), Policy: envprofile.PolicyFromConfig(cfg), NativeHomeOf: c.profileNativeHomeResolver()}, nil)
+		}, c.stdout, c.stderr)
+	}
 	if wantsHelp(args) {
-		_, _ = fmt.Fprint(c.stdout, "usage: curator env <resolve|status|config|migrate|unmanage> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
+		_, _ = fmt.Fprint(c.stdout, "usage: curator env <resolve|status|config|migrate|unmanage|lease> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
 		return exitOK
 	}
 	cfg, code := c.loadConfig()
