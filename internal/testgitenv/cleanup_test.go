@@ -10,7 +10,7 @@ import (
 )
 
 // TestMain cleanup removes a read-only module-cache tree. On Unix, it must
-// also preserve external symlink targets and hardlinked file contents/modes.
+// also preserve external symlink targets and hard link contents/modes.
 func TestIsolateCleansReadonlyHome(t *testing.T) {
 	report := filepath.Join(t.TempDir(), "home")
 	outside := t.TempDir()

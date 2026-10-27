@@ -606,3 +606,26 @@ home-preservation regressions, or `go test ./...` for the full suite.
 `TestMain` removes its temporary homes, including read-only module-cache
 directories; its permission walk never follows symlinks or chmods regular
 files. Optional logs belong under `.temp/`.
+
+The repository selector inventory also clears common/object/alternate storage,
+namespace, template, graft/shallow/replace-ref paths, discovery/worktree hints,
+quarantine and reference backend selectors. It covers the installed Git's
+`rev-parse --local-env-vars` list; Git configuration count/parameter/indexed
+channels are cleared dynamically. The source inventory is `git(1)` (Environment
+Variables), `git-init(1)` (templates), and that Git-reported local list.
+Scratch roots are absolute physical paths (`Abs` and `EvalSymlinks`) before
+HOME, config or cleanup paths are derived. TMPDIR/TMP/TEMP are normalized too,
+so a later cwd change cannot redirect a temporary fixture; cleanup restores
+all managed values, including absence and explicitly empty values.
+
+Standalone `.github/ci/gate-selftest.sh` sources
+`.github/ci/isolate-test-env.sh` before its first fixture command. This is the
+shell equivalent of the same boundary, scoped to the disposable gate process;
+the caller owns its scratch directory and cleanup. Run
+`bash .github/ci/gate-selftest.sh` for gate checks. The helper suite replays the
+actual ancestry prefix with hostile repository/storage and signing channels,
+compares every disposable decoy file, and checks shell/Go selector parity.
+`TestPhysicalTemporaryRoots` covers absolute, relative `.tmp` and symlinked
+temporary roots plus cwd changes; a platform that cannot create a directory
+symlink reports that one control as skipped. These checks use synthetic data;
+they neither read live credentials nor operate on an operator repository.

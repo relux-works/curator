@@ -22,11 +22,22 @@ import (
 // empty global Git config with system config disabled. Native provider and
 // XDG data/state/cache root overrides are cleared too. Call before m.Run;
 // deliberate per-test overrides remain possible. Cleanup restores the caller's
-// managed variables and removes the scratch home. Setup failures fail closed.
+// managed variables and removes the scratch home. Owned paths and the temporary
+// directory variables are absolute and physical. Setup failures fail closed.
 func Isolate() func() {
-	dir, err := os.MkdirTemp("", "curator-test-gitconfig-*")
+	base, err := physicalPath(os.TempDir())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "testgitenv: resolve temporary root:", err)
+		os.Exit(2)
+	}
+	dir, err := os.MkdirTemp(base, "curator-test-gitconfig-*")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "testgitenv: create isolated git config dir:", err)
+		os.Exit(2)
+	}
+	dir, err = physicalPath(dir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "testgitenv: resolve isolated root:", err)
 		os.Exit(2)
 	}
 	path := filepath.Join(dir, "gitconfig")
@@ -53,6 +64,7 @@ func Isolate() func() {
 	for key, value := range map[string]string{
 		"GIT_CONFIG_GLOBAL": path, "GIT_CONFIG_NOSYSTEM": "1",
 		"HOME": home, "XDG_CONFIG_HOME": xdg,
+		"TMPDIR": base, "TMP": base, "TEMP": base,
 	} {
 		mustEnv(os.Setenv(key, value))
 	}
@@ -111,11 +123,26 @@ func managed(key string) bool {
 		return true
 	}
 	switch key {
-	case "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_CEILING_DIRECTORIES", "SSH_AUTH_SOCK", "HOME", "XDG_CONFIG_HOME",
+	case "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
+		"GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_TEMPLATE_DIR", "GIT_CEILING_DIRECTORIES",
+		"GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_IMPLICIT_WORK_TREE", "GIT_GRAFT_FILE", "GIT_SHALLOW_FILE",
+		"GIT_NO_REPLACE_OBJECTS", "GIT_REPLACE_REF_BASE", "GIT_PREFIX", "GIT_QUARANTINE_PATH",
+		"GIT_REFERENCE_BACKEND", "GIT_DEFAULT_HASH", "GIT_DEFAULT_REF_FORMAT",
+		"SSH_AUTH_SOCK", "HOME", "XDG_CONFIG_HOME", "TMPDIR", "TMP", "TEMP",
 		"CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME":
 		return true
 	}
 	return false
+}
+
+// Resolve before deriving exported paths or cleanup ownership: relative TMPDIR
+// and symlinked temporary volumes must not move those paths with a later chdir.
+func physicalPath(path string) (string, error) {
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	return filepath.EvalSymlinks(absolute)
 }
 
 func mustEnv(err error) {
