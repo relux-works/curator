@@ -167,6 +167,13 @@ func Use(home, name, environment, target string, clearScope bool) ([]EntryResult
 // UseWithPolicy switches under the machine gates of policy (environments
 // §9.1). The CLI passes the gates of its already-loaded configuration.
 func UseWithPolicy(home, name, environment, target string, clearScope bool, policy Policy) ([]EntryResult, error) {
+	candidate := name
+	if clearScope {
+		candidate = ""
+	}
+	if err := refusePreparedSkillPlanAdoption(home, candidate); err != nil {
+		return nil, err
+	}
 	op, err := beginOperation(home)
 	if err != nil {
 		return nil, err
@@ -395,6 +402,9 @@ func Sync(home string) ([]EntryResult, error) {
 // SyncWithPolicy syncs under the machine gates of policy (environments
 // §9.1). The CLI passes the gates of its already-loaded configuration.
 func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
+	if err := refusePreparedSkillPlanAdoption(home, ""); err != nil {
+		return nil, err
+	}
 	op, err := beginOperation(home)
 	if err != nil {
 		return nil, err

@@ -82,9 +82,35 @@ func (e *env) schema8ScriptSkill(name string, enforced bool, interpreter ...stri
 // run, so the ~20 MB production-binary fixtures do not leak into the
 // system temp dir on every package run.
 func TestMain(m *testing.M) {
+	// BUG-261027-5t7pqj: inherited adapter roots must never escape the test HOME.
+	testHome, err := os.MkdirTemp("", "curator-package-home-*")
+	if err != nil {
+		panic(err)
+	}
+	for key, value := range map[string]string{
+		"HOME": testHome, "USERPROFILE": testHome,
+		"CURATOR_CONFIG": filepath.Join(testHome, "config.json"), "CURATOR_SYSTEM_CONFIG": filepath.Join(testHome, "system-config.json"),
+		"CLAUDE_CONFIG_DIR":       filepath.Join(testHome, ".claude"),
+		"CODEX_HOME":              filepath.Join(testHome, ".codex"),
+		"XDG_CONFIG_HOME":         filepath.Join(testHome, ".config"),
+		"XDG_STATE_HOME":          filepath.Join(testHome, ".local", "state"),
+		"PI_CODING_AGENT_DIR":     filepath.Join(testHome, ".pi"),
+		"CURATOR_GLOBAL_USER_BIN": filepath.Join(testHome, "bin"),
+	} {
+		if err := os.Setenv(key, value); err != nil {
+			panic(err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(testHome, "bin"), 0700); err != nil {
+		panic(err)
+	}
+	if err := os.Setenv("PATH", filepath.Join(testHome, "bin")+string(os.PathListSeparator)+os.Getenv("PATH")); err != nil {
+		panic(err)
+	}
 	restoreGitEnv := testgitenv.Isolate()
 	code := m.Run()
 	restoreGitEnv()
+	_ = os.RemoveAll(testHome)
 	if enforcedOnce.directory != "" {
 		_ = os.RemoveAll(enforcedOnce.directory)
 	}

@@ -19,7 +19,9 @@ import (
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/skillruntime"
 	"github.com/relux-works/curator/internal/stateread"
+	"github.com/relux-works/curator/internal/transaction"
 )
 
 // SkillPlanPreparation performs ordinary trusted audit/build/receipt checks on
@@ -38,9 +40,24 @@ type SkillDrift struct {
 
 // SkillPlanResult contains the prepared lock binding and unrelated drift.
 type SkillPlanResult struct {
-	Lock     *contextlock.Lock
-	LockHash string
-	Drift    []SkillDrift
+	Lock       *contextlock.Lock
+	LockHash   string
+	Drift      []SkillDrift
+	Diagnostic string
+}
+
+// SkillRuntimePreparation joins verified runtime outputs to the same lock journal.
+// The witness is held by the outer operation; callbacks must not take another
+// home lock, commit a journal or publish mutable routing paths themselves.
+type SkillRuntimePreparation func(*contextlock.Lock, []*closure.Node, transaction.HomeLock) (skillruntime.Publication, error)
+
+// PrepareSkillRuntime retains the admission across compilation, staging and
+// one journal publication, without permitting v5 profile adoption.
+func PrepareSkillRuntime(home, profile, expectedHash string, policy Policy, session *skillruntime.Session, prepare SkillPlanPreparation, stage SkillRuntimePreparation) (SkillPlanResult, error) {
+	if session == nil || stage == nil || session.Request().Home != home || session.Request().Profile != profile {
+		return SkillPlanResult{}, fmt.Errorf("profile_skill_routing_unproven: bound routing session required")
+	}
+	return prepareSkillPlan(home, profile, expectedHash, policy, prepare, session, stage)
 }
 
 // PrepareSkillPlan explicitly upgrades an installed profile's stored pins to
@@ -49,17 +66,37 @@ type SkillPlanResult struct {
 // expectedHash is the caller's observed lock pin; it is checked before work and
 // again before publication. The shared manager journal publishes only records.
 func PrepareSkillPlan(home, profile, expectedHash string, policy Policy, prepare SkillPlanPreparation) (SkillPlanResult, error) {
+	return prepareSkillPlan(home, profile, expectedHash, policy, prepare, nil, nil)
+}
+
+func prepareSkillPlan(home, profile, expectedHash string, policy Policy, prepare SkillPlanPreparation, session *skillruntime.Session, stage SkillRuntimePreparation) (SkillPlanResult, error) {
 	if !validProfileName(profile) || expectedHash == "" || prepare == nil {
 		return SkillPlanResult{}, fmt.Errorf("profile_skill_plan_invalid: profile, observed lock and preparation required")
 	}
 	if err := policy.checkHardenedProfileMutation(); err != nil {
 		return SkillPlanResult{}, err
 	}
-	op, err := beginOperation(home)
+	var op *operation
+	var err error
+	if session == nil {
+		op, err = beginOperation(home)
+	} else {
+		// Admission was acquired before this function, hence before lock/recovery.
+		op, err = beginOperationAdmitted(home, session.Revalidate)
+	}
 	if err != nil {
 		return SkillPlanResult{}, err
 	}
 	defer func() { _ = op.close() }()
+	if session != nil {
+		current, err := Current(home)
+		if err != nil {
+			return SkillPlanResult{}, err
+		}
+		if current != session.Request().Current {
+			return SkillPlanResult{}, fmt.Errorf("profile_skill_plan_binding_invalid: stale machine current")
+		}
+	}
 	old, hash, err := readLock(home, profile)
 	if err != nil {
 		return SkillPlanResult{}, err
@@ -144,6 +181,10 @@ func PrepareSkillPlan(home, profile, expectedHash string, policy Policy, prepare
 	}
 	globalPath := manifest.PathIn(filepath.Join(home, "global"))
 	global, err := stateread.ReadRegularFile(globalPath)
+	if err != nil {
+		return SkillPlanResult{}, err
+	}
+	globalDigest, err := transaction.DigestPath(globalPath)
 	if err != nil {
 		return SkillPlanResult{}, err
 	}
@@ -241,29 +282,36 @@ func PrepareSkillPlan(home, profile, expectedHash string, policy Policy, prepare
 	if err := prepare(plan.Nodes); err != nil {
 		return SkillPlanResult{}, err
 	}
-	// Recheck snapshot content and all optimistic observations after compilation.
-	for tree, expected := range contextTrees {
-		actual, err := hashing.ContentSHA256WithVersion(tree, map[string]bool{}, hashing.VersionV2)
-		if err != nil {
-			return SkillPlanResult{}, err
+	// Recheck the same admitted bytes after compilation and runtime staging.
+	verifySources := func() error {
+		for tree, expected := range contextTrees {
+			actual, err := hashing.ContentSHA256WithVersion(tree, map[string]bool{}, hashing.VersionV2)
+			if err != nil {
+				return err
+			}
+			if actual != expected {
+				return fmt.Errorf("profile_skill_plan_invalid: context changed during preparation")
+			}
 		}
-		if actual != expected {
-			return SkillPlanResult{}, fmt.Errorf("profile_skill_plan_invalid: context changed during preparation")
-		}
-	}
 
-	for _, pin := range plan.Lock.SkillPlan.Nodes {
-		for _, node := range plan.Nodes {
-			if node.Name == pin.Name {
-				digest, err := hashing.ContentSHA256WithVersion(node.Snapshot, map[string]bool{}, hashing.VersionV2)
-				if err != nil {
-					return SkillPlanResult{}, err
-				}
-				if strings.TrimPrefix(digest, "sha256:") != pin.ContentSHA256 {
-					return SkillPlanResult{}, fmt.Errorf("profile_skill_plan_invalid: frozen source changed during preparation")
+		for _, pin := range plan.Lock.SkillPlan.Nodes {
+			for _, node := range plan.Nodes {
+				if node.Name == pin.Name {
+					digest, err := hashing.ContentSHA256WithVersion(node.Snapshot, map[string]bool{}, hashing.VersionV2)
+					if err != nil {
+						return err
+					}
+					if strings.TrimPrefix(digest, "sha256:") != pin.ContentSHA256 {
+						return fmt.Errorf("profile_skill_plan_invalid: frozen source changed during preparation")
+					}
 				}
 			}
 		}
+
+		return nil
+	}
+	if err := verifySources(); err != nil {
+		return SkillPlanResult{}, err
 	}
 	currentGlobal, err := stateread.ReadRegularFile(globalPath)
 	if err != nil {
@@ -282,6 +330,7 @@ func PrepareSkillPlan(home, profile, expectedHash string, policy Policy, prepare
 	drift := skillPlanDrift(home, plan.Nodes, direct)
 	// Selected immutable snapshots only; unrelated direct installations and
 	// retained lock members are neither opened for repair nor rewritten.
+	persistentInputs := []string{}
 	for _, node := range plan.Nodes {
 		entry, err := contextstore.EnsureGit(home, "skill", node.Name, node.Repo, node.Resolved.Commit)
 		if err != nil {
@@ -302,6 +351,7 @@ func PrepareSkillPlan(home, profile, expectedHash string, policy Policy, prepare
 		if actual != expected {
 			return SkillPlanResult{}, fmt.Errorf("profile_skill_plan_invalid: selected store bytes differ from admitted source")
 		}
+		persistentInputs = append(persistentInputs, selected)
 	}
 
 	canonical, err := plan.Lock.Canonical()
@@ -312,10 +362,56 @@ func PrepareSkillPlan(home, profile, expectedHash string, policy Policy, prepare
 	if err != nil {
 		return SkillPlanResult{}, err
 	}
-	if err := op.publish(map[string][]byte{lockPath(home, profile): canonical, prevLockPath(home, profile): oldCanonical}); err != nil {
+	var publication skillruntime.Publication
+	if stage != nil {
+		publication, err = stage(plan.Lock, plan.Nodes, op.witness())
+		if err != nil {
+			return SkillPlanResult{}, err
+		}
+		if publication.Verify == nil {
+			return SkillPlanResult{}, fmt.Errorf("profile_skill_plan_binding_invalid: runtime revalidation required")
+		}
+		if err := publication.Verify(); err != nil {
+			return SkillPlanResult{}, err
+		}
+	}
+	if stage != nil {
+		if err := verifySources(); err != nil {
+			return SkillPlanResult{}, err
+		}
+		current, err := Current(home)
+		if err != nil {
+			return SkillPlanResult{}, err
+		}
+		if current != session.Request().Current {
+			return SkillPlanResult{}, fmt.Errorf("profile_skill_plan_binding_invalid: machine current changed during runtime staging")
+		}
+		// Durable source-boundary proofs use persistent immutable stores. Private
+		// extraction/build paths are released after an interrupted caller returns.
+		// Prepared journal bytes seal the operation; recovery does not re-resolve
+		// declarations from a later operation.
+		publication.Admitted = persistentInputs
+		currentGlobal, err := stateread.ReadRegularFile(globalPath)
+		if err != nil {
+			return SkillPlanResult{}, err
+		}
+		currentDigest, err := transaction.DigestPath(globalPath)
+		if err != nil || currentDigest != globalDigest || currentGlobal.Kind != global.Kind || !bytes.Equal(currentGlobal.Bytes, global.Bytes) {
+			return SkillPlanResult{}, fmt.Errorf("profile_skill_plan_binding_invalid: direct declarations changed during runtime staging")
+		}
+		_, currentHash, err := readLock(home, profile)
+		if err != nil {
+			return SkillPlanResult{}, err
+		}
+		if currentHash != hash {
+			return SkillPlanResult{}, fmt.Errorf("profile_skill_plan_binding_invalid: lock changed during runtime staging")
+		}
+	}
+	files := map[string][]byte{lockPath(home, profile): canonical, prevLockPath(home, profile): oldCanonical}
+	if err := op.publishCombined(files, nil, nil, publication); err != nil {
 		return SkillPlanResult{}, err
 	}
-	return SkillPlanResult{Lock: plan.Lock, LockHash: contextlock.HashBytes(canonical), Drift: drift}, nil
+	return SkillPlanResult{Lock: plan.Lock, LockHash: contextlock.HashBytes(canonical), Drift: drift, Diagnostic: publication.Diagnostic}, nil
 }
 
 func skillPlanDrift(home string, nodes []*closure.Node, direct []manifest.Decl) []SkillDrift {
@@ -368,6 +464,29 @@ func skillPlanDrift(home string, nodes []*closure.Node, direct []manifest.Decl) 
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
+}
+
+// refusePreparedSkillPlanAdoption preserves the companion diagnostic before a
+// legacy entry point attempts domain admission or journal recovery. This is a
+// read-only refusal probe; existing under-lock validation remains authoritative
+// for absent, malformed or concurrently replaced records.
+func refusePreparedSkillPlanAdoption(home, profile string) error {
+	if profile == "" {
+		var err error
+		profile, err = Current(home)
+		if err != nil {
+			return nil
+		}
+		if profile == "" {
+			profile = DefaultProfile
+		}
+	}
+	if validProfileName(profile) {
+		if candidate, _, err := readLock(home, profile); err == nil && candidate.SchemaVersion == contextlock.SchemaVersion5 {
+			return RefuseSkillPlanAdoption()
+		}
+	}
+	return nil
 }
 
 // RefuseSkillPlanAdoption is unconditional until accepted companion allocations
