@@ -1,0 +1,84 @@
+# Former source: project-admission.puml, removed in the move to the book kit;
+# it remains in the repository history.
+# Admission of project context as a decision flowchart. Content follows
+# project-admission.puml and chapter "Контекст проекта и рабочее место". To
+# fit the tall box the candidate inventory and the protected preview share one
+# step, and composition shares one step with the check before launch; both
+# branches end the flow, so there is no end state. The registration carries
+# the two independent switches of chapter "Контекст проекта и рабочее место"
+# (source mode and admission, defaults `strict` and `off`); its note carries
+# the native-project rule: context items refuse, only whole skills and MCP
+# are delivered, and the notice `project sources not isolated` is reported. The puml legend rule about edits is
+# the note on the question; its status word is left out.
+layout = "graph"
+direction = "TB"
+same_rank = [["start", "reg"], ["gen", "inert"], ["comp", "refuse"]]
+alt = "Допуск контекста проекта: предпросмотр не выдаёт полномочий, только одобрение точного элемента вводит его в защищённое поколение."
+
+[nodes.start]
+shape = "start"
+
+[nodes.reg]
+role = "store"
+name = "Зарегистрированный чекаут"
+text = "проверенная идентичность; режим источников и допуск независимы, по умолчанию `strict` и `off`"
+note = "В режиме `native-project` элемент контекста отказывает, Curator доставляет только целые скиллы и MCP, а статус и запуск сообщают `project sources not isolated`."
+
+[nodes.preview]
+role = "service"
+name = "Кандидат и предпросмотр"
+text = "кандидат читается как недоверенные данные; защищённый снимок показывает точный элемент и его эффекты"
+
+[nodes.q]
+role = "neutral"
+name = "Есть действующее одобрение этого элемента в пределах потолка политики?"
+note = "Правка в чекауте создаёт нового кандидата. Прежнее одобрение на него не переносится."
+
+[nodes.gen]
+role = "store"
+name = "Одобренное поколение"
+
+[nodes.inert]
+role = "neutral"
+name = "Кандидат остаётся инертным"
+
+[nodes.comp]
+role = "service"
+name = "Композиция и проверка перед запуском"
+text = "lock профиля, поколение, среда и политика; поверхности, исключение источников и аренда"
+
+[nodes.refuse]
+role = "alert"
+name = "Отказ запуска"
+text = "если элемент обязателен"
+
+[[links]]
+from = "start"
+to = "reg"
+
+[[links]]
+from = "reg"
+to = "preview"
+
+[[links]]
+from = "preview"
+to = "q"
+
+[[links]]
+from = "q"
+to = "gen"
+label = "да"
+
+[[links]]
+from = "q"
+to = "inert"
+label = "нет"
+
+[[links]]
+from = "gen"
+to = "comp"
+
+[[links]]
+from = "inert"
+to = "refuse"
+color = "alert"

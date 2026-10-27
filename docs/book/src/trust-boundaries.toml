@@ -1,0 +1,101 @@
+# Former source: trust-boundaries.puml, removed in the move to the book kit;
+# it remains in the repository history.
+# Trust boundaries of project control. Content follows trust-boundaries.puml
+# and chapter "Безопасность, разрешения и доверие". Containers are the three
+# zones of the puml: the checkout (controlled by whoever writes the
+# repository, hence `external`), the protected manager state and the qualified
+# runtime boundary (both controlled by the manager, `service`). The operating
+# system or trusted execution provider is a separate boundary below. The puml
+# legend lines go to the candidate text (repository bytes create no approval
+# or grant) and to the note on the harness (the managed home is no
+# operating-system sandbox), together with the native-project reading of the checkout from the
+# project context contract (CIP-0002). Its status words are left out.
+layout = "graph"
+direction = "TB"
+same_rank = [["data", "cand"], ["policy", "approval"]]
+alt = "Границы доверия: данные проекта, полномочия менеджера и среда исполнения."
+
+[theme.space]
+graph_ranksep = 0.3
+
+[groups.checkout]
+label = "Чекаут"
+role = "external"
+
+[groups.manager]
+label = "Защищённое состояние менеджера"
+role = "service"
+
+[groups.runtime]
+label = "Квалифицированная среда"
+role = "service"
+
+[nodes.data]
+group = "checkout"
+role = "neutral"
+name = "Код и обычные данные"
+
+[nodes.cand]
+group = "checkout"
+role = "neutral"
+name = "Кандидаты"
+text = "контекст, скиллы, MCP; разрешения проекта как инертный запрос без гранта"
+
+[nodes.policy]
+group = "manager"
+role = "store"
+name = "Политика оператора"
+text = "неотменяемые запреты; гранты агента в пределах потолка"
+
+[nodes.approval]
+group = "manager"
+role = "store"
+name = "Одобренный дайджест"
+text = "идентичность проекта, композиция и аренды"
+
+[nodes.copies]
+group = "runtime"
+role = "store"
+name = "Защищённые копии"
+text = "корневой контекст профиля и одобренный слой проекта"
+
+[nodes.harness]
+group = "runtime"
+role = "agent"
+name = "Харнес"
+text = "запрет по умолчанию, нативная память выключена, исключение источников в строгом режиме"
+note = "Управляемый дом не служит песочницей ОС. В режиме `native-project` харнес сам читает управляющие файлы чекаута."
+
+[nodes.os]
+role = "neutral"
+name = "ОС или доверенный исполнитель"
+text = "отдельная граница исполнения"
+
+[[links]]
+from = "cand"
+to = "approval"
+label = "аудит и одобрение"
+
+[[links]]
+from = "policy"
+to = "approval"
+label = "ограничивает допуск"
+
+[[links]]
+from = "approval"
+to = "copies"
+label = "проверка перед доставкой и стартом"
+
+[[links]]
+from = "copies"
+to = "harness"
+
+[[links]]
+from = "data"
+to = "harness"
+label = "рабочие данные через инструменты"
+
+[[links]]
+from = "harness"
+to = "os"
+label = "реальное действие"

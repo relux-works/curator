@@ -1,0 +1,80 @@
+# Former source: werkstatt.puml, removed in the move to the book kit; it
+# remains in the repository history.
+# The Werkstatt: one persistent work place per checkout x profile x
+# environment. Content follows werkstatt.puml and chapter "Контекст проекта и
+# рабочее место". The container is the manager-owned work place; the protected
+# manager records stay outside it. The puml note (busy home, sparse worktree)
+# is split: the busy-home rule goes to the records, the sandbox limit and the
+# native-project reading of the checkout (CIP-0002 amendment) to the worktree.
+layout = "graph"
+direction = "TB"
+same_rank = [["repo", "profile"], ["home", "worktree"]]
+alt = "Рабочее место связывает чекаут, профиль и агентскую среду: чекаут остаётся рабочими данными, защищённые записи менеджера задают управляющие входы."
+
+[groups.werkstatt]
+label = "Рабочее место"
+role = "service"
+
+[nodes.repo]
+role = "neutral"
+name = "Исходный чекаут"
+text = "код как рабочие данные, управляющие файлы как кандидаты"
+
+[nodes.profile]
+role = "store"
+name = "Lock выбранного профиля"
+
+[nodes.records]
+role = "store"
+name = "Защищённые записи менеджера"
+text = "регистрация, одобрения, поколение, композиция и аренда"
+
+[nodes.home]
+group = "werkstatt"
+role = "store"
+name = "Управляемый дом"
+text = "корневой контекст профиля, в строгом режиме одобренный слой проекта, состояние харнеса"
+
+[nodes.worktree]
+group = "werkstatt"
+role = "neutral"
+name = "Разрежённое рабочее дерево"
+text = "вне исходного дерева и вне корней менеджера"
+note = "Рабочее дерево не служит песочницей. В режиме `native-project` дом несёт только корневой контекст профиля, а харнес сам читает управляющие файлы дерева."
+
+[nodes.harness]
+group = "werkstatt"
+role = "agent"
+name = "Сессия харнеса"
+text = "связана арендой с композицией"
+note = "Замена занятого сессией дома ждёт освобождения или получает отказ."
+
+[[links]]
+from = "repo"
+to = "records"
+label = "осмотр и одобрение"
+
+[[links]]
+from = "profile"
+to = "records"
+label = "привязка"
+
+[[links]]
+from = "records"
+to = "home"
+label = "материализация"
+
+[[links]]
+from = "repo"
+to = "worktree"
+label = "явная подготовка"
+
+[[links]]
+from = "home"
+to = "harness"
+label = "управляющие входы"
+
+[[links]]
+from = "worktree"
+to = "harness"
+label = "рабочие данные"

@@ -1,0 +1,52 @@
+# Former source: runtime-exclusion.puml (a PlantUML salt table of measured
+# runtime versions), removed in the move to the book kit; it remains in the
+# repository history.
+# Native source exclusion over the life of a session. The measured versions
+# and their gaps are a facts table and stay a Markdown table in chapter
+# "Агентские среды и харнесы"; the figure shows the mechanism the table
+# measures: the managed home stays visible (the positive control), the
+# checkout's control files must stay closed at every point where the harness
+# discovers sources, and a qualified adapter is what closes them for one
+# release and platform. The salt footnote (research on single surfaces
+# activates no adapter) is the note on the adapter.
+layout = "graph"
+direction = "LR"
+same_rank = [["home", "checkout"]]
+alt = "Исключение нативных источников: управляемый дом остаётся виден, а управляющие файлы чекаута закрыты в каждой точке, где харнес ищет источники."
+
+[nodes.home]
+role = "store"
+name = "Управляемый дом"
+text = "корневые инструкции и одобренные копии"
+
+[nodes.checkout]
+role = "neutral"
+name = "Управляющие файлы чекаута"
+text = "инструкции, правила, скиллы, хуки, настройки, MCP"
+
+[nodes.harness]
+role = "agent"
+name = "Харнес"
+text = "ищет источники при старте, перезагрузке, позднем обнаружении, возобновлении и входе дочернего агента"
+
+[nodes.adapter]
+role = "service"
+name = "Квалифицированный адаптер"
+text = "закрывает каждую точку для точной версии и платформы"
+note = "Проверка отдельных поверхностей адаптер не включает."
+
+[[links]]
+from = "home"
+to = "harness"
+label = "остаётся виден"
+
+[[links]]
+from = "checkout"
+to = "harness"
+label = "закрыто в строгом режиме"
+color = "alert"
+
+[[links]]
+from = "adapter"
+to = "harness"
+label = "программирует запуск"

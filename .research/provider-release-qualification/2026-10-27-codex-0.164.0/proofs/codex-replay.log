@@ -1,0 +1,64 @@
+=== RUN   TestCodexShellDenial
+=== RUN   TestCodexShellDenial/workspace-write
+=== RUN   TestCodexShellDenial/read-only
+--- PASS: TestCodexShellDenial (5.26s)
+    --- PASS: TestCodexShellDenial/workspace-write (1.99s)
+    --- PASS: TestCodexShellDenial/read-only (3.27s)
+=== RUN   TestCodexMemoryRead
+=== RUN   TestCodexMemoryRead/enabled-true
+=== RUN   TestCodexMemoryRead/enabled-false
+--- PASS: TestCodexMemoryRead (4.36s)
+    --- PASS: TestCodexMemoryRead/enabled-true (2.50s)
+    --- PASS: TestCodexMemoryRead/enabled-false (1.86s)
+=== RUN   TestCodexMCPDenial
+=== RUN   TestCodexMCPDenial/disabled-false
+=== RUN   TestCodexMCPDenial/disabled-true
+--- PASS: TestCodexMCPDenial (2.80s)
+    --- PASS: TestCodexMCPDenial/disabled-false (1.38s)
+    --- PASS: TestCodexMCPDenial/disabled-true (1.42s)
+=== RUN   TestCodexMCPDefaultPrompt
+=== RUN   TestCodexMCPDefaultPrompt/disabled-false
+=== RUN   TestCodexMCPDefaultPrompt/disabled-true
+--- PASS: TestCodexMCPDefaultPrompt (2.95s)
+    --- PASS: TestCodexMCPDefaultPrompt/disabled-false (1.50s)
+    --- PASS: TestCodexMCPDefaultPrompt/disabled-true (1.45s)
+=== RUN   TestFilesystemDenialAttribution
+--- PASS: TestFilesystemDenialAttribution (0.00s)
+=== RUN   TestCodexDedicatedMemory
+=== RUN   TestCodexDedicatedMemory/read
+=== RUN   TestCodexDedicatedMemory/read/on-true
+=== RUN   TestCodexDedicatedMemory/read/on-false
+=== RUN   TestCodexDedicatedMemory/write
+=== RUN   TestCodexDedicatedMemory/write/on-true
+=== RUN   TestCodexDedicatedMemory/write/on-false
+--- PASS: TestCodexDedicatedMemory (4.92s)
+    --- PASS: TestCodexDedicatedMemory/read (2.71s)
+        --- PASS: TestCodexDedicatedMemory/read/on-true (1.66s)
+        --- PASS: TestCodexDedicatedMemory/read/on-false (1.05s)
+    --- PASS: TestCodexDedicatedMemory/write (2.21s)
+        --- PASS: TestCodexDedicatedMemory/write/on-true (1.13s)
+        --- PASS: TestCodexDedicatedMemory/write/on-false (1.08s)
+=== RUN   TestCodexMemoryResume
+--- PASS: TestCodexMemoryResume (1.64s)
+=== RUN   TestRequestAttribution
+--- PASS: TestRequestAttribution (0.00s)
+=== RUN   TestFunctionResults
+--- PASS: TestFunctionResults (0.00s)
+=== RUN   TestIntake
+=== RUN   TestIntake/missing
+=== RUN   TestIntake/digest
+--- PASS: TestIntake (0.04s)
+    --- PASS: TestIntake/missing (0.02s)
+    --- PASS: TestIntake/digest (0.02s)
+=== RUN   TestOfflineBoundary
+--- PASS: TestOfflineBoundary (0.63s)
+=== RUN   TestNativeIntrospection
+=== RUN   TestNativeIntrospection/codex
+--- PASS: TestNativeIntrospection (0.77s)
+    --- PASS: TestNativeIntrospection/codex (0.77s)
+=== RUN   TestNestedSandboxControl
+--- PASS: TestNestedSandboxControl (0.52s)
+=== RUN   TestVerdictGate
+--- PASS: TestVerdictGate (0.00s)
+PASS
+ok  	github.com/relux-works/curator/.tmp/canary-0164/codex-r2-01/stage	24.296s

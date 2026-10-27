@@ -1,0 +1,75 @@
+# Former source: profile-lock-home.puml, removed in the move to the book kit;
+# it remains in the repository history.
+# From declarations to the managed home. Content follows profile-lock-home.puml
+# and chapter "Профили и воспроизводимые источники": the package and the
+# machine overlays feed the resolution, which writes the profile lock and the
+# store of verified snapshots; materialization reads both and writes the home.
+# The puml note about seeds and native mutable state is the note on the home.
+layout = "graph"
+direction = "TB"
+same_rank = [["pkg", "overlay"], ["lock", "store"]]
+alt = "Из деклараций менеджер получает проверенное замыкание и lock, затем материализует управляемые поверхности дома."
+
+[nodes.pkg]
+role = "neutral"
+name = "Контекстный пакет"
+text = "`agent-context.json`, модули и требования"
+
+[nodes.overlay]
+role = "neutral"
+name = "Оверлеи и политика машины"
+text = "машинная композиция профиля"
+
+[nodes.resolve]
+role = "service"
+name = "Разрешение замыкания"
+text = "проверки источника, подписанта и аудита"
+
+[nodes.lock]
+role = "store"
+name = "Lock профиля"
+text = "участники замыкания и пины"
+
+[nodes.store]
+role = "store"
+name = "Хранилище"
+text = "проверенные неизменяемые снимки"
+
+[nodes.materialize]
+role = "service"
+name = "Материализация"
+text = "lock, агентская среда и форма запуска"
+
+[nodes.home]
+role = "store"
+name = "Управляемый дом"
+text = "корневые инструкции, проекции скиллов, управляемые каналы и маркер"
+note = "Начальные файлы и изменяемое состояние харнеса лежат в доме под отдельным владением."
+
+[[links]]
+from = "pkg"
+to = "resolve"
+
+[[links]]
+from = "overlay"
+to = "resolve"
+
+[[links]]
+from = "resolve"
+to = "lock"
+
+[[links]]
+from = "resolve"
+to = "store"
+
+[[links]]
+from = "lock"
+to = "materialize"
+
+[[links]]
+from = "store"
+to = "materialize"
+
+[[links]]
+from = "materialize"
+to = "home"

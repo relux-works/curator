@@ -1,0 +1,32 @@
+[
+  {
+    "case": "same",
+    "exit": 0,
+    "admitted": false,
+    "detected": false
+  },
+  {
+    "case": "drift",
+    "exit": 2,
+    "admitted": false,
+    "detected": true
+  },
+  {
+    "case": "missing-form",
+    "exit": 3,
+    "admitted": false,
+    "detected": true
+  },
+  {
+    "case": "malformed",
+    "exit": 3,
+    "admitted": false,
+    "detected": true
+  },
+  {
+    "case": "foreign-digest-before-fixture-or-execution",
+    "exit": 2,
+    "no_fixture": true,
+    "no_execution_effect": true
+  }
+]

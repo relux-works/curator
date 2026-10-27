@@ -1,0 +1,104 @@
+# Former source: launch-route.puml, removed in the move to the book kit; it
+# remains in the repository history.
+# Hosted launch route as a decision flowchart. Content follows
+# launch-route.puml and chapter "Контекст проекта и рабочее место": without a
+# qualified exact capability the request is delegated and the process reads
+# the live managed home; with it the caller prepares a snapshot and seals the
+# full plan, which the host checks without recomposition. The puml legend
+# (refusal never falls back to a native launch) is the note on the question;
+# the title words "принятый дизайн" are a status and are left out.
+layout = "graph"
+direction = "TB"
+same_rank = [["start", "run"], ["del", "prep"], ["mgr", "plan"]]
+alt = "Маршрут запуска: делегированный запрос читает живой управляемый дом, точный план связывает снимок и полный процесс; оба собираются через общую библиотеку сборки."
+
+[theme.space]
+graph_ranksep = 0.35
+
+[nodes.start]
+shape = "start"
+
+[nodes.run]
+role = "service"
+name = "`curator run`"
+text = "разрешает профиль и политику; fragment называет арендованный дом рабочего места"
+
+[nodes.q]
+role = "neutral"
+name = "Точный план квалифицирован для этой среды и формы запуска?"
+note = "Отказ на любом шаге не переходит к нативному запуску."
+
+[nodes.del]
+role = "service"
+name = "Делегированный запрос"
+text = "пин профиля и дайджест fragment"
+
+[nodes.mgr]
+role = "service"
+name = "Часть менеджера на стороне вызывающего"
+text = "собирает процесс через общую библиотеку сборки; процесс читает живой арендованный дом"
+
+[nodes.prep]
+role = "service"
+name = "Подготовка ресурсов сессии"
+text = "одобренный контекст становится проверенным частным снимком"
+
+[nodes.plan]
+role = "service"
+name = "Точный план запуска"
+text = "полный неизменяемый план процесса через ту же библиотеку сборки"
+
+[nodes.verify]
+role = "service"
+name = "Хост проверяет точный план"
+text = "без пересборки"
+
+[nodes.host]
+role = "service"
+name = "Хост сессий ведёт процесс"
+text = "attach, resume и состояние сессии"
+
+[nodes.end]
+shape = "end"
+
+[[links]]
+from = "start"
+to = "run"
+
+[[links]]
+from = "run"
+to = "q"
+
+[[links]]
+from = "q"
+to = "del"
+label = "нет"
+
+[[links]]
+from = "q"
+to = "prep"
+label = "да"
+
+[[links]]
+from = "del"
+to = "mgr"
+
+[[links]]
+from = "prep"
+to = "plan"
+
+[[links]]
+from = "plan"
+to = "verify"
+
+[[links]]
+from = "mgr"
+to = "host"
+
+[[links]]
+from = "verify"
+to = "host"
+
+[[links]]
+from = "host"
+to = "end"

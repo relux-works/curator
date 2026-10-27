@@ -7,6 +7,8 @@
 # Environment:
 #   CURATOR_VERSION   install a specific version (default: latest)
 #   CURATOR_BIN_DIR   install directory (default: /usr/local/bin, falls back to ~/.local/bin)
+#   CURATOR_YES=1     skip confirmation (also: --yes)
+#   --plan            show the plan without downloading or installing artifacts
 #   CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1
 #                     bypass release attestation, signature, and checksum verification
 set -eu
@@ -15,6 +17,61 @@ REPO="relux-works/curator"
 SIGNER_IDENTITY_REGEX='^https://github.com/relux-works/curator/\.github/workflows/release\.yml@refs/tags/v'
 SIGNER_WORKFLOW="$REPO/.github/workflows/release.yml"
 OIDC_ISSUER="https://token.actions.githubusercontent.com"
+
+# Keep translations together. Labels are padded inside each block because
+# POSIX printf field widths do not consistently count UTF-8 display columns.
+case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
+  ru|ru_*|ru.*|ru@*)
+    msg_title='План установки'
+    msg_component='  Компонент:      %s\n'
+    msg_version='  Версия:         %s\n'
+    msg_latest_unresolved='latest (не удалось определить)'
+    msg_metadata='До подтверждения: read-only GET метаданных latest, без записи файлов (timeout 5 с).\n'
+    msg_target='  Путь:           %s\n'
+    msg_sudo='  Нужен sudo:     нет\n'
+    msg_source='  Исходники:      %s\n'
+    msg_readme='  README:         %s\n'
+    msg_book='  Книга:          %s\n'
+    msg_spec='  Спецификация:   %s\n'
+    msg_verify='Проверка: GitHub build attestation или подпись cosign, затем checksum SHA-256.\n'
+    msg_insecure='Проверка ОТКЛЮЧЕНА: CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1. Файл будет установлен без проверки целостности.\n'
+    msg_prompt='Продолжить? [д/Н] '
+    msg_cancel='Установка отменена. Изменений нет.\n'
+    msg_terminal='Для подтверждения нужен терминал. Для установки без вопроса используйте --yes или CURATOR_YES=1.\n'
+    msg_option='curator installer: неизвестный параметр: %s (используйте --plan или --yes)\n'
+    yes_word='да'; yes_upper='ДА'; yes_title='Да'; yes_short='д'; yes_short_upper='Д'
+    ;;
+  *)
+    msg_title='Installation plan'
+    msg_component='  Component:      %s\n'
+    msg_version='  Version:        %s\n'
+    msg_latest_unresolved='latest (could not be resolved)'
+    msg_metadata='Before consent: read-only latest metadata GET, no file writes (5s timeout).\n'
+    msg_target='  Path:           %s\n'
+    msg_sudo='  Needs sudo:     no\n'
+    msg_source='  Source:         %s\n'
+    msg_readme='  README:         %s\n'
+    msg_book='  Book:           %s\n'
+    msg_spec='  Specification:  %s\n'
+    msg_verify='Verification: GitHub build attestation or a cosign signature, then the SHA-256 checksum.\n'
+    msg_insecure='Verification DISABLED: CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1. The file will be installed without integrity verification.\n'
+    msg_prompt='Continue? [y/N] '
+    msg_cancel='Installation cancelled. Nothing changed.\n'
+    msg_terminal='Confirmation needs a terminal. Use --yes or CURATOR_YES=1 to install without a prompt.\n'
+    msg_option='curator installer: unknown option: %s (use --plan or --yes)\n'
+    yes_word='yes'; yes_upper='YES'; yes_title='Yes'; yes_short='y'; yes_short_upper='Y'
+    ;;
+esac
+
+assume_yes=${CURATOR_YES:-0}
+plan_only=0
+for option in "$@"; do
+  case "$option" in
+    --yes) assume_yes=1 ;;
+    --plan) plan_only=1 ;;
+    *) printf "$msg_option" "$option" >&2; exit 1 ;;
+  esac
+done
 
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "$os" in
@@ -29,14 +86,85 @@ case "$arch" in
   *) echo "curator installer: unsupported architecture: $arch" >&2; exit 1 ;;
 esac
 
+# Read-only and bounded: stdout only, with curl configuration disabled so it
+# cannot add output files. Check curl's status before parsing partial responses.
+resolve_latest() {
+  metadata=$(curl -q -fsSL --connect-timeout 3 --max-time 5 \
+    "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null) || return 1
+  printf '%s\n' "$metadata" | grep '"tag_name"' | head -1 | cut -d '"' -f 4
+}
+
 version="${CURATOR_VERSION:-}"
 if [ -z "$version" ]; then
-  version=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" |
-    grep '"tag_name"' | head -1 | cut -d '"' -f 4)
+  version=$(resolve_latest) || version=''
 fi
-[ -n "$version" ] || { echo "curator installer: could not determine the latest version" >&2; exit 1; }
-bare=${version#v}
+plan_version=${version:-$msg_latest_unresolved}
 
+# Resolve exactly the existing destination rule, without creating it yet.
+bin_dir="${CURATOR_BIN_DIR:-/usr/local/bin}"
+create_bin_dir=0
+if [ ! -w "$bin_dir" ]; then
+  bin_dir="$HOME/.local/bin"
+  create_bin_dir=1
+fi
+
+# One row group per component; a future bundle can add another call here.
+print_component() {
+  printf "$msg_component" "$1"
+  printf "$msg_version" "$2"
+  printf "$msg_target" "$3"
+  printf "$msg_sudo"
+  printf "$msg_source" "$4"
+  printf "$msg_readme" "$5"
+  printf "$msg_book" "$6"
+  printf "$msg_spec" "$7"
+}
+
+colour=''
+reset=''
+if [ -t 1 ] && [ "${NO_COLOR+x}" != x ]; then
+  colour=$(printf '\033[1;36m')
+  reset=$(printf '\033[0m')
+fi
+printf '\n%s%s%s\n\n' "$colour" "$msg_title" "$reset"
+print_component curator "$plan_version" "$bin_dir/curator" \
+  "https://github.com/$REPO" "https://github.com/$REPO#readme" \
+  "https://github.com/$REPO/blob/main/docs/book/README.md" \
+  'https://github.com/relux-works/curator-spec'
+printf '\n'
+if [ -z "${CURATOR_VERSION:-}" ]; then
+  printf "$msg_metadata"
+fi
+if [ "${CURATOR_INSTALL_INSECURE_SKIP_VERIFY:-}" = 1 ]; then
+  printf "$msg_insecure"
+else
+  printf "$msg_verify"
+fi
+printf '\n'
+
+[ "$plan_only" -eq 0 ] || exit 0
+if [ "$assume_yes" != 1 ]; then
+  printf '%s' "$msg_prompt"
+  # stdin can contain this script (curl | sh); never consume it as an answer.
+  if ! { IFS= read -r answer </dev/tty; } 2>/dev/null; then
+    printf '\n' >&2
+    printf "$msg_terminal" >&2
+    exit 1
+  fi
+  case "$answer" in
+    "$yes_word"|"$yes_upper"|"$yes_title"|"$yes_short"|"$yes_short_upper"|y|Y|yes|Yes|YES) ;;
+    *) printf "$msg_cancel"; exit 1 ;;
+  esac
+fi
+
+if [ -z "$version" ]; then
+  version=$(resolve_latest) || version=''
+  [ -n "$version" ] || {
+    echo "curator installer: could not determine the latest version after consent; check network access or set CURATOR_VERSION; refusing to install" >&2
+    exit 1
+  }
+fi
+bare=${version#v}
 archive="curator_${bare}_${os}_${arch}.tar.gz"
 base="https://github.com/$REPO/releases/download/$version"
 
@@ -122,9 +250,7 @@ fi
 
 tar -xzf "$tmp/$archive" -C "$tmp" curator
 
-bin_dir="${CURATOR_BIN_DIR:-/usr/local/bin}"
-if [ ! -w "$bin_dir" ]; then
-  bin_dir="$HOME/.local/bin"
+if [ "$create_bin_dir" -eq 1 ]; then
   mkdir -p "$bin_dir"
 fi
 install -m 0755 "$tmp/curator" "$bin_dir/curator"
