@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/homelease/state"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/transaction"
@@ -50,7 +51,23 @@ func homeLeaseReadLegacy(home string, held *managerlock.Held) error {
 	if err != nil {
 		return err
 	}
-	pending, err := engine.PendingRecovery(witness)
+	pending, err := engine.PendingRecoveryMatching(witness, func(journal transaction.Journal) (bool, error) {
+		roots := []string{ProfilesDir(home), EnvRoot(home), contextstore.Root(home), state.Namespace(home), filepath.Join(home, "state", "project-leases")}
+		for _, target := range journal.Targets {
+			for _, path := range []string{target.LivePath, target.BackupPath, target.StagedPath, target.RollbackPath} {
+				if path == "" {
+					continue
+				}
+				for _, root := range roots {
+					matches, err := state.Overlap(path, root)
+					if err != nil || matches {
+						return matches, err
+					}
+				}
+			}
+		}
+		return false, nil
+	})
 	if err != nil {
 		return state.Refuse("environment_lease_unreadable", "state_unreadable")
 	}

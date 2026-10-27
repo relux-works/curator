@@ -331,3 +331,34 @@ func TestHomeLeaseReadOnlyLegacyIntent(t *testing.T) {
 		t.Fatal("positive read-only resolve changed preimage")
 	}
 }
+
+// HL17: pending home publication refuses no-repair resolve, while an unrelated
+// valid state publication remains a read-only positive control. Both calls
+// preserve the complete preimage, including the still-pending journal.
+func TestHomeLeaseReadOnlyPendingTargets(t *testing.T) {
+	for _, relevant := range []bool{false, true} {
+		t.Run(map[bool]string{false: "unrelated-control", true: "managed-home-refusal"}[relevant], func(t *testing.T) {
+			isolateHomeLeaseWriters(t)
+			fx, _ := captureFixture(t)
+			target := filepath.Join(fx.home, "state", "unrelated-note")
+			if relevant {
+				target = filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI), ".agent-environment.json")
+			}
+			prepareAuthorityIntent(t, fx.home, "pending-read", target, []byte("pending replacement"))
+			before, _ := captureFixtureState(t, fx)
+			result, err := Resolve(fx.request(envregistry.CodexCLI))
+			if relevant {
+				var refusal *homelease.Refusal
+				if result != nil || !errors.As(err, &refusal) || refusal.Code != "environment_lease_recovery_required" || refusal.Reason != "pending_mutation" {
+					t.Fatalf("pending home publication: %+v %v", result, err)
+				}
+			} else if err != nil || result == nil {
+				t.Fatalf("unrelated pending control: %+v %v", result, err)
+			}
+			after, _ := captureFixtureState(t, fx)
+			if !bytes.Equal(before, after) {
+				t.Fatal("read-only pending observation changed preimage")
+			}
+		})
+	}
+}
