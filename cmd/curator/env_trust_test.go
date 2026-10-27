@@ -171,7 +171,13 @@ func TestOperatorPolicyCLI(t *testing.T) {
 // not a claim about tests that later deliberately mutate their environment.
 func TestOperatorPolicyHomeIsolation(t *testing.T) {
 	home := os.Getenv("HOME")
-	if home == "" || os.Getenv("USERPROFILE") != home || os.Getenv("XDG_CONFIG_HOME") != home || os.Getenv("CODEX_HOME") != "" || os.Getenv("CLAUDE_CONFIG_DIR") != "" || !strings.Contains(filepath.Base(home), "curator-cli-home-") {
+	if home == "" || os.Getenv("USERPROFILE") != home || os.Getenv("CODEX_HOME") != "" || os.Getenv("CLAUDE_CONFIG_DIR") != "" || !filepath.IsAbs(home) || filepath.Dir(home) != filepath.Dir(os.Getenv("XDG_CONFIG_HOME")) {
 		t.Fatal("test package homes not isolated")
+	}
+	for _, entry := range os.Environ() {
+		key, _, _ := strings.Cut(entry, "=")
+		if strings.HasPrefix(key, "GIT_") && key != "GIT_CONFIG_GLOBAL" && key != "GIT_CONFIG_NOSYSTEM" {
+			t.Fatalf("inherited Git override survived neutral isolation: %s", key)
+		}
 	}
 }

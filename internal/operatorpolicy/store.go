@@ -95,13 +95,24 @@ func (s Store) begin(ctx context.Context, bootstrap bool) (*operation, error) {
 }
 func (op *operation) close() { _ = op.held.Close() }
 
-// entryRevisions derives a durable ordering boundary from the immutable audit,
-// including revocations of entries no longer present in Policies. No clock or
-// separate counter file can reset the boundary on delete/recreate.
+// entryRevisions counts accepted commands and retained terminal lapses. Lapse
+// remains part of the boundary after revocation moves it into event history;
+// reads and serialization cannot reset it or count it twice. Existing signed
+// audit bytes are unchanged, and no wall clock establishes approval freshness.
 func (op *operation) entryRevisions() map[string]uint64 {
 	revisions := map[string]uint64{}
 	for _, a := range op.state.Audit {
 		revisions[a.Command.EntryID]++
+	}
+	for _, ev := range op.state.Events {
+		if ev.State.Status == "lapsed" {
+			revisions[ev.Policy.ID]++
+		}
+		for _, state := range ev.History {
+			if state.Status == "lapsed" {
+				revisions[ev.Policy.ID]++
+			}
+		}
 	}
 	return revisions
 }

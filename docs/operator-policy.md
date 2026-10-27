@@ -62,13 +62,17 @@ must match the enrolled operator principal/key. Reusing `approval_ref` for
 other bytes refuses. Caller role strings, package signatures and unsigned
 requests confer no authority. Duplicate/unknown/misspelled members refuse.
 
-The revision is the number of retained successful grant/revoke commands for
-that entry, including commands for removed policies and revokes with no event.
+The revision counts retained successful grant/revoke commands and terminal
+lapses for that entry, including commands for removed policies and revokes
+with no event. A lapse advances it in the same atomic write as the terminal
+event state. Moving the lapse into history on a later grant or revoke retains
+that increment; listing, repeated denied reads and serialization never count
+it twice.
 An absent entry in `entry_revisions` has revision zero. Every new command must
 bind the current revision in both signatures. Accepted commands increase it;
-rejected commands and idempotent retries do not. Revoking an entry therefore
-invalidates pending unused approvals for that entry, even if their signed
-timestamps equal or follow the revoke's timestamp. A keeper must obtain fresh
+rejected commands and idempotent retries do not. Revoking or lapsing an entry
+therefore invalidates pending unused approvals for that entry, even if their
+signed timestamps equal or follow the transition's timestamp. A keeper must obtain fresh
 operator approval after reading the new revision; changing the revision alone
 invalidates the signatures. This boundary also serializes competing updates.
 Existing audit commands with no revision remain verifiable at their original
@@ -142,8 +146,22 @@ env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS HOME=$(mktemp -d) go
 env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS HOME=$(mktemp -d) go test ./cmd/curator -run '^TestOperatorPolicy' -count=1
 ```
 
-Both test packages pin `HOME`, `USERPROFILE`, `XDG_CONFIG_HOME` in `TestMain`
-and clear `CODEX_HOME` and `CLAUDE_CONFIG_DIR`. Logs belong under `.temp/`.
+Both test packages call the neutral `testgitenv.Isolate` in `TestMain` and pin
+`USERPROFILE` to the resulting fixture HOME on every OS. The helper owns HOME
+and XDG config directories and scrubs inherited Git/SSH/native-root overrides.
+Explicit fixture homes are transported to CLI helpers and PATH/native children
+after isolation. An absent neutral HOME boundary fails before tests run.
+
+Until PR #196 lands, validation requires its exact neutral helper as a source
+overlay: head `613e730d847476f0f422e1474f001f5a94e99f66`, file
+`internal/testgitenv/testgitenv.go`, blob
+`5e84fdd4342f937e27ef65c19d6bc0c9fe5eadf0`. That dependency is not copied into
+this PR. Only directly relevant CLI fixture-home transport is reused here.
+No separate Git-prefix scrub implementation is introduced. Test launchers must
+clear every inherited `GIT_*` and `XDG_*` variable, `SSH_AUTH_SOCK`, `GOFLAGS`,
+`CODEX_HOME`, and `CLAUDE_CONFIG_DIR`, with only explicit fixture overrides
+allowed. All HOME, working-directory and cache paths must be absolute and
+temporary. Logs belong under `.temp/`.
 
 | Contract/vector | Paired production-path test |
 | --- | --- |
@@ -152,6 +170,8 @@ and clear `CODEX_HOME` and `CLAUDE_CONFIG_DIR`. Logs belong under `.temp/`.
 | Unused pre-revoke approval, equal/newer signed clocks, fresh post-revoke control | `TestReviewerDelayedApprovalAfterRevoke` |
 | Revocation without an event, retained revision, forged revision, fresh signature | `TestPolicyRevisionRetainedWithoutEvent` |
 | Missing checkout/restore terminal lapse and new approval control | `TestReviewerMissingCheckoutLapse` |
+| Pre-lapse future/equal-second approval, post-lapse signature positive | `TestR2PendingApprovalAcrossLapse` |
+| Lapse counted once, retained across read/list/history and later revoke | `TestPolicyLapseRevisionCountsOnce`, `TestR2LapseSurvivesRewrite` |
 | Duplicate active write and distinct lane control | `TestReviewerAmbiguousEntries` |
 | Authenticated legacy ambiguity in both event orders, public/core reads | `TestReviewerLegacyAmbiguousRead` |
 | Changed effective hook, unlisted native approval, empty list, unreadable hook state | `TestPolicyHookPairs` (internal observer only) |
@@ -165,6 +185,8 @@ and clear `CODEX_HOME` and `CLAUDE_CONFIG_DIR`. Logs belong under `.temp/`.
 | Closed request parser; duplicate/missing/unknown/case-alias controls | `TestSignedCommandClosedParser` |
 | Production refuses unqualified adapters, including empty hooks | `TestProductionReadQualification`, `TestOperatorPolicyCLI` |
 | CLI package startup home isolation | `TestOperatorPolicyHomeIsolation` |
+| Explicit child fixture HOME, malformed carrier and PATH/native-owner controls | `TestCLIUnitFixtureHomesPreserveExplicitSelection`, `TestCLIUnitFixtureHomesRejectInvalidPayloads`, `TestCLIPathIsolation`, native-owner tests |
+| Inherited Git overrides removed before fixture signing | `TestSignerRowsSurviveHostileGlobalGitConfig`, package startup assertions |
 
 The embedded event schema and event schema corpus are pinned verbatim from
 curator-spec `e1051a7ad8e7e8e91637a22d6347755754ea0953`. They establish

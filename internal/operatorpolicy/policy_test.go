@@ -18,27 +18,25 @@ import (
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextpkg"
 	"github.com/relux-works/curator/internal/projectcontext"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 func TestMain(m *testing.M) {
-	home, e := os.MkdirTemp("", "operator-policy-home-*")
-	if e != nil {
+	restore := testgitenv.Isolate()
+	home := os.Getenv("HOME")
+	root := filepath.Dir(os.Getenv("GIT_CONFIG_GLOBAL"))
+	// Fail before any test if the neutral HOME/prefix boundary is unavailable.
+	// PR #196 supplies it; validation overlays that exact helper until landing.
+	if !filepath.IsAbs(home) || home != filepath.Join(root, "home") || os.Getenv("XDG_CONFIG_HOME") != filepath.Join(root, "xdg") {
+		_, _ = os.Stderr.WriteString("operatorpolicy tests require the neutral testgitenv HOME boundary (PR #196)\n")
+		restore()
+		os.Exit(2)
+	}
+	if e := os.Setenv("USERPROFILE", home); e != nil {
 		panic(e)
 	}
-	for _, k := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME"} {
-		if e = os.Setenv(k, home); e != nil {
-			panic(e)
-		}
-	}
-	for _, k := range []string{"CODEX_HOME", "CLAUDE_CONFIG_DIR"} {
-		if e = os.Unsetenv(k); e != nil {
-			panic(e)
-		}
-	}
 	code := m.Run()
-	if e = os.RemoveAll(home); e != nil && code == 0 {
-		code = 1
-	}
+	restore()
 	os.Exit(code)
 }
 

@@ -149,7 +149,7 @@ type Command struct {
 	Time      string `json:"time"`
 	Reason    string `json:"reason"`
 	EntryID   string `json:"entry_id"`
-	// EntryRevision counts retained successful commands for this entry. Zero
+	// EntryRevision counts retained successful commands and lapses. Zero
 	// is omitted for first commands and compatibility with existing audit bytes.
 	EntryRevision  uint64     `json:"entry_revision,omitempty"`
 	Policy         *Policy    `json:"policy,omitempty"`

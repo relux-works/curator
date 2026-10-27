@@ -37,6 +37,7 @@ import (
 const (
 	cliHelperProcess = "CURATOR_TEST_CLI_HELPER"
 	cliHelperConfig  = "CURATOR_TEST_CONFIG_PATH"
+	cliHelperHomes   = "CURATOR_TEST_CLI_FIXTURE_HOMES"
 )
 
 // TestMain gives the test binary the same fixed hidden worker mode the
@@ -44,25 +45,20 @@ const (
 // installation in these tests runs the real identity-verified process graph
 // instead of a mock.
 func TestMain(m *testing.M) {
-	// Pin every host config root before helper, worker or ordinary test paths.
-	home, err := os.MkdirTemp("", "curator-cli-home-*")
-	if err != nil {
+	restore := testgitenv.Isolate()
+	home := os.Getenv("HOME")
+	root := filepath.Dir(os.Getenv("GIT_CONFIG_GLOBAL"))
+	// Until PR #196 lands, refuse to run without its neutral HOME boundary.
+	if !filepath.IsAbs(home) || home != filepath.Join(root, "home") || os.Getenv("XDG_CONFIG_HOME") != filepath.Join(root, "xdg") {
+		_, _ = fmt.Fprintln(os.Stderr, "CLI tests require the neutral testgitenv HOME boundary (PR #196)")
+		restore()
+		os.Exit(2)
+	}
+	if err := os.Setenv("USERPROFILE", home); err != nil {
 		panic(err)
 	}
-	for _, name := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME"} {
-		if err := os.Setenv(name, home); err != nil {
-			panic(err)
-		}
-	}
-	for _, name := range []string{"CODEX_HOME", "CLAUDE_CONFIG_DIR"} {
-		if err := os.Unsetenv(name); err != nil {
-			panic(err)
-		}
-	}
 	code := isolatedTestMain(m)
-	if err := os.RemoveAll(home); err != nil && code == 0 {
-		code = 1
-	}
+	restore()
 	os.Exit(code)
 }
 
@@ -78,24 +74,35 @@ func isolatedTestMain(m *testing.M) int {
 		return runNativeBuildWorker()
 	}
 	// Before any branch that runs tests: a CLI helper child runs git too.
-	restoreGitEnv := testgitenv.Isolate()
 	if os.Getenv(cliHelperProcess) == "1" {
 		code := m.Run()
-		restoreGitEnv()
 		return code
 	}
 	restorePath, err := isolateCLIPath()
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "isolate CLI test PATH:", err)
-		restoreGitEnv()
 		return 1
 	}
 	// The parent already holds the host-toolchain lock. These children run
 	// only PATH isolation witnesses, including their explicit provider cases.
 	if os.Getenv(cliPathChild) == "1" {
+		if os.Getenv(cliPathPlant) != "" {
+			homes, err := cliUnitHomes()
+			if err == nil {
+				for key, value := range homes {
+					if err = os.Setenv(key, value); err != nil {
+						break
+					}
+				}
+			}
+			if err != nil {
+				_, _ = fmt.Fprintln(os.Stderr, "restore selected PATH-fixture homes:", err)
+				restorePath()
+				return 1
+			}
+		}
 		code := m.Run()
 		restorePath()
-		restoreGitEnv()
 		return code
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -104,12 +111,10 @@ func isolatedTestMain(m *testing.M) int {
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "acquire package host GOROOT test lock:", err)
 		restorePath()
-		restoreGitEnv()
 		return 1
 	}
 	code := m.Run()
 	restorePath()
-	restoreGitEnv()
 	if lock != nil {
 		if closeErr := lock.Close(); closeErr != nil {
 			_, _ = fmt.Fprintln(os.Stderr, "release package host GOROOT test lock:", closeErr)
@@ -124,6 +129,7 @@ func TestCLIHelperProcess(t *testing.T) {
 		t.Parallel()
 		return
 	}
+	restoreCLIUnitHomes(t)
 	separator := -1
 	for index, arg := range os.Args {
 		if arg == "--" {
@@ -192,7 +198,7 @@ func captureWithEnv(t *testing.T, configPath string, environment map[string]stri
 	commandArgs := []string{"-test.run=^TestCLIHelperProcess$", "--"}
 	commandArgs = append(commandArgs, args...)
 	command := exec.Command(os.Args[0], commandArgs...)
-	overrides := map[string]string{cliHelperProcess: "1", cliHelperConfig: configPath}
+	overrides := map[string]string{cliHelperProcess: "1", cliHelperConfig: configPath, cliHelperHomes: forwardCLIUnitHomes(t, environment)}
 	for key, value := range environment {
 		overrides[key] = value
 	}
@@ -217,6 +223,68 @@ func captureWithEnv(t *testing.T, configPath string, environment map[string]stri
 		code = exitError.ExitCode()
 	}
 	return code, stdout.String(), stderr.String()
+}
+
+// A child TestMain must scrub ambient homes. Production-command helpers then
+// reapply only the fixture homes explicitly selected by their isolated parent,
+// just as the native helper restores its fixture Git mapping after TestMain.
+func forwardCLIUnitHomes(t *testing.T, overrides map[string]string) string {
+	t.Helper()
+	homes := map[string]string{}
+	for _, key := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME"} {
+		value, ok := overrides[key]
+		if !ok {
+			value = os.Getenv(key)
+		}
+		homes[key] = value
+	}
+	// These optional roots override HOME-based resolution. Only carry roots
+	// selected inside the isolated parent fixture; preserve unset vs empty.
+	for _, key := range []string{"CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
+		value, present := overrides[key]
+		if !present {
+			value, present = os.LookupEnv(key)
+		}
+		if present {
+			homes[key] = value
+		}
+	}
+	data, err := json.Marshal(homes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+func restoreCLIUnitHomes(t *testing.T) {
+	t.Helper()
+	homes, err := cliUnitHomes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for key, value := range homes {
+		t.Setenv(key, value)
+	}
+}
+
+func cliUnitHomes() (map[string]string, error) {
+	homes := map[string]string{}
+	if err := json.Unmarshal([]byte(os.Getenv(cliHelperHomes)), &homes); err != nil {
+		return nil, err
+	}
+	for _, key := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME"} {
+		if _, present := homes[key]; !present {
+			return nil, errors.New("missing explicit fixture homes")
+		}
+	}
+	for key := range homes {
+		switch key {
+		case "HOME", "USERPROFILE", "XDG_CONFIG_HOME", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME":
+		default:
+			return nil, fmt.Errorf("unexpected fixture home key %q", key)
+		}
+	}
+	return homes, nil
 }
 
 func cloneEnvironment(environment map[string]string) map[string]string {

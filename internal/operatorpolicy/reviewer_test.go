@@ -133,8 +133,14 @@ func TestReviewerAmbiguousEntries(t *testing.T) {
 // overrides before test cases, as the CLI package separately demonstrates.
 func TestReviewerPolicyHomeIsolation(t *testing.T) {
 	h := os.Getenv("HOME")
-	if !strings.Contains(h, "operator-policy-home-") || os.Getenv("USERPROFILE") != h || os.Getenv("XDG_CONFIG_HOME") != h || os.Getenv("CODEX_HOME") != "" || os.Getenv("CLAUDE_CONFIG_DIR") != "" {
+	if !filepath.IsAbs(h) || filepath.Dir(h) != filepath.Dir(os.Getenv("XDG_CONFIG_HOME")) || os.Getenv("USERPROFILE") != h || os.Getenv("CODEX_HOME") != "" || os.Getenv("CLAUDE_CONFIG_DIR") != "" {
 		t.Fatal("operator policy test home boundary missing")
+	}
+	for _, entry := range os.Environ() {
+		key, _, _ := strings.Cut(entry, "=")
+		if strings.HasPrefix(key, "GIT_") && key != "GIT_CONFIG_GLOBAL" && key != "GIT_CONFIG_NOSYSTEM" {
+			t.Fatalf("inherited Git override survived neutral isolation: %s", key)
+		}
 	}
 }
 
