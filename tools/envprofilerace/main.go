@@ -129,17 +129,21 @@ func runShard(dir string, shard int) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
+	// #nosec G304 -- The explicit CLI evidence directory is the intended output boundary.
 	stream, err := os.Create(filepath.Join(dir, "go-test.json"))
 	if err != nil {
 		return err
 	}
-	defer stream.Close()
 	m := manifest{Commit: commit, GOOS: runtime.GOOS, Shard: shard, Tests: tests, Selector: selector(shards[shard])}
+	// #nosec G204 -- Selector is an escaped list of discovered test names; no shell is invoked.
 	cmd := exec.Command("go", "test", "-race", "-json", "-count=1", "-timeout="+timeout, "-run", m.Selector, "./internal/envprofile")
 	cmd.Stdout = stream
 	cmd.Stderr = os.Stderr
 	fmt.Printf("envprofilerace: shard %d/%d, %d of %d tests, timeout=%s\n", shard, shardCount, len(shards[shard]), len(tests), timeout)
 	runErr := cmd.Run()
+	if err := stream.Close(); err != nil {
+		return fmt.Errorf("close test JSON: %w", err)
+	}
 	if runErr != nil {
 		m.ExitCode = 1
 	}
@@ -153,6 +157,7 @@ func runShard(dir string, shard int) error {
 	if runErr != nil {
 		return runErr
 	}
+	// #nosec G304 -- Read back the JSON just written to the explicit evidence directory.
 	data, err = os.ReadFile(filepath.Join(dir, "go-test.json"))
 	if err != nil {
 		return err
@@ -231,6 +236,7 @@ func mergeEvidence(dir, out string, tests []string, commit, goos string) error {
 	seen := map[int]bool{}
 	var merged bytes.Buffer
 	for _, path := range paths {
+		// #nosec G304 -- Manifests are read only from the explicit CI artifact glob above.
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
