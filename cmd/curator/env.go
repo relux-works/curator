@@ -74,7 +74,7 @@ func (c cli) cmdEnv(args []string) int {
 			if code != exitOK {
 				return nil, fmt.Errorf("lease configuration unavailable")
 			}
-			return envprofile.HomeLeaseManager(envprofile.ResolveRequest{Home: cfg.Home(), Machine: machineFromConfig(cfg), Policy: envprofile.PolicyFromConfig(cfg)}, nil)
+			return envprofile.HomeLeaseManager(envprofile.ResolveRequest{Home: cfg.Home(), Machine: machineFromConfig(cfg), Policy: envprofile.PolicyFromConfig(cfg)}, homelease.SessionManagerObserver())
 		}, c.stdout, c.stderr)
 	}
 	if wantsHelp(args) {

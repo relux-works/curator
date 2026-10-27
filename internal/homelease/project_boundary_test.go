@@ -27,7 +27,7 @@ func (a projectAuthority) Authorize(_ context.Context, held managerlock.Held, _ 
 	return held.Validate(a.home)
 }
 func (a projectAuthority) Observe(_ context.Context, session string, generation int64) (projectlease.Evidence, error) {
-	return projectlease.Evidence{SessionRef: session, Generation: generation, OwnerRef: "principal:operator", NoChildStarted: true}, nil
+	return projectlease.Evidence{SessionRef: session, Generation: generation, OwnerRef: "principal:operator", NoChildStarted: true, OwnershipReconciled: true}, nil
 }
 
 // HL10/12/W16: actual project allocations remain project-lease/1 and busy
@@ -80,6 +80,15 @@ func TestProjectKindBoundary(t *testing.T) {
 	}
 	if !reflect.DeepEqual(before, boundarySnapshot(t, home)) {
 		t.Fatal("absent control changed state")
+	}
+	// Corpus 57's positive control uses the real project lifecycle, rather
+	// than treating a profile absent-ID result as project reconciliation.
+	if err := p.Reconcile(context.Background(), b.LeaseID); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := p.Status(context.Background())
+	if err != nil || len(rows) != 1 || rows[0].State != projectlease.Released {
+		t.Fatalf("project reconcile control: %+v %v", rows, err)
 	}
 }
 
