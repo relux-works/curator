@@ -1,0 +1,460 @@
+{
+  "claude-loader": [
+    {
+      "case": "TestP4Hooks_exclude-false",
+      "effects": {
+        "approved-hook": true,
+        "approved-mcp": false,
+        "foreign-hook": true,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "aa15dd807fbe88f041ab31639069157c8827816490ecafe2ff5b0bcb207d8365"
+    },
+    {
+      "case": "TestP4Hooks_exclude-true",
+      "effects": {
+        "approved-hook": true,
+        "approved-mcp": false,
+        "foreign-hook": false,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "7cd0e58173447370c8234aeb2112a5ce9c8af1270190994c2413c4a7904e3bd8"
+    },
+    {
+      "case": "TestP5MCP_project-empty-false_exclude-false_strict-false_approved-false",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": false,
+        "foreign-hook": false,
+        "foreign-mcp": true
+      },
+      "exit": 0,
+      "native_mcp": [
+        {
+          "name": "foreign-probe",
+          "source": "project",
+          "status": "connected"
+        }
+      ],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "c38dce72ca19110a988cdbb6db4730759e86b4add7705aaaa8b912a2aa38029e"
+    },
+    {
+      "case": "TestP5MCP_project-empty-false_exclude-false_strict-false_approved-true",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": true,
+        "foreign-hook": false,
+        "foreign-mcp": true
+      },
+      "exit": 0,
+      "native_mcp": [
+        {
+          "name": "foreign-probe",
+          "source": "project",
+          "status": "connected"
+        },
+        {
+          "name": "approved-probe",
+          "source": "dynamic",
+          "status": "connected"
+        }
+      ],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "b8e0f31cc7667d0d9b7b94a9f93a34a0340f608b6a9f467c9f4bcd98506ca021"
+    },
+    {
+      "case": "TestP5MCP_project-empty-false_exclude-false_strict-true_approved-false",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": false,
+        "foreign-hook": false,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "687e8d37468714abbff6cf325369e86abe06f6b6d7d218f3714d463b6a52c649"
+    },
+    {
+      "case": "TestP5MCP_project-empty-false_exclude-false_strict-true_approved-true",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": true,
+        "foreign-hook": false,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [
+        {
+          "name": "approved-probe",
+          "source": "dynamic",
+          "status": "connected"
+        }
+      ],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "a87bd05a1d3cb549ea44dc0219e4f592e37591c47e5a5b15a43870873108d85d"
+    },
+    {
+      "case": "TestP5MCP_project-empty-false_exclude-true_strict-false_approved-false",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": false,
+        "foreign-hook": false,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "c44a165bb1542c3aebd189a11d80cf37b5f9f03b5fcd4740df65fe207f805800"
+    },
+    {
+      "case": "TestP5MCP_project-empty-false_exclude-true_strict-false_approved-true",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": true,
+        "foreign-hook": false,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [
+        {
+          "name": "approved-probe",
+          "source": "dynamic",
+          "status": "connected"
+        }
+      ],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "ccd992958f4ac6223398c01cb67e51d15a7d83ae1e056b23e7be26b1de7a03f5"
+    },
+    {
+      "case": "TestP5MCP_project-empty-false_exclude-true_strict-true_approved-false",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": false,
+        "foreign-hook": false,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "59284f3dab4b7facbd3b864ca2a4f5f6eaf16ec86a72af1134e260b1da9d3a1b"
+    },
+    {
+      "case": "TestP5MCP_project-empty-false_exclude-true_strict-true_approved-true",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": true,
+        "foreign-hook": false,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [
+        {
+          "name": "approved-probe",
+          "source": "dynamic",
+          "status": "connected"
+        }
+      ],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "4f95c2730771cc6ecf6ab50ae133f025a7fc02b713493ddd89c387cee13799c0"
+    },
+    {
+      "case": "TestP5MCP_project-empty-true_exclude-false_strict-false_approved-false",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": false,
+        "foreign-hook": false,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "7bf42dba9239f004bdc8d6b7113311a6adef202c3b3e11cf471f365b3eed76e9"
+    },
+    {
+      "case": "TestP5MCP_project-empty-true_exclude-false_strict-false_approved-true",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": true,
+        "foreign-hook": false,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [
+        {
+          "name": "approved-probe",
+          "source": "dynamic",
+          "status": "connected"
+        }
+      ],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "fe9e05af5e012d53a329e79b24cc2e257d9e87579ca4fb6bece9daba15edc376"
+    },
+    {
+      "case": "TestP5MCP_project-empty-true_exclude-false_strict-true_approved-false",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": false,
+        "foreign-hook": false,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "0a53c1582b8171682bfeecc60221bb649289251a73b1c3f422b10ffff4b83426"
+    },
+    {
+      "case": "TestP5MCP_project-empty-true_exclude-false_strict-true_approved-true",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": true,
+        "foreign-hook": false,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [
+        {
+          "name": "approved-probe",
+          "source": "dynamic",
+          "status": "connected"
+        }
+      ],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "276d10804d6cb74c1913173f7c58197d4f7c4de7dd7d2105fd74134d6c7cae02"
+    },
+    {
+      "case": "TestP5MCP_project-empty-true_exclude-true_strict-false_approved-false",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": false,
+        "foreign-hook": false,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "39270f5996225729bd0e38a23a6731887d7f3de67bd3bf5d3dff3cff1c846230"
+    },
+    {
+      "case": "TestP5MCP_project-empty-true_exclude-true_strict-false_approved-true",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": true,
+        "foreign-hook": false,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [
+        {
+          "name": "approved-probe",
+          "source": "dynamic",
+          "status": "connected"
+        }
+      ],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "ba71143058ed05a6b92728a3f89cd3da7342e80ffa8f8b1479363e888fc56817"
+    },
+    {
+      "case": "TestP5MCP_project-empty-true_exclude-true_strict-true_approved-false",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": false,
+        "foreign-hook": false,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "3c15a82fe7f407887aec0fef9bb6edc8b7fe940e8379439196f1c1d325b1629a"
+    },
+    {
+      "case": "TestP5MCP_project-empty-true_exclude-true_strict-true_approved-true",
+      "effects": {
+        "approved-hook": false,
+        "approved-mcp": true,
+        "foreign-hook": false,
+        "foreign-mcp": false
+      },
+      "exit": 0,
+      "native_mcp": [
+        {
+          "name": "approved-probe",
+          "source": "dynamic",
+          "status": "connected"
+        }
+      ],
+      "record": "turn.json",
+      "request_count": 1,
+      "sha256_sanitized_record": "f1fd5ef3e44bee4993c306e5e8c716d337ba9c91489afd7d55d09349eaf97be7"
+    }
+  ],
+  "codex-loader": [
+    {
+      "case": "TestConfigLayers_trusted",
+      "facts": {
+        "\"approval_policy\":\"never\"": true,
+        "\"type\":\"readOnly\"": false,
+        "APPROVED_HOOK": true,
+        "PROJECT_HOOK": true,
+        "approved_tool": false,
+        "project_tool": false
+      },
+      "record": "config-result.json",
+      "sha256_sanitized_record": "c364d34646c8498539ae969b3738bcbc2cc46af610616adef5501d265000b537"
+    },
+    {
+      "case": "TestConfigLayers_trusted",
+      "facts": {
+        "\"approval_policy\":\"never\"": false,
+        "\"type\":\"readOnly\"": false,
+        "APPROVED_HOOK": true,
+        "PROJECT_HOOK": true,
+        "approved_tool": false,
+        "project_tool": false
+      },
+      "record": "hooks-result.json",
+      "sha256_sanitized_record": "cd37b395bf339f372d90079f9d0afab6cbc629b29cb57d1da9ca7dec4f067f01"
+    },
+    {
+      "case": "TestConfigLayers_trusted",
+      "facts": {
+        "\"approval_policy\":\"never\"": false,
+        "\"type\":\"readOnly\"": false,
+        "APPROVED_HOOK": false,
+        "PROJECT_HOOK": false,
+        "approved_tool": false,
+        "project_tool": false
+      },
+      "record": "permission-thread.json",
+      "sha256_sanitized_record": "67d1fe8da7ff3af7fd994a602f4cffe877247108fabfe529361561257c06b217"
+    },
+    {
+      "case": "TestConfigLayers_untrusted",
+      "facts": {
+        "\"approval_policy\":\"never\"": true,
+        "\"type\":\"readOnly\"": false,
+        "APPROVED_HOOK": true,
+        "PROJECT_HOOK": true,
+        "approved_tool": false,
+        "project_tool": false
+      },
+      "record": "config-result.json",
+      "sha256_sanitized_record": "2d810d70a57673b9ae1bd7b16562daad87402ff29a465cb82fd44182934e7a43"
+    },
+    {
+      "case": "TestConfigLayers_untrusted",
+      "facts": {
+        "\"approval_policy\":\"never\"": false,
+        "\"type\":\"readOnly\"": false,
+        "APPROVED_HOOK": true,
+        "PROJECT_HOOK": false,
+        "approved_tool": false,
+        "project_tool": false
+      },
+      "record": "hooks-result.json",
+      "sha256_sanitized_record": "fca339c1ced182cbeacdc0a30d3bfe5b14110c52c410c3631dbe2e225b56df2f"
+    },
+    {
+      "case": "TestConfigLayers_untrusted",
+      "facts": {
+        "\"approval_policy\":\"never\"": false,
+        "\"type\":\"readOnly\"": true,
+        "APPROVED_HOOK": false,
+        "PROJECT_HOOK": false,
+        "approved_tool": false,
+        "project_tool": false
+      },
+      "record": "permission-thread.json",
+      "sha256_sanitized_record": "afa604e34192a7181043e816ab4ed2b72c0dd42d2c55ff6449fead6636aef171"
+    },
+    {
+      "case": "TestMCPRuntime_trusted_false",
+      "facts": {
+        "\"approval_policy\":\"never\"": false,
+        "\"type\":\"readOnly\"": false,
+        "APPROVED_HOOK": false,
+        "PROJECT_HOOK": false,
+        "approved_tool": true,
+        "project_tool": false
+      },
+      "record": "mcp-status.json",
+      "server_names": [
+        "approved_tool"
+      ],
+      "sha256_sanitized_record": "999057921a2e721bd92890c01e9e3539371e218906ded08156afc13fef46a7cf"
+    },
+    {
+      "case": "TestMCPRuntime_trusted_true",
+      "facts": {
+        "\"approval_policy\":\"never\"": false,
+        "\"type\":\"readOnly\"": false,
+        "APPROVED_HOOK": false,
+        "PROJECT_HOOK": false,
+        "approved_tool": true,
+        "project_tool": true
+      },
+      "record": "mcp-status.json",
+      "server_names": [
+        "approved_tool",
+        "project_tool"
+      ],
+      "sha256_sanitized_record": "d6534a0acf3f5300034cc90e9c9ea8dd78964043a925958be5eb12b2e9468939"
+    },
+    {
+      "case": "TestMCPRuntime_untrusted_false",
+      "facts": {
+        "\"approval_policy\":\"never\"": false,
+        "\"type\":\"readOnly\"": false,
+        "APPROVED_HOOK": false,
+        "PROJECT_HOOK": false,
+        "approved_tool": true,
+        "project_tool": false
+      },
+      "record": "mcp-status.json",
+      "server_names": [
+        "approved_tool"
+      ],
+      "sha256_sanitized_record": "999057921a2e721bd92890c01e9e3539371e218906ded08156afc13fef46a7cf"
+    },
+    {
+      "case": "TestMCPRuntime_untrusted_true",
+      "facts": {
+        "\"approval_policy\":\"never\"": false,
+        "\"type\":\"readOnly\"": false,
+        "APPROVED_HOOK": false,
+        "PROJECT_HOOK": false,
+        "approved_tool": true,
+        "project_tool": false
+      },
+      "record": "mcp-status.json",
+      "server_names": [
+        "approved_tool"
+      ],
+      "sha256_sanitized_record": "999057921a2e721bd92890c01e9e3539371e218906ded08156afc13fef46a7cf"
+    }
+  ]
+}

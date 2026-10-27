@@ -1,6 +1,11 @@
 version: 2
 
 project_name: curator
+dist: .tmp/dist
+
+before:
+  hooks:
+    - python3 release/bundle.py prepare
 
 builds:
   - id: curator
@@ -12,13 +17,40 @@ builds:
     ldflags:
       - -s -w -X github.com/relux-works/curator/internal/version.value=v{{ .Version }}
 
+  # Exported only after the annotated tag, commit and release signer match.
+  - id: curator-run
+    dir: .tmp/curator-run
+    main: ./cmd/curator-run
+    binary: curator-run
+    env: [CGO_ENABLED=0, GOFLAGS=-mod=readonly, GOTOOLCHAIN=go1.25.5]
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath, -buildvcs=false]
+    ldflags:
+      - -s -w -buildid= -X main.buildVersion=0.5.0
+    hooks:
+      post:
+        - cmd: 'python3 release/bundle.py binary "{{ .Path }}"'
+          dir: .
+
 archives:
   - id: default
+    ids: [curator, curator-run]
+    allow_different_binary_count: true
+    name_template: "curator_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     formats: [tar.gz]
     format_overrides:
       - goos: windows
         formats: [zip]
-    files: [LICENSE, NOTICE, README.md]
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+      - release/curator-run.json
+      - src: .tmp/curator-run/LICENSE
+        dst: licenses/curator-run/LICENSE
+      - src: .tmp/curator-run/NOTICE
+        dst: licenses/curator-run/NOTICE
 
 checksum:
   name_template: checksums.txt
@@ -26,12 +58,12 @@ checksum:
 sboms:
   - artifacts: archive
 
-# macOS Developer ID signing (Relux Works, LLC). Notarization submission
-# activates once the App Store Connect API key secrets are present.
+# Both macOS binaries use the same Developer ID and notarization inputs.
+# Real releases require these credentials; snapshots explicitly skip signing.
 notarize:
   macos:
-    - enabled: '{{ isEnvSet "MACOS_SIGN_P12" }}'
-      ids: [curator]
+    - enabled: '{{ not .IsSnapshot }}'
+      ids: [curator, curator-run]
       sign:
         certificate: "{{ .Env.MACOS_SIGN_P12 }}"
         password: "{{ .Env.MACOS_SIGN_P12_PASSWORD }}"
@@ -45,19 +77,20 @@ notarize:
 # Keyless cosign signatures over the checksums file: verifying it transitively
 # verifies every artifact hash.
 signs:
-  - cmd: cosign
+  - cmd: bash
     certificate: "${artifact}.pem"
     args:
-      - sign-blob
-      - "--output-certificate=${certificate}"
-      - "--output-signature=${signature}"
+      - release/sign-checksums.sh
       - "${artifact}"
-      - "--yes"
+      - "${certificate}"
+      - "${signature}"
     artifacts: checksum
     output: true
 
 nfpms:
   - id: packages
+    ids: [curator, curator-run]
+    file_name_template: "curator_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     package_name: curator
     vendor: Relux Works, LLC
     homepage: https://github.com/relux-works/curator
@@ -66,9 +99,25 @@ nfpms:
     license: Apache-2.0
     formats: [deb, rpm]
     bindir: /usr/bin
+    deb:
+      compression: gzip
+    rpm:
+      compression: gzip
+    contents:
+      - src: LICENSE
+        dst: /usr/share/licenses/curator/LICENSE
+      - src: NOTICE
+        dst: /usr/share/licenses/curator/NOTICE
+      - src: .tmp/curator-run/LICENSE
+        dst: /usr/share/licenses/curator-run/LICENSE
+      - src: .tmp/curator-run/NOTICE
+        dst: /usr/share/licenses/curator-run/NOTICE
+      - src: release/curator-run.json
+        dst: /usr/share/doc/curator/curator-run.json
 
 homebrew_casks:
   - name: curator
+    binaries: [curator, curator-run]
     # A release candidate must not replace the stable formula: `auto` skips the
     # upload whenever the release is a prerelease. v0.14.0-rc.1 reached the tap
     # because this was unset.
@@ -84,6 +133,7 @@ homebrew_casks:
 
 scoops:
   - name: curator
+    # Windows carries Curator only.
     # Same reason as the cask above.
     skip_upload: "auto"
     repository:
@@ -94,6 +144,28 @@ scoops:
     homepage: https://github.com/relux-works/curator
     description: Agent environment manager
     license: Apache-2.0
+
+# Maintained with the Curator release channels. No second launcher package.
+aurs:
+  - name: curator-bin
+    ids: [default]
+    skip_upload: "auto"
+    homepage: https://github.com/relux-works/curator
+    description: Curator environment manager with curator-run
+    license: Apache-2.0
+    maintainers: ["Ivan Oparin <ivan@relux.works>"]
+    provides: [curator]
+    conflicts: [curator]
+    git_url: ssh://aur@aur.archlinux.org/curator-bin.git
+    private_key: "{{ .Env.AUR_SSH_PRIVATE_KEY }}"
+    package: |-
+      install -Dm755 curator "${pkgdir}/usr/bin/curator"
+      install -Dm755 curator-run "${pkgdir}/usr/bin/curator-run"
+      install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/curator/LICENSE"
+      install -Dm644 NOTICE "${pkgdir}/usr/share/licenses/curator/NOTICE"
+      install -Dm644 licenses/curator-run/LICENSE "${pkgdir}/usr/share/licenses/curator-run/LICENSE"
+      install -Dm644 licenses/curator-run/NOTICE "${pkgdir}/usr/share/licenses/curator-run/NOTICE"
+      install -Dm644 release/curator-run.json "${pkgdir}/usr/share/doc/curator/curator-run.json"
 
 release:
   github:
