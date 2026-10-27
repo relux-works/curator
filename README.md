@@ -608,6 +608,8 @@ The 40 network-contact vectors from curator-spec `c1a2bb25` are pinned in `inter
 
 For the rc.7 Muse policy and v4 slice, run `go test ./internal/envfragment ./internal/envprofile ./cmd/curator -run TestMuse`; this includes synthetic fixtures and narrowing controls, not runtime qualification. For the credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run 'TestCredential(Store|Projection)'`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
 
+The [Codex 0.164.0 permission grammar record](docs/qualification/codex-0.164.0.md) preserves sanitized native observations and admission limits.
+
 The [Muse 1.4.8 qualification record](docs/qualification/muse-1.4.8-R6256.1.md)
 separates passing exec loader rows from failed interactive skill exclusion.
 The [opt-in replay](.research/muse148/README.md) documents Go/tmux/sandbox-exec
