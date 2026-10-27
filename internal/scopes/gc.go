@@ -10,6 +10,8 @@ import (
 
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildrepo"
+	"github.com/relux-works/curator/internal/homelease"
+	homeleasestate "github.com/relux-works/curator/internal/homelease/state"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/projectlease"
@@ -27,6 +29,9 @@ import (
 func CollectRuntime(home string) ([]string, error) {
 	if projectlease.HasState(home) {
 		return nil, fmt.Errorf("project leases require serialized Collect; runtime sweep skipped")
+	}
+	if homeleasestate.HasState(home) {
+		return nil, fmt.Errorf("home leases require serialized Collect; runtime sweep skipped")
 	}
 	marked := markScopes(home)
 	if err := pruneConsumers(home, marked); err != nil {
@@ -100,6 +105,12 @@ func Collect(request MaintenanceRequest) (MaintenanceResult, error) {
 	if err != nil {
 		return MaintenanceResult{}, fmt.Errorf("project lease references unreadable; runtime and build sweeps skipped: %w", err)
 	}
+	homeRoots, err := homelease.ReferencesUnderLock(request.Home, request.Lock)
+	if err != nil {
+		return MaintenanceResult{}, err
+	}
+	leaseRoots.RuntimeEntries = append(leaseRoots.RuntimeEntries, homeRoots.RuntimeEntries...)
+	leaseRoots.BuildKeys = append(leaseRoots.BuildKeys, homeRoots.BuildKeys...)
 	owner, ok := request.Lock.(interface{ Held() managerlock.Held })
 	if !ok {
 		return MaintenanceResult{}, managerlock.ErrNotHeld

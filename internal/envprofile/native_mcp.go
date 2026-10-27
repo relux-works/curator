@@ -259,7 +259,7 @@ func ProfileMCP(req ProfileMCPRequest) (result *ProfileMCPResult, resultErr erro
 				return fmt.Errorf("transaction_input_changed: first-install input changed")
 			}
 		}
-		return nil
+		return homeLeaseMCPPreflight(req)
 	}
 	if err := validateInputs(); err != nil {
 		return result, err
@@ -267,7 +267,7 @@ func ProfileMCP(req ProfileMCPRequest) (result *ProfileMCPResult, resultErr erro
 	var op *operation
 	if req.Mode != "status" && !req.DryRun {
 		var err error
-		op, err = beginOperationValidated(req.Home, validateInputs, req.transactionOptions...)
+		op, err = beginOperationGuarded(req.Home, validateInputs, homeLeaseProfileTargets(req.Home, req.Profile, ""), req.transactionOptions...)
 		if err != nil {
 			return result, err
 		}

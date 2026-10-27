@@ -287,6 +287,9 @@ func (c cli) run(args []string) int {
 		_, _ = fmt.Fprint(c.stderr, usage)
 		return exitUsage
 	}
+	if len(args) >= 2 && args[0] == "env" && args[1] == "lease" {
+		return c.cmdEnv(args[1:])
+	}
 	if rejectsTakeover(args) {
 		if len(args) > 1 && args[0] == "skill" && args[1] == "validate-codex" && !hasHelpFlag(args[2:]) {
 			for _, arg := range args[2:] {

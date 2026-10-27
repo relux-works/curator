@@ -1587,6 +1587,9 @@ func reconcileLinkToPriorJournaled(home string, journal *migrationJournal, index
 // bytes through the journaled record publication, then converges the
 // links back. Best effort per stage; failures are collected.
 func rollbackMigrationMarkersAndLinks(op *operation, req MigrateRequest, journal *migrationJournal) error {
+	if err := homeLeaseGuard(req.Home, op.lock, nil); err != nil {
+		return err
+	}
 	var stages []string
 	if len(journal.Markers) > 0 {
 		priors := make(map[string][]byte, len(journal.Markers))
@@ -1840,6 +1843,9 @@ func recoverMigrationJournal(home string, op *operation, announce io.Writer, sym
 		return nil, err
 	}
 	if err := envauthority.Validate(home); err != nil {
+		return nil, err
+	}
+	if err := homeLeaseGuard(home, op.lock, nil); err != nil {
 		return nil, err
 	}
 	journal, err := readMigrationJournal(home)

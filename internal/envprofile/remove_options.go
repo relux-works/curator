@@ -51,7 +51,7 @@ func RemoveWithOptions(home, name string, opts RemoveOptions) error {
 			return err
 		}
 	}
-	op, err := beginOperation(home)
+	op, err := beginOperationGuarded(home, nil, homeLeaseProfileTargets(home, name, ""))
 	if err != nil {
 		return err
 	}

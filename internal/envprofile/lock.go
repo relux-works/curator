@@ -102,7 +102,7 @@ func beginOperationValidated(home string, validateInputs func() error, options .
 	if err := skillruntime.RefuseUnadmitted(home); err != nil {
 		return nil, err
 	}
-	return beginOperationChecked(home, validateInputs, nil, options...)
+	return beginOperationGuarded(home, validateInputs, nil, options...)
 }
 
 func beginOperationAdmitted(home string, revalidateAdmission func() error) (*operation, error) {
@@ -112,7 +112,22 @@ func beginOperationAdmitted(home string, revalidateAdmission func() error) (*ope
 	return beginOperationChecked(home, nil, revalidateAdmission)
 }
 
+func beginOperationSelected(home string, validate func() error, selectTargets func() ([]string, error), options ...transaction.Option) (*operation, error) {
+	return beginOperationSelectedRecovery(home, validate, selectTargets, true, options...)
+}
+
+func beginOperationSelectedRecovery(home string, validate func() error, selectTargets func() ([]string, error), recoverPending bool, options ...transaction.Option) (*operation, error) {
+	if err := skillruntime.RefuseUnadmitted(home); err != nil {
+		return nil, err
+	}
+	return beginOperationCheckedLease(home, validate, nil, selectTargets, recoverPending, options...)
+}
+
 func beginOperationChecked(home string, validateInputs, revalidateAdmission func() error, options ...transaction.Option) (*operation, error) {
+	return beginOperationCheckedLease(home, validateInputs, revalidateAdmission, nil, true, options...)
+}
+
+func beginOperationCheckedLease(home string, validateInputs, revalidateAdmission func() error, selectTargets func() ([]string, error), recoverPending bool, options ...transaction.Option) (*operation, error) {
 	admitted := revalidateAdmission != nil
 	// Refuse before even creating mutation-lock state in an existing node home.
 	if err := envauthority.Validate(home); err != nil {
@@ -154,6 +169,17 @@ func beginOperationChecked(home string, validateInputs, revalidateAdmission func
 			return nil, err
 		}
 	}
+	if selectTargets != nil {
+		targets, err := selectTargets()
+		if err != nil {
+			_ = lock.Close()
+			return nil, err
+		}
+		if err := homeLeaseGuard(home, lock, targets); err != nil {
+			_ = lock.Close()
+			return nil, err
+		}
+	}
 	// Keep the admission live for recovery, every swap and rollback. The
 	// ordinary project-lease check remains in the combined check as well.
 	options = append(options, transaction.WithCommitCheck(func(w transaction.HomeLock, j transaction.Journal) error {
@@ -185,7 +211,7 @@ func beginOperationChecked(home string, validateInputs, revalidateAdmission func
 		}
 		journalWitness = &routingHomeLock{underlying: lock, validate: revalidateAdmission}
 		recovered, err = engine.RecoverWithOutcome(journalWitness)
-	} else {
+	} else if recoverPending {
 		recovered, err = projectlease.RecoverUnderLock(home, lock, engine)
 	}
 	if err != nil {
