@@ -382,6 +382,8 @@ for paths, journal recovery, Codex base collisions and qualification limits.
 
 Curator conforms to an open specification. Independent implementations include [cocoaskills](https://github.com/ivanopcode/cocoaskills). The registry protocol is implemented by [Curator Skill Registry](https://github.com/relux-works/curator-skill-registry).
 
+For source-specific release-key pins, expected fingerprints, Git verification, status diagnostics and the remaining release-only policy gap, see [source signers](docs/source-signers.md).
+
 ## Development
 
 Curator uses an in-repository task board in `.task-board/`. Automated gates run under `.github/ci/` and mirror `Makefile` targets; see [docs/ci-gates.md](docs/ci-gates.md) for gate definitions, evidence paths, platform carve-out rules, and suite consumption requirements.
