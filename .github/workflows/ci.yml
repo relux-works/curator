@@ -602,6 +602,26 @@ jobs:
         shell: bash
         run: bash scripts/restore-runner-tmp.sh
 
+  lint-darwin:
+    name: Lint (Darwin)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Verify Go toolchain identity
+        shell: bash
+        run: bash .github/ci/toolchain-identity.sh
+
+      - uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.12.2
+
   lint:
     name: Lint
     # Linux entries run on the repository's self-hosted Linux runners when the

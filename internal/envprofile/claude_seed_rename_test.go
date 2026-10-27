@@ -5,10 +5,12 @@ package envprofile
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/relux-works/curator/internal/envregistry"
@@ -189,13 +191,14 @@ func TestClaudeSeedNativeRenameBoundaryChild(t *testing.T) {
 // The prepared native operation replaces an absent or regular destination;
 // a directory destination and an invalid path cannot destroy either entry.
 func TestClaudeSeedPreparedRename(t *testing.T) {
-	for _, variant := range []string{"absent", "regular", "directory", "invalid-path"} {
+	for _, variant := range []string{"absent", "regular", "directory", "invalid-path", "invalid-source"} {
 		t.Run(variant, func(t *testing.T) {
 			root := t.TempDir()
 			source, target := filepath.Join(root, "staged"), filepath.Join(root, "seed")
 			if err := os.WriteFile(source, []byte("new"), 0600); err != nil {
 				t.Fatal(err)
 			}
+			staged := source
 			switch variant {
 			case "regular":
 				if err := os.WriteFile(target, []byte("old"), 0600); err != nil {
@@ -207,13 +210,29 @@ func TestClaudeSeedPreparedRename(t *testing.T) {
 				}
 			case "invalid-path":
 				target += "\x00"
+			case "invalid-source":
+				source += "\x00"
 			}
 			rename, release, err := prepareClaudeSeedRename(source, target)
+			// NUL in either path must fail during preparation with rename metadata,
+			// no publication callbacks, and the staged source still intact.
+			if variant == "invalid-path" || variant == "invalid-source" {
+				var linkErr *os.LinkError
+				if !errors.Is(err, syscall.EINVAL) || !errors.As(err, &linkErr) ||
+					linkErr.Op != "rename" || linkErr.Old != source || linkErr.New != target ||
+					rename != nil || release != nil {
+					t.Fatalf("invalid path preparation returned unexpected result: %v", err)
+				}
+				if string(readClaudeState(t, staged)) != "new" {
+					t.Fatal("invalid path preparation changed the staged source")
+				}
+				return
+			}
 			if err == nil {
 				err = rename()
 				release()
 			}
-			if variant == "directory" || variant == "invalid-path" {
+			if variant == "directory" {
 				if err == nil || string(readClaudeState(t, source)) != "new" {
 					t.Fatalf("invalid destination was not refused with source intact: %v", err)
 				}
