@@ -180,3 +180,86 @@ func TestProfileSkillPlanExactTagGrammar(t *testing.T) {
 		}
 	}
 }
+
+// PSP01: successor fields are forbidden by presence on historical carriers,
+// including JSON null. V5 preserves strict member unions and string shapes;
+// state context accepts only absent network identity fields.
+func TestProfileSkillPlanStrictMemberAndLegacyPresence(t *testing.T) {
+	var fixture struct{ Lock json.RawMessage }
+	planFixture(t, "baseline.json", &fixture)
+	baseline, err := Parse(fixture.Lock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, schema := range []int{1, 2, 4} {
+		legacy := *baseline
+		legacy.SchemaVersion = schema
+		legacy.HashVersion = 2
+		if schema == 1 {
+			legacy.HashVersion = 1
+		}
+		legacy.SkillPlan = nil
+		legacy.SkillPlanSHA256 = ""
+		legacy.Members = append([]Member(nil), baseline.Members...)
+		for i := range legacy.Members {
+			if legacy.Members[i].Kind == KindSkill {
+				legacy.Members[i].Directory = ""
+			}
+		}
+		payload, err := legacy.Canonical()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Parse(payload); err != nil {
+			t.Fatal(err)
+		}
+		for _, key := range []string{"skill_plan", "skill_plan_sha256"} {
+			var object map[string]any
+			_ = json.Unmarshal(payload, &object)
+			object[key] = nil
+			tampered, _ := json.Marshal(object)
+			if _, err := Parse(tampered); err == nil || !strings.Contains(err.Error(), "profile_skill_plan_invalid") {
+				t.Fatalf("legacy %d accepted null %s: %v", schema, key, err)
+			}
+		}
+	}
+	for _, mode := range []string{"state-valid", "state-source-empty", "state-source-null", "state-commit-null", "network-state-null", "skill-version-null", "skill-version-empty", "noncanonical-source"} {
+		t.Run(mode, func(t *testing.T) {
+			var object map[string]any
+			_ = json.Unmarshal(fixture.Lock, &object)
+			members := object["members"].([]any)
+			context := members[0].(map[string]any)
+			if strings.HasPrefix(mode, "state-") {
+				delete(context, "source")
+				delete(context, "commit")
+				delete(context, "directory")
+				context["state_sha256"] = strings.Repeat("a", 64)
+			}
+			switch mode {
+			case "state-source-empty":
+				context["source"] = ""
+			case "state-source-null":
+				context["source"] = nil
+			case "state-commit-null":
+				context["commit"] = nil
+			case "network-state-null":
+				context["state_sha256"] = nil
+			case "skill-version-null":
+				members[1].(map[string]any)["version"] = nil
+			case "skill-version-empty":
+				members[1].(map[string]any)["version"] = ""
+			case "noncanonical-source":
+				context["source"] = "github.com/example/profile.git"
+			}
+			payload, _ := json.Marshal(object)
+			_, err := Parse(payload)
+			if mode == "state-valid" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), "profile_skill_plan_invalid") {
+				t.Fatalf("member shape refusal: %v", err)
+			}
+		})
+	}
+}

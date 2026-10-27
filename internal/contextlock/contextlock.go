@@ -294,6 +294,9 @@ func (lock *Lock) Validate() error {
 		default:
 			return fmt.Errorf("member %s carries no pin", member.Name)
 		}
+		if schemaVersion == SchemaVersion5 && member.Source != "" && !validSkillSource(member.Source) {
+			return fmt.Errorf("profile_skill_plan_invalid: noncanonical member source")
+		}
 		if member.Directory != "" && !(schemaVersion == SchemaVersion5 && member.Kind == KindSkill && member.Directory == ".") && !identifiers.PortablePath(member.Directory) {
 			return fmt.Errorf("member %s directory %q is not a portable path", member.Name, member.Directory)
 		}
@@ -509,6 +512,26 @@ func Parse(payload []byte) (*Lock, error) {
 	} else if raw.CodexSettings != nil || raw.Contributions != nil || present["precedence"] != nil {
 		return nil, fmt.Errorf("invalid lock: successor fields on legacy schema")
 	}
+	if schemaVersion == SchemaVersion5 {
+		var shapes []map[string]json.RawMessage
+		if err := json.Unmarshal(present["members"], &shapes); err != nil {
+			return nil, fmt.Errorf("profile_skill_plan_invalid: member shapes: %w", err)
+		}
+		for _, member := range shapes {
+			for _, key := range []string{"source", "commit", "state_sha256", "directory", "version"} {
+				if value, ok := member[key]; ok && (bytes.Equal(bytes.TrimSpace(value), []byte("null")) || key == "version" && bytes.Equal(bytes.TrimSpace(value), []byte(`""`))) {
+					return nil, fmt.Errorf("profile_skill_plan_invalid: member %s must be a non-null string", key)
+				}
+			}
+			if _, state := member["state_sha256"]; state {
+				for _, key := range []string{"source", "commit", "directory"} {
+					if _, ok := member[key]; ok {
+						return nil, fmt.Errorf("profile_skill_plan_invalid: state member carries %s", key)
+					}
+				}
+			}
+		}
+	}
 	for _, member := range raw.Members {
 		weight, err := strconv.ParseInt(string(member.Weight), 10, 64)
 		if err != nil {
@@ -529,6 +552,8 @@ func Parse(payload []byte) (*Lock, error) {
 			RequiredBy: member.RequiredBy, Overlay: *member.Overlay,
 		})
 	}
+	_, hasPlan := present["skill_plan"]
+	_, hasPlanDigest := present["skill_plan_sha256"]
 	if schemaVersion == SchemaVersion5 {
 		if raw.SkillPlan == nil || raw.SkillPlanSHA256 == nil {
 			return nil, fmt.Errorf("profile_skill_plan_invalid: missing skill plan")
@@ -539,7 +564,7 @@ func Parse(payload []byte) (*Lock, error) {
 		}
 		lock.SkillPlan = plan
 		lock.SkillPlanSHA256 = *raw.SkillPlanSHA256
-	} else if raw.SkillPlan != nil || raw.SkillPlanSHA256 != nil {
+	} else if hasPlan || hasPlanDigest {
 		return nil, fmt.Errorf("profile_skill_plan_invalid: successor fields on legacy lock")
 	}
 	if err := lock.Validate(); err != nil {
