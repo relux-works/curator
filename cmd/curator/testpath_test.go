@@ -65,6 +65,11 @@ func TestCLIPathIsolationChild(t *testing.T) {
 	if os.Getenv(cliPathChild) != "1" || planted == "" {
 		t.Skip("helper process: only runs in the planted PATH subprocess")
 	}
+	// Reapply this test's explicit temporary home after TestMain's ambient
+	// isolation, so the managed user-bin plant retains its original meaning.
+	homeOfPlant := filepath.Dir(filepath.Dir(planted))
+	t.Setenv("HOME", homeOfPlant)
+	t.Setenv("USERPROFILE", homeOfPlant)
 	for _, name := range []string{"curator-engines", "curator-run"} {
 		if path, err := exec.LookPath(name); err == nil || !errors.Is(err, exec.ErrNotFound) {
 			t.Errorf("ambient provider %s leaked through TestMain: %q, %v", name, path, err)

@@ -37,6 +37,7 @@ import (
 const (
 	cliHelperProcess = "CURATOR_TEST_CLI_HELPER"
 	cliHelperConfig  = "CURATOR_TEST_CONFIG_PATH"
+	cliHelperHomes   = "CURATOR_TEST_CLI_FIXTURE_HOMES"
 )
 
 // TestMain gives the test binary the same fixed hidden worker mode the
@@ -101,6 +102,7 @@ func TestCLIHelperProcess(t *testing.T) {
 		t.Parallel()
 		return
 	}
+	restoreCLIUnitHomes(t)
 	separator := -1
 	for index, arg := range os.Args {
 		if arg == "--" {
@@ -169,7 +171,8 @@ func captureWithEnv(t *testing.T, configPath string, environment map[string]stri
 	commandArgs := []string{"-test.run=^TestCLIHelperProcess$", "--"}
 	commandArgs = append(commandArgs, args...)
 	command := exec.Command(os.Args[0], commandArgs...)
-	overrides := map[string]string{cliHelperProcess: "1", cliHelperConfig: configPath}
+	overrides := map[string]string{cliHelperProcess: "1", cliHelperConfig: configPath,
+		cliHelperHomes: forwardCLIUnitHomes(t, environment)}
 	for key, value := range environment {
 		overrides[key] = value
 	}
@@ -194,6 +197,37 @@ func captureWithEnv(t *testing.T, configPath string, environment map[string]stri
 		code = exitError.ExitCode()
 	}
 	return code, stdout.String(), stderr.String()
+}
+
+// A child TestMain must scrub ambient homes. Production-command helpers then
+// reapply only the fixture homes explicitly selected by their isolated parent,
+// just as the native helper restores its fixture Git mapping after TestMain.
+func forwardCLIUnitHomes(t *testing.T, overrides map[string]string) string {
+	t.Helper()
+	homes := map[string]string{}
+	for _, key := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME"} {
+		value, ok := overrides[key]
+		if !ok {
+			value = os.Getenv(key)
+		}
+		homes[key] = value
+	}
+	data, err := json.Marshal(homes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+func restoreCLIUnitHomes(t *testing.T) {
+	t.Helper()
+	homes := map[string]string{}
+	if err := json.Unmarshal([]byte(os.Getenv(cliHelperHomes)), &homes); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME"} {
+		t.Setenv(key, homes[key])
+	}
 }
 
 func cloneEnvironment(environment map[string]string) map[string]string {

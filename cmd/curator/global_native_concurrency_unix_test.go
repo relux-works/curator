@@ -46,10 +46,11 @@ func installNativeGitBarrier(t *testing.T, published, ready, release string) {
 
 // Child entry restores only the parent's fixture Git mapping after TestMain's
 // ambient-config isolation, then invokes the production CLI without fake I/O.
-func TestNativeCommandProcess(_ *testing.T) {
+func TestNativeCommandProcess(t *testing.T) {
 	if os.Getenv("CURATOR_NATIVE_COMMAND_HELPER") != "1" {
 		return
 	}
+	restoreCLIUnitHomes(t)
 	_ = os.Setenv("GIT_CONFIG_GLOBAL", os.Getenv("CURATOR_NATIVE_GIT_CONFIG"))
 	for i, arg := range os.Args {
 		if arg == "--" {
@@ -74,7 +75,9 @@ func startNativeCommand(t *testing.T, fixture nativeGlobalFixture, args ...strin
 	t.Helper()
 	child := &nativeCommand{done: make(chan error, 1)}
 	child.cmd = exec.Command(os.Args[0], append([]string{"-test.run=^TestNativeCommandProcess$", "--"}, args...)...)
-	child.cmd.Env = append(os.Environ(), cliHelperProcess+"=1", cliHelperConfig+"="+fixture.config, "CURATOR_NATIVE_COMMAND_HELPER=1", "CURATOR_NATIVE_GIT_CONFIG="+os.Getenv("GIT_CONFIG_GLOBAL"))
+	child.cmd.Env = append(os.Environ(), cliHelperProcess+"=1", cliHelperConfig+"="+fixture.config,
+		cliHelperHomes+"="+forwardCLIUnitHomes(t, nil),
+		"CURATOR_NATIVE_COMMAND_HELPER=1", "CURATOR_NATIVE_GIT_CONFIG="+os.Getenv("GIT_CONFIG_GLOBAL"))
 	child.cmd.Stdout = &child.output
 	child.cmd.Stderr = &child.output
 	child.cmd.WaitDelay = 5 * time.Second
