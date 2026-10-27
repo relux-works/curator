@@ -1006,17 +1006,20 @@ gate_lane_records() {
 			sub(/[ \t\r]*$/, "", timeout)
 		}
 		/test-gate\.sh/ && /^[ \t]*run:/ {
-			printf "%s\t%s\t%s\n", job, step, timeout
+			lane = job
+			if (job == "test" && step == "Windows go test + platform-case gate")
+				lane = "test-windows"
+			printf "%s\t%s\t%s\n", lane, step, timeout
 		}
 	' "$WORKFLOW"
 }
 
 lane_records="$(gate_lane_records)"
 lane_count="$(printf '%s\n' "$lane_records" | awk 'NF { count++ } END { print count + 0 }')"
-if [ "$lane_count" -eq 4 ]; then
-	ok 'the workflow has four explicitly budgeted test-gate lanes'
+if [ "$lane_count" -eq 5 ]; then
+	ok 'the workflow has five explicitly budgeted test-gate lanes'
 else
-	bad 'the workflow has four explicitly budgeted test-gate lanes' \
+	bad 'the workflow has five explicitly budgeted test-gate lanes' \
 		"found $lane_count lanes; records: $(printf '%s ' "$lane_records")"
 fi
 
@@ -1036,8 +1039,9 @@ lane_timeout_matches() {
 workflow_timeouts_match() {
 	records="$1"
 	count="$(printf '%s\n' "$records" | awk 'NF { count++ } END { print count + 0 }')"
-	[ "$count" -eq 4 ] || return 1
+	[ "$count" -eq 5 ] || return 1
 	lane_timeout_matches "$records" test "$WINDOWS_MATRIX_TIMEOUT" &&
+		lane_timeout_matches "$records" test-windows '120m' &&
 		lane_timeout_matches "$records" test-self-hosted '60m' &&
 		lane_timeout_matches "$records" race '60m' &&
 		lane_timeout_matches "$records" candidate-conformance "$WINDOWS_MATRIX_TIMEOUT"
@@ -1054,11 +1058,12 @@ check_lane_timeout() {
 }
 
 if workflow_timeouts_match "$lane_records"; then
-	ok 'the self-test enforces all four workflow lane timeout pins'
+	ok 'the self-test enforces all five workflow lane timeout pins'
 else
-	bad 'the self-test enforces all four workflow lane timeout pins' 'one or more lane expressions drifted'
+	bad 'the self-test enforces all five workflow lane timeout pins' 'one or more lane expressions drifted'
 fi
 check_lane_timeout test "$WINDOWS_MATRIX_TIMEOUT"
+check_lane_timeout test-windows '120m'
 check_lane_timeout test-self-hosted '60m'
 check_lane_timeout race '60m'
 # The candidate matrix pin includes its Windows value as well as Ubuntu/macOS.
@@ -1071,7 +1076,16 @@ mutate_timeout_lane() {
 			job = $1
 			sub(/:[ \t\r]*$/, "", job)
 		}
-		job == target && /^[ \t]*GO_TEST_TIMEOUT:/ {
+		/^      - name:/ {
+			step = $0
+			sub(/^      - name:[ \t]*/, "", step)
+		}
+		/^[ \t]*GO_TEST_TIMEOUT:/ {
+			lane = job
+			if (job == "test" && step == "Windows go test + platform-case gate")
+				lane = "test-windows"
+		}
+		lane == target && /^[ \t]*GO_TEST_TIMEOUT:/ {
 			line = $0
 			sub(/GO_TEST_TIMEOUT:.*/, "", line)
 			print line "GO_TEST_TIMEOUT: " replacement
@@ -1103,6 +1117,7 @@ check_timeout_drift_rejected() {
 }
 
 check_timeout_drift_rejected 'the self-test rejects Test timeout drift' test "$WINDOWS_MATRIX_TIMEOUT" '30m'
+check_timeout_drift_rejected 'the self-test rejects Windows Test budget drift' test-windows '120m' '90m'
 check_timeout_drift_rejected 'the self-test rejects self-hosted Test timeout drift' test-self-hosted '60m' '30m'
 check_timeout_drift_rejected 'the self-test rejects Race timeout drift' race '60m' '30m'
 check_timeout_drift_rejected 'the self-test rejects candidate timeout drift' candidate-conformance "$WINDOWS_MATRIX_TIMEOUT" '30m'
