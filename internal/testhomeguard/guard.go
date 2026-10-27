@@ -1,4 +1,4 @@
-// Package testhomeguard isolates test processes from operator native homes.
+// Package testhomeguard observes protected native homes around test processes.
 // Production code must not import it. Snapshots never read credential files.
 package testhomeguard
 
@@ -15,8 +15,6 @@ import (
 
 const Changed = "testhomeguard: protected native home changed"
 
-var isolatedHome string
-
 type identity struct {
 	info os.FileInfo
 	link string
@@ -26,13 +24,13 @@ type identity struct {
 type Guard struct {
 	roots  []string
 	before map[string]identity
-	home   string
 }
 
-// Start records the OS account home as well as inherited home overrides before
-// pinning all provider defaults. A caller's belt-and-braces HOME does not hide
-// the OS account home on hosts whose account database supplies it.
-func Start() (*Guard, error) {
+// start observes account authority and, for an ambient test process, inherited
+// native homes. Fixture helpers retain their deliberately supplied environment;
+// the surrounding package supervisor already watches its original ambient roots.
+// This package never pins HOME: testgitenv is the sole isolation owner.
+func start(inherited bool) (*Guard, error) {
 	roots := map[string]bool{}
 	add := func(path string) {
 		if path != "" {
@@ -41,7 +39,7 @@ func Start() (*Guard, error) {
 	}
 	homes := map[string]bool{}
 	for _, name := range []string{"HOME", "USERPROFILE"} {
-		if home := os.Getenv(name); home != "" {
+		if home := os.Getenv(name); inherited && home != "" {
 			homes[home] = true
 		}
 	}
@@ -51,18 +49,21 @@ func Start() (*Guard, error) {
 	}
 	homes[account.HomeDir] = true
 	for home := range homes {
+		add(filepath.Join(home, ".claude.json"))
 		for _, suffix := range []string{".claude", ".codex", ".config/opencode", ".config/muse", ".local/share/muse", ".pi", ".pi/agent", ".agents"} {
 			add(filepath.Join(home, filepath.FromSlash(suffix)))
 		}
 	}
-	for _, name := range []string{"CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR"} {
-		add(os.Getenv(name))
+	if inherited {
+		for _, name := range []string{"CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR"} {
+			add(os.Getenv(name))
+		}
 	}
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); inherited && xdg != "" {
 		add(filepath.Join(xdg, "opencode"))
 		add(filepath.Join(xdg, "muse"))
 	}
-	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+	if xdg := os.Getenv("XDG_DATA_HOME"); inherited && xdg != "" {
 		add(filepath.Join(xdg, "muse"))
 	}
 	g := &Guard{}
@@ -77,40 +78,11 @@ func Start() (*Guard, error) {
 	if err != nil {
 		return nil, fmt.Errorf("testhomeguard: cannot establish protected preimage")
 	}
-	g.home, err = os.MkdirTemp("", "curator-test-home-*")
-	if err != nil {
-		return nil, fmt.Errorf("testhomeguard: cannot create isolated home")
-	}
-	for _, dir := range []string{".config", ".local/share", ".local/state", ".cache"} {
-		if err := os.MkdirAll(filepath.Join(g.home, filepath.FromSlash(dir)), 0700); err != nil {
-			_ = os.RemoveAll(g.home)
-			return nil, err
-		}
-	}
-	for name, value := range map[string]string{
-		"HOME": g.home, "USERPROFILE": g.home,
-		"XDG_CONFIG_HOME": filepath.Join(g.home, ".config"),
-		"XDG_DATA_HOME":   filepath.Join(g.home, ".local", "share"),
-		"XDG_STATE_HOME":  filepath.Join(g.home, ".local", "state"),
-		"XDG_CACHE_HOME":  filepath.Join(g.home, ".cache"),
-	} {
-		if err := os.Setenv(name, value); err != nil {
-			_ = os.RemoveAll(g.home)
-			return nil, err
-		}
-	}
-	for _, name := range []string{"CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR"} {
-		if err := os.Unsetenv(name); err != nil {
-			_ = os.RemoveAll(g.home)
-			return nil, err
-		}
-	}
-	isolatedHome = g.home
 	return g, nil
 }
 
 // Finish fails the package on a changed identity, link, mode or context hash,
-// including when the tests otherwise pass. It removes only its own fresh home.
+// including when the tests otherwise pass. It owns no isolation directory.
 func (g *Guard) Finish(code int) int {
 	after, err := snapshot(g.roots)
 	if err != nil {
@@ -149,60 +121,119 @@ func (g *Guard) Finish(code int) int {
 	} else {
 		fmt.Fprintln(os.Stderr, "testhomeguard: protected native homes unchanged")
 	}
-	if err := os.RemoveAll(g.home); err != nil {
-		fmt.Fprintln(os.Stderr, "testhomeguard: isolated home cleanup failed")
-		code = 1
-	}
 	return code
+}
+
+const maxEntries = 65536
+const maxDepth = 64
+
+// Installed skill trees can contain large tool assets. Keep the complete
+// recursive inventory bounded without silently omitting those regular files.
+const maxFileBytes = 128 << 20
+const maxSnapshotBytes = 1 << 30
+
+// Native configuration, instructions and Curator environment state only.
+// Runtime databases, logs and session histories are deliberately excluded.
+var files = []string{
+	"CLAUDE.md", "AGENTS.md", "AGENTS.override.md", "SYSTEM.md", "APPEND_SYSTEM.md",
+	"settings.json", "settings.local.json", ".claude.json", "config.json", "config.jsonc", "config.toml",
+	"opencode.json", "opencode.jsonc", "models.json", "trust.json", ".mcp.json",
+	"curator-mcp.config.toml", "curator-mcp.json", ".agent-environment.json",
+	"auth.json", ".credentials.json", "credentials.json", "oauth.json", "tokens.json",
 }
 
 func snapshot(roots []string) (map[string]identity, error) {
 	out := map[string]identity{}
+	var bytes int64
 	for _, root := range roots {
 		if err := capture(out, root, false); err != nil {
 			return nil, err
 		}
-		for _, name := range []string{"CLAUDE.md", "AGENTS.md", ".agent-environment.json"} {
-			if err := capture(out, filepath.Join(root, name), true); err != nil {
+		if i := out[root].info; i != nil && !i.IsDir() {
+			if i.Mode().IsRegular() && filepath.Base(root) == ".claude.json" {
+				if err := captureBounded(out, root, true, &bytes); err != nil {
+					return nil, err
+				}
+			}
+			continue // Observe a linked root itself without traversing its target.
+		}
+		for _, name := range files {
+			path := filepath.Join(root, name)
+			if err := captureBounded(out, path, !credential(name), &bytes); err != nil {
 				return nil, err
 			}
 		}
-		skills := filepath.Join(root, "skills")
-		if err := capture(out, skills, false); err != nil {
-			return nil, err
-		}
-		i, err := os.Lstat(skills)
-		if os.IsNotExist(err) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		if !i.IsDir() {
-			continue
-		}
-		f, err := os.Open(skills)
-		if err != nil {
-			return nil, err
-		}
-		entries, readErr := f.ReadDir(4097)
-		closeErr := f.Close()
-		if readErr != nil && readErr != io.EOF {
-			return nil, readErr
-		}
-		if closeErr != nil {
-			return nil, closeErr
-		}
-		if len(entries) > 4096 {
-			return nil, fmt.Errorf("skill identity bound exceeded")
-		}
-		for _, entry := range entries {
-			if err := capture(out, filepath.Join(skills, entry.Name()), false); err != nil {
+		for _, name := range []string{"skills", ".agent-environment-backup"} {
+			if err := captureTree(out, filepath.Join(root, name), 0, &bytes); err != nil {
 				return nil, err
 			}
 		}
 	}
 	return out, nil
+}
+
+// Known credential carriers are metadata-only, even inside copied skills.
+func credential(name string) bool {
+	name = strings.ToLower(name)
+	return strings.Contains(name, "credential") || strings.Contains(name, "token") ||
+		strings.Contains(name, "secret") || name == "auth.json" || name == "oauth.json" ||
+		strings.HasSuffix(name, ".key") || strings.HasSuffix(name, ".pem") ||
+		strings.HasSuffix(name, ".p12") || strings.HasSuffix(name, ".pfx")
+}
+
+func captureBounded(out map[string]identity, path string, hash bool, bytes *int64) error {
+	if len(out) >= maxEntries {
+		return fmt.Errorf("native snapshot entry bound exceeded")
+	}
+	if err := capture(out, path, hash); err != nil {
+		return err
+	}
+	if i := out[path].info; hash && i != nil && i.Mode().IsRegular() {
+		*bytes += i.Size()
+		if *bytes > maxSnapshotBytes {
+			return fmt.Errorf("native snapshot byte bound exceeded")
+		}
+	}
+	return nil
+}
+
+func captureTree(out map[string]identity, path string, depth int, bytes *int64) error {
+	if depth > maxDepth {
+		return fmt.Errorf("native snapshot depth bound exceeded")
+	}
+	if err := captureBounded(out, path, !credential(filepath.Base(path)), bytes); err != nil {
+		return err
+	}
+	i := out[path].info
+	if i == nil || !i.IsDir() {
+		return nil
+	} // Lstat: never follow a skill symlink.
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	opened, err := f.Stat()
+	if err != nil || !os.SameFile(i, opened) {
+		_ = f.Close()
+		return fmt.Errorf("skill directory changed during snapshot")
+	}
+	entries, readErr := f.ReadDir(maxEntries + 1)
+	closeErr := f.Close()
+	if readErr != nil && readErr != io.EOF {
+		return readErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	if len(entries) > maxEntries {
+		return fmt.Errorf("skill directory entry bound exceeded")
+	}
+	for _, e := range entries {
+		if err := captureTree(out, filepath.Join(path, e.Name()), depth+1, bytes); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func capture(out map[string]identity, path string, hashContent bool) error {
@@ -218,7 +249,7 @@ func capture(out map[string]identity, path string, hashContent bool) error {
 	if i.Mode()&os.ModeSymlink != 0 {
 		v.link, err = os.Readlink(path)
 	} else if hashContent && i.Mode().IsRegular() {
-		if i.Size() > 16<<20 {
+		if i.Size() > maxFileBytes {
 			return fmt.Errorf("context identity bound exceeded")
 		}
 		f, openErr := os.Open(path)
@@ -231,7 +262,7 @@ func capture(out map[string]identity, path string, hashContent bool) error {
 			return fmt.Errorf("context identity changed during snapshot")
 		}
 		h := sha256.New()
-		n, readErr := io.Copy(h, io.LimitReader(f, (16<<20)+1))
+		n, readErr := io.Copy(h, io.LimitReader(f, (maxFileBytes)+1))
 		closeErr := f.Close()
 		if readErr != nil {
 			return readErr
@@ -239,7 +270,7 @@ func capture(out map[string]identity, path string, hashContent bool) error {
 		if closeErr != nil {
 			return closeErr
 		}
-		if n > 16<<20 {
+		if n > maxFileBytes {
 			return fmt.Errorf("context identity bound exceeded")
 		}
 		copy(v.hash[:], h.Sum(nil))
