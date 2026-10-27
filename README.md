@@ -394,8 +394,9 @@ consume authenticated signed commands; `list` inspects private event history,
 including retained entry revisions for signing new commands. Revocation and
 terminal lapse invalidate unused approvals at the old revision. Missing checkouts
 retain terminal lapse, and ambiguous active selections refuse. `read` refuses
-unqualified runtime adapters. Run
-`env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS HOME=$(mktemp -d) go test ./internal/operatorpolicy ./cmd/curator -run 'Test(Policy|Reviewer|ProductionReadQualification|SignedCommand|OperatorPolicy)' -count=1`.
+unqualified runtime adapters. In a scrubbed test child with absolute temporary
+working-directory/cache paths (see the guide), run
+`env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS -u GIT_CONFIG_COUNT -u GIT_CONFIG_PARAMETERS HOME=$(mktemp -d /tmp/curator-policy-home.XXXXXX) go test ./internal/operatorpolicy ./cmd/curator -run 'Test(Policy|Reviewer|ProductionReadQualification|SignedCommand|OperatorPolicy)' -count=1`.
 Both packages isolate host/vendor homes in `TestMain`; save validation logs in
 `.temp/`. Until PR #196 lands, use its pinned neutral-helper overlay described
 in the operator-policy guide; tests refuse to run without that HOME boundary.

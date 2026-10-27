@@ -139,11 +139,15 @@ remain independent operator/runtime policies. A trust grant changes none of them
 
 ## Validation
 
-Run with isolated process homes and without ambient Git/SSH/Go overrides:
+Run inside an already scrubbed test child: remove every inherited `GIT_*` and
+`XDG_*` variable, SSH_AUTH_SOCK/SSH_ASKPASS, GOFLAGS and vendor-home overrides
+before launching Go. Use an absolute temporary validation checkout and cache
+paths. The flags below repeat the minimum cleanup; they alone do not scrub
+all Git overrides. HOME uses an absolute mktemp template:
 
 ```sh
-env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS HOME=$(mktemp -d) go test ./internal/operatorpolicy -count=1
-env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS HOME=$(mktemp -d) go test ./cmd/curator -run '^TestOperatorPolicy' -count=1
+env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS -u GIT_CONFIG_COUNT -u GIT_CONFIG_PARAMETERS HOME=$(mktemp -d /tmp/curator-policy-home.XXXXXX) go test ./internal/operatorpolicy -count=1
+env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS -u GIT_CONFIG_COUNT -u GIT_CONFIG_PARAMETERS HOME=$(mktemp -d /tmp/curator-policy-home.XXXXXX) go test ./cmd/curator -run '^TestOperatorPolicy' -count=1
 ```
 
 Both test packages call the neutral `testgitenv.Isolate` in `TestMain` and pin
