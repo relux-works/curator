@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -14,13 +13,11 @@ import (
 // prevents an inherited index selector from writing outside the child fixture.
 // Bypass and broken-family controls must demonstrate their intended violation.
 func TestUnixTestEnvironment(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Unix launch boundary; Windows retains its separate launch recipe")
-	}
 	script, err := filepath.Abs("../../.github/ci/isolated-test.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
+	script = filepath.ToSlash(script)
 	contents, err := os.ReadFile(script)
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +102,7 @@ done < <(compgen -e)
 			if err := os.WriteFile(path, []byte(broken), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			cmd := exec.Command("bash", path, "bash", "-c", probe)
+			cmd := exec.Command("bash", filepath.ToSlash(path), "bash", "-c", probe)
 			cmd.Dir, cmd.Env = child, hostile
 			out, err := cmd.CombinedOutput()
 			if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 73 {
@@ -122,7 +119,7 @@ done < <(compgen -e)
 		if err := os.WriteFile(path, []byte(broken), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		cmd := exec.Command("bash", path, "bash", "-c", probe)
+		cmd := exec.Command("bash", filepath.ToSlash(path), "bash", "-c", probe)
 		cmd.Dir, cmd.Env = child, hostile
 		out, err := cmd.CombinedOutput()
 		if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 72 {
