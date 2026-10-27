@@ -25,7 +25,16 @@ func (engine *Engine) PendingRecoveryFor(lock HomeLock, projectIdentity string) 
 	return engine.pendingRecovery(lock, projectIdentity)
 }
 
-func (engine *Engine) pendingRecovery(lock HomeLock, projectIdentity string) (bool, error) {
+// PendingRecoveryMatching observes matching intent through detached journal
+// snapshots and validates the complete inventory. It never resumes intent.
+func (engine *Engine) PendingRecoveryMatching(lock HomeLock, matches func(Journal) (bool, error)) (bool, error) {
+	if matches == nil {
+		return false, journalf("pending transaction selector is absent")
+	}
+	return engine.pendingRecovery(lock, "", matches)
+}
+
+func (engine *Engine) pendingRecovery(lock HomeLock, projectIdentity string, selectors ...func(Journal) (bool, error)) (bool, error) {
 	if err := requireHomeLock(lock); err != nil {
 		return false, err
 	}
@@ -59,7 +68,14 @@ func (engine *Engine) pendingRecovery(lock HomeLock, projectIdentity string) (bo
 			return false, err
 		}
 		if projectIdentity == "" || journal.ProjectIdentity == projectIdentity {
-			pending = true
+			matches := true
+			if len(selectors) > 0 {
+				matches, err = selectors[0](*cloneJournal(journal))
+				if err != nil {
+					return false, err
+				}
+			}
+			pending = pending || matches
 		}
 	}
 	return pending, nil
