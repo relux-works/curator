@@ -277,6 +277,9 @@ type skillOf struct {
 // materialized files must not be able to poison the PATH the §11 dispatch
 // trusts.
 func skillsOf(home string, manager *gitManager, lock *contextlock.Lock) ([]skillOf, error) {
+	if lock.SchemaVersion == contextlock.SchemaVersion5 {
+		return nil, RefuseSkillPlanAdoption()
+	}
 	var skills []skillOf
 	for _, member := range lock.Members {
 		if member.Kind != contextlock.KindSkill {
@@ -2770,6 +2773,9 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	source, lock, hash, err := loadResolveInputsWithOwner(req.Home, profile, req.readRegularFile, req.boundaryOwnerLookup)
 	if err != nil {
 		return nil, err
+	}
+	if lock.SchemaVersion == contextlock.SchemaVersion5 {
+		return nil, RefuseSkillPlanAdoption()
 	}
 	// Admit the marker authority before store repair, identity migration or
 	// native-state inspection can enter a mutation/recovery path.

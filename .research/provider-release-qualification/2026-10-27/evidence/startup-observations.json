@@ -1,0 +1,378 @@
+{
+  "claude-exec": {
+    "argv": [
+      "-p",
+      "QUAL_OFFLINE_STARTUP",
+      "--tools",
+      "Read"
+    ],
+    "bounded_stop": true,
+    "exit": 143,
+    "hook_effect": true,
+    "pid": 44267,
+    "sha256_output": "579a5b5e7bb7d3cd98ef2d14f698adcddd20ab16a8c8c1c974cef78ed04826cf",
+    "signals": {
+      "1.4.13": false,
+      "2.1.311 (Claude Code)": false,
+      "Operation not permitted": false,
+      "codex-cli 0.163.0": false,
+      "login": false,
+      "not found": false,
+      "sandbox_apply": false,
+      "sign in": false,
+      "trust": true
+    }
+  },
+  "claude-help": {
+    "argv": [
+      "--help"
+    ],
+    "bounded_stop": false,
+    "exit": 0,
+    "hook_effect": false,
+    "pid": 42344,
+    "sha256_output": "fc9af56f65f8a84a9e7e98cd538ccac13f57d1cc0e22099666508198ba88d64d",
+    "signals": {
+      "1.4.13": false,
+      "2.1.311 (Claude Code)": false,
+      "Operation not permitted": false,
+      "codex-cli 0.163.0": false,
+      "login": false,
+      "not found": false,
+      "sandbox_apply": false,
+      "sign in": false,
+      "trust": true
+    }
+  },
+  "claude-interactive": {
+    "argv": [
+      "--tools",
+      "Read"
+    ],
+    "bounded_stop": true,
+    "exit": -9,
+    "hook_effect": false,
+    "pid": 42553,
+    "sha256_output": "b34392dbae4326951b44074f218095199c1f922a7a66ec97f80d2df8c0954163",
+    "signals": {
+      "1.4.13": false,
+      "2.1.311 (Claude Code)": false,
+      "Operation not permitted": false,
+      "codex-cli 0.163.0": false,
+      "login": false,
+      "not found": false,
+      "sandbox_apply": false,
+      "sign in": false,
+      "trust": true
+    }
+  },
+  "claude-resume": {
+    "argv": [
+      "-p",
+      "QUAL_OFFLINE_STARTUP",
+      "--tools",
+      "Read",
+      "--continue"
+    ],
+    "bounded_stop": true,
+    "exit": 143,
+    "hook_effect": true,
+    "pid": 47242,
+    "sha256_output": "579a5b5e7bb7d3cd98ef2d14f698adcddd20ab16a8c8c1c974cef78ed04826cf",
+    "signals": {
+      "1.4.13": false,
+      "2.1.311 (Claude Code)": false,
+      "Operation not permitted": false,
+      "codex-cli 0.163.0": false,
+      "login": false,
+      "not found": false,
+      "sandbox_apply": false,
+      "sign in": false,
+      "trust": true
+    }
+  },
+  "claude-version": {
+    "argv": [
+      "--version"
+    ],
+    "bounded_stop": true,
+    "exit": 0,
+    "hook_effect": false,
+    "pid": 42308,
+    "sha256_output": "0896bb2b0f0c7741c8ab6df43385b83f8fc18620da007e784d0dba2f4b75580b",
+    "signals": {
+      "1.4.13": false,
+      "2.1.311 (Claude Code)": true,
+      "Operation not permitted": false,
+      "codex-cli 0.163.0": false,
+      "login": false,
+      "not found": false,
+      "sandbox_apply": false,
+      "sign in": false,
+      "trust": false
+    }
+  },
+  "codex-exec": {
+    "argv": [
+      "exec",
+      "-c",
+      "approval_policy=\"never\"",
+      "-c",
+      "sandbox_mode=\"read-only\"",
+      "-c",
+      "features.memories=false",
+      "-c",
+      "features.memory_tool=false",
+      "-c",
+      "memories.generate_memories=false",
+      "-c",
+      "memories.use_memories=false",
+      "-c",
+      "memories.dedicated_tools=false",
+      "QUAL_OFFLINE_STARTUP"
+    ],
+    "bounded_stop": true,
+    "exit": -15,
+    "hook_effect": false,
+    "pid": 40207,
+    "sha256_output": "2fcb3000bc227e9cfa820398f289e4fa2d1c5b0a6583a77e063cbd56fa70c083",
+    "signals": {
+      "1.4.13": false,
+      "2.1.311 (Claude Code)": false,
+      "Operation not permitted": false,
+      "codex-cli 0.163.0": false,
+      "login": false,
+      "not found": true,
+      "sandbox_apply": false,
+      "sign in": false,
+      "trust": false
+    }
+  },
+  "codex-help": {
+    "argv": [
+      "--help"
+    ],
+    "bounded_stop": true,
+    "exit": 0,
+    "hook_effect": false,
+    "pid": 39101,
+    "sha256_output": "4a7f0188d4d6e6d812c5cfbcf82468336b899acd5e437de7450421a403c0071e",
+    "signals": {
+      "1.4.13": false,
+      "2.1.311 (Claude Code)": false,
+      "Operation not permitted": false,
+      "codex-cli 0.163.0": false,
+      "login": true,
+      "not found": false,
+      "sandbox_apply": false,
+      "sign in": false,
+      "trust": true
+    }
+  },
+  "codex-interactive": {
+    "argv": [
+      "-c",
+      "approval_policy=\"never\"",
+      "-c",
+      "sandbox_mode=\"read-only\"",
+      "-c",
+      "features.memories=false",
+      "-c",
+      "features.memory_tool=false",
+      "-c",
+      "memories.generate_memories=false",
+      "-c",
+      "memories.use_memories=false",
+      "-c",
+      "memories.dedicated_tools=false"
+    ],
+    "bounded_stop": true,
+    "exit": -15,
+    "hook_effect": false,
+    "pid": 39138,
+    "sha256_output": "bad729dba54fc00a3698694a0654169cbeeb53956275530442b00873852bc16b",
+    "signals": {
+      "1.4.13": false,
+      "2.1.311 (Claude Code)": false,
+      "Operation not permitted": false,
+      "codex-cli 0.163.0": false,
+      "login": false,
+      "not found": false,
+      "sandbox_apply": false,
+      "sign in": false,
+      "trust": true
+    }
+  },
+  "codex-resume": {
+    "argv": [
+      "exec",
+      "resume",
+      "-c",
+      "approval_policy=\"never\"",
+      "-c",
+      "sandbox_mode=\"read-only\"",
+      "-c",
+      "features.memories=false",
+      "-c",
+      "features.memory_tool=false",
+      "-c",
+      "memories.generate_memories=false",
+      "-c",
+      "memories.use_memories=false",
+      "-c",
+      "memories.dedicated_tools=false",
+      "--last",
+      "QUAL_OFFLINE_STARTUP"
+    ],
+    "bounded_stop": true,
+    "exit": -15,
+    "hook_effect": false,
+    "pid": 41265,
+    "sha256_output": "1adae8780e31c1ac47f54db42fc1b90aca369ae638d3254f941c75db4e87cfa6",
+    "signals": {
+      "1.4.13": false,
+      "2.1.311 (Claude Code)": false,
+      "Operation not permitted": false,
+      "codex-cli 0.163.0": false,
+      "login": false,
+      "not found": true,
+      "sandbox_apply": false,
+      "sign in": false,
+      "trust": false
+    }
+  },
+  "codex-version": {
+    "argv": [
+      "--version"
+    ],
+    "bounded_stop": true,
+    "exit": 0,
+    "hook_effect": false,
+    "pid": 39077,
+    "sha256_output": "15c9db57c80035537f94bea647d07608a1fab5148f5482c0a0d1d7422b7fb69e",
+    "signals": {
+      "1.4.13": false,
+      "2.1.311 (Claude Code)": false,
+      "Operation not permitted": false,
+      "codex-cli 0.163.0": true,
+      "login": false,
+      "not found": false,
+      "sandbox_apply": false,
+      "sign in": false,
+      "trust": false
+    }
+  },
+  "muse-exec": {
+    "argv": [
+      "exec",
+      "--json",
+      "--provider",
+      "echo",
+      "QUAL_OFFLINE_STARTUP"
+    ],
+    "bounded_stop": true,
+    "exit": 0,
+    "hook_effect": false,
+    "pid": 51618,
+    "sha256_output": "cebb5493ad31b846000f3f3615b9b38137b4310089fcca07c23fbbf9d43a0794",
+    "signals": {
+      "1.4.13": false,
+      "2.1.311 (Claude Code)": false,
+      "Operation not permitted": true,
+      "codex-cli 0.163.0": false,
+      "login": false,
+      "not found": false,
+      "sandbox_apply": false,
+      "sign in": false,
+      "trust": true
+    }
+  },
+  "muse-help": {
+    "argv": [
+      "--help"
+    ],
+    "bounded_stop": true,
+    "exit": 0,
+    "hook_effect": false,
+    "pid": 50093,
+    "sha256_output": "e30810b5571178998d57a0a21d3e492e9575b96966982b7c7c00447faed5ce0a",
+    "signals": {
+      "1.4.13": false,
+      "2.1.311 (Claude Code)": false,
+      "Operation not permitted": false,
+      "codex-cli 0.163.0": false,
+      "login": true,
+      "not found": false,
+      "sandbox_apply": false,
+      "sign in": false,
+      "trust": true
+    }
+  },
+  "muse-interactive": {
+    "argv": [
+      "--provider",
+      "echo"
+    ],
+    "bounded_stop": true,
+    "exit": -15,
+    "hook_effect": false,
+    "pid": 50178,
+    "sha256_output": "eefef5b0377c3cd86cae69020f41431c9e6917a2632c26928357f0a5f9f75f13",
+    "signals": {
+      "1.4.13": false,
+      "2.1.311 (Claude Code)": false,
+      "Operation not permitted": false,
+      "codex-cli 0.163.0": false,
+      "login": false,
+      "not found": false,
+      "sandbox_apply": false,
+      "sign in": false,
+      "trust": true
+    }
+  },
+  "muse-resume": {
+    "argv": [
+      "resume",
+      "--last",
+      "--provider",
+      "echo"
+    ],
+    "bounded_stop": false,
+    "exit": 1,
+    "hook_effect": false,
+    "pid": 52291,
+    "sha256_output": "43a93f87119db975ee40f585844c28e310a809a2a16a2e1e1d61fb3aaa65472c",
+    "signals": {
+      "1.4.13": false,
+      "2.1.311 (Claude Code)": false,
+      "Operation not permitted": false,
+      "codex-cli 0.163.0": false,
+      "login": false,
+      "not found": false,
+      "sandbox_apply": false,
+      "sign in": false,
+      "trust": false
+    }
+  },
+  "muse-version": {
+    "argv": [
+      "--version"
+    ],
+    "bounded_stop": true,
+    "exit": 0,
+    "hook_effect": false,
+    "pid": 50043,
+    "sha256_output": "be07a12e9f3622ebc4c25cb71ce59bab646b705cb3b7c991dea9e6a4ce2b308c",
+    "signals": {
+      "1.4.13": true,
+      "2.1.311 (Claude Code)": false,
+      "Operation not permitted": false,
+      "codex-cli 0.163.0": false,
+      "login": false,
+      "not found": false,
+      "sandbox_apply": false,
+      "sign in": false,
+      "trust": false
+    }
+  }
+}

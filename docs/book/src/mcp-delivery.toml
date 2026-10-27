@@ -1,0 +1,122 @@
+# Former source: mcp-delivery.puml, removed in the move to the book kit; it
+# remains in the repository history.
+# MCP from the project Skillfile as a decision flowchart. Content follows
+# mcp-delivery.puml and chapter "MCP: от зависимости до нативной
+# конфигурации", whose terms win: "первый этап", "второй этап", "писатель".
+# The first stage resolves packages into `Skillfile.mcp-lock.json`; the
+# check before publication reports `skipped: unsupported` for a name and
+# environment pair without a qualified writer; the native writer and the
+# qualified launch are later steps of the same order. A string address or an
+# inline `server` without project approval refuses with
+# `mcp_inline_approval_unsupported`. The puml title and legend are status
+# words and are left out.
+layout = "graph"
+direction = "TB"
+same_rank = [["start", "skillfile"], ["pkg", "qapprove"], ["lock", "refuse", "approve"], ["writer", "skipped"]]
+alt = "MCP проекта: сначала пакеты, декларации в проекте только после одобрения; запись нативной конфигурации и запуск идут после проверки."
+
+[theme.space]
+graph_ranksep = 0.3
+
+[nodes.start]
+shape = "start"
+
+[nodes.skillfile]
+role = "neutral"
+name = "Проектный `Skillfile.json`"
+text = "версия 3, поле `mcp_servers`"
+
+[nodes.pkg]
+role = "service"
+name = "Первый этап: пакет"
+text = "`curator project resolve .`: источники, подписанты, отзывы и аудит"
+
+[nodes.lock]
+role = "store"
+name = "`Skillfile.mcp-lock.json`"
+text = "и защищённая локальная запись Curator"
+
+[nodes.qapprove]
+role = "neutral"
+name = "Есть одобрение имени в проекте?"
+
+[nodes.refuse]
+role = "alert"
+name = "Отказ"
+text = "`mcp_inline_approval_unsupported`"
+
+[nodes.approve]
+role = "service"
+name = "Второй этап: одобрение"
+text = "дайджест нормализованного сервера, одобривший и потолок"
+
+[nodes.preflight]
+role = "service"
+name = "Проверка до публикации"
+text = "весь набор деклараций, одобрения, политика и прежнее содержимое нативных файлов"
+
+[nodes.writer]
+role = "service"
+name = "Писатель нативной конфигурации"
+text = "не запускает сервер и не проверяет вход"
+
+[nodes.skipped]
+role = "neutral"
+name = "`skipped: unsupported`"
+text = "исход пары в отчёте, без пути"
+
+[nodes.launch]
+role = "service"
+name = "Квалифицированный запуск"
+text = "одобренный действующий набор; строгий режим исключает нативные MCP проекта"
+
+[[links]]
+from = "start"
+to = "skillfile"
+
+[[links]]
+from = "skillfile"
+to = "pkg"
+label = "`package`"
+
+[[links]]
+from = "skillfile"
+to = "qapprove"
+label = "адрес или `server`"
+
+[[links]]
+from = "pkg"
+to = "lock"
+
+[[links]]
+from = "qapprove"
+to = "refuse"
+label = "нет"
+color = "alert"
+
+[[links]]
+from = "qapprove"
+to = "approve"
+label = "да"
+
+[[links]]
+from = "lock"
+to = "preflight"
+
+[[links]]
+from = "approve"
+to = "preflight"
+
+[[links]]
+from = "preflight"
+to = "writer"
+label = "писатель квалифицирован"
+
+[[links]]
+from = "preflight"
+to = "skipped"
+label = "писателя нет"
+
+[[links]]
+from = "writer"
+to = "launch"

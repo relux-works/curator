@@ -1,30 +1,78 @@
 #!/usr/bin/env bash
-# Build the Curator book with pandoc 3.x and WeasyPrint 69+.
-# Usage: docs/book/build.sh [ru [OUTPUT.pdf]]
+# Build the Curator book: Markdown chapters -> HTML (pandoc) -> PDF (WeasyPrint).
+#
+#   docs/book/build.sh          builds docs/book/curator-book.ru.pdf from docs/book/ru/
+#   docs/book/build.sh ru OUT   writes the PDF to OUT instead
+#
+# Needs pandoc 3.x and WeasyPrint 69+, and the PT Serif, PT Sans and PT Mono fonts.
+#
+# The chapters are checked first (docs/book/check.sh: hygiene and links), then
+# the figures (docs/book/check-figures.sh): the structural pass always runs,
+# the render pass (fresh and fitting SVGs) needs Python 3.11+ and the Graphviz
+# the vendored diagram kit pins and fails the build otherwise.
+# BOOK_SKIP_FIGURE_RENDER=1 skips only the render pass, with a warning. An
+# image WeasyPrint cannot load also fails the build. Temporary HTML lives in a
+# private directory under TMPDIR, never in the repository, and the PDF replaces
+# OUT only after a clean run, so a failed build leaves the prior output as it was.
 set -euo pipefail
+
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 lang="${1:-ru}"
 src="$here/$lang"
 out="${2:-$here/curator-book.$lang.pdf}"
+
 for tool in pandoc weasyprint; do
   command -v "$tool" >/dev/null || { echo "build.sh: $tool not found" >&2; exit 1; }
 done
+
 shopt -s nullglob
 chapters=("$src"/[0-9][0-9]-*.md)
 if (( ${#chapters[@]} == 0 )); then
   echo "build.sh: no chapters in $src" >&2
   exit 1
 fi
-"$here/check-figures.sh"
-# Keep temporary HTML within the book tree, independently of caller TMPDIR.
-mkdir -p "$here/.temp"
-tmp="$(mktemp -d "$here/.temp/build.XXXXXX")"
+
+bash "$here/check.sh" || { echo "build.sh: chapter check failed" >&2; exit 1; }
+bash "$here/check-figures.sh" --structural || { echo "build.sh: figure check failed" >&2; exit 1; }
+if [ "${BOOK_SKIP_FIGURE_RENDER:-}" = 1 ]; then
+  echo "build.sh: WARNING: BOOK_SKIP_FIGURE_RENDER=1, figure freshness and fit are not checked" >&2
+else
+  bash "$here/check-figures.sh" --render || {
+    echo "build.sh: figure render check failed (BOOK_SKIP_FIGURE_RENDER=1 skips it for a draft)" >&2
+    exit 1
+  }
+fi
+
+tmp="$(mktemp -d "${TMPDIR:-/tmp}/curator-book.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
+
+# Chapter 0 is numbered 0, so the offset is -1.
 pandoc "${chapters[@]}" \
-  --from markdown --to html5 --standalone \
-  --template "$here/template.html" --lua-filter "$here/filters/book.lua" \
-  --toc --toc-depth=2 --section-divs --syntax-highlighting=none \
-  --number-sections --number-offset=-1 --metadata lang="$lang" \
+  --from markdown \
+  --to html5 \
+  --standalone \
+  --template "$here/template.html" \
+  --lua-filter "$here/filters/book.lua" \
+  --toc --toc-depth=2 \
+  --section-divs \
+  --syntax-highlighting=none \
+  --number-sections --number-offset=-1 \
+  --metadata lang="$lang" \
   --output "$tmp/book.html"
-weasyprint --base-url "$src/" --stylesheet "$here/style.css" "$tmp/book.html" "$out"
+
+# Relative image paths in the chapters (../diagrams/...) resolve against the
+# chapter directory.
+# WeasyPrint only logs an image it cannot load; that fails the build here,
+# and the PDF is moved to OUT only after a clean run.
+weasyprint \
+  --base-url "$src/" \
+  --stylesheet "$here/style.css" \
+  "$tmp/book.html" "$tmp/book.pdf" 2> "$tmp/weasyprint.log" || { cat "$tmp/weasyprint.log" >&2; exit 1; }
+cat "$tmp/weasyprint.log" >&2
+if grep -q 'Failed to load image' "$tmp/weasyprint.log"; then
+  echo "build.sh: an image failed to load; $out is left unchanged" >&2
+  exit 1
+fi
+mv "$tmp/book.pdf" "$out"
+
 echo "$out"

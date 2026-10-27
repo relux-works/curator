@@ -11,10 +11,10 @@ Version v0.1 development is complete: all twelve phases in [docs/implementation-
 ## Install
 
 <details open>
-<summary>Homebrew (macOS, Linux)</summary>
+<summary>Homebrew cask (macOS)</summary>
 
 ```bash
-brew install relux-works/tap/curator
+brew install --cask relux-works/tap/curator
 ```
 
 </details>
@@ -25,6 +25,10 @@ brew install relux-works/tap/curator
 ```bash
 curl -fsSL https://raw.githubusercontent.com/relux-works/curator/main/install.sh | sh
 ```
+
+The installer first shows the version, destination, repository/docs links and verification plan in English or Russian, then asks for confirmation. Curator needs no sudo. Use `sh -s -- --plan` to preview only, or `sh -s -- --yes` (or `CURATOR_YES=1`) for automation. Confirmation uses `/dev/tty`; without a terminal, pass `--yes`. See [installer plan and confirmation](docs/installer-plan.md) for locale precedence, `NO_COLOR` and unchanged destination rules.
+
+With `CURATOR_VERSION` unset, a read-only latest-release metadata GET runs before the plan and consent, with a 3-second connection timeout and 5-second total timeout and no file writes. If it fails, the complete plan shows `latest (could not be resolved)` and `--plan` exits successfully. Installation retries resolution after consent and refuses before staging or artifact downloads if it still fails.
 
 The installer verifies the release's `checksums.txt` with GitHub artifact attestation when `gh attestation verify` is available, or with the release's keyless cosign signature when it is not. Both checks pin the Curator release workflow identity and GitHub Actions OIDC issuer. It then checks the downloaded archive's SHA-256 against the verified checksum file. Install the [GitHub CLI](https://cli.github.com/) or [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) before using the script; it refuses to install when neither verifier is available or verification fails.
 
@@ -56,6 +60,8 @@ go install github.com/relux-works/curator/cmd/curator@latest
 ```
 
 </details>
+
+The bundled release configuration installs `curator` and `curator-run` together through the macOS cask, Linux deb/rpm packages and AUR `curator-bin`. Windows uses the existing Scoop bucket and carries Curator only. The installer script and `go install` currently install Curator alone. See [the release channel matrix, source gates and snapshot commands](release/README.md).
 
 Debian and RPM packages ship with every release alongside SBOMs and cosign signatures. macOS binaries are Developer ID signed (Relux Works, LLC). Run the verification command to check any downloaded artifact:
 
@@ -388,6 +394,8 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+Release tooling uses Python/SSH source and payload gates, GoReleaser OSS 2.17.0 and Syft for SBOMs. Run the [release checks](release/README.md#local-checks); snapshots and exported launcher sources stay under `.tmp/`, and local validation logs belong under task-scoped `.temp/`.
+
 The marker/snapshot schema regexp engine is pinned to regexp2 v1.11.5, which
 fixes stale timeout deadlines after idle. Run
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envmarker -run TestMarker7AfterRegexpClockIdle -count=1`
@@ -580,6 +588,8 @@ see [skill projection repair](docs/profile-skill-directories.md). Save logs unde
 PlantUML renders the agent-login diagrams. Run `plantuml -tsvg -nometadata diagrams/plantuml/agent-login-*.puml` to write SVG files beside their sources. The [agent login reference](docs/agent-logins.md) embeds these outputs.
 
 Lychee checks Markdown links. Run `lychee --offline --include-fragments --no-progress README.md docs/environment-config.md docs/agent-logins.md` for local targets and anchors, then `lychee --no-progress --timeout 30 docs/agent-logins.md` for the reference's external links. Store logs under `.temp/`. Run `git diff --check` for whitespace validation.
+
+POSIX installer tests use scratch prefixes and the standard `script` utility for PTY confirmation/colour checks. Run `env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS go test ./internal/install -run '^TestInstallScriptSecurityRows$' -count=1 -timeout=3m`; keep output under task-scoped `.temp/`. See [installer validation](docs/installer-plan.md#validation) for the verification and early-write controls.
 
 Managed Muse homes materialize monolithic root context at `config/muse/AGENTS.md`; `referenced` is refused. A profile without a context declaration writes no root file. Curator resolves the environment fragment; its external Muse `exec` consumer must add `--no-foreign-personal-context` exactly when the root target is materialized (environments §10.2). The v4 fragment carries the verified `root_context` fact, effective file agreement and mandatory `TBH_CREDENTIAL_BACKEND=file`; it carries no argv member. `env status` records the remaining discovery, `serve`, and workspace-precedence bounds.
 

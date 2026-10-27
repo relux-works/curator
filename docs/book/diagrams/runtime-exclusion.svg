@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="701.2" height="504.5" viewBox="0 0 701.2 504.5">
+<title>Исключение нативных источников: управляемый дом остаётся виден, а управляющие файлы чекаута закрыты в каждой точке, где харнес ищет источники.</title>
+<rect width="701.2" height="504.5" fill="#ffffff"/>
+<g transform="translate(12 12)">
+<!-- graphviz 14.0.4 -->
+<!-- node home -->
+<rect x="24.1" y="0" width="177.9" height="90.4" rx="12" fill="#e7f5f1" stroke="#11826d" stroke-width="2" class="box" data-id="home"/>
+<text x="40.1" y="26.1" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Управляемый дом</tspan></text>
+<text x="41" y="54.6" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">корневые инструкции</tspan></text>
+<text x="44.3" y="74.1" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">и одобренные копии</tspan></text>
+<!-- node checkout -->
+<rect x="0" y="112.3" width="226" height="113.8" rx="12" fill="#f6f7f9" stroke="#8b929c" stroke-width="2" class="box" data-id="checkout"/>
+<text x="56.9" y="138.4" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Управляющие</tspan></text>
+<text x="53.6" y="161.8" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">файлы чекаута</tspan></text>
+<text x="16" y="190.3" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">инструкции, правила, скиллы,</tspan></text>
+<text x="42.7" y="209.8" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">хуки, настройки, MCP</tspan></text>
+<!-- node harness -->
+<rect x="448" y="104.5" width="229.1" height="129.4" rx="12" fill="#f3effd" stroke="#7c4ddb" stroke-width="2" class="box" data-id="harness"/>
+<text x="534.3" y="130.6" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Харнес</tspan></text>
+<text x="471.5" y="159.1" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">ищет источники при старте,</tspan></text>
+<text x="487.3" y="178.6" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">перезагрузке, позднем</tspan></text>
+<text x="464" y="198.1" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">обнаружении, возобновлении</tspan></text>
+<text x="477.7" y="217.6" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">и входе дочернего агента</tspan></text>
+<!-- node adapter -->
+<rect x="2.8" y="248.3" width="220.4" height="113.8" rx="12" fill="#ebf2ff" stroke="#2f6fdb" stroke-width="2" class="box" data-id="adapter"/>
+<text x="28.1" y="274.4" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Квалифицированный</tspan></text>
+<text x="81" y="297.8" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">адаптер</tspan></text>
+<text x="18.8" y="326.3" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">закрывает каждую точку для</tspan></text>
+<text x="19.4" y="345.8" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">точной версии и платформы</tspan></text>
+<!-- note adapter -->
+<rect x="35.2" y="405.9" width="155.6" height="74.6" rx="10" fill="#f6f7f9" stroke="#d5d9df" stroke-width="1.2" class="note" data-id="note_adapter"/>
+<text x="48.7" y="429.2" font-size="14" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">Проверка отдельных</tspan></text>
+<text x="70.2" y="447.4" font-size="14" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">поверхностей</tspan></text>
+<text x="47.2" y="465.6" font-size="14" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">адаптер не включает.</tspan></text>
+<path d="M 113 362.1 L 113 405.9" fill="none" stroke="#d5d9df" stroke-width="1.5" stroke-dasharray="4 4" class="connector" data-from="adapter" data-to="note_adapter"/>
+<!-- link home -> harness -->
+<path d="M 202.4 69.7 C 270.6 88.6 365.5 114.9 440.6 135.7 L 442 136.1" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="home" data-to="harness" data-edge="e0"/>
+<polygon points="447.8,137.7 439.4,130.7 437,139.4" fill="#3a3f47"/>
+<g class="label" data-edge="e0">
+<text x="278.3" y="79.6" font-size="15" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">остаётся виден</tspan></text>
+</g>
+<!-- link checkout -> harness -->
+<path d="M 226.4 169.2 C 291.6 169.2 373.7 169.2 440.4 169.2 L 441.6 169.2" fill="none" stroke="#c8285f" stroke-width="2" class="edge" data-from="checkout" data-to="harness" data-edge="e1"/>
+<polygon points="447.6,169.2 437.6,164.7 437.6,173.7" fill="#c8285f"/>
+<g class="label" data-edge="e1">
+<text x="247.7" y="157.9" font-size="15" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">закрыто в строгом режиме</tspan></text>
+</g>
+<!-- link adapter -> harness -->
+<path d="M 223.5 271.9 C 289.3 251.9 373.1 226.5 440.9 205.9 L 442 205.5" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="adapter" data-to="harness" data-edge="e2"/>
+<polygon points="447.8,203.8 436.9,202.4 439.5,211" fill="#3a3f47"/>
+<g class="label" data-edge="e2">
+<text x="271.8" y="201" font-size="15" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">программирует запуск</tspan></text>
+</g>
+</g>
+</svg>

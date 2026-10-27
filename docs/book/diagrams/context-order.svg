@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="837.1" height="641.5" viewBox="0 0 837.1 641.5">
+<title>Порядок частей файла инструкций в управляемом доме: проект добавляет одобренные части ниже корневого контекста профиля.</title>
+<rect width="837.1" height="641.5" fill="#ffffff"/>
+<g transform="translate(12 12)">
+<!-- group home -->
+<rect x="0" y="0" width="581.6" height="485.7" rx="16" fill="none" stroke="#2f6fdb" stroke-width="2" stroke-dasharray="8 6" class="group" data-id="home"/>
+<!-- node root -->
+<rect x="18" y="37.7" width="545.6" height="70.9" rx="12" fill="#e7f5f1" stroke="#11826d" stroke-width="2" class="box" data-id="root"/>
+<text x="178" y="63.8" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Корневой контекст профиля</tspan></text>
+<text x="34" y="92.4" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">собран из выбранного lock для этой агентской среды; проект его не заменяет</tspan></text>
+<!-- node general -->
+<rect x="18" y="158.6" width="545.6" height="70.9" rx="12" fill="#e7f5f1" stroke="#11826d" stroke-width="2" class="box" data-id="general"/>
+<text x="192.4" y="184.7" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Общий контекст проекта</tspan></text>
+<text x="150.5" y="213.3" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">одобренная часть для всех агентских сред</tspan></text>
+<!-- node env -->
+<rect x="18" y="279.5" width="545.6" height="70.9" rx="12" fill="#e7f5f1" stroke="#11826d" stroke-width="2" class="box" data-id="env"/>
+<text x="177.6" y="305.6" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Контекст проекта для среды</tspan></text>
+<text x="140.2" y="334.1" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">одобренная часть, например для</tspan><tspan x="360.4" font-family="PT Mono, monospace">codex_cli</tspan></text>
+<!-- node deep -->
+<rect x="18" y="400.4" width="545.6" height="70.9" rx="12" fill="#e7f5f1" stroke="#11826d" stroke-width="2" class="box" data-id="deep"/>
+<text x="151.2" y="426.5" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Уточнения более глубокой области</tspan></text>
+<text x="86.6" y="455" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">одобренная часть подкаталога, после более широкой области</tspan></text>
+<!-- node harness -->
+<rect x="0" y="535.7" width="581.6" height="70.9" rx="12" fill="#f3effd" stroke="#7c4ddb" stroke-width="2" class="box" data-id="harness"/>
+<text x="262.5" y="561.8" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Харнес</tspan></text>
+<text x="172.6" y="590.3" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">читает собранный файл инструкций</tspan></text>
+<!-- link root -> general -->
+<path d="M 290.8 108.6 L 290.8 152.6" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="root" data-to="general" data-edge="e0"/>
+<polygon points="290.8,158.6 295.3,148.6 286.3,148.6" fill="#3a3f47"/>
+<g class="label" data-edge="e0">
+
+</g>
+<!-- link general -> env -->
+<path d="M 290.8 229.5 L 290.8 273.5" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="general" data-to="env" data-edge="e1"/>
+<polygon points="290.8,279.5 295.3,269.5 286.3,269.5" fill="#3a3f47"/>
+<g class="label" data-edge="e1">
+
+</g>
+<!-- link env -> deep -->
+<path d="M 290.8 350.4 L 290.8 394.4" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="env" data-to="deep" data-edge="e2"/>
+<polygon points="290.8,400.4 295.3,390.4 286.3,390.4" fill="#3a3f47"/>
+<g class="label" data-edge="e2">
+
+</g>
+<!-- link home -> harness -->
+<path d="M 290.8 485.7 L 290.8 529.7" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="home" data-to="harness" data-edge="e3"/>
+<polygon points="290.8,535.7 295.3,525.7 286.3,525.7" fill="#3a3f47"/>
+<g class="label" data-edge="e3">
+<text x="302.8" y="515.2" font-size="15" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">файл</tspan><tspan x="340.4" font-family="PT Mono, monospace" font-weight="bold">AGENTS.md</tspan><tspan x="425.2" font-family="PT Sans, sans-serif" font-weight="bold">или</tspan><tspan x="453.1" font-family="PT Mono, monospace" font-weight="bold">CLAUDE.md</tspan></text>
+</g>
+<!-- note root -->
+<rect x="601.6" y="35.9" width="203.5" height="74.6" rx="10" fill="#f6f7f9" stroke="#d5d9df" stroke-width="1.2" class="note" data-id="note_root"/>
+<text x="673.6" y="59.2" font-size="14" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">В режиме</tspan></text>
+<text x="627.1" y="77.4" font-size="14" fill="#4b5260"><tspan font-family="PT Mono, monospace">native-project</tspan><tspan x="748.5" font-family="PT Sans, sans-serif">файл</tspan></text>
+<text x="613.6" y="95.5" font-size="14" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">состоит только из этой части.</tspan></text>
+<path d="M 563.6 73.2 L 601.6 73.2" fill="none" stroke="#d5d9df" stroke-width="1.5" stroke-dasharray="4 4" class="connector" data-from="root" data-to="note_root"/>
+<!-- note deep -->
+<rect x="601.6" y="398.5" width="211.4" height="74.6" rx="10" fill="#f6f7f9" stroke="#d5d9df" stroke-width="1.2" class="note" data-id="note_deep"/>
+<text x="613.6" y="421.8" font-size="14" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">Порядок выражает намерение</tspan></text>
+<text x="620.3" y="440" font-size="14" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">композиции. Поздний абзац</tspan></text>
+<text x="635.2" y="458.2" font-size="14" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">разрешений не выдаёт.</tspan></text>
+<path d="M 563.6 435.8 L 601.6 435.8" fill="none" stroke="#d5d9df" stroke-width="1.5" stroke-dasharray="4 4" class="connector" data-from="deep" data-to="note_deep"/>
+<!-- note harness -->
+<rect x="601.6" y="524.8" width="206.1" height="92.8" rx="10" fill="#f6f7f9" stroke="#d5d9df" stroke-width="1.2" class="note" data-id="note_harness"/>
+<text x="648.7" y="548" font-size="14" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">В строгом режиме</tspan></text>
+<text x="613.8" y="566.2" font-size="14" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">квалифицированный адаптер</tspan></text>
+<text x="625.2" y="584.4" font-size="14" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">исключает неодобренные</tspan></text>
+<text x="613.6" y="602.6" font-size="14" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">управляющие файлы чекаута.</tspan></text>
+<path d="M 581.6 571.1 L 601.6 571.1" fill="none" stroke="#d5d9df" stroke-width="1.5" stroke-dasharray="4 4" class="connector" data-from="harness" data-to="note_harness"/>
+<!-- group label home -->
+<rect x="12" y="10" width="163" height="18.9" fill="#ffffff" class="plate"/>
+<text x="18" y="24.4" font-size="13" fill="#2a62c4" letter-spacing="2.1"><tspan font-family="PT Sans, sans-serif" font-weight="bold">УПРАВЛЯЕМЫЙ ДОМ</tspan></text>
+</g>
+</svg>

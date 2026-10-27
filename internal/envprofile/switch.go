@@ -189,6 +189,9 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 		}
 	}
 	if profileToValidate != "" {
+		if candidate, _, err := readLock(home, profileToValidate); err == nil && candidate.SchemaVersion == contextlock.SchemaVersion5 {
+			return nil, RefuseSkillPlanAdoption()
+		}
 		if err := preflightProfilePathSources(home, profileToValidate, policy); err != nil {
 			return nil, err
 		}
@@ -454,6 +457,10 @@ func materializeScopeWithNativeHome(op *operation, home, profile, environment st
 	if err != nil {
 		return nil, err
 	}
+	if lock.SchemaVersion == contextlock.SchemaVersion5 {
+		return nil, RefuseSkillPlanAdoption()
+	}
+
 	source, err := readSource(home, profile)
 	if err != nil {
 		return nil, err
@@ -507,6 +514,10 @@ func preflightInPlaceScope(home, profile, environment string, policy Policy, nat
 	if err != nil {
 		return err
 	}
+	if lock.SchemaVersion == contextlock.SchemaVersion5 {
+		return RefuseSkillPlanAdoption()
+	}
+
 	source, err := readSource(home, profile)
 	if err != nil {
 		return err

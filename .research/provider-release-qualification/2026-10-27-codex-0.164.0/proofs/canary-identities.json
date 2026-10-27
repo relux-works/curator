@@ -1,0 +1,40 @@
+{
+  "admitted": false,
+  "qualification_required": true,
+  "changes": [
+    {
+      "kind": "release",
+      "provider": "codex",
+      "field": "version",
+      "before": "0.163.0",
+      "after": "0.164.0"
+    },
+    {
+      "kind": "release",
+      "provider": "codex",
+      "field": "sha256",
+      "before": "8813367285524ac798dd96d1b071aea30d58708c7226fd236cd275cf1cfdee31",
+      "after": "d8990e3ee7acfbc26f91265b12a1a83f0fee40d0e0f8f1f40a37d4ec21f499cf"
+    }
+  ],
+  "candidate": {
+    "format": "provider-release-candidate-v1",
+    "platform": "darwin/arm64",
+    "admitted": false,
+    "releases": {
+      "codex": {
+        "version": "0.164.0",
+        "sha256": "d8990e3ee7acfbc26f91265b12a1a83f0fee40d0e0f8f1f40a37d4ec21f499cf"
+      },
+      "claude": {
+        "version": "2.1.311",
+        "sha256": "85d8c08707fcfd1e78ffa0204eefbc6ec9e4fe22f375fb2767ef85d957ed3161"
+      },
+      "muse": {
+        "version": "1.4.13-R6996.1",
+        "sha256": "9fd40ae9c6dfb847e3ef58b61405c004d0ebbf19ceb0297be966f750b3b84aa0"
+      }
+    }
+  },
+  "verdict_drift": "not measured by a pin manifest"
+}
