@@ -2,6 +2,8 @@ package ciworkflow
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -109,4 +111,16 @@ func TestWindowsShardsWiring(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Windows checkout line endings must leave every positive and negative shard
+// wiring control executable, including the existing Race controls.
+func TestShardControlsWithCRLFCheckout(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ci.yml")
+	if err := os.WriteFile(path, []byte(strings.ReplaceAll(string(workflowBytes(t)), "\n", "\r\n")), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CI_WORKFLOW_UNDER_TEST", path)
+	t.Run("race", TestEnvprofileRaceWiring)
+	t.Run("windows", TestWindowsShardsWiring)
 }

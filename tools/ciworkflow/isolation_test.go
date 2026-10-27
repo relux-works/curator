@@ -65,7 +65,9 @@ func workflowBytes(t *testing.T) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return data
+	// Mutation controls use LF snippets; Windows Git checkouts may use CRLF.
+	// YAML semantics are identical, so normalize before applying the plants.
+	return []byte(strings.ReplaceAll(string(data), "\r\n", "\n"))
 }
 
 func checkIsolation(data []byte) error {

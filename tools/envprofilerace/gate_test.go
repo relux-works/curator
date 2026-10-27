@@ -13,6 +13,9 @@ import (
 // envprofile, and apply the real platform gate to required subcases. The Go
 // launcher/planner are bounded stand-ins; merge validation is tested separately.
 func TestGateUsesVerifiedShardUnion(t *testing.T) {
+	// A Windows aggregate must not leak its lane into this Race fixture.
+	t.Setenv("CI_WINDOWS_TEST_SHARDS", "ambient-windows-shards")
+	t.Setenv("GO_TEST_TIMEOUT", "120m")
 	for _, control := range []string{"valid", "merge-refused", "missing-required-subcase"} {
 		t.Run(control, func(t *testing.T) {
 			dir := t.TempDir()
@@ -82,7 +85,7 @@ esac
 			cmd.Env = append(os.Environ(),
 				"GO="+filepath.ToSlash(filepath.Join(dir, "fake-go")),
 				"CURATOR_CONFORMANCE_ROOT="+filepath.ToSlash(dir),
-				"CI_ENVPROFILE_SHARDS=shards", "GO_TEST_FLAGS=-race",
+				"CI_ENVPROFILE_SHARDS=shards", "CI_WINDOWS_TEST_SHARDS=", "GO_TEST_FLAGS=-race", "GO_TEST_TIMEOUT=60m",
 				"CI_PLATFORM_CASES=ledger.tsv", "CI_SKIP_CLASSES=classes.tsv",
 				"CI_GATE_GOOS=linux", "FIXTURE_ROOT="+filepath.ToSlash(dir), "MERGE_REFUSED=0")
 			if control == "merge-refused" {
