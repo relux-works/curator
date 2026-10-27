@@ -297,7 +297,7 @@ func (lock *Lock) Validate() error {
 		if schemaVersion == SchemaVersion5 && member.Source != "" && !validSkillSource(member.Source) {
 			return fmt.Errorf("profile_skill_plan_invalid: noncanonical member source")
 		}
-		if member.Directory != "" && !(schemaVersion == SchemaVersion5 && member.Kind == KindSkill && member.Directory == ".") && !identifiers.PortablePath(member.Directory) {
+		if member.Directory != "" && (schemaVersion != SchemaVersion5 || member.Kind != KindSkill || member.Directory != ".") && !identifiers.PortablePath(member.Directory) {
 			return fmt.Errorf("member %s directory %q is not a portable path", member.Name, member.Directory)
 		}
 		if member.Kind == KindSkill {
@@ -542,7 +542,7 @@ func Parse(payload []byte) (*Lock, error) {
 		}
 		var directory string
 		if member.Directory != nil {
-			if err := json.Unmarshal(member.Directory, &directory); err != nil || (!(schemaVersion == SchemaVersion5 && member.Kind == KindSkill && directory == ".") && !identifiers.PortablePath(directory)) {
+			if err := json.Unmarshal(member.Directory, &directory); err != nil || ((schemaVersion != SchemaVersion5 || member.Kind != KindSkill || directory != ".") && !identifiers.PortablePath(directory)) {
 				return nil, fmt.Errorf("invalid lock: member %s directory must be a portable path", member.Name)
 			}
 		}

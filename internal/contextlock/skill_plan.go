@@ -23,6 +23,7 @@ type SkillPlan struct {
 	DirectConstraints []DirectConstraint `json:"direct_constraints"`
 }
 
+// SkillPin binds one selected skill package to exact source and content pins.
 type SkillPin struct {
 	Kind          string `json:"kind"`
 	Name          string `json:"name"`
@@ -33,16 +34,19 @@ type SkillPin struct {
 	ContentSHA256 string `json:"content_sha256"`
 }
 
+// SkillConsumer identifies the context, skill or machine owning an edge.
 type SkillConsumer struct {
 	Kind string `json:"kind"`
 	Name string `json:"name"`
 }
 
+// SkillRef records the exact declared tag or revision for an incoming edge.
 type SkillRef struct {
 	Kind  string `json:"kind"`
 	Value string `json:"value"`
 }
 
+// SkillEdge carries one dependency edge and its requested activation.
 type SkillEdge struct {
 	Consumer SkillConsumer `json:"consumer"`
 	Provider string        `json:"provider"`
@@ -51,6 +55,7 @@ type SkillEdge struct {
 	Commands []string      `json:"commands,omitempty"`
 }
 
+// DirectConstraint binds an overlapping direct declaration to its resolved pin.
 type DirectConstraint struct {
 	Name              string   `json:"name"`
 	Source            string   `json:"source"`
@@ -60,6 +65,7 @@ type DirectConstraint struct {
 	DeclarationSHA256 string   `json:"declaration_sha256"`
 }
 
+// Object returns the portable plan representation for canonical encoding.
 func (plan *SkillPlan) Object() map[string]any {
 	payload, _ := json.Marshal(plan)
 	var object map[string]any
@@ -69,6 +75,7 @@ func (plan *SkillPlan) Object() map[string]any {
 	return object
 }
 
+// Hash returns the SHA-256 binding over the plan's CCJ-1 representation.
 func (plan *SkillPlan) Hash() (string, error) {
 	payload, err := protocoljson.MarshalCanonical(plan.Object())
 	if err != nil {
@@ -77,6 +84,7 @@ func (plan *SkillPlan) Hash() (string, error) {
 	return HashBytes(payload), nil
 }
 
+// ParseSkillPlan strictly reads and validates the closed portable carrier.
 func ParseSkillPlan(payload []byte) (*SkillPlan, error) {
 	if err := protocoljson.Validate(payload); err != nil {
 		return nil, fmt.Errorf("profile_skill_plan_invalid: %w", err)
@@ -126,6 +134,7 @@ func validSkillRef(ref SkillRef, commit string) bool {
 	return false
 }
 
+// SkillEdgeKey orders edges by consumer kind, consumer name and provider.
 func SkillEdgeKey(edge SkillEdge) string {
 	return edge.Consumer.Kind + "\x00" + edge.Consumer.Name + "\x00" + edge.Provider
 }
