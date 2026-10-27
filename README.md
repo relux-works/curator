@@ -414,7 +414,25 @@ and uses `go run ./tools/envprofilerace -lane windows-test -mode merge -dir .tem
 to admit the complete per-package native inventories and actual completions.
 Only the resulting `.packages` list removes packages from execution; their full
 JSON still reaches the unchanged platform gate in `test-evidence-windows-latest`.
-Linux/macOS ordinary tests and all race selectors retain their previous behavior.
+All race selectors retain their previous behavior.
+
+The `-lane unix-test` mode reuses that same ordinary-test discovery, hash selector,
+execution and admission engine for Linux (three shards) and macOS (two shards).
+It runs the same three packages at the unchanged `60m` timeout and admits only
+package times strictly below `1800s`. Run
+`go run ./tools/envprofilerace -lane unix-test -shard 0 -dir .temp/ci-evidence/unix-shard`
+on the native platform; merge downloaded `unix-test-shard-<runner>-<index>`
+artifacts with
+`go run ./tools/envprofilerace -lane unix-test -mode merge -dir .temp/unix-test-shards -out .temp/unix-merged.json`.
+The existing Test job still executes every remaining package and enforces the
+unchanged full platform-case ledger against the original combined JSON. Native
+inventories, source/platform/lane, exact selectors, actual completions and budget
+are checked before package removal. New tests enter the stable hash automatically;
+missing or stale evidence fails admission. The five explicit native jobs share
+packages without a package matrix. Test commands use an absolute disposable HOME
+and clear Git, SSH, agent and XDG selectors. Outputs stay under `.temp/` and in
+uploaded artifacts, as for the Windows mode. Native runtime evidence is required
+in addition to tool and workflow fixture controls.
 
 The marker/snapshot schema regexp engine is pinned to regexp2 v1.11.5, which
 fixes stale timeout deadlines after idle. Run

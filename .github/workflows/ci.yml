@@ -236,9 +236,108 @@ jobs:
           path: .temp/ci-evidence/windows-shard/
           if-no-files-found: error
 
+  # Three Linux and two macOS jobs share all three packages; no package matrix.
+  unix-test-shards:
+    name: Unix tests (${{ matrix.os }}, shard ${{ matrix.shard }})
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, shard: 0}
+          - {os: ubuntu-latest, shard: 1}
+          - {os: ubuntu-latest, shard: 2}
+          - {os: macos-latest, shard: 0}
+          - {os: macos-latest, shard: 1}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Initialize private Go state
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash .github/ci/isolate-go-state.sh
+      - name: Checkout authoritative protocol suite
+        uses: actions/checkout@v4
+        with:
+          repository: relux-works/curator-spec
+          ref: ${{ env.SPEC_PIN }}
+          path: protocol-spec
+      - uses: actions/setup-go@v5
+        with:
+          cache: ${{ runner.environment != 'self-hosted' || runner.os != 'Linux' }}
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify pnpm pin matches Go constant
+        shell: bash
+        run: bash .github/ci/pnpm-pin-guard.sh
+
+      - name: Install pinned pnpm via npm
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Lane-local prefix: npm stages a REAL pnpm package root here, which
+          # the TestRealPinnedPNPM* cases need (they resolve the executable
+          # and stage dir(dir(entrypoint))). A corepack dispatcher shim
+          # provides no such root (rehearsal: MODULE_NOT_FOUND).
+          npm install -g --prefix "$RUNNER_TEMP/pnpm-prefix" "pnpm@${{ env.PNPM_PIN }}"
+          # npm lays out the global bin dir per platform ($prefix/bin on unix,
+          # the prefix root itself on Windows); prepend both so the pinned
+          # pnpm is first on PATH on every runner and outranks any ambient
+          # shim (macbook-iv run 35072267145).
+          echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
+          echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
+
+      - name: Verify rust pin matches Go constant
+        shell: bash
+        run: bash .github/ci/rust-pin-guard.sh
+
+      # rustup is the installer on every runner: the hosted images ship it,
+      # and the self-hosted runner gets it once per
+      # docs/self-hosted-runner-setup.md. The install step reads the channel
+      # from rust-toolchain.toml (verified above against
+      # internal/rustsource.SupportedRustToolchainVersion), installs exactly
+      # that toolchain, and prepends the rustup shim directory to PATH, so
+      # `rustc -vV` in the rustsource production cases resolves the pinned
+      # release instead of failing the lane (rose-air run 35121791685).
+      - name: Install pinned Rust toolchain via rustup
+        shell: bash
+        run: bash .github/ci/install-rust-toolchain.sh
+
+      - name: Verify Go toolchain identity
+        shell: bash
+        run: bash .github/ci/toolchain-identity.sh
+
+      - name: Run Unix shard (60m timeout, <30m per package)
+        shell: bash
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+        run: |
+          set -euo pipefail
+          test_home="$(mktemp -d)"
+          test_home="$(cd "$test_home" && pwd -P)"
+          [[ "$test_home" = /* ]]
+          env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS -u GIT_CONFIG_COUNT -u GIT_CONFIG_PARAMETERS -u CODEX_HOME -u CLAUDE_CONFIG_DIR -u PI_CODING_AGENT_DIR -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME HOME="$test_home" go run ./tools/envprofilerace -lane unix-test -shard ${{ matrix.shard }} -dir .temp/ci-evidence/unix-shard
+      - name: Upload Unix shard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unix-test-shard-${{ matrix.os }}-${{ matrix.shard }}
+          path: .temp/ci-evidence/unix-shard/
+          if-no-files-found: error
+      - name: Restore runner temporary tree permissions
+        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/restore-runner-tmp.sh
+
+
   test:
     if: ${{ !cancelled() }}
-    needs: windows-test-shards
+    needs: [windows-test-shards, unix-test-shards]
     name: Test (${{ matrix.os }})
     # Linux entries run on the repository's self-hosted Linux runners when the
     # LINUX_SELF_HOSTED repository variable is true, for pushes, dispatches and
@@ -429,13 +528,26 @@ jobs:
           CI_WINDOWS_TEST_SHARDS: .temp/windows-test-shards
         run: env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS -u GIT_CONFIG_COUNT -u GIT_CONFIG_PARAMETERS -u CODEX_HOME -u CLAUDE_CONFIG_DIR -u PI_CODING_AGENT_DIR -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME HOME="$(mktemp -d)" bash .github/ci/test-gate.sh .temp/ci-evidence/test
 
+      - name: Download Unix test shards
+        if: runner.os != 'Windows'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: unix-test-shard-${{ matrix.os }}-*
+          path: .temp/unix-test-shards
+
       - name: go test + platform-case gate
         if: runner.os != 'Windows'
         shell: bash
         env:
           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+          CI_UNIX_TEST_SHARDS: .temp/unix-test-shards
           GO_TEST_TIMEOUT: ${{ runner.os == 'Windows' && '120m' || '60m' }}
-        run: bash .github/ci/test-gate.sh .temp/ci-evidence/test
+        run: |
+          set -euo pipefail
+          test_home="$(mktemp -d)"
+          test_home="$(cd "$test_home" && pwd -P)"
+          [[ "$test_home" = /* ]]
+          env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS -u GIT_CONFIG_COUNT -u GIT_CONFIG_PARAMETERS -u CODEX_HOME -u CLAUDE_CONFIG_DIR -u PI_CODING_AGENT_DIR -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME HOME="$test_home" bash .github/ci/test-gate.sh .temp/ci-evidence/test
 
       - name: Upload gate evidence
         if: always()

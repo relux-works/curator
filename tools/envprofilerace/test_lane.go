@@ -10,22 +10,39 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"sort"
 	"strings"
 )
 
-const windowsShardCount = 4
-const windowsTimeout = "120m"
-const windowsMargin = 3600
+// All ordinary lanes share discovery, partitioning, execution and admission.
+// Windows keeps its measured four-shard/120m configuration unchanged.
+type testLane struct {
+	goos, lane, timeout string
+	shards, margin      int
+}
 
-var windowsPackages = []string{
+func ordinaryConfig(lane, goos string) (testLane, error) {
+	if lane == "windows-test" && goos == "windows" {
+		return testLane{goos, lane, "120m", 4, 3600}, nil
+	}
+	if lane == "unix-test" {
+		switch goos {
+		case "linux":
+			return testLane{goos, lane, "60m", 3, 1800}, nil
+		case "darwin":
+			return testLane{goos, lane, "60m", 2, 1800}, nil
+		}
+	}
+	return testLane{}, fmt.Errorf("%s lane does not support native %s", lane, goos)
+}
+
+var ordinaryPackages = []string{
 	"github.com/relux-works/curator/internal/envprofile",
 	"github.com/relux-works/curator/internal/install",
 	"github.com/relux-works/curator/cmd/curator",
 }
 
-type windowsManifest struct {
+type testManifest struct {
 	Commit, GOOS, Lane string
 	Shard              int
 	Inventories        map[string][]string
@@ -33,15 +50,15 @@ type windowsManifest struct {
 	ExitCode           int
 }
 
-// The three measured slow packages share four jobs. Hashing only the name
+// The three measured slow packages share native jobs. Hashing only the name
 // makes a union selector safe even when packages declare identical test names.
-func windowsPartition(tests map[string][]string) (map[string][][]string, error) {
-	if len(tests) != len(windowsPackages) {
-		return nil, fmt.Errorf("windows package inventory mismatch")
+func (c testLane) partition(tests map[string][]string) (map[string][][]string, error) {
+	if len(tests) != len(ordinaryPackages) {
+		return nil, fmt.Errorf("ordinary package inventory mismatch")
 	}
 	result := map[string][][]string{}
-	for _, p := range windowsPackages {
-		shards := make([][]string, windowsShardCount)
+	for _, p := range ordinaryPackages {
+		shards := make([][]string, c.shards)
 		seen := map[string]bool{}
 		for _, name := range tests[p] {
 			if name == "" || strings.Contains(name, "/") || seen[name] {
@@ -50,13 +67,14 @@ func windowsPartition(tests map[string][]string) (map[string][][]string, error) 
 			seen[name] = true
 			h := fnv.New64a()
 			_, _ = h.Write([]byte(name))
-			i := int(h.Sum64() % windowsShardCount)
+			// #nosec G115 -- Native configurations fix the positive shard count to 2, 3 or 4.
+			i := int(h.Sum64() % uint64(c.shards))
 			shards[i] = append(shards[i], name)
 		}
 		for i := range shards {
 			sort.Strings(shards[i])
 			if len(shards[i]) == 0 {
-				return nil, fmt.Errorf("empty Windows shard %d in %s", i, p)
+				return nil, fmt.Errorf("empty ordinary shard %d in %s", i, p)
 			}
 		}
 		result[p] = shards
@@ -64,9 +82,9 @@ func windowsPartition(tests map[string][]string) (map[string][][]string, error) 
 	return result, nil
 }
 
-func windowsSelector(parts map[string][][]string, shard int) string {
+func (c testLane) selector(parts map[string][][]string, shard int) string {
 	names := map[string]bool{}
-	for _, p := range windowsPackages {
+	for _, p := range ordinaryPackages {
 		for _, name := range parts[p][shard] {
 			names[name] = true
 		}
@@ -79,9 +97,9 @@ func windowsSelector(parts map[string][][]string, shard int) string {
 	return selector(list)
 }
 
-func windowsInventory() (map[string][]string, error) {
+func (c testLane) inventory() (map[string][]string, error) {
 	tests := map[string][]string{}
-	for _, p := range windowsPackages {
+	for _, p := range ordinaryPackages {
 		list, err := nativeInventory(p, false)
 		if err != nil {
 			return nil, err
@@ -91,9 +109,9 @@ func windowsInventory() (map[string][]string, error) {
 	return tests, nil
 }
 
-func validateWindowsStream(data []byte, parts map[string][][]string, shard int) error {
+func (c testLane) validateStream(data []byte, parts map[string][][]string, shard int) error {
 	streams := map[string]*bytes.Buffer{}
-	for _, p := range windowsPackages {
+	for _, p := range ordinaryPackages {
 		streams[p] = &bytes.Buffer{}
 	}
 	dec := json.NewDecoder(bytes.NewReader(data))
@@ -103,7 +121,7 @@ func validateWindowsStream(data []byte, parts map[string][][]string, shard int) 
 			if err == io.EOF {
 				break
 			}
-			return fmt.Errorf("invalid Windows test JSON: %w", err)
+			return fmt.Errorf("invalid ordinary test JSON: %w", err)
 		}
 		var e event
 		if err := json.Unmarshal(raw, &e); err != nil {
@@ -111,41 +129,41 @@ func validateWindowsStream(data []byte, parts map[string][][]string, shard int) 
 		}
 		stream, ok := streams[e.Package]
 		if !ok {
-			return fmt.Errorf("unexpected Windows package %q", e.Package)
+			return fmt.Errorf("unexpected ordinary package %q", e.Package)
 		}
 		stream.Write(raw)
 		stream.WriteByte('\n')
 	}
-	for _, p := range windowsPackages {
-		elapsed, err := validatePackageStream(streams[p].Bytes(), parts[p][shard], p, windowsMargin)
+	for _, p := range ordinaryPackages {
+		elapsed, err := validatePackageStream(streams[p].Bytes(), parts[p][shard], p, float64(c.margin))
 		if err != nil {
 			return fmt.Errorf("%s: %w", p, err)
 		}
-		fmt.Printf("windows-test: shard %d %s: %d tests, %.3fs (<%ds)\n", shard, p, len(parts[p][shard]), elapsed, windowsMargin)
+		fmt.Printf("%s: shard %d %s: %d tests, %.3fs (<%ds)\n", c.lane, shard, p, len(parts[p][shard]), elapsed, c.margin)
 	}
 	return nil
 }
 
-func runWindowsShard(dir string, shard int, tests map[string][]string, commit string) error {
-	if shard < 0 || shard >= windowsShardCount {
-		return fmt.Errorf("windows shard must be 0..%d", windowsShardCount-1)
+func (c testLane) run(dir string, shard int, tests map[string][]string, commit string) error {
+	if shard < 0 || shard >= c.shards {
+		return fmt.Errorf("ordinary shard must be 0..%d", c.shards-1)
 	}
-	parts, err := windowsPartition(tests)
+	parts, err := c.partition(tests)
 	if err != nil {
 		return err
 	}
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	m := windowsManifest{Commit: commit, GOOS: "windows", Lane: "windows-test", Shard: shard, Inventories: tests, Selector: windowsSelector(parts, shard)}
+	m := testManifest{Commit: commit, GOOS: c.goos, Lane: c.lane, Shard: shard, Inventories: tests, Selector: c.selector(parts, shard)}
 	// #nosec G304 -- The CLI evidence directory is the explicit output boundary.
 	stream, err := os.Create(filepath.Join(dir, "go-test.json"))
 	if err != nil {
 		return err
 	}
-	args := []string{"test", "-json", "-count=1", "-timeout=" + windowsTimeout, "-run", m.Selector}
+	args := []string{"test", "-json", "-count=1", "-timeout=" + c.timeout, "-run", m.Selector}
 	// #nosec G204 -- Fixed packages and an escaped native-name selector; no shell.
-	cmd := exec.Command("go", append(args, windowsPackages...)...)
+	cmd := exec.Command("go", append(args, ordinaryPackages...)...)
 	cmd.Stdout, cmd.Stderr = stream, os.Stderr
 	runErr := cmd.Run()
 	if err := stream.Close(); err != nil {
@@ -169,11 +187,11 @@ func runWindowsShard(dir string, shard int, tests map[string][]string, commit st
 	if err != nil {
 		return err
 	}
-	return validateWindowsStream(data, parts, shard)
+	return c.validateStream(data, parts, shard)
 }
 
-func mergeWindowsEvidence(dir, out string, tests map[string][]string, commit string) error {
-	parts, err := windowsPartition(tests)
+func (c testLane) merge(dir, out string, tests map[string][]string, commit string) error {
+	parts, err := c.partition(tests)
 	if err != nil {
 		return err
 	}
@@ -181,8 +199,8 @@ func mergeWindowsEvidence(dir, out string, tests map[string][]string, commit str
 	if err != nil {
 		return err
 	}
-	if len(paths) != windowsShardCount {
-		return fmt.Errorf("want %d Windows manifests, got %d", windowsShardCount, len(paths))
+	if len(paths) != c.shards {
+		return fmt.Errorf("want %d ordinary manifests, got %d", c.shards, len(paths))
 	}
 	seen := map[int]bool{}
 	var merged bytes.Buffer
@@ -192,48 +210,45 @@ func mergeWindowsEvidence(dir, out string, tests map[string][]string, commit str
 		if err != nil {
 			return err
 		}
-		var m windowsManifest
+		var m testManifest
 		if err := json.Unmarshal(data, &m); err != nil {
 			return err
 		}
-		if m.Shard < 0 || m.Shard >= windowsShardCount || seen[m.Shard] {
-			return fmt.Errorf("invalid or duplicate Windows shard %d", m.Shard)
+		if m.Shard < 0 || m.Shard >= c.shards || seen[m.Shard] {
+			return fmt.Errorf("invalid or duplicate ordinary shard %d", m.Shard)
 		}
 		seen[m.Shard] = true
-		if m.Commit != commit || m.GOOS != "windows" || m.Lane != "windows-test" || m.ExitCode != 0 || !reflect.DeepEqual(m.Inventories, tests) || m.Selector != windowsSelector(parts, m.Shard) {
-			return fmt.Errorf("windows shard %d: source/platform/lane/inventory/selector/exit mismatch", m.Shard)
+		if m.Commit != commit || m.GOOS != c.goos || m.Lane != c.lane || m.ExitCode != 0 || !reflect.DeepEqual(m.Inventories, tests) || m.Selector != c.selector(parts, m.Shard) {
+			return fmt.Errorf("ordinary shard %d: source/platform/lane/inventory/selector/exit mismatch", m.Shard)
 		}
 		data, err = os.ReadFile(filepath.Join(filepath.Dir(path), "go-test.json"))
 		if err != nil {
 			return err
 		}
-		if err := validateWindowsStream(data, parts, m.Shard); err != nil {
+		if err := c.validateStream(data, parts, m.Shard); err != nil {
 			return err
 		}
 		merged.Write(data)
 		merged.WriteByte('\n')
 	}
 	// The shell gate uses only this admitted package list to filter execution.
-	if err := os.WriteFile(out+".packages", []byte(strings.Join(windowsPackages, "\n")+"\n"), 0644); err != nil {
+	if err := os.WriteFile(out+".packages", []byte(strings.Join(ordinaryPackages, "\n")+"\n"), 0644); err != nil {
 		return err
 	}
 	if err := os.WriteFile(out, merged.Bytes(), 0644); err != nil {
 		return err
 	}
-	for _, p := range windowsPackages {
-		fmt.Printf("windows-test: union equals full native list: %s: %d tests\n", p, len(tests[p]))
+	for _, p := range ordinaryPackages {
+		fmt.Printf("%s: union equals full native list: %s: %d tests\n", c.lane, p, len(tests[p]))
 	}
 	return nil
 }
 
-func windowsLane(mode, dir, out string, shard int) error {
-	if runtime.GOOS != "windows" {
-		return fmt.Errorf("windows-test lane requires native Windows")
-	}
+func (c testLane) execute(mode, dir, out string, shard int) error {
 	if mode != "run" && mode != "merge" {
-		return fmt.Errorf("unknown Windows mode %q", mode)
+		return fmt.Errorf("unknown ordinary mode %q", mode)
 	}
-	tests, err := windowsInventory()
+	tests, err := c.inventory()
 	if err != nil {
 		return err
 	}
@@ -242,7 +257,7 @@ func windowsLane(mode, dir, out string, shard int) error {
 		return err
 	}
 	if mode == "merge" {
-		return mergeWindowsEvidence(dir, out, tests, commit)
+		return c.merge(dir, out, tests, commit)
 	}
-	return runWindowsShard(dir, shard, tests, commit)
+	return c.run(dir, shard, tests, commit)
 }

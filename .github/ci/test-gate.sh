@@ -33,6 +33,8 @@
 #                            replacing envprofile with their combined JSON
 #   CI_WINDOWS_TEST_SHARDS   four native Windows test artifacts for the three
 #                            measured slow packages; admits their complete union
+#   CI_UNIX_TEST_SHARDS      native Linux/macOS ordinary artifacts, verified by
+#                            the same admission engine at the unchanged 60m budget
 #
 # The gate never rewrites, relaxes or retries a failing run.
 
@@ -111,28 +113,45 @@ run_stage() {
 
 TEST_RC=0
 
-if [ -n "${CI_WINDOWS_TEST_SHARDS:-}" ]; then
-	if [ -n "${GO_TEST_FLAGS:-}" ] || [ "$GO_TEST_TIMEOUT" != '120m' ] ||
-		[ -n "${CI_ENVPROFILE_SHARDS:-}" ]; then
-		echo 'test-gate: Windows shard evidence requires the ordinary 120m lane' >&2
+if [ -n "${CI_WINDOWS_TEST_SHARDS:-}${CI_UNIX_TEST_SHARDS:-}" ]; then
+	if [ -n "${CI_WINDOWS_TEST_SHARDS:-}" ] && [ -n "${CI_UNIX_TEST_SHARDS:-}" ]; then
+		echo 'test-gate: ordinary shard lanes are mutually exclusive' >&2
 		exit 2
 	fi
-	"$GO" run ./tools/envprofilerace -lane windows-test -mode merge \
-		-dir "$CI_WINDOWS_TEST_SHARDS" -out "$EVIDENCE/windows-merged.json" || exit 1
+	shard_lane=windows-test
+	shard_label=Windows
+	shard_dir="${CI_WINDOWS_TEST_SHARDS:-}"
+	shard_timeout=120m
+	shard_tag=windows
+	if [ -n "${CI_UNIX_TEST_SHARDS:-}" ]; then
+		shard_lane=unix-test
+		shard_label=Unix
+		shard_dir="$CI_UNIX_TEST_SHARDS"
+		shard_timeout=60m
+		shard_tag=unix
+	fi
+	if [ -n "${GO_TEST_FLAGS:-}" ] || [ "$GO_TEST_TIMEOUT" != "$shard_timeout" ] ||
+		[ -n "${CI_ENVPROFILE_SHARDS:-}" ]; then
+		echo "test-gate: $shard_label shard evidence requires the ordinary $shard_timeout lane" >&2
+		exit 2
+	fi
+	merged="$EVIDENCE/$shard_tag-merged.json"
+	"$GO" run ./tools/envprofilerace -lane "$shard_lane" -mode merge \
+		-dir "$shard_dir" -out "$merged" || exit 1
 	while IFS= read -r package; do
 		if ! grep -qxF "$package" "$SERVED"; then
-			echo "test-gate: admitted Windows package is not served: $package" >&2
+			echo "test-gate: admitted $shard_label package is not served: $package" >&2
 			exit 2
 		fi
-	done <"$EVIDENCE/windows-merged.json.packages"
-	cat "$EVIDENCE/windows-merged.json" >>"$JSON"
-	grep -vxF -f "$EVIDENCE/windows-merged.json.packages" "$SERVED" >"$EVIDENCE/plan-served-windows-remaining.txt"
-	SERVED="$EVIDENCE/plan-served-windows-remaining.txt"
+	done <"$merged.packages"
+	cat "$merged" >>"$JSON"
+	grep -vxF -f "$merged.packages" "$SERVED" >"$EVIDENCE/plan-served-$shard_tag-remaining.txt"
+	SERVED="$EVIDENCE/plan-served-$shard_tag-remaining.txt"
 fi
 
 # Race jobs execute envprofile on separate runners. Admit only a complete,
 # same-head/platform union, then keep its subtests in the ordinary platform gate.
-# Other lanes still execute the unpartitioned package.
+# Without admitted artifacts the gate executes the unpartitioned package.
 if [ -n "${CI_ENVPROFILE_SHARDS:-}" ]; then
 	if [ "${GO_TEST_FLAGS:-}" != '-race' ] ||
 		! grep -qxF "$MODULE/internal/envprofile" "$SERVED"; then

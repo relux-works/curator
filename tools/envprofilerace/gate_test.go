@@ -85,7 +85,7 @@ esac
 			cmd.Env = append(os.Environ(),
 				"GO="+filepath.ToSlash(filepath.Join(dir, "fake-go")),
 				"CURATOR_CONFORMANCE_ROOT="+filepath.ToSlash(dir),
-				"CI_ENVPROFILE_SHARDS=shards", "CI_WINDOWS_TEST_SHARDS=", "GO_TEST_FLAGS=-race", "GO_TEST_TIMEOUT=60m",
+				"CI_ENVPROFILE_SHARDS=shards", "CI_WINDOWS_TEST_SHARDS=", "CI_UNIX_TEST_SHARDS=", "GO_TEST_FLAGS=-race", "GO_TEST_TIMEOUT=60m",
 				"CI_PLATFORM_CASES=ledger.tsv", "CI_SKIP_CLASSES=classes.tsv",
 				"CI_GATE_GOOS=linux", "FIXTURE_ROOT="+filepath.ToSlash(dir), "MERGE_REFUSED=0")
 			if control == "merge-refused" {

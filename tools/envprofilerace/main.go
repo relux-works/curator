@@ -293,15 +293,19 @@ func mergeEvidence(dir, out string, tests []string, commit, goos string) error {
 }
 
 func main() {
-	lane := flag.String("lane", "race", "race or windows-test")
+	lane := flag.String("lane", "race", "race, windows-test or unix-test")
 	mode := flag.String("mode", "run", "run or merge")
 	dir := flag.String("dir", "", "shard output, or downloaded artifact directory")
 	out := flag.String("out", "", "merged JSON output")
 	shard := flag.Int("shard", -1, "zero-based shard index")
 	flag.Parse()
 	var err error
-	if *lane == "windows-test" {
-		err = windowsLane(*mode, *dir, *out, *shard)
+	if *lane == "windows-test" || *lane == "unix-test" {
+		var config testLane
+		config, err = ordinaryConfig(*lane, runtime.GOOS)
+		if err == nil {
+			err = config.execute(*mode, *dir, *out, *shard)
+		}
 	} else if *lane != "race" {
 		err = fmt.Errorf("unknown lane %q", *lane)
 	} else {

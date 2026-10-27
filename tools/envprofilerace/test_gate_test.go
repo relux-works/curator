@@ -9,11 +9,8 @@ import (
 	"testing"
 )
 
-// Real shell gates must consume all admitted packages, reject unserved or
-// failed admission before testing, and catch a missing required Windows child.
-// The bounded Go/planner stand-ins do not claim native Windows execution.
-func TestWindowsGateUnion(t *testing.T) {
-	for _, control := range []string{"valid", "merge-refused", "unserved", "missing-required-subcase"} {
+func testOrdinaryGateUnion(t *testing.T, c testLane) {
+	for _, control := range []string{"valid", "merge-refused", "unserved", "missing-required-subcase", "mixed-lanes", "wrong-timeout", "race-flags", "race-artifacts"} {
 		t.Run(control, func(t *testing.T) {
 			dir := t.TempDir()
 			if err := os.MkdirAll(filepath.Join(dir, ".github/ci"), 0755); err != nil {
@@ -34,16 +31,16 @@ func TestWindowsGateUnion(t *testing.T) {
 			}
 			write("go.mod", "module github.com/relux-works/curator\n")
 			write("manifest.json", "{}\n")
-			write("ledger.tsv", "internal/envprofile\tTestShard/windows-required\twindows\t-\t-\tWindows required child\n")
+			write("ledger.tsv", fmt.Sprintf("internal/envprofile\tTestShard/native-required\t%s\t-\t-\tNative required child\n", c.goos))
 			var stream strings.Builder
-			for _, p := range windowsPackages {
+			for _, p := range ordinaryPackages {
 				fmt.Fprintf(&stream, "{\"Action\":\"pass\",\"Package\":%q,\"Test\":\"TestShard\"}\n{\"Action\":\"pass\",\"Package\":%q,\"Elapsed\":42}\n", p, p)
 			}
 			if control != "missing-required-subcase" {
-				fmt.Fprintf(&stream, "{\"Action\":\"pass\",\"Package\":%q,\"Test\":\"TestShard/windows-required\"}\n", windowsPackages[0])
+				fmt.Fprintf(&stream, "{\"Action\":\"pass\",\"Package\":%q,\"Test\":\"TestShard/native-required\"}\n", ordinaryPackages[0])
 			}
 			write("union.json", stream.String())
-			write("packages.txt", strings.Join(windowsPackages, "\n")+"\n")
+			write("packages.txt", strings.Join(ordinaryPackages, "\n")+"\n")
 			write(".github/ci/suite-plan.sh", `#!/usr/bin/env bash
 set -eu
 mkdir -p "$2"
@@ -61,7 +58,7 @@ echo "$*" >>commands.txt
 case "$1" in
 run)
   [ "$2" = ./tools/envprofilerace ]
-  [ "$3" = -lane ] && [ "$4" = windows-test ]
+  [ "$3" = -lane ] && [ "$4" = "$LANE" ]
   [ "$5" = -mode ] && [ "$6" = merge ]
   [ "$7" = -dir ] && [ "$8" = shards ] && [ "$9" = -out ]
   [ "$CONTROL" != merge-refused ] || exit 17
@@ -81,17 +78,32 @@ esac
 			cmd.Dir = dir
 			cmd.Env = append(os.Environ(), "GO="+filepath.ToSlash(filepath.Join(dir, "fake-go")),
 				"CURATOR_CONFORMANCE_ROOT="+filepath.ToSlash(dir), "CONTROL="+control,
-				"CI_WINDOWS_TEST_SHARDS=shards", "CI_ENVPROFILE_SHARDS=", "GO_TEST_FLAGS=", "GO_TEST_TIMEOUT=120m",
-				"CI_GATE_GOOS=windows", "CI_PLATFORM_CASES=ledger.tsv")
+				"CI_WINDOWS_TEST_SHARDS=", "CI_UNIX_TEST_SHARDS=", "CI_ENVPROFILE_SHARDS=", "GO_TEST_FLAGS=", "GO_TEST_TIMEOUT="+c.timeout, "LANE="+c.lane,
+				"CI_GATE_GOOS="+c.goos, "CI_PLATFORM_CASES=ledger.tsv")
+			key := "CI_UNIX_TEST_SHARDS"
+			if c.goos == "windows" {
+				key = "CI_WINDOWS_TEST_SHARDS"
+			}
+			cmd.Env = append(cmd.Env, key+"=shards")
+			switch control {
+			case "mixed-lanes":
+				cmd.Env = append(cmd.Env, "CI_UNIX_TEST_SHARDS=shards", "CI_WINDOWS_TEST_SHARDS=shards")
+			case "wrong-timeout":
+				cmd.Env = append(cmd.Env, "GO_TEST_TIMEOUT=90m")
+			case "race-flags":
+				cmd.Env = append(cmd.Env, "GO_TEST_FLAGS=-race")
+			case "race-artifacts":
+				cmd.Env = append(cmd.Env, "CI_ENVPROFILE_SHARDS=shards")
+			}
 			out, err := cmd.CombinedOutput()
 			if control == "valid" {
 				if err != nil || !strings.Contains(string(out), "platform-case gate: ok") {
-					t.Fatalf("valid Windows union: %v\n%s", err, out)
+					t.Fatalf("valid native union: %v\n%s", err, out)
 				}
 				return
 			}
 			code := 1
-			if control == "unserved" {
+			if control == "unserved" || control == "mixed-lanes" || control == "wrong-timeout" || control == "race-flags" || control == "race-artifacts" {
 				code = 2
 			}
 			exit, ok := err.(*exec.ExitError)
@@ -99,15 +111,46 @@ esac
 				t.Fatalf("want intended exit %d, got %v\n%s", code, err, out)
 			}
 			if control == "missing-required-subcase" {
-				if !strings.Contains(string(out), "required case never ran on windows: internal/envprofile :: TestShard/windows-required") {
+				if !strings.Contains(string(out), "required case never ran on "+c.goos+": internal/envprofile :: TestShard/native-required") {
 					t.Fatalf("wrong subcase rejection: %s", out)
 				}
 			} else {
+				want := ""
+				switch control {
+				case "mixed-lanes":
+					want = "ordinary shard lanes are mutually exclusive"
+				case "wrong-timeout", "race-flags", "race-artifacts":
+					want = "shard evidence requires the ordinary " + c.timeout + " lane"
+				case "unserved":
+					want = "package is not served: " + ordinaryPackages[1]
+				}
+				if want != "" && !strings.Contains(string(out), want) {
+					t.Fatalf("wrong rejection: want %s: %s", want, out)
+				}
 				commands, err := os.ReadFile(filepath.Join(dir, "commands.txt"))
-				if err != nil || strings.Contains(string(commands), "test -json") {
+				if (err != nil && !os.IsNotExist(err)) || strings.Contains(string(commands), "test -json") {
 					t.Fatalf("tests ran after rejected admission: %s, %v", commands, err)
 				}
 			}
+		})
+	}
+}
+
+// The real shell and unchanged ledger gate admit complete native unions and
+// reject the intended missing-child/configuration controls on each platform.
+// Go execution/planning are bounded stand-ins; native CI supplies runtime proof.
+func TestOrdinaryGateUnion(t *testing.T) {
+	for _, goos := range []string{"windows", "linux", "darwin"} {
+		t.Run(goos, func(t *testing.T) {
+			lane := "unix-test"
+			if goos == "windows" {
+				lane = "windows-test"
+			}
+			c, err := ordinaryConfig(lane, goos)
+			if err != nil {
+				t.Fatal(err)
+			}
+			testOrdinaryGateUnion(t, c)
 		})
 	}
 }

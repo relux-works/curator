@@ -35,8 +35,8 @@ func checkTemporaryTreeRestore(data []byte) error {
 			return fmt.Errorf("%s: missing guarded final tmp restore", name)
 		}
 	}
-	if count != 8 {
-		return fmt.Errorf("expected eight Linux-routable jobs, got %d", count)
+	if count != 9 {
+		return fmt.Errorf("expected nine Linux-routable jobs, got %d", count)
 	}
 	return nil
 }
