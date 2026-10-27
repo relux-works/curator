@@ -51,15 +51,40 @@ func TestMain(m *testing.M) {
 	if name := filepath.Base(os.Args[0]); name == "git" || name == "git.exe" {
 		os.Exit(runMissingPinGit())
 	}
-	dir, err := os.MkdirTemp("", "curator-test-noconfig-*")
-	if err == nil {
-		// Never created: the loader maps an absent file to an empty policy.
-		_ = os.Setenv("CURATOR_CONFIG", filepath.Join(dir, "config.json"))
-		_ = os.Setenv("CURATOR_SYSTEM_CONFIG", "")
+	// BUG-261027-5t7pqj: inherited adapter roots must never escape the test HOME.
+	testHome, err := os.MkdirTemp("", "curator-package-home-*")
+	if err != nil {
+		panic(err)
+	}
+	// An explicit system-policy path is required to exist by config.Load.
+	// Use a neutral fixture, rather than an absent override or host policy.
+	if err := os.WriteFile(filepath.Join(testHome, "system-config.json"), []byte("{\"schema_version\":1}\n"), 0o600); err != nil {
+		panic(err)
+	}
+	for key, value := range map[string]string{
+		"HOME": testHome, "USERPROFILE": testHome,
+		"CURATOR_CONFIG": filepath.Join(testHome, "config.json"), "CURATOR_SYSTEM_CONFIG": filepath.Join(testHome, "system-config.json"),
+		"CLAUDE_CONFIG_DIR":       filepath.Join(testHome, ".claude"),
+		"CODEX_HOME":              filepath.Join(testHome, ".codex"),
+		"XDG_CONFIG_HOME":         filepath.Join(testHome, ".config"),
+		"XDG_STATE_HOME":          filepath.Join(testHome, ".local", "state"),
+		"PI_CODING_AGENT_DIR":     filepath.Join(testHome, ".pi"),
+		"CURATOR_GLOBAL_USER_BIN": filepath.Join(testHome, "bin"),
+	} {
+		if err := os.Setenv(key, value); err != nil {
+			panic(err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(testHome, "bin"), 0700); err != nil {
+		panic(err)
+	}
+	if err := os.Setenv("PATH", filepath.Join(testHome, "bin")+string(os.PathListSeparator)+os.Getenv("PATH")); err != nil {
+		panic(err)
 	}
 	restoreGitEnv := testgitenv.Isolate()
 	code := m.Run()
 	restoreGitEnv()
+	_ = os.RemoveAll(testHome)
 	os.Exit(code)
 }
 

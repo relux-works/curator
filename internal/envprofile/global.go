@@ -48,6 +48,9 @@ func globalSkillOperation(home string, policy Policy, machine envregistry.Machin
 }
 
 func globalSkillOperationWithOperation(home string, policy Policy, machine envregistry.MachineConfig, addition *DirectSkill, nativeHomeOf func(string) (string, error), borrowed *operation) (Info, error) {
+	if err := refusePreparedSkillPlanAdoption(home, ""); err != nil {
+		return Info{}, err
+	}
 	op, err := borrowed, error(nil)
 	if op == nil {
 		op, err = beginOperation(home)
@@ -84,6 +87,10 @@ func globalSkillOperationWithOperation(home string, policy Policy, machine envre
 	if err != nil {
 		return Info{}, err
 	}
+	if oldLock.SchemaVersion == contextlock.SchemaVersion5 {
+		return Info{}, RefuseSkillPlanAdoption()
+	}
+
 	manager := newGitManager(home).withPolicy(policy)
 	if err := fetchLockedSources(manager, oldLock); err != nil {
 		return Info{}, err
@@ -247,6 +254,9 @@ func globalSkillInput(home, profile string, source Source, oldLock *contextlock.
 // managed homes from its lock. It complements the native in-place pass in
 // SyncWithPolicy; both source the skill set from the same profile lock.
 func SyncManagedHomesWithPolicy(home string, policy Policy, machine envregistry.MachineConfig) ([]EntryResult, error) {
+	if err := refusePreparedSkillPlanAdoption(home, ""); err != nil {
+		return nil, err
+	}
 	if err := EnsureDefaultWithPolicy(home, policy); err != nil {
 		return nil, err
 	}
@@ -279,6 +289,10 @@ func preflightManagedProfile(home, profile string, policy Policy, machine envreg
 	if err != nil {
 		return err
 	}
+	if lock.SchemaVersion == contextlock.SchemaVersion5 {
+		return RefuseSkillPlanAdoption()
+	}
+
 	precedence := policy.Precedence()
 	for _, adapter := range envregistry.Registry {
 		// Muse is managed-home-only and is provisioned by an explicit resolve.

@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="904.5" height="836.2" viewBox="0 0 904.5 836.2">
+<title>MCP проекта: сначала пакеты, декларации в проекте только после одобрения; запись нативной конфигурации и запуск идут после проверки.</title>
+<rect width="904.5" height="836.2" fill="#ffffff"/>
+<g transform="translate(12 12)">
+<!-- graphviz 14.0.4 -->
+<!-- node start -->
+<circle cx="169.2" cy="47.2" r="11" fill="#3a3f47" class="box" data-id="start"/>
+<!-- node skillfile -->
+<rect x="223.9" y="0" width="230.6" height="94.3" rx="12" fill="#f6f7f9" stroke="#8b929c" stroke-width="2" class="box" data-id="skillfile"/>
+<text x="295" y="26.1" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Проектный</tspan></text>
+<text x="263.6" y="49.5" font-size="18" fill="#1f2328"><tspan font-family="PT Mono, monospace" font-weight="bold">Skillfile.json</tspan></text>
+<text x="239.9" y="78.1" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">версия 3, поле</tspan><tspan x="339.5" font-family="PT Mono, monospace">mcp_servers</tspan></text>
+<!-- node pkg -->
+<rect x="107.1" y="140.3" width="218.3" height="109.9" rx="12" fill="#ebf2ff" stroke="#2f6fdb" stroke-width="2" class="box" data-id="pkg"/>
+<text x="139.1" y="166.4" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Первый этап: пакет</tspan></text>
+<text x="151.2" y="195" font-size="15" fill="#4b5260"><tspan font-family="PT Mono, monospace">curator</tspan><tspan x="218.2" font-family="PT Mono, monospace">project</tspan></text>
+<text x="139.1" y="214.5" font-size="15" fill="#4b5260"><tspan font-family="PT Mono, monospace">resolve</tspan><tspan x="206.1" font-family="PT Mono, monospace">.</tspan><tspan x="215.1" font-family="PT Sans, sans-serif">: источники,</tspan></text>
+<text x="123.1" y="234" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">подписанты, отзывы и аудит</tspan></text>
+<!-- node lock -->
+<rect x="0" y="296.2" width="280.4" height="90.4" rx="12" fill="#e7f5f1" stroke="#11826d" stroke-width="2" class="box" data-id="lock"/>
+<text x="16" y="322.3" font-size="18" fill="#1f2328"><tspan font-family="PT Mono, monospace" font-weight="bold">Skillfile.mcp-lock.json</tspan></text>
+<text x="56.8" y="350.9" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">и защищённая локальная</tspan></text>
+<text x="92.5" y="370.4" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">запись Curator</tspan></text>
+<!-- node qapprove -->
+<rect x="372" y="160.8" width="172.4" height="68.8" rx="12" fill="#f6f7f9" stroke="#8b929c" stroke-width="2" class="box" data-id="qapprove"/>
+<text x="395.8" y="186.9" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Есть одобрение</tspan></text>
+<text x="388" y="210.3" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">имени в проекте?</tspan></text>
+<!-- node refuse -->
+<rect x="302.7" y="306" width="311" height="70.9" rx="12" fill="#fdeef3" stroke="#c8285f" stroke-width="2" class="box" data-id="refuse"/>
+<text x="435.7" y="332.1" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Отказ</tspan></text>
+<text x="318.7" y="360.6" font-size="15" fill="#4b5260"><tspan font-family="PT Mono, monospace">mcp_inline_approval_unsupported</tspan></text>
+<!-- node approve -->
+<rect x="635.9" y="296.2" width="244.5" height="90.4" rx="12" fill="#ebf2ff" stroke="#2f6fdb" stroke-width="2" class="box" data-id="approve"/>
+<text x="662.2" y="322.3" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Второй этап: одобрение</tspan></text>
+<text x="662.9" y="350.9" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">дайджест нормализованного</tspan></text>
+<text x="651.9" y="370.4" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">сервера, одобривший и потолок</tspan></text>
+<!-- node preflight -->
+<rect x="326.2" y="409.6" width="244.1" height="109.9" rx="12" fill="#ebf2ff" stroke="#2f6fdb" stroke-width="2" class="box" data-id="preflight"/>
+<text x="348.2" y="435.7" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Проверка до публикации</tspan></text>
+<text x="369.4" y="464.3" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">весь набор деклараций,</tspan></text>
+<text x="342.2" y="483.8" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">одобрения, политика и прежнее</tspan></text>
+<text x="347.3" y="503.3" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">содержимое нативных файлов</tspan></text>
+<!-- node writer -->
+<rect x="239.4" y="565.5" width="183.5" height="113.8" rx="12" fill="#ebf2ff" stroke="#2f6fdb" stroke-width="2" class="box" data-id="writer"/>
+<text x="255.4" y="591.6" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Писатель нативной</tspan></text>
+<text x="274.1" y="615" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">конфигурации</tspan></text>
+<text x="264.5" y="643.6" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">не запускает сервер</tspan></text>
+<text x="263.5" y="663.1" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">и не проверяет вход</tspan></text>
+<!-- node skipped -->
+<rect x="445.3" y="587" width="241.8" height="70.9" rx="12" fill="#f6f7f9" stroke="#8b929c" stroke-width="2" class="box" data-id="skipped"/>
+<text x="461.3" y="613.1" font-size="18" fill="#1f2328"><tspan font-family="PT Mono, monospace" font-weight="bold">skipped:</tspan><tspan x="552.3" font-family="PT Mono, monospace" font-weight="bold">unsupported</tspan></text>
+<text x="467.8" y="641.6" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">исход пары в отчёте, без пути</tspan></text>
+<!-- node launch -->
+<rect x="202.3" y="702.3" width="257.8" height="109.9" rx="12" fill="#ebf2ff" stroke="#2f6fdb" stroke-width="2" class="box" data-id="launch"/>
+<text x="218.3" y="728.4" font-size="18" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">Квалифицированный запуск</tspan></text>
+<text x="243.3" y="757" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">одобренный действующий</tspan></text>
+<text x="221.9" y="776.5" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">набор; строгий режим исключает</tspan></text>
+<text x="255.2" y="796" font-size="15" fill="#4b5260"><tspan font-family="PT Sans, sans-serif">нативные MCP проекта</tspan></text>
+<!-- link start -> skillfile -->
+<path d="M 180.5 47.2 C 192.4 47.2 204.3 47.2 216.2 47.2 L 217.6 47.2" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="start" data-to="skillfile" data-edge="e0"/>
+<polygon points="223.6,47.2 213.6,42.7 213.6,51.7" fill="#3a3f47"/>
+<!-- link skillfile -> pkg -->
+<path d="M 299.9 94.8 C 289.4 107.4 277.8 121.1 266.7 134.3 L 265.8 135.3" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="skillfile" data-to="pkg" data-edge="e1"/>
+<polygon points="261.9,139.9 271.8,135.2 264.9,129.4" fill="#3a3f47"/>
+<g class="label" data-edge="e1">
+<text x="292.7" y="121.8" font-size="15" fill="#1f2328"><tspan font-family="PT Mono, monospace" font-weight="bold">package</tspan></text>
+</g>
+<!-- link skillfile -> qapprove -->
+<path d="M 377.2 94.8 C 393 114.2 411.1 136.4 426.2 154.9 L 427 155.9" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="skillfile" data-to="qapprove" data-edge="e2"/>
+<polygon points="430.8,160.6 427.9,150 420.9,155.6" fill="#3a3f47"/>
+<g class="label" data-edge="e2">
+<text x="406.3" y="121.8" font-size="15" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">адрес или</tspan><tspan x="476.2" font-family="PT Mono, monospace" font-weight="bold">server</tspan></text>
+</g>
+<!-- link pkg -> lock -->
+<path d="M 187.7 250.3 C 180.9 263.1 173.8 276.7 167.1 289.4 L 166.5 290.6" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="pkg" data-to="lock" data-edge="e3"/>
+<polygon points="163.7,295.9 172.3,289.1 164.3,284.9" fill="#3a3f47"/>
+<!-- link qapprove -> refuse -->
+<path d="M 458.2 230.1 C 458.2 250.4 458.2 276.4 458.2 298.1 L 458.2 299.6" fill="none" stroke="#c8285f" stroke-width="2" class="edge" data-from="qapprove" data-to="refuse" data-edge="e4"/>
+<polygon points="458.2,305.6 462.7,295.6 453.7,295.6" fill="#c8285f"/>
+<g class="label" data-edge="e4">
+<text x="466.2" y="278.7" font-size="15" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">нет</tspan></text>
+</g>
+<!-- link qapprove -> approve -->
+<path d="M 528.5 230.1 C 567.3 248.7 616.1 272.1 658.8 292.6 L 659.9 293.2" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="qapprove" data-to="approve" data-edge="e5"/>
+<polygon points="665.3,295.8 658.2,287.4 654.3,295.5" fill="#3a3f47"/>
+<g class="label" data-edge="e5">
+<text x="634.5" y="268.8" font-size="15" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">да</tspan></text>
+</g>
+<!-- link lock -> preflight -->
+<path d="M 253.6 387 C 274.9 395.4 297.3 404.2 319 412.7 L 320.2 413.2" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="lock" data-to="preflight" data-edge="e6"/>
+<polygon points="325.7,415.4 318.1,407.5 314.8,415.9" fill="#3a3f47"/>
+<!-- link approve -> preflight -->
+<path d="M 644.1 387 C 622.4 395.5 599.6 404.4 577.5 413 L 576.3 413.5" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="approve" data-to="preflight" data-edge="e7"/>
+<polygon points="570.7,415.7 581.6,416.2 578.3,407.9" fill="#3a3f47"/>
+<!-- link preflight -> writer -->
+<path d="M 363.8 519.8 C 360.7 523.2 357.8 526.8 355.2 530.5 C 349.4 538.8 345 548.4 341.7 558.2 L 341.2 559.6" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="preflight" data-to="writer" data-edge="e8"/>
+<polygon points="339.4,565.3 346.7,557.1 338.1,554.5" fill="#3a3f47"/>
+<g class="label" data-edge="e8">
+<text x="359.4" y="547" font-size="15" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">писатель квалифицирован</tspan></text>
+</g>
+<!-- link preflight -> skipped -->
+<path d="M 531.6 519.9 C 534.7 523.3 537.6 526.8 540.2 530.5 C 550.4 544.9 556.6 563.3 560.4 579.7 L 560.7 580.8" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="preflight" data-to="skipped" data-edge="e9"/>
+<polygon points="561.9,586.6 564.2,575.9 555.4,577.8" fill="#3a3f47"/>
+<g class="label" data-edge="e9">
+<text x="565.8" y="563.9" font-size="15" fill="#1f2328"><tspan font-family="PT Sans, sans-serif" font-weight="bold">писателя нет</tspan></text>
+</g>
+<!-- link writer -> launch -->
+<path d="M 331.2 679.8 C 331.2 684.7 331.2 689.7 331.2 694.7 L 331.2 696" fill="none" stroke="#3a3f47" stroke-width="2" class="edge" data-from="writer" data-to="launch" data-edge="e10"/>
+<polygon points="331.2,702 335.7,692 326.7,692" fill="#3a3f47"/>
+</g>
+</svg>

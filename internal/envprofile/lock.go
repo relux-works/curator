@@ -15,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/projectlease"
+	"github.com/relux-works/curator/internal/skillruntime"
 	"github.com/relux-works/curator/internal/staging"
 	"github.com/relux-works/curator/internal/transaction"
 )
@@ -32,7 +33,8 @@ type operation struct {
 		AssertCurrent() error
 		Close() error
 	}
-	engine *transaction.Engine
+	engine         *transaction.Engine
+	journalWitness transaction.HomeLock
 	// Prepared under this lock before recovery or repair publication.
 	claudePrepared *claudeSeedPlan
 	recovered      bool
@@ -41,7 +43,7 @@ type operation struct {
 
 // newOperationEngine keeps recovery observation available to entry-point tests.
 var newOperationEngine = func(home string, options ...transaction.Option) (*transaction.Engine, error) {
-	return transaction.New(home, append(options, transaction.WithCommitCheck(projectlease.TransactionCheck(home)))...)
+	return transaction.New(home, append([]transaction.Option{transaction.WithCommitCheck(projectlease.TransactionCheck(home))}, options...)...)
 }
 
 // beginCaptureOperation never provisions a home or invokes recovery. The
@@ -96,7 +98,22 @@ func beginOperation(home string, options ...transaction.Option) (*operation, err
 
 // beginOperationValidated checks read-only inputs under the lock before journal
 // recovery can write. All mutations also validate manager-wide authority.
-func beginOperationValidated(home string, validate func() error, options ...transaction.Option) (*operation, error) {
+func beginOperationValidated(home string, validateInputs func() error, options ...transaction.Option) (*operation, error) {
+	if err := skillruntime.RefuseUnadmitted(home); err != nil {
+		return nil, err
+	}
+	return beginOperationChecked(home, validateInputs, nil, options...)
+}
+
+func beginOperationAdmitted(home string, revalidateAdmission func() error) (*operation, error) {
+	if revalidateAdmission == nil {
+		return nil, fmt.Errorf("profile_skill_routing_unproven: missing routing admission")
+	}
+	return beginOperationChecked(home, nil, revalidateAdmission)
+}
+
+func beginOperationChecked(home string, validateInputs, revalidateAdmission func() error, options ...transaction.Option) (*operation, error) {
+	admitted := revalidateAdmission != nil
 	// Refuse before even creating mutation-lock state in an existing node home.
 	if err := envauthority.Validate(home); err != nil {
 		return nil, err
@@ -111,31 +128,77 @@ func beginOperationValidated(home string, validate func() error, options ...tran
 	if err != nil {
 		return nil, fmt.Errorf("%s: acquire the manager-home mutation lock: %v", DiagLockUnavailable, err)
 	}
+	if !admitted {
+		if err := skillruntime.RefuseUnadmitted(home); err != nil {
+			_ = lock.Close()
+			return nil, err
+		}
+	}
 	// Authority may have changed while waiting for the lock.
 	if err := envauthority.Validate(home); err != nil {
 		_ = lock.Close()
 		return nil, err
 	}
-	if validate != nil {
-		if err := validate(); err != nil {
+	// Input snapshots may include transaction targets. Check them only before
+	// recovery: their own backup/install states are not external input drift.
+	// Publication plans freeze non-target inputs separately in ReadInputs.
+	if validateInputs != nil {
+		if err := validateInputs(); err != nil {
 			_ = lock.Close()
 			return nil, err
 		}
 	}
+	if revalidateAdmission != nil {
+		if err := revalidateAdmission(); err != nil {
+			_ = lock.Close()
+			return nil, err
+		}
+	}
+	// Keep the admission live for recovery, every swap and rollback. The
+	// ordinary project-lease check remains in the combined check as well.
+	options = append(options, transaction.WithCommitCheck(func(w transaction.HomeLock, j transaction.Journal) error {
+		if !admitted {
+			if err := skillruntime.RefuseUnadmitted(home); err != nil {
+				return err
+			}
+		}
+		if revalidateAdmission != nil {
+			if err := revalidateAdmission(); err != nil {
+				return err
+			}
+		}
+		return projectlease.TransactionCheck(home)(w, j)
+	}))
 	engine, err := newOperationEngine(home, options...)
 	if err != nil {
 		_ = lock.Close()
 		return nil, err
 	}
-	recovered, err := projectlease.RecoverUnderLock(home, lock, engine)
+	var recovered bool
+	var journalWitness transaction.HomeLock = lock
+	if admitted {
+		// The exclusive Slice A domain cannot share legacy project-lease lifecycle
+		// recovery. A joint supervisor/lease adapter is a later integration gate.
+		if projectlease.HasState(home) {
+			_ = lock.Close()
+			return nil, fmt.Errorf("profile_skill_routing_unproven: isolated domain has project-lease state")
+		}
+		journalWitness = &routingHomeLock{underlying: lock, validate: revalidateAdmission}
+		recovered, err = engine.RecoverWithOutcome(journalWitness)
+	} else {
+		recovered, err = projectlease.RecoverUnderLock(home, lock, engine)
+	}
 	if err != nil {
 		_ = lock.Close()
 		if isCredentialRefusal(err) {
 			return nil, err
 		}
+		if admitted {
+			return nil, fmt.Errorf("profile_skill_recovery_failed: %w", err)
+		}
 		return nil, fmt.Errorf("recover incomplete profile transactions: %w", err)
 	}
-	op := &operation{lock: lock, engine: engine, recovered: recovered}
+	op := &operation{lock: lock, engine: engine, recovered: recovered, journalWitness: journalWitness}
 	// Previously durable intent may itself replace the authority marker.
 	if err := envauthority.Validate(home); err != nil {
 		_ = op.close()
@@ -172,6 +235,10 @@ func (op *operation) publish(files map[string][]byte, removals ...string) error 
 // publishProtected adds planning-time boundary identities and a current-input
 // check to the existing journal publisher. Legacy profile calls remain nil.
 func (op *operation) publishProtected(files map[string][]byte, boundaries *staging.Boundaries, validate func() error, removals ...string) error {
+	return op.publishCombined(files, boundaries, validate, skillruntime.Publication{}, removals...)
+}
+
+func (op *operation) publishCombined(files map[string][]byte, boundaries *staging.Boundaries, validate func() error, runtime skillruntime.Publication, removals ...string) error {
 	for path := range files {
 		if err := op.capture(path); err != nil {
 			return err
@@ -180,7 +247,7 @@ func (op *operation) publishProtected(files map[string][]byte, boundaries *stagi
 	if err := op.capture(removals...); err != nil {
 		return err
 	}
-	if len(files) == 0 && len(removals) == 0 {
+	if len(files) == 0 && len(removals) == 0 && len(runtime.Plan.Targets) == 0 {
 		return nil
 	}
 	type change struct {
@@ -209,7 +276,19 @@ func (op *operation) publishProtected(files map[string][]byte, boundaries *stagi
 			_ = os.Remove(temp)
 		}
 	}()
-	plan := transaction.Plan{TransactionID: newTransactionID(), ProjectIdentity: "profiles"}
+	plan := transaction.Plan{TransactionID: newTransactionID(), ProjectIdentity: "profiles", ReferencedBuildKeys: runtime.ReferencedBuildKeys}
+	for _, staged := range runtime.Plan.Targets {
+		if staged.StagedPath != "" {
+			if err := os.MkdirAll(filepath.Dir(staged.LivePath), 0700); err != nil {
+				return err
+			}
+		}
+		preimage, err := transaction.DigestTarget(transaction.TargetKind(staged.Kind), staged.LivePath)
+		if err != nil {
+			return err
+		}
+		plan.Targets = append(plan.Targets, transaction.Target{Class: staged.Class, Identifier: staged.Identifier, Kind: transaction.TargetKind(staged.Kind), LivePath: staged.LivePath, StagedSource: staged.StagedPath, PreimageDigest: preimage, PrivateFile: staged.Class == "84-profile-generation" || staged.Class == "85-profile-routing"})
+	}
 	for _, item := range changes {
 		live := item.path
 		if err := os.MkdirAll(filepath.Dir(live), 0o755); err != nil {
@@ -219,8 +298,12 @@ func (op *operation) publishProtected(files map[string][]byte, boundaries *stagi
 		if err != nil {
 			return fmt.Errorf("read the current state of %s: %w", live, err)
 		}
+		class := "profile"
+		if live == CurrentFile(filepath.Dir(filepath.Dir(live))) {
+			class = "zz-profile-current"
+		}
 		target := transaction.Target{
-			Class: "profile", Identifier: live, Kind: transaction.KindBytes,
+			Class: class, Identifier: live, Kind: transaction.KindBytes,
 			LivePath: live, PreimageDigest: preimage,
 		}
 		if !item.remove {
@@ -245,6 +328,21 @@ func (op *operation) publishProtected(files map[string][]byte, boundaries *stagi
 		}
 		plan.Targets = append(plan.Targets, target)
 	}
+	if len(runtime.Plan.Targets) != 0 && boundaries == nil {
+		var complete staging.Plan
+		for _, target := range plan.Targets {
+			complete.Targets = append(complete.Targets, staging.Target{Class: target.Class, Identifier: target.Identifier, Kind: string(target.Kind), LivePath: target.LivePath, StagedPath: target.StagedSource})
+		}
+		snapshot, err := complete.Snapshot(runtime.Admitted)
+		if err != nil {
+			return err
+		}
+		durable, err := snapshot.Durable()
+		if err != nil {
+			return err
+		}
+		boundaries = &staging.Boundaries{Snapshot: snapshot, Admitted: runtime.Admitted, Durable: durable}
+	}
 	if boundaries != nil {
 		plan.BoundaryProof = &boundaries.Durable
 		plan.BoundaryCheck = func(_ int, path string) error {
@@ -262,14 +360,14 @@ func (op *operation) publishProtected(files map[string][]byte, boundaries *stagi
 			return err
 		}
 	}
-	if _, err := op.engine.Prepare(op.lock, plan); err != nil {
+	if _, err := op.engine.Prepare(op.witness(), plan); err != nil {
 		return fmt.Errorf("prepare profile records: %w", err)
 	}
 	for _, temp := range temps {
 		_ = os.Remove(temp)
 	}
 	temps = nil
-	if err := op.engine.Commit(op.lock, plan.TransactionID); err != nil {
+	if err := op.engine.Commit(op.witness(), plan.TransactionID); err != nil {
 		return fmt.Errorf("commit profile records: %w", err)
 	}
 	for _, item := range changes {
@@ -294,4 +392,29 @@ func newTransactionID() string {
 		return fmt.Sprintf("profile-%d", time.Now().UnixNano())
 	}
 	return "profile-" + hex.EncodeToString(random[:])
+}
+
+// Do not expose Held on this wrapper: the transaction engine calls AssertHeld
+// at every mutation, including rollback and cleanup, so a lost admission cannot
+// be bypassed by its forward-policy exception for rollback.
+type routingHomeLock struct {
+	underlying interface {
+		AssertHeld() error
+		AssertCurrent() error
+		Close() error
+	}
+	validate func() error
+}
+
+func (w *routingHomeLock) AssertHeld() error {
+	if err := w.underlying.AssertCurrent(); err != nil {
+		return err
+	}
+	return w.validate()
+}
+func (op *operation) witness() transaction.HomeLock {
+	if op.journalWitness != nil {
+		return op.journalWitness
+	}
+	return op.lock
 }

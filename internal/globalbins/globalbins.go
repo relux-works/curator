@@ -13,6 +13,7 @@ import (
 
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/runtimestore"
+	"github.com/relux-works/curator/internal/skillruntime"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -42,6 +43,9 @@ type ledger struct {
 // Refresh synchronizes forwarding shims for expected global commands.
 // environment is injectable for tests; nil reads the current process.
 func Refresh(home string, expected map[string]bool, platform string, environment map[string]string, userHome string) []string {
+	if err := skillruntime.RefuseUnadmitted(home); err != nil {
+		return []string{err.Error()}
+	}
 	if platform == "" {
 		platform = runtimestore.Platform()
 	}

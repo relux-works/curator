@@ -1,5 +1,5 @@
 // Package contextlock is the profile lock of the agent-environments
-// capability, context-lock-v1/v2/v4 (environments §1.3): the strict schema
+// capability, context-lock-v1/v2/v4/v5 (environments §1.3): the strict schema
 // object naming the root and every closure member, its canonical CCJ-1 bytes,
 // and the lock hash that is the profile's effective pin.
 package contextlock
@@ -33,6 +33,9 @@ const SchemaVersion2 = 2
 
 // SchemaVersion4 is the closed rc.7 successor admitting skill directories.
 const SchemaVersion4 = 4
+
+// SchemaVersion5 binds the complete profile skill plan. It is explicit opt-in.
+const SchemaVersion5 = 5
 
 // Precedence binds the effective composition policy into a schema-4 lock.
 type Precedence struct {
@@ -82,11 +85,13 @@ func (m Member) PinKey() string {
 
 // Lock is one versioned context-lock object.
 type Lock struct {
-	Precedence    Precedence
-	SchemaVersion int
-	HashVersion   int
-	Root          string
-	Members       []Member
+	SkillPlan       *SkillPlan
+	SkillPlanSHA256 string
+	Precedence      Precedence
+	SchemaVersion   int
+	HashVersion     int
+	Root            string
+	Members         []Member
 }
 
 // Delta is one resolved-version change between two locks. Exactly one of
@@ -229,14 +234,14 @@ var (
 	hex256RE = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
-// Validate applies the context-lock-v1/v2/v4 schema rules.
+// Validate applies the context-lock-v1/v2/v4/v5 schema rules.
 func (lock *Lock) Validate() error {
 	schemaVersion, hashVersion := lockVersions(lock)
-	if (schemaVersion != SchemaVersion || hashVersion != 1) && (schemaVersion != SchemaVersion2 || hashVersion != 2) && (schemaVersion != SchemaVersion4 || hashVersion != 2) {
+	if (schemaVersion != SchemaVersion || hashVersion != 1) && (schemaVersion != SchemaVersion2 || hashVersion != 2) && (schemaVersion != SchemaVersion4 || hashVersion != 2) && (schemaVersion != SchemaVersion5 || hashVersion != 2) {
 		return fmt.Errorf("lock schema_version %d and hash_version %d are incompatible", schemaVersion, hashVersion)
 	}
-	if schemaVersion == SchemaVersion4 && ((lock.Precedence.Winner != "higher-weight" && lock.Precedence.Winner != "lower-weight") || (lock.Precedence.Placement != "winner-last" && lock.Precedence.Placement != "winner-first")) {
-		return fmt.Errorf("schema-4 lock has invalid precedence")
+	if (schemaVersion == SchemaVersion4 || schemaVersion == SchemaVersion5) && ((lock.Precedence.Winner != "higher-weight" && lock.Precedence.Winner != "lower-weight") || (lock.Precedence.Placement != "winner-last" && lock.Precedence.Placement != "winner-first")) {
+		return fmt.Errorf("schema-4/5 lock has invalid precedence")
 	}
 	if !identifiers.Valid(lock.Root) {
 		return fmt.Errorf("lock root %q is not a portable identifier", lock.Root)
@@ -289,11 +294,17 @@ func (lock *Lock) Validate() error {
 		default:
 			return fmt.Errorf("member %s carries no pin", member.Name)
 		}
-		if member.Directory != "" && !identifiers.PortablePath(member.Directory) {
+		if schemaVersion == SchemaVersion5 && member.Source != "" && !validSkillSource(member.Source) {
+			return fmt.Errorf("profile_skill_plan_invalid: noncanonical member source")
+		}
+		if member.Directory != "" && (schemaVersion != SchemaVersion5 || member.Kind != KindSkill || member.Directory != ".") && !identifiers.PortablePath(member.Directory) {
 			return fmt.Errorf("member %s directory %q is not a portable path", member.Name, member.Directory)
 		}
 		if member.Kind == KindSkill {
-			if member.Directory != "" && schemaVersion != SchemaVersion4 {
+			if schemaVersion == SchemaVersion5 && member.Directory == "" {
+				return fmt.Errorf("profile_skill_plan_invalid: skill directory is required")
+			}
+			if member.Directory != "" && schemaVersion != SchemaVersion4 && schemaVersion != SchemaVersion5 {
 				return fmt.Errorf("skill member %s carries a directory", member.Name)
 			}
 		} else if member.Version == "" {
@@ -321,6 +332,12 @@ func (lock *Lock) Validate() error {
 	}
 	if !rootSeen {
 		return fmt.Errorf("lock root %s is not a context member", lock.Root)
+	}
+	if schemaVersion == SchemaVersion5 {
+		return lock.validateSkillPlan()
+	}
+	if lock.SkillPlan != nil || lock.SkillPlanSHA256 != "" {
+		return fmt.Errorf("profile_skill_plan_invalid: successor fields on legacy lock")
 	}
 	return nil
 }
@@ -363,13 +380,17 @@ func (lock *Lock) Object() map[string]any {
 		"root":           lock.Root,
 		"members":        members,
 	}
-	if schemaVersion == SchemaVersion2 || schemaVersion == SchemaVersion4 {
+	if schemaVersion == SchemaVersion2 || (schemaVersion == SchemaVersion4 || schemaVersion == SchemaVersion5) {
 		object["hash_version"] = hashVersion
 	}
-	if schemaVersion == SchemaVersion4 {
+	if schemaVersion == SchemaVersion4 || schemaVersion == SchemaVersion5 {
 		object["codex_settings"] = map[string]any{}
 		object["codex_settings_contributions"] = []any{}
 		object["precedence"] = map[string]any{"winner": lock.Precedence.Winner, "placement": lock.Precedence.Placement}
+	}
+	if schemaVersion == SchemaVersion5 {
+		object["skill_plan"] = lock.SkillPlan.Object()
+		object["skill_plan_sha256"] = lock.SkillPlanSHA256
 	}
 	return object
 }
@@ -435,13 +456,15 @@ func Parse(payload []byte) (*Lock, error) {
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.UseNumber()
 	var raw struct {
-		SchemaVersion json.RawMessage `json:"schema_version"`
-		HashVersion   json.RawMessage `json:"hash_version"`
-		CodexSettings json.RawMessage `json:"codex_settings"`
-		Contributions json.RawMessage `json:"codex_settings_contributions"`
-		Precedence    *Precedence     `json:"precedence"`
-		Root          string          `json:"root"`
-		Members       []struct {
+		SkillPlan       json.RawMessage `json:"skill_plan"`
+		SkillPlanSHA256 *string         `json:"skill_plan_sha256"`
+		SchemaVersion   json.RawMessage `json:"schema_version"`
+		HashVersion     json.RawMessage `json:"hash_version"`
+		CodexSettings   json.RawMessage `json:"codex_settings"`
+		Contributions   json.RawMessage `json:"codex_settings_contributions"`
+		Precedence      *Precedence     `json:"precedence"`
+		Root            string          `json:"root"`
+		Members         []struct {
 			Kind       string          `json:"kind"`
 			Name       string          `json:"name"`
 			Source     string          `json:"source"`
@@ -454,6 +477,9 @@ func Parse(payload []byte) (*Lock, error) {
 			Overlay    *bool           `json:"overlay"`
 		} `json:"members"`
 	}
+	if err := validateExactJSONKeys(payload, &raw); err != nil {
+		return nil, fmt.Errorf("invalid lock: %w", err)
+	}
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&raw); err != nil {
 		return nil, fmt.Errorf("invalid lock: %w", err)
@@ -461,11 +487,11 @@ func Parse(payload []byte) (*Lock, error) {
 	// Parse the JSON token itself: json.Number also accepts quoted digits,
 	// which are strings rather than numeric carrier fields in every lock schema.
 	schemaVersion, err := strconv.Atoi(string(raw.SchemaVersion))
-	if err != nil || (schemaVersion != SchemaVersion && schemaVersion != SchemaVersion2 && schemaVersion != SchemaVersion4) {
-		return nil, fmt.Errorf("invalid lock: schema_version must be %d, %d or %d", SchemaVersion, SchemaVersion2, SchemaVersion4)
+	if err != nil || (schemaVersion != SchemaVersion && schemaVersion != SchemaVersion2 && schemaVersion != SchemaVersion4 && schemaVersion != SchemaVersion5) {
+		return nil, fmt.Errorf("invalid lock: schema_version must be %d, %d, %d or %d", SchemaVersion, SchemaVersion2, SchemaVersion4, SchemaVersion5)
 	}
 	hashVersion := 1
-	if schemaVersion == SchemaVersion2 || schemaVersion == SchemaVersion4 {
+	if schemaVersion == SchemaVersion2 || (schemaVersion == SchemaVersion4 || schemaVersion == SchemaVersion5) {
 		parsed, parseErr := strconv.Atoi(string(raw.HashVersion))
 		if parseErr != nil || parsed != 2 {
 			return nil, fmt.Errorf("invalid lock: schema_version %d requires hash_version 2", schemaVersion)
@@ -479,7 +505,7 @@ func Parse(payload []byte) (*Lock, error) {
 		return nil, fmt.Errorf("invalid lock: %w", err)
 	}
 	lock := &Lock{SchemaVersion: schemaVersion, HashVersion: hashVersion, Root: raw.Root}
-	if schemaVersion == SchemaVersion4 {
+	if schemaVersion == SchemaVersion4 || schemaVersion == SchemaVersion5 {
 		var settings map[string]any
 		var contributions []any
 		if json.Unmarshal(raw.CodexSettings, &settings) != nil || settings == nil || len(settings) != 0 || json.Unmarshal(raw.Contributions, &contributions) != nil || contributions == nil || len(contributions) != 0 || raw.Precedence == nil {
@@ -488,6 +514,26 @@ func Parse(payload []byte) (*Lock, error) {
 		lock.Precedence = *raw.Precedence
 	} else if raw.CodexSettings != nil || raw.Contributions != nil || present["precedence"] != nil {
 		return nil, fmt.Errorf("invalid lock: successor fields on legacy schema")
+	}
+	if schemaVersion == SchemaVersion5 {
+		var shapes []map[string]json.RawMessage
+		if err := json.Unmarshal(present["members"], &shapes); err != nil {
+			return nil, fmt.Errorf("profile_skill_plan_invalid: member shapes: %w", err)
+		}
+		for _, member := range shapes {
+			for _, key := range []string{"source", "commit", "state_sha256", "directory", "version"} {
+				if value, ok := member[key]; ok && (bytes.Equal(bytes.TrimSpace(value), []byte("null")) || key == "version" && bytes.Equal(bytes.TrimSpace(value), []byte(`""`))) {
+					return nil, fmt.Errorf("profile_skill_plan_invalid: member %s must be a non-null string", key)
+				}
+			}
+			if _, state := member["state_sha256"]; state {
+				for _, key := range []string{"source", "commit", "directory"} {
+					if _, ok := member[key]; ok {
+						return nil, fmt.Errorf("profile_skill_plan_invalid: state member carries %s", key)
+					}
+				}
+			}
+		}
 	}
 	for _, member := range raw.Members {
 		weight, err := strconv.ParseInt(string(member.Weight), 10, 64)
@@ -499,7 +545,7 @@ func Parse(payload []byte) (*Lock, error) {
 		}
 		var directory string
 		if member.Directory != nil {
-			if err := json.Unmarshal(member.Directory, &directory); err != nil || !identifiers.PortablePath(directory) {
+			if err := json.Unmarshal(member.Directory, &directory); err != nil || ((schemaVersion != SchemaVersion5 || member.Kind != KindSkill || directory != ".") && !identifiers.PortablePath(directory)) {
 				return nil, fmt.Errorf("invalid lock: member %s directory must be a portable path", member.Name)
 			}
 		}
@@ -508,6 +554,21 @@ func Parse(payload []byte) (*Lock, error) {
 			Version: member.Version, Commit: member.Commit, StateHash: member.StateHash, Weight: weight,
 			RequiredBy: member.RequiredBy, Overlay: *member.Overlay,
 		})
+	}
+	_, hasPlan := present["skill_plan"]
+	_, hasPlanDigest := present["skill_plan_sha256"]
+	if schemaVersion == SchemaVersion5 {
+		if raw.SkillPlan == nil || raw.SkillPlanSHA256 == nil {
+			return nil, fmt.Errorf("profile_skill_plan_invalid: missing skill plan")
+		}
+		plan, err := ParseSkillPlan(raw.SkillPlan)
+		if err != nil {
+			return nil, err
+		}
+		lock.SkillPlan = plan
+		lock.SkillPlanSHA256 = *raw.SkillPlanSHA256
+	} else if hasPlan || hasPlanDigest {
+		return nil, fmt.Errorf("profile_skill_plan_invalid: successor fields on legacy lock")
 	}
 	if err := lock.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid lock: %w", err)

@@ -1,0 +1,213 @@
+{
+  "claim": "CLI evidence defects refuse for the intended reason; intact and repaired proofs pass without admission",
+  "cases": [
+    {
+      "case": "blank",
+      "intact": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      },
+      "negative": {
+        "exit": 3,
+        "admitted": false,
+        "qualification_required": true,
+        "error": "blank evidence reference"
+      },
+      "repaired": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      }
+    },
+    {
+      "case": "dangling",
+      "intact": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      },
+      "negative": {
+        "exit": 3,
+        "admitted": false,
+        "qualification_required": true,
+        "error": "unbound evidence reference: evidence/nonexistent-proof.json"
+      },
+      "repaired": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      }
+    },
+    {
+      "case": "missing-directory",
+      "intact": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      },
+      "negative": {
+        "exit": 3,
+        "admitted": false,
+        "qualification_required": true,
+        "error": "missing evidence directory"
+      },
+      "repaired": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      }
+    },
+    {
+      "case": "missing-baseline-directory",
+      "intact": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      },
+      "negative": {
+        "exit": 3,
+        "admitted": false,
+        "qualification_required": true,
+        "error": "missing evidence directory"
+      },
+      "repaired": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      }
+    },
+    {
+      "case": "missing-artifact",
+      "intact": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      },
+      "negative": {
+        "exit": 3,
+        "admitted": false,
+        "qualification_required": true,
+        "error": "missing evidence artifact: evidence/loader-observations.json"
+      },
+      "repaired": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      }
+    },
+    {
+      "case": "altered-artifact",
+      "intact": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      },
+      "negative": {
+        "exit": 3,
+        "admitted": false,
+        "qualification_required": true,
+        "error": "evidence artifact hash mismatch: evidence/loader-observations.json"
+      },
+      "repaired": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      }
+    },
+    {
+      "case": "missing-manifest",
+      "intact": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      },
+      "negative": {
+        "exit": 3,
+        "admitted": false,
+        "qualification_required": true,
+        "error": "missing evidence manifest"
+      },
+      "repaired": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      }
+    },
+    {
+      "case": "altered-manifest",
+      "intact": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      },
+      "negative": {
+        "exit": 3,
+        "admitted": false,
+        "qualification_required": true,
+        "error": "evidence manifest hash mismatch"
+      },
+      "repaired": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      }
+    },
+    {
+      "case": "escaping-reference",
+      "intact": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      },
+      "negative": {
+        "exit": 3,
+        "admitted": false,
+        "qualification_required": true,
+        "error": "invalid evidence path"
+      },
+      "repaired": {
+        "exit": 0,
+        "admitted": false,
+        "qualification_required": false,
+        "changes": [],
+        "disposition": "no observed drift; admission still belongs to product policy"
+      }
+    }
+  ],
+  "admitted": false
+}

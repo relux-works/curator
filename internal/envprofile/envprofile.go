@@ -52,6 +52,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/skillruntime"
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -330,6 +331,9 @@ func Current(home string) (string, error) {
 
 // SetCurrent records the machine current profile.
 func SetCurrent(home, name string) error {
+	if err := skillruntime.RefuseUnadmitted(home); err != nil {
+		return err
+	}
 	if err := envauthority.Validate(home); err != nil {
 		return err
 	}
@@ -710,6 +714,11 @@ type InstallOptions struct {
 // Install holds the manager-home mutation lock and publishes its records
 // through the operation journal (see lock.go).
 func Install(home string, options InstallOptions) (Info, bool, bool, error) {
+	if options.As != "" {
+		if err := refusePreparedSkillPlanAdoption(home, options.As); err != nil {
+			return Info{}, false, false, err
+		}
+	}
 	if err := options.Policy.checkHardenedProfileMutation(); err != nil {
 		return Info{}, false, false, err
 	}
@@ -971,6 +980,10 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 	if err != nil {
 		return Info{}, false, false, err
 	}
+	if oldLock != nil && oldLock.SchemaVersion == contextlock.SchemaVersion5 {
+		return Info{}, false, false, RefuseSkillPlanAdoption()
+	}
+
 	if err := fetchLockedSources(manager, oldLock); err != nil {
 		return Info{}, false, false, err
 	}
@@ -1192,6 +1205,9 @@ func UpdateWithPolicy(home, name string, policy Policy) (Info, bool, error) {
 // UpdateWithOptions re-resolves like UpdateWithPolicy and prints the §2.3
 // declaration rows to the options' sink at the required emission point.
 func UpdateWithOptions(home, name string, options UpdateOptions) (Info, bool, error) {
+	if err := refusePreparedSkillPlanAdoption(home, name); err != nil {
+		return Info{}, false, err
+	}
 	if err := options.Policy.checkHardenedProfileMutation(); err != nil {
 		return Info{}, false, err
 	}
@@ -1237,6 +1253,10 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 	if err != nil {
 		return Info{}, false, err
 	}
+	if oldLock != nil && oldLock.SchemaVersion == contextlock.SchemaVersion5 {
+		return Info{}, false, RefuseSkillPlanAdoption()
+	}
+
 	// Establish that the named profile's recorded evidence is readable before
 	// ensureDefault can publish any state. An unreadable lock makes update
 	// read-only: no other profile or generation is created as a side effect.
