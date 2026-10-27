@@ -30,7 +30,10 @@ func fixtureGit(t *testing.T, dir string, args ...string) []byte {
 // Every inherited config channel and repository selector is removed; native
 // home writes use scratch space, and cleanup restores exact previous values.
 func TestIsolateEnvironmentAndHome(t *testing.T) {
-	for _, key := range []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_CONFIG", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0", "GIT_CONFIG_PARAMETERS", "GIT_CEILING_DIRECTORIES", "SSH_AUTH_SOCK"} {
+	// This acceptance list is independent of managed: omitting a key from the
+	// implementation must not also remove its assertion from the test.
+	inheritedKeys := []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_CONFIG", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0", "GIT_CONFIG_PARAMETERS", "GIT_CEILING_DIRECTORIES", "SSH_AUTH_SOCK"}
+	for _, key := range inheritedKeys {
 		t.Setenv(key, "poison")
 	}
 	operatorHome := t.TempDir()
@@ -54,9 +57,11 @@ func TestIsolateEnvironmentAndHome(t *testing.T) {
 		if resolved, err := os.UserHomeDir(); err != nil || resolved != home {
 			t.Fatalf("native home = %q, want %q: %v", resolved, home, err)
 		}
-		for _, entry := range os.Environ() {
-			key, value, _ := strings.Cut(entry, "=")
-			if managed(key) && key != "HOME" && key != "USERPROFILE" && key != "XDG_CONFIG_HOME" && key != "GIT_CONFIG_GLOBAL" && key != "GIT_CONFIG_NOSYSTEM" {
+		for _, key := range inheritedKeys {
+			if key == "GIT_CONFIG_GLOBAL" || key == "GIT_CONFIG_NOSYSTEM" {
+				continue // These are replaced by owned, empty configuration below.
+			}
+			if value, exists := os.LookupEnv(key); exists {
 				t.Errorf("inherited %s=%q", key, value)
 			}
 		}
