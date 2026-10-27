@@ -545,6 +545,9 @@ jobs:
         run: bash scripts/restore-runner-tmp.sh
 
   race:
+    # A failed dependency must produce a red required Race check, not a
+    # skipped check that GitHub treats as successful. Respect PR cancellation.
+    if: ${{ !cancelled() }}
     needs: envprofile-race
     name: Race (${{ matrix.os }})
     # Snapshot publication refuses ACL-bearing retained ancestry. Qualified

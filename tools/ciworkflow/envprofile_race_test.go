@@ -36,8 +36,8 @@ func checkEnvprofileRace(data []byte) error {
 	if shards.If != "" || shards.Strategy.FailFast || !reflect.DeepEqual(shards.Strategy.Matrix.Shard, []int{0, 1, 2, 3, 4, 5, 6, 7}) || !reflect.DeepEqual(shards.Strategy.Matrix.OS, race.Strategy.Matrix.OS) || !reflect.DeepEqual(shards.RunsOn, race.RunsOn) {
 		return fmt.Errorf("shards must run every index on both Race platforms with identical routing, on main and PRs")
 	}
-	if race.Needs != "envprofile-race" {
-		return fmt.Errorf("Race must require the completed envprofile shards")
+	if race.Needs != "envprofile-race" || race.If != "${{ !cancelled() }}" {
+		return fmt.Errorf("Race must require the shards and run on dependency failure unless cancelled")
 	}
 	run, upload, download, consume := 0, 0, 0, 0
 	for _, s := range shards.Steps {
@@ -71,13 +71,14 @@ func TestEnvprofileRaceWiring(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, pair := range map[string][2]string{
-		"dropped-shard":  {"shard: [0, 1, 2, 3, 4, 5, 6, 7]", "shard: [0, 1, 2, 3, 4, 5, 6]"},
-		"no-dependency":  {"needs: envprofile-race", "needs: test"},
-		"only-main":      {"  envprofile-race:\n", "  envprofile-race:\n    if: github.event_name == 'push'\n"},
-		"wrong-platform": {"pattern: envprofile-race-${{ matrix.os }}-*", "pattern: envprofile-race-ubuntu-latest-*"},
-		"no-consumption": {"CI_ENVPROFILE_SHARDS: .temp/envprofile-shards", "CI_OTHER_SHARDS: .temp/envprofile-shards"},
-		"lost-selector":  {"-shard ${{ matrix.shard }}", "-shard 0"},
-		"lost-upload":    {"name: envprofile-race-${{ matrix.os }}-${{ matrix.shard }}", "name: envprofile-race-${{ matrix.os }}"},
+		"dropped-shard":        {"shard: [0, 1, 2, 3, 4, 5, 6, 7]", "shard: [0, 1, 2, 3, 4, 5, 6]"},
+		"skipped-failure-gate": {"    if: ${{ !cancelled() }}", "    if: success()"},
+		"no-dependency":        {"needs: envprofile-race", "needs: test"},
+		"only-main":            {"  envprofile-race:\n", "  envprofile-race:\n    if: github.event_name == 'push'\n"},
+		"wrong-platform":       {"pattern: envprofile-race-${{ matrix.os }}-*", "pattern: envprofile-race-ubuntu-latest-*"},
+		"no-consumption":       {"CI_ENVPROFILE_SHARDS: .temp/envprofile-shards", "CI_OTHER_SHARDS: .temp/envprofile-shards"},
+		"lost-selector":        {"-shard ${{ matrix.shard }}", "-shard 0"},
+		"lost-upload":          {"name: envprofile-race-${{ matrix.os }}-${{ matrix.shard }}", "name: envprofile-race-${{ matrix.os }}"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			planted := strings.Replace(string(good), pair[0], pair[1], 1)
