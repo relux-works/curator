@@ -44,28 +44,51 @@ const (
 // installation in these tests runs the real identity-verified process graph
 // instead of a mock.
 func TestMain(m *testing.M) {
+	// Pin every host config root before helper, worker or ordinary test paths.
+	home, err := os.MkdirTemp("", "curator-cli-home-*")
+	if err != nil {
+		panic(err)
+	}
+	for _, name := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME"} {
+		if err := os.Setenv(name, home); err != nil {
+			panic(err)
+		}
+	}
+	for _, name := range []string{"CODEX_HOME", "CLAUDE_CONFIG_DIR"} {
+		if err := os.Unsetenv(name); err != nil {
+			panic(err)
+		}
+	}
+	code := isolatedTestMain(m)
+	if err := os.RemoveAll(home); err != nil && code == 0 {
+		code = 1
+	}
+	os.Exit(code)
+}
+
+func isolatedTestMain(m *testing.M) int {
 	if strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe") == "mcp-stage-a-tripwire" {
 		if path := os.Getenv("CURATOR_TEST_MCP_TRIPWIRE"); path != "" {
 			_ = os.WriteFile(path, []byte("invoked"), 0600)
 		}
-		os.Exit(97)
+		return 97
 	}
 
 	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
-		os.Exit(runNativeBuildWorker())
+		return runNativeBuildWorker()
 	}
 	// Before any branch that runs tests: a CLI helper child runs git too.
 	restoreGitEnv := testgitenv.Isolate()
 	if os.Getenv(cliHelperProcess) == "1" {
 		code := m.Run()
 		restoreGitEnv()
-		os.Exit(code)
+		return code
 	}
 	restorePath, err := isolateCLIPath()
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "isolate CLI test PATH:", err)
 		restoreGitEnv()
-		os.Exit(1)
+		return 1
 	}
 	// The parent already holds the host-toolchain lock. These children run
 	// only PATH isolation witnesses, including their explicit provider cases.
@@ -73,7 +96,7 @@ func TestMain(m *testing.M) {
 		code := m.Run()
 		restorePath()
 		restoreGitEnv()
-		os.Exit(code)
+		return code
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -82,7 +105,7 @@ func TestMain(m *testing.M) {
 		_, _ = fmt.Fprintln(os.Stderr, "acquire package host GOROOT test lock:", err)
 		restorePath()
 		restoreGitEnv()
-		os.Exit(1)
+		return 1
 	}
 	code := m.Run()
 	restorePath()
@@ -93,7 +116,7 @@ func TestMain(m *testing.M) {
 			code = 1
 		}
 	}
-	os.Exit(code)
+	return code
 }
 
 func TestCLIHelperProcess(t *testing.T) {

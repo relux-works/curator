@@ -81,7 +81,7 @@ Commands:
   skill check <dir>        validate one skill package (--locale, --json)
   global <subcommand>      init | add | remove | list | status (--check, --json) | install | adopt <command> [--dry-run] | update | upgrade
   profile <subcommand>     install | list | use | update | remove | sync | compose (see profile install -h)
-  env <subcommand>         resolve | status | config | migrate | unmanage (see env resolve -h)
+  env <subcommand>         resolve | status | config | migrate | unmanage | trust (see env -h)
   run <env-id> ...         umbrella dispatch to curator-run (see §11)
   hybrid <subcommand>      add | remove | list | status
   audit [target] [flags]   run audit, pin trust, or publish a signed record
