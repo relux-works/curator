@@ -28,6 +28,8 @@ curl -fsSL https://raw.githubusercontent.com/relux-works/curator/main/install.sh
 
 The installer first shows the version, destination, repository/docs links and verification plan in English or Russian, then asks for confirmation. Curator needs no sudo. Use `sh -s -- --plan` to preview only, or `sh -s -- --yes` (or `CURATOR_YES=1`) for automation. Confirmation uses `/dev/tty`; without a terminal, pass `--yes`. See [installer plan and confirmation](docs/installer-plan.md) for locale precedence, `NO_COLOR` and unchanged destination rules.
 
+With `CURATOR_VERSION` unset, a read-only latest-release metadata GET runs before the plan and consent, with a 3-second connection timeout and 5-second total timeout and no file writes. If it fails, the complete plan shows `latest (could not be resolved)` and `--plan` exits successfully. Installation retries resolution after consent and refuses before staging or artifact downloads if it still fails.
+
 The installer verifies the release's `checksums.txt` with GitHub artifact attestation when `gh attestation verify` is available, or with the release's keyless cosign signature when it is not. Both checks pin the Curator release workflow identity and GitHub Actions OIDC issuer. It then checks the downloaded archive's SHA-256 against the verified checksum file. Install the [GitHub CLI](https://cli.github.com/) or [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) before using the script; it refuses to install when neither verifier is available or verification fails.
 
 For an emergency only, `CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1` bypasses attestation, signature, and checksum verification. The installer prints a warning and installs the downloaded executable without integrity verification:

@@ -45,6 +45,79 @@ func testInstallScriptPlan(t *testing.T) {
 		}
 	})
 
+	t.Run("latest_metadata", func(t *testing.T) {
+		// Default-unset lookup failures still show every plan field. Decline and
+		// repeated failure after consent leave the scratch tree unchanged; a later
+		// successful lookup installs only after consent. Timeout is a curl exit-28
+		// fixture that also requires the actual connection/total timeout arguments.
+		for _, row := range []struct {
+			name, mode, input string
+			args              []string
+			tty, install      bool
+			calls, exitCode   int
+		}{
+			{"failure_plan", "failure", "", []string{"--plan"}, false, false, 1, 0},
+			{"failure_decline", "failure", "n\n", nil, true, false, 1, 1},
+			{"failure_consent", "failure", "y\n", nil, true, false, 2, 1},
+			{"failure_yes", "failure", "", []string{"--yes"}, false, false, 2, 1},
+			{"timeout_plan", "timeout", "", []string{"--plan"}, false, false, 1, 0},
+			{"timeout_consent", "timeout", "", []string{"--yes"}, false, false, 2, 1},
+			{"empty_plan", "empty", "", []string{"--plan"}, false, false, 1, 0},
+			{"empty_consent", "empty", "", []string{"--yes"}, false, false, 2, 1},
+			{"partial_failure_consent", "partial_failure", "", []string{"--yes"}, false, false, 2, 1},
+			{"recovers_after_consent", "recover", "y\n", nil, true, true, 2, 0},
+		} {
+			t.Run(row.name, func(t *testing.T) {
+				result := runInstallScriptFixture(t, installScriptFixture{
+					metadataMode: row.mode, args: row.args, tty: row.tty, input: row.input,
+					env:                 map[string]string{"NO_COLOR": "1"},
+					fallbackDestination: true, ghAvailable: true, ghAttestationCommand: true,
+					ghSupportsSignerWorkflow: true, ghAttestationValid: true,
+				})
+				assertInstallerPlanVersion(t, result, "Installation plan", "latest (could not be resolved)")
+				if result.exitCode != row.exitCode || strings.Count(result.curlRequests, "latest\n") != row.calls {
+					t.Fatalf("exit=%d requests=%q; want exit=%d metadata calls=%d\n%s", result.exitCode, result.curlRequests, row.exitCode, row.calls, result.output)
+				}
+				if row.install {
+					if !result.installed || !installerPlanPrecedesMutation(result.output) || !strings.Contains(result.output, "downloading curator "+fixtureVersion) {
+						t.Fatalf("retry did not install resolved version after plan/consent:\n%s", result.output)
+					}
+				} else {
+					assertInstallerUnchanged(t, result)
+					if row.calls == 2 {
+						assertInstallRefused(t, result, "could not determine the latest version after consent")
+					} else if row.tty && !strings.Contains(result.output, "Installation cancelled") {
+						t.Fatalf("failed lookup bypassed normal decline:\n%s", result.output)
+					}
+				}
+			})
+		}
+		// The pinned positive control must bypass even a failing metadata API.
+		t.Run("pinned_skips_lookup", func(t *testing.T) {
+			result := runInstallScriptFixture(t, installScriptFixture{
+				args: []string{"--plan"}, metadataMode: "failure",
+				env: map[string]string{"CURATOR_VERSION": fixtureVersion},
+			})
+			assertInstallerUnchanged(t, result)
+			assertInstallerPlan(t, result, "Installation plan")
+			if result.exitCode != 0 || result.curlRequests != "" {
+				t.Fatalf("pinned plan contacted metadata API: exit=%d requests=%q", result.exitCode, result.curlRequests)
+			}
+		})
+		// The unresolved plan and metadata disclosure also stay localized.
+		t.Run("failure_plan_ru", func(t *testing.T) {
+			result := runInstallScriptFixture(t, installScriptFixture{
+				args: []string{"--plan"}, metadataMode: "failure",
+				env: map[string]string{"LANG": "ru"},
+			})
+			assertInstallerUnchanged(t, result)
+			assertInstallerPlanVersion(t, result, "План установки", "latest (не удалось определить)")
+			if result.exitCode != 0 || result.curlRequests != "latest\n" {
+				t.Fatalf("failed Russian preview: exit=%d requests=%q\n%s", result.exitCode, result.curlRequests, result.output)
+			}
+		})
+	})
+
 	// Verification rows above remain the positive/negative security controls
 	// after consent. These rows isolate consent, destination and presentation.
 	for _, row := range []struct {
@@ -128,12 +201,26 @@ func testInstallScriptPlan(t *testing.T) {
 
 func assertInstallerPlan(t *testing.T, result installScriptResult, title string) {
 	t.Helper()
-	for _, value := range []string{"curator", fixtureVersion, result.installPath,
+	assertInstallerPlanVersion(t, result, title, fixtureVersion)
+}
+
+func assertInstallerPlanVersion(t *testing.T, result installScriptResult, title, version string) {
+	t.Helper()
+	for _, value := range []string{title, "curator", version, result.installPath,
 		"https://github.com/relux-works/curator#readme",
 		"https://github.com/relux-works/curator/blob/main/docs/book/README.md",
 		"https://github.com/relux-works/curator-spec", "GitHub build attestation", "cosign", "SHA-256"} {
 		if !strings.Contains(result.output, value) {
 			t.Errorf("plan omits %q:\n%s", value, result.output)
+		}
+	}
+	if strings.Contains(result.curlRequests, "latest\n") {
+		disclosure := "Before consent: read-only latest metadata GET, no file writes (5s timeout)."
+		if title == "План установки" {
+			disclosure = "До подтверждения: read-only GET метаданных latest, без записи файлов (timeout 5 с)."
+		}
+		if !strings.Contains(result.output, disclosure) {
+			t.Errorf("plan omits metadata disclosure %q:\n%s", disclosure, result.output)
 		}
 	}
 	if title == "План установки" {
@@ -150,7 +237,10 @@ func assertInstallerPlan(t *testing.T, result installScriptResult, title string)
 
 func assertInstallerUnchanged(t *testing.T, result installScriptResult) {
 	t.Helper()
-	if result.installed || len(result.changes) != 0 || result.mutations != "" || result.curlRequests != "" || result.ghCalls != "" || result.cosignCalls != "" {
+	// A read-only latest metadata GET is allowed; artifact requests and all
+	// installer filesystem writes remain forbidden before consent or resolution.
+	artifactRequests := strings.ReplaceAll(result.curlRequests, "latest\n", "")
+	if result.installed || len(result.changes) != 0 || result.mutations != "" || artifactRequests != "" || result.ghCalls != "" || result.cosignCalls != "" {
 		t.Fatalf("plan/decline had effects: installed=%t changes=%v mutations=%q requests=%q\n%s",
 			result.installed, result.changes, result.mutations, result.curlRequests, result.output)
 	}

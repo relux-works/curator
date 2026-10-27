@@ -25,6 +25,8 @@ case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
     msg_title='План установки'
     msg_component='  Компонент:      %s\n'
     msg_version='  Версия:         %s\n'
+    msg_latest_unresolved='latest (не удалось определить)'
+    msg_metadata='До подтверждения: read-only GET метаданных latest, без записи файлов (timeout 5 с).\n'
     msg_target='  Путь:           %s\n'
     msg_sudo='  Нужен sudo:     нет\n'
     msg_source='  Исходники:      %s\n'
@@ -43,6 +45,8 @@ case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
     msg_title='Installation plan'
     msg_component='  Component:      %s\n'
     msg_version='  Version:        %s\n'
+    msg_latest_unresolved='latest (could not be resolved)'
+    msg_metadata='Before consent: read-only latest metadata GET, no file writes (5s timeout).\n'
     msg_target='  Path:           %s\n'
     msg_sudo='  Needs sudo:     no\n'
     msg_source='  Source:         %s\n'
@@ -82,16 +86,19 @@ case "$arch" in
   *) echo "curator installer: unsupported architecture: $arch" >&2; exit 1 ;;
 esac
 
+# Read-only and bounded: stdout only, with curl configuration disabled so it
+# cannot add output files. Check curl's status before parsing partial responses.
+resolve_latest() {
+  metadata=$(curl -q -fsSL --connect-timeout 3 --max-time 5 \
+    "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null) || return 1
+  printf '%s\n' "$metadata" | grep '"tag_name"' | head -1 | cut -d '"' -f 4
+}
+
 version="${CURATOR_VERSION:-}"
 if [ -z "$version" ]; then
-  version=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" |
-    grep '"tag_name"' | head -1 | cut -d '"' -f 4)
+  version=$(resolve_latest) || version=''
 fi
-[ -n "$version" ] || { echo "curator installer: could not determine the latest version" >&2; exit 1; }
-bare=${version#v}
-
-archive="curator_${bare}_${os}_${arch}.tar.gz"
-base="https://github.com/$REPO/releases/download/$version"
+plan_version=${version:-$msg_latest_unresolved}
 
 # Resolve exactly the existing destination rule, without creating it yet.
 bin_dir="${CURATOR_BIN_DIR:-/usr/local/bin}"
@@ -120,11 +127,14 @@ if [ -t 1 ] && [ "${NO_COLOR+x}" != x ]; then
   reset=$(printf '\033[0m')
 fi
 printf '\n%s%s%s\n\n' "$colour" "$msg_title" "$reset"
-print_component curator "$version" "$bin_dir/curator" \
+print_component curator "$plan_version" "$bin_dir/curator" \
   "https://github.com/$REPO" "https://github.com/$REPO#readme" \
   "https://github.com/$REPO/blob/main/docs/book/README.md" \
   'https://github.com/relux-works/curator-spec'
 printf '\n'
+if [ -z "${CURATOR_VERSION:-}" ]; then
+  printf "$msg_metadata"
+fi
 if [ "${CURATOR_INSTALL_INSECURE_SKIP_VERIFY:-}" = 1 ]; then
   printf "$msg_insecure"
 else
@@ -146,6 +156,17 @@ if [ "$assume_yes" != 1 ]; then
     *) printf "$msg_cancel"; exit 1 ;;
   esac
 fi
+
+if [ -z "$version" ]; then
+  version=$(resolve_latest) || version=''
+  [ -n "$version" ] || {
+    echo "curator installer: could not determine the latest version after consent; check network access or set CURATOR_VERSION; refusing to install" >&2
+    exit 1
+  }
+fi
+bare=${version#v}
+archive="curator_${bare}_${os}_${arch}.tar.gz"
+base="https://github.com/$REPO/releases/download/$version"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT

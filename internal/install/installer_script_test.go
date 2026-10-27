@@ -44,6 +44,7 @@ type installScriptFixture struct {
 	input                    string
 	fallbackDestination      bool
 	plantEarlyMutation       bool
+	metadataMode             string
 }
 
 type installScriptResult struct {
@@ -417,15 +418,37 @@ esac
 	writeInstallerExecutable(t, filepath.Join(toolDir, "curl"), `#!/bin/sh
 out=
 url=
+connect_timeout=
+max_time=
+config_disabled=0
+[ "${1:-}" != -q ] || config_disabled=1
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -o) out=$2; shift 2 ;;
+    --connect-timeout) connect_timeout=$2; shift 2 ;;
+    --max-time) max_time=$2; shift 2 ;;
     -*) shift ;;
     *) url=$1; shift ;;
   esac
 done
 name=${url##*/}
 printf '%s\n' "$name" >> "$CURL_LOG"
+if [ "$url" = https://api.github.com/repos/relux-works/curator/releases/latest ]; then
+  [ "$METADATA_MODE" != failure ] || exit 22
+  if [ -n "$out" ] || [ "$connect_timeout" != 3 ] || [ "$max_time" != 5 ] || [ "$config_disabled" != 1 ]; then
+    printf 'invalid_metadata_options\n' >> "$CURL_LOG"
+    echo 'fixture metadata GET must use stdout and short timeouts' >&2
+    exit 2
+  fi
+  case "$METADATA_MODE" in
+    timeout) exit 28 ;;
+    empty) printf '{}\n'; exit 0 ;;
+    partial_failure) printf '{"tag_name":"v1.2.3"}\n'; exit 22 ;;
+    recover) [ "$(grep -c '^latest$' "$CURL_LOG")" -gt 1 ] || exit 22 ;;
+  esac
+  printf '{"tag_name":"v1.2.3"}\n'
+  exit 0
+fi
 if [ -z "$out" ] || [ ! -f "$FIXTURE_RELEASE_DIR/$name" ]; then
   echo "fixture release asset not found: $name" >&2
   exit 22
@@ -546,7 +569,7 @@ exit 0
 		"PATH=" + toolDir,
 		"HOME=" + filepath.Join(root, "home"),
 		"TMPDIR=" + root,
-		"CURATOR_VERSION=" + fixtureVersion,
+		"METADATA_MODE=" + fixture.metadataMode,
 		"CURATOR_BIN_DIR=" + requestedDir,
 		"MUTATION_LOG=" + mutationLog,
 		"INSTALLER_SCRIPT=" + installerPath,

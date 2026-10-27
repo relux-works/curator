@@ -6,6 +6,20 @@ installs `curator` only. Each component block lists the version, final executabl
 path, whether sudo is needed, its source repository, README, book and protocol
 specification. Curator does not request root or run sudo.
 
+When `CURATOR_VERSION` is unset, the installer makes a read-only GitHub
+latest-release metadata GET before displaying the plan and asking for consent,
+so the plan can show the real version. This request writes no files, ignores
+curl configuration files, and has a 3-second connection timeout and 5-second
+total timeout. The plan explicitly states this pre-consent lookup. Setting
+`CURATOR_VERSION` skips it.
+
+If metadata cannot be fetched or has no version, the complete plan still prints
+with `latest (could not be resolved)` (localized in Russian). `--plan` exits 0.
+Installation asks for consent as usual; a decline changes nothing. After
+consent, an unresolved version is looked up again with the same timeouts. A
+second failure clearly refuses installation before creating staging files,
+downloading release artifacts or creating the destination directory.
+
 The plan describes the existing verification chain: GitHub build attestation
 when supported, otherwise a cosign signature, followed by the archive's SHA-256
 checksum. A failed attestation still refuses rather than falling back to cosign.
@@ -50,6 +64,13 @@ sh -n install.sh
 ```
 
 The existing release-verification fixtures now explicitly consent with `--yes`.
+Fixtures leave `CURATOR_VERSION` unset by default and serve metadata from a
+network stub; a pinned-version control proves that it skips the lookup. Failure,
+empty metadata, partial failed responses and simulated curl timeout controls
+cover full-plan rendering and failure before staging/download; decline and
+retry-recovery controls exercise the consent boundary. The timeout stub checks
+the connection/total timeout arguments and returns curl's timeout exit code;
+it does not measure live network latency.
 The plan subtests use scratch homes and prefixes, fixture release assets and
 verifiers, and the standard `script` utility for real PTY confirmation/colour
 checks on macOS/Linux. They compare scratch-tree contents/modes and regular-file
