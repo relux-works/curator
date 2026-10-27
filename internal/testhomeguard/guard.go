@@ -14,6 +14,7 @@ import (
 	"strings"
 )
 
+// Changed identifies the postimage refusal in package control assertions.
 const Changed = "testhomeguard: protected native home changed"
 
 type identity struct {
@@ -22,6 +23,7 @@ type identity struct {
 	hash [sha256.Size]byte
 }
 
+// Guard retains bounded metadata and permitted payload hashes until Finish.
 type Guard struct {
 	roots  []string
 	before map[string]identity
@@ -222,7 +224,7 @@ func captureTree(out map[string]identity, root, path string, depth int, bytes *i
 	if i == nil || !i.IsDir() {
 		return nil
 	} // Lstat: never follow a skill symlink.
-	f, err := os.Open(path)
+	f, err := os.Open(path) // #nosec G304 -- Lstat-admitted skill directory; opened identity is checked below.
 	if err != nil {
 		return err
 	}
@@ -265,7 +267,7 @@ func runtimeSkillMetadata(root, path string) bool {
 
 // Optional private JSONL evidence contains paths and lstat/link metadata only.
 // Content and content hashes never enter it. Public stderr keeps fingerprints.
-func recordChanges(roots []string, before, after map[string]identity) error {
+func recordChanges(roots []string, before, after map[string]identity) (result error) {
 	dir := os.Getenv("CURATOR_TEST_HOME_GUARD_REPORT")
 	if dir == "" {
 		return nil
@@ -289,7 +291,11 @@ func recordChanges(roots []string, before, after map[string]identity) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); result == nil {
+			result = err
+		}
+	}()
 	metadata := func(v identity) any {
 		if v.info == nil {
 			return nil
@@ -338,7 +344,7 @@ func capture(out map[string]identity, path string, hashContent bool) error {
 		if i.Size() > maxFileBytes {
 			return fmt.Errorf("context identity bound exceeded")
 		}
-		f, openErr := os.Open(path)
+		f, openErr := os.Open(path) // #nosec G304 -- Bounded non-credential regular file from the protected inventory; opened identity checked below.
 		if openErr != nil {
 			return openErr
 		}
