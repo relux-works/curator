@@ -33,12 +33,25 @@ jobs:
 
       - uses: anchore/sbom-action/download-syft@v0
 
+      - name: Require credentials for every stable release channel
+        run: python3 release/bundle.py credentials
+        env:
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+          MACOS_SIGN_P12_PASSWORD: ${{ secrets.MACOS_SIGN_P12_PASSWORD }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
-          version: "~> v2"
+          distribution: goreleaser
+          version: v2.17.0
           args: release --clean
         env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
           MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
@@ -51,8 +64,8 @@ jobs:
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
-            dist/*.tar.gz
-            dist/*.zip
-            dist/*.deb
-            dist/*.rpm
-            dist/checksums.txt
+            .tmp/dist/*.tar.gz
+            .tmp/dist/*.zip
+            .tmp/dist/*.deb
+            .tmp/dist/*.rpm
+            .tmp/dist/checksums.txt

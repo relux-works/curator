@@ -1,0 +1,118 @@
+=== RUN   TestCodexShellDenial
+=== RUN   TestCodexShellDenial/workspace-write
+=== RUN   TestCodexShellDenial/read-only
+--- PASS: TestCodexShellDenial (10.21s)
+    --- PASS: TestCodexShellDenial/workspace-write (5.64s)
+    --- PASS: TestCodexShellDenial/read-only (4.57s)
+=== RUN   TestCodexMemoryRead
+=== RUN   TestCodexMemoryRead/enabled-true
+=== RUN   TestCodexMemoryRead/enabled-false
+--- PASS: TestCodexMemoryRead (6.01s)
+    --- PASS: TestCodexMemoryRead/enabled-true (3.20s)
+    --- PASS: TestCodexMemoryRead/enabled-false (2.82s)
+=== RUN   TestCodexMCPDenial
+=== RUN   TestCodexMCPDenial/disabled-false
+=== RUN   TestCodexMCPDenial/disabled-true
+--- PASS: TestCodexMCPDenial (5.42s)
+    --- PASS: TestCodexMCPDenial/disabled-false (2.92s)
+    --- PASS: TestCodexMCPDenial/disabled-true (2.50s)
+=== RUN   TestCodexMCPDefaultPrompt
+=== RUN   TestCodexMCPDefaultPrompt/disabled-false
+=== RUN   TestCodexMCPDefaultPrompt/disabled-true
+--- PASS: TestCodexMCPDefaultPrompt (5.40s)
+    --- PASS: TestCodexMCPDefaultPrompt/disabled-false (3.04s)
+    --- PASS: TestCodexMCPDefaultPrompt/disabled-true (2.36s)
+=== RUN   TestFilesystemDenialAttribution
+--- PASS: TestFilesystemDenialAttribution (0.00s)
+=== RUN   TestCodexDedicatedMemory
+=== RUN   TestCodexDedicatedMemory/read
+=== RUN   TestCodexDedicatedMemory/read/on-true
+=== RUN   TestCodexDedicatedMemory/read/on-false
+=== RUN   TestCodexDedicatedMemory/write
+=== RUN   TestCodexDedicatedMemory/write/on-true
+=== RUN   TestCodexDedicatedMemory/write/on-false
+--- PASS: TestCodexDedicatedMemory (8.17s)
+    --- PASS: TestCodexDedicatedMemory/read (4.41s)
+        --- PASS: TestCodexDedicatedMemory/read/on-true (2.27s)
+        --- PASS: TestCodexDedicatedMemory/read/on-false (2.13s)
+    --- PASS: TestCodexDedicatedMemory/write (3.76s)
+        --- PASS: TestCodexDedicatedMemory/write/on-true (1.83s)
+        --- PASS: TestCodexDedicatedMemory/write/on-false (1.93s)
+=== RUN   TestCodexMemoryResume
+--- PASS: TestCodexMemoryResume (3.52s)
+=== RUN   TestRequestAttribution
+--- PASS: TestRequestAttribution (0.00s)
+=== RUN   TestFunctionResults
+--- PASS: TestFunctionResults (0.00s)
+=== RUN   TestIntake
+=== RUN   TestIntake/missing
+=== RUN   TestIntake/digest
+--- PASS: TestIntake (0.03s)
+    --- PASS: TestIntake/missing (0.01s)
+    --- PASS: TestIntake/digest (0.02s)
+=== RUN   TestOfflineBoundary
+--- PASS: TestOfflineBoundary (0.87s)
+=== RUN   TestMuseLocalBaseline
+--- PASS: TestMuseLocalBaseline (3.27s)
+=== RUN   TestMuseConfigHelp
+--- PASS: TestMuseConfigHelp (1.62s)
+=== RUN   TestMuseToolDenials
+=== RUN   TestMuseToolDenials/write_file
+=== RUN   TestMuseToolDenials/write_file/disabled-false
+=== RUN   TestMuseToolDenials/write_file/disabled-true
+=== RUN   TestMuseToolDenials/edit_file
+=== RUN   TestMuseToolDenials/edit_file/disabled-false
+=== RUN   TestMuseToolDenials/edit_file/disabled-true
+=== RUN   TestMuseToolDenials/bash
+=== RUN   TestMuseToolDenials/bash/disabled-false
+=== RUN   TestMuseToolDenials/bash/disabled-true
+=== RUN   TestMuseToolDenials/legacy-bash
+=== RUN   TestMuseToolDenials/legacy-bash/disabled-false
+=== RUN   TestMuseToolDenials/legacy-bash/disabled-true
+=== RUN   TestMuseToolDenials/web_fetch
+=== RUN   TestMuseToolDenials/web_fetch/disabled-false
+=== RUN   TestMuseToolDenials/web_fetch/disabled-true
+=== RUN   TestMuseToolDenials/add_memory
+=== RUN   TestMuseToolDenials/add_memory/disabled-false
+=== RUN   TestMuseToolDenials/add_memory/disabled-true
+=== RUN   TestMuseToolDenials/read_memory
+=== RUN   TestMuseToolDenials/read_memory/disabled-false
+=== RUN   TestMuseToolDenials/read_memory/disabled-true
+--- PASS: TestMuseToolDenials (55.85s)
+    --- PASS: TestMuseToolDenials/write_file (9.60s)
+        --- PASS: TestMuseToolDenials/write_file/disabled-false (4.83s)
+        --- PASS: TestMuseToolDenials/write_file/disabled-true (4.77s)
+    --- PASS: TestMuseToolDenials/edit_file (9.94s)
+        --- PASS: TestMuseToolDenials/edit_file/disabled-false (5.53s)
+        --- PASS: TestMuseToolDenials/edit_file/disabled-true (4.40s)
+    --- PASS: TestMuseToolDenials/bash (7.65s)
+        --- PASS: TestMuseToolDenials/bash/disabled-false (3.78s)
+        --- PASS: TestMuseToolDenials/bash/disabled-true (3.87s)
+    --- PASS: TestMuseToolDenials/legacy-bash (7.04s)
+        --- PASS: TestMuseToolDenials/legacy-bash/disabled-false (3.72s)
+        --- PASS: TestMuseToolDenials/legacy-bash/disabled-true (3.32s)
+    --- PASS: TestMuseToolDenials/web_fetch (7.84s)
+        --- PASS: TestMuseToolDenials/web_fetch/disabled-false (4.00s)
+        --- PASS: TestMuseToolDenials/web_fetch/disabled-true (3.83s)
+    --- PASS: TestMuseToolDenials/add_memory (6.66s)
+        --- PASS: TestMuseToolDenials/add_memory/disabled-false (3.42s)
+        --- PASS: TestMuseToolDenials/add_memory/disabled-true (3.24s)
+    --- PASS: TestMuseToolDenials/read_memory (7.11s)
+        --- PASS: TestMuseToolDenials/read_memory/disabled-false (3.97s)
+        --- PASS: TestMuseToolDenials/read_memory/disabled-true (3.13s)
+=== RUN   TestMuseMemoryConfigCandidate
+--- PASS: TestMuseMemoryConfigCandidate (0.45s)
+=== RUN   TestMuseMemoryReentry
+--- PASS: TestMuseMemoryReentry (5.66s)
+=== RUN   TestNativeIntrospection
+=== RUN   TestNativeIntrospection/muse
+=== RUN   TestNativeIntrospection/codex
+--- PASS: TestNativeIntrospection (4.99s)
+    --- PASS: TestNativeIntrospection/muse (3.84s)
+    --- PASS: TestNativeIntrospection/codex (1.15s)
+=== RUN   TestNestedSandboxControl
+--- PASS: TestNestedSandboxControl (0.81s)
+=== RUN   TestVerdictGate
+--- PASS: TestVerdictGate (0.00s)
+PASS
+ok  	github.com/relux-works/curator/.tmp/TASK-261027-pu2vvu/permissions-01/stage	112.830s

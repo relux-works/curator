@@ -1,0 +1,55 @@
+=== RUN   TestNarrowing
+=== RUN   TestNarrowing/memory-on
+    controls_test.go:100: caught intended assertion: memory canary escaped off gate
+=== RUN   TestNarrowing/muse-web-enabled
+    controls_test.go:100: caught intended assertion: Muse disabled web_fetch executed
+=== RUN   TestNarrowing/muse-tool-enabled
+    controls_test.go:100: caught intended assertion: Muse disabled write_file executed
+=== RUN   TestNarrowing/mcp-enabled
+    controls_test.go:100: caught intended assertion: disabled MCP tool executed
+=== RUN   TestNarrowing/mcp-prompt-auto
+    controls_test.go:100: caught intended assertion: disabled MCP tool executed
+=== RUN   TestNarrowing/dedicated-memory-on
+    controls_test.go:100: caught intended assertion: memory tool escaped off gate
+=== RUN   TestNarrowing/muse-edit-enabled
+    controls_test.go:100: caught intended assertion: Muse disabled edit_file executed
+=== RUN   TestNarrowing/muse-memory-write-enabled
+    controls_test.go:100: caught intended assertion: Muse disabled add_memory executed
+=== RUN   TestNarrowing/muse-shell-enabled
+    controls_test.go:100: caught intended assertion: Muse disabled legacy-bash executed
+=== RUN   TestNarrowing/nested-as-policy
+    controls_test.go:100: caught intended assertion: nested startup misattributed to manager denial
+=== RUN   TestNarrowing/request-attribution
+    controls_test.go:100: caught intended assertion: background request misattributed to main turn
+=== RUN   TestNarrowing/result-attribution
+    controls_test.go:100: caught intended assertion: tool-result attribution lost
+=== RUN   TestNarrowing/unknown-qualified
+    controls_test.go:100: caught intended assertion: false qualification
+=== RUN   TestNarrowing/collector-prompt
+    controls_test.go:100: caught intended assertion: native prompt leaked
+=== RUN   TestNarrowing/digest
+    controls_test.go:100: caught intended assertion: foreign digest did not refuse
+=== RUN   TestNarrowing/network
+    controls_test.go:100: caught intended assertion: unrelated loopback not denied
+=== RUN   TestNarrowing/keychains
+    controls_test.go:100: caught intended assertion: synthetic Keychains read not denied
+--- PASS: TestNarrowing (56.03s)
+    --- PASS: TestNarrowing/memory-on (3.26s)
+    --- PASS: TestNarrowing/muse-web-enabled (9.67s)
+    --- PASS: TestNarrowing/muse-tool-enabled (9.06s)
+    --- PASS: TestNarrowing/mcp-enabled (3.64s)
+    --- PASS: TestNarrowing/mcp-prompt-auto (3.00s)
+    --- PASS: TestNarrowing/dedicated-memory-on (4.26s)
+    --- PASS: TestNarrowing/muse-edit-enabled (6.20s)
+    --- PASS: TestNarrowing/muse-memory-write-enabled (8.16s)
+    --- PASS: TestNarrowing/muse-shell-enabled (6.48s)
+    --- PASS: TestNarrowing/nested-as-policy (0.01s)
+    --- PASS: TestNarrowing/request-attribution (0.01s)
+    --- PASS: TestNarrowing/result-attribution (0.01s)
+    --- PASS: TestNarrowing/unknown-qualified (0.01s)
+    --- PASS: TestNarrowing/collector-prompt (0.19s)
+    --- PASS: TestNarrowing/digest (0.54s)
+    --- PASS: TestNarrowing/network (0.47s)
+    --- PASS: TestNarrowing/keychains (1.06s)
+PASS
+ok  	github.com/relux-works/curator/.tmp/TASK-261027-pu2vvu/controls-01/stage	56.347s

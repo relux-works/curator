@@ -1,5 +1,11 @@
 # Unresolved questions
 
+- TASK-261026-5lvr34: Release maintainers must provision AUR `curator-bin`
+  publishing authorization and its CI SSH secret before a real stable release.
+  Script installation of the companion and honest provider version JSON remain
+  follow-up slices; bundling alone does not qualify or activate a provider.
+  [Release scope and gates](release/README.md).
+
 - TASK-261026-6b5ioc: Profile skill runtime needs a successor lock allocation
   and an explicit reconciliation boundary that preserves unrelated machine
   declarations. Enrollment readiness needs a skill-owned probe/report contract
