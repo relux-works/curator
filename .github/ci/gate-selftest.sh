@@ -989,6 +989,7 @@ echo '=== ci.yml: every test-gate lane pins its per-package timeout ==='
 # Every workflow lane must retain the selected deadline. The matrix expression
 # covers its Windows value explicitly; fixed-host and race lanes are pinned
 # separately. Adding a lane or changing a timeout requires updating these pins.
+# Include literal/folded run blocks, whose test command may follow HOME setup.
 gate_lane_records() {
 	awk '
 		/^  [a-z][a-z0-9-]*:[ \t\r]*$/ {
@@ -999,13 +1000,16 @@ gate_lane_records() {
 			step = $0
 			sub(/^      - name:[ \t]*/, "", step)
 			timeout = ""
+			in_run = 0
 		}
 		/^[ \t]*GO_TEST_TIMEOUT:/ {
 			timeout = $0
 			sub(/^[ \t]*GO_TEST_TIMEOUT:[ \t]*/, "", timeout)
 			sub(/[ \t\r]*$/, "", timeout)
 		}
-		/test-gate\.sh/ && /^[ \t]*run:/ {
+		/^        [a-z][a-z0-9-]*:/ { in_run = 0 }
+		/^        run:/ { in_run = 1 }
+		in_run && /test-gate\.sh/ && (/^        run:/ || /^          /) {
 			lane = job
 			if (job == "test" && step == "Windows go test + platform-case gate")
 				lane = "test-windows"
