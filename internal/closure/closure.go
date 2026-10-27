@@ -29,9 +29,11 @@ const ProjectEdge = "<project>"
 
 // Edge is one activation edge: who requires the node and how.
 type Edge struct {
-	Consumer string
-	Mode     string // full | runtime | context
-	Commands []string
+	ConsumerKind string
+	Ref          manifest.Ref
+	Consumer     string
+	Mode         string // full | runtime | context
+	Commands     []string
 }
 
 // Node is one resolved closure member.
@@ -123,6 +125,7 @@ func (n *Node) Consumers() []string {
 
 // Options carries the environment of a resolution run.
 type Options struct {
+	profileAcquire func(pending) (*Node, error)
 	SkillsRoot     string
 	Home           string // machine home for caches
 	AllowedSources []string
@@ -184,7 +187,11 @@ func buildQueue(opts Options, queue []pending, substitutions map[string]devsub.S
 			resolved := item.selected
 			if resolved == nil {
 				var err error
-				resolved, err = resolveNode(opts, item, substitutions, sharedRepositories)
+				if opts.profileAcquire != nil {
+					resolved, err = opts.profileAcquire(item)
+				} else {
+					resolved, err = resolveNode(opts, item, substitutions, sharedRepositories)
+				}
 				if err != nil {
 					return nil, err
 				}
@@ -210,9 +217,17 @@ func buildQueue(opts Options, queue []pending, substitutions map[string]devsub.S
 					source:        requirement.Name,
 					directory:     requirement.Directory,
 					selectPackage: node.Spec.SchemaVersion >= 9,
-					edge:          Edge{Consumer: item.name, Mode: requirement.Mode, Commands: requirement.Commands},
+					edge:          Edge{Consumer: item.name, ConsumerKind: "skill", Ref: manifest.Ref{Kind: requirement.RefKind, Value: requirement.RefValue}, Mode: requirement.Mode, Commands: requirement.Commands},
 					chain:         item.chain + " -> " + requirement.Name,
 				})
+			}
+		} else if opts.profileAcquire != nil {
+			other, err := opts.profileAcquire(item)
+			if err != nil {
+				return nil, err
+			}
+			if err := unifyProfile(node, other); err != nil {
+				return nil, err
 			}
 		} else if err := unify(node, item); err != nil {
 			if draft {
@@ -224,7 +239,7 @@ func buildQueue(opts Options, queue []pending, substitutions map[string]devsub.S
 		node.Chains = append(node.Chains, item.chain)
 	}
 
-	if err := validateRequirementCommands(nodes); err != nil {
+	if err := validateRequirementCommands(nodes); err != nil && opts.profileAcquire == nil {
 		return nil, err
 	}
 	return topologicalOrder(nodes)

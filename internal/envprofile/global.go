@@ -84,6 +84,10 @@ func globalSkillOperationWithOperation(home string, policy Policy, machine envre
 	if err != nil {
 		return Info{}, err
 	}
+	if oldLock.SchemaVersion == contextlock.SchemaVersion5 {
+		return Info{}, RefuseSkillPlanAdoption()
+	}
+
 	manager := newGitManager(home).withPolicy(policy)
 	if err := fetchLockedSources(manager, oldLock); err != nil {
 		return Info{}, err
@@ -279,6 +283,10 @@ func preflightManagedProfile(home, profile string, policy Policy, machine envreg
 	if err != nil {
 		return err
 	}
+	if lock.SchemaVersion == contextlock.SchemaVersion5 {
+		return RefuseSkillPlanAdoption()
+	}
+
 	precedence := policy.Precedence()
 	for _, adapter := range envregistry.Registry {
 		// Muse is managed-home-only and is provisioned by an explicit resolve.
