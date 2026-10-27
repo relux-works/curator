@@ -1,0 +1,3 @@
+# Adjacent Windows fixture agent boundary
+
+Primary pinned wmain_common.c sets SSH_AUTH_SOCK to the native default agent pipe if the variable is absent; pinned ssh-keygen.c sig_sign attempts an agent connection before private-file fallback. Therefore after enabling startup, an omitted socket would touch live agent discovery despite synthetic keys. Explicitly replace inherited socket input with a nonexistent absolute socket under the exclusive fixture root for signing children. Verifier already strips sockets and only verifies; no production change. Regression must prove caller socket is discarded and only the nonexistent fixture-owned path is supplied. This is isolation, not live environment propagation or a trust-policy change.

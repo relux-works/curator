@@ -1,0 +1,9 @@
+# Security rework claims before implementation
+
+Correct both findings on the existing signed source-provenance candidate. Preserve source-only versus release-tag trust, fixed repository/API/ref roots, containment before acceptance and unchanged original release trust bytes.
+
+R1-01: Both helpers must refuse real urllib/http.client newline-bearing synthetic Authorization header validation before any connect, with stable helper diagnostics and stderr, no credential fragment, header value or chained raw transport exception in formatted public failures. Other token-bearing OSError/URLError/ValueError failures must also refuse safely. Raise the stable failure outside the exception handler to discard raw exception chaining, while retaining the actual validation/error path. No live token is a test input. Real fixed-endpoint in-memory HTTP responses must succeed, and real redirects/error results must refuse. These are transport/state controls, not TLS/network qualification. Old exact candidate must fail the intended confidentiality assertion without printing synthetic sensitive material; paired valid responses prevent reject-all from passing.
+
+R1-02: Current main and open PR inventories show PR200 owns decision0033 and0034 is free. Rename only this later source-trust record to0034, heading/four documentation references and current PR publication text. Preserve foreign PR200 and all historical artifacts; recheck allocation before publication.
+
+Run only the three admitted named Python modules and tiny confidentiality detector controls in an allowlisted disposable environment. Retain old red evidence, exact PIDs, immutable new handover, sanitized board outcome/readback and real exact-head COMMENT. Preserve board status/assignee, PR198 stable checkout/index/untracked bytes, signatures and prior objects. No landing/closure/goal operation or hosted wait; independent successor review and all real hosted/native/main recovery gates remain pending.
