@@ -4,6 +4,7 @@ package testhomeguard
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -49,9 +50,8 @@ func start(inherited bool) (*Guard, error) {
 	}
 	homes[account.HomeDir] = true
 	for home := range homes {
-		add(filepath.Join(home, ".claude.json"))
-		for _, suffix := range []string{".claude", ".codex", ".config/opencode", ".config/muse", ".local/share/muse", ".pi", ".pi/agent", ".agents"} {
-			add(filepath.Join(home, filepath.FromSlash(suffix)))
+		for _, root := range nativeHomePaths(home) {
+			add(root)
 		}
 	}
 	if inherited {
@@ -81,6 +81,14 @@ func start(inherited bool) (*Guard, error) {
 	return g, nil
 }
 
+func nativeHomePaths(home string) []string {
+	var roots []string
+	for _, suffix := range []string{".claude", ".codex", ".config/opencode", ".config/muse", ".local/share/muse", ".pi", ".pi/agent", ".agents"} {
+		roots = append(roots, filepath.Join(home, filepath.FromSlash(suffix)))
+	}
+	return roots
+}
+
 // Finish fails the package on a changed identity, link, mode or context hash,
 // including when the tests otherwise pass. It owns no isolation directory.
 func (g *Guard) Finish(code int) int {
@@ -89,6 +97,9 @@ func (g *Guard) Finish(code int) int {
 		fmt.Fprintln(os.Stderr, "testhomeguard: protected native home unreadable")
 		code = 1
 	} else if !same(g.before, after) {
+		if err := recordChanges(g.roots, g.before, after); err != nil {
+			fmt.Fprintln(os.Stderr, "testhomeguard: cannot record changed-path metadata")
+		}
 		for _, root := range g.roots {
 			a, b := map[string]identity{}, map[string]identity{}
 			for path, v := range g.before {
@@ -150,11 +161,6 @@ func snapshot(roots []string) (map[string]identity, error) {
 			return nil, err
 		}
 		if i := out[root].info; i != nil && !i.IsDir() {
-			if i.Mode().IsRegular() && filepath.Base(root) == ".claude.json" {
-				if err := captureBounded(out, root, true, &bytes); err != nil {
-					return nil, err
-				}
-			}
 			continue // Observe a linked root itself without traversing its target.
 		}
 		for _, name := range files {
@@ -164,7 +170,7 @@ func snapshot(roots []string) (map[string]identity, error) {
 			}
 		}
 		for _, name := range []string{"skills", ".agent-environment-backup"} {
-			if err := captureTree(out, filepath.Join(root, name), 0, &bytes); err != nil {
+			if err := captureTree(out, root, filepath.Join(root, name), 0, &bytes); err != nil {
 				return nil, err
 			}
 		}
@@ -202,9 +208,12 @@ func captureBounded(out map[string]identity, path string, hash bool, bytes *int6
 	return nil
 }
 
-func captureTree(out map[string]identity, path string, depth int, bytes *int64) error {
+func captureTree(out map[string]identity, root, path string, depth int, bytes *int64) error {
 	if depth > maxDepth {
 		return fmt.Errorf("native snapshot depth bound exceeded")
+	}
+	if runtimeSkillMetadata(root, path) {
+		return nil
 	}
 	if err := captureBounded(out, path, !credential(filepath.Base(path)), bytes); err != nil {
 		return err
@@ -234,8 +243,80 @@ func captureTree(out map[string]identity, path string, depth int, bytes *int64) 
 		return fmt.Errorf("skill directory entry bound exceeded")
 	}
 	for _, e := range entries {
-		if err := captureTree(out, filepath.Join(path, e.Name()), depth+1, bytes); err != nil {
+		if err := captureTree(out, root, filepath.Join(path, e.Name()), depth+1, bytes); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// The session skill projector updates these two coordination files, not skill
+// payloads. Exclude only this exact depth; nested manifests and SKILL.md remain
+// protected, as do every file in ordinary copied skill trees and env backups.
+func runtimeSkillMetadata(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	return len(parts) == 4 && parts[0] == "skills" && parts[1] == "synced" &&
+		(parts[3] == "manifest.json" || parts[3] == ".last-complete-round")
+}
+
+// Optional private JSONL evidence contains paths and lstat/link metadata only.
+// Content and content hashes never enter it. Public stderr keeps fingerprints.
+func recordChanges(roots []string, before, after map[string]identity) error {
+	dir := os.Getenv("CURATOR_TEST_HOME_GUARD_REPORT")
+	if dir == "" {
+		return nil
+	}
+	dir, err := filepath.EvalSymlinks(dir)
+	if err != nil || !filepath.IsAbs(dir) {
+		return fmt.Errorf("private report directory unavailable")
+	}
+	for _, root := range roots {
+		canonical, err := filepath.EvalSymlinks(root)
+		if err != nil {
+			canonical = root
+		}
+		rel, err := filepath.Rel(canonical, dir)
+		if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("private report directory overlaps protected home")
+		}
+	}
+	// Exclusive creation avoids following an existing report symlink/hardlink.
+	f, err := os.CreateTemp(dir, "changed-*.jsonl")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	metadata := func(v identity) any {
+		if v.info == nil {
+			return nil
+		}
+		return map[string]any{"mode": v.info.Mode().String(), "size": v.info.Size(), "mtime": v.info.ModTime(), "identity": fmt.Sprint(v.info.Sys()), "link": v.link}
+	}
+	paths := map[string]bool{}
+	for p := range before {
+		paths[p] = true
+	}
+	for p := range after {
+		paths[p] = true
+	}
+	keys := make([]string, 0, len(paths))
+	for p := range paths {
+		keys = append(keys, p)
+	}
+	sort.Strings(keys)
+	for _, p := range keys {
+		if !same(map[string]identity{p: before[p]}, map[string]identity{p: after[p]}) {
+			raw, err := json.Marshal(map[string]any{"path": p, "before": metadata(before[p]), "after": metadata(after[p]), "observer_pid": os.Getpid()})
+			if err != nil {
+				return err
+			}
+			if _, err := f.Write(append(raw, '\n')); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

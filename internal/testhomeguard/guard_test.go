@@ -1,9 +1,11 @@
 package testhomeguard
 
 import (
+	"encoding/json"
 	"github.com/relux-works/curator/internal/testgitenv"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -164,5 +166,148 @@ func TestSnapshotIdentity(t *testing.T) {
 				t.Fatalf("snapshot equality = %v, want %v", !wantSame, wantSame)
 			}
 		})
+	}
+}
+
+// Root runtime churn and the two exact session-projector metadata leaves are
+// ignored. Profile payloads at adjacent and deeper paths still fail with an
+// equal-size/restored-mtime content mutation, including manifests and backups.
+func TestRuntimeChurnAndRenderedPayloads(t *testing.T) {
+	root := t.TempDir()
+	protected := []string{"settings.json", ".claude.json", ".agent-environment.json", ".agent-environment-backup/settings.json", "skills/copied/manifest.json", "skills/synced/fixture/SKILL.md", "skills/synced/fixture/nested/manifest.json"}
+	write := func(name, body string) {
+		t.Helper()
+		path := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range protected {
+		write(name, "before")
+	}
+	before, err := snapshot([]string{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// These are native-root runtime names, never exclusions inside skill payloads.
+	for _, name := range []string{"sessions/event", "history/event", "history.jsonl", "sqlite/state", "state_5.sqlite", "state_5.sqlite-wal", "state_5.sqlite-shm", "models_cache/event", "models_cache.json", "global-state/event", "global-state.json", ".global-state.json", "shell-snapshots/event", "todos/event", "statsig/event", "backups/event", "logs/event", "projects/event", "skills/synced/fixture/manifest.json", "skills/synced/fixture/.last-complete-round"} {
+		write(name, "runtime")
+	}
+	after, err := snapshot([]string{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !same(before, after) {
+		t.Fatal("runtime-only churn changed protected image")
+	}
+	for _, name := range protected {
+		t.Run(name, func(t *testing.T) {
+			before, err := snapshot([]string{root})
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(root, filepath.FromSlash(name))
+			info, err := os.Stat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			write(name, "after!")
+			if err := os.Chtimes(path, info.ModTime(), info.ModTime()); err != nil {
+				t.Fatal(err)
+			}
+			after, err := snapshot([]string{root})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if same(before, after) {
+				t.Fatal("rendered payload mutation was excluded")
+			}
+		})
+	}
+}
+
+// The optional private report names the exact diff and lstat metadata without
+// recording protected contents or their hashes. Unchanged images stay empty.
+func TestPrivateChangedPathReport(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "settings.json")
+	if err := os.WriteFile(path, []byte("before-payload"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	before, err := snapshot([]string{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := t.TempDir()
+	t.Setenv("CURATOR_TEST_HOME_GUARD_REPORT", report)
+	g := &Guard{roots: []string{root}, before: before}
+	if g.Finish(0) != 0 {
+		t.Fatal("unchanged control failed")
+	}
+	if entries, err := os.ReadDir(report); err != nil || len(entries) != 0 {
+		t.Fatal("unchanged control wrote a diff")
+	}
+	if err := os.WriteFile(path, []byte("after--payload"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if g.Finish(0) != 1 {
+		t.Fatal("rendered write admitted")
+	}
+	entries, err := os.ReadDir(report)
+	if err != nil || len(entries) != 1 {
+		t.Fatal("private report missing")
+	}
+	raw, err := os.ReadFile(filepath.Join(report, entries[0].Name()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row map[string]any
+	if err := json.Unmarshal(raw, &row); err != nil {
+		t.Fatal(err)
+	}
+	if row["path"] != path || row["before"] == nil || row["after"] == nil {
+		t.Fatal("exact metadata diff missing")
+	}
+	for _, forbidden := range []string{"before-payload", "after--payload", "hash"} {
+		if strings.Contains(string(raw), forbidden) {
+			t.Fatal("report disclosed content identity")
+		}
+	}
+}
+
+// Account-level Claude runtime state is outside the managed-home footprint;
+// a native context write inside that footprint still changes its image.
+func TestAccountRuntimeOutsideManagedHomes(t *testing.T) {
+	home := t.TempDir()
+	roots := nativeHomePaths(home)
+	before, err := snapshot(roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".claude.json"), []byte("runtime"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	after, err := snapshot(roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !same(before, after) {
+		t.Fatal("account runtime state protected")
+	}
+	if err := os.MkdirAll(filepath.Join(home, ".claude"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".claude", "CLAUDE.md"), []byte("profile"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	after, err = snapshot(roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if same(before, after) {
+		t.Fatal("native context write omitted")
 	}
 }

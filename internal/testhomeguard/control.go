@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -19,7 +20,7 @@ const controlOrigin = "CURATOR_TEST_NATIVE_GUARD_ORIGIN"
 // the plant never selects the OS account home. The paired isolated write passes.
 func Control(t *testing.T, childTest string, childEnv ...string) {
 	t.Helper()
-	for _, mode := range []string{"isolated", "plant", "settings", "skill-copy", "env-state", "panic", "exit", "panic-clean", "exit-clean"} {
+	for _, mode := range []string{"isolated", "plant", "settings", "skill-copy", "synced-skill", "env-state", "panic", "exit", "panic-clean", "exit-clean", "forged", "forged-overflow", "overflow"} {
 		t.Run(mode, func(t *testing.T) {
 			origin := t.TempDir()
 			if err := os.WriteFile(filepath.Join(origin, "guard-fixture"), []byte("synthetic origin"), 0600); err != nil {
@@ -27,12 +28,23 @@ func Control(t *testing.T, childTest string, childEnv ...string) {
 			}
 			// Existing decoys make settings/copied-skill controls discriminate
 			// the old shallow snapshot: no parent or skill-entry identity changes.
-			for _, name := range []string{"CLAUDE.md", "settings.json", ".agent-environment.json", "skills/copied/nested/SKILL.md"} {
+			for _, name := range []string{"CLAUDE.md", "settings.json", ".agent-environment.json", "skills/copied/nested/SKILL.md", "skills/synced/fixture/SKILL.md"} {
 				path := filepath.Join(origin, ".claude", filepath.FromSlash(name))
 				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 					t.Fatal(err)
 				}
 				if err := os.WriteFile(path, []byte(strings.Repeat("b", len("synthetic native context witness"))), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if mode == "overflow" || mode == "forged-overflow" {
+				f, err := os.OpenFile(filepath.Join(origin, ".claude", "CLAUDE.md"), os.O_WRONLY, 0600)
+				if err != nil {
+					t.Fatal(err)
+				}
+				err = f.Truncate(maxFileBytes + 1)
+				_ = f.Close()
+				if err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -42,14 +54,28 @@ func Control(t *testing.T, childTest string, childEnv ...string) {
 			for _, entry := range os.Environ() {
 				key, _, _ := strings.Cut(entry, "=")
 				switch key {
-				case "HOME", "USERPROFILE", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", controlMode, controlOrigin:
+				case "HOME", "USERPROFILE", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", controlMode, controlOrigin, supervisorPID, observerAddress, observerKey:
 					continue
 				}
 				cmd.Env = append(cmd.Env, entry)
 			}
 			cmd.Env = append(cmd.Env, "HOME="+origin, "USERPROFILE="+origin, "XDG_CONFIG_HOME="+filepath.Join(origin, ".config"), controlMode+"="+mode, controlOrigin+"="+origin)
 			cmd.Env = append(cmd.Env, childEnv...)
+			if strings.HasPrefix(mode, "forged") {
+				cmd.Env = append(cmd.Env, supervisorPID+"="+strconv.Itoa(os.Getpid()))
+			}
 			out, err := cmd.CombinedOutput()
+			if strings.HasPrefix(mode, "forged") || mode == "overflow" {
+				want := "live observer handoff required"
+				if mode == "overflow" {
+					want = "cannot establish protected preimage"
+				}
+				exit, ok := err.(*exec.ExitError)
+				if !ok || exit.ExitCode() != 2 || !bytes.Contains(out, []byte(want)) || bytes.Contains(out, []byte("synthetic child reached")) {
+					t.Fatalf("pre-test refusal missing: %v\n%s", err, out)
+				}
+				return
+			}
 			if mode != "isolated" && mode != "panic-clean" && mode != "exit-clean" {
 				exit, ok := err.(*exec.ExitError)
 				if !ok || exit.ExitCode() != 1 || !bytes.Contains(out, []byte(Changed+" ["+fingerprint(filepath.Join(origin, ".claude"))+"]")) || !bytes.Contains(out, []byte("synthetic "+mode+" plant completed")) {
@@ -91,6 +117,7 @@ func Child(t *testing.T, resolve func() (string, error)) {
 	if mode == "" {
 		return
 	}
+	t.Log("synthetic child reached")
 	origin := os.Getenv(controlOrigin)
 	marker, err := os.ReadFile(filepath.Join(origin, "guard-fixture"))
 	if err != nil || string(marker) != "synthetic origin" {
@@ -132,6 +159,8 @@ func Child(t *testing.T, resolve func() (string, error)) {
 			name = "settings.json"
 		case "skill-copy":
 			name = "skills/copied/nested/SKILL.md"
+		case "synced-skill":
+			name = "skills/synced/fixture/SKILL.md"
 		case "env-state":
 			name = ".agent-environment.json"
 		}
