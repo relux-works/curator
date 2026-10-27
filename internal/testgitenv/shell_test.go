@@ -39,14 +39,20 @@ test -n "$MAIN_COMMIT" && test -n "$TOPIC_COMMIT" && test "$MAIN_COMMIT" != "$TO
 test "$FAIL" -eq 0 || exit 3
 printf 'ancestry fixture completed\n'
 `
-	cases := []string{"clean", "repository", "storage", "config-count", "config-parameters", "config-global"}
+	cases := []string{"clean", "repository", "storage", "config-count", "config-parameters", "config-global", "GIT_TRACE", "GIT_TRACE_SETUP", "GIT_TRACE2_EVENT"}
 	for _, mode := range cases {
 		t.Run(mode, func(t *testing.T) {
 			decoy := newDecoy(t)
+			trace := filepath.Join(decoy, "trace.log")
+			if err := os.WriteFile(trace, []byte("external sentinel\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
 			before := decoyImage(t, decoy)
 			cmd := exec.Command("bash", "-c", prefix, script)
 			cmd.Env = append(os.Environ(), "SSH_AUTH_SOCK="+filepath.Join(decoy, "absent-agent"))
 			switch mode {
+			case "GIT_TRACE", "GIT_TRACE_SETUP", "GIT_TRACE2_EVENT":
+				cmd.Env = append(cmd.Env, mode+"="+trace)
 			case "repository":
 				cmd.Env = append(cmd.Env, "GIT_DIR="+filepath.Join(decoy, ".git"), "GIT_WORK_TREE="+decoy, "GIT_INDEX_FILE="+filepath.Join(decoy, ".git", "index"))
 			case "storage":
@@ -88,13 +94,23 @@ for key do
 done
 case "$HOME:$XDG_CONFIG_HOME:$GIT_CONFIG_GLOBAL:$TMPDIR:$TMP:$TEMP" in /*:/*:/*:/*:/*:/*) ;; *) exit 4 ;; esac
 test "$GIT_CONFIG_NOSYSTEM" = 1 && test ! -s "$GIT_CONFIG_GLOBAL" || exit 5
+# Explicit fixture-local tracing must still work after inherited keys are gone.
+GIT_TRACE="$HOME/fixture.trace"
+export GIT_TRACE
+git init -q "$HOME/repository" || exit 6
+test -s "$GIT_TRACE" && grep -q 'built-in: git init' "$GIT_TRACE" || exit 7
 printf 'shell boundary isolated\n'
 `, "_", script)
 	cmd.Args = append(cmd.Args, repositorySelectors...)
 	cmd.Args = append(cmd.Args, nativeRootOverrides...)
 	cmd.Args = append(cmd.Args, "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_KEY_41", "GIT_CONFIG_VALUE_41", "SSH_AUTH_SOCK")
+	probeKeys := gitPrefixProbeKeys(t)
+	cmd.Args = append(cmd.Args, probeKeys...)
 	cmd.Dir = t.TempDir()
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_COUNT=42", "GIT_CONFIG_PARAMETERS=poison", "GIT_CONFIG_KEY_41=poison", "GIT_CONFIG_VALUE_41=poison", "SSH_AUTH_SOCK=absent")
+	for _, key := range probeKeys {
+		cmd.Env = append(cmd.Env, key+"=poison")
+	}
 	for _, key := range repositorySelectors {
 		cmd.Env = append(cmd.Env, key+"=poison")
 	}

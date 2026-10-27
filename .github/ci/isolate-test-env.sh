@@ -18,12 +18,7 @@ isolate_test_env() {
 	for key in $(compgen -e); do
 		upper="$(printf '%s' "$key" | tr '[:lower:]' '[:upper:]')"
 		case "$upper" in
-			GIT_CONFIG*|GIT_DIR|GIT_WORK_TREE|GIT_INDEX_FILE|GIT_COMMON_DIR|GIT_OBJECT_DIRECTORY|\
-			GIT_ALTERNATE_OBJECT_DIRECTORIES|GIT_NAMESPACE|GIT_TEMPLATE_DIR|GIT_CEILING_DIRECTORIES|\
-			GIT_DISCOVERY_ACROSS_FILESYSTEM|GIT_IMPLICIT_WORK_TREE|GIT_GRAFT_FILE|GIT_SHALLOW_FILE|\
-			GIT_NO_REPLACE_OBJECTS|GIT_REPLACE_REF_BASE|GIT_PREFIX|GIT_QUARANTINE_PATH|\
-			GIT_REFERENCE_BACKEND|GIT_DEFAULT_HASH|GIT_DEFAULT_REF_FORMAT|\
-			SSH_AUTH_SOCK|HOME|XDG_CONFIG_HOME|CODEX_HOME|CLAUDE_CONFIG_DIR|PI_CODING_AGENT_DIR|\
+			GIT_*|SSH_AUTH_SOCK|SSH_ASKPASS|HOME|XDG_CONFIG_HOME|CODEX_HOME|CLAUDE_CONFIG_DIR|PI_CODING_AGENT_DIR|\
 			XDG_DATA_HOME|XDG_STATE_HOME|XDG_CACHE_HOME)
 				unset "$key" || return 2 ;;
 			USERPROFILE)
@@ -33,7 +28,9 @@ isolate_test_env() {
 	(umask 077; mkdir "$root/home" "$root/xdg" "$root/tmp" && : >"$root/gitconfig") || return 2
 	HOME="$root/home"
 	XDG_CONFIG_HOME="$root/xdg"
+	# Git allowlist: use only the fixture-owned empty global config.
 	GIT_CONFIG_GLOBAL="$root/gitconfig"
+	# Do not read host system Git configuration or its helpers.
 	GIT_CONFIG_NOSYSTEM=1
 	TMPDIR="$root/tmp"
 	TMP="$TMPDIR"

@@ -595,7 +595,7 @@ Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 Test packages that create or drive scratch Git repositories call the neutral
 `internal/testgitenv.Isolate` helper from `TestMain`, before `m.Run`. It removes
-inherited repository, index, config and ceiling selectors and `SSH_AUTH_SOCK`,
+every inherited `GIT_*` variable, `SSH_AUTH_SOCK` and `SSH_ASKPASS`,
 uses an empty global Git config with system config disabled, and pins HOME and
 XDG_CONFIG_HOME to disposable directories (also USERPROFILE on Windows).
 It clears inherited CODEX_HOME, CLAUDE_CONFIG_DIR, PI_CODING_AGENT_DIR and
@@ -607,12 +607,14 @@ home-preservation regressions, or `go test ./...` for the full suite.
 directories; its permission walk never follows symlinks or chmods regular
 files. Optional logs belong under `.temp/`.
 
-The repository selector inventory also clears common/object/alternate storage,
-namespace, template, graft/shallow/replace-ref paths, discovery/worktree hints,
-quarantine and reference backend selectors. It covers the installed Git's
-`rev-parse --local-env-vars` list; Git configuration count/parameter/indexed
-channels are cleared dynamically. The source inventory is `git(1)` (Environment
-Variables), `git-init(1)` (templates), and that Git-reported local list.
+The prefix rule covers repository/storage selectors, tracing destinations,
+attribute/index overrides, SSH commands and unknown future `GIT_*` names.
+Only two Git variables are reintroduced: `GIT_CONFIG_GLOBAL` selects the owned
+empty file, and `GIT_CONFIG_NOSYSTEM=1` disables host system configuration.
+Fixture-local overrides, including explicit `GIT_TRACE`, still work after entry.
+The independent regression inputs include random unknown names and actual
+external trace sentinels. Git's `rev-parse --local-env-vars` is checked as a
+reported subset, not treated as a complete environment inventory.
 Scratch roots are absolute physical paths (`Abs` and `EvalSymlinks`) before
 HOME, config or cleanup paths are derived. TMPDIR/TMP/TEMP are normalized too,
 so a later cwd change cannot redirect a temporary fixture; cleanup restores
@@ -623,9 +625,10 @@ Standalone `.github/ci/gate-selftest.sh` sources
 shell equivalent of the same boundary, scoped to the disposable gate process;
 the caller owns its scratch directory and cleanup. Run
 `bash .github/ci/gate-selftest.sh` for gate checks. The helper suite replays the
-actual ancestry prefix with hostile repository/storage and signing channels,
-compares every disposable decoy file, and checks shell/Go selector parity.
+actual ancestry prefix with hostile repository/storage, signing and trace
+channels, compares every disposable decoy file, and checks shell/Go prefix
+parity plus fixture-local tracing.
 `TestPhysicalTemporaryRoots` covers absolute, relative `.tmp` and symlinked
 temporary roots plus cwd changes; a platform that cannot create a directory
-symlink reports that one control as skipped. These checks use synthetic data;
+symlink fails that control with an explicit error. These checks use synthetic data;
 they neither read live credentials nor operate on an operator repository.

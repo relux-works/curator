@@ -39,6 +39,7 @@ func TestIsolateEnvironmentAndHome(t *testing.T) {
 	// implementation must not also remove its assertion from the test.
 	inheritedKeys := []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_CONFIG", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0", "GIT_CONFIG_PARAMETERS", "GIT_CEILING_DIRECTORIES", "SSH_AUTH_SOCK"}
 	inheritedKeys = append(inheritedKeys, nativeRootOverrides...)
+	inheritedKeys = append(inheritedKeys, gitPrefixProbeKeys(t)...)
 	for _, key := range inheritedKeys {
 		t.Setenv(key, "poison")
 	}
@@ -71,6 +72,12 @@ func TestIsolateEnvironmentAndHome(t *testing.T) {
 				t.Errorf("inherited %s=%q", key, value)
 			}
 		}
+		for _, entry := range os.Environ() {
+			key, _, _ := strings.Cut(entry, "=")
+			if strings.HasPrefix(key, "GIT_") && key != "GIT_CONFIG_GLOBAL" && key != "GIT_CONFIG_NOSYSTEM" {
+				t.Errorf("Git variable outside the fixture allowlist: %s", key)
+			}
+		}
 		if config, err := os.ReadFile(os.Getenv("GIT_CONFIG_GLOBAL")); err != nil || len(config) != 0 || os.Getenv("GIT_CONFIG_NOSYSTEM") != "1" {
 			t.Fatalf("unsafe Git configuration: %q, %v", config, err)
 		}
@@ -84,7 +91,13 @@ func TestIsolateEnvironmentAndHome(t *testing.T) {
 		if err := os.WriteFile(native, []byte("fixture"), 0o600); err != nil {
 			t.Fatal(err)
 		}
+		if err := os.Setenv("GIT_FOO_BAR_CREATED_INSIDE", "fixture"); err != nil {
+			t.Fatal(err)
+		}
 	}()
+	if _, ok := os.LookupEnv("GIT_FOO_BAR_CREATED_INSIDE"); ok {
+		t.Error("cleanup retained a Git variable introduced inside the boundary")
+	}
 	for _, entry := range before {
 		key, value, _ := strings.Cut(entry, "=")
 		if got, ok := os.LookupEnv(key); !ok || got != value {

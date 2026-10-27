@@ -17,7 +17,7 @@ import (
 	"strings"
 )
 
-// Isolate scrubs inherited Git repository/config selectors and SSH_AUTH_SOCK,
+// Isolate scrubs every inherited GIT_* variable, SSH_AUTH_SOCK and SSH_ASKPASS,
 // pins HOME/XDG_CONFIG_HOME to private scratch directories, and installs an
 // empty global Git config with system config disabled. Native provider and
 // XDG data/state/cache root overrides are cleared too. Call before m.Run;
@@ -62,7 +62,14 @@ func Isolate() func() {
 		}
 	}
 	for key, value := range map[string]string{
-		"GIT_CONFIG_GLOBAL": path, "GIT_CONFIG_NOSYSTEM": "1",
+		// Git allowlist: use only the fixture-owned empty global config.
+		"GIT_CONFIG_GLOBAL": path,
+		// Do not read host system Git configuration or its helpers.
+		"GIT_CONFIG_NOSYSTEM": "1",
+	} {
+		mustEnv(os.Setenv(key, value))
+	}
+	for key, value := range map[string]string{
 		"HOME": home, "XDG_CONFIG_HOME": xdg,
 		"TMPDIR": base, "TMP": base, "TEMP": base,
 	} {
@@ -119,16 +126,11 @@ func managed(key string) bool {
 	if runtime.GOOS == "windows" && key == "USERPROFILE" {
 		return true
 	}
-	if strings.HasPrefix(key, "GIT_CONFIG") {
+	if strings.HasPrefix(key, "GIT_") {
 		return true
 	}
 	switch key {
-	case "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
-		"GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_TEMPLATE_DIR", "GIT_CEILING_DIRECTORIES",
-		"GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_IMPLICIT_WORK_TREE", "GIT_GRAFT_FILE", "GIT_SHALLOW_FILE",
-		"GIT_NO_REPLACE_OBJECTS", "GIT_REPLACE_REF_BASE", "GIT_PREFIX", "GIT_QUARANTINE_PATH",
-		"GIT_REFERENCE_BACKEND", "GIT_DEFAULT_HASH", "GIT_DEFAULT_REF_FORMAT",
-		"SSH_AUTH_SOCK", "HOME", "XDG_CONFIG_HOME", "TMPDIR", "TMP", "TEMP",
+	case "SSH_AUTH_SOCK", "SSH_ASKPASS", "HOME", "XDG_CONFIG_HOME", "TMPDIR", "TMP", "TEMP",
 		"CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME":
 		return true
 	}

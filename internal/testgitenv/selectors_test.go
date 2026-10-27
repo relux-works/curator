@@ -217,7 +217,7 @@ func TestPhysicalTemporaryRoots(t *testing.T) {
 			case "symlink":
 				selected = filepath.Join(root, "link")
 				if err := os.Symlink(tmp, selected); err != nil {
-					t.Skipf("directory symlink unavailable: %v", err)
+					t.Fatalf("directory symlink is required for this fixture control: %v", err)
 				}
 			}
 			report := filepath.Join(root, "home-report")
@@ -312,20 +312,22 @@ func envMap(env []string) map[string]string {
 	return result
 }
 
-// The installed Git's own repository-local inventory cannot silently grow
-// beyond the independent admission list and dynamic configuration channels.
+// Every name in Git's reported local subset is scrubbed. That subset is not
+// a complete inventory; unknown-name and trace probes cover the prefix rule.
 func TestInstalledGitSelectorInventory(t *testing.T) {
 	output := fixtureGit(t, t.TempDir(), "rev-parse", "--local-env-vars")
-	for _, key := range strings.Fields(string(output)) {
-		if strings.HasPrefix(key, "GIT_CONFIG") {
+	keys := strings.Fields(string(output))
+	for _, key := range keys {
+		t.Setenv(key, "inventory-poison")
+	}
+	cleanup := Isolate()
+	defer cleanup()
+	for _, key := range keys {
+		if key == "GIT_CONFIG_GLOBAL" || key == "GIT_CONFIG_NOSYSTEM" {
 			continue
 		}
-		found := false
-		for _, known := range repositorySelectors {
-			found = found || known == key
-		}
-		if !found {
-			t.Errorf("unqualified repository selector: %s", key)
+		if _, ok := os.LookupEnv(key); ok {
+			t.Errorf("Git-reported local variable survived: %s", key)
 		}
 	}
 }
