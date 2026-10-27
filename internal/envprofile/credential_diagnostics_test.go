@@ -22,7 +22,8 @@ func TestClaudeCredentialLinkDiagnostics(t *testing.T) {
 		warning bool
 	}{
 		{"healthy", CredentialLinkOK, false},
-		{"relative", CredentialLinkOK, false},
+		{"relative", CredentialLinkWrongTarget, false},
+		{"symlink-dotdot", CredentialLinkWrongTarget, false},
 		{"dangling", CredentialLinkDangling, true},
 		{"replaced", CredentialLinkReplaced, false},
 		{"wrong-target", CredentialLinkWrongTarget, false},
@@ -34,7 +35,8 @@ func TestClaudeCredentialLinkDiagnostics(t *testing.T) {
 			root := t.TempDir()
 			target := filepath.Join(root, "native", ".credentials.json")
 			full := filepath.Join(root, "managed", ".credentials.json")
-			for _, dir := range []string{filepath.Dir(target), filepath.Dir(full)} {
+			alt := filepath.Join(root, "other", ".credentials.json")
+			for _, dir := range []string{filepath.Dir(target), filepath.Dir(full), filepath.Join(root, "other", "subdir")} {
 				if err := os.MkdirAll(dir, 0o700); err != nil {
 					t.Fatal(err)
 				}
@@ -43,7 +45,6 @@ func TestClaudeCredentialLinkDiagnostics(t *testing.T) {
 			if err := os.WriteFile(target, []byte(payload), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			alt := filepath.Join(root, "other")
 			if err := os.WriteFile(alt, []byte("synthetic-other-payload"), 0o600); err != nil {
 				t.Fatal(err)
 			}
@@ -51,6 +52,12 @@ func TestClaudeCredentialLinkDiagnostics(t *testing.T) {
 			switch tc.name {
 			case "relative":
 				linkTarget = filepath.Join("..", "native", ".credentials.json")
+			case "symlink-dotdot":
+				if err := os.Symlink(filepath.Join(root, "other", "subdir"), filepath.Join(root, "native", "alias")); err != nil {
+					t.Fatal(err)
+				}
+				// Keep the raw traversal: filepath.Join would erase the witness.
+				linkTarget = filepath.Join(root, "native", "alias") + string(filepath.Separator) + ".." + string(filepath.Separator) + ".credentials.json"
 			case "wrong-target":
 				linkTarget = alt
 			case "dangling":
@@ -80,17 +87,48 @@ func TestClaudeCredentialLinkDiagnostics(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			unchanged := credentialPreimage(t, full, target, alt)
+			// Absolute and relative controls reach the expected inode. The
+			// Unix symlink/.. witness reaches another inode; on Windows only
+			// the exact raw-target refusal below is a portable claim.
+			if tc.name == "healthy" || tc.name == "relative" || tc.name == "symlink-dotdot" {
+				actual, err := os.Stat(full)
+				if err != nil {
+					t.Fatal(err)
+				}
+				expected, err := os.Stat(target)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if tc.name == "symlink-dotdot" && runtime.GOOS == "windows" {
+					t.Logf("host traversal identity matches expected: %t", os.SameFile(actual, expected))
+				} else if os.SameFile(actual, expected) != (tc.name != "symlink-dotdot") {
+					t.Fatal("fixture does not demonstrate the intended target identity")
+				}
+			}
+			unchanged := credentialPreimage(t, full, target, alt, filepath.Join(root, "native", "alias"))
 			req := ResolveRequest{}
-			if got := req.inspectCredentialLink(full, target); got != tc.want {
+			got := req.inspectCredentialLink(full, target)
+			unchanged()
+			if got != tc.want {
 				t.Fatalf("reason=%s, want %s", got, tc.want)
 			}
 			adapter, _ := envregistry.ByID(envregistry.ClaudeCode)
 			plan := &homePlan{adapter: adapter, homeDir: filepath.Dir(full)}
 			verdict := &verification{}
-			if !verdict.checkClaudeCredentialLink(&req, plan, ".credentials.json", target) {
-				t.Fatal("Claude credential link was not handled")
+			// Supply a synthetic Linux file-link policy to exercise the real
+			// verifier hook on every host without changing backend admission.
+			release := "unknown"
+			req.credentialRelease = &release
+			req.credentialPolicy = &credentialPolicyResolution{
+				environment: adapter.ID, release: release,
+				policy: &effectiveCredentialPolicy{
+					links:      map[string]string{".credentials.json": target},
+					strategies: map[string]string{".credentials.json": envregistry.StrategyFileLink},
+				},
 			}
+			entries := []envmarker.Passthrough{{Path: ".credentials.json", Strategy: envregistry.StrategyFileLink}}
+			verdict.checkPassthrough(&req, plan, &envmarker.Marker{Version: envmarker.VersionV1, Passthrough: &entries})
+			unchanged()
 			findings := strings.Join(append(verdict.reasons, verdict.warnings...), "; ")
 			if tc.want == CredentialLinkOK {
 				if findings != "" {
@@ -99,6 +137,9 @@ func TestClaudeCredentialLinkDiagnostics(t *testing.T) {
 			} else {
 				if !strings.Contains(findings, DiagCredentialLink) || !strings.Contains(findings, "reason="+string(tc.want)) {
 					t.Fatalf("missing typed reason: %s", findings)
+				}
+				if tc.want == CredentialLinkWrongTarget && !strings.Contains(findings, envregistry.DiagCredentialConflict) {
+					t.Fatalf("wrong target must retain the credential conflict refusal: %s", findings)
 				}
 				if tc.warning != (len(verdict.warnings) > 0) || tc.warning == (len(verdict.reasons) > 0) {
 					t.Fatalf("wrong warning/stale classification: %+v", verdict)

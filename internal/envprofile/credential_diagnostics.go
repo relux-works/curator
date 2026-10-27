@@ -61,11 +61,9 @@ func (req *ResolveRequest) inspectCredentialLink(full, target string) Credential
 	if link.Kind == stateread.KindAbsent {
 		return CredentialLinkMissing
 	}
-	got := link.Target
-	if !filepath.IsAbs(got) {
-		got = filepath.Join(filepath.Dir(full), got)
-	}
-	if filepath.Clean(got) != filepath.Clean(target) {
+	// Preserve the verifier's exact-target contract. Lexical normalization
+	// can erase symlink/.. traversal and cannot establish file identity.
+	if link.Target != target {
 		return CredentialLinkWrongTarget
 	}
 	metadata, err = stateread.Stat(full)
