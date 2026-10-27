@@ -12,6 +12,7 @@ import (
 // CredentialLinkReason describes file-link readiness, never token validity.
 type CredentialLinkReason string
 
+// Credential link reasons describe only the observed filesystem shape.
 const (
 	CredentialLinkOK          CredentialLinkReason = "ok"
 	CredentialLinkMissing     CredentialLinkReason = "missing"
@@ -26,11 +27,13 @@ const (
 // inspectCredentialLink performs metadata-only inspection. It never opens the
 // credential file, even when the link was replaced by a provider refresh.
 func (req *ResolveRequest) inspectCredentialLink(full, target string) CredentialLinkReason {
-	lstat := req.passthroughLstat
-	if lstat == nil {
-		lstat = os.Lstat
+	var metadata stateread.Metadata
+	var err error
+	if req.passthroughLstat == nil {
+		metadata, err = stateread.Lstat(full)
+	} else {
+		metadata, err = stateread.LstatWith(full, req.passthroughLstat)
 	}
-	metadata, err := stateread.LstatWith(full, lstat)
 	if err != nil || metadata.Kind == stateread.KindUnreadable {
 		return CredentialLinkUnreadable
 	}
@@ -46,11 +49,12 @@ func (req *ResolveRequest) inspectCredentialLink(full, target string) Credential
 	if metadata.Info.Mode()&os.ModeSymlink == 0 {
 		return CredentialLinkWrongShape
 	}
-	readlink := req.passthroughReadlink
-	if readlink == nil {
-		readlink = os.Readlink
+	var link stateread.Link
+	if req.passthroughReadlink == nil {
+		link, err = stateread.Readlink(full)
+	} else {
+		link, err = stateread.ReadlinkWith(full, req.passthroughReadlink)
 	}
-	link, err := stateread.ReadlinkWith(full, readlink)
 	if err != nil || link.Kind == stateread.KindUnreadable {
 		return CredentialLinkUnreadable
 	}
