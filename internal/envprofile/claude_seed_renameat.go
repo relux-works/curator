@@ -1,4 +1,4 @@
-//go:build darwin || (linux && !loong64 && !riscv64)
+//go:build linux && !loong64 && !riscv64
 
 package envprofile
 

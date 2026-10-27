@@ -570,6 +570,10 @@ remains pending; green regression tests do not authorize a new Muse build.
 
 Use `go build ./...` to compile and `go vet ./...` for static validation. Run `make lint` (golangci-lint) for repository lint; store local validation logs under `.temp/`. Run `sh scripts/remote-gate.sh` for the full hosted test and race suite; capture its output under `.temp/`. The gate signs and verifies its detached snapshot with the configured human identity; it leaves the working tree, branch and index unchanged. Go tests use temporary homes. Run `go test ./internal/envprofile/... ./cmd/curator/...` for focused environment validation. The preserve-lock vector family is pinned in `internal/envprofile/testdata/environments-repair-preserve-lock.json`; `CURATOR_PRESERVE_LOCK_VECTORS=/path/to/vectors.json go test ./internal/envprofile -run TestRepairPreserveLockVectors` runs its upstream counterpart.
 
+CI runs golangci-lint on Linux and native Darwin to check platform-specific APIs.
+To check Linux build selection locally on macOS, run `GOOS=linux make lint`;
+keep its output under `.temp/` alongside the native `make lint` log.
+
 Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envprofile ./internal/transaction -run 'Test(SkillProjectionRepairNoGap|SkillProjectionExchangeNarrowingMutant|Exchange)' -count=1`
 for deterministic projection reader, atomic exchange, crash recovery and narrowing
 controls on macOS/Linux. Other platforms retain their existing replacement path;
