@@ -176,7 +176,12 @@ func snapshot(roots []string) (map[string]identity, error) {
 func credential(name string) bool {
 	name = strings.ToLower(name)
 	return strings.Contains(name, "credential") || strings.Contains(name, "token") ||
-		strings.Contains(name, "secret") || name == "auth.json" || name == "oauth.json" ||
+		strings.Contains(name, "secret") || strings.Contains(name, "oauth") ||
+		strings.Contains(name, "auth.json") || name == "auth" ||
+		strings.HasPrefix(name, "auth-") || strings.HasPrefix(name, "auth_") ||
+		strings.HasPrefix(name, "auth.") || strings.HasPrefix(name, "id_rsa") ||
+		strings.HasPrefix(name, "id_ed25519") || strings.HasPrefix(name, "id_ecdsa") ||
+		name == ".netrc" || name == ".npmrc" || name == ".pypirc" || strings.HasPrefix(name, ".env") ||
 		strings.HasSuffix(name, ".key") || strings.HasSuffix(name, ".pem") ||
 		strings.HasSuffix(name, ".p12") || strings.HasSuffix(name, ".pfx")
 }

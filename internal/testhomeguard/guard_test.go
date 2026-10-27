@@ -8,6 +8,35 @@ import (
 	"time"
 )
 
+// Copied skill trees may contain credential carriers and their backup names.
+// They retain only metadata; an adjacent instruction file is actually hashed.
+func TestCredentialCarriersMetadataOnly(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "skills", "copied")
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	names := []string{"auth.json", "auth.json.previous", "oauth_creds.json", "auth-backup.json", "secret.txt", "id_ed25519", ".env.local", ".npmrc"}
+	for _, name := range append(names, "SKILL.md") {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("synthetic fixture"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	image, err := snapshot([]string{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range names {
+		v := image[filepath.Join(dir, name)]
+		if v.info == nil || v.hash != ([32]byte{}) {
+			t.Fatalf("credential carrier was not metadata-only: %s", name)
+		}
+	}
+	if image[filepath.Join(dir, "SKILL.md")].hash == ([32]byte{}) {
+		t.Fatal("instruction positive control was not hashed")
+	}
+}
+
 // F2: the neutral helper supplies the isolated HOME. Its retained provider
 // override must fail our pre-test check; clearing that synthetic override is
 // the valid runner control. No provider or native writer is called here.
