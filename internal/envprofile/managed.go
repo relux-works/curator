@@ -37,6 +37,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/mcpnative"
 	"github.com/relux-works/curator/internal/opaquescan"
 	"github.com/relux-works/curator/internal/pathboundary"
@@ -104,12 +105,14 @@ type ResolveRequest struct {
 	readOnly bool
 	// Capture remains a strict evidence-producing operation at every level.
 	strictStartupInput bool
-	Home               string
-	Profile            string
-	EnvID              string
-	LaunchDir          string
-	Machine            envregistry.MachineConfig
-	Repair             bool
+	// homeLeaseHeld borrows the acquisition already held by lease admission.
+	homeLeaseHeld *managerlock.Held
+	Home          string
+	Profile       string
+	EnvID         string
+	LaunchDir     string
+	Machine       envregistry.MachineConfig
+	Repair        bool
 	// PreserveLock refuses repair that changes the effective profile pin.
 	PreserveLock bool
 	// DryRun reports store rebuilds that a repair would perform without
@@ -1415,6 +1418,9 @@ func sameStoreTree(target, storeRoot string) bool {
 // removed; unrecorded files are preserved except the explicitly opted-in
 // Claude settings files, whose bytes survive permission repair.
 func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded map[string]bool, prior *envmarker.Marker, provisioned bool) (resultErr error) {
+	if err := homeLeaseGuardPlan(op, req, plan); err != nil {
+		return err
+	}
 	root := EnvRoot(req.Home)
 	homeRel, err := managedRelative(root, plan.homeDir)
 	if err != nil {
@@ -2941,6 +2947,11 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 			return nil, err
 		}
 	}
+	if !req.Repair {
+		if err := homeLeaseReadRequest(req); err != nil {
+			return nil, err
+		}
+	}
 	selection, err := req.Machine.CredentialStoreFor(req.Profile, adapter.ID)
 	if err != nil {
 		return nil, err
@@ -3292,9 +3303,12 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 	}
 	op, err := req.borrowedOperation, error(nil)
 	if op == nil {
-		op, err = beginOperationValidated(req.Home, validate, req.transactionOptions...)
+		op, err = beginOperationGuarded(req.Home, validate, homeLeaseProfileTargets(req.Home, req.Profile, req.EnvID), req.transactionOptions...)
 	} else {
 		err = validate()
+		if err == nil {
+			err = homeLeaseGuard(req.Home, op.lock, homeLeaseProfileTargets(req.Home, req.Profile, req.EnvID))
+		}
 	}
 	if err != nil {
 		return nil, err
@@ -3550,7 +3564,7 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		// A credential refusal is not a store failure: the repair
 		// stops with the refusal diagnostic itself (§10.4), not
 		// wrapped as environment_repair_failed.
-		if isCredentialRefusal(err) {
+		if isCredentialRefusal(err) || homeLeaseRefusal(err) {
 			return nil, err
 		}
 		return nil, fmt.Errorf("%s: %w", DiagRepairFailed, err)

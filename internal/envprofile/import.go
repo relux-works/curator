@@ -112,11 +112,17 @@ func Import(home string, options ImportOptions) (Info, bool, bool, error) {
 			return Info{}, false, false, err
 		}
 	}
-	op, err := beginOperationValidated(home, func() error {
+	name := options.As
+	if name == "" {
+		name = ImportProfileDefault
+	}
+	op, err := beginOperationSelected(home, func() error {
 		if !options.Use {
 			return nil
 		}
 		return requireAdapterRuntimes(home, "", "")
+	}, func() ([]string, error) {
+		return homeLeaseInstallTargets(home, InstallOptions{As: name, Use: options.Use})
 	})
 	if err != nil {
 		return Info{}, false, false, err

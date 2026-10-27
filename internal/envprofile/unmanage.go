@@ -90,7 +90,7 @@ func Unmanage(req UnmanageRequest) (*UnmanageResult, error) {
 		return nil, fmt.Errorf("secondary fixed-home target %q writes are deferred: unmanage does not touch target homes until surface writes are implemented", req.TargetID)
 	}
 
-	op, err := beginOperation(req.Home)
+	op, err := beginOperationSelected(req.Home, nil, func() ([]string, error) { return homeLeaseUnmanageTargets(req) })
 	if err != nil {
 		return nil, err
 	}
