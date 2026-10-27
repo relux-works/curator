@@ -338,7 +338,7 @@ var (
 	draftCLIHexRE       = regexp.MustCompile(`\b[0-9a-f]{64}\b|\b[0-9a-f]{40}\b`)
 	draftCLIBuildRepoRE = regexp.MustCompile(`curator-buildrepo-[0-9]+`)
 	draftCLISSHDirRE    = regexp.MustCompile(`curator-draft-ssh-[0-9]+`)
-	draftCLIGoBuildRE   = regexp.MustCompile(`go-build[0-9]+`)
+	draftCLIGoBuildRE   = regexp.MustCompile(`go-build[0-9]+([/\\])b[0-9]+([/\\])`)
 	draftCLITagSHARE    = regexp.MustCompile(`tag v1 [0-9a-f]+`)
 )
 
@@ -363,10 +363,34 @@ func normalizeDraftCLI(t *testing.T, root, value string) string {
 	}
 	value = draftCLIBuildRepoRE.ReplaceAllString(value, `curator-buildrepo-$$N`)
 	value = draftCLISSHDirRE.ReplaceAllString(value, `curator-draft-ssh-$$N`)
-	value = draftCLIGoBuildRE.ReplaceAllString(value, `go-build$$N`)
+	value = draftCLIGoBuildRE.ReplaceAllString(value, `go-build$$N${1}b$$N${2}`)
 	value = draftCLITagSHARE.ReplaceAllString(value, `tag v1 $$S`)
 	value = draftCLIHexRE.ReplaceAllString(value, `$$H`)
 	return value
+}
+
+// Go action indices vary with the package set. Normalize only the build path;
+// binary names and transport arguments must remain observable in the golden.
+func TestDraftCLIGoBuildNormalization(t *testing.T) {
+	root := t.TempDir()
+	for _, action := range []string{"b001", "b336", "b338"} {
+		for _, separator := range []string{"/", `\`} {
+			input := "go-build123" + separator + action + separator + "curator.test"
+			want := "go-build$N" + separator + "b$N" + separator + "curator.test"
+			if got := normalizeDraftCLI(t, root, input); got != want {
+				t.Errorf("normalize %q = %q, want %q", input, got, want)
+			}
+		}
+	}
+	for _, input := range []string{"b338/curator.test", "go-build123/broken/curator.test", "ssh://fixture.test/b338"} {
+		if got := normalizeDraftCLI(t, root, input); got != input {
+			t.Errorf("unrelated value changed: %q -> %q", input, got)
+		}
+	}
+	input := "go-build123/b338/other.test --upload-pack=custom-pack"
+	if got, want := normalizeDraftCLI(t, root, input), "go-build$N/b$N/other.test --upload-pack=custom-pack"; got != want {
+		t.Errorf("binary or transport arguments changed: got %q, want %q", got, want)
+	}
 }
 
 func draftCLIShellQuote(value string) string {
