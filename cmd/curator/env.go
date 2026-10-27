@@ -63,11 +63,11 @@ func (c cli) profileNativeHomeResolver() func(string) (string, error) {
 
 func (c cli) cmdEnv(args []string) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config | migrate | unmanage")
+		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config | migrate | unmanage | trust")
 		return exitUsage
 	}
 	if wantsHelp(args) {
-		_, _ = fmt.Fprint(c.stdout, "usage: curator env <resolve|status|config|migrate|unmanage> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
+		_, _ = fmt.Fprint(c.stdout, "usage: curator env <resolve|status|config|migrate|unmanage|trust> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
 		return exitOK
 	}
 	cfg, code := c.loadConfig()
@@ -75,6 +75,8 @@ func (c cli) cmdEnv(args []string) int {
 		return code
 	}
 	switch args[0] {
+	case "trust":
+		return c.cmdEnvTrust(cfg, args[1:])
 	case "resolve":
 		return c.cmdEnvResolve(cfg, args[1:])
 	case "status":

@@ -45,6 +45,7 @@ func TestCLIPathIsolation(t *testing.T) {
 	}
 	command := exec.Command(child, "-test.v", "-test.run=^(TestCLIPathIsolationChild|TestCLIStatusReportsLegacyPackageMarkerCurrent|TestDraftStatusReportsUpToDateThroughCLI|TestCuratorStatusProviderPostureAndCheck)$")
 	command.Env = append(os.Environ(), cliPathChild+"=1", cliPathPlant+"="+planted,
+		cliHelperHomes+"="+forwardCLIUnitHomes(t, map[string]string{"HOME": home, "USERPROFILE": home}),
 		"HOME="+home, "USERPROFILE="+home, "CURATOR_GLOBAL_USER_BIN=",
 		"PATH="+planted+string(os.PathListSeparator)+os.Getenv("PATH"))
 	output, err := command.CombinedOutput()
