@@ -56,6 +56,11 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
+	// An explicit system-policy path is required to exist by config.Load.
+	// Use a neutral fixture, rather than an absent override or host policy.
+	if err := os.WriteFile(filepath.Join(testHome, "system-config.json"), []byte("{\"schema_version\":1}\n"), 0o600); err != nil {
+		panic(err)
+	}
 	for key, value := range map[string]string{
 		"HOME": testHome, "USERPROFILE": testHome,
 		"CURATOR_CONFIG": filepath.Join(testHome, "config.json"), "CURATOR_SYSTEM_CONFIG": filepath.Join(testHome, "system-config.json"),

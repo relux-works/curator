@@ -98,21 +98,22 @@ func beginOperation(home string, options ...transaction.Option) (*operation, err
 
 // beginOperationValidated checks read-only inputs under the lock before journal
 // recovery can write. All mutations also validate manager-wide authority.
-func beginOperationValidated(home string, validate func() error, options ...transaction.Option) (*operation, error) {
+func beginOperationValidated(home string, validateInputs func() error, options ...transaction.Option) (*operation, error) {
 	if err := skillruntime.RefuseUnadmitted(home); err != nil {
 		return nil, err
 	}
-	return beginOperationChecked(home, validate, false, options...)
+	return beginOperationChecked(home, validateInputs, nil, options...)
 }
 
-func beginOperationAdmitted(home string, validate func() error) (*operation, error) {
-	if validate == nil {
+func beginOperationAdmitted(home string, revalidateAdmission func() error) (*operation, error) {
+	if revalidateAdmission == nil {
 		return nil, fmt.Errorf("profile_skill_routing_unproven: missing routing admission")
 	}
-	return beginOperationChecked(home, validate, true)
+	return beginOperationChecked(home, nil, revalidateAdmission)
 }
 
-func beginOperationChecked(home string, validate func() error, admitted bool, options ...transaction.Option) (*operation, error) {
+func beginOperationChecked(home string, validateInputs, revalidateAdmission func() error, options ...transaction.Option) (*operation, error) {
+	admitted := revalidateAdmission != nil
 	// Refuse before even creating mutation-lock state in an existing node home.
 	if err := envauthority.Validate(home); err != nil {
 		return nil, err
@@ -138,8 +139,17 @@ func beginOperationChecked(home string, validate func() error, admitted bool, op
 		_ = lock.Close()
 		return nil, err
 	}
-	if validate != nil {
-		if err := validate(); err != nil {
+	// Input snapshots may include transaction targets. Check them only before
+	// recovery: their own backup/install states are not external input drift.
+	// Publication plans freeze non-target inputs separately in ReadInputs.
+	if validateInputs != nil {
+		if err := validateInputs(); err != nil {
+			_ = lock.Close()
+			return nil, err
+		}
+	}
+	if revalidateAdmission != nil {
+		if err := revalidateAdmission(); err != nil {
 			_ = lock.Close()
 			return nil, err
 		}
@@ -152,8 +162,8 @@ func beginOperationChecked(home string, validate func() error, admitted bool, op
 				return err
 			}
 		}
-		if validate != nil {
-			if err := validate(); err != nil {
+		if revalidateAdmission != nil {
+			if err := revalidateAdmission(); err != nil {
 				return err
 			}
 		}
@@ -173,7 +183,7 @@ func beginOperationChecked(home string, validate func() error, admitted bool, op
 			_ = lock.Close()
 			return nil, fmt.Errorf("profile_skill_routing_unproven: isolated domain has project-lease state")
 		}
-		journalWitness = &routingHomeLock{underlying: lock, validate: validate}
+		journalWitness = &routingHomeLock{underlying: lock, validate: revalidateAdmission}
 		recovered, err = engine.RecoverWithOutcome(journalWitness)
 	} else {
 		recovered, err = projectlease.RecoverUnderLock(home, lock, engine)
