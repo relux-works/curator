@@ -228,6 +228,17 @@ func forwardCLIUnitHomes(t *testing.T, overrides map[string]string) string {
 		}
 		homes[key] = value
 	}
+	// These optional roots override HOME-based resolution. Only carry roots
+	// selected inside the isolated parent fixture; preserve unset vs empty.
+	for _, key := range []string{"CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
+		value, present := overrides[key]
+		if !present {
+			value, present = os.LookupEnv(key)
+		}
+		if present {
+			homes[key] = value
+		}
+	}
 	data, err := json.Marshal(homes)
 	if err != nil {
 		t.Fatal(err)
@@ -251,11 +262,15 @@ func cliUnitHomes() (map[string]string, error) {
 	if err := json.Unmarshal([]byte(os.Getenv(cliHelperHomes)), &homes); err != nil {
 		return nil, err
 	}
-	if len(homes) != 3 {
-		return nil, errors.New("missing explicit fixture homes")
+	for _, key := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME"} {
+		if _, present := homes[key]; !present {
+			return nil, errors.New("missing explicit fixture homes")
+		}
 	}
 	for key := range homes {
-		if key != "HOME" && key != "USERPROFILE" && key != "XDG_CONFIG_HOME" {
+		switch key {
+		case "HOME", "USERPROFILE", "XDG_CONFIG_HOME", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME":
+		default:
 			return nil, fmt.Errorf("unexpected fixture home key %q", key)
 		}
 	}

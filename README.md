@@ -598,6 +598,8 @@ Test packages that create or drive scratch Git repositories call the neutral
 inherited repository, index, config and ceiling selectors and `SSH_AUTH_SOCK`,
 uses an empty global Git config with system config disabled, and pins HOME and
 XDG_CONFIG_HOME to disposable directories (also USERPROFILE on Windows).
+It clears inherited CODEX_HOME, CLAUDE_CONFIG_DIR, PI_CODING_AGENT_DIR and
+XDG_DATA_HOME/XDG_STATE_HOME/XDG_CACHE_HOME so they cannot bypass HOME pinning.
 Tests can still set explicit fixture configuration inside that boundary.
 Run `go test -count=1 ./internal/testgitenv` for real hostile-repository and
 home-preservation regressions, or `go test ./...` for the full suite.

@@ -18,7 +18,8 @@ import (
 
 // Isolate scrubs inherited Git repository/config selectors and SSH_AUTH_SOCK,
 // pins HOME/XDG_CONFIG_HOME to private scratch directories, and installs an
-// empty global Git config with system config disabled. Call before m.Run;
+// empty global Git config with system config disabled. Native provider and
+// XDG data/state/cache root overrides are cleared too. Call before m.Run;
 // deliberate per-test overrides remain possible. Cleanup restores the caller's
 // managed variables and removes the scratch home. Setup failures fail closed.
 func Isolate() func() {
@@ -84,7 +85,8 @@ func managed(key string) bool {
 		return true
 	}
 	switch key {
-	case "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_CEILING_DIRECTORIES", "SSH_AUTH_SOCK", "HOME", "XDG_CONFIG_HOME":
+	case "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_CEILING_DIRECTORIES", "SSH_AUTH_SOCK", "HOME", "XDG_CONFIG_HOME",
+		"CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME":
 		return true
 	}
 	return false

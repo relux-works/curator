@@ -9,6 +9,11 @@ import (
 	"testing"
 )
 
+var nativeRootOverrides = []string{
+	"CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR",
+	"XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME",
+}
+
 func TestMain(m *testing.M) {
 	cleanup := Isolate()
 	code := m.Run()
@@ -33,6 +38,7 @@ func TestIsolateEnvironmentAndHome(t *testing.T) {
 	// This acceptance list is independent of managed: omitting a key from the
 	// implementation must not also remove its assertion from the test.
 	inheritedKeys := []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_CONFIG", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0", "GIT_CONFIG_PARAMETERS", "GIT_CEILING_DIRECTORIES", "SSH_AUTH_SOCK"}
+	inheritedKeys = append(inheritedKeys, nativeRootOverrides...)
 	for _, key := range inheritedKeys {
 		t.Setenv(key, "poison")
 	}
@@ -123,6 +129,9 @@ func TestFixtureLeavesHostileRepositoryUntouched(t *testing.T) {
 		"GIT_INDEX_FILE="+filepath.Join(decoy, ".git", "index"),
 		"GIT_CEILING_DIRECTORIES="+root, "SSH_AUTH_SOCK="+filepath.Join(root, "agent"),
 		"GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=fixture.injected", "GIT_CONFIG_VALUE_0=hostile")
+	for _, key := range nativeRootOverrides {
+		cmd.Env = append(cmd.Env, key+"="+filepath.Join(root, "operator-native-home"))
+	}
 	output, childErr := cmd.CombinedOutput()
 	after := snapshot()
 	for i, label := range []string{"refs", "config", "objects"} {
@@ -140,6 +149,11 @@ func TestFixtureLeavesHostileRepositoryUntouched(t *testing.T) {
 func TestScratchFixtureChild(t *testing.T) {
 	if os.Getenv("CURATOR_TEST_HOSTILE_FIXTURE") != "1" {
 		return
+	}
+	for _, key := range nativeRootOverrides {
+		if _, exists := os.LookupEnv(key); exists {
+			t.Errorf("inherited native root %s bypassed HOME isolation", key)
+		}
 	}
 	fixture := t.TempDir()
 	fixtureGit(t, fixture, "init", "-q")
