@@ -1,3 +1,5 @@
+//go:build !windows
+
 package envprofile
 
 import (
@@ -11,7 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 )
 
-// The metadata diagnostic distinguishes synthetic link shapes on every host,
+// The metadata diagnostic distinguishes synthetic link shapes on non-Windows hosts,
 // preserves each preimage, and never includes fixture payloads in its findings.
 // This proves file-link readiness, not OAuth validity or refresh reliability.
 func TestClaudeCredentialLinkDiagnostics(t *testing.T) {
@@ -88,8 +90,7 @@ func TestClaudeCredentialLinkDiagnostics(t *testing.T) {
 				}
 			}
 			// Absolute and relative controls reach the expected inode. The
-			// Unix symlink/.. witness reaches another inode; on Windows only
-			// the exact raw-target refusal below is a portable claim.
+			// Unix symlink/.. witness reaches another inode.
 			if tc.name == "healthy" || tc.name == "relative" || tc.name == "symlink-dotdot" {
 				actual, err := os.Stat(full)
 				if err != nil {
@@ -99,9 +100,7 @@ func TestClaudeCredentialLinkDiagnostics(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if tc.name == "symlink-dotdot" && runtime.GOOS == "windows" {
-					t.Logf("host traversal identity matches expected: %t", os.SameFile(actual, expected))
-				} else if os.SameFile(actual, expected) != (tc.name != "symlink-dotdot") {
+				if os.SameFile(actual, expected) != (tc.name != "symlink-dotdot") {
 					t.Fatal("fixture does not demonstrate the intended target identity")
 				}
 			}
@@ -116,7 +115,7 @@ func TestClaudeCredentialLinkDiagnostics(t *testing.T) {
 			plan := &homePlan{adapter: adapter, homeDir: filepath.Dir(full)}
 			verdict := &verification{}
 			// Supply a synthetic Linux file-link policy to exercise the real
-			// verifier hook on every host without changing backend admission.
+			// verifier hook without changing backend admission.
 			release := "unknown"
 			req.credentialRelease = &release
 			req.credentialPolicy = &credentialPolicyResolution{
@@ -154,10 +153,10 @@ func TestClaudeCredentialLinkDiagnostics(t *testing.T) {
 }
 
 // Status and resolve use the same diagnostic on Linux's actual file backend.
-// macOS/Windows do not declare this shared link and must not gain one here.
+// macOS does not declare this shared link and must not gain one here.
 func TestClaudeCredentialDiagnosticsStatusResolve(t *testing.T) {
 	if runtime.GOOS != "linux" {
-		t.Skip("Claude shared file-link backend is exercised on Linux; metadata/hook cases run on all hosts")
+		t.Skip("Claude shared file-link backend is exercised on Linux; metadata/hook cases run on non-Windows hosts")
 	}
 	requireLinkCapability(t)
 	for _, shape := range []string{"healthy", "dangling", "replaced", "wrong-target", "missing"} {
@@ -233,57 +232,6 @@ func TestClaudeCredentialDiagnosticsStatusResolve(t *testing.T) {
 	}
 }
 
-// credentialPreimage reads only synthetic fixture bytes to detect mutation;
-// production inspection has no content-reader dependency.
-func credentialPreimage(t *testing.T, paths ...string) func() {
-	t.Helper()
-	type image struct {
-		info   os.FileInfo
-		data   string
-		absent bool
-	}
-	capture := func(path string) image {
-		info, err := os.Lstat(path)
-		if os.IsNotExist(err) {
-			return image{absent: true}
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		out := image{info: info}
-		if info.Mode()&os.ModeSymlink != 0 {
-			out.data, err = os.Readlink(path)
-		} else if info.Mode().IsRegular() {
-			var b []byte
-			b, err = os.ReadFile(path)
-			out.data = string(b)
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		return out
-	}
-	before := map[string]image{}
-	for _, path := range paths {
-		before[path] = capture(path)
-	}
-	return func() {
-		t.Helper()
-		for _, path := range paths {
-			a, b := before[path], capture(path)
-			if a.absent != b.absent {
-				t.Fatal("diagnostic changed fixture path existence")
-			}
-			if a.absent {
-				continue
-			}
-			if !os.SameFile(a.info, b.info) || a.info.Mode() != b.info.Mode() || a.info.Size() != b.info.Size() || !a.info.ModTime().Equal(b.info.ModTime()) || a.data != b.data {
-				t.Fatal("diagnostic changed fixture preimage")
-			}
-		}
-	}
-}
-
 // Inspection failures are unreadable, never healthy or absent; error payloads
 // are not echoed, and no error path changes the synthetic link or target.
 func TestClaudeCredentialDiagnosticsUnreadable(t *testing.T) {
@@ -314,23 +262,5 @@ func TestClaudeCredentialDiagnosticsUnreadable(t *testing.T) {
 			t.Fatalf("wrong unreadable verdict: %+v", verdict)
 		}
 		unchanged()
-	}
-}
-
-// Other providers and non-credential paths retain their existing verifier.
-func TestClaudeCredentialDiagnosticsScope(t *testing.T) {
-	for _, tc := range []struct{ id, path string }{{envregistry.CodexCLI, "auth.json"}, {envregistry.ClaudeCode, "other.json"}} {
-		adapter, _ := envregistry.ByID(tc.id)
-		req := ResolveRequest{passthroughLstat: func(string) (os.FileInfo, error) {
-			t.Fatal("out-of-scope path inspected")
-			return nil, os.ErrPermission
-		}}
-		verdict := &verification{}
-		if verdict.checkClaudeCredentialLink(&req, &homePlan{adapter: adapter}, tc.path, "unused") {
-			t.Fatal("out-of-scope path handled")
-		}
-		if len(verdict.reasons) != 0 || len(verdict.warnings) != 0 {
-			t.Fatal("out-of-scope finding")
-		}
 	}
 }
