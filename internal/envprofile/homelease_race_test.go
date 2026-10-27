@@ -82,7 +82,18 @@ func TestHomeLeaseRepairAcquireProcessRace(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmd := exec.CommandContext(ctx, exe, "-test.run=^TestHomeLeaseRaceProcess$", "-test.timeout=15s")
-	cmd.Env = append(os.Environ(), "CURATOR_TEST_HOME_LEASE_PROCESS=1")
+	// Native fixture paths travel in the closed stdin payload. The child is
+	// an ambient test process, so do not forward the parent's per-test provider
+	// overrides across the neutral helper's fresh process boundary.
+	for _, entry := range os.Environ() {
+		name, _, _ := strings.Cut(entry, "=")
+		switch name {
+		case "CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME":
+			continue
+		}
+		cmd.Env = append(cmd.Env, entry)
+	}
+	cmd.Env = append(cmd.Env, "CURATOR_TEST_HOME_LEASE_PROCESS=1")
 	cmd.Stdin = bytes.NewReader(raw)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
