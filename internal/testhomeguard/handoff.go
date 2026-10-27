@@ -65,7 +65,7 @@ func (o *liveObserver) authenticate(childPID int) error {
 	if err != nil {
 		return err
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	parts, err := readHandoff(c)
 	if err != nil || len(parts) != 3 || parts[0] != strconv.Itoa(childPID) || len(parts[1]) != 32 {
 		return fmt.Errorf("invalid handoff")
@@ -88,11 +88,11 @@ func verifyObserver() error {
 	if _, err := hex.DecodeString(key); err != nil {
 		return err
 	}
-	c, err := net.DialTimeout("tcp4", address, handoffTimeout)
+	c, err := net.DialTimeout("tcp4", address, handoffTimeout) // #nosec G704 -- Literal 127.0.0.1 host and valid port required above; no DNS or remote endpoint.
 	if err != nil {
 		return err
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	_ = c.SetDeadline(time.Now().Add(handoffTimeout))
 	challenge := randomChallenge(16)
 	tuple := strconv.Itoa(os.Getppid()) + "|" + strconv.Itoa(os.Getpid()) + "|" + challenge
