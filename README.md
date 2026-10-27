@@ -26,6 +26,8 @@ brew install --cask relux-works/tap/curator
 curl -fsSL https://raw.githubusercontent.com/relux-works/curator/main/install.sh | sh
 ```
 
+The installer first shows the version, destination, repository/docs links and verification plan in English or Russian, then asks for confirmation. Curator needs no sudo. Use `sh -s -- --plan` to preview only, or `sh -s -- --yes` (or `CURATOR_YES=1`) for automation. Confirmation uses `/dev/tty`; without a terminal, pass `--yes`. See [installer plan and confirmation](docs/installer-plan.md) for locale precedence, `NO_COLOR` and unchanged destination rules.
+
 The installer verifies the release's `checksums.txt` with GitHub artifact attestation when `gh attestation verify` is available, or with the release's keyless cosign signature when it is not. Both checks pin the Curator release workflow identity and GitHub Actions OIDC issuer. It then checks the downloaded archive's SHA-256 against the verified checksum file. Install the [GitHub CLI](https://cli.github.com/) or [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) before using the script; it refuses to install when neither verifier is available or verification fails.
 
 For an emergency only, `CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1` bypasses attestation, signature, and checksum verification. The installer prints a warning and installs the downloaded executable without integrity verification:
@@ -584,6 +586,8 @@ see [skill projection repair](docs/profile-skill-directories.md). Save logs unde
 PlantUML renders the agent-login diagrams. Run `plantuml -tsvg -nometadata diagrams/plantuml/agent-login-*.puml` to write SVG files beside their sources. The [agent login reference](docs/agent-logins.md) embeds these outputs.
 
 Lychee checks Markdown links. Run `lychee --offline --include-fragments --no-progress README.md docs/environment-config.md docs/agent-logins.md` for local targets and anchors, then `lychee --no-progress --timeout 30 docs/agent-logins.md` for the reference's external links. Store logs under `.temp/`. Run `git diff --check` for whitespace validation.
+
+POSIX installer tests use scratch prefixes and the standard `script` utility for PTY confirmation/colour checks. Run `env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS go test ./internal/install -run '^TestInstallScriptSecurityRows$' -count=1 -timeout=3m`; keep output under task-scoped `.temp/`. See [installer validation](docs/installer-plan.md#validation) for the verification and early-write controls.
 
 Managed Muse homes materialize monolithic root context at `config/muse/AGENTS.md`; `referenced` is refused. A profile without a context declaration writes no root file. Curator resolves the environment fragment; its external Muse `exec` consumer must add `--no-foreign-personal-context` exactly when the root target is materialized (environments §10.2). The v4 fragment carries the verified `root_context` fact, effective file agreement and mandatory `TBH_CREDENTIAL_BACKEND=file`; it carries no argv member. `env status` records the remaining discovery, `serve`, and workspace-precedence bounds.
 

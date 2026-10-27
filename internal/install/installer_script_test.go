@@ -38,6 +38,12 @@ type installScriptFixture struct {
 	duplicateChecksumEntry   bool
 	forceShasum              bool
 	skipVerification         bool
+	args                     []string
+	env                      map[string]string
+	tty                      bool
+	input                    string
+	fallbackDestination      bool
+	plantEarlyMutation       bool
 }
 
 type installScriptResult struct {
@@ -47,6 +53,9 @@ type installScriptResult struct {
 	ghCalls      string
 	cosignCalls  string
 	curlRequests string
+	mutations    string
+	changes      []string
+	installPath  string
 }
 
 func TestInstallScriptSecurityRows(t *testing.T) {
@@ -237,7 +246,9 @@ func TestInstallScriptSecurityRows(t *testing.T) {
 	for _, testRow := range rows {
 		testRow := testRow
 		if t.Run(testRow.name, func(t *testing.T) {
-			result := runInstallScriptFixture(t, testRow.fixture)
+			fixture := testRow.fixture
+			fixture.args = []string{"--yes"} // These rows exercise verification after consent.
+			result := runInstallScriptFixture(t, fixture)
 			if testRow.install {
 				if result.exitCode != 0 || !result.installed {
 					t.Fatalf("expected install: exit=%d installed=%t\n%s", result.exitCode, result.installed, result.output)
@@ -279,6 +290,7 @@ func TestInstallScriptSecurityRows(t *testing.T) {
 	if passed != expectedTotalRows {
 		t.Errorf("production-entry rows passed = %d/%d", passed, expectedTotalRows)
 	}
+	t.Run("localized_plan", testInstallScriptPlan)
 }
 
 func assertCosignPolicyArgs(t *testing.T, calls string) {
@@ -316,7 +328,14 @@ func runInstallScriptFixture(t *testing.T, fixture installScriptFixture) install
 	releaseDir := filepath.Join(root, "release")
 	toolDir := filepath.Join(root, "tools")
 	installDir := filepath.Join(root, "installed")
-	for _, dir := range []string{releaseDir, toolDir, installDir} {
+	requestedDir := installDir
+	dirs := []string{releaseDir, toolDir, installDir}
+	if fixture.fallbackDestination {
+		requestedDir = filepath.Join(root, "missing", "bin")
+		installDir = filepath.Join(root, "home", ".local", "bin")
+		dirs = []string{releaseDir, toolDir}
+	}
+	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -369,6 +388,22 @@ func runInstallScriptFixture(t *testing.T, fixture installScriptFixture) install
 		if _, err := exec.LookPath("shasum"); err != nil {
 			t.Fatalf("shasum is required for the macOS checksum fallback row: %v", err)
 		}
+	}
+	mutationLog := filepath.Join(root, "mutations.log")
+	for _, name := range []string{"mktemp", "mkdir", "install", "rm"} {
+		realPath, err := exec.LookPath(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Replace only this fixture's symlink, never its real utility target.
+		if err := os.Remove(filepath.Join(toolDir, name)); err != nil {
+			t.Fatal(err)
+		}
+		writeInstallerExecutable(t, filepath.Join(toolDir, name), fmt.Sprintf(`#!/bin/sh
+printf 'FIXTURE_MUTATION %s\n' >&2
+printf '%s\n' >> "$MUTATION_LOG"
+exec "%s" "$@"
+`, name, name, realPath))
 	}
 	writeInstallerExecutable(t, filepath.Join(toolDir, "uname"), `#!/bin/sh
 case "${1:-}" in
@@ -482,13 +517,40 @@ exit 0
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("/bin/sh", installerPath)
+	if fixture.plantEarlyMutation {
+		data, err := os.ReadFile(installerPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		installerPath = filepath.Join(root, "early-mutation.sh")
+		writeInstallerExecutable(t, installerPath, "#!/bin/sh\nmktemp -d\n"+string(data))
+	}
+	cmd := exec.Command("/bin/sh", append([]string{installerPath}, fixture.args...)...)
+	if fixture.tty {
+		script, err := exec.LookPath("script")
+		if err != nil {
+			t.Fatalf("PTY controls require the standard script utility: %v", err)
+		}
+		if runtime.GOOS == "darwin" {
+			cmd = exec.Command(script, append([]string{"-q", "/dev/null", "/bin/sh", installerPath}, fixture.args...)...)
+		} else {
+			command := `exec /bin/sh "$INSTALLER_SCRIPT"`
+			for _, arg := range fixture.args {
+				command += " '" + strings.ReplaceAll(arg, "'", "'\\''") + "'"
+			}
+			cmd = exec.Command(script, "-q", "-e", "-c", command, "/dev/null")
+		}
+	}
+	cmd.Stdin = strings.NewReader(fixture.input)
 	cmd.Env = []string{
 		"PATH=" + toolDir,
 		"HOME=" + filepath.Join(root, "home"),
 		"TMPDIR=" + root,
 		"CURATOR_VERSION=" + fixtureVersion,
-		"CURATOR_BIN_DIR=" + installDir,
+		"CURATOR_BIN_DIR=" + requestedDir,
+		"MUTATION_LOG=" + mutationLog,
+		"INSTALLER_SCRIPT=" + installerPath,
+		"SHELL=/bin/sh",
 		"FIXTURE_RELEASE_DIR=" + releaseDir,
 		"CURL_LOG=" + curlLog,
 		"GH_LOG=" + ghLog,
@@ -504,9 +566,20 @@ exit 0
 	if fixture.skipVerification {
 		cmd.Env = append(cmd.Env, "CURATOR_INSTALL_INSECURE_SKIP_VERIFY=1")
 	}
+	for key, value := range fixture.env {
+		cmd.Env = append(cmd.Env, key+"="+value)
+	}
 
-	output, runErr := cmd.CombinedOutput()
-	result := installScriptResult{output: string(output)}
+	before := installerFixtureTree(t, root, curlLog)
+	var output []byte
+	var runErr error
+	if fixture.tty {
+		cmd.Stdin = nil
+		output, runErr = runInstallerTTY(t, cmd, fixture.input)
+	} else {
+		output, runErr = cmd.CombinedOutput()
+	}
+	result := installScriptResult{output: string(output), installPath: filepath.Join(installDir, "curator")}
 	if runErr != nil {
 		var exitErr *exec.ExitError
 		if !errors.As(runErr, &exitErr) {
@@ -522,6 +595,8 @@ exit 0
 	result.ghCalls = readOptionalFixtureLog(t, ghLog)
 	result.cosignCalls = readOptionalFixtureLog(t, cosignLog)
 	result.curlRequests = readOptionalFixtureLog(t, curlLog)
+	result.mutations = readOptionalFixtureLog(t, mutationLog)
+	result.changes = installerFixtureChanges(before, installerFixtureTree(t, root, curlLog))
 	return result
 }
 
